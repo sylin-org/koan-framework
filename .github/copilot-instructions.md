@@ -1,8 +1,18 @@
-﻿You're helping to create a new framework, Sora. It's a modern, modular framework for building applications with a focus on simplicity and flexibility, inspired the old Zen framework.
+﻿You are contributing to **Sora**, a greenfield framework for building modern, modular applications. Sora emphasizes **simplicity** and **flexibility**, drawing inspiration from the legacy Zen framework.
 
-Always refer to the documentation under /docs for implementation guidelines. Update documentation as necessary to keep it current with decisions. Feedback (both positive and negative) is welcome and encouraged, especially regarding areas that may need clarification or improvement.
+#### Guidelines
 
-Look for opportunities to improve the framework and make it more user-friendly. Consider the needs of developers who will be using Sora and strive to create a seamless experience for them.
+* **Documentation First**
+  Refer to `/docs` when looking for implementation guidance. Keep documentation updated with new decisions to ensure accuracy and consistency.
 
-Prioritize clear documentation and intuitive design to help users understand and utilize the framework effectively.
+* **Clean Content**
+  At this stage, there's no need to keep stubs or support backward compatibility. Focus on delivering a polished and cohesive framework.
 
+* **Feedback & Collaboration**
+  Provide feedback—positive or critical—on areas that need clarification, improvement, or refinement. Collaboration is key to evolving the framework.
+
+* **Developer Experience**
+  Continuously look for opportunities to improve usability and make Sora more developer-friendly. Strive for a seamless experience that minimizes friction.
+
+* **Clarity & Design**
+  Prioritize clear documentation and intuitive design so developers can quickly understand, adopt, and extend Sora.

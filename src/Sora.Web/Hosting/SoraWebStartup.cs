@@ -115,7 +115,7 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                     });
                     app.UseEndpoints(endpoints =>
                     {
-                        // MVC controllers
+                        // MVC controllers handle all endpoints including health
                         endpoints.MapControllers();
 
                         // Optional lightweight health path (avoid conflict with controller default /api/health)
@@ -127,37 +127,6 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                                 await context.Response.WriteAsJsonAsync(new { status = "ok" });
                             });
                         }
-
-                        // Liveness: stays healthy unless process is failing hard
-                        endpoints.MapGet("/health/live", async context =>
-                        {
-                            context.Response.ContentType = "application/json";
-                            await context.Response.WriteAsJsonAsync(new { status = "healthy" });
-                        });
-
-                        // Readiness: aggregate contributors; unhealthy only if a critical dependency is unhealthy
-                        endpoints.MapGet("/health/ready", async context =>
-                        {
-                            var scopeFactory = context.RequestServices.GetRequiredService<IServiceScopeFactory>();
-                            using var scope = scopeFactory.CreateScope();
-                            var hs = scope.ServiceProvider.GetRequiredService<IHealthService>();
-                            var (overall, reports) = await hs.CheckAllAsync(context.RequestAborted);
-                            var payload = new
-                            {
-                                status = overall.ToString().ToLowerInvariant(),
-                                details = reports.Select(r => new
-                                {
-                                    name = r.Name,
-                                    state = r.State.ToString().ToLowerInvariant(),
-                                    description = r.Description,
-                                    data = r.Data
-                                })
-                            };
-                            if (overall == HealthState.Unhealthy)
-                                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-                            context.Response.ContentType = "application/json";
-                            await context.Response.WriteAsJsonAsync(payload);
-                        });
                     });
                 }
                 if (pipeline.UseRateLimiter)
