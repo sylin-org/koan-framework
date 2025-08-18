@@ -3,6 +3,7 @@ using Sora.Core;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sora.Data.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Sora.Data.Core;
 
@@ -70,7 +71,7 @@ internal sealed class SoraRuntime : ISoraRuntime
         // Warn in production if discovery is running (explicit registration still wins)
         var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
                   ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
-        if (string.Equals(env, "Production", StringComparison.OrdinalIgnoreCase))
+    if (string.Equals(env, "Production", StringComparison.OrdinalIgnoreCase))
         {
             // In isolated/containerized environments, downgrade the noise level.
             var inContainer = string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase);
@@ -83,6 +84,34 @@ internal sealed class SoraRuntime : ISoraRuntime
             }
             catch { /* ignore */ }
         }
+
+        // Bootstrap report: aggregate from ISoraAutoRegistrar implementations
+        try
+        {
+            var report = new Sora.Core.SoraBootstrapReport();
+            var envSvc = _sp.GetService<IHostEnvironment>();
+            var cfg = _sp.GetService<IConfiguration>();
+            var regs = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
+                .Where(t => !t.IsAbstract && typeof(Sora.Core.ISoraAutoRegistrar).IsAssignableFrom(t))
+                .Select(t => { try { return Activator.CreateInstance(t) as Sora.Core.ISoraAutoRegistrar; } catch { return null; } })
+                .Where(r => r is not null)
+                .ToList();
+            foreach (var r in regs!)
+            {
+                report.AddModule(r!.ModuleName, r.ModuleVersion);
+                r.Describe(report, cfg!, envSvc!);
+            }
+            var show = !string.Equals(env, "Production", StringComparison.OrdinalIgnoreCase);
+            var obs = _sp.GetService<Microsoft.Extensions.Options.IOptions<Sora.Core.Observability.ObservabilityOptions>>();
+            if (!show)
+                show = obs?.Value?.Enabled == true && obs.Value?.Traces?.Enabled == true; // signal that observability is on
+            if (show)
+            {
+                try { Console.Write(report.ToString()); } catch { }
+            }
+        }
+        catch { /* best-effort */ }
     }
     public void Start()
     {
