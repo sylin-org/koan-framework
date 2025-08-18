@@ -1,6 +1,6 @@
-## Release flow: bump, merge, tag, publish
+## Release flow: PR to main, auto-tag, publish
 
-Use the helper script to bump version, fast-forward `main` from `dev`, tag `vX.Y.Z`, and push. The tag triggers the NuGet publish workflow.
+Releases are driven by `version.json`. After a PR merges to `main`, GitHub Actions reads the version and creates the tag `vX.Y.Z` automatically. The tag triggers the NuGet publish workflow.
 
 ### Prerequisites
 - Clean working tree (no uncommitted changes).
@@ -8,37 +8,22 @@ Use the helper script to bump version, fast-forward `main` from `dev`, tag `vX.Y
 - `main` can fast-forward to `dev` (no extra commits on `main`).
 - Org/repo secret `NUGET_API_KEY` is set for nuget.org publishing.
 
-### Run the script (PowerShell)
+### How to release
 
-```powershell
-# From repo root
-# Bump Minor (auto +1), merge dev -> main (ff-only), tag vX.Y.Z, push
-pwsh -File ./scripts/versioning/release-from-dev.ps1 -Part Minor
+1) On `dev`, update `version.json` with the desired new version (semantic version).
+2) Open a PR from `dev` to `main` and merge (fast-forward preferred).
+3) The `tag-on-main` workflow will create an annotated tag `vX.Y.Z` on `main` if it does not already exist.
+4) The tag triggers `.github/workflows/nuget-release.yml` which packs and publishes to nuget.org.
 
-# Other options
-pwsh -File ./scripts/versioning/release-from-dev.ps1 -Part Major
-pwsh -File ./scripts/versioning/release-from-dev.ps1 -Part Patch
+What happens
+1) You update `version.json` on `dev` in a PR.
+2) After merge to `main`, `tag-on-main` creates `vX.Y.Z` on the merge commit.
+3) `nuget-release` (triggered by the tag) packs all libraries and meta packages and pushes to nuget.org.
 
-# Dry run (no pushes/tags)
-pwsh -File ./scripts/versioning/release-from-dev.ps1 -Part Minor -DryRun
-
-# PR-only mode (when main is protected and requires PRs)
-# Bumps version on dev and pushes; stops before touching main. Optionally opens a PR if GitHub CLI is installed.
-pwsh -File ./scripts/versioning/release-from-dev.ps1 -Part Minor -PrOnly -CreatePr
-```
-
-What it does
-1) Updates `version.json` by incrementing Major/Minor/Patch.
-2) Commits and pushes to `dev`.
-3) Checks out `main` and fast-forward merges from `dev`.
-4) Creates an annotated tag `vX.Y.Z` and pushes `main` and the tag.
-5) The tag triggers `.github/workflows/nuget-release.yml` which packs and publishes to nuget.org.
-
-PR-only variant (-PrOnly)
-1) Updates `version.json` and commits to `dev`, pushes `dev`.
-2) Does not checkout or push `main`, and does not create a tag.
-3) If `-CreatePr` is specified and GitHub CLI (`gh`) is available, it opens a PR: base `main`, head `dev`.
-4) After the PR merges (fast-forward), create the annotated tag `vX.Y.Z` on `main` and push the tag to trigger the publish workflow.
+Notes
+- Do not manually create tags in normal flow; let CI tag `main` from `version.json`.
+- If the tag already exists, the workflow skips tagging.
+- Ensure `NUGET_API_KEY` is configured for the repo/org.
 
 ### Troubleshooting
 - Fast-forward merge failed: `main` has commits not on `dev`. Re-align by reverting the extra commits or merge `main` into `dev`, then try again.
