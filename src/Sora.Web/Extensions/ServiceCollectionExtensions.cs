@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Newtonsoft.Json;
@@ -10,8 +12,15 @@ namespace Sora.Web;
 
 public static class ServiceCollectionExtensions
 {
+    // Marker to ensure AddSoraWeb runs once
+    private sealed class SoraWebMarker { }
+
     public static IServiceCollection AddSoraWeb(this IServiceCollection services)
     {
+        // Idempotence: if we've already wired Sora.Web, no-op
+        if (services.Any(d => d.ServiceType == typeof(SoraWebMarker))) return services;
+        services.TryAddSingleton<SoraWebMarker>();
+
         services.AddOptions<SoraWebOptions>();
         // Core web bits expected by Sora Web apps
         services.AddRouting();
@@ -94,14 +103,12 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection WithExceptionHandler(this IServiceCollection services)
     {
-        services.AddSoraWeb();
         services.Configure<WebPipelineOptions>(p => p.UseExceptionHandler = true);
         return services;
     }
 
     public static IServiceCollection WithRateLimit(this IServiceCollection services)
     {
-        services.AddSoraWeb();
         services.Configure<WebPipelineOptions>(p => p.UseRateLimiter = true);
         return services;
     }
@@ -109,8 +116,16 @@ public static class ServiceCollectionExtensions
     // Convenience toggle: mark app as proxied to skip security headers from Sora
     public static IServiceCollection AsProxiedApi(this IServiceCollection services)
     {
-        services.AddSoraWeb();
         services.Configure<SoraWebOptions>(o => o.IsProxiedApi = true);
         return services;
     }
+
+    // Correct spelling; prefer this going forward
+    public static IServiceCollection SuppressSecurityHeaders(this IServiceCollection services)
+        => services.AsProxiedApi();
+
+    // Back-compat alias (typo). Remove in a future major version.
+    [Obsolete("Use SuppressSecurityHeaders() instead.")]
+    public static IServiceCollection SupressSecurityHeaders(this IServiceCollection services)
+        => services.SuppressSecurityHeaders();
 }
