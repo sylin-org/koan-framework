@@ -85,9 +85,15 @@ jobs:
           $nugetVersion = & $nbgv get-version -v NuGetPackageVersion
           echo "NUGETVERSION=$nugetVersion" >> $env:GITHUB_OUTPUT
       - name: Pack all src projects (stable)
+        shell: pwsh
         run: |
-          pwsh -File ./.github/scripts/find-packable-csproj.ps1 > list.txt
-          Get-Content list.txt | ForEach-Object { dotnet pack $_ -c Release }
+          $list = & pwsh -NoProfile -ExecutionPolicy Bypass -File ./.github/scripts/find-packable-csproj.ps1
+          if (-not $list) { Write-Warning "No packable projects found by find-packable-csproj.ps1" }
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          foreach ($p in $list) {
+            Write-Host "Packing $p" -ForegroundColor Cyan
+            dotnet pack "$p" -c Release -o artifacts
+          }
       - name: Pack meta packages
         run: pwsh ./.github/scripts/pack-meta.ps1 -Version "${{ steps.nbgv.outputs.NUGETVERSION }}" -OutDir artifacts
       - name: Verify NUGET_API_KEY present
@@ -101,6 +107,9 @@ jobs:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           $source = "https://api.nuget.org/v3/index.json"
+          Write-Host "Listing nupkg candidates under artifacts and repo root:" -ForegroundColor Yellow
+          Get-ChildItem -Path artifacts -Filter *.nupkg -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+          Get-ChildItem -Path . -Filter *.nupkg -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
           $pkgs = Get-ChildItem -Recurse -Filter *.nupkg | Where-Object { $_.FullName -notlike "*.symbols.nupkg" }
           foreach ($p in $pkgs) {
             Write-Host "Pushing $($p.FullName)" -ForegroundColor Cyan
