@@ -38,7 +38,8 @@ public sealed class WellKnownController(
 
         var opts = obsOptions?.Value ?? new ObservabilityOptions();
         // Respect OTLP env vars if Options not configured
-        var otlpEndpoint = opts.Otlp.Endpoint ?? cfg["OTEL_EXPORTER_OTLP_ENDPOINT"];
+        var otlpEndpoint = opts.Otlp.Endpoint
+            ?? Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Endpoint, null);
 
         var payload = new
         {

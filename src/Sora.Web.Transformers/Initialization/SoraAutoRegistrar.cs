@@ -20,7 +20,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var enabled = cfg.GetValue<bool?>("Sora:Web:Transformers:AutoDiscover");
-        report.AddSetting("AutoDiscover", (enabled ?? true).ToString());
+    var enabled = Sora.Core.Configuration.Read(cfg, Sora.Web.Transformers.Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
+    report.AddSetting("AutoDiscover", enabled.ToString());
     }
 }

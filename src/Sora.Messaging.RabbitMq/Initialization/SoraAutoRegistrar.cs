@@ -19,7 +19,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var section = cfg.GetSection("Sora:Messaging:Buses:default:RabbitMq");
+    var section = cfg.GetSection($"{Sora.Messaging.Core.Infrastructure.Constants.Configuration.Buses}:default:RabbitMq");
         var exchange = section.GetValue<string?>("Exchange") ?? "sora";
         report.AddSetting("Exchange", exchange);
         var conn = section.GetValue<string?>("ConnectionString");

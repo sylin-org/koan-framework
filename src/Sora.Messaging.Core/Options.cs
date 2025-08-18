@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Sora.Messaging.Core.Infrastructure;
 
 namespace Sora.Messaging;
 
@@ -52,7 +53,7 @@ internal sealed class MessageBusSelector : IMessageBusSelector
             .ThenBy(f => f.ProviderName)
             .FirstOrDefault();
         if (selected is null) throw new InvalidOperationException("No messaging providers registered.");
-        var (bus, caps) = selected.Create(_sp, busCode, _cfg.GetSection($"Sora:Messaging:Buses:{busCode}"));
+    var (bus, caps) = selected.Create(_sp, busCode, _cfg.GetSection($"{Constants.Configuration.Buses}:{busCode}"));
     // Diagnostics are registered by providers when creating the bus
         return bus;
     }
@@ -62,7 +63,7 @@ public static class MessagingServiceCollectionExtensions
 {
     public static IServiceCollection AddMessagingCore(this IServiceCollection services)
     {
-        services.AddOptions<MessagingOptions>().BindConfiguration("Sora:Messaging");
+    services.AddOptions<MessagingOptions>().BindConfiguration(Constants.Configuration.Section);
         services.TryAddSingleton<IMessageBusSelector, MessageBusSelector>();
         services.TryAddSingleton<ITypeAliasRegistry, DefaultTypeAliasRegistry>();
     services.TryAddSingleton<IMessagingDiagnostics, MessagingDiagnostics>();

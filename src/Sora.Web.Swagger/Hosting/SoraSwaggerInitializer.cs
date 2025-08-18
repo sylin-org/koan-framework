@@ -35,8 +35,8 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
                 }
                 else if (env?.IsProduction() == true)
                 {
-                    enabled = cfg?.GetValue<bool?>("Sora__Web__Swagger__Enabled") == true
-                           || cfg?.GetValue<bool?>("Sora:AllowMagicInProduction") == true;
+                    enabled = Sora.Core.Configuration.Read(cfg, Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
+                  || Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
                 }
                 else
                 {
@@ -79,9 +79,9 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
     {
         var o = new SoraWebSwaggerOptions();
         try { cfg?.GetSection("Sora:Web:Swagger").Bind(o); } catch { }
-        var envEnabled = cfg?.GetValue<bool?>("Sora__Web__Swagger__Enabled");
+    var envEnabled = Sora.Core.Configuration.Read<bool?>(cfg, Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled);
         if (envEnabled.HasValue) o.Enabled = envEnabled;
-        var magic = cfg?.GetValue<bool?>("Sora:AllowMagicInProduction");
+    var magic = Sora.Core.Configuration.Read<bool?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
         if (magic == true) o.Enabled = true;
         return o;
     }

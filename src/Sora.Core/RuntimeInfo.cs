@@ -35,19 +35,25 @@ public static class SoraEnv
 
     private static Snapshot ComputeSnapshot(IConfiguration? cfg, IHostEnvironment? env)
     {
-        var envName = env?.EnvironmentName ?? cfg?["DOTNET_ENVIRONMENT"] ?? cfg?["ASPNETCORE_ENVIRONMENT"]
-                      ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
-                      ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
-                      ?? string.Empty;
+        var envName = env?.EnvironmentName
+            ?? Sora.Core.Configuration.ReadFirst(
+                cfg,
+                Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment,
+                Sora.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment
+            )
+            ?? string.Empty;
         bool isDev = env?.IsDevelopment() ?? string.Equals(envName, "Development", StringComparison.OrdinalIgnoreCase);
         bool isProd = env?.IsProduction() ?? string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase);
         bool isStg = env?.IsStaging() ?? string.Equals(envName, "Staging", StringComparison.OrdinalIgnoreCase);
-        bool inContainer = string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase)
-                        || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST"));
-        bool isCi = string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase)
-                 || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TF_BUILD"));
+    bool inContainer = Sora.Core.Configuration.Read(
+                cfg,
+                Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetRunningInContainer,
+                false)
+            || !string.IsNullOrEmpty(Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Env.KubernetesServiceHost, null));
+    bool isCi = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Env.Ci, false)
+                 || !string.IsNullOrEmpty(Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Env.TfBuild, null));
         // Read flag with precedence (env var overrides config) via SoraConfig
-        bool magic = Sora.Core.Configuration.SoraConfig.Read<bool>(
+    bool magic = Sora.Core.Configuration.Read(
             cfg,
             Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction,
             false

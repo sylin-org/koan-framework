@@ -41,28 +41,28 @@ public sealed class InboxDiscoveryPolicy : IInboxDiscoveryPolicy
     public bool ShouldDiscover(IServiceProvider sp)
     {
         var cfg = (IConfiguration)sp.GetService(typeof(IConfiguration))!;
-        var endpoint = cfg["Sora:Messaging:Inbox:Endpoint"];
+    var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
         if (!string.IsNullOrWhiteSpace(endpoint)) return false; // explicit config wins
 
-        var enabledSetting = cfg["Sora:Messaging:Discovery:Enabled"];
+    var enabledSetting = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery.Enabled, null);
         if (!string.IsNullOrWhiteSpace(enabledSetting))
             return string.Equals(enabledSetting, "true", StringComparison.OrdinalIgnoreCase);
 
         var isProd = IsProduction();
-        var magic = string.Equals(cfg["Sora:AllowMagicInProduction"] ?? "false", "true", StringComparison.OrdinalIgnoreCase);
+    var magic = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         return !isProd || magic;
     }
 
     public string Reason(IServiceProvider sp)
     {
         var cfg = (IConfiguration)sp.GetService(typeof(IConfiguration))!;
-        var endpoint = cfg["Sora:Messaging:Inbox:Endpoint"];
+    var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
         if (!string.IsNullOrWhiteSpace(endpoint)) return "explicit-endpoint";
-        var enabledSetting = cfg["Sora:Messaging:Discovery:Enabled"];
+    var enabledSetting = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery.Enabled, null);
         if (!string.IsNullOrWhiteSpace(enabledSetting))
             return string.Equals(enabledSetting, "true", StringComparison.OrdinalIgnoreCase) ? "enabled-explicit" : "disabled-explicit";
         var isProd = IsProduction();
-        var magic = string.Equals(cfg["Sora:AllowMagicInProduction"] ?? "false", "true", StringComparison.OrdinalIgnoreCase);
+    var magic = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         if (isProd && !magic) return "disabled-production-default";
         if (isProd && magic) return "enabled-magic";
         return "enabled-dev-default";
@@ -71,8 +71,7 @@ public sealed class InboxDiscoveryPolicy : IInboxDiscoveryPolicy
     private static bool IsProduction()
     {
     try { return SoraEnv.IsProduction; } catch { }
-        var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
-                  ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+    var env = Sora.Core.Configuration.ReadFirst(null, Sora.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment);
         return string.Equals(env, "Production", StringComparison.OrdinalIgnoreCase);
     }
 }

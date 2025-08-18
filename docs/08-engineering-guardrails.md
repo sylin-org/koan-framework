@@ -136,6 +136,11 @@ Options & configuration
 - Bind options once at startup with validation; inject as IOptions<T> (Singleton semantics) or IOptionsMonitor<T> when hot-reload is required.
 - Avoid IOptionsSnapshot (Scoped) unless absolutely necessary.
 
+### Naming: configuration helper and constants
+- Use `Sora.Core.Configuration.Read[...]` and `ReadFirst[...]` for config access. Avoid ad-hoc `cfg["..."]` and direct `Environment.GetEnvironmentVariable` reads.
+- Keep constant keys in canonical `:` form; the helper translates env/provider shapes internally.
+- Name the per-assembly constants class `Constants` and rely on namespaces for clarity (e.g., `Sora.Web.Swagger.Infrastructure.Constants`). Use using-aliases when multiple `Constants` are required in the same file.
+
 Heuristics (choose lifetime)
 1) Does it hold mutable state across calls? If yes, can it be internal and thread-safe? → Singleton; otherwise Transient.
 2) Does it need request-specific ambient data? Prefer parameter passing; only use Scoped if unavoidable.

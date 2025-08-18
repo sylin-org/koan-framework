@@ -188,8 +188,7 @@ public static class TransformerServiceCollectionExtensions
                 b.Bindings.Add(sp =>
                 {
                     var cfg = sp.GetService<IConfiguration>();
-                    var enabled = cfg?.GetValue<bool?>("Sora:Web:Transformers:AutoDiscover")
-                                   ?? true; // default on
+                    var enabled = Sora.Core.Configuration.Read(cfg, Sora.Web.Transformers.Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
                     if (!enabled) return;
 
                     var reg = sp.GetRequiredService<ITransformerRegistry>();

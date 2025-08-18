@@ -56,10 +56,10 @@ public static class AddSoraSwaggerExtensions
         {
             enabled = opts.Enabled.Value;
         }
-    else if (Sora.Core.SoraEnv.IsProduction)
+        else if (Sora.Core.SoraEnv.IsProduction)
         {
-            enabled = cfg.GetValue<bool?>("Sora__Web__Swagger__Enabled") == true ||
-              cfg.GetValue<bool?>("Sora:AllowMagicInProduction") == true;
+            enabled = Sora.Core.Configuration.Read(cfg, Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
+                  || Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         }
         else
         {
@@ -102,10 +102,10 @@ public static class AddSoraSwaggerExtensions
         var o = new SoraWebSwaggerOptions();
         cfg.GetSection("Sora:Web:Swagger").Bind(o);
     // also support Sora__Web__Swagger__Enabled env var
-        var envEnabled = cfg.GetValue<bool?>("Sora__Web__Swagger__Enabled");
+    var envEnabled = Sora.Core.Configuration.Read<bool?>(cfg, Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled);
         if (envEnabled.HasValue) o.Enabled = envEnabled;
     // magic flag unified across Sora
-    var magic = cfg.GetValue<bool?>("Sora:AllowMagicInProduction");
+    var magic = Sora.Core.Configuration.Read<bool?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
     if (magic == true) o.Enabled = true;
         return o;
     }

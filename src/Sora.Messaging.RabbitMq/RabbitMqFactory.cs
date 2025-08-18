@@ -265,8 +265,9 @@ public sealed class RabbitMqFactory : IMessageBusFactory
 
     // Determine effective provisioning default: true normally, false in Production unless Sora:AllowMagicInProduction = true
     bool isProd = false;
-    try { isProd = Sora.Core.SoraEnv.IsProduction; } catch { isProd = string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase); }
-    bool allowMagic = string.Equals((configRoot?["Sora:AllowMagicInProduction"] ?? "false"), "true", StringComparison.OrdinalIgnoreCase);
+    try { isProd = Sora.Core.SoraEnv.IsProduction; }
+    catch { isProd = string.Equals(Sora.Core.Configuration.ReadFirst(null, Sora.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment) ?? string.Empty, "Production", StringComparison.OrdinalIgnoreCase); }
+    bool allowMagic = Sora.Core.Configuration.Read(configRoot, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
     bool provisionExplicit = cfg["ProvisionOnStart"] is not null; // detect explicit config presence
     bool provisionEffective = provisionExplicit ? opts.ProvisionOnStart : (!isProd || allowMagic);
 
@@ -570,7 +571,7 @@ internal sealed class RabbitMqInboxDiscoveryClient : IInboxDiscoveryClient
     var disc = (IOptions<DiscoveryOptions>?)_sp.GetService(typeof(IOptions<DiscoveryOptions>));
         var opts = (IOptions<MessagingOptions>?)_sp.GetService(typeof(IOptions<MessagingOptions>));
         var busCode = opts?.Value.DefaultBus ?? "default";
-        var busSection = cfg?.GetSection($"Sora:Messaging:Buses:{busCode}");
+    var busSection = cfg?.GetSection($"Sora:Messaging:Buses:{busCode}");
         if (busSection is null) return null;
         var rOpts = new RabbitMqOptions();
         busSection.Bind(rOpts);
@@ -696,7 +697,7 @@ internal sealed class RabbitMqInboxDiscoveryInitializer : ISoraInitializer
         using var sp = services.BuildServiceProvider();
     var policy = sp.GetService(typeof(IInboxDiscoveryPolicy)) as IInboxDiscoveryPolicy;
         var cfg = sp.GetService(typeof(IConfiguration)) as IConfiguration;
-        var endpoint = cfg?["Sora:Messaging:Inbox:Endpoint"];
+    var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
         if (!string.IsNullOrWhiteSpace(endpoint)) return; // explicit wins
         if (policy is null || !policy.ShouldDiscover(sp))
         {

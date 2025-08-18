@@ -69,8 +69,9 @@ internal sealed class SoraRuntime : ISoraRuntime
         _ = _sp.GetService<IDataService>();
 
         // Warn in production if discovery is running (explicit registration still wins)
-        var env = Sora.Core.SoraEnv.EnvironmentName ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
-                  ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+    var env = Sora.Core.SoraEnv.EnvironmentName
+          ?? Sora.Core.Configuration.ReadFirst(null, Sora.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment)
+          ?? string.Empty;
         if (Sora.Core.SoraEnv.IsProduction)
         {
             // In isolated/containerized environments, downgrade the noise level.

@@ -12,7 +12,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddSoraObservability(this IServiceCollection services, Action<ObservabilityOptions>? configure = null)
     {
-        services.AddOptions<ObservabilityOptions>().BindConfiguration("Sora:Observability");
+    services.AddOptions<ObservabilityOptions>().BindConfiguration(Sora.Core.Infrastructure.Constants.Configuration.Observability.Section);
         if (configure is not null) services.Configure(configure);
 
         using var tmp = services.BuildServiceProvider();
@@ -21,8 +21,9 @@ public static class ServiceCollectionExtensions
         var opts = tmp.GetService<Microsoft.Extensions.Options.IOptions<ObservabilityOptions>>()?.Value ?? new ObservabilityOptions();
 
         var enabled = opts.Enabled;
-        var otlpEndpoint = opts.Otlp.Endpoint ?? cfg?["OTEL_EXPORTER_OTLP_ENDPOINT"];
-    if (string.IsNullOrWhiteSpace(otlpEndpoint) && (SoraEnv.IsProduction || env?.IsProduction() == true))
+        var otlpEndpoint = opts.Otlp.Endpoint
+            ?? Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Endpoint, null);
+        if (string.IsNullOrWhiteSpace(otlpEndpoint) && (SoraEnv.IsProduction || env?.IsProduction() == true))
         {
             enabled = false;
         }
@@ -50,7 +51,8 @@ public static class ServiceCollectionExtensions
                     b.AddOtlpExporter(o =>
                     {
                         o.Endpoint = new Uri(otlpEndpoint);
-                        var headers = opts.Otlp.Headers ?? cfg?["OTEL_EXPORTER_OTLP_HEADERS"];
+                        var headers = opts.Otlp.Headers
+                            ?? Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Headers, null);
                         if (!string.IsNullOrWhiteSpace(headers)) o.Headers = headers;
                     });
                 }
