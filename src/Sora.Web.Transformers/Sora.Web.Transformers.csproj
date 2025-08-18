@@ -3,6 +3,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+  <Description>HTTP payload transformers for Sora Web: flexible request/response shaping with auto-discovery.</Description>
+  <PackageTags>$(CommonPackageTags);web;transformers;middleware;http</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Web\Sora.Web.csproj" />

@@ -6,6 +6,8 @@
     <LangVersion>preview</LangVersion>
     <AssemblyName>Sora.Messaging.Core</AssemblyName>
     <RootNamespace>Sora.Messaging</RootNamespace>
+  <Description>Core messaging abstractions and helpers for Sora: bus configuration, auto-registration, and options binding.</Description>
+  <PackageTags>$(CommonPackageTags);messaging;bus;abstractions;options;configuration</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Messaging.Abstractions\Sora.Messaging.Abstractions.csproj" />

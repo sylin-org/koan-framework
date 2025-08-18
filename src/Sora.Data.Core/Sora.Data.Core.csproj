@@ -4,6 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+  <Description>Data core for Sora: repository primitives, options, and shared helpers for relational and document providers.</Description>
+  <PackageTags>$(CommonPackageTags);data;repository;abstractions;options</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

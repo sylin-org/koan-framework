@@ -5,19 +5,26 @@
     <!-- Suppress missing XML comment warnings to keep builds clean while docs evolve. -->
     <NoWarn>$(NoWarn);1591</NoWarn>
     <!-- CI-friendly builds (SourceLink, deterministic PDBs) -->
-    <ContinuousIntegrationBuild Condition="'$(ContinuousIntegrationBuild)' == ''">true</ContinuousIntegrationBuild>
+  <ContinuousIntegrationBuild Condition="'$(ContinuousIntegrationBuild)' == ''">true</ContinuousIntegrationBuild>
+  <!-- SourceLink/Repo metadata -->
+  <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  <EmbedUntrackedSources>true</EmbedUntrackedSources>
   <!-- NuGet package IDs: publish under Sylin.Sora.* while keeping code namespaces as Sora.* -->
   <PackageId Condition="'$(IsPackable)' == 'true' and '$(PackageId)' == ''">Sylin.$(AssemblyName)</PackageId>
   <!-- Common NuGet package metadata -->
   <Authors>Sylin Labs</Authors>
   <Company>Sylin Labs</Company>
-  <PackageProjectUrl>https://github.com/sylin-labs/sora-framework</PackageProjectUrl>
+  <PackageProjectUrl>https://github.com/sylin-labs/sora-framework/issues</PackageProjectUrl>
   <RepositoryUrl>https://github.com/sylin-labs/sora-framework.git</RepositoryUrl>
   <RepositoryType>git</RepositoryType>
   <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   <IncludeSymbols>true</IncludeSymbols>
   <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReadmeFile Condition="Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See release notes: https://github.com/sylin-labs/sora-framework/releases</PackageReleaseNotes>
+    <!-- Common tags; projects can append by using $(CommonPackageTags) in their PackageTags -->
+    <CommonPackageTags>sora;framework;modular;dotnet;aspnetcore;cqrs;ddd;messaging;data;opentelemetry</CommonPackageTags>
   </PropertyGroup>
   <ItemGroup>
     <!-- Unified versioning across the repo via Nerdbank.GitVersioning -->
@@ -25,4 +32,17 @@
   <!-- SourceLink for better debugging experience on NuGet -->
   <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Pack the repo README into each package root when present -->
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)README.md')" />
+    <!-- If you provide an icon.png at repo root, it will be packed and used automatically -->
+    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
+  <None Include="$(MSBuildThisFileDirectory)resources\image\0_2.jpg" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)resources\image\0_2.jpg')" />
+  </ItemGroup>
+  <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)icon.png')">
+    <PackageIcon>icon.png</PackageIcon>
+  </PropertyGroup>
+  <PropertyGroup Condition="!Exists('$(MSBuildThisFileDirectory)icon.png') and Exists('$(MSBuildThisFileDirectory)resources\\image\\0_2.jpg')">
+    <PackageIcon>0_2.jpg</PackageIcon>
+  </PropertyGroup>
 </Project>

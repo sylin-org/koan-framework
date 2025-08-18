@@ -4,6 +4,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <Description>Outbox implementation for Sora CQRS using MongoDB.</Description>
+  <PackageTags>$(CommonPackageTags);data;cqrs;outbox;mongodb</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Data.Cqrs\Sora.Data.Cqrs.csproj" />

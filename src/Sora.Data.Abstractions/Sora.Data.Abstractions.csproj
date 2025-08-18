@@ -4,6 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+  <Description>Data abstractions for Sora: repository contracts, entities, and filtering interfaces.</Description>
+  <PackageTags>$(CommonPackageTags);data;abstractions;repository;entities</PackageTags>
   </PropertyGroup>
 
 </Project>

@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Sora.Messaging.Inbox.Http</AssemblyName>
     <RootNamespace>Sora.Messaging.Inbox.Http</RootNamespace>
+  <Description>HTTP-based inbox store for Sora Messaging: simple and configurable receiver endpoint.</Description>
+  <PackageTags>$(CommonPackageTags);messaging;inbox;http</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Messaging.Abstractions\Sora.Messaging.Abstractions.csproj" />

@@ -4,6 +4,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <Description>CQRS utilities for Sora Data: query/command helpers and patterns.</Description>
+  <PackageTags>$(CommonPackageTags);data;cqrs;commands;queries</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
