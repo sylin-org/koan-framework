@@ -105,4 +105,12 @@ public static class ServiceCollectionExtensions
         services.Configure<WebPipelineOptions>(p => p.UseRateLimiter = true);
         return services;
     }
+
+    // Convenience toggle: mark app as proxied to skip security headers from Sora
+    public static IServiceCollection AsProxiedApi(this IServiceCollection services)
+    {
+        services.AddSoraWeb();
+        services.Configure<SoraWebOptions>(o => o.IsProxiedApi = true);
+        return services;
+    }
 }

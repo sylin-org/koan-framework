@@ -23,6 +23,12 @@ public sealed class SoraWebOptions
     // Apply a minimal set of secure response headers via middleware.
     public bool EnableSecureHeaders { get; set; } = true;
 
+    // If true, assumes the app sits behind a reverse proxy (e.g., nginx) that applies
+    // security headers. When set, Sora will omit emitting its own security headers
+    // to avoid duplicates and potential conflicts.
+    // Configure via: Sora:Web:IsProxiedApi=true (env: Sora__Web__IsProxiedApi=true)
+    public bool IsProxiedApi { get; set; } = false;
+
     // Optional Content-Security-Policy value. If null/empty, CSP is not set.
     // Example safe default for simple static content:
     // "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"

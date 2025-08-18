@@ -89,7 +89,7 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                     app.UseDefaultFiles();
                     app.UseStaticFiles();
                 }
-                if (opts.EnableSecureHeaders)
+                if (opts.EnableSecureHeaders && !opts.IsProxiedApi)
                 {
                     app.Use((ctx, next) =>
                     {
