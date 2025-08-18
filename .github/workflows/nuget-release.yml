@@ -23,6 +23,44 @@ jobs:
           dotnet-version: '9.0.x'
       - name: Install nuget.exe
         uses: nuget/setup-nuget@v2
+      - name: Generate icon.png (256x256) from resources/image/0_2.jpg
+        shell: pwsh
+        run: |
+          $srcPath = Join-Path $pwd 'resources/image/0_2.jpg'
+          if (Test-Path $srcPath) {
+            Add-Type -AssemblyName System.Drawing
+            $size = 256
+            $src = [System.Drawing.Image]::FromFile($srcPath)
+            try {
+              $bmp = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+              $gfx = [System.Drawing.Graphics]::FromImage($bmp)
+              try {
+                $gfx.Clear([System.Drawing.Color]::Transparent)
+                $gfx.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+                $gfx.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+                $gfx.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+                $ratioW = $size / $src.Width
+                $ratioH = $size / $src.Height
+                $ratio = [Math]::Min($ratioW, $ratioH)
+                $newW = [int]([Math]::Round($src.Width * $ratio))
+                $newH = [int]([Math]::Round($src.Height * $ratio))
+                $x = [int](($size - $newW) / 2)
+                $y = [int](($size - $newH) / 2)
+                $rect = New-Object System.Drawing.Rectangle($x, $y, $newW, $newH)
+                $gfx.DrawImage($src, $rect)
+              } finally {
+                $gfx.Dispose()
+              }
+              $outPath = Join-Path $pwd 'icon.png'
+              $bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
+              Write-Host "icon.png generated at $outPath"
+            } finally {
+              $bmp.Dispose()
+              $src.Dispose()
+            }
+          } else {
+            Write-Host "No resources/image/0_2.jpg found; skipping icon generation."
+          }
       - name: Restore
         shell: pwsh
         run: |
