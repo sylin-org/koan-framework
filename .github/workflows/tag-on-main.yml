@@ -1,0 +1,50 @@
+name: tag-on-main
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to create and push tags
+
+concurrency:
+  group: tag-main-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Read version from version.json
+        id: ver
+        run: |
+          VERSION=$(python3 - <<'PY'
+          import json
+          with open('version.json','r', encoding='utf-8') as f:
+              print(json.load(f)['version'])
+          PY
+          )
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag if missing
+        env:
+          VERSION: ${{ steps.ver.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+          tag="v${VERSION}"
+          echo "Target tag: $tag"
+          git fetch --tags
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Tag ${tag} already exists. Skipping."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${tag}" -m "Release ${tag}"
+          git push origin "${tag}"
