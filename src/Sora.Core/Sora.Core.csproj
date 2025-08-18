@@ -4,6 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+  <Description>Core primitives for Sora: configuration helper, environment snapshot (SoraEnv), constants, and foundational abstractions.</Description>
+  <PackageTags>$(CommonPackageTags);core;configuration;options;environment;runtimesnapshot;constants</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

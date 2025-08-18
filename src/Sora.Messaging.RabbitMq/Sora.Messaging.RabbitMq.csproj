@@ -6,6 +6,8 @@
     <LangVersion>preview</LangVersion>
     <AssemblyName>Sora.Messaging.RabbitMq</AssemblyName>
     <RootNamespace>Sora.Messaging.RabbitMq</RootNamespace>
+  <Description>RabbitMQ transport for Sora Messaging: resilient connection management, config-first options, and inbox integration.</Description>
+  <PackageTags>$(CommonPackageTags);messaging;rabbitmq;transport;queue;inbox</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Messaging.Abstractions\Sora.Messaging.Abstractions.csproj" />

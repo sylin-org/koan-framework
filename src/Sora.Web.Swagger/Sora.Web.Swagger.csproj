@@ -3,6 +3,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+  <Description>Swagger/OpenAPI integration for Sora Web: idempotent registration, config-driven enablement, and friendly defaults.</Description>
+  <PackageTags>$(CommonPackageTags);swagger;openapi;ui;documentation</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />

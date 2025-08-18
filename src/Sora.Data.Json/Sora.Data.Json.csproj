@@ -18,6 +18,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+  <Description>JSON file-backed data provider for Sora: simple repository for demos, tests, and local development.</Description>
+  <PackageTags>$(CommonPackageTags);data;json;file;repository</PackageTags>
   </PropertyGroup>
 
 </Project>

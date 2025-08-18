@@ -3,6 +3,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+  <Description>SQLite provider for Sora relational data: lightweight local development and testing support.</Description>
+  <PackageTags>$(CommonPackageTags);data;sqlite;relational;efcore</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
