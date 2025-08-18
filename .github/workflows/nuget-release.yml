@@ -34,9 +34,15 @@ jobs:
         id: nbgv
         shell: pwsh
         run: |
-          dotnet tool install --global nbgv --version 3.6.143
-          $tool = Join-Path $env:HOME ".dotnet/tools/nbgv"
-          $nugetVersion = & $tool get-version -v NuGetPackageVersion
+          # Ensure the nbgv tool is available (update if present, install otherwise)
+          dotnet tool update --global nbgv || dotnet tool install --global nbgv
+          # Resolve the nbgv executable reliably on Windows runners
+          $nbgv = (Get-Command nbgv -ErrorAction SilentlyContinue)?.Source
+          if (-not $nbgv) {
+            $nbgv = Join-Path $env:USERPROFILE ".dotnet/tools/nbgv.exe"
+          }
+          if (-not (Test-Path $nbgv)) { throw "nbgv tool not found on PATH or at $nbgv" }
+          $nugetVersion = & $nbgv get-version -v NuGetPackageVersion
           echo "NUGETVERSION=$nugetVersion" >> $env:GITHUB_OUTPUT
       - name: Pack all src projects (stable)
         run: |
