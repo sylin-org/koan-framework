@@ -1,0 +1,61 @@
+:root{
+  --bg-primary:#0d1117;
+  --bg-secondary:#161b22;
+  --bg-tertiary:#21262d;
+  --text-primary:#f0f6fc;
+  --text-secondary:#8b949e;
+  --accent-green:#39d353;
+  --accent-blue:#58a6ff;
+  --accent-purple:#bc8cff;
+  --accent-orange:#ff9500;
+  --border-color:#30363d;
+  --code-bg:#161b22;
+}
+
+html,body{background:var(--bg-primary);color:var(--text-primary);}
+
+/* Typography to match Inter + JetBrains Mono */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+body{font-family:'Inter',sans-serif;}
+code,pre,.lang-cs,.lang-json{font-family:'JetBrains Mono',monospace;}
+
+/* Header */
+.toc .nav > li > a, .sidetoc .nav > li > a{color:var(--text-secondary);} 
+.toc .nav > li > a:hover, .sidetoc .nav > li > a:hover{color:var(--accent-blue);} 
+
+.navbar, .navbar .container{background:var(--bg-secondary)!important;border-bottom:1px solid var(--border-color);} 
+.navbar-brand, .navbar-brand a{color:var(--accent-green)!important;font-weight:700;}
+
+/* Links */
+a{color:var(--accent-blue);} a:hover{color:#7bb6ff;}
+
+/* Content */
+.article{background:var(--bg-primary);} 
+.article .content{color:var(--text-primary);} 
+.article h1,.article h2,.article h3{color:var(--text-primary);} 
+.article blockquote{border-left:3px solid var(--accent-blue);background:var(--bg-secondary);}
+
+/* Code Blocks */
+.hljs,.codeHeader+pre{background:var(--code-bg)!important;border:1px solid var(--border-color);} 
+pre code{color:var(--text-primary);} 
+.codeHeader{background:var(--bg-tertiary);border:1px solid var(--border-color);} 
+
+/* Tables */
+table{background:var(--bg-secondary);border-color:var(--border-color);} 
+th,td{border-color:var(--border-color);} 
+
+/* Alerts */
+.alert{background:var(--bg-secondary);border-color:var(--border-color);color:var(--text-primary);} 
+
+/* Footer */
+.footer{background:var(--bg-secondary);border-top:1px solid var(--border-color);} 
+
+/* Search box */
+#search-query{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border-color);} 
+
+/* Breadcrumbs */
+.breadcrumb{background:transparent;} 
+
+/* API Reference Tweaks */
+.sidefilter{background:var(--bg-secondary)!important;border-right:1px solid var(--border-color);} 
+.affix ul>li.active>a{color:var(--accent-blue);} 
