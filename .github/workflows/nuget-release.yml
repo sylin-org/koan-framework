@@ -50,9 +50,15 @@ jobs:
           Get-Content list.txt | ForEach-Object { dotnet pack $_ -c Release }
       - name: Pack meta packages
         run: pwsh ./.github/scripts/pack-meta.ps1 -Version "${{ steps.nbgv.outputs.NUGETVERSION }}" -OutDir artifacts
+      - name: Verify NUGET_API_KEY present
+        shell: pwsh
+        run: |
+          if (-not $env:NUGET_API_KEY) { throw "NUGET_API_KEY is empty or not provided" }
+          Write-Host "NUGET_API_KEY supplied (length: $($env:NUGET_API_KEY.Length))"
       - name: Push all to nuget.org
+        shell: pwsh
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          dotnet nuget push **/*.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
-          dotnet nuget push **/*.snupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push **/*.nupkg --api-key "$env:NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push **/*.snupkg --api-key "$env:NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
