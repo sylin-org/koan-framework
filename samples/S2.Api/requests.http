@@ -1,0 +1,17 @@
+### Health
+GET http://localhost:5054/api/health
+
+### List items
+GET http://localhost:5054/api/items
+
+### Create item
+POST http://localhost:5054/api/items
+Content-Type: application/json
+
+{ "name": "Item A" }
+
+### Seed N items (server-side)
+POST http://localhost:5054/api/items/seed/25
+
+### Clear all items
+DELETE http://localhost:5054/api/items/clear

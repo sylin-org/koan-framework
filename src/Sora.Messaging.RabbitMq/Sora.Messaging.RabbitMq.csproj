@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <AssemblyName>Sora.Messaging.RabbitMq</AssemblyName>
+    <RootNamespace>Sora.Messaging.RabbitMq</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sora.Messaging.Abstractions\Sora.Messaging.Abstractions.csproj" />
+    <ProjectReference Include="..\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
+    <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
+    <ProjectReference Include="..\Sora.Messaging.Inbox.Http\Sora.Messaging.Inbox.Http.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" Version="6.6.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.8" />
+  </ItemGroup>
+</Project>

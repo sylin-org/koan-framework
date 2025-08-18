@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Sylin Labs",
+  "classifications": ["Sora", "Web", "API", "Tiny", "Docker"],
+  "identity": "Sylin.Sora.TinyDockerApp",
+  "name": "Sora TinyDockerApp (Alpine.js + MongoDB + Docker Compose)",
+  "shortName": "sora-tiny-docker",
+  "sourceName": "TinyDockerApp",
+  "preferNameDirectory": true,
+  "tags": { "language": "C#", "type": "project" },
+  "symbols": {
+    "port": {
+      "type": "parameter",
+      "datatype": "integer",
+      "defaultValue": "6255",
+      "replaces": "__PORT__",
+      "description": "HTTP port (default 6255; falls back if busy)"
+    }
+  },
+  "primaryOutputs": [
+    { "path": "TinyDockerApp.csproj" }
+  ]
+}

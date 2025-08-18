@@ -1,0 +1,3 @@
+@echo off
+echo Stopping TinyDockerApp via compose...
+docker compose -f .\compose\docker-compose.yml down

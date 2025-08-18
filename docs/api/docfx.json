@@ -1,0 +1,27 @@
+{
+  "metadata": [
+    {
+      "src": [
+        { "files": ["src/**.csproj"], "exclude": ["**/bin/**", "**/obj/**"] }
+      ],
+      "dest": "api",
+      "properties": {
+        "TargetFramework": "net9.0"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      { "files": ["api/**.yml", "api/index.md"] },
+      { "files": ["toc.yml", "assemblies.md", "web-http-api.md", "well-known-endpoints.md", "openapi-generation.md"] },
+      { "files": ["**/*.md"], "exclude": ["bin/**", "obj/**", "node_modules/**"] }
+    ],
+    "resource": [ { "files": ["**/images/**"] } ],
+    "dest": "_site",
+    "globalMetadata": {
+      "_appTitle": "Sora Framework API"
+    },
+    "xref": [],
+    "template": ["default"]
+  }
+}

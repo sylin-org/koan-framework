@@ -1,0 +1,41 @@
+### Health
+GET http://localhost:5000/api/health
+
+### List (page 1, size 10)
+GET http://localhost:5000/api/todo?page=1&size=10
+
+### Seed 25
+POST http://localhost:5000/api/todo/seed/25
+
+### Create
+POST http://localhost:5000/api/todo
+Content-Type: application/json
+
+{ "title": "Buy milk" }
+
+### Update (upsert)
+POST http://localhost:5000/api/todo
+Content-Type: application/json
+
+{ "id": "REPLACE_WITH_ID", "title": "Buy milk and bread" }
+
+### Delete one
+DELETE http://localhost:5000/api/todo/REPLACE_WITH_ID
+
+### Bulk upsert
+POST http://localhost:5000/api/todo/bulk
+Content-Type: application/json
+
+[
+  { "title": "Task A" },
+  { "title": "Task B" }
+]
+
+### Bulk delete
+DELETE http://localhost:5000/api/todo/bulk
+Content-Type: application/json
+
+[ "REPLACE_ID_A", "REPLACE_ID_B" ]
+
+### Clear collection (helper)
+DELETE http://localhost:5000/api/todo/clear

@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Sylin Labs",
+  "classifications": ["Sora", "Worker", "Tiny"],
+  "identity": "Sylin.Sora.TinyWorker",
+  "name": "Sora TinyWorker (BackgroundService)",
+  "shortName": "sora-tiny-worker",
+  "sourceName": "TinyWorker",
+  "preferNameDirectory": true,
+  "tags": { "language": "C#", "type": "project" },
+  "primaryOutputs": [
+    { "path": "TinyWorker.csproj" }
+  ]
+}

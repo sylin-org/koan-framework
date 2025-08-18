@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en" ng-app="s2app">
+<head>
+  <meta charset="utf-8">
+  <title>S2 Client • Sora</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-normalize@2/modern-normalize.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+</head>
+<body ng-controller="MainCtrl as vm" class="sora-bs">
+<div class="container-lg py-3">
+  <header class="mb-3">
+    <div class="d-flex align-items-center justify-content-between gap-3">
+      <div class="d-flex align-items-center gap-2">
+        <div class="logo" aria-hidden="true"></div>
+        <h1 class="mb-0" style="font-size:1.6rem; font-weight:700;">S2 Client</h1>
+        <span class="badge rounded-pill bg-info text-dark">AngularJS</span>
+      </div>
+      <div class="text-secondary small">Served by Nginx • talks to S2.Api at <code>/api</code></div>
+    </div>
+  </header>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card bg-dark border-secondary shadow-sm">
+      <div class="card-header" style="flex-wrap: wrap; gap: 8px;">
+        <div class="card-title">Items (Mongo)</div>
+        <div class="ms-auto w-100 w-md-auto d-flex flex-wrap align-items-center gap-2">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Seed">
+            <button type="button" class="btn btn-outline-light" ng-click="vm.seed(1)">+1</button>
+            <button type="button" class="btn btn-outline-light" ng-click="vm.seed(10)">+10</button>
+            <button type="button" class="btn btn-outline-light" ng-click="vm.seed(100)">+100</button>
+            <button type="button" class="btn btn-outline-light" ng-click="vm.seed(1000)">+1000</button>
+          </div>
+          <div class="form-check form-check-inline ms-1">
+            <input class="form-check-input" type="checkbox" id="serverSeed" ng-model="vm.useServerSeed">
+            <label class="form-check-label text-secondary" for="serverSeed">server-side</label>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-warning" ng-click="vm.clearAll()">Clear</button>
+          <form class="d-flex flex-row gap-2 ms-auto" ng-submit="vm.create()">
+            <input type="text" class="form-control form-control-sm" placeholder="New item name" ng-model="vm.name" />
+            <button type="submit" class="btn btn-sm btn-outline-light">Add</button>
+          </form>
+        </div>
+      </div>
+  <div class="card-body">
+  <form class="row g-2 align-items-center sora-filter-bar" ng-submit="vm.load()" style="margin-bottom:10px">
+          <div class="col-auto"><label class="form-label text-secondary mb-0">Page</label></div>
+          <div class="col-4 col-sm-2 col-md-1"><input type="number" class="form-control form-control-sm" ng-model="vm.page" min="1" /></div>
+          <div class="col-auto"><label class="form-label text-secondary mb-0">Size</label></div>
+          <div class="col-4 col-sm-2 col-md-1"><input type="number" class="form-control form-control-sm" ng-model="vm.size" min="1" max="200" /></div>
+
+          <div class="col-12 col-sm-auto"><label class="form-label text-secondary mb-0">Filter</label></div>
+          <div class="col-6 col-sm-4 col-md-3">
+            <select class="form-select form-select-sm" ng-model="vm.field" ng-options="f for f in vm.fields"></select>
+          </div>
+          <div class="col-6 col-sm-3 col-md-2">
+            <select class="form-select form-select-sm" ng-model="vm.op">
+              <option value="contains">contains</option>
+              <option value="equals">equals</option>
+            </select>
+          </div>
+          <div class="col-12 col-sm-6 col-md-4">
+            <input type="text" class="form-control form-control-sm" placeholder="value" ng-model="vm.term" />
+          </div>
+          <div class="col-auto">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="ignoreCase" ng-model="vm.ignoreCase">
+              <label class="form-check-label text-secondary" for="ignoreCase">ignore case</label>
+            </div>
+          </div>
+
+          <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-outline-light">Apply</button>
+          </div>
+          <div class="col-auto">
+            <button type="button" class="btn btn-sm btn-outline-light" ng-click="vm.clearFilter()" ng-disabled="!vm.term">Clear</button>
+          </div>
+          <div class="col-auto">
+            <div class="btn-group btn-group-sm" role="group" aria-label="CSV tools">
+              <button type="button" class="btn btn-outline-info" ng-click="vm.previewCsv()">Preview CSV</button>
+              <button type="button" class="btn btn-outline-info" ng-click="vm.downloadCsv()" ng-disabled="!vm.csv">Download CSV</button>
+            </div>
+          </div>
+          <div class="col text-end">
+            <div class="text-secondary">{{vm.total}} items • page {{vm.page}} of {{vm.totalPages || 0}}</div>
+          </div>
+        </form>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Pager left">
+              <button type="button" class="btn btn-outline-light" ng-click="vm.gotoStart()" ng-disabled="vm.page <= 1">Start</button>
+              <button type="button" class="btn btn-outline-light" ng-click="vm.shift(-100)" ng-disabled="vm.page <= 1">-100</button>
+              <button type="button" class="btn btn-outline-light" ng-click="vm.shift(-10)" ng-disabled="vm.page <= 1">-10</button>
+              <button type="button" class="btn btn-outline-light" ng-click="vm.shift(-1)" ng-disabled="vm.page <= 1">-1</button>
+            </div>
+            <div class="ms-auto"></div>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Pager right">
+              <button type="button" class="btn btn-outline-light" ng-click="vm.shift(1)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+1</button>
+              <button type="button" class="btn btn-outline-light" ng-click="vm.shift(10)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+10</button>
+              <button type="button" class="btn btn-outline-light" ng-click="vm.shift(100)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+100</button>
+              <button type="button" class="btn btn-outline-light" ng-click="vm.gotoEnd()" ng-disabled="vm.totalPages <= 1">End</button>
+            </div>
+          </div>
+
+          <div class="list" style="margin-top:6px">
+            <div class="todo-row" ng-repeat="it in vm.items track by it.id">
+              <input type="text" class="form-control form-control-sm" ng-model="it.name" />
+              <button class="btn btn-sm btn-outline-light" ng-click="vm.save(it)">Save</button>
+              <button class="btn btn-sm btn-outline-danger" ng-click="vm.remove(it)">Delete</button>
+            </div>
+            <div class="text-secondary" ng-if="vm.loading">Loading…</div>
+          </div>
+          <div class="mt-2" ng-if="vm.csv">
+            <div class="text-secondary">CSV preview (first 2KB):</div>
+            <pre class="text-light" style="white-space:pre-wrap; max-height:160px; overflow:auto">{{vm.csv | limitTo:2048}}</pre>
+          </div>
+          <hr class="text-secondary" />
+          <div class="mt-2">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="text-secondary">Bulk CSV import</div>
+              <button class="btn btn-sm btn-outline-info" type="button" ng-click="vm.fillCsvSample()">Sample</button>
+            </div>
+            <textarea class="form-control form-control-sm" rows="4" ng-model="vm.csvIn" placeholder="Id,Name&#10;..."></textarea>
+            <div class="d-flex gap-2 mt-2">
+              <button class="btn btn-sm btn-outline-light" type="button" ng-click="vm.importCsv()" ng-disabled="!vm.csvIn || vm.csvIn.trim().length===0">Import CSV</button>
+              <span class="text-secondary" ng-if="vm.csvMsg">{{vm.csvMsg}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card bg-dark border-secondary shadow-sm">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="card-title mb-0">API Requests</div>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-outline-light" ng-click="vm.clearRequests()">Clear</button>
+            <span class="text-secondary" ng-if="!vm.requests.length">No requests yet</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-dark table-sm align-middle mb-0" ng-if="vm.requests.length">
+              <thead>
+                <tr>
+                  <th style="width:86px">Time</th>
+                  <th style="width:62px">Meth</th>
+                  <th>URL</th>
+                  <th style="width:68px">Status</th>
+                  <th style="width:64px">ms</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="r in vm.requests | limitTo:100 | orderBy:'-ts' track by $index">
+                  <td>{{r.ts | date:'HH:mm:ss'}}</td>
+                  <td>{{r.method}}</td>
+                  <td><code>{{r.url}}</code></td>
+                  <td><span ng-class="{'text-secondary': r.status==0, 'ok': r.status>=200 && r.status<300, 'warn': r.status>=300 && r.status<400, 'danger': r.status>=400}">{{r.status || '—'}}</span></td>
+                  <td>{{r.ms}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card bg-dark border-secondary shadow-sm">
+        <div class="card-body d-flex align-items-center gap-2">
+          <div class="text-secondary">System:</div>
+          <div>
+            <span ng-if="vm.health">{{vm.health.status}}</span>
+            <span class="text-secondary" ng-if="!vm.health">unknown</span>
+          </div>
+          <div class="ms-auto"></div>
+          <button class="btn btn-sm btn-outline-light" ng-click="vm.check()">Ping</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card bg-dark border-secondary shadow-sm">
+        <div class="card-header d-flex align-items-center justify-content-between" style="gap:8px; flex-wrap:wrap;">
+          <div class="card-title mb-0">Observability</div>
+          <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-sm btn-outline-light" href="/.well-known/sora/observability" target="_blank" rel="noopener">Open JSON</a>
+            <a class="btn btn-sm btn-outline-light" href="/swagger" target="_blank" rel="noopener">Swagger UI</a>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="row g-2 text-secondary" ng-if="vm.obs">
+            <div class="col-12 col-md-6">Enabled: <span class="text-light">{{vm.obs.enabled}}</span></div>
+            <div class="col-12 col-md-6">Service: <span class="text-light">{{vm.obs.resource.serviceName}} {{vm.obs.resource.serviceVersion}}</span></div>
+            <div class="col-12 col-md-6">Traces: <span class="text-light">{{vm.obs.traces.enabled}} @ {{vm.obs.traces.sampleRate}}</span></div>
+            <div class="col-12 col-md-6">Exporter: <span class="text-light">{{vm.obs.traces.exporter.type}} {{vm.obs.traces.exporter.endpoint}}</span></div>
+            <div class="col-12 col-md-6">Metrics: <span class="text-light">{{vm.obs.metrics.enabled}}</span></div>
+            <div class="col-12 col-md-6">TraceId (current): <span class="text-light">{{vm.obs.traces.currentTraceId || '—'}}</span></div>
+          </div>
+          <div class="text-secondary" ng-if="!vm.obs">No data (dev only unless enabled)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer text-center text-secondary mt-3">Sora Framework sample • S2.Client</div>
+</div>
+<script>
+angular.module('s2app', [])
+.factory('requestLog', function() { var svc = { entries: [] }; svc.add = function(e){ svc.entries.push(e); if(svc.entries.length>500) svc.entries.shift(); }; svc.clear = function(){ svc.entries.length=0; }; return svc; })
+.config(function($httpProvider){ $httpProvider.interceptors.push(function($q, requestLog){ return {
+  request: function(cfg){ if (typeof cfg.url==='string' && cfg.url.indexOf('/api/')===0){ cfg._sora_meta={t0:Date.now(), method:(cfg.method||'GET').toUpperCase(), url:cfg.url}; } return cfg; },
+  response: function(res){ var m=res.config&&res.config._sora_meta; if(m){ requestLog.add({ ts:new Date(), method:m.method, url:m.url, status:res.status, ms: Date.now()-m.t0 }); } return res; },
+  responseError: function(err){ var res=err&&err.config?err:null; var m=res&&res.config&&res.config._sora_meta; if(m){ var status=(err&&err.status)||0; requestLog.add({ ts:new Date(), method:m.method, url:m.url, status:status, ms: Date.now()-m.t0 }); } return $q.reject(err); }
+}; }); })
+.controller('MainCtrl', function($http, $q, requestLog){
+  var vm=this; vm.items=[]; vm.requests=requestLog.entries; vm.clearRequests=function(){ requestLog.clear(); };
+  vm.page=1; vm.size=10; vm.total=0; vm.totalPages=0;
+  vm.fields=['Name','Id']; vm.field='Name'; vm.op='contains'; vm.term=''; vm.ignoreCase=false;
+  vm.clearFilter=function(){ vm.term=''; vm.page=1; vm.load(); };
+  vm.csv=null; vm.csvIn=''; vm.csvMsg='';
+  function computeFieldsFromItems(){
+    if (vm.items && vm.items.length>0){
+      var keys = Object.keys(vm.items[0]);
+      var mapped = [];
+      for (var i=0;i<keys.length;i++){
+        var k = keys[i]; if(!k) continue;
+        // Map camelCase to PascalCase heuristic
+        var pas = k.charAt(0).toUpperCase() + k.slice(1);
+        if (mapped.indexOf(pas) < 0) mapped.push(pas);
+      }
+      if (mapped.length>0) vm.fields = mapped;
+      if (vm.fields.indexOf(vm.field) < 0) vm.field = vm.fields[0];
+    }
+  }
+  function buildUrl(){
+    vm.loading=true;
+    var url='/api/items?page=' + encodeURIComponent(vm.page) + '&size=' + encodeURIComponent(vm.size);
+    // Build filter JSON based on selected field/operator
+    if (vm.term && vm.term.trim().length>0){
+      var field = vm.field || 'Name';
+      if (field && field.length>0){ field = field.charAt(0).toUpperCase() + field.slice(1); }
+      var value = vm.term.trim();
+  var filterObj={};
+      if ((vm.op||'contains') === 'contains') filterObj[field] = '*' + value + '*';
+      else filterObj[field] = value;
+  if (vm.ignoreCase === true) filterObj['$options'] = { ignoreCase: true };
+      var filterJson = JSON.stringify(filterObj);
+      url += '&filter=' + encodeURIComponent(filterJson);
+    }
+    return url;
+  }
+  vm.load=function(){
+    var url = buildUrl();
+    $http.get(url).then(function(r){
+      vm.items=r.data;
+      computeFieldsFromItems();
+      vm.total=parseInt(r.headers('X-Total-Count')||'0');
+      var hdrPage=parseInt(r.headers('X-Page')||vm.page||'1');
+      var hdrSize=parseInt(r.headers('X-Page-Size')||vm.size||'10');
+      var hdrTotalPages=parseInt(r.headers('X-Total-Pages')||'0');
+      if(!isNaN(hdrPage) && hdrPage>0) vm.page=hdrPage; else vm.page=1;
+      if(!isNaN(hdrSize) && hdrSize>0) vm.size=hdrSize;
+      vm.totalPages=!isNaN(hdrTotalPages) ? hdrTotalPages : (vm.size>0 ? Math.ceil(vm.total/vm.size) : 0);
+    }).finally(function(){ vm.loading=false; });
+  };
+  vm.previewCsv=function(){
+    var url = buildUrl();
+    $http.get(url, { headers: { 'Accept': 'text/csv' }, responseType: 'text' }).then(function(r){ vm.csv = r.data; });
+  };
+  vm.downloadCsv=function(){
+    if(!vm.csv){ return; }
+    var blob = new Blob([vm.csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'items.csv'; a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  };
+  vm.fillCsvSample=function(){
+    vm.csvIn = 'Id,Name\n';
+    vm.csvIn += ',' + ('New Item ' + (Date.now()%10000)) + '\n';
+    vm.csvIn += ',' + ('Another ' + (Date.now()%10000)) + '\n';
+  };
+  vm.importCsv=function(){
+    var body = vm.csvIn || '';
+    vm.csvMsg='';
+    $http.post('/api/items/bulk', body, { headers: { 'Content-Type': 'text/csv' } }).then(function(){ vm.csvMsg='Imported'; vm.csvIn=''; vm.load(); }, function(err){ vm.csvMsg='Error: ' + (err && err.status); });
+  };
+  vm.shift=function(n){
+    var tp=vm.totalPages||0; var target=(vm.page||1)+n; if(target<1) target=1; if(tp>0 && target>tp) target=tp; if(target!==vm.page){ vm.page=target; vm.load(); }
+  };
+  vm.gotoStart=function(){ if(vm.page>1){ vm.page=1; vm.load(); } };
+  vm.gotoEnd=function(){ var tp=vm.totalPages||0; var target=tp>0?tp:1; if(vm.page!==target){ vm.page=target; vm.load(); } };
+
+  vm.create=function(){ if(!vm.name) return; $http.post('/api/items', { name: vm.name }).then(function(){ vm.name=''; vm.load(); }); };
+  vm.seed=function(n){
+    n = parseInt(n||0); if(!n || n<1) return;
+    if(vm.useServerSeed){
+      $http.post('/api/items/seed/' + encodeURIComponent(n), {}).finally(function(){ vm.load(); });
+    } else {
+      var ops=[]; for(var i=0;i<n;i++){ ops.push($http.post('/api/items', { name: 'Item '+(Date.now()%10000)+'-'+(i+1) })); }
+      $q.all(ops).finally(function(){ vm.load(); });
+    }
+  };
+  vm.save=function(it){ $http.post('/api/items', it).then(function(){ vm.load(); }); };
+  vm.remove=function(it){ $http.delete('/api/items/' + encodeURIComponent(it.id)).then(function(){ vm.load(); }); };
+  vm.clearAll=function(){
+    $http.delete('/api/items/clear').finally(function(){
+      vm.page = 1;
+      vm.load();
+    });
+  };
+  vm.check=function(){ $http.get('/api/health').then(function(r){ vm.health=r.data; }); };
+  vm.obs=null; function loadObs(){ $http.get('/.well-known/sora/observability').then(function(r){ vm.obs=r.data; }, function(){ vm.obs=null; }); }
+  vm.load(); vm.check(); loadObs();
+});
+</script>
+</body>
+</html>

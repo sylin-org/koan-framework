@@ -1,0 +1,49 @@
+name: nuget-release
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pack-and-push-all:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Install nuget.exe
+        uses: nuget/setup-nuget@v2
+      - name: Restore
+        shell: pwsh
+        run: |
+          $list = 
+            & pwsh -NoProfile -ExecutionPolicy Bypass -File ./.github/scripts/find-packable-csproj.ps1
+          foreach ($p in $list) {
+            Write-Host "Restoring $p" -ForegroundColor Cyan
+            dotnet restore "$p"
+          }
+      - name: Compute version
+        id: nbgv
+        shell: pwsh
+        run: |
+          dotnet tool install --global nbgv --version 3.6.143
+          $tool = Join-Path $env:HOME ".dotnet/tools/nbgv"
+          $nugetVersion = & $tool get-version -v NuGetPackageVersion
+          echo "NUGETVERSION=$nugetVersion" >> $env:GITHUB_OUTPUT
+      - name: Pack all src projects (stable)
+        run: |
+          pwsh -File ./.github/scripts/find-packable-csproj.ps1 > list.txt
+          Get-Content list.txt | ForEach-Object { dotnet pack $_ -c Release }
+      - name: Pack meta packages
+        run: pwsh ./.github/scripts/pack-meta.ps1 -Version "${{ steps.nbgv.outputs.NUGETVERSION }}" -OutDir artifacts
+      - name: Push all to nuget.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push **/*.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push **/*.snupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate

@@ -1,0 +1,22 @@
+name: ci
+
+on:
+  push:
+    branches: [ dev, main ]
+  pull_request:
+    branches: [ dev, main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Restore
+        run: dotnet restore Sora.sln
+      - name: Build
+        run: dotnet build Sora.sln --no-restore -c Release
+      - name: Test
+        run: dotnet test Sora.sln --no-build -c Release -v minimal

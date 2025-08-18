@@ -1,0 +1,10 @@
+.git
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/node_modules/
+**/data/
+Dockerfile
+README.md
+requests.http

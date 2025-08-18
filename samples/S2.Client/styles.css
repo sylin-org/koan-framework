@@ -1,0 +1,61 @@
+:root{ --bg:#0b0d10; --bg2:#11151b; --panel:#151a21; --panel2:#1a2029; --text:#e7edf4; --muted:#9aa8b7; --accent:#6cc0ff; --ok:#2ecc71; --warn:#f1c40f; --danger:#e74c3c; --shadow:0 8px 30px rgba(0,0,0,.35); --radius:14px; --radius-sm:10px; --grid:14px }
+*{ box-sizing:border-box }
+html,body{ height:100% }
+body{ margin:0; font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, sans-serif; color:var(--text); background:radial-gradient(1200px 600px at 10% -10%, #0f1621 0%, #0b0d10 60%, #0b0d10 100%) fixed; }
+.container{ max-width:1100px; margin:0 auto; padding:24px; }
+.site{ display:flex; align-items:center; justify-content:space-between; margin:8px 0 18px }
+.brand{ display:flex; align-items:center; gap:12px }
+.logo{ width:34px; height:34px; border-radius:8px; background:linear-gradient(140deg, #6cc0ff, #8b6cff); box-shadow:var(--shadow) }
+.badge{ font-size:12px; color:#111; background:var(--accent); padding:2px 8px; border-radius:999px }
+.muted{ color:var(--muted) }
+.grid{ display:grid; grid-template-columns: 1fr 1fr; grid-gap:18px }
+.card{ border-radius:var(--radius); background:linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%); box-shadow:var(--shadow); overflow:hidden }
+.card-header{ display:flex; align-items:center; gap:12px; padding:12px 14px; background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0)); border-bottom:1px solid rgba(255,255,255,.06) }
+.card-title{ font-weight:700 }
+.toolbar{ margin-left:auto; display:flex; align-items:center; gap:8px }
+/* Bootstrap-friendly overrides */
+.sora-filter-bar .form-label { color: var(--muted); }
+.sora-filter-bar .btn-outline-light { border-color: rgba(255,255,255,.25); color: var(--text); }
+.sora-filter-bar .btn-outline-light:hover { background: rgba(255,255,255,.08); }
+@media (max-width: 575.98px){
+	.sora-filter-bar .text-end { text-align: left !important; margin-top: 6px; }
+}
+.card-body{ padding:14px }
+.list{ display:flex; flex-direction:column; gap:10px }
+.todo-row{ display:grid; grid-template-columns: 1fr auto auto; gap:8px; align-items:center }
+.pager{ display:flex; align-items:center; gap:8px; margin:8px 0 }
+button, input{ border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.02); color:var(--text); padding:8px 10px }
+button{ cursor:pointer }
+button.ghost{ background:transparent }
+button.danger{ background:rgba(231,76,60,.15); border-color:rgba(231,76,60,.35) }
+.ok{ color:var(--ok) }
+.warn{ color:var(--warn) }
+.danger{ color:var(--danger) }
+.system-strip{ display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:var(--radius); background:linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%); box-shadow:var(--shadow) }
+.system-strip .spacer{ flex:1 }
+.footer{ margin-top:18px; color:var(--muted); text-align:center }
+
+@media (max-width: 860px){ .grid{ grid-template-columns: 1fr } .card[style*='grid-column: 2']{ grid-column:auto; } }
+
+/* Bootstrap theming (dark) */
+.sora-bs .form-control,
+.sora-bs .form-select{
+	background-color: rgba(255,255,255,.04);
+	border-color: rgba(255,255,255,.18);
+	color: var(--text);
+}
+.sora-bs .form-control::placeholder{ color: rgba(231,237,244,.6); }
+.sora-bs .form-control:focus,
+.sora-bs .form-select:focus{
+	background-color: rgba(255,255,255,.06);
+	border-color: var(--accent);
+	box-shadow: 0 0 0 .2rem rgba(108,192,255,.2);
+}
+.sora-bs .btn-outline-light{ color: var(--text); border-color: rgba(255,255,255,.25); }
+.sora-bs .btn-outline-light:hover{ background-color: rgba(255,255,255,.08); }
+.sora-bs .btn-outline-warning{ color: var(--warn); border-color: rgba(241,196,15,.45); }
+.sora-bs .btn-outline-warning:hover{ background: rgba(241,196,15,.12); }
+.sora-bs .btn-danger{ background: rgba(231,76,60,.15); border-color: rgba(231,76,60,.35); }
+
+/* Buttons in list rows stay visible */
+.todo-row button{ padding:6px 10px }

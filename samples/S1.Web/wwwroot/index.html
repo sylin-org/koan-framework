@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en" ng-app="s1app">
+<head>
+  <meta charset="utf-8">
+  <title>S1 Web • Sora</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-normalize@2/modern-normalize.min.css">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+</head>
+<body ng-controller="MainCtrl as vm">
+<div class="container">
+  <header class="site">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <h1>S1 Web</h1>
+      <span class="badge">AngularJS</span>
+    </div>
+    <div class="muted">Static app served from <code>wwwroot/</code> • Health at <code>/api/health</code></div>
+  </header>
+
+  <div class="grid">
+    <!-- Left: Todos -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Todos</div>
+        <div class="toolbar">
+          <button class="ok" ng-click="vm.seed(10)">Create 10</button>
+          <button class="ok" ng-click="vm.seed(100)">Create 100</button>
+          <button class="ok" ng-click="vm.seed(1000)">Create 1000</button>
+          <button class="danger" ng-click="vm.clear()">Clear</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="toolbar" style="margin-bottom:10px">
+          <span class="muted">Page</span>
+          <input type="number" ng-model="vm.page" min="1" style="width:5rem"/>
+          <span class="muted">Size</span>
+          <input type="number" ng-model="vm.size" min="1" max="200" style="width:5rem"/>
+          <button class="ghost" ng-click="vm.load()">Apply</button>
+          <span class="spacer"></span>
+          <div class="muted">{{vm.total}} items • page {{vm.page}} of {{vm.totalPages || 0}}</div>
+        </div>
+
+        <div class="pager">
+          <button ng-click="vm.gotoStart()" ng-disabled="vm.page <= 1">Start</button>
+          <button ng-click="vm.shift(-100)" ng-disabled="vm.page <= 1">-100</button>
+          <button ng-click="vm.shift(-10)" ng-disabled="vm.page <= 1">-10</button>
+          <button ng-click="vm.shift(-1)" ng-disabled="vm.page <= 1">-1</button>
+          <span class="spacer"></span>
+          <button ng-click="vm.shift(1)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+1</button>
+          <button ng-click="vm.shift(10)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+10</button>
+          <button ng-click="vm.shift(100)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+100</button>
+          <button ng-click="vm.gotoEnd()" ng-disabled="vm.totalPages <= 1">End</button>
+        </div>
+
+        <form class="list" ng-submit="vm.create()" style="margin-top:10px">
+          <div class="todo-row">
+            <input type="text" placeholder="New todo title" ng-model="vm.title" />
+            <button type="submit">Add</button>
+          </div>
+        </form>
+
+        <div class="list" style="margin-top:10px">
+          <div class="todo-row" ng-repeat="t in vm.todos track by t.id">
+            <input type="text" ng-model="t.title" />
+            <button class="ghost" ng-click="vm.save(t)">Save</button>
+            <button class="danger" ng-click="vm.remove(t)">Delete</button>
+          </div>
+          <div class="muted" ng-if="vm.loading">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: API Requests -->
+    <div class="card" style="grid-column: 2;">
+      <div class="card-header">
+        <div class="card-title">API Requests</div>
+        <div class="toolbar">
+          <button class="ghost" ng-click="vm.clearRequests()">Clear</button>
+          <span class="muted" ng-if="!vm.requests.length">No requests yet</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <table ng-if="vm.requests.length">
+          <thead>
+            <tr>
+              <th style="width:86px">Time</th>
+              <th style="width:62px">Meth</th>
+              <th>URL</th>
+              <th style="width:68px">Status</th>
+              <th style="width:64px">ms</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="r in vm.requests | limitTo:100 | orderBy:'-ts' track by $index">
+              <td>{{r.ts | date:'HH:mm:ss'}}</td>
+              <td>{{r.method}}</td>
+              <td><code>{{r.url}}</code></td>
+              <td><span ng-class="{'muted': r.status==0, 'ok': r.status>=200 && r.status<300, 'warn': r.status>=300 && r.status<400, 'danger': r.status>=400}">{{r.status || '—'}}</span></td>
+              <td>{{r.ms}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- System strip spanning full width, above Capabilities -->
+    <div class="system-strip" style="grid-column: 1 / -1;">
+      <div class="muted">System:</div>
+      <div>
+        <span ng-if="vm.health">{{vm.health.status}}</span>
+        <span class="muted" ng-if="!vm.health">unknown</span>
+      </div>
+      <div class="spacer"></div>
+      <button class="ghost" ng-click="vm.check()">Ping</button>
+    </div>
+
+    <!-- Capabilities full width -->
+    <div class="card" style="grid-column: 1 / -1;">
+      <div class="card-header">
+        <div class="card-title">Capabilities</div>
+        <div class="toolbar">
+          <button class="ghost" ng-click="vm.loadCaps()">Reload</button>
+          <span class="muted" ng-if="vm.capsLoading">Loading…</span>
+          <span class="muted" ng-if="!vm.capsLoading && vm.caps && vm.caps.aggregates">({{vm.caps.aggregates.length}} aggregates)</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <table ng-if="vm.caps && vm.caps.aggregates && vm.caps.aggregates.length">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Key</th>
+              <th>Provider</th>
+              <th>Query</th>
+              <th>Write</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="a in vm.caps.aggregates | orderBy:'type'">
+              <td><code>{{a.type}}</code></td>
+              <td><code>{{a.key}}</code></td>
+              <td><code>{{a.provider}}</code></td>
+              <td>{{(a.query || []).join(', ') || '—'}}</td>
+              <td>{{(a.write || []).join(', ') || '—'}}</td>
+            </tr>
+          </tbody>
+        </table>
+  <div class="muted" ng-if="vm.caps && (!vm.caps || !vm.caps.aggregates || vm.caps.aggregates.length === 0)">No aggregates discovered.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Sora Framework sample • S1.Web</div>
+</div>
+<script>
+angular.module('s1app', [])
+// Request log service
+.factory('requestLog', function() {
+  var svc = { entries: [] };
+  svc.add = function(e) { svc.entries.push(e); if (svc.entries.length > 500) svc.entries.shift(); };
+  svc.clear = function() { svc.entries.length = 0; };
+  return svc;
+})
+// Interceptor to capture API requests to /api/* and /.well-known/sora/*
+.config(function($httpProvider) {
+  $httpProvider.interceptors.push(function($q, requestLog) {
+    return {
+      request: function(cfg) {
+  if (typeof cfg.url === 'string' && (cfg.url.indexOf('/api/') === 0 || cfg.url.indexOf('/.well-known/sora/') === 0)) {
+          cfg._sora_meta = { t0: Date.now(), method: (cfg.method||'GET').toUpperCase(), url: cfg.url };
+        }
+        return cfg;
+      },
+      response: function(res) {
+        var m = res.config && res.config._sora_meta;
+        if (m) {
+          requestLog.add({ ts: new Date(), method: m.method, url: m.url, status: res.status, ms: Date.now() - m.t0 });
+        }
+        return res;
+      },
+      responseError: function(err) {
+        var res = err && err.config ? err : null;
+        var m = res && res.config && res.config._sora_meta;
+        if (m) {
+          var status = (err && err.status) || 0;
+          requestLog.add({ ts: new Date(), method: m.method, url: m.url, status: status, ms: Date.now() - m.t0 });
+        }
+        return $q.reject(err);
+      }
+    };
+  });
+})
+.controller('MainCtrl', function($http, requestLog) {
+  var vm = this;
+  vm.todos = [];
+  vm.check = function() { $http.get('/api/health').then(function(r){ vm.health = r.data; }); };
+  vm.caps = null; vm.capsLoading = false;
+  vm.loadCaps = function(){ vm.capsLoading = true; $http.get('/.well-known/sora/capabilities').then(function(r){ vm.caps = r.data; }).finally(function(){ vm.capsLoading = false; }); };
+  vm.requests = requestLog.entries;
+  vm.clearRequests = function(){ requestLog.clear(); };
+  vm.page = 1; vm.size = 10; vm.total = 0; vm.totalPages = 0;
+  vm.load = function(){
+    vm.loading = true;
+    var url = '/api/todo?page=' + encodeURIComponent(vm.page) + '&size=' + encodeURIComponent(vm.size);
+    $http.get(url).then(function(r){
+      vm.todos = r.data;
+      vm.total = parseInt(r.headers('X-Total-Count')||'0');
+      var hdrPage = parseInt(r.headers('X-Page')||vm.page||'1');
+      var hdrSize = parseInt(r.headers('X-Page-Size')||vm.size||'10');
+      var hdrTotalPages = parseInt(r.headers('X-Total-Pages')||'0');
+      // Normalize values
+      if (!isNaN(hdrPage) && hdrPage > 0) vm.page = hdrPage; else vm.page = 1;
+      if (!isNaN(hdrSize) && hdrSize > 0) vm.size = hdrSize;
+      vm.totalPages = !isNaN(hdrTotalPages) ? hdrTotalPages : (vm.size > 0 ? Math.ceil(vm.total / vm.size) : 0);
+    }).finally(function(){ vm.loading=false; });
+  };
+  vm.create = function(){ if(!vm.title) return; $http.post('/api/todo', { title: vm.title }).then(function(){ vm.title=''; vm.load(); }); };
+  vm.save = function(t){ $http.post('/api/todo', t).then(function(){ vm.load(); }); };
+  vm.remove = function(t){ $http.delete('/api/todo/' + encodeURIComponent(t.id)).then(function(){ vm.load(); }); };
+  vm.seed = function(n){ $http.post('/api/todo/seed/' + encodeURIComponent(n)).then(function(){ vm.load(); }); };
+  vm.clear = function(){ $http.delete('/api/todo/clear').then(function(){ vm.load(); }); };
+  vm.shift = function(n){
+    var tp = vm.totalPages || 0;
+    var target = (vm.page || 1) + n;
+    if (target < 1) target = 1;
+    if (tp > 0 && target > tp) target = tp;
+    if (target !== vm.page) { vm.page = target; vm.load(); }
+  };
+  vm.gotoStart = function(){ if (vm.page > 1) { vm.page = 1; vm.load(); } };
+  vm.gotoEnd = function(){ var tp = vm.totalPages || 0; var target = tp > 0 ? tp : 1; if (vm.page !== target) { vm.page = target; vm.load(); } };
+  vm.load();
+  vm.loadCaps();
+});
+</script>
+</body>
+</html>

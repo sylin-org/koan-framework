@@ -1,0 +1,15 @@
+<Project>
+  <!-- Apply only to projects under the tests folder -->
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+    <_Temp>$(TEMP)</_Temp>
+    <_Temp Condition="'$(_Temp)' == ''">$(TMP)</_Temp>
+    <_BaseTestOut Condition="'$(_Temp)' != ''">$(_Temp)\sora-framework-tests\$(MSBuildProjectName)\</_BaseTestOut>
+    <BaseOutputPath Condition="'$(_BaseTestOut)' != ''">$(_BaseTestOut)bin\</BaseOutputPath>
+    <BaseIntermediateOutputPath Condition="'$(_BaseTestOut)' != ''">$(_BaseTestOut)obj\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+
+  <Target Name="CleanupTempTestOutputsOnClean" AfterTargets="Clean" Condition="'$(_BaseTestOut)' != '' And Exists('$(_BaseTestOut)')">
+    <Message Importance="low" Text="Cleaning temp test output: $(_BaseTestOut)" />
+    <RemoveDir Directories="$(_BaseTestOut)" ContinueOnError="true" />
+  </Target>
+</Project>

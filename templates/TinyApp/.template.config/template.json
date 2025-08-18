@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Sylin Labs",
+  "classifications": ["Sora", "Web", "API", "Tiny"],
+  "identity": "Sylin.Sora.TinyApp",
+  "name": "Sora TinyApp (SQLite)",
+  "shortName": "sora-tiny-app",
+  "sourceName": "TinyApp",
+  "preferNameDirectory": true,
+  "tags": { "language": "C#", "type": "project" },
+  "symbols": {
+    "port": {
+      "type": "parameter",
+      "datatype": "integer",
+      "defaultValue": "6155",
+      "replaces": "__PORT__",
+      "description": "HTTP port (default 6155; falls back if busy)"
+    }
+  },
+  "primaryOutputs": [
+    { "path": "TinyApp.csproj" }
+  ]
+}

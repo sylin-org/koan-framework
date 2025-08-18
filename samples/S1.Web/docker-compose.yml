@@ -1,0 +1,12 @@
+services:
+  s1:
+    container_name: sora-s1
+    build:
+      context: ../..
+      dockerfile: samples/S1.Web/Dockerfile
+    ports:
+      - "${HOST_PORT:-5044}:5044"
+    volumes:
+      # Persist JSON data on host
+      - ./data:/app/data
+    restart: unless-stopped

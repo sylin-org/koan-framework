@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <!-- Generate XML docs for all projects to support API documentation. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Suppress missing XML comment warnings to keep builds clean while docs evolve. -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
+    <!-- CI-friendly builds (SourceLink, deterministic PDBs) -->
+    <ContinuousIntegrationBuild Condition="'$(ContinuousIntegrationBuild)' == ''">true</ContinuousIntegrationBuild>
+  <!-- NuGet package IDs: publish under Sylin.Sora.* while keeping code namespaces as Sora.* -->
+  <PackageId Condition="'$(IsPackable)' == 'true' and '$(PackageId)' == ''">Sylin.$(AssemblyName)</PackageId>
+  <!-- Common NuGet package metadata -->
+  <Authors>Sylin Labs</Authors>
+  <Company>Sylin Labs</Company>
+  <PackageProjectUrl>https://github.com/sylin-labs/sora-framework</PackageProjectUrl>
+  <RepositoryUrl>https://github.com/sylin-labs/sora-framework.git</RepositoryUrl>
+  <RepositoryType>git</RepositoryType>
+  <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+  <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+  <IncludeSymbols>true</IncludeSymbols>
+  <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Unified versioning across the repo via Nerdbank.GitVersioning -->
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.6.143" PrivateAssets="all" />
+  <!-- SourceLink for better debugging experience on NuGet -->
+  <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+  <id>Sylin.Sora.App</id>
+  <!-- Version is supplied by the workflow using -Version argument -->
+  <version>$version$</version>
+    <authors>Sylin Labs</authors>
+    <owners>Sylin Labs</owners>
+  <license type="expression">Apache-2.0</license>
+    <projectUrl>https://github.com/sylin-labs/sora-framework</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+  <description>Meta-package for Sora apps: includes Sylin.Sora and Sylin.Sora.Web for ASP.NET Core scenarios.</description>
+    <packageTypes>
+      <packageType name="Dependency" />
+    </packageTypes>
+    <dependencies>
+      <group targetFramework="net9.0">
+        <dependency id="Sylin.Sora" version="$depVersionRange$" />
+        <dependency id="Sylin.Sora.Web" version="$depVersionRange$" />
+      </group>
+    </dependencies>
+  <tags>sora sylin meta-package web aspnetcore</tags>
+  </metadata>
+</package>

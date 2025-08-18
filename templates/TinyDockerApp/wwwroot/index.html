@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TinyDockerApp</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:2rem}input,button{font-size:1rem}ul{padding-left:1rem}</style>
+</head>
+<body x-data="todoApp()" x-init="load()">
+  <h1>Todos</h1>
+  <div>
+    <input x-model="title" placeholder="New todo" />
+    <button @click="add()">Add</button>
+  </div>
+  <p x-show="error" style="color:red" x-text="error"></p>
+  <ul>
+    <template x-for="t in todos" :key="t.id">
+      <li x-text="t.title"></li>
+    </template>
+  </ul>
+  <p><a href="/swagger">Open Swagger</a></p>
+<script>
+function todoApp(){
+  return {
+    todos:[], title:"", error:"",
+    async load(){
+      try{
+        const res = await fetch('/api/todos');
+        this.todos = await res.json();
+      }catch(e){ this.error = e.message }
+    },
+    async add(){
+      try{
+        const res = await fetch('/api/todos',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:this.title})});
+        if(!res.ok) throw new Error('POST failed');
+        this.title=''; await this.load();
+      }catch(e){ this.error = e.message }
+    }
+  }
+}
+</script>
+</body>
+</html>

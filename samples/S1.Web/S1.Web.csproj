@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+  <ProjectReference Include="..\..\src\Sora.Data.Sqlite\Sora.Data.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Data.Json\Sora.Data.Json.csproj" />
+  </ItemGroup>
+</Project>

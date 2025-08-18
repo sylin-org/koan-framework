@@ -1,0 +1,319 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
+using Sora.Data.Abstractions;
+using Sora.Core;
+using System.ComponentModel.DataAnnotations;
+
+namespace Sora.Data.Json;
+
+/// <summary>
+/// Options for the JSON file-backed data adapter.
+/// </summary>
+public sealed class JsonDataOptions
+{
+    [Required]
+    public string DirectoryPath { get; set; } = ".\\data";
+}
+
+public static class JsonDataServiceCollectionExtensions
+{
+    /// <summary>
+    /// Register a JSON repository for a specific aggregate pair.
+    /// </summary>
+    public static IServiceCollection AddJsonData<TEntity, TKey>(this IServiceCollection services, Action<JsonDataOptions>? configure = null)
+    where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        services.AddOptions<JsonDataOptions>();
+        if (configure is not null) services.Configure(configure);
+        services.AddSingleton<IDataRepository<TEntity, TKey>, JsonRepository<TEntity, TKey>>();
+        return services;
+    }
+}
+
+[Sora.Data.Abstractions.ProviderPriority(0)]
+public sealed class JsonAdapterFactory : IDataAdapterFactory
+{
+    public bool CanHandle(string provider) => string.Equals(provider, "json", StringComparison.OrdinalIgnoreCase);
+
+    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+    where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        var opts = sp.GetRequiredService<IOptions<JsonDataOptions>>();
+        return new JsonRepository<TEntity, TKey>(opts);
+    }
+}
+
+public static class JsonAdapterRegistration
+{
+    /// <summary>
+    /// Register the JSON adapter for discovery; optionally configure options.
+    /// </summary>
+    public static IServiceCollection AddJsonAdapter(this IServiceCollection services, Action<JsonDataOptions>? configure = null)
+    {
+    services.AddOptions<JsonDataOptions>();
+        if (configure is not null) services.Configure(configure);
+        services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
+        return services;
+    }
+}
+
+// Self-registration hook so the adapter is available with AddSoraDataCore()
+/// <summary>
+/// Auto-registers the JSON adapter and health contributor during Sora initialization.
+/// </summary>
+public sealed class JsonSoraInitializer : ISoraInitializer
+{
+    public void Initialize(IServiceCollection services)
+    {
+        // Bind if configuration exists; otherwise default JsonDataOptions will be used
+    services.AddOptions<JsonDataOptions>().ValidateDataAnnotations();
+        services.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>, JsonDataOptionsConfigurator>();
+        services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
+        // Auto-register health contributor
+        services.AddHealthContributor<JsonHealthContributor>();
+    }
+}
+
+internal sealed class JsonDataOptionsConfigurator(IConfiguration config) : Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>
+{
+    public void Configure(JsonDataOptions options)
+    {
+        // Primary: Sora:Data:Json
+        config.GetSection("Sora:Data:Json").Bind(options);
+        // Also support named default source pattern for consistency
+        config.GetSection("Sora:Data:Sources:Default:json").Bind(options);
+    }
+}
+
+/// <summary>
+/// In-memory dictionary with JSON file persistence per aggregate.
+/// Supports LINQ queries and bulk upsert/delete.
+/// </summary>
+internal sealed class JsonRepository<TEntity, TKey> :
+    IDataRepository<TEntity, TKey>,
+    ILinqQueryRepository<TEntity, TKey>,
+    IQueryCapabilities,
+    IWriteCapabilities,
+    IBulkUpsert<TKey>,
+    IBulkDelete<TKey>,
+    Sora.Data.Abstractions.Instructions.IInstructionExecutor<TEntity>
+    where TEntity : class, IEntity<TKey>
+    where TKey : notnull
+{
+    private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
+    private readonly string _baseDir;
+    // Maintain per-physical-name stores and file paths so different sets are isolated
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, TEntity>> _stores = new();
+    private readonly ConcurrentDictionary<string, string> _files = new();
+    public QueryCapabilities Capabilities => QueryCapabilities.Linq; // supports LINQ predicate
+    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete;
+
+    public JsonRepository(IOptions<JsonDataOptions> options)
+    {
+        _baseDir = options.Value.DirectoryPath;
+        Directory.CreateDirectory(_baseDir);
+    }
+
+    public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+    {
+        var store = ResolveStore();
+        return Task.FromResult(store.TryGetValue(id, out var value) ? value : null);
+    }
+
+    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+    {
+        var store = ResolveStore();
+        return Task.FromResult((IReadOnlyList<TEntity>)store.Values.ToList());
+    }
+
+    public Task<int> CountAsync(object? query, CancellationToken ct = default)
+    {
+        var store = ResolveStore();
+        return Task.FromResult(store.Count);
+    }
+
+    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    {
+        var store = ResolveStore();
+        return Task.FromResult((IReadOnlyList<TEntity>)store.Values.AsQueryable().Where(predicate).ToList());
+    }
+
+    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    {
+        var store = ResolveStore();
+        return Task.FromResult(store.Values.AsQueryable().Count(predicate));
+    }
+
+    public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    {
+        var (name, store) = ResolveNameAndStore();
+        store[model.Id] = model;
+        Persist(name, store);
+        return Task.FromResult(model);
+    }
+
+    public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    {
+        var (name, store) = ResolveNameAndStore();
+        var ok = store.TryRemove(id, out _);
+        if (ok) Persist(name, store);
+        return Task.FromResult(ok);
+    }
+
+    public Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+    {
+        var (name, store) = ResolveNameAndStore();
+        var count = 0;
+        foreach (var m in models) { store[m.Id] = m; count++; }
+        if (count > 0) Persist(name, store);
+        return Task.FromResult(count);
+    }
+
+    public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        var (name, store) = ResolveNameAndStore();
+        var count = 0;
+        foreach (var id in ids) if (store.TryRemove(id, out _)) count++;
+        if (count > 0) Persist(name, store);
+        return Task.FromResult(count);
+    }
+
+    public Task<int> DeleteAllAsync(CancellationToken ct = default)
+    {
+        var (name, store) = ResolveNameAndStore();
+        var deleted = store.Count;
+        store.Clear();
+        Persist(name, store);
+        return Task.FromResult(deleted);
+    }
+
+    public IBatchSet<TEntity, TKey> CreateBatch() => new JsonBatch(this);
+
+    // Instruction execution for fast-path operations (e.g., clear all)
+    public Task<TResult> ExecuteAsync<TResult>(Sora.Data.Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
+    {
+        switch (instruction.Name)
+        {
+            case "data.clear":
+            {
+                var (name, store) = ResolveNameAndStore();
+                var deleted = store.Count;
+                store.Clear();
+                Persist(name, store);
+                object result = deleted;
+                return Task.FromResult((TResult)result);
+            }
+            default:
+                throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by JSON adapter for {typeof(TEntity).Name}.");
+        }
+    }
+
+    private void LoadFromDisk(string path, ConcurrentDictionary<TKey, TEntity> store)
+    {
+        if (!File.Exists(path)) return;
+        try
+        {
+            var json = File.ReadAllText(path);
+            var list = JsonSerializer.Deserialize<List<TEntity>>(json, _json) ?? [];
+            foreach (var item in list) store[item.Id] = item;
+        }
+        catch { /* ignore corrupted files in early dev */ }
+    }
+
+    private void Persist(string physicalName, ConcurrentDictionary<TKey, TEntity> store)
+    {
+        var path = _files.GetOrAdd(physicalName, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
+        var list = store.Values.ToList();
+        var json = JsonSerializer.Serialize(list, _json);
+        File.WriteAllText(path, json);
+    }
+
+    private ConcurrentDictionary<TKey, TEntity> ResolveStore()
+    {
+        var name = ComputePhysicalName();
+        return _stores.GetOrAdd(name, n =>
+        {
+            var s = new ConcurrentDictionary<TKey, TEntity>();
+            var path = Path.Combine(_baseDir, SanitizeFileName(n) + ".json");
+            _files[n] = path;
+            LoadFromDisk(path, s);
+            return s;
+        });
+    }
+
+    private (string name, ConcurrentDictionary<TKey, TEntity> store) ResolveNameAndStore()
+    {
+        var name = ComputePhysicalName();
+        var store = ResolveStore();
+        return (name, store);
+    }
+
+    private static string SanitizeFileName(string physicalName)
+        => physicalName.Replace(':', '.');
+
+    private static string ComputePhysicalName()
+    {
+        var sp = Sora.Core.SoraApp.Current;
+        if (sp is not null)
+        {
+            // Delegate to central naming registry which is set-aware
+            return Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
+        }
+        return typeof(TEntity).Name;
+    }
+
+    private sealed class JsonBatch : IBatchSet<TEntity, TKey>
+    {
+        private readonly JsonRepository<TEntity, TKey> _repo;
+        private readonly List<TEntity> _adds = new();
+    private readonly List<TEntity> _updates = new();
+        private readonly List<TKey> _deletes = new();
+	private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
+
+        public JsonBatch(JsonRepository<TEntity, TKey> repo) => _repo = repo;
+
+        public IBatchSet<TEntity, TKey> Add(TEntity entity) { _adds.Add(entity); return this; }
+        public IBatchSet<TEntity, TKey> Update(TEntity entity) { _updates.Add(entity); return this; }
+        public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
+        public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
+        public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
+
+        public Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        {
+            // apply in-memory mutations before persisting
+        if (_mutations.Count != 0)
+            {
+                foreach (var (id, mutate) in _mutations)
+                {
+                    var curStore = _repo.ResolveStore();
+                    if (curStore.TryGetValue(id, out var current))
+                    {
+                        mutate(current);
+                        _updates.Add(current);
+                    }
+                }
+            }
+            var (name, store) = _repo.ResolveNameAndStore();
+            foreach (var e in _adds) { store[e.Id] = e; }
+            foreach (var e in _updates) { store[e.Id] = e; }
+            var del = 0; foreach (var id in _deletes) if (store.TryRemove(id, out _)) del++;
+            _repo.Persist(name, store);
+            return Task.FromResult(new BatchResult(_adds.Count, _updates.Count, del));
+        }
+    }
+
+    // Adapter stays simple; no auto-ID here by design.
+}

@@ -1,0 +1,53 @@
+name: canary-nightly
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: publish-canary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.collect.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+      - name: Find changed projects since last nightly (dev)
+        id: collect
+        shell: pwsh
+        run: |
+          ./.github/scripts/find-changed-csproj.ps1 -Base "origin/dev~1" -Head "origin/dev" | Out-File matrix.json -Encoding utf8
+          echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+
+  pack-and-push-canary:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.matrix != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '9.0.x' }
+      - name: Pack prerelease to GitHub Packages
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          dotnet pack "${{ matrix.csproj }}" -c Release -p:VersionSuffix=ci.${{ github.run_number }}
+      - name: Push to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dotnet nuget push **/*.nupkg --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --api-key "$GITHUB_TOKEN" --skip-duplicate

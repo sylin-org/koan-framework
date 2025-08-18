@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Sora.Messaging.Inbox</RootNamespace>
+    <AssemblyName>Sora.Messaging.Inbox.InMemory</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sora.Messaging.Abstractions\Sora.Messaging.Abstractions.csproj" />
+    <ProjectReference Include="..\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
+    <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
+  <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.8" />
+  </ItemGroup>
+</Project>
