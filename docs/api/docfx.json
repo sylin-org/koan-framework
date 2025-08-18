@@ -17,7 +17,7 @@
       { "files": ["**/*.md"], "exclude": ["bin/**", "obj/**", "node_modules/**"] }
     ],
     "resource": [ { "files": ["**/images/**"] } ],
-    "dest": "_site",
+  "dest": "../../resources/website/docs",
     "globalMetadata": {
       "_appTitle": "Sora Framework API"
     },
