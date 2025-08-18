@@ -129,16 +129,6 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                     {
                         // MVC controllers handle all endpoints including health
                         endpoints.MapControllers();
-
-                        // Optional lightweight health path (avoid conflict with controller default /api/health)
-                        if (!string.IsNullOrWhiteSpace(opts.HealthPath) && !string.Equals(opts.HealthPath, SoraWebConstants.Routes.ApiHealth, StringComparison.OrdinalIgnoreCase))
-                        {
-                            endpoints.MapGet(opts.HealthPath, async context =>
-                            {
-                                context.Response.ContentType = "application/json";
-                                await context.Response.WriteAsJsonAsync(new { status = "ok" });
-                            });
-                        }
                     });
                 }
                 if (pipeline.UseRateLimiter)

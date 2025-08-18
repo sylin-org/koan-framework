@@ -16,7 +16,6 @@ public sealed class HealthController(IHealthService health, IHostEnvironment env
 {
     // Human-friendly info endpoint; simple up check (no dependencies)
     [HttpGet]
-    [HttpGet(SoraWebConstants.Routes.ApiHealth)] // legacy alias
     public IActionResult Info() => Ok(new { status = "ok" });
 
     // Liveness: process is running; no dependency checks
