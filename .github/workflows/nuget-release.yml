@@ -62,5 +62,18 @@ jobs:
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          dotnet nuget push **/*.nupkg --api-key "$env:NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
-          dotnet nuget push **/*.snupkg --api-key "$env:NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          $source = "https://api.nuget.org/v3/index.json"
+          $pkgs = Get-ChildItem -Recurse -Filter *.nupkg | Where-Object { $_.FullName -notlike "*.symbols.nupkg" }
+          foreach ($p in $pkgs) {
+            Write-Host "Pushing $($p.FullName)" -ForegroundColor Cyan
+            dotnet nuget push "$($p.FullName)" --api-key "$env:NUGET_API_KEY" --source $source --skip-duplicate
+          }
+          $snupkgs = Get-ChildItem -Recurse -Filter *.snupkg -ErrorAction SilentlyContinue
+          if ($snupkgs) {
+            foreach ($s in $snupkgs) {
+              Write-Host "Pushing symbols $($s.FullName)" -ForegroundColor Cyan
+              dotnet nuget push "$($s.FullName)" --api-key "$env:NUGET_API_KEY" --source $source --skip-duplicate
+            }
+          } else {
+            Write-Host "No .snupkg files found; skipping symbol push." -ForegroundColor Yellow
+          }
