@@ -74,18 +74,7 @@ public static class JsonAdapterRegistration
 /// <summary>
 /// Auto-registers the JSON adapter and health contributor during Sora initialization.
 /// </summary>
-public sealed class JsonSoraInitializer : ISoraInitializer
-{
-    public void Initialize(IServiceCollection services)
-    {
-        // Bind if configuration exists; otherwise default JsonDataOptions will be used
-    services.AddOptions<JsonDataOptions>().ValidateDataAnnotations();
-        services.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>, JsonDataOptionsConfigurator>();
-        services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
-        // Auto-register health contributor
-        services.AddHealthContributor<JsonHealthContributor>();
-    }
-}
+// legacy initializer removed in favor of standardized auto-registrar
 
 internal sealed class JsonDataOptionsConfigurator(IConfiguration config) : Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>
 {

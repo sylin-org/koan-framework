@@ -11,6 +11,7 @@ var redisConn = cfg["Sora:Inbox:Redis:ConnectionString"] ?? cfg[$"ConnectionStri
 var mux = await ConnectionMultiplexer.ConnectAsync(redisConn);
 builder.Services.AddSingleton<IConnectionMultiplexer>(mux);
 
+builder.Services.AddControllers();
 var app = builder.Build();
 
 // Build base URL for announce (prefer explicit config, else infer from environment)
@@ -83,32 +84,6 @@ void TryStartAnnouncer()
 
 TryStartAnnouncer();
 
-app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
-app.MapGet("/health/ready", async (IConnectionMultiplexer cm) =>
-{
-    try { var _ = await cm.GetDatabase().PingAsync(); return Results.Ok(new { status = "ready" }); }
-    catch { return Results.StatusCode(503); }
-});
-
-// GET /v1/inbox/{key}
-app.MapGet("/v1/inbox/{key}", async (string key, IConnectionMultiplexer cm) =>
-{
-    var db = cm.GetDatabase();
-    var val = await db.StringGetAsync($"inbox:{key}");
-    if (val.IsNullOrEmpty) return Results.NotFound();
-    return Results.Ok(new { status = "Processed" });
-});
-
-// POST /v1/inbox/mark-processed
-app.MapPost("/v1/inbox/mark-processed", async (MarkRequest req, IConnectionMultiplexer cm) =>
-{
-    if (string.IsNullOrWhiteSpace(req.Key)) return Results.BadRequest();
-    var db = cm.GetDatabase();
-    // Set presence with TTL of 24h; make configurable later
-    await db.StringSetAsync($"inbox:{req.Key}", "1", TimeSpan.FromHours(24));
-    return Results.Ok(new { status = "Processed" });
-});
+app.MapControllers();
 
 app.Run();
-
-record MarkRequest(string Key);

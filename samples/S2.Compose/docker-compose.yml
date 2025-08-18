@@ -15,6 +15,10 @@ services:
       ASPNETCORE_URLS: http://+:5054
       ConnectionStrings__Default: mongodb://mongo:27017
       Sora__Data__Mongo__Database: s2
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_ENVIRONMENT: Development
+  # Sora.Web: running behind a reverse proxy; let proxy own security headers
+      Sora__Web__IsProxiedApi: "true"
   # Enable Swagger UI in non-development per Sora.Web.Swagger policy
       Sora__Web__Swagger__Enabled: "true"
   # Optional OpenTelemetry endpoint (enable by uncommenting the collector service below)

@@ -8,15 +8,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSora()
     .AsWebApi()
+    .AsProxiedApi()
     .WithRateLimit();
-
-// Register CSV transformer for Items (Accept: text/csv)
-builder.Services.AddEntityTransformer<S2.Api.Item, string, S2.Api.ItemCsvTransformer>("text/csv");
 
 // Optional: enable OpenTelemetry based on config/env (Sora:Observability or OTEL_* env vars)
 builder.Services.AddSoraObservability();
-// Optional: add Swagger/OpenAPI (Dev on; non-dev gated by flags). Needed for /swagger UI.
-builder.Services.AddSoraSwagger(builder.Configuration);
+// Swagger/OpenAPI is auto-registered via Sora.Web.Swagger. Call AddSoraSwagger only for custom config.
 
 // Enable Mongo adapter via discovery or explicit registration (optional)
 // builder.Services.AddMongoAdapter();

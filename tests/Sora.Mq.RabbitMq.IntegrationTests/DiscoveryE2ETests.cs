@@ -76,7 +76,9 @@ public class DiscoveryE2ETests : IAsyncLifetime
             channel.BasicAck(ea.DeliveryTag, false);
             await Task.CompletedTask;
         };
-        channel.BasicConsume(queue: q, autoAck: false, consumer: consumer);
+    channel.BasicConsume(queue: q, autoAck: false, consumer: consumer);
+    // Give the consumer a tick to attach before publishing test messages
+    await Task.Delay(10);
 
         // Now build a Sora app configured for discovery
         var services = new ServiceCollection();

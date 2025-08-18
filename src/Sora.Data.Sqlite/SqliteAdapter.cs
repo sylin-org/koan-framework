@@ -40,17 +40,7 @@ public static class SqliteRegistration
     }
 }
 
-public sealed class SqliteSoraInitializer : ISoraInitializer
-{
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddOptions<SqliteOptions>().ValidateDataAnnotations();
-        services.AddSingleton<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>();
-        services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
-        services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
-    }
-}
+// legacy initializer removed in favor of standardized auto-registrar
 
 internal sealed class SqliteOptionsConfigurator(IConfiguration config) : IConfigureOptions<SqliteOptions>
 {

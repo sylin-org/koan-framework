@@ -105,7 +105,7 @@
           </div>
 
           <div class="list" style="margin-top:6px">
-            <div class="todo-row" ng-repeat="it in vm.items track by it.id">
+            <div class="todo-row" ng-repeat="it in vm.items track by (it.id || it.Id || $index)">
               <input type="text" class="form-control form-control-sm" ng-model="it.name" />
               <button class="btn btn-sm btn-outline-light" ng-click="vm.save(it)">Save</button>
               <button class="btn btn-sm btn-outline-danger" ng-click="vm.remove(it)">Delete</button>
@@ -312,7 +312,7 @@ angular.module('s2app', [])
       vm.load();
     });
   };
-  vm.check=function(){ $http.get('/api/health').then(function(r){ vm.health=r.data; }); };
+  vm.check=function(){ $http.get('/health').then(function(r){ vm.health=r.data; }); };
   vm.obs=null; function loadObs(){ $http.get('/.well-known/sora/observability').then(function(r){ vm.obs=r.data; }, function(){ vm.obs=null; }); }
   vm.load(); vm.check(); loadObs();
 });

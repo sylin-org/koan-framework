@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Sora.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Swagger;
@@ -13,12 +13,22 @@ public static class AddSoraSwaggerExtensions
 {
     public static IServiceCollection AddSoraSwagger(this IServiceCollection services, IConfiguration? config = null)
     {
-        config ??= services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        // Idempotency: if Swagger services are already registered, skip to avoid duplicate docs/config actions
+        if (services.Any(d => d.ServiceType == typeof(ISwaggerProvider)))
+        {
+            return services;
+        }
+        if (config is null)
+        {
+            // Delay resolve until app builds; rely on DI at UseSoraSwagger time if needed.
+            // For Add phase, prefer having config passed in; otherwise, we skip config-dependent parts.
+        }
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(c =>
         {
             c.SwaggerDoc("v1", new OpenApiInfo { Title = "Sora API", Version = "v1" });
-            if (GetOptions(config).IncludeXmlComments)
+            var opts = config is not null ? GetOptions(config) : new SoraWebSwaggerOptions();
+            if (opts.IncludeXmlComments)
             {
                 foreach (var xml in GetXmlDocFiles())
                 {
@@ -38,7 +48,7 @@ public static class AddSoraSwaggerExtensions
 
     public static WebApplication UseSoraSwagger(this WebApplication app)
     {
-        var env = app.Environment;
+    var env = app.Environment;
         var cfg = app.Configuration;
         var opts = GetOptions(cfg);
 
@@ -47,10 +57,10 @@ public static class AddSoraSwaggerExtensions
         {
             enabled = opts.Enabled.Value;
         }
-        else if (env.IsProduction())
+        else if (Sora.Core.SoraEnv.IsProduction)
         {
-            enabled = cfg.GetValue<bool?>("Sora__Web__Swagger__Enabled") == true ||
-                      cfg.GetValue<bool?>("Sora:AllowMagicInProduction") == true;
+            enabled = cfg.Read(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
+                  || cfg.Read(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         }
         else
         {
@@ -76,7 +86,7 @@ public static class AddSoraSwaggerExtensions
         });
 
         // Optionally protect UI outside Development
-        if (!env.IsDevelopment() && opts.RequireAuthOutsideDevelopment)
+    if (!Sora.Core.SoraEnv.IsDevelopment && opts.RequireAuthOutsideDevelopment)
         {
             app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments($"/{opts.RoutePrefix}"), b =>
             {
@@ -93,10 +103,10 @@ public static class AddSoraSwaggerExtensions
         var o = new SoraWebSwaggerOptions();
         cfg.GetSection("Sora:Web:Swagger").Bind(o);
     // also support Sora__Web__Swagger__Enabled env var
-        var envEnabled = cfg.GetValue<bool?>("Sora__Web__Swagger__Enabled");
+    var envEnabled = cfg.Read<bool?>(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled);
         if (envEnabled.HasValue) o.Enabled = envEnabled;
     // magic flag unified across Sora
-    var magic = cfg.GetValue<bool?>("Sora:AllowMagicInProduction");
+    var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
     if (magic == true) o.Enabled = true;
         return o;
     }

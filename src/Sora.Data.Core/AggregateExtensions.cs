@@ -80,12 +80,13 @@ public static class AggregateExtensions
     /// </summary>
     public static async Task<object?> Upsert(this object model, CancellationToken ct = default)
     {
+    if (model is null) throw new System.ArgumentNullException(nameof(model));
         var (aggType, keyType) = ResolveAggregateContract(model.GetType());
         var data = DataService();
         var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
-        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, null)!;
+    var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
     var upsert = repo.GetType().GetMethod("UpsertAsync")!;
-        var task = (Task)upsert.Invoke(repo, new object[] { model, ct })!;
+    var task = (Task)upsert.Invoke(repo, new object[] { model, ct })!;
         await task.ConfigureAwait(false);
         var resultProp = task.GetType().GetProperty("Result");
         return resultProp?.GetValue(task);
@@ -97,12 +98,13 @@ public static class AggregateExtensions
     /// </summary>
     public static async Task<bool> Delete(this object model, CancellationToken ct = default)
     {
+    if (model is null) throw new System.ArgumentNullException(nameof(model));
         var type = model.GetType();
         var (aggType, keyType) = ResolveAggregateContract(type);
     var id = Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue(model) ?? throw new System.InvalidOperationException("Model has no identifier");
         var data = DataService();
         var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
-        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, null)!;
+    var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
     var del = repo.GetType().GetMethod("DeleteAsync")!;
         var task = (Task)del.Invoke(repo, new object[] { id, ct })!;
         await task.ConfigureAwait(false);

@@ -31,11 +31,5 @@ public static class InMemoryInboxRegistration
     }
 }
 
-/// Auto-discovery initializer so AddSora() wires the in-memory inbox when referenced.
-public sealed class InMemoryInboxSoraInitializer : ISoraInitializer
-{
-    public void Initialize(IServiceCollection services)
-    {
-        services.TryAddSingleton<IInboxStore, InMemoryInboxStore>();
-    }
-}
+// Auto-discovery initializer so AddSora() wires the in-memory inbox when referenced.
+// legacy initializer removed in favor of standardized auto-registrar

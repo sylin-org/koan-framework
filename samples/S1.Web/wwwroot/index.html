@@ -195,7 +195,7 @@ angular.module('s1app', [])
 .controller('MainCtrl', function($http, requestLog) {
   var vm = this;
   vm.todos = [];
-  vm.check = function() { $http.get('/api/health').then(function(r){ vm.health = r.data; }); };
+  vm.check = function() { $http.get('/health').then(function(r){ vm.health = r.data; }); };
   vm.caps = null; vm.capsLoading = false;
   vm.loadCaps = function(){ vm.capsLoading = true; $http.get('/.well-known/sora/capabilities').then(function(r){ vm.caps = r.data; }).finally(function(){ vm.capsLoading = false; }); };
   vm.requests = requestLog.entries;

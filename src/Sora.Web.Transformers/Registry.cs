@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
+using Sora.Core;
 
 namespace Sora.Web.Transformers;
 
@@ -57,11 +58,12 @@ internal sealed class TransformerRegistry : ITransformerRegistry
 
     public TransformerMatch<TEntity>? ResolveForOutput<TEntity>(IEnumerable<string> acceptTypes)
     {
-    EnsureInitialized();
+        EnsureInitialized();
         if (!_map.TryGetValue(typeof(TEntity), out var list)) return null;
 
         // Build candidate media ranges from Accept: type/subtype[;q=]
-        var ranges = new List<(string Type, string Sub, double Q, int Order)>();
+        var explicitRanges = new List<(string Type, string Sub, double Q, int Order)>();
+        var wildcardRanges = new List<(string Type, string Sub, double Q, int Order)>();
         int order = 0;
         foreach (var accept in acceptTypes)
         {
@@ -79,34 +81,52 @@ internal sealed class TransformerRegistry : ITransformerRegistry
                     }
                 }
                 var ts = media.Split('/'); if (ts.Length != 2) continue;
-                ranges.Add((ts[0].ToLowerInvariant(), ts[1].ToLowerInvariant(), q, order++));
+                var entry = (ts[0].ToLowerInvariant(), ts[1].ToLowerInvariant(), q, order++);
+                if (ts[0] == "*" || ts[1] == "*") wildcardRanges.Add(entry); else explicitRanges.Add(entry);
             }
         }
-        if (ranges.Count == 0) return null;
+        if (explicitRanges.Count == 0 && wildcardRanges.Count == 0) return null;
 
-        // Score registered content types vs ranges: higher q, higher priority, more specific wins
-    (string ct, object tr, int prio, double score, int order)? best = null;
-        foreach (var reg in list)
+        // Prefer explicit Accepts; ignore */* only to allow default JSON to win
+        (string ct, object tr, int prio, double score, int order)? best = null;
+        bool TryScoreAgainst(IEnumerable<(string Type, string Sub, double Q, int Order)> ranges)
         {
-            var ts = reg.ContentType.Split('/'); if (ts.Length != 2) continue;
-            var rType = ts[0].ToLowerInvariant(); var rSub = ts[1].ToLowerInvariant();
-            foreach (var range in ranges)
+            bool any = false;
+            foreach (var reg in list)
             {
-                bool typeMatch = range.Type == "*" || range.Type == rType;
-                bool subMatch = range.Sub == "*" || range.Sub == rSub;
-                if (!typeMatch || !subMatch) continue;
-                // Specificity: exact match (1.0), subtype wildcard (0.8), type wildcard (0.5)
-                double spec = (range.Type == "*" && range.Sub == "*") ? 0.5 : (range.Sub == "*" ? 0.8 : 1.0);
-                double score = range.Q * spec;
-        if (best is null || score > best.Value.score ||
-            (score == best.Value.score && reg.Priority > best.Value.prio) ||
-            (score == best.Value.score && reg.Priority == best.Value.prio && range.Order < best.Value.order))
+                var ts = reg.ContentType.Split('/'); if (ts.Length != 2) continue;
+                var rType = ts[0].ToLowerInvariant(); var rSub = ts[1].ToLowerInvariant();
+                foreach (var range in ranges)
                 {
-            best = (reg.ContentType, reg.Transformer, reg.Priority, score, range.Order);
+                    bool typeMatch = range.Type == "*" || range.Type == rType;
+                    bool subMatch = range.Sub == "*" || range.Sub == rSub;
+                    if (!typeMatch || !subMatch) continue;
+                    any = true;
+                    // Specificity: exact match (1.0), subtype wildcard (0.8), type wildcard (0.5)
+                    double spec = (range.Type == "*" && range.Sub == "*") ? 0.5 : (range.Sub == "*" ? 0.8 : 1.0);
+                    double score = range.Q * spec;
+                    if (best is null || score > best.Value.score ||
+                        (score == best.Value.score && reg.Priority > best.Value.prio) ||
+                        (score == best.Value.score && reg.Priority == best.Value.prio && range.Order < best.Value.order))
+                    {
+                        best = (reg.ContentType, reg.Transformer, reg.Priority, score, range.Order);
+                    }
                 }
             }
+            return any;
         }
-    return best is not null ? new TransformerMatch<TEntity>(best.Value.ct, best.Value.tr) : null;
+
+        // Score explicit ranges first
+        var hadExplicitMatch = TryScoreAgainst(explicitRanges);
+        if (!hadExplicitMatch)
+        {
+            // If only wildcard Accepts (e.g., */*), do NOT force a transformer; let MVC default (JSON) handle it.
+            // Only match wildcards if there was also at least one explicit media range.
+            // This avoids surprising CSV when client doesn't ask for it.
+            return null;
+        }
+
+        return best is not null ? new TransformerMatch<TEntity>(best.Value.ct, best.Value.tr) : null;
     }
 
     public TransformerMatch<TEntity>? ResolveForInput<TEntity>(string contentType)
@@ -169,8 +189,7 @@ public static class TransformerServiceCollectionExtensions
                 b.Bindings.Add(sp =>
                 {
                     var cfg = sp.GetService<IConfiguration>();
-                    var enabled = cfg?.GetValue<bool?>("Sora:Web:Transformers:AutoDiscover")
-                                   ?? true; // default on
+                    var enabled = cfg.Read(Sora.Web.Transformers.Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
                     if (!enabled) return;
 
                     var reg = sp.GetRequiredService<ITransformerRegistry>();
