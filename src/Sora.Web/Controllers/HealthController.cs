@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,42 +9,46 @@ namespace Sora.Web.Controllers;
 
 [ApiController]
 [Produces("application/json")]
-public sealed class HealthController(IServiceScopeFactory scopeFactory) : ControllerBase
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+[Route("health")]
+public sealed class HealthController(IHealthService health, IHostEnvironment env) : ControllerBase
 {
-    // API health endpoint - simple status check
-    [HttpGet("api/health")]
-    public IActionResult Get() => Ok(new { status = "ok" });
+    // Human-friendly info endpoint; simple up check (no dependencies)
+    [HttpGet]
+    [HttpGet("/api/health")] // legacy alias
+    public IActionResult Info() => Ok(new { status = "ok" });
 
-    // Liveness probe - stays healthy unless process is failing hard
-    [HttpGet("/health/live")]
-    public IActionResult Live()
-    {
-        return Ok(new { status = "healthy" });
-    }
+    // Liveness: process is running; no dependency checks
+    [HttpGet("live")]
+    public IActionResult Live() => Ok(new { status = "healthy" });
 
-    // Readiness probe - aggregate contributors; unhealthy only if a critical dependency is unhealthy
-    [HttpGet("/health/ready")]
+    // Readiness: dependencies are ready; returns 503 when any critical check is unhealthy
+    [HttpGet("ready")]
+    [Produces("application/health+json")]
     public async Task<IActionResult> Ready()
     {
-        using var scope = scopeFactory.CreateScope();
-        var hs = scope.ServiceProvider.GetRequiredService<IHealthService>();
-        var (overall, reports) = await hs.CheckAllAsync(HttpContext.RequestAborted);
-        
-        var payload = new
-        {
-            status = overall.ToString().ToLowerInvariant(),
-            details = reports.Select(r => new
+        var (overall, reports) = await health.CheckAllAsync(HttpContext.RequestAborted);
+
+        object payload = env.IsDevelopment()
+            ? new
             {
-                name = r.Name,
-                state = r.State.ToString().ToLowerInvariant(),
-                description = r.Description,
-                data = r.Data
-            })
-        };
-        
+                status = overall.ToString().ToLowerInvariant(),
+                details = reports.Select(r => new
+                {
+                    name = r.Name,
+                    state = r.State.ToString().ToLowerInvariant(),
+                    description = r.Description,
+                    data = r.Data
+                })
+            }
+            : new { status = overall.ToString().ToLowerInvariant() };
+
         if (overall == HealthState.Unhealthy)
+        {
             Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            
+        }
+
+        Response.Headers["Cache-Control"] = "no-store";
         return Ok(payload);
     }
 }
