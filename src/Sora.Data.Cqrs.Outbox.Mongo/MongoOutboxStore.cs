@@ -162,15 +162,7 @@ public static class MongoOutboxRegistration
 }
 
 // Auto-registration for discovery
-public sealed class MongoOutboxSoraInitializer : Sora.Core.ISoraInitializer
-{
-    public void Initialize(IServiceCollection services)
-    {
-        services.BindOutboxOptions<MongoOutboxOptions>("Mongo");
-        services.AddSingleton<MongoOutboxStore>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutboxStoreFactory, MongoOutboxFactory>());
-    }
-}
+// legacy initializer removed in favor of standardized auto-registrar
 
 [Sora.Data.Abstractions.ProviderPriority(20)]
 public sealed class MongoOutboxFactory : IOutboxStoreFactory

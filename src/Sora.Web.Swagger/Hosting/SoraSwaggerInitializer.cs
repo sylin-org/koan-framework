@@ -10,16 +10,7 @@ using Swashbuckle.AspNetCore.Swagger;
 namespace Sora.Web.Swagger.Hosting;
 
 // Auto-register Swagger when the assembly is referenced
-public sealed class SoraSwaggerInitializer : ISoraInitializer
-{
-    public void Initialize(IServiceCollection services)
-    {
-        // Register Swagger services (idempotent)
-        services.AddSoraSwagger();
-        // Auto-wire middleware in the pipeline via startup filter (idempotent)
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IStartupFilter, SoraSwaggerStartupFilter>());
-    }
-}
+// legacy initializer removed in favor of standardized auto-registrar
 
 internal sealed class SoraSwaggerStartupFilter : IStartupFilter
 {

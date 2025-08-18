@@ -549,13 +549,7 @@ internal sealed class RabbitMqHealth : IHealthContributor
 }
 
 // Auto-discovery initializer so AddSora() wires RabbitMQ when referenced
-public sealed class RabbitMqSoraInitializer : ISoraInitializer
-{
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddRabbitMq();
-    }
-}
+// legacy initializer removed in favor of standardized auto-registrar
 
 internal sealed class RabbitMqInboxDiscoveryClient : IInboxDiscoveryClient
 {
