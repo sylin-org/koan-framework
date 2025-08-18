@@ -62,3 +62,4 @@ wwwroot/.cache/
 # Node (future UI work)
 node_modules/
 **/node_modules/
+/other
