@@ -42,12 +42,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Resolve repo root once so all git commands run from a stable working directory
+$Script:RepoRoot = $null
 
 function Invoke-Git {
   param([Parameter(Mandatory=$true)][string[]]$Args)
   $display = ($Args -join ' ')
   Write-Host "git $display" -ForegroundColor DarkGray
-  & git @Args
+  if (-not $Script:RepoRoot) { $Script:RepoRoot = Get-RepoRoot }
+  & git -C $Script:RepoRoot @Args
   if ($LASTEXITCODE -ne 0) { throw "Git failed: git $display" }
 }
 
@@ -123,6 +126,7 @@ if ((Get-CurrentBranch) -ne $DevBranch) { throw "Expected to be on '$DevBranch' 
 Invoke-Git @("pull", $Remote, $DevBranch)
 
 $root = Get-RepoRoot
+$Script:RepoRoot = $root
 $verPath = Join-Path $root 'version.json'
 $ver = Read-VersionJson $verPath
 $old = $ver.version
@@ -133,7 +137,7 @@ Write-Host "[release] version: $old -> $new (bump: $Part)" -ForegroundColor Gree
 $ver.version = $new
 Write-VersionJson $ver $verPath
 
-Invoke-Git @("add", "version.json")
+Invoke-Git @("add", "--", "version.json")
 Invoke-Git @("commit", "-m", "chore: bump version to $new")
 
 if (-not $DryRun) {
