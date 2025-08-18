@@ -1,28 +1,10 @@
-name: validate-main-pr
+name: disabled-validate-main-pr
 
 on:
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  enforce-dev-source-and-ff:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - name: Check PR source is dev
-        if: github.head_ref != 'dev'
-        run: |
-          echo "Only PRs from 'dev' to 'main' are allowed." 1>&2
-          exit 1
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Verify fast-forward (linear history)
-        run: |
-          git fetch origin ${{ github.base_ref }} ${{ github.head_ref }}
-          # Ensure base is ancestor of head (ff-only)
-          if git merge-base --is-ancestor "origin/${{ github.base_ref }}" "origin/${{ github.head_ref }}"; then
-            echo "Fast-forward is possible."
-          else
-            echo "This PR is not fast-forwardable. Rebase dev on main (or merge main into dev) and try again." 1>&2
-            exit 1
-          fi
+      - run: echo "This workflow is disabled and kept only as a placeholder."

@@ -1,7 +1,8 @@
 name: nuget-release
+
 on:
   push:
-    tags: [ 'v*.*.*' ]
+    branches: [ main ]
   workflow_dispatch:
 
 concurrency:
@@ -11,18 +12,25 @@ concurrency:
 jobs:
   pack-and-push-all:
     runs-on: windows-latest
+    permissions:
+      contents: write
     env:
       NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/setup-dotnet@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
+
       - name: Install nuget.exe
         uses: nuget/setup-nuget@v2
+
       - name: Generate icon.png (256x256) from resources/image/0_2.jpg
         shell: pwsh
         run: |
@@ -48,42 +56,54 @@ jobs:
                 $y = [int](($size - $newH) / 2)
                 $rect = New-Object System.Drawing.Rectangle($x, $y, $newW, $newH)
                 $gfx.DrawImage($src, $rect)
-              } finally {
-                $gfx.Dispose()
-              }
+              } finally { $gfx.Dispose() }
               $outPath = Join-Path $pwd 'icon.png'
               $bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
               Write-Host "icon.png generated at $outPath"
-            } finally {
-              $bmp.Dispose()
-              $src.Dispose()
-            }
+            } finally { $bmp.Dispose(); $src.Dispose() }
           } else {
             Write-Host "No resources/image/0_2.jpg found; skipping icon generation."
           }
+
       - name: Restore
         shell: pwsh
         run: |
-          $list = 
-            & pwsh -NoProfile -ExecutionPolicy Bypass -File ./.github/scripts/find-packable-csproj.ps1
+          $list = & pwsh -NoProfile -ExecutionPolicy Bypass -File ./.github/scripts/find-packable-csproj.ps1
           foreach ($p in $list) {
             Write-Host "Restoring $p" -ForegroundColor Cyan
             dotnet restore "$p"
           }
+
       - name: Compute version
         id: nbgv
         shell: pwsh
         run: |
-          # Ensure the nbgv tool is available (update if present, install otherwise)
           dotnet tool update --global nbgv || dotnet tool install --global nbgv
-          # Resolve the nbgv executable reliably on Windows runners
           $nbgv = (Get-Command nbgv -ErrorAction SilentlyContinue)?.Source
-          if (-not $nbgv) {
-            $nbgv = Join-Path $env:USERPROFILE ".dotnet/tools/nbgv.exe"
-          }
+          if (-not $nbgv) { $nbgv = Join-Path $env:USERPROFILE ".dotnet/tools/nbgv.exe" }
           if (-not (Test-Path $nbgv)) { throw "nbgv tool not found on PATH or at $nbgv" }
           $nugetVersion = & $nbgv get-version -v NuGetPackageVersion
+          $simple = & $nbgv get-version -v SimpleVersion
           echo "NUGETVERSION=$nugetVersion" >> $env:GITHUB_OUTPUT
+          echo "SIMPLEVERSION=$simple" >> $env:GITHUB_OUTPUT
+
+      - name: Create and push tag (v{SimpleVersion}) if missing
+        shell: pwsh
+        env:
+          SIMPLE: ${{ steps.nbgv.outputs.SIMPLEVERSION }}
+        run: |
+          if (-not $env:SIMPLE) { throw "No SimpleVersion computed" }
+          $tag = "v$env:SIMPLE"
+          git fetch --tags
+          if (git rev-parse -q --verify "refs/tags/$tag") {
+            Write-Host "Tag $tag already exists."
+          } else {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a $tag -m "Release $tag"
+            git push origin $tag
+          }
+
       - name: Pack all src projects (stable)
         shell: pwsh
         run: |
@@ -92,15 +112,19 @@ jobs:
           New-Item -ItemType Directory -Path artifacts -Force | Out-Null
           foreach ($p in $list) {
             Write-Host "Packing $p" -ForegroundColor Cyan
-            dotnet pack "$p" -c Release -o artifacts
+            dotnet pack "$p" -c Release -o artifacts -p:PublicRelease=true
           }
+
       - name: Pack meta packages
-        run: pwsh ./.github/scripts/pack-meta.ps1 -Version "${{ steps.nbgv.outputs.NUGETVERSION }}" -OutDir artifacts
+        shell: pwsh
+        run: pwsh ./.github/scripts/pack-meta.ps1 -Version "${{ steps.nbgv.outputs.SIMPLEVERSION }}" -OutDir artifacts
+
       - name: Verify NUGET_API_KEY present
         shell: pwsh
         run: |
           if (-not $env:NUGET_API_KEY) { throw "NUGET_API_KEY is empty or not provided" }
           Write-Host "NUGET_API_KEY supplied (length: $($env:NUGET_API_KEY.Length))"
+
       - name: Push all to nuget.org
         shell: pwsh
         env:
