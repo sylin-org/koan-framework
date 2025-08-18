@@ -140,6 +140,7 @@ Options & configuration
 - Use `Sora.Core.Configuration.Read[...]` and `ReadFirst[...]` for config access. Avoid ad-hoc `cfg["..."]` and direct `Environment.GetEnvironmentVariable` reads.
 - Keep constant keys in canonical `:` form; the helper translates env/provider shapes internally.
 - Name the per-assembly constants class `Constants` and rely on namespaces for clarity (e.g., `Sora.Web.Swagger.Infrastructure.Constants`). Use using-aliases when multiple `Constants` are required in the same file.
+ - When an `IConfiguration cfg` is in scope, prefer the extension methods `cfg.Read(...)` and `cfg.ReadFirst(...)` for brevity; use `Sora.Core.Configuration.Read(...)` when no `cfg` is readily available.
 
 Heuristics (choose lifetime)
 1) Does it hold mutable state across calls? If yes, can it be internal and thread-safe? → Singleton; otherwise Transient.

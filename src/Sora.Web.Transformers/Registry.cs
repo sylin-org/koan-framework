@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
+using Sora.Core;
 
 namespace Sora.Web.Transformers;
 
@@ -188,7 +189,7 @@ public static class TransformerServiceCollectionExtensions
                 b.Bindings.Add(sp =>
                 {
                     var cfg = sp.GetService<IConfiguration>();
-                    var enabled = Sora.Core.Configuration.Read(cfg, Sora.Web.Transformers.Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
+                    var enabled = cfg.Read(Sora.Web.Transformers.Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
                     if (!enabled) return;
 
                     var reg = sp.GetRequiredService<ITransformerRegistry>();

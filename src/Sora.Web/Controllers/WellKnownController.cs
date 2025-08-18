@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Sora.Core;
 using Sora.Core.Observability;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
@@ -39,7 +40,7 @@ public sealed class WellKnownController(
         var opts = obsOptions?.Value ?? new ObservabilityOptions();
         // Respect OTLP env vars if Options not configured
         var otlpEndpoint = opts.Otlp.Endpoint
-            ?? Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Endpoint, null);
+            ?? cfg.Read<string?>(Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Endpoint, null);
 
         var payload = new
         {

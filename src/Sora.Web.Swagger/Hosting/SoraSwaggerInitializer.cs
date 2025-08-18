@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core;
 using Swashbuckle.AspNetCore.Swagger;
 
 namespace Sora.Web.Swagger.Hosting;
@@ -35,8 +36,8 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
                 }
                 else if (env?.IsProduction() == true)
                 {
-                    enabled = Sora.Core.Configuration.Read(cfg, Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
-                  || Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+                    enabled = cfg.Read(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
+                  || cfg.Read(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
                 }
                 else
                 {
@@ -79,9 +80,9 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
     {
         var o = new SoraWebSwaggerOptions();
         try { cfg?.GetSection("Sora:Web:Swagger").Bind(o); } catch { }
-    var envEnabled = Sora.Core.Configuration.Read<bool?>(cfg, Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled);
+    var envEnabled = cfg.Read<bool?>(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled);
         if (envEnabled.HasValue) o.Enabled = envEnabled;
-    var magic = Sora.Core.Configuration.Read<bool?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
+    var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
         if (magic == true) o.Enabled = true;
         return o;
     }

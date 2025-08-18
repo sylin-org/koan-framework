@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Sora.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Swagger;
@@ -58,8 +59,8 @@ public static class AddSoraSwaggerExtensions
         }
         else if (Sora.Core.SoraEnv.IsProduction)
         {
-            enabled = Sora.Core.Configuration.Read(cfg, Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
-                  || Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+            enabled = cfg.Read(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
+                  || cfg.Read(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         }
         else
         {
@@ -102,10 +103,10 @@ public static class AddSoraSwaggerExtensions
         var o = new SoraWebSwaggerOptions();
         cfg.GetSection("Sora:Web:Swagger").Bind(o);
     // also support Sora__Web__Swagger__Enabled env var
-    var envEnabled = Sora.Core.Configuration.Read<bool?>(cfg, Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled);
+    var envEnabled = cfg.Read<bool?>(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled);
         if (envEnabled.HasValue) o.Enabled = envEnabled;
     // magic flag unified across Sora
-    var magic = Sora.Core.Configuration.Read<bool?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
+    var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
     if (magic == true) o.Enabled = true;
         return o;
     }
