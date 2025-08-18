@@ -11,6 +11,7 @@ public static class SoraWebConstants
         public const string XFrameOptions = "X-Frame-Options";
         public const string ReferrerPolicy = "Referrer-Policy";
         public const string ContentSecurityPolicy = "Content-Security-Policy";
+    public const string XXssProtection = "X-XSS-Protection"; // deprecated; remove if present
         public const string SoraTraceId = "Sora-Trace-Id";
     }
 

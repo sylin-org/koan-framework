@@ -96,9 +96,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     {
     // Mark Accept as a content-variant
     Response.Headers["Vary"] = "Accept";
-        Response.Headers["Sora-Access-Read"] = CanRead.ToString().ToLowerInvariant();
-        Response.Headers["Sora-Access-Write"] = CanWrite.ToString().ToLowerInvariant();
-        Response.Headers["Sora-Access-Remove"] = CanRemove.ToString().ToLowerInvariant();
+    Response.Headers["Sora-Access-Read"] = CanRead.ToString().ToLowerInvariant();
+    Response.Headers["Sora-Access-Write"] = CanWrite.ToString().ToLowerInvariant();
+    Response.Headers["Sora-Access-Remove"] = CanRemove.ToString().ToLowerInvariant();
         return new ObjectResult(content);
     }
 
@@ -307,7 +307,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
         if (!await runner.AfterCollectionAsync(ctx, list)) return ctx.ShortCircuitResult!;
         var (replaced, transformed) = await runner.EmitCollectionAsync(ctx, list);
-        foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
+    foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
         return PrepareResponse(transformed);
     }
 

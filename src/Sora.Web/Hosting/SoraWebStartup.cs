@@ -91,14 +91,25 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                 }
                 if (opts.EnableSecureHeaders)
                 {
-                    app.Use(async (ctx, next) =>
+                    app.Use((ctx, next) =>
                     {
-                        ctx.Response.Headers.TryAdd(SoraWebConstants.Headers.XContentTypeOptions, SoraWebConstants.Policies.NoSniff);
-                        ctx.Response.Headers.TryAdd(SoraWebConstants.Headers.XFrameOptions, SoraWebConstants.Policies.Deny);
-                        ctx.Response.Headers.TryAdd(SoraWebConstants.Headers.ReferrerPolicy, SoraWebConstants.Policies.NoReferrer);
-                        if (!string.IsNullOrWhiteSpace(opts.ContentSecurityPolicy))
-                            ctx.Response.Headers[SoraWebConstants.Headers.ContentSecurityPolicy] = opts.ContentSecurityPolicy;
-                        await next();
+                        // Ensure headers are normalized just before sending
+                        ctx.Response.OnStarting(() =>
+                        {
+                            var headers = ctx.Response.Headers;
+                            if (headers.ContainsKey(SoraWebConstants.Headers.XXssProtection))
+                                headers.Remove(SoraWebConstants.Headers.XXssProtection);
+                            if (!headers.ContainsKey(SoraWebConstants.Headers.XContentTypeOptions))
+                                headers[SoraWebConstants.Headers.XContentTypeOptions] = SoraWebConstants.Policies.NoSniff;
+                            if (!headers.ContainsKey(SoraWebConstants.Headers.XFrameOptions))
+                                headers[SoraWebConstants.Headers.XFrameOptions] = SoraWebConstants.Policies.Deny;
+                            if (!headers.ContainsKey(SoraWebConstants.Headers.ReferrerPolicy))
+                                headers[SoraWebConstants.Headers.ReferrerPolicy] = SoraWebConstants.Policies.NoReferrer;
+                            if (!string.IsNullOrWhiteSpace(opts.ContentSecurityPolicy) && !headers.ContainsKey(SoraWebConstants.Headers.ContentSecurityPolicy))
+                                headers[SoraWebConstants.Headers.ContentSecurityPolicy] = opts.ContentSecurityPolicy;
+                            return Task.CompletedTask;
+                        });
+                        return next();
                     });
                 }
                 if (opts.AutoMapControllers)
