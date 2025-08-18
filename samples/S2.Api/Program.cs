@@ -8,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSora()
     .AsWebApi()
+    .AsProxiedApi()
     .WithRateLimit();
 
 // Optional: enable OpenTelemetry based on config/env (Sora:Observability or OTEL_* env vars)
