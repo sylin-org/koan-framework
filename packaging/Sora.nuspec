@@ -8,8 +8,11 @@
     <owners>Sylin Labs</owners>
   <license type="expression">Apache-2.0</license>
     <projectUrl>https://github.com/sylin-labs/sora-framework</projectUrl>
+  <repository type="git" url="https://github.com/sylin-labs/sora-framework.git" />
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
   <description>Meta-package for Sora: core runtime, data abstractions, and JSON adapter for an out-of-the-box experience. Published under the Sylin.Sora.* namespace.</description>
+  <readme>README.md</readme>
+  <icon>icon.png</icon>
     <packageTypes>
       <packageType name="Dependency" />
     </packageTypes>
@@ -23,4 +26,8 @@
     </dependencies>
   <tags>sora sylin meta-package data json</tags>
   </metadata>
+  <files>
+    <file src="README.md" target="/" />
+    <file src="icon.png" target="/" />
+  </files>
 </package>

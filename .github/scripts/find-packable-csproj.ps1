@@ -1,18 +1,27 @@
 param()
-# Emits a list of packable csproj files under src/** (defaults to true for class library SDK projects)
+# Emits a list of packable csproj files under src/**
+# Defaults to true for SDK-style class libraries; Web SDK must opt-in via Pack/IsPackable=true
 $roots = @((Resolve-Path "$PSScriptRoot/../../src").Path)
 Get-ChildItem -Recurse -Path $roots -Filter *.csproj |
   Where-Object {
     $xml = [xml](Get-Content -Raw $_.FullName)
-    $sdk = $xml.Project.Sdk
+    $sdk = [string]$xml.Project.Sdk
     $isWebSdk = $sdk -like '*Microsoft.NET.Sdk.Web*'
-    if ($isWebSdk) {
-      # Only include explicit packable web projects (services) if they opt-in
-      $pack = ($xml.Project.PropertyGroup.Pack + ' ' + $xml.Project.PropertyGroup.IsPackable) -join ' '
-      return ($pack -match '(?i)true')
+    # Collect explicit Pack/IsPackable values across all PropertyGroups (may be multiple)
+    $vals = @()
+    foreach ($pg in @($xml.Project.PropertyGroup)) {
+      if ($null -ne $pg.Pack) { $vals += [string]$pg.Pack }
+      if ($null -ne $pg.IsPackable) { $vals += [string]$pg.IsPackable }
     }
-    $packable = $xml.Project.PropertyGroup.Pack -or $xml.Project.PropertyGroup.IsPackable
-    if ($packable -eq $null -or [string]::IsNullOrWhiteSpace($packable)) { return $true }
-    [string]::Equals("$packable", 'true', 'OrdinalIgnoreCase')
+    $joined = ($vals -join ' ').Trim()
+
+    if ($isWebSdk) {
+      # Only include web projects if they explicitly opt in
+      return ($joined -match '(?i)\btrue\b')
+    }
+
+    # For non-web projects, default include when not specified
+    if ([string]::IsNullOrWhiteSpace($joined)) { return $true }
+    return ($joined -match '(?i)\btrue\b')
   } |
   ForEach-Object { $_.FullName }
