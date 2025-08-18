@@ -31,6 +31,7 @@ These are default assumptions for all code. Follow them unless a documented ADR 
 5) Class/file layout and co-location
 - Do: keep one public/top-level class per file. If a helper is a true satellite of a main type, prefer nesting it inside the main class rather than creating a separate file.
 - Do: allow interfaces and attributes to share the same file only when they address the exact same concern; name the file after the concern (e.g., AuthorizationHooks.cs).
+- Do: Separate concerns into different files (e.g., controllers, services, models).
 - Don’t: co-locate unrelated types in the same file. Ensure filenames reflect their primary concern.
 
 ## Working conventions

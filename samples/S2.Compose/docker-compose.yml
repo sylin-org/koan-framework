@@ -18,9 +18,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_ENVIRONMENT: Development
   # Sora.Web: running behind a reverse proxy; let proxy own security headers
-  Sora__Web__IsProxiedApi: "true"
+      Sora__Web__IsProxiedApi: "true"
   # Enable Swagger UI in non-development per Sora.Web.Swagger policy
-  Sora__Web__Swagger__Enabled: "true"
+      Sora__Web__Swagger__Enabled: "true"
   # Optional OpenTelemetry endpoint (enable by uncommenting the collector service below)
   # OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
     depends_on:

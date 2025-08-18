@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Sora.Web;
 
@@ -52,22 +54,8 @@ public static class ServiceCollectionExtensions
             j.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
 
         });
-        // Add input formatter if available
-        services.PostConfigure<Microsoft.AspNetCore.Mvc.MvcOptions>(mvcOpts =>
-        {
-            try
-            {
-                var formatterType = Type.GetType("Sora.Web.Transformers.EntityInputTransformFormatter, Sora.Web.Transformers");
-                if (formatterType is not null)
-                {
-                    var sp = services.BuildServiceProvider();
-                    var formatter = (Microsoft.AspNetCore.Mvc.Formatters.IInputFormatter?)ActivatorUtilities.CreateInstance(sp, formatterType);
-                    if (formatter is not null)
-                        mvcOpts.InputFormatters.Insert(0, formatter);
-                }
-            }
-            catch { /* optional */ }
-        });
+    // Add input formatter via DI-aware options configurator (no early ServiceProvider build)
+    services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, OptionalTransformerInputFormatterConfigurator>());
         services.AddOptions<WebPipelineOptions>();
 
         // Observability is wired in Sora.Core's AddSoraObservability; Sora.Web only ensures core web services are present.
@@ -124,8 +112,27 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection SuppressSecurityHeaders(this IServiceCollection services)
         => services.AsProxiedApi();
 
-    // Back-compat alias (typo). Remove in a future major version.
-    [Obsolete("Use SuppressSecurityHeaders() instead.")]
-    public static IServiceCollection SupressSecurityHeaders(this IServiceCollection services)
-        => services.SuppressSecurityHeaders();
+}
+
+// Internal DI-aware configurator to register optional transformer input formatter when package is present
+internal sealed class OptionalTransformerInputFormatterConfigurator : IConfigureOptions<MvcOptions>
+{
+    private readonly IServiceProvider _sp;
+    public OptionalTransformerInputFormatterConfigurator(IServiceProvider sp) => _sp = sp;
+
+    public void Configure(MvcOptions options)
+    {
+        try
+        {
+            var formatterType = Type.GetType("Sora.Web.Transformers.EntityInputTransformFormatter, Sora.Web.Transformers");
+            if (formatterType is null) return;
+            var formatter = (Microsoft.AspNetCore.Mvc.Formatters.IInputFormatter?)ActivatorUtilities.CreateInstance(_sp, formatterType);
+            if (formatter is not null)
+            {
+                // Put first so it can claim matching content types before JSON
+                options.InputFormatters.Insert(0, formatter);
+            }
+        }
+        catch { /* optional */ }
+    }
 }
