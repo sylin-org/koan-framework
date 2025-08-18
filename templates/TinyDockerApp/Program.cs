@@ -24,6 +24,4 @@ app.UseSoraSwagger();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.MapGet("/", () => Results.Redirect("/index.html"));
-
 app.Run($"http://0.0.0.0:__PORT__");

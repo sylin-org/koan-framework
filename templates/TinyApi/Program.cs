@@ -18,6 +18,4 @@ app.UseSoraSwagger();
 
 app.UseStaticFiles();
 
-app.MapGet("/", () => Results.Redirect("/swagger"));
-
 app.Run($"http://localhost:__PORT__");
