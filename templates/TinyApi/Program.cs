@@ -9,12 +9,12 @@ builder.Services.AsWebApi();
 // JSON adapter is auto-discovered when referenced; explicit call optional
 // builder.Services.AddJsonAdapter();
 
-builder.Services.AddSoraSwagger();
+// Swagger auto-registers via Sora initializer
 
 var app = builder.Build();
 
 app.UseSoraWeb();
-app.UseSoraSwagger();
+// Swagger UI wired automatically by startup filter
 
 app.UseStaticFiles();
 

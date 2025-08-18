@@ -9,12 +9,12 @@ builder.Services.AsWebApi();
 
 builder.Services.AddSqliteAdapter(o => o.ConnectionString = "Data Source=./data/app.db");
 
-builder.Services.AddSoraSwagger();
+// Swagger auto-registers via Sora initializer
 
 var app = builder.Build();
 
 app.UseSoraWeb();
-app.UseSoraSwagger();
+// Swagger UI wired automatically by startup filter
 
 app.UseStaticFiles();
 

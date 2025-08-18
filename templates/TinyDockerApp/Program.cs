@@ -14,12 +14,12 @@ var cs = builder.Configuration.GetConnectionString("mongo")
 
 builder.Services.AddMongoAdapter(o => o.ConnectionString = cs);
 
-builder.Services.AddSoraSwagger();
+// Swagger auto-registers via Sora initializer
 
 var app = builder.Build();
 
 app.UseSoraWeb();
-app.UseSoraSwagger();
+// Swagger UI wired automatically by startup filter
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
