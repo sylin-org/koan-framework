@@ -79,6 +79,24 @@ Layering defaults (see ADR-0011)
 - Tests prioritize clarity over cleverness. Keep setup small; prefer builders over mocking frameworks.
 - Public APIs have concise XML docs or markdown snippets where helpful.
 
+## Auto-registration (reference = intent)
+
+Standard
+- Intent to use a Sora module is expressed by adding a reference. Every package must self-register when referenced.
+- Each assembly exposes a single registrar at `/Initialization/SoraAutoRegistrar.cs` implementing `Sora.Core.ISoraAutoRegistrar`.
+- Registrar contract:
+  - Initialize(IServiceCollection): wire services and options. Keep idempotent; avoid provider rebuilds.
+  - Describe(SoraBootstrapReport, IConfiguration, IHostEnvironment): add a module header and a few key settings to the startup report.
+
+Describe expectations
+- Include stable, high-signal settings (flags, route prefixes, provider names). Avoid volatile values.
+- Redact secrets by marking values with `isSecret: true`; the runtime will de-identify values.
+- Keep output short: tokens like key=value; and optional brief notes.
+
+Hygiene
+- Do not keep placeholder initializers. Remove empty/non-functional files.
+- If an assembly already contains internal `ISoraInitializer` helpers for discovery, ensure the registrar doesn’t duplicate the same work.
+
 ## PR checklist (short)
 - Readability: can a new contributor follow the flow without prior context?
 - Simplicity: is there a less clever, more obvious way?

@@ -12,6 +12,11 @@ public static class AddSoraSwaggerExtensions
 {
     public static IServiceCollection AddSoraSwagger(this IServiceCollection services, IConfiguration? config = null)
     {
+        // Idempotency: if Swagger services are already registered, skip to avoid duplicate docs/config actions
+        if (services.Any(d => d.ServiceType == typeof(ISwaggerProvider)))
+        {
+            return services;
+        }
         if (config is null)
         {
             // Delay resolve until app builds; rely on DI at UseSoraSwagger time if needed.

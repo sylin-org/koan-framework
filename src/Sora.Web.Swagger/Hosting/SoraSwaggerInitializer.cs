@@ -10,7 +10,7 @@ using Swashbuckle.AspNetCore.Swagger;
 namespace Sora.Web.Swagger.Hosting;
 
 // Auto-register Swagger when the assembly is referenced
-// legacy initializer removed in favor of standardized auto-registrar
+// Startup filter remains; auto-registration is provided via Initialization/SoraAutoRegistrar.
 
 internal sealed class SoraSwaggerStartupFilter : IStartupFilter
 {

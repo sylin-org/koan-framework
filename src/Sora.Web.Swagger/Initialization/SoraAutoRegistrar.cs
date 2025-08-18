@@ -14,7 +14,11 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddSoraSwagger();
+        // Guard to prevent duplicate Swagger registration if the app already called AddSoraSwagger()
+        if (!services.Any(d => d.ServiceType == typeof(ISwaggerProvider)))
+        {
+            services.AddSoraSwagger();
+        }
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.SoraSwaggerStartupFilter>());
     }
 

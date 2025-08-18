@@ -24,7 +24,7 @@ public sealed class HealthController(IHealthService health, IHostEnvironment env
 
     // Readiness: dependencies are ready; returns 503 when any critical check is unhealthy
     [HttpGet(SoraWebConstants.Routes.HealthReady)]
-    [Produces("application/health+json")]
+    [Produces("application/health+json", "application/json")]
     public async Task<IActionResult> Ready()
     {
         var (overall, reports) = await health.CheckAllAsync(HttpContext.RequestAborted);

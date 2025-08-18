@@ -13,8 +13,7 @@ builder.Services.AddSora()
 
 // Optional: enable OpenTelemetry based on config/env (Sora:Observability or OTEL_* env vars)
 builder.Services.AddSoraObservability();
-// Optional: add Swagger/OpenAPI (Dev on; non-dev gated by flags). Needed for /swagger UI.
-builder.Services.AddSoraSwagger(builder.Configuration);
+// Swagger/OpenAPI is auto-registered via Sora.Web.Swagger. Call AddSoraSwagger only for custom config.
 
 // Enable Mongo adapter via discovery or explicit registration (optional)
 // builder.Services.AddMongoAdapter();

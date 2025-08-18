@@ -312,7 +312,7 @@ angular.module('s2app', [])
       vm.load();
     });
   };
-  vm.check=function(){ $http.get('/api/health').then(function(r){ vm.health=r.data; }); };
+  vm.check=function(){ $http.get('/health').then(function(r){ vm.health=r.data; }); };
   vm.obs=null; function loadObs(){ $http.get('/.well-known/sora/observability').then(function(r){ vm.obs=r.data; }, function(){ vm.obs=null; }); }
   vm.load(); vm.check(); loadObs();
 });
