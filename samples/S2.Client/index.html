@@ -105,7 +105,7 @@
           </div>
 
           <div class="list" style="margin-top:6px">
-            <div class="todo-row" ng-repeat="it in vm.items track by it.id">
+            <div class="todo-row" ng-repeat="it in vm.items track by (it.id || it.Id || $index)">
               <input type="text" class="form-control form-control-sm" ng-model="it.name" />
               <button class="btn btn-sm btn-outline-light" ng-click="vm.save(it)">Save</button>
               <button class="btn btn-sm btn-outline-danger" ng-click="vm.remove(it)">Delete</button>

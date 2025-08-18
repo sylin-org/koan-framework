@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using System.Diagnostics;
+using Sora.Web.Infrastructure;
 
 namespace Sora.Web.Hosting;
 
@@ -92,11 +93,11 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                 {
                     app.Use(async (ctx, next) =>
                     {
-                        ctx.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
-                        ctx.Response.Headers.TryAdd("X-Frame-Options", "DENY");
-                        ctx.Response.Headers.TryAdd("Referrer-Policy", "no-referrer");
+                        ctx.Response.Headers.TryAdd(SoraWebConstants.Headers.XContentTypeOptions, SoraWebConstants.Policies.NoSniff);
+                        ctx.Response.Headers.TryAdd(SoraWebConstants.Headers.XFrameOptions, SoraWebConstants.Policies.Deny);
+                        ctx.Response.Headers.TryAdd(SoraWebConstants.Headers.ReferrerPolicy, SoraWebConstants.Policies.NoReferrer);
                         if (!string.IsNullOrWhiteSpace(opts.ContentSecurityPolicy))
-                            ctx.Response.Headers["Content-Security-Policy"] = opts.ContentSecurityPolicy;
+                            ctx.Response.Headers[SoraWebConstants.Headers.ContentSecurityPolicy] = opts.ContentSecurityPolicy;
                         await next();
                     });
                 }
@@ -109,7 +110,7 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                         var traceId = Activity.Current?.TraceId.ToString();
                         if (!string.IsNullOrEmpty(traceId))
                         {
-                            ctx.Response.Headers["Sora-Trace-Id"] = traceId;
+                            ctx.Response.Headers[SoraWebConstants.Headers.SoraTraceId] = traceId;
                         }
                         await next();
                     });
@@ -119,7 +120,7 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                         endpoints.MapControllers();
 
                         // Optional lightweight health path (avoid conflict with controller default /api/health)
-                        if (!string.IsNullOrWhiteSpace(opts.HealthPath) && !string.Equals(opts.HealthPath, "/api/health", StringComparison.OrdinalIgnoreCase))
+                        if (!string.IsNullOrWhiteSpace(opts.HealthPath) && !string.Equals(opts.HealthPath, SoraWebConstants.Routes.ApiHealth, StringComparison.OrdinalIgnoreCase))
                         {
                             endpoints.MapGet(opts.HealthPath, async context =>
                             {

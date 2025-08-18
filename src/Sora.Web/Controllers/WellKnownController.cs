@@ -14,7 +14,7 @@ namespace Sora.Web.Controllers;
 
 [ApiController]
 [Produces("application/json")]
-[Route(".well-known/sora")]
+[Route(SoraWebConstants.Routes.WellKnownBase)]
 public sealed class WellKnownController(
     IHostEnvironment env,
     IOptions<SoraWebOptions> webOptions,
@@ -60,10 +60,10 @@ public sealed class WellKnownController(
                 exporter = new { type = string.IsNullOrWhiteSpace(otlpEndpoint) ? "none" : "otlp", endpoint = otlpEndpoint }
             },
             propagation = new[] { "tracecontext", "baggage" },
-            headers = new { responseTraceHeader = "Sora-Trace-Id" }
+            headers = new { responseTraceHeader = SoraWebConstants.Headers.SoraTraceId }
         };
 
-        Response.Headers.CacheControl = "no-store";
+        Response.Headers.CacheControl = SoraWebConstants.Policies.NoStore;
         return Ok(payload);
     }
 
@@ -111,7 +111,7 @@ public sealed class WellKnownController(
         var payload = new
         {
             aggregates = items,
-            links = new[] { new { rel = "observability", href = "/.well-known/sora/observability" } }
+            links = new[] { new { rel = "observability", href = $"/{SoraWebConstants.Routes.WellKnownBase}/{SoraWebConstants.Routes.WellKnownObservability}" } }
         };
         return Ok(payload);
     }

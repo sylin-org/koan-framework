@@ -29,6 +29,7 @@ public sealed class AggregateIdentityManager : IAggregateIdentityManager
     where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
+    if (entity is null) return ValueTask.CompletedTask;
         var (prop, isString, isGuid) = GetIdProp<TEntity>();
         if (prop is null) return ValueTask.CompletedTask;
 

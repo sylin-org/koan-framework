@@ -21,8 +21,10 @@ public static class DataServiceExecuteExtensions
     var id = AggregateMetadata.GetIdSpec(typeof(TEntity)) ?? throw new InvalidOperationException($"No Identifier on {typeof(TEntity).Name}");
     var keyType = id.Prop.PropertyType;
     var mi = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository));
-    var gm = mi!.MakeGenericMethod(typeof(TEntity), keyType);
-    var repo = gm.Invoke(data, null)!;
+    if (mi is null) throw new InvalidOperationException("IDataService.GetRepository method not found.");
+    var gm = mi.MakeGenericMethod(typeof(TEntity), keyType);
+    // Invoke the generic method on the instance 'data' (target must be the instance for non-static methods)
+    var repo = gm.Invoke(data, Array.Empty<object>())!;
     if (repo is IInstructionExecutor<TEntity> exec)
         {
             return await exec.ExecuteAsync<TResult>(instruction, ct);

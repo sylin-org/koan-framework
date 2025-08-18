@@ -4,26 +4,27 @@ using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using System.Linq;
 using System.Threading.Tasks;
+using Sora.Web.Infrastructure;
 
 namespace Sora.Web.Controllers;
 
 [ApiController]
 [Produces("application/json")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-[Route("health")]
+[Route(SoraWebConstants.Routes.HealthBase)]
 public sealed class HealthController(IHealthService health, IHostEnvironment env) : ControllerBase
 {
     // Human-friendly info endpoint; simple up check (no dependencies)
     [HttpGet]
-    [HttpGet("/api/health")] // legacy alias
+    [HttpGet(SoraWebConstants.Routes.ApiHealth)] // legacy alias
     public IActionResult Info() => Ok(new { status = "ok" });
 
     // Liveness: process is running; no dependency checks
-    [HttpGet("live")]
+    [HttpGet(SoraWebConstants.Routes.HealthLive)]
     public IActionResult Live() => Ok(new { status = "healthy" });
 
     // Readiness: dependencies are ready; returns 503 when any critical check is unhealthy
-    [HttpGet("ready")]
+    [HttpGet(SoraWebConstants.Routes.HealthReady)]
     [Produces("application/health+json")]
     public async Task<IActionResult> Ready()
     {
@@ -48,7 +49,7 @@ public sealed class HealthController(IHealthService health, IHostEnvironment env
             Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
         }
 
-        Response.Headers["Cache-Control"] = "no-store";
+    Response.Headers["Cache-Control"] = SoraWebConstants.Policies.NoStore;
         return Ok(payload);
     }
 }

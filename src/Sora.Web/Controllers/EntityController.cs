@@ -14,6 +14,7 @@ using Sora.Data.Core;
 using Sora.Domain;
 using Sora.Web.Filtering;
 using Sora.Web.Hooks;
+using Sora.Web.Infrastructure;
 
 namespace Sora.Web.Controllers;
 
@@ -57,8 +58,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     var beh = GetType().GetCustomAttributes(typeof(SoraDataBehaviorAttribute), true).FirstOrDefault() as SoraDataBehaviorAttribute;
         if (q.TryGetValue("q", out var vq)) opts.Q = vq.FirstOrDefault();
     if (q.TryGetValue("page", out var vp) && int.TryParse(vp, out var p) && p > 0) opts.Page = p; else opts.Page = 1;
-    var maxSize = beh?.MaxPageSize ?? 200;
-    var defSize = beh?.DefaultPageSize ?? 50;
+    var maxSize = beh?.MaxPageSize ?? SoraWebConstants.Defaults.MaxPageSize;
+    var defSize = beh?.DefaultPageSize ?? SoraWebConstants.Defaults.DefaultPageSize;
     if (q.TryGetValue("size", out var vs) && int.TryParse(vs, out var s) && s > 0) opts.PageSize = Math.Min(s, maxSize); else opts.PageSize = defSize;
         if (q.TryGetValue("sort", out var vsort))
         {
@@ -364,6 +365,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpPost("")]
     public virtual async Task<IActionResult> Upsert([FromBody][ValidateNever] TEntity model, CancellationToken ct)
     {
+    if (model is null) return BadRequest(new { error = "Request body is required" });
         if (!CanWrite) return Forbid();
         var repo = HttpContext.RequestServices.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>();
         var caps = Capabilities(repo);
@@ -389,7 +391,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpPost("bulk")]
     public virtual async Task<IActionResult> UpsertMany([FromBody][ValidateNever] IEnumerable<TEntity> models, CancellationToken ct)
     {
-        if (!CanWrite) return Forbid();
+    if (models is null) return BadRequest(new { error = "Request body is required" });
+    if (!CanWrite) return Forbid();
         var repo = HttpContext.RequestServices.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>();
         var caps = Capabilities(repo);
         var writes = WriteCaps(repo);
@@ -398,7 +401,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var runner = GetRunner();
 
         // Run per-model BeforeSave hooks and ensure IDs via facade
-        var list = models?.ToList() ?? [];
+    var list = models.ToList();
+    if (list.Count == 0) return BadRequest(new { error = "At least one item is required" });
+    if (list.Any(m => m is null)) return BadRequest(new { error = "Null items are not allowed" });
         foreach (var m in list) await runner.BeforeSaveAsync(ctx, m);
 
         var count = await Data<TEntity, TKey>.UpsertManyAsync(list, ct);
