@@ -46,8 +46,12 @@ public static class SoraEnv
                         || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST"));
         bool isCi = string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase)
                  || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TF_BUILD"));
-        bool magic = (cfg?.GetValue<bool?>("Sora:AllowMagicInProduction") ?? false)
-                  || string.Equals(Environment.GetEnvironmentVariable("Sora__AllowMagicInProduction"), "true", StringComparison.OrdinalIgnoreCase);
+        // Read flag with precedence (env var overrides config) via SoraConfig
+        bool magic = Sora.Core.Configuration.SoraConfig.Read<bool>(
+            cfg,
+            Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction,
+            false
+        );
         return new Snapshot(envName, isDev, isProd, isStg, inContainer, isCi, magic, DateTimeOffset.UtcNow);
     }
 
