@@ -17,12 +17,12 @@ public static class ServiceCollectionExtensions
 
         using var tmp = services.BuildServiceProvider();
         var cfg = tmp.GetService<IConfiguration>();
-        var env = tmp.GetService<IHostEnvironment>();
+    var env = tmp.GetService<IHostEnvironment>();
         var opts = tmp.GetService<Microsoft.Extensions.Options.IOptions<ObservabilityOptions>>()?.Value ?? new ObservabilityOptions();
 
         var enabled = opts.Enabled;
         var otlpEndpoint = opts.Otlp.Endpoint ?? cfg?["OTEL_EXPORTER_OTLP_ENDPOINT"];
-        if (string.IsNullOrWhiteSpace(otlpEndpoint) && env?.IsProduction() == true)
+    if (string.IsNullOrWhiteSpace(otlpEndpoint) && (SoraEnv.IsProduction || env?.IsProduction() == true))
         {
             enabled = false;
         }

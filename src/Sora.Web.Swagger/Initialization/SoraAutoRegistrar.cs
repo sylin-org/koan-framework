@@ -31,7 +31,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         if (envEnabled.HasValue) o.Enabled = envEnabled;
         var magic = cfg.GetValue<bool?>("Sora:AllowMagicInProduction");
         if (magic == true) o.Enabled = true;
-        report.AddSetting("Enabled", (o.Enabled ?? !env.IsProduction()).ToString());
+    report.AddSetting("Enabled", (o.Enabled ?? !SoraEnv.IsProduction).ToString());
         report.AddSetting("RoutePrefix", o.RoutePrefix);
         report.AddSetting("RequireAuthOutsideDevelopment", o.RequireAuthOutsideDevelopment.ToString());
         report.AddSetting("IncludeXmlComments", o.IncludeXmlComments.ToString());

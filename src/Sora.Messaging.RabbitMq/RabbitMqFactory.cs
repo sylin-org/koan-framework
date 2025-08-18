@@ -264,7 +264,8 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         }
 
     // Determine effective provisioning default: true normally, false in Production unless Sora:AllowMagicInProduction = true
-    bool isProd = string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase);
+    bool isProd = false;
+    try { isProd = Sora.Core.SoraEnv.IsProduction; } catch { isProd = string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase); }
     bool allowMagic = string.Equals((configRoot?["Sora:AllowMagicInProduction"] ?? "false"), "true", StringComparison.OrdinalIgnoreCase);
     bool provisionExplicit = cfg["ProvisionOnStart"] is not null; // detect explicit config presence
     bool provisionEffective = provisionExplicit ? opts.ProvisionOnStart : (!isProd || allowMagic);

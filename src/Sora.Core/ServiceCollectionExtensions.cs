@@ -23,6 +23,8 @@ public static class ServiceCollectionExtensions
             logging.AddFilter("Sora", LogLevel.Information);
         });
 
+    // Best-effort early initialization when provider is built later
+
     services.AddSingleton<IHealthRegistry, HealthRegistry>();
     services.AddSingleton<IHealthAnnouncementsStore, HealthAnnouncements>();
     services.AddSingleton<IHealthAnnouncer>(sp => (HealthAnnouncements)sp.GetRequiredService<IHealthAnnouncementsStore>());

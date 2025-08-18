@@ -47,7 +47,7 @@ public static class AddSoraSwaggerExtensions
 
     public static WebApplication UseSoraSwagger(this WebApplication app)
     {
-        var env = app.Environment;
+    var env = app.Environment;
         var cfg = app.Configuration;
         var opts = GetOptions(cfg);
 
@@ -56,10 +56,10 @@ public static class AddSoraSwaggerExtensions
         {
             enabled = opts.Enabled.Value;
         }
-        else if (env.IsProduction())
+    else if (Sora.Core.SoraEnv.IsProduction)
         {
             enabled = cfg.GetValue<bool?>("Sora__Web__Swagger__Enabled") == true ||
-                      cfg.GetValue<bool?>("Sora:AllowMagicInProduction") == true;
+              cfg.GetValue<bool?>("Sora:AllowMagicInProduction") == true;
         }
         else
         {
@@ -85,7 +85,7 @@ public static class AddSoraSwaggerExtensions
         });
 
         // Optionally protect UI outside Development
-        if (!env.IsDevelopment() && opts.RequireAuthOutsideDevelopment)
+    if (!Sora.Core.SoraEnv.IsDevelopment && opts.RequireAuthOutsideDevelopment)
         {
             app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments($"/{opts.RoutePrefix}"), b =>
             {

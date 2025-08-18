@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Sora.Core;
 
 namespace Sora.Messaging;
 
@@ -69,6 +70,7 @@ public sealed class InboxDiscoveryPolicy : IInboxDiscoveryPolicy
 
     private static bool IsProduction()
     {
+    try { return SoraEnv.IsProduction; } catch { }
         var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
                   ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
         return string.Equals(env, "Production", StringComparison.OrdinalIgnoreCase);
