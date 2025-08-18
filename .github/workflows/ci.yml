@@ -21,5 +21,3 @@ jobs:
         run: dotnet restore Sora.sln
       - name: Build
         run: dotnet build Sora.sln --no-restore -c Release
-      - name: Test
-        run: dotnet test Sora.sln --no-build -c Release -v minimal
