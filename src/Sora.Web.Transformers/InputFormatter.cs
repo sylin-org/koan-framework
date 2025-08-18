@@ -40,13 +40,15 @@ internal sealed class EntityInputTransformFormatter : InputFormatter
         }
         else entityType = modelType;
 
-        var contentType = http.Request.ContentType ?? string.Empty;
+    var contentType = http.Request.ContentType ?? string.Empty;
         var resolver = typeof(ITransformerRegistry).GetMethod(nameof(ITransformerRegistry.ResolveForInput))!.MakeGenericMethod(entityType);
         var match = resolver.Invoke(_registry, new object?[] { contentType });
-        if (match is null) return await InputFormatterResult.FailureAsync();
+    // If no matching transformer, let the next formatter handle (likely JSON)
+    if (match is null) return await InputFormatterResult.NoValueAsync();
         var transformer = match.GetType().GetProperty("Transformer")!.GetValue(match)!;
 
-        using var body = http.Request.Body;
+    // Don't dispose the request body; the framework owns it
+    var body = http.Request.Body;
         if (isMany)
         {
             var mi = transformer.GetType().GetMethod("ParseManyAsync")!;

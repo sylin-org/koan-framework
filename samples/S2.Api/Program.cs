@@ -10,9 +10,6 @@ builder.Services.AddSora()
     .AsWebApi()
     .WithRateLimit();
 
-// Register CSV transformer for Items (Accept: text/csv)
-builder.Services.AddEntityTransformer<S2.Api.Item, string, S2.Api.ItemCsvTransformer>("text/csv");
-
 // Optional: enable OpenTelemetry based on config/env (Sora:Observability or OTEL_* env vars)
 builder.Services.AddSoraObservability();
 // Optional: add Swagger/OpenAPI (Dev on; non-dev gated by flags). Needed for /swagger UI.
