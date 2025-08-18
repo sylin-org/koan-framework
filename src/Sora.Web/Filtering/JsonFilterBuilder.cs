@@ -161,11 +161,15 @@ public static class JsonFilterBuilder
         // Handle strings and primitives; coerce to member type when possible
         if (member.Type == typeof(string))
         {
-            var items = arrayNode.EnumerateArray().Select(e => e.ValueKind == JsonValueKind.String ? e.GetString() : e.ToString()).ToList();
+            // Coerce to non-null strings to avoid List<string?> nullability mismatch
+            var items = arrayNode
+                .EnumerateArray()
+                .Select(e => e.ValueKind == JsonValueKind.String ? (e.GetString() ?? string.Empty) : (e.ToString() ?? string.Empty))
+                .ToList();
             if (opts.IgnoreCase)
             {
-                items = items.Select(s => (s ?? string.Empty).ToLower()).ToList();
-                var loweredMember = Expression.Call(Expression.Coalesce(member, Expression.Constant(string.Empty)), nameof(string.ToLower), Type.EmptyTypes);
+                items = items.Select(s => s.ToLowerInvariant()).ToList();
+                var loweredMember = Expression.Call(Expression.Coalesce(member, Expression.Constant(string.Empty)), nameof(string.ToLowerInvariant), Type.EmptyTypes);
                 var constExprLower = Expression.Constant(items);
                 var containsLower = typeof(Enumerable)
                     .GetMethods()

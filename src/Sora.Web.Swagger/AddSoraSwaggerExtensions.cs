@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -13,12 +12,17 @@ public static class AddSoraSwaggerExtensions
 {
     public static IServiceCollection AddSoraSwagger(this IServiceCollection services, IConfiguration? config = null)
     {
-        config ??= services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        if (config is null)
+        {
+            // Delay resolve until app builds; rely on DI at UseSoraSwagger time if needed.
+            // For Add phase, prefer having config passed in; otherwise, we skip config-dependent parts.
+        }
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(c =>
         {
             c.SwaggerDoc("v1", new OpenApiInfo { Title = "Sora API", Version = "v1" });
-            if (GetOptions(config).IncludeXmlComments)
+            var opts = config is not null ? GetOptions(config) : new SoraWebSwaggerOptions();
+            if (opts.IncludeXmlComments)
             {
                 foreach (var xml in GetXmlDocFiles())
                 {
