@@ -1,0 +1,64 @@
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# .NET build outputs
+bin/
+obj/
+out/
+artifacts/
+TestResults/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/packages/
+project.lock.json
+*.nuget.props
+*.nuget.g.props
+*.nuget.targets
+
+# Logs & coverage
+*.log
+coverage/
+*.coverage
+*.coveragexml
+*.opencover.xml
+lcov.info
+
+# Docker/compose (override files)
+**/docker-compose.override.yml
+
+# Data files generated at runtime
+*.db
+*.db3
+# Avoid ignoring the Sora.Data.Sqlite project folder; scope sqlite file ignores to data dirs
+/data/**/*.sqlite
+/data/**/*.sqlite3
+/samples/**/data/**/*.sqlite
+/samples/**/data/**/*.sqlite3
+
+# Repo-specific data rules
+# Ignore sample/local data directories, but keep the tracked root sample file
+/samples/**/data/
+/data/**
+!/data/Todo.json
+
+# Web build artifacts
+wwwroot/dist/
+wwwroot/.cache/
+
+# Node (future UI work)
+node_modules/
+**/node_modules/
