@@ -22,10 +22,10 @@ Learning Path: progressive tutorials you can complete in focused sessions.
 - [Module 4: CQRS & Messaging — Commands, queries, events](04-commands-and-events.md)
 - [Module 5: Production Patterns — Observability and health](05-production-ready.md)
 - [Module 6 (optional): Advanced Capstone — Microservices with containers](06-capstone-project.md)
+  
+Continuations:
 
-Bonus:
-
-- [Add another database (Mongo) and copy data between stores](02b-mongo-and-migration.md)
+- [Module 2B: Add another database (Mongo) and copy data between stores](02b-mongo-and-migration.md)
 
 If you’re short on time, do Modules 0, 1, 3, and 5 for the essentials.
 

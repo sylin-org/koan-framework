@@ -1,4 +1,4 @@
-# Bonus: Add another database (Mongo) and copy data between stores
+# Module 2B — Add another database (Mongo) and copy data between stores
 
 In this bonus step, you’ll: (1) add MongoDB as another data store, (2) map a model to Mongo with attributes, and (3) copy data from SQLite to Mongo.
 

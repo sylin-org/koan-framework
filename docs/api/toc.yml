@@ -15,7 +15,7 @@
       href: quickstart/01-hello-sora-api.md
     - name: Module 2 - SQLite Upgrade
       href: quickstart/02-sqlite-upgrade.md
-    - name: Bonus - Mongo & Migration
+    - name: Module 2B - Mongo & Migration
       href: quickstart/02b-mongo-and-migration.md
     - name: Module 3 - Production APIs
       href: quickstart/03-proper-apis.md

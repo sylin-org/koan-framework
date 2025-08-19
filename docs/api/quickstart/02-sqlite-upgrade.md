@@ -45,4 +45,7 @@ dotnet run
 
 Create a task, stop the app, run again — data persists now.
 
-Next: Production APIs → 03-proper-apis.md
+## Next steps
+
+- Continue to [Module 2B: Add another database (Mongo) and copy data between stores](02b-mongo-and-migration.md)
+- Then go to Production APIs → [Module 3](03-proper-apis.md)
