@@ -1,0 +1,104 @@
+- name: Decisions
+  href: index.md
+- name: Architecture (ARCH)
+  items:
+    - name: Config and constants naming
+      href: 0040-config-and-constants-naming.md
+    - name: DDD docs and glossary
+      href: 0034-ddd-documentation-and-glossary.md
+    - name: SoraEnv static runtime
+      href: 0039-soraenv-static-runtime.md
+- name: Data (DATA)
+  items:
+    - name: Postgres adapter
+      href: 0047-postgres-adapter.md
+    - name: Instruction constants
+      href: 0050-instruction-name-constants-and-scoping.md
+    - name: Direct commands API
+      href: 0049-direct-commands-api.md
+    - name: Direct routing via instruction executors
+      href: 0051-direct-routing-via-instruction-executors.md
+    - name: Dapper boundary; Direct uses ADO.NET
+      href: 0052-relational-dapper-boundary-and-direct-ado.md
+    - name: SQLite DDL policy
+      href: 0046-sqlite-schema-governance-ddl-policy.md
+    - name: Paging guardrails and tracing
+      href: 0044-paging-guardrails-and-tracing-must.md
+    - name: Default projection policy
+      href: 0045-default-projection-policy-and-json-pushdown.md
+    - name: Entity sets routing and suffixing
+      href: 0030-entity-sets-routing-and-storage-suffixing.md
+    - name: JSON filter language
+      href: 0029-json-filter-language-and-endpoint.md
+    - name: Filter ignore-case option
+      href: 0031-filter-ignore-case-option.md
+    - name: Relational schema toolkit
+      href: 0005-relational-schema-toolkit.md
+    - name: Instruction execution API
+      href: 0006-instruction-execution-api.md
+    - name: LINQ-to-SQL helper
+      href: 0007-relational-linq-to-sql-helper.md
+    - name: Transactional batch and concurrency
+      href: 0007-transactional-batch-and-concurrency.md
+    - name: Relational command caching
+      href: 0008-relational-command-caching.md
+    - name: Unify on IEntity
+      href: 0009-unify-on-ientity.md
+    - name: Entity extensions naming
+      href: 0016-entity-extensions-naming-and-parity.md
+    - name: Storage naming conventions
+      href: 0017-storage-naming-conventions.md
+    - name: Centralized naming registry and DX
+      href: 0018-centralized-naming-registry-and-dx.md
+    - name: Outbox helper and defaults
+      href: 0019-outbox-helper-and-defaults.md
+    - name: Outbox provider discovery and priority
+      href: 0020-outbox-provider-discovery-and-priority.md
+    - name: Query capabilities flag
+      href: 0002-query-capabilities-flag.md
+    - name: Write capabilities and bulk markers
+      href: 0003-write-capabilities-and-bulk-markers.md
+    - name: Index anchoring and JSON mapping
+      href: 0004-index-anchoring-and-json-mapping.md
+- name: Web (WEB)
+  items:
+    - name: Web templates and rate limiters
+      href: 0012-web-templates-and-rate-limiters.md
+    - name: GraphQL module and controller
+      href: 0041-graphql-module-and-controller.md
+    - name: GraphQL naming and discovery
+      href: 0042-graphql-naming-and-discovery.md
+    - name: EntityController transformers
+      href: 0035-entitycontroller-transformers.md
+- name: Messaging (MESS)
+  items:
+    - name: Messaging capabilities and negotiation
+      href: 0021-messaging-capabilities-and-negotiation.md
+    - name: MQ provisioning, aliases, dispatcher
+      href: 0022-mq-provisioning-aliases-and-dispatcher.md
+    - name: Alias defaults and DefaultGroup
+      href: 0023-alias-defaults-default-group-and-onmessage.md
+    - name: Batch semantics and aliasing
+      href: 0024-batch-semantics-and-aliasing.md
+    - name: Inbox contract and client
+      href: 0025-inbox-contract-and-client.md
+    - name: Discovery over MQ policy
+      href: 0026-discovery-over-mq-policy.md
+    - name: Standalone MQ services and naming
+      href: 0027-standalone-mq-services-and-naming.md
+- name: Ops (OPS)
+  items:
+    - name: Mongo container default host
+      href: 0043-mongo-container-default-host.md
+    - name: Samples port allocation
+      href: 0014-samples-port-allocation.md
+    - name: Default configuration fallback
+      href: 0015-default-configuration-fallback.md
+- name: DevEx (DX)
+  items:
+    - name: Tiny templates family
+      href: 0037-tiny-templates-family.md
+    - name: Auto-registration
+      href: 0038-auto-registration.md
+    - name: Sylin prefix and package IDs
+      href: 0036-sylin-prefix-and-package-ids.md
