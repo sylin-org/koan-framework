@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>S4 GraphQL Client (Alpine.js)</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="container" x-data="itemsApp()" x-init="init()">
+    <h1>Items (GraphQL)</h1>
+
+    <div class="actions">
+      <button @click="seed(5)">Seed 5</button>
+      <button @click="clearAll()">Clear</button>
+      <input x-model="name" placeholder="New item name" />
+      <button @click="add()">Add</button>
+    </div>
+
+    <div class="list">
+      <template x-for="it in items" :key="it.id">
+        <div class="row"> <span x-text="it.display ?? it.name"></span> </div>
+      </template>
+    </div>
+  </div>
+
+  <script>
+    function itemsApp() {
+      const endpoint = '/graphql';
+      async function gql(query, variables) {
+        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) });
+        const data = await res.json();
+        if (data.errors) throw new Error(data.errors.map(e => e.message).join('; '));
+        return data.data;
+      }
+      return {
+        items: [], name: '',
+        async init() { await this.load(); },
+        async load() {
+          const q = `query($page:Int,$size:Int){ items(page:$page,size:$size){ items{ id name display } totalCount } }`;
+          const data = await gql(q, { page: 1, size: 50 });
+          this.items = data.items.items;
+        },
+        async add() {
+          if (!this.name) return;
+          const m = `mutation($input: ItemInput!){ upsertItem(input:$input){ id name display } }`;
+          await gql(m, { input: { name: this.name } });
+          this.name = '';
+          await this.load();
+        },
+        async seed(n) {
+          await fetch('/api/items/seed/' + n, { method: 'POST' });
+          await this.load();
+        },
+        async clearAll() {
+          await fetch('/api/items/clear', { method: 'DELETE' });
+          await this.load();
+        }
+      }
+    }
+  </script>
+</body>
+</html>

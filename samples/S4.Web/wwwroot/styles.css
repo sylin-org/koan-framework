@@ -1,0 +1,6 @@
+body{font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif;margin:2rem;background:#fafafa;color:#222}
+.container{max-width:720px;margin:0 auto}
+.actions{display:flex;gap:.5rem;align-items:center;margin-bottom:1rem}
+.row{padding:.5rem;border-bottom:1px solid #eee}
+button{padding:.4rem .8rem}
+input{padding:.4rem .6rem}

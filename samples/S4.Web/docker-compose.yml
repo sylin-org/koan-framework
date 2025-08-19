@@ -1,0 +1,27 @@
+version: '3.9'
+services:
+  mongo:
+    image: mongo:7
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  s4:
+    build:
+      context: ../..
+      dockerfile: samples/S4.Web/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:5064
+      ConnectionStrings__Default: mongodb://mongo:27017
+      Sora__Data__Mongo__Database: s4
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_ENVIRONMENT: Development
+      Sora__Web__IsProxiedApi: "true"
+      Sora__Web__Swagger__Enabled: "true"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "5064:5064"
+    command: ["dotnet", "S4.Web.dll"]
