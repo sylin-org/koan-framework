@@ -30,7 +30,7 @@ internal static class MongoTelemetry
 public sealed class MongoOptions
 {
     [Required]
-    public string ConnectionString { get; set; } = string.Empty; // resolved by configurator
+    public string ConnectionString { get; set; } = MongoConstants.DefaultLocalUri; // safe default even without configurator
     [Required]
     public string Database { get; set; } = "sora";
     public Func<Type,string>? CollectionName { get; set; }
@@ -54,6 +54,8 @@ public static class MongoRegistration
     {
         services.AddOptions<MongoOptions>().ValidateDataAnnotations();
         if (configure is not null) services.Configure(configure);
+    // Ensure health contributor is available even outside Sora bootstrap
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
         return services;
     }

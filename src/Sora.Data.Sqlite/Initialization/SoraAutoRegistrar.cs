@@ -37,5 +37,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         report.AddSetting("ConnectionString", cs, isSecret: true);
         report.AddSetting("NamingStyle", o.NamingStyle.ToString());
         report.AddSetting("Separator", o.Separator);
+    // Announce schema capability per acceptance criteria
+    report.AddSetting("EnsureCreatedSupported", true.ToString());
     }
 }
