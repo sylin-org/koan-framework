@@ -21,6 +21,29 @@ using Sora.Data.Relational.Linq;
 
 namespace Sora.Data.Sqlite;
 
+internal sealed class SqliteHealthContributor(IOptions<SqliteOptions> options) : IHealthContributor
+{
+    public string Name => "data:sqlite";
+    public bool IsCritical => true;
+    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await using var conn = new SqliteConnection(options.Value.ConnectionString);
+            await conn.OpenAsync(ct);
+            // trivial probe
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "PRAGMA user_version;";
+            _ = await cmd.ExecuteScalarAsync(ct);
+            return new HealthReport(Name, HealthState.Healthy);
+        }
+        catch (Exception ex)
+        {
+            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, ex);
+        }
+    }
+}
+
 public sealed class SqliteOptions
 {
     [Required]
@@ -35,6 +58,8 @@ public static class SqliteRegistration
     {
         services.AddOptions<SqliteOptions>().ValidateDataAnnotations();
         if (configure is not null) services.Configure(configure);
+        // Ensure health contributor is available even outside Sora bootstrap
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
         return services;
     }
@@ -87,6 +112,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly SqliteOptions _options;
     private readonly IStorageNameResolver _nameResolver;
     private readonly StorageNameResolver.Convention _conv;
+    private readonly ILinqSqlDialect _dialect = new SqliteDialect();
 
     public SqliteRepository(IServiceProvider sp, SqliteOptions options, IStorageNameResolver resolver)
     {
@@ -201,14 +227,46 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
-        // Minimal: load all then filter in-memory; future: translate to SQL
-    ct.ThrowIfCancellationRequested();
-    var all = await QueryAsync((object?)null, ct);
-        return all.AsQueryable().Where(predicate).ToList();
+        // Translate predicate to SQL WHERE via relational LINQ translator
+        ct.ThrowIfCancellationRequested();
+        var translator = new LinqWhereTranslator<TEntity>(_dialect);
+        try
+        {
+            var (whereSql, parameters) = translator.Translate(predicate);
+            using var conn = Open();
+            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql}";
+            var dyn = new DynamicParameters();
+            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
+            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+            return rows.Select(FromRow).ToList();
+        }
+        catch (NotSupportedException)
+        {
+            // Safe fallback: in-memory filtering for unsupported shapes
+            var all = await QueryAsync((object?)null, ct);
+            return all.AsQueryable().Where(predicate).ToList();
+        }
     }
 
     public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    => Task.FromResult(QueryAsync(predicate, ct).Result.Count);
+    {
+        ct.ThrowIfCancellationRequested();
+        var translator = new LinqWhereTranslator<TEntity>(_dialect);
+        try
+        {
+            var (whereSql, parameters) = translator.Translate(predicate);
+            using var conn = Open();
+            var sql = $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
+            var dyn = new DynamicParameters();
+            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
+            return conn.ExecuteScalarAsync<int>(sql, dyn);
+        }
+        catch (NotSupportedException)
+        {
+            // Fallback to materialize + count
+            return Task.FromResult(QueryAsync(predicate, ct).Result.Count);
+        }
+    }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
     {
@@ -284,7 +342,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         using var conn = Open();
-        using var tx = conn.BeginTransaction();
+    using var tx = conn.BeginTransaction();
         var count = 0;
         foreach (var e in models)
         {
@@ -325,7 +383,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+    public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
         {
             // Apply mutations by loading entities then queueing as updates
             foreach (var (id, mutate) in _mutations)
@@ -335,10 +393,48 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             }
             var upserts = _adds.Concat(_updates);
             var added = _adds.Count; var updated = _updates.Count;
-            if (upserts.Any()) await repo.UpsertManyAsync(upserts, ct);
-            var deleted = 0; if (_deletes.Any()) deleted = await repo.DeleteManyAsync(_deletes, ct);
-            return new BatchResult(added, updated, deleted);
+            var requireAtomic = options?.RequireAtomic == true;
+            if (!requireAtomic)
+            {
+                if (upserts.Any()) await repo.UpsertManyAsync(upserts, ct);
+                var deleted = 0; if (_deletes.Any()) deleted = await repo.DeleteManyAsync(_deletes, ct);
+                return new BatchResult(added, updated, deleted);
+            }
+
+            // Atomic path: single transaction
+            using var conn = repo.Open();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                foreach (var e in upserts)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var row = ToRowFull(e);
+                    await conn.ExecuteAsync($"INSERT INTO [{repo.TableName}] (Id, Title, Meta, Json) VALUES (@Id, @Title, @Meta, @Json) ON CONFLICT(Id) DO UPDATE SET Title = excluded.Title, Meta = excluded.Meta, Json = excluded.Json;", new { row.Id, row.Title, row.Meta, row.Json }, tx);
+                }
+                var deleted = 0;
+                if (_deletes.Any())
+                {
+                    deleted = await conn.ExecuteAsync($"DELETE FROM [{repo.TableName}] WHERE Id IN @Ids", new { Ids = _deletes.Select(i => i!.ToString()!).ToArray() }, tx);
+                }
+                tx.Commit();
+                return new BatchResult(added, updated, deleted);
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
         }
+    }
+
+    // Minimal SQLite dialect for LINQ translation
+    private sealed class SqliteDialect : ILinqSqlDialect
+    {
+        public string QuoteIdent(string ident) => $"[{ident}]";
+        public string EscapeLike(string fragment)
+            => fragment.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        public string Parameter(int index) => $"@p{index}";
     }
 
     // IInstructionExecutor implementation for schema and raw SQL helpers

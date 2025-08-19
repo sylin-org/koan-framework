@@ -20,6 +20,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddSingleton<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
+        // Health contributor for readiness checks
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
     }
 
