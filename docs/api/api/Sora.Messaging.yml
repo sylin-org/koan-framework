@@ -1,0 +1,313 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Messaging
+  commentId: N:Sora.Messaging
+  id: Sora.Messaging
+  children:
+  - Sora.Messaging.Batch`1
+  - Sora.Messaging.DelaySecondsAttribute
+  - Sora.Messaging.DiscoveryOptions
+  - Sora.Messaging.DlqOptions
+  - Sora.Messaging.EffectiveMessagingPlan
+  - Sora.Messaging.HeaderAttribute
+  - Sora.Messaging.IInboxDiscoveryClient
+  - Sora.Messaging.IInboxDiscoveryPolicy
+  - Sora.Messaging.IInboxStore
+  - Sora.Messaging.IMessageBus
+  - Sora.Messaging.IMessageBusFactory
+  - Sora.Messaging.IMessageBusSelector
+  - Sora.Messaging.IMessageHandler`1
+  - Sora.Messaging.IMessagingCapabilities
+  - Sora.Messaging.IMessagingDiagnostics
+  - Sora.Messaging.ITypeAliasRegistry
+  - Sora.Messaging.IdempotencyKeyAttribute
+  - Sora.Messaging.InboxClientOptions
+  - Sora.Messaging.InboxConfigurationExtensions
+  - Sora.Messaging.InboxDiscoveryPolicy
+  - Sora.Messaging.MessageAttribute
+  - Sora.Messaging.MessageEnvelope
+  - Sora.Messaging.MessagingExtensions
+  - Sora.Messaging.MessagingExtensions.MessageHandlerBuilder
+  - Sora.Messaging.MessagingOptions
+  - Sora.Messaging.MessagingServiceCollectionExtensions
+  - Sora.Messaging.Negotiation
+  - Sora.Messaging.PartitionKeyAttribute
+  - Sora.Messaging.RetryOptions
+  - Sora.Messaging.SensitiveAttribute
+  langs:
+  - csharp
+  - vb
+  name: Sora.Messaging
+  nameWithType: Sora.Messaging
+  fullName: Sora.Messaging
+  type: Namespace
+  assemblies:
+  - Sora.Messaging.Abstractions
+references:
+- uid: Sora.Messaging.IMessageBus
+  commentId: T:Sora.Messaging.IMessageBus
+  parent: Sora.Messaging
+  href: Sora.Messaging.IMessageBus.html
+  name: IMessageBus
+  nameWithType: IMessageBus
+  fullName: Sora.Messaging.IMessageBus
+- uid: Sora.Messaging.IMessageHandler`1
+  commentId: T:Sora.Messaging.IMessageHandler`1
+  href: Sora.Messaging.IMessageHandler-1.html
+  name: IMessageHandler<T>
+  nameWithType: IMessageHandler<T>
+  fullName: Sora.Messaging.IMessageHandler<T>
+  nameWithType.vb: IMessageHandler(Of T)
+  fullName.vb: Sora.Messaging.IMessageHandler(Of T)
+  name.vb: IMessageHandler(Of T)
+  spec.csharp:
+  - uid: Sora.Messaging.IMessageHandler`1
+    name: IMessageHandler
+    href: Sora.Messaging.IMessageHandler-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: Sora.Messaging.IMessageHandler`1
+    name: IMessageHandler
+    href: Sora.Messaging.IMessageHandler-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: Sora.Messaging.MessageEnvelope
+  commentId: T:Sora.Messaging.MessageEnvelope
+  parent: Sora.Messaging
+  href: Sora.Messaging.MessageEnvelope.html
+  name: MessageEnvelope
+  nameWithType: MessageEnvelope
+  fullName: Sora.Messaging.MessageEnvelope
+- uid: Sora.Messaging.ITypeAliasRegistry
+  commentId: T:Sora.Messaging.ITypeAliasRegistry
+  href: Sora.Messaging.ITypeAliasRegistry.html
+  name: ITypeAliasRegistry
+  nameWithType: ITypeAliasRegistry
+  fullName: Sora.Messaging.ITypeAliasRegistry
+- uid: Sora.Messaging.IMessagingCapabilities
+  commentId: T:Sora.Messaging.IMessagingCapabilities
+  parent: Sora.Messaging
+  href: Sora.Messaging.IMessagingCapabilities.html
+  name: IMessagingCapabilities
+  nameWithType: IMessagingCapabilities
+  fullName: Sora.Messaging.IMessagingCapabilities
+- uid: Sora.Messaging.MessageAttribute
+  commentId: T:Sora.Messaging.MessageAttribute
+  href: Sora.Messaging.MessageAttribute.html
+  name: MessageAttribute
+  nameWithType: MessageAttribute
+  fullName: Sora.Messaging.MessageAttribute
+- uid: Sora.Messaging.PartitionKeyAttribute
+  commentId: T:Sora.Messaging.PartitionKeyAttribute
+  href: Sora.Messaging.PartitionKeyAttribute.html
+  name: PartitionKeyAttribute
+  nameWithType: PartitionKeyAttribute
+  fullName: Sora.Messaging.PartitionKeyAttribute
+- uid: Sora.Messaging.HeaderAttribute
+  commentId: T:Sora.Messaging.HeaderAttribute
+  href: Sora.Messaging.HeaderAttribute.html
+  name: HeaderAttribute
+  nameWithType: HeaderAttribute
+  fullName: Sora.Messaging.HeaderAttribute
+- uid: Sora.Messaging.SensitiveAttribute
+  commentId: T:Sora.Messaging.SensitiveAttribute
+  href: Sora.Messaging.SensitiveAttribute.html
+  name: SensitiveAttribute
+  nameWithType: SensitiveAttribute
+  fullName: Sora.Messaging.SensitiveAttribute
+- uid: Sora.Messaging.DelaySecondsAttribute
+  commentId: T:Sora.Messaging.DelaySecondsAttribute
+  href: Sora.Messaging.DelaySecondsAttribute.html
+  name: DelaySecondsAttribute
+  nameWithType: DelaySecondsAttribute
+  fullName: Sora.Messaging.DelaySecondsAttribute
+- uid: Sora.Messaging.IdempotencyKeyAttribute
+  commentId: T:Sora.Messaging.IdempotencyKeyAttribute
+  href: Sora.Messaging.IdempotencyKeyAttribute.html
+  name: IdempotencyKeyAttribute
+  nameWithType: IdempotencyKeyAttribute
+  fullName: Sora.Messaging.IdempotencyKeyAttribute
+- uid: Sora.Messaging.Batch`1
+  commentId: T:Sora.Messaging.Batch`1
+  href: Sora.Messaging.Batch-1.html
+  name: Batch<T>
+  nameWithType: Batch<T>
+  fullName: Sora.Messaging.Batch<T>
+  nameWithType.vb: Batch(Of T)
+  fullName.vb: Sora.Messaging.Batch(Of T)
+  name.vb: Batch(Of T)
+  spec.csharp:
+  - uid: Sora.Messaging.Batch`1
+    name: Batch
+    href: Sora.Messaging.Batch-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: Sora.Messaging.Batch`1
+    name: Batch
+    href: Sora.Messaging.Batch-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: Sora.Messaging.InboxClientOptions
+  commentId: T:Sora.Messaging.InboxClientOptions
+  href: Sora.Messaging.InboxClientOptions.html
+  name: InboxClientOptions
+  nameWithType: InboxClientOptions
+  fullName: Sora.Messaging.InboxClientOptions
+- uid: Sora.Messaging.DiscoveryOptions
+  commentId: T:Sora.Messaging.DiscoveryOptions
+  href: Sora.Messaging.DiscoveryOptions.html
+  name: DiscoveryOptions
+  nameWithType: DiscoveryOptions
+  fullName: Sora.Messaging.DiscoveryOptions
+- uid: Sora.Messaging.IInboxDiscoveryPolicy
+  commentId: T:Sora.Messaging.IInboxDiscoveryPolicy
+  parent: Sora.Messaging
+  href: Sora.Messaging.IInboxDiscoveryPolicy.html
+  name: IInboxDiscoveryPolicy
+  nameWithType: IInboxDiscoveryPolicy
+  fullName: Sora.Messaging.IInboxDiscoveryPolicy
+- uid: Sora.Messaging.IInboxDiscoveryClient
+  commentId: T:Sora.Messaging.IInboxDiscoveryClient
+  href: Sora.Messaging.IInboxDiscoveryClient.html
+  name: IInboxDiscoveryClient
+  nameWithType: IInboxDiscoveryClient
+  fullName: Sora.Messaging.IInboxDiscoveryClient
+- uid: Sora.Messaging.InboxDiscoveryPolicy
+  commentId: T:Sora.Messaging.InboxDiscoveryPolicy
+  href: Sora.Messaging.InboxDiscoveryPolicy.html
+  name: InboxDiscoveryPolicy
+  nameWithType: InboxDiscoveryPolicy
+  fullName: Sora.Messaging.InboxDiscoveryPolicy
+- uid: Sora.Messaging.InboxConfigurationExtensions
+  commentId: T:Sora.Messaging.InboxConfigurationExtensions
+  href: Sora.Messaging.InboxConfigurationExtensions.html
+  name: InboxConfigurationExtensions
+  nameWithType: InboxConfigurationExtensions
+  fullName: Sora.Messaging.InboxConfigurationExtensions
+- uid: Sora.Messaging.IInboxStore
+  commentId: T:Sora.Messaging.IInboxStore
+  parent: Sora.Messaging
+  href: Sora.Messaging.IInboxStore.html
+  name: IInboxStore
+  nameWithType: IInboxStore
+  fullName: Sora.Messaging.IInboxStore
+- uid: Sora.Messaging.MessagingExtensions
+  commentId: T:Sora.Messaging.MessagingExtensions
+  parent: Sora.Messaging
+  href: Sora.Messaging.MessagingExtensions.html
+  name: MessagingExtensions
+  nameWithType: MessagingExtensions
+  fullName: Sora.Messaging.MessagingExtensions
+- uid: Sora.Messaging.MessagingExtensions.MessageHandlerBuilder
+  commentId: T:Sora.Messaging.MessagingExtensions.MessageHandlerBuilder
+  parent: Sora.Messaging
+  href: Sora.Messaging.MessagingExtensions.html
+  name: MessagingExtensions.MessageHandlerBuilder
+  nameWithType: MessagingExtensions.MessageHandlerBuilder
+  fullName: Sora.Messaging.MessagingExtensions.MessageHandlerBuilder
+  spec.csharp:
+  - uid: Sora.Messaging.MessagingExtensions
+    name: MessagingExtensions
+    href: Sora.Messaging.MessagingExtensions.html
+  - name: .
+  - uid: Sora.Messaging.MessagingExtensions.MessageHandlerBuilder
+    name: MessageHandlerBuilder
+    href: Sora.Messaging.MessagingExtensions.MessageHandlerBuilder.html
+  spec.vb:
+  - uid: Sora.Messaging.MessagingExtensions
+    name: MessagingExtensions
+    href: Sora.Messaging.MessagingExtensions.html
+  - name: .
+  - uid: Sora.Messaging.MessagingExtensions.MessageHandlerBuilder
+    name: MessageHandlerBuilder
+    href: Sora.Messaging.MessagingExtensions.MessageHandlerBuilder.html
+- uid: Sora.Messaging.RetryOptions
+  commentId: T:Sora.Messaging.RetryOptions
+  parent: Sora.Messaging
+  href: Sora.Messaging.RetryOptions.html
+  name: RetryOptions
+  nameWithType: RetryOptions
+  fullName: Sora.Messaging.RetryOptions
+- uid: Sora.Messaging.DlqOptions
+  commentId: T:Sora.Messaging.DlqOptions
+  parent: Sora.Messaging
+  href: Sora.Messaging.DlqOptions.html
+  name: DlqOptions
+  nameWithType: DlqOptions
+  fullName: Sora.Messaging.DlqOptions
+- uid: Sora.Messaging.EffectiveMessagingPlan
+  commentId: T:Sora.Messaging.EffectiveMessagingPlan
+  parent: Sora.Messaging
+  href: Sora.Messaging.EffectiveMessagingPlan.html
+  name: EffectiveMessagingPlan
+  nameWithType: EffectiveMessagingPlan
+  fullName: Sora.Messaging.EffectiveMessagingPlan
+- uid: Sora.Messaging.Negotiation
+  commentId: T:Sora.Messaging.Negotiation
+  href: Sora.Messaging.Negotiation.html
+  name: Negotiation
+  nameWithType: Negotiation
+  fullName: Sora.Messaging.Negotiation
+- uid: Sora.Messaging.IMessagingDiagnostics
+  commentId: T:Sora.Messaging.IMessagingDiagnostics
+  href: Sora.Messaging.IMessagingDiagnostics.html
+  name: IMessagingDiagnostics
+  nameWithType: IMessagingDiagnostics
+  fullName: Sora.Messaging.IMessagingDiagnostics
+- uid: Sora.Messaging.MessagingOptions
+  commentId: T:Sora.Messaging.MessagingOptions
+  href: Sora.Messaging.MessagingOptions.html
+  name: MessagingOptions
+  nameWithType: MessagingOptions
+  fullName: Sora.Messaging.MessagingOptions
+- uid: Sora.Messaging.IMessageBusFactory
+  commentId: T:Sora.Messaging.IMessageBusFactory
+  parent: Sora.Messaging
+  href: Sora.Messaging.IMessageBusFactory.html
+  name: IMessageBusFactory
+  nameWithType: IMessageBusFactory
+  fullName: Sora.Messaging.IMessageBusFactory
+- uid: Sora.Messaging.IMessageBusSelector
+  commentId: T:Sora.Messaging.IMessageBusSelector
+  href: Sora.Messaging.IMessageBusSelector.html
+  name: IMessageBusSelector
+  nameWithType: IMessageBusSelector
+  fullName: Sora.Messaging.IMessageBusSelector
+- uid: Sora.Messaging.MessagingServiceCollectionExtensions
+  commentId: T:Sora.Messaging.MessagingServiceCollectionExtensions
+  href: Sora.Messaging.MessagingServiceCollectionExtensions.html
+  name: MessagingServiceCollectionExtensions
+  nameWithType: MessagingServiceCollectionExtensions
+  fullName: Sora.Messaging.MessagingServiceCollectionExtensions
+- uid: Sora.Messaging
+  commentId: N:Sora.Messaging
+  href: Sora.html
+  name: Sora.Messaging
+  nameWithType: Sora.Messaging
+  fullName: Sora.Messaging
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Messaging
+    name: Messaging
+    href: Sora.Messaging.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Messaging
+    name: Messaging
+    href: Sora.Messaging.html

@@ -1,0 +1,51 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Json
+  commentId: N:Sora.Data.Json
+  id: Sora.Data.Json
+  children:
+  - Sora.Data.Json.JsonAdapterFactory
+  - Sora.Data.Json.JsonAdapterRegistration
+  - Sora.Data.Json.JsonDataOptions
+  - Sora.Data.Json.JsonDataServiceCollectionExtensions
+  - Sora.Data.Json.JsonRepo
+  langs:
+  - csharp
+  - vb
+  name: Sora.Data.Json
+  nameWithType: Sora.Data.Json
+  fullName: Sora.Data.Json
+  type: Namespace
+  assemblies:
+  - Sora.Data.Json
+references:
+- uid: Sora.Data.Json.JsonRepo
+  commentId: T:Sora.Data.Json.JsonRepo
+  href: Sora.Data.Json.JsonRepo.html
+  name: JsonRepo
+  nameWithType: JsonRepo
+  fullName: Sora.Data.Json.JsonRepo
+- uid: Sora.Data.Json.JsonDataOptions
+  commentId: T:Sora.Data.Json.JsonDataOptions
+  href: Sora.Data.Json.JsonDataOptions.html
+  name: JsonDataOptions
+  nameWithType: JsonDataOptions
+  fullName: Sora.Data.Json.JsonDataOptions
+- uid: Sora.Data.Json.JsonDataServiceCollectionExtensions
+  commentId: T:Sora.Data.Json.JsonDataServiceCollectionExtensions
+  href: Sora.Data.Json.JsonDataServiceCollectionExtensions.html
+  name: JsonDataServiceCollectionExtensions
+  nameWithType: JsonDataServiceCollectionExtensions
+  fullName: Sora.Data.Json.JsonDataServiceCollectionExtensions
+- uid: Sora.Data.Json.JsonAdapterFactory
+  commentId: T:Sora.Data.Json.JsonAdapterFactory
+  href: Sora.Data.Json.JsonAdapterFactory.html
+  name: JsonAdapterFactory
+  nameWithType: JsonAdapterFactory
+  fullName: Sora.Data.Json.JsonAdapterFactory
+- uid: Sora.Data.Json.JsonAdapterRegistration
+  commentId: T:Sora.Data.Json.JsonAdapterRegistration
+  href: Sora.Data.Json.JsonAdapterRegistration.html
+  name: JsonAdapterRegistration
+  nameWithType: JsonAdapterRegistration
+  fullName: Sora.Data.Json.JsonAdapterRegistration

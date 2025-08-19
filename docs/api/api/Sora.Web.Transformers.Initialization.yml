@@ -1,0 +1,23 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Web.Transformers.Initialization
+  commentId: N:Sora.Web.Transformers.Initialization
+  id: Sora.Web.Transformers.Initialization
+  children:
+  - Sora.Web.Transformers.Initialization.SoraAutoRegistrar
+  langs:
+  - csharp
+  - vb
+  name: Sora.Web.Transformers.Initialization
+  nameWithType: Sora.Web.Transformers.Initialization
+  fullName: Sora.Web.Transformers.Initialization
+  type: Namespace
+  assemblies:
+  - Sora.Web.Transformers
+references:
+- uid: Sora.Web.Transformers.Initialization.SoraAutoRegistrar
+  commentId: T:Sora.Web.Transformers.Initialization.SoraAutoRegistrar
+  href: Sora.Web.Transformers.Initialization.SoraAutoRegistrar.html
+  name: SoraAutoRegistrar
+  nameWithType: SoraAutoRegistrar
+  fullName: Sora.Web.Transformers.Initialization.SoraAutoRegistrar

@@ -1,0 +1,955 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Core.Configuration
+  commentId: T:Sora.Core.Configuration
+  id: Configuration
+  parent: Sora.Core
+  children:
+  - Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String)
+  - Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.Boolean)
+  - Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.Int32)
+  - Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.String)
+  - Sora.Core.Configuration.Read(System.String)
+  - Sora.Core.Configuration.Read(System.String,System.Boolean)
+  - Sora.Core.Configuration.Read(System.String,System.Int32)
+  - Sora.Core.Configuration.Read(System.String,System.String)
+  - Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.Boolean,System.String[])
+  - Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.Int32,System.String[])
+  - Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.String[])
+  - Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.String[])
+  - Sora.Core.Configuration.Read``1(Microsoft.Extensions.Configuration.IConfiguration,System.String)
+  - Sora.Core.Configuration.Read``1(Microsoft.Extensions.Configuration.IConfiguration,System.String,``0)
+  langs:
+  - csharp
+  - vb
+  name: Configuration
+  nameWithType: Configuration
+  fullName: Sora.Core.Configuration
+  type: Class
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Configuration
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 6
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static class Configuration
+    content.vb: Public Module Configuration
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: Sora.Core.Configuration.Read``1(Microsoft.Extensions.Configuration.IConfiguration,System.String)
+  commentId: M:Sora.Core.Configuration.Read``1(Microsoft.Extensions.Configuration.IConfiguration,System.String)
+  id: Read``1(Microsoft.Extensions.Configuration.IConfiguration,System.String)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read<T>(IConfiguration?, string)
+  nameWithType: Configuration.Read<T>(IConfiguration?, string)
+  fullName: Sora.Core.Configuration.Read<T>(Microsoft.Extensions.Configuration.IConfiguration?, string)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 9
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static T? Read<T>(IConfiguration? cfg, string key)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: key
+      type: System.String
+    typeParameters:
+    - id: T
+    return:
+      type: '{T}'
+    content.vb: Public Shared Function Read(Of T)(cfg As IConfiguration, key As String) As T
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(Of T)(IConfiguration, String)
+  fullName.vb: Sora.Core.Configuration.Read(Of T)(Microsoft.Extensions.Configuration.IConfiguration, String)
+  name.vb: Read(Of T)(IConfiguration, String)
+- uid: Sora.Core.Configuration.Read(System.String)
+  commentId: M:Sora.Core.Configuration.Read(System.String)
+  id: Read(System.String)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read(string)
+  nameWithType: Configuration.Read(string)
+  fullName: Sora.Core.Configuration.Read(string)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 13
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static bool Read(string key)
+    parameters:
+    - id: key
+      type: System.String
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Function Read(key As String) As Boolean
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(String)
+  fullName.vb: Sora.Core.Configuration.Read(String)
+  name.vb: Read(String)
+- uid: Sora.Core.Configuration.Read(System.String,System.Boolean)
+  commentId: M:Sora.Core.Configuration.Read(System.String,System.Boolean)
+  id: Read(System.String,System.Boolean)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read(string, bool)
+  nameWithType: Configuration.Read(string, bool)
+  fullName: Sora.Core.Configuration.Read(string, bool)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 14
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static bool Read(string key, bool defaultValue)
+    parameters:
+    - id: key
+      type: System.String
+    - id: defaultValue
+      type: System.Boolean
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Function Read(key As String, defaultValue As Boolean) As Boolean
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(String, Boolean)
+  fullName.vb: Sora.Core.Configuration.Read(String, Boolean)
+  name.vb: Read(String, Boolean)
+- uid: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String)
+  commentId: M:Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String)
+  id: Read(Microsoft.Extensions.Configuration.IConfiguration,System.String)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read(IConfiguration?, string)
+  nameWithType: Configuration.Read(IConfiguration?, string)
+  fullName: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration?, string)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 17
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static bool Read(IConfiguration? cfg, string key)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: key
+      type: System.String
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Function Read(cfg As IConfiguration, key As String) As Boolean
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(IConfiguration, String)
+  fullName.vb: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration, String)
+  name.vb: Read(IConfiguration, String)
+- uid: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.Boolean)
+  commentId: M:Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.Boolean)
+  id: Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.Boolean)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read(IConfiguration?, string, bool)
+  nameWithType: Configuration.Read(IConfiguration?, string, bool)
+  fullName: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration?, string, bool)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 18
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static bool Read(IConfiguration? cfg, string key, bool defaultValue)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: key
+      type: System.String
+    - id: defaultValue
+      type: System.Boolean
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Function Read(cfg As IConfiguration, key As String, defaultValue As Boolean) As Boolean
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(IConfiguration, String, Boolean)
+  fullName.vb: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration, String, Boolean)
+  name.vb: Read(IConfiguration, String, Boolean)
+- uid: Sora.Core.Configuration.Read(System.String,System.Int32)
+  commentId: M:Sora.Core.Configuration.Read(System.String,System.Int32)
+  id: Read(System.String,System.Int32)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read(string, int)
+  nameWithType: Configuration.Read(string, int)
+  fullName: Sora.Core.Configuration.Read(string, int)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 21
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static int Read(string key, int defaultValue)
+    parameters:
+    - id: key
+      type: System.String
+    - id: defaultValue
+      type: System.Int32
+    return:
+      type: System.Int32
+    content.vb: Public Shared Function Read(key As String, defaultValue As Integer) As Integer
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(String, Integer)
+  fullName.vb: Sora.Core.Configuration.Read(String, Integer)
+  name.vb: Read(String, Integer)
+- uid: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.Int32)
+  commentId: M:Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.Int32)
+  id: Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.Int32)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read(IConfiguration?, string, int)
+  nameWithType: Configuration.Read(IConfiguration?, string, int)
+  fullName: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration?, string, int)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 22
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static int Read(IConfiguration? cfg, string key, int defaultValue)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: key
+      type: System.String
+    - id: defaultValue
+      type: System.Int32
+    return:
+      type: System.Int32
+    content.vb: Public Shared Function Read(cfg As IConfiguration, key As String, defaultValue As Integer) As Integer
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(IConfiguration, String, Integer)
+  fullName.vb: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration, String, Integer)
+  name.vb: Read(IConfiguration, String, Integer)
+- uid: Sora.Core.Configuration.Read(System.String,System.String)
+  commentId: M:Sora.Core.Configuration.Read(System.String,System.String)
+  id: Read(System.String,System.String)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read(string, string?)
+  nameWithType: Configuration.Read(string, string?)
+  fullName: Sora.Core.Configuration.Read(string, string?)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 25
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static string? Read(string key, string? defaultValue)
+    parameters:
+    - id: key
+      type: System.String
+    - id: defaultValue
+      type: System.String
+    return:
+      type: System.String
+    content.vb: Public Shared Function Read(key As String, defaultValue As String) As String
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(String, String)
+  fullName.vb: Sora.Core.Configuration.Read(String, String)
+  name.vb: Read(String, String)
+- uid: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.String)
+  commentId: M:Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.String)
+  id: Read(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.String)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read(IConfiguration?, string, string?)
+  nameWithType: Configuration.Read(IConfiguration?, string, string?)
+  fullName: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration?, string, string?)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 26
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static string? Read(IConfiguration? cfg, string key, string? defaultValue)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: key
+      type: System.String
+    - id: defaultValue
+      type: System.String
+    return:
+      type: System.String
+    content.vb: Public Shared Function Read(cfg As IConfiguration, key As String, defaultValue As String) As String
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(IConfiguration, String, String)
+  fullName.vb: Sora.Core.Configuration.Read(Microsoft.Extensions.Configuration.IConfiguration, String, String)
+  name.vb: Read(IConfiguration, String, String)
+- uid: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.String[])
+  commentId: M:Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.String[])
+  id: ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.String[])
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: ReadFirst(IConfiguration?, params string[])
+  nameWithType: Configuration.ReadFirst(IConfiguration?, params string[])
+  fullName: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration?, params string[])
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: ReadFirst
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 29
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static string? ReadFirst(IConfiguration? cfg, params string[] keys)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: keys
+      type: System.String[]
+    return:
+      type: System.String
+    content.vb: Public Shared Function ReadFirst(cfg As IConfiguration, ParamArray keys As String()) As String
+  overload: Sora.Core.Configuration.ReadFirst*
+  nameWithType.vb: Configuration.ReadFirst(IConfiguration, ParamArray String())
+  fullName.vb: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration, ParamArray String())
+  name.vb: ReadFirst(IConfiguration, ParamArray String())
+- uid: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.String[])
+  commentId: M:Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.String[])
+  id: ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.String,System.String[])
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: ReadFirst(IConfiguration?, string, params string[])
+  nameWithType: Configuration.ReadFirst(IConfiguration?, string, params string[])
+  fullName: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration?, string, params string[])
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: ReadFirst
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 41
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static string ReadFirst(IConfiguration? cfg, string defaultValue, params string[] keys)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: defaultValue
+      type: System.String
+    - id: keys
+      type: System.String[]
+    return:
+      type: System.String
+    content.vb: Public Shared Function ReadFirst(cfg As IConfiguration, defaultValue As String, ParamArray keys As String()) As String
+  overload: Sora.Core.Configuration.ReadFirst*
+  nameWithType.vb: Configuration.ReadFirst(IConfiguration, String, ParamArray String())
+  fullName.vb: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration, String, ParamArray String())
+  name.vb: ReadFirst(IConfiguration, String, ParamArray String())
+- uid: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.Boolean,System.String[])
+  commentId: M:Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.Boolean,System.String[])
+  id: ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.Boolean,System.String[])
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: ReadFirst(IConfiguration?, bool, params string[])
+  nameWithType: Configuration.ReadFirst(IConfiguration?, bool, params string[])
+  fullName: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration?, bool, params string[])
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: ReadFirst
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 45
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static bool ReadFirst(IConfiguration? cfg, bool defaultValue, params string[] keys)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: defaultValue
+      type: System.Boolean
+    - id: keys
+      type: System.String[]
+    return:
+      type: System.Boolean
+    content.vb: Public Shared Function ReadFirst(cfg As IConfiguration, defaultValue As Boolean, ParamArray keys As String()) As Boolean
+  overload: Sora.Core.Configuration.ReadFirst*
+  nameWithType.vb: Configuration.ReadFirst(IConfiguration, Boolean, ParamArray String())
+  fullName.vb: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration, Boolean, ParamArray String())
+  name.vb: ReadFirst(IConfiguration, Boolean, ParamArray String())
+- uid: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.Int32,System.String[])
+  commentId: M:Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.Int32,System.String[])
+  id: ReadFirst(Microsoft.Extensions.Configuration.IConfiguration,System.Int32,System.String[])
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: ReadFirst(IConfiguration?, int, params string[])
+  nameWithType: Configuration.ReadFirst(IConfiguration?, int, params string[])
+  fullName: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration?, int, params string[])
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: ReadFirst
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 57
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static int ReadFirst(IConfiguration? cfg, int defaultValue, params string[] keys)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: defaultValue
+      type: System.Int32
+    - id: keys
+      type: System.String[]
+    return:
+      type: System.Int32
+    content.vb: Public Shared Function ReadFirst(cfg As IConfiguration, defaultValue As Integer, ParamArray keys As String()) As Integer
+  overload: Sora.Core.Configuration.ReadFirst*
+  nameWithType.vb: Configuration.ReadFirst(IConfiguration, Integer, ParamArray String())
+  fullName.vb: Sora.Core.Configuration.ReadFirst(Microsoft.Extensions.Configuration.IConfiguration, Integer, ParamArray String())
+  name.vb: ReadFirst(IConfiguration, Integer, ParamArray String())
+- uid: Sora.Core.Configuration.Read``1(Microsoft.Extensions.Configuration.IConfiguration,System.String,``0)
+  commentId: M:Sora.Core.Configuration.Read``1(Microsoft.Extensions.Configuration.IConfiguration,System.String,``0)
+  id: Read``1(Microsoft.Extensions.Configuration.IConfiguration,System.String,``0)
+  parent: Sora.Core.Configuration
+  langs:
+  - csharp
+  - vb
+  name: Read<T>(IConfiguration?, string, T)
+  nameWithType: Configuration.Read<T>(IConfiguration?, string, T)
+  fullName: Sora.Core.Configuration.Read<T>(Microsoft.Extensions.Configuration.IConfiguration?, string, T)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Core/Configuration.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: Read
+    path: ../../src/Sora.Core/Configuration.cs
+    startLine: 69
+  assemblies:
+  - Sora.Core
+  namespace: Sora.Core
+  syntax:
+    content: public static T Read<T>(IConfiguration? cfg, string key, T defaultValue)
+    parameters:
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    - id: key
+      type: System.String
+    - id: defaultValue
+      type: '{T}'
+    typeParameters:
+    - id: T
+    return:
+      type: '{T}'
+    content.vb: Public Shared Function Read(Of T)(cfg As IConfiguration, key As String, defaultValue As T) As T
+  overload: Sora.Core.Configuration.Read*
+  nameWithType.vb: Configuration.Read(Of T)(IConfiguration, String, T)
+  fullName.vb: Sora.Core.Configuration.Read(Of T)(Microsoft.Extensions.Configuration.IConfiguration, String, T)
+  name.vb: Read(Of T)(IConfiguration, String, T)
+references:
+- uid: Sora.Core
+  commentId: N:Sora.Core
+  href: Sora.html
+  name: Sora.Core
+  nameWithType: Sora.Core
+  fullName: Sora.Core
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Core
+    name: Core
+    href: Sora.Core.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Core
+    name: Core
+    href: Sora.Core.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sora.Core.Configuration.Read*
+  commentId: Overload:Sora.Core.Configuration.Read
+  href: Sora.Core.Configuration.html#Sora_Core_Configuration_Read__1_Microsoft_Extensions_Configuration_IConfiguration_System_String_
+  name: Read
+  nameWithType: Configuration.Read
+  fullName: Sora.Core.Configuration.Read
+- uid: Microsoft.Extensions.Configuration.IConfiguration
+  commentId: T:Microsoft.Extensions.Configuration.IConfiguration
+  parent: Microsoft.Extensions.Configuration
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.configuration.iconfiguration
+  name: IConfiguration
+  nameWithType: IConfiguration
+  fullName: Microsoft.Extensions.Configuration.IConfiguration
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: Microsoft.Extensions.Configuration
+  commentId: N:Microsoft.Extensions.Configuration
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft
+  name: Microsoft.Extensions.Configuration
+  nameWithType: Microsoft.Extensions.Configuration
+  fullName: Microsoft.Extensions.Configuration
+  spec.csharp:
+  - uid: Microsoft
+    name: Microsoft
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Configuration
+    name: Configuration
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.configuration
+  spec.vb:
+  - uid: Microsoft
+    name: Microsoft
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Configuration
+    name: Configuration
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.configuration
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: Sora.Core.Configuration.ReadFirst*
+  commentId: Overload:Sora.Core.Configuration.ReadFirst
+  href: Sora.Core.Configuration.html#Sora_Core_Configuration_ReadFirst_Microsoft_Extensions_Configuration_IConfiguration_System_String___
+  name: ReadFirst
+  nameWithType: Configuration.ReadFirst
+  fullName: Sora.Core.Configuration.ReadFirst
+- uid: System.String[]
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string[]
+  nameWithType: string[]
+  fullName: string[]
+  nameWithType.vb: String()
+  fullName.vb: String()
+  name.vb: String()
+  spec.csharp:
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '['
+  - name: ']'
+  spec.vb:
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: (
+  - name: )

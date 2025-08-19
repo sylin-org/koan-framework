@@ -1,0 +1,2135 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+  commentId: T:Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+  id: MongoOutboxStore
+  parent: Sora.Data.Cqrs.Outbox.Mongo
+  children:
+  - Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.#ctor(Microsoft.Extensions.Logging.ILogger{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore},Microsoft.Extensions.Options.IOptions{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions},Microsoft.Extensions.Configuration.IConfiguration)
+  - Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry,System.Threading.CancellationToken)
+  - Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.DequeueAsync(System.Int32,System.Threading.CancellationToken)
+  - Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MarkProcessedAsync(System.String,System.Threading.CancellationToken)
+  langs:
+  - csharp
+  - vb
+  name: MongoOutboxStore
+  nameWithType: MongoOutboxStore
+  fullName: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+  type: Class
+  source:
+    remote:
+      path: src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: MongoOutboxStore
+    path: ../../src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+    startLine: 46
+  assemblies:
+  - Sora.Data.Cqrs.Outbox.Mongo
+  namespace: Sora.Data.Cqrs.Outbox.Mongo
+  syntax:
+    content: 'public sealed class MongoOutboxStore : IOutboxStore'
+    content.vb: Public NotInheritable Class MongoOutboxStore Implements IOutboxStore
+  inheritance:
+  - System.Object
+  implements:
+  - Sora.Data.Cqrs.IOutboxStore
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+  extensionMethods:
+  - Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.AggregateExtensions.Remove``2(System.Threading.CancellationToken)
+  - Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.AggregateExtensions.Save``2(System.Threading.CancellationToken)
+  - Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.AggregateExtensions.UpsertId``2(System.Threading.CancellationToken)
+  - Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.AggregateExtensions.Upsert``2(System.Threading.CancellationToken)
+  - Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  - System.Object.Sora.Data.Core.AggregateExtensions.Delete(System.Threading.CancellationToken)
+  - System.Object.Sora.Data.Core.AggregateExtensions.Upsert(System.Threading.CancellationToken)
+  - System.Object.Sora.Messaging.MessagingExtensions.Send(System.Threading.CancellationToken)
+  - System.Object.Sora.Messaging.MessagingExtensions.SendTo(System.String,System.Threading.CancellationToken)
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.#ctor(Microsoft.Extensions.Logging.ILogger{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore},Microsoft.Extensions.Options.IOptions{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions},Microsoft.Extensions.Configuration.IConfiguration)
+  commentId: M:Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.#ctor(Microsoft.Extensions.Logging.ILogger{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore},Microsoft.Extensions.Options.IOptions{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions},Microsoft.Extensions.Configuration.IConfiguration)
+  id: '#ctor(Microsoft.Extensions.Logging.ILogger{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore},Microsoft.Extensions.Options.IOptions{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions},Microsoft.Extensions.Configuration.IConfiguration)'
+  parent: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+  langs:
+  - csharp
+  - vb
+  name: MongoOutboxStore(ILogger<MongoOutboxStore>, IOptions<MongoOutboxOptions>, IConfiguration)
+  nameWithType: MongoOutboxStore.MongoOutboxStore(ILogger<MongoOutboxStore>, IOptions<MongoOutboxOptions>, IConfiguration)
+  fullName: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MongoOutboxStore(Microsoft.Extensions.Logging.ILogger<Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore>, Microsoft.Extensions.Options.IOptions<Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions>, Microsoft.Extensions.Configuration.IConfiguration)
+  type: Constructor
+  source:
+    remote:
+      path: src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: .ctor
+    path: ../../src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+    startLine: 52
+  assemblies:
+  - Sora.Data.Cqrs.Outbox.Mongo
+  namespace: Sora.Data.Cqrs.Outbox.Mongo
+  syntax:
+    content: public MongoOutboxStore(ILogger<MongoOutboxStore> logger, IOptions<MongoOutboxOptions> options, IConfiguration cfg)
+    parameters:
+    - id: logger
+      type: Microsoft.Extensions.Logging.ILogger{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore}
+    - id: options
+      type: Microsoft.Extensions.Options.IOptions{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions}
+    - id: cfg
+      type: Microsoft.Extensions.Configuration.IConfiguration
+    content.vb: Public Sub New(logger As ILogger(Of MongoOutboxStore), options As IOptions(Of MongoOutboxOptions), cfg As IConfiguration)
+  overload: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.#ctor*
+  nameWithType.vb: MongoOutboxStore.New(ILogger(Of MongoOutboxStore), IOptions(Of MongoOutboxOptions), IConfiguration)
+  fullName.vb: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.New(Microsoft.Extensions.Logging.ILogger(Of Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore), Microsoft.Extensions.Options.IOptions(Of Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions), Microsoft.Extensions.Configuration.IConfiguration)
+  name.vb: New(ILogger(Of MongoOutboxStore), IOptions(Of MongoOutboxOptions), IConfiguration)
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry,System.Threading.CancellationToken)
+  id: AppendAsync(Sora.Data.Cqrs.OutboxEntry,System.Threading.CancellationToken)
+  parent: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+  langs:
+  - csharp
+  - vb
+  name: AppendAsync(OutboxEntry, CancellationToken)
+  nameWithType: MongoOutboxStore.AppendAsync(OutboxEntry, CancellationToken)
+  fullName: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: AppendAsync
+    path: ../../src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+    startLine: 72
+  assemblies:
+  - Sora.Data.Cqrs.Outbox.Mongo
+  namespace: Sora.Data.Cqrs.Outbox.Mongo
+  example: []
+  syntax:
+    content: public Task AppendAsync(OutboxEntry entry, CancellationToken ct = default)
+    parameters:
+    - id: entry
+      type: Sora.Data.Cqrs.OutboxEntry
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Public Function AppendAsync(entry As OutboxEntry, ct As CancellationToken = Nothing) As Task
+  overload: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.AppendAsync*
+  implements:
+  - Sora.Data.Cqrs.IOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry,System.Threading.CancellationToken)
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.DequeueAsync(System.Int32,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.DequeueAsync(System.Int32,System.Threading.CancellationToken)
+  id: DequeueAsync(System.Int32,System.Threading.CancellationToken)
+  parent: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+  langs:
+  - csharp
+  - vb
+  name: DequeueAsync(int, CancellationToken)
+  nameWithType: MongoOutboxStore.DequeueAsync(int, CancellationToken)
+  fullName: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.DequeueAsync(int, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: DequeueAsync
+    path: ../../src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+    startLine: 78
+  assemblies:
+  - Sora.Data.Cqrs.Outbox.Mongo
+  namespace: Sora.Data.Cqrs.Outbox.Mongo
+  summary: >-
+    Dequeue up to <code class="paramref">max</code> pending entries for processing.
+
+    Implementations should ensure entries are not delivered to multiple consumers concurrently.
+  example: []
+  syntax:
+    content: public Task<IReadOnlyList<OutboxEntry>> DequeueAsync(int max = 100, CancellationToken ct = default)
+    parameters:
+    - id: max
+      type: System.Int32
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{Sora.Data.Cqrs.OutboxEntry}}
+    content.vb: Public Function DequeueAsync(max As Integer = 100, ct As CancellationToken = Nothing) As Task(Of IReadOnlyList(Of OutboxEntry))
+  overload: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.DequeueAsync*
+  implements:
+  - Sora.Data.Cqrs.IOutboxStore.DequeueAsync(System.Int32,System.Threading.CancellationToken)
+  nameWithType.vb: MongoOutboxStore.DequeueAsync(Integer, CancellationToken)
+  fullName.vb: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.DequeueAsync(Integer, System.Threading.CancellationToken)
+  name.vb: DequeueAsync(Integer, CancellationToken)
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MarkProcessedAsync(System.String,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MarkProcessedAsync(System.String,System.Threading.CancellationToken)
+  id: MarkProcessedAsync(System.String,System.Threading.CancellationToken)
+  parent: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+  langs:
+  - csharp
+  - vb
+  name: MarkProcessedAsync(string, CancellationToken)
+  nameWithType: MongoOutboxStore.MarkProcessedAsync(string, CancellationToken)
+  fullName: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MarkProcessedAsync(string, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: MarkProcessedAsync
+    path: ../../src/Sora.Data.Cqrs.Outbox.Mongo/MongoOutboxStore.cs
+    startLine: 118
+  assemblies:
+  - Sora.Data.Cqrs.Outbox.Mongo
+  namespace: Sora.Data.Cqrs.Outbox.Mongo
+  summary: Mark an entry as processed so it won't be delivered again.
+  example: []
+  syntax:
+    content: public Task MarkProcessedAsync(string id, CancellationToken ct = default)
+    parameters:
+    - id: id
+      type: System.String
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Public Function MarkProcessedAsync(id As String, ct As CancellationToken = Nothing) As Task
+  overload: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MarkProcessedAsync*
+  implements:
+  - Sora.Data.Cqrs.IOutboxStore.MarkProcessedAsync(System.String,System.Threading.CancellationToken)
+  nameWithType.vb: MongoOutboxStore.MarkProcessedAsync(String, CancellationToken)
+  fullName.vb: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MarkProcessedAsync(String, System.Threading.CancellationToken)
+  name.vb: MarkProcessedAsync(String, CancellationToken)
+references:
+- uid: Sora.Data.Cqrs.Outbox.Mongo
+  commentId: N:Sora.Data.Cqrs.Outbox.Mongo
+  href: Sora.html
+  name: Sora.Data.Cqrs.Outbox.Mongo
+  nameWithType: Sora.Data.Cqrs.Outbox.Mongo
+  fullName: Sora.Data.Cqrs.Outbox.Mongo
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Cqrs
+    name: Cqrs
+    href: Sora.Data.Cqrs.html
+  - name: .
+  - uid: Sora.Data.Cqrs.Outbox
+    name: Outbox
+    href: Sora.Data.Cqrs.Outbox.html
+  - name: .
+  - uid: Sora.Data.Cqrs.Outbox.Mongo
+    name: Mongo
+    href: Sora.Data.Cqrs.Outbox.Mongo.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Cqrs
+    name: Cqrs
+    href: Sora.Data.Cqrs.html
+  - name: .
+  - uid: Sora.Data.Cqrs.Outbox
+    name: Outbox
+    href: Sora.Data.Cqrs.Outbox.html
+  - name: .
+  - uid: Sora.Data.Cqrs.Outbox.Mongo
+    name: Mongo
+    href: Sora.Data.Cqrs.Outbox.Mongo.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: Sora.Data.Cqrs.IOutboxStore
+  commentId: T:Sora.Data.Cqrs.IOutboxStore
+  parent: Sora.Data.Cqrs
+  href: Sora.Data.Cqrs.IOutboxStore.html
+  name: IOutboxStore
+  nameWithType: IOutboxStore
+  fullName: Sora.Data.Cqrs.IOutboxStore
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.AggregateExtensions.Remove``2(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  name: Remove<MongoOutboxStore, TKey>(MongoOutboxStore, CancellationToken)
+  nameWithType: AggregateExtensions.Remove<MongoOutboxStore, TKey>(MongoOutboxStore, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Remove<Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey>(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Remove(Of MongoOutboxStore, TKey)(MongoOutboxStore, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Remove(Of Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey)(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, System.Threading.CancellationToken)
+  name.vb: Remove(Of MongoOutboxStore, TKey)(MongoOutboxStore, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Remove``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.Threading.CancellationToken)
+    name: Remove
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Remove``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.Threading.CancellationToken)
+    name: Remove
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.AggregateExtensions.Save``2(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  name: Save<MongoOutboxStore, TKey>(MongoOutboxStore, CancellationToken)
+  nameWithType: AggregateExtensions.Save<MongoOutboxStore, TKey>(MongoOutboxStore, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Save<Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey>(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Save(Of MongoOutboxStore, TKey)(MongoOutboxStore, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Save(Of Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey)(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, System.Threading.CancellationToken)
+  name.vb: Save(Of MongoOutboxStore, TKey)(MongoOutboxStore, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Save``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.Threading.CancellationToken)
+    name: Save
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Save``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.Threading.CancellationToken)
+    name: Save
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.AggregateExtensions.UpsertId``2(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  name: UpsertId<MongoOutboxStore, TKey>(MongoOutboxStore, CancellationToken)
+  nameWithType: AggregateExtensions.UpsertId<MongoOutboxStore, TKey>(MongoOutboxStore, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.UpsertId<Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey>(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.UpsertId(Of MongoOutboxStore, TKey)(MongoOutboxStore, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.UpsertId(Of Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey)(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, System.Threading.CancellationToken)
+  name.vb: UpsertId(Of MongoOutboxStore, TKey)(MongoOutboxStore, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.Threading.CancellationToken)
+    name: UpsertId
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.Threading.CancellationToken)
+    name: UpsertId
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.AggregateExtensions.Upsert``2(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  name: Upsert<MongoOutboxStore, TKey>(MongoOutboxStore, CancellationToken)
+  nameWithType: AggregateExtensions.Upsert<MongoOutboxStore, TKey>(MongoOutboxStore, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Upsert<Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey>(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Upsert(Of MongoOutboxStore, TKey)(MongoOutboxStore, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Upsert(Of Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey)(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, System.Threading.CancellationToken)
+  name.vb: Upsert(Of MongoOutboxStore, TKey)(MongoOutboxStore, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.EntitySetMoveExtensions
+  definition: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  name: MoveToSet<MongoOutboxStore, TKey>(MongoOutboxStore, string, string, bool, CancellationToken)
+  nameWithType: EntitySetMoveExtensions.MoveToSet<MongoOutboxStore, TKey>(MongoOutboxStore, string, string, bool, CancellationToken)
+  fullName: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet<Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey>(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, string, string, bool, System.Threading.CancellationToken)
+  nameWithType.vb: EntitySetMoveExtensions.MoveToSet(Of MongoOutboxStore, TKey)(MongoOutboxStore, String, String, Boolean, CancellationToken)
+  fullName.vb: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet(Of Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, TKey)(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore, String, String, Boolean, System.Threading.CancellationToken)
+  name.vb: MoveToSet(Of MongoOutboxStore, TKey)(MongoOutboxStore, String, String, Boolean, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+    name: MoveToSet
+    href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+    name: MoveToSet
+    href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Object.Sora.Data.Core.AggregateExtensions.Delete(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  name: Delete(object, CancellationToken)
+  nameWithType: AggregateExtensions.Delete(object, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Delete(object, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Delete(Object, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Delete(Object, System.Threading.CancellationToken)
+  name.vb: Delete(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+    name: Delete
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+    name: Delete
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Object.Sora.Data.Core.AggregateExtensions.Upsert(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  name: Upsert(object, CancellationToken)
+  nameWithType: AggregateExtensions.Upsert(object, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Upsert(object, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Upsert(Object, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Upsert(Object, System.Threading.CancellationToken)
+  name.vb: Upsert(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Object.Sora.Messaging.MessagingExtensions.Send(System.Threading.CancellationToken)
+  commentId: M:Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+  parent: Sora.Messaging.MessagingExtensions
+  definition: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+  href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  name: Send(object, CancellationToken)
+  nameWithType: MessagingExtensions.Send(object, CancellationToken)
+  fullName: Sora.Messaging.MessagingExtensions.Send(object, System.Threading.CancellationToken)
+  nameWithType.vb: MessagingExtensions.Send(Object, CancellationToken)
+  fullName.vb: Sora.Messaging.MessagingExtensions.Send(Object, System.Threading.CancellationToken)
+  name.vb: Send(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+    name: Send
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+    name: Send
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Object.Sora.Messaging.MessagingExtensions.SendTo(System.String,System.Threading.CancellationToken)
+  commentId: M:Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+  parent: Sora.Messaging.MessagingExtensions
+  definition: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+  href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  name: SendTo(object, string, CancellationToken)
+  nameWithType: MessagingExtensions.SendTo(object, string, CancellationToken)
+  fullName: Sora.Messaging.MessagingExtensions.SendTo(object, string, System.Threading.CancellationToken)
+  nameWithType.vb: MessagingExtensions.SendTo(Object, String, CancellationToken)
+  fullName.vb: Sora.Messaging.MessagingExtensions.SendTo(Object, String, System.Threading.CancellationToken)
+  name.vb: SendTo(Object, String, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+    name: SendTo
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+    name: SendTo
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sora.Data.Cqrs
+  commentId: N:Sora.Data.Cqrs
+  href: Sora.html
+  name: Sora.Data.Cqrs
+  nameWithType: Sora.Data.Cqrs
+  fullName: Sora.Data.Cqrs
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Cqrs
+    name: Cqrs
+    href: Sora.Data.Cqrs.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Cqrs
+    name: Cqrs
+    href: Sora.Data.Cqrs.html
+- uid: Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  name: Remove<TEntity, TKey>(TEntity, CancellationToken)
+  nameWithType: AggregateExtensions.Remove<TEntity, TKey>(TEntity, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Remove<TEntity, TKey>(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Remove(Of TEntity, TKey)(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Remove(Of TEntity, TKey)(TEntity, System.Threading.CancellationToken)
+  name.vb: Remove(Of TEntity, TKey)(TEntity, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+    name: Remove
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+    name: Remove
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.AggregateExtensions
+  commentId: T:Sora.Data.Core.AggregateExtensions
+  parent: Sora.Data.Core
+  href: Sora.Data.Core.AggregateExtensions.html
+  name: AggregateExtensions
+  nameWithType: AggregateExtensions
+  fullName: Sora.Data.Core.AggregateExtensions
+- uid: Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  name: Save<TEntity, TKey>(TEntity, CancellationToken)
+  nameWithType: AggregateExtensions.Save<TEntity, TKey>(TEntity, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Save<TEntity, TKey>(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Save(Of TEntity, TKey)(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Save(Of TEntity, TKey)(TEntity, System.Threading.CancellationToken)
+  name.vb: Save(Of TEntity, TKey)(TEntity, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+    name: Save
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+    name: Save
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  name: UpsertId<TEntity, TKey>(TEntity, CancellationToken)
+  nameWithType: AggregateExtensions.UpsertId<TEntity, TKey>(TEntity, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.UpsertId<TEntity, TKey>(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.UpsertId(Of TEntity, TKey)(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.UpsertId(Of TEntity, TKey)(TEntity, System.Threading.CancellationToken)
+  name.vb: UpsertId(Of TEntity, TKey)(TEntity, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+    name: UpsertId
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+    name: UpsertId
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  name: Upsert<TEntity, TKey>(TEntity, CancellationToken)
+  nameWithType: AggregateExtensions.Upsert<TEntity, TKey>(TEntity, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Upsert<TEntity, TKey>(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Upsert(Of TEntity, TKey)(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Upsert(Of TEntity, TKey)(TEntity, System.Threading.CancellationToken)
+  name.vb: Upsert(Of TEntity, TKey)(TEntity, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  name: MoveToSet<TEntity, TKey>(TEntity, string, string, bool, CancellationToken)
+  nameWithType: EntitySetMoveExtensions.MoveToSet<TEntity, TKey>(TEntity, string, string, bool, CancellationToken)
+  fullName: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet<TEntity, TKey>(TEntity, string, string, bool, System.Threading.CancellationToken)
+  nameWithType.vb: EntitySetMoveExtensions.MoveToSet(Of TEntity, TKey)(TEntity, String, String, Boolean, CancellationToken)
+  fullName.vb: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet(Of TEntity, TKey)(TEntity, String, String, Boolean, System.Threading.CancellationToken)
+  name.vb: MoveToSet(Of TEntity, TKey)(TEntity, String, String, Boolean, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+    name: MoveToSet
+    href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+    name: MoveToSet
+    href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.EntitySetMoveExtensions
+  commentId: T:Sora.Data.Core.EntitySetMoveExtensions
+  parent: Sora.Data.Core
+  href: Sora.Data.Core.EntitySetMoveExtensions.html
+  name: EntitySetMoveExtensions
+  nameWithType: EntitySetMoveExtensions
+  fullName: Sora.Data.Core.EntitySetMoveExtensions
+- uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  name: Delete(object, CancellationToken)
+  nameWithType: AggregateExtensions.Delete(object, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Delete(object, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Delete(Object, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Delete(Object, System.Threading.CancellationToken)
+  name.vb: Delete(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+    name: Delete
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+    name: Delete
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  name: Upsert(object, CancellationToken)
+  nameWithType: AggregateExtensions.Upsert(object, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Upsert(object, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Upsert(Object, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Upsert(Object, System.Threading.CancellationToken)
+  name.vb: Upsert(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  name: Send(object, CancellationToken)
+  nameWithType: MessagingExtensions.Send(object, CancellationToken)
+  fullName: Sora.Messaging.MessagingExtensions.Send(object, System.Threading.CancellationToken)
+  nameWithType.vb: MessagingExtensions.Send(Object, CancellationToken)
+  fullName.vb: Sora.Messaging.MessagingExtensions.Send(Object, System.Threading.CancellationToken)
+  name.vb: Send(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+    name: Send
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+    name: Send
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Messaging.MessagingExtensions
+  commentId: T:Sora.Messaging.MessagingExtensions
+  parent: Sora.Messaging
+  href: Sora.Messaging.MessagingExtensions.html
+  name: MessagingExtensions
+  nameWithType: MessagingExtensions
+  fullName: Sora.Messaging.MessagingExtensions
+- uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+  commentId: M:Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  name: SendTo(object, string, CancellationToken)
+  nameWithType: MessagingExtensions.SendTo(object, string, CancellationToken)
+  fullName: Sora.Messaging.MessagingExtensions.SendTo(object, string, System.Threading.CancellationToken)
+  nameWithType.vb: MessagingExtensions.SendTo(Object, String, CancellationToken)
+  fullName.vb: Sora.Messaging.MessagingExtensions.SendTo(Object, String, System.Threading.CancellationToken)
+  name.vb: SendTo(Object, String, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+    name: SendTo
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+    name: SendTo
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core
+  commentId: N:Sora.Data.Core
+  href: Sora.html
+  name: Sora.Data.Core
+  nameWithType: Sora.Data.Core
+  fullName: Sora.Data.Core
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Core
+    name: Core
+    href: Sora.Data.Core.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Core
+    name: Core
+    href: Sora.Data.Core.html
+- uid: Sora.Messaging
+  commentId: N:Sora.Messaging
+  href: Sora.html
+  name: Sora.Messaging
+  nameWithType: Sora.Messaging
+  fullName: Sora.Messaging
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Messaging
+    name: Messaging
+    href: Sora.Messaging.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Messaging
+    name: Messaging
+    href: Sora.Messaging.html
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.#ctor*
+  commentId: Overload:Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.#ctor
+  href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html#Sora_Data_Cqrs_Outbox_Mongo_MongoOutboxStore__ctor_Microsoft_Extensions_Logging_ILogger_Sora_Data_Cqrs_Outbox_Mongo_MongoOutboxStore__Microsoft_Extensions_Options_IOptions_Sora_Data_Cqrs_Outbox_Mongo_MongoOutboxOptions__Microsoft_Extensions_Configuration_IConfiguration_
+  name: MongoOutboxStore
+  nameWithType: MongoOutboxStore.MongoOutboxStore
+  fullName: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MongoOutboxStore
+  nameWithType.vb: MongoOutboxStore.New
+  fullName.vb: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.New
+  name.vb: New
+- uid: Microsoft.Extensions.Logging.ILogger{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore}
+  commentId: T:Microsoft.Extensions.Logging.ILogger{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore}
+  parent: Microsoft.Extensions.Logging
+  definition: Microsoft.Extensions.Logging.ILogger`1
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1
+  name: ILogger<MongoOutboxStore>
+  nameWithType: ILogger<MongoOutboxStore>
+  fullName: Microsoft.Extensions.Logging.ILogger<Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore>
+  nameWithType.vb: ILogger(Of MongoOutboxStore)
+  fullName.vb: Microsoft.Extensions.Logging.ILogger(Of Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore)
+  name.vb: ILogger(Of MongoOutboxStore)
+  spec.csharp:
+  - uid: Microsoft.Extensions.Logging.ILogger`1
+    name: ILogger
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1
+  - name: <
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: '>'
+  spec.vb:
+  - uid: Microsoft.Extensions.Logging.ILogger`1
+    name: ILogger
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html
+  - name: )
+- uid: Microsoft.Extensions.Options.IOptions{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions}
+  commentId: T:Microsoft.Extensions.Options.IOptions{Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions}
+  parent: Microsoft.Extensions.Options
+  definition: Microsoft.Extensions.Options.IOptions`1
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1
+  name: IOptions<MongoOutboxOptions>
+  nameWithType: IOptions<MongoOutboxOptions>
+  fullName: Microsoft.Extensions.Options.IOptions<Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions>
+  nameWithType.vb: IOptions(Of MongoOutboxOptions)
+  fullName.vb: Microsoft.Extensions.Options.IOptions(Of Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions)
+  name.vb: IOptions(Of MongoOutboxOptions)
+  spec.csharp:
+  - uid: Microsoft.Extensions.Options.IOptions`1
+    name: IOptions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1
+  - name: <
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions
+    name: MongoOutboxOptions
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions.html
+  - name: '>'
+  spec.vb:
+  - uid: Microsoft.Extensions.Options.IOptions`1
+    name: IOptions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions
+    name: MongoOutboxOptions
+    href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions.html
+  - name: )
+- uid: Microsoft.Extensions.Configuration.IConfiguration
+  commentId: T:Microsoft.Extensions.Configuration.IConfiguration
+  parent: Microsoft.Extensions.Configuration
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.configuration.iconfiguration
+  name: IConfiguration
+  nameWithType: IConfiguration
+  fullName: Microsoft.Extensions.Configuration.IConfiguration
+- uid: Microsoft.Extensions.Logging.ILogger`1
+  commentId: T:Microsoft.Extensions.Logging.ILogger`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1
+  name: ILogger<TCategoryName>
+  nameWithType: ILogger<TCategoryName>
+  fullName: Microsoft.Extensions.Logging.ILogger<TCategoryName>
+  nameWithType.vb: ILogger(Of TCategoryName)
+  fullName.vb: Microsoft.Extensions.Logging.ILogger(Of TCategoryName)
+  name.vb: ILogger(Of TCategoryName)
+  spec.csharp:
+  - uid: Microsoft.Extensions.Logging.ILogger`1
+    name: ILogger
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1
+  - name: <
+  - name: TCategoryName
+  - name: '>'
+  spec.vb:
+  - uid: Microsoft.Extensions.Logging.ILogger`1
+    name: ILogger
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TCategoryName
+  - name: )
+- uid: Microsoft.Extensions.Logging
+  commentId: N:Microsoft.Extensions.Logging
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft
+  name: Microsoft.Extensions.Logging
+  nameWithType: Microsoft.Extensions.Logging
+  fullName: Microsoft.Extensions.Logging
+  spec.csharp:
+  - uid: Microsoft
+    name: Microsoft
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+  spec.vb:
+  - uid: Microsoft
+    name: Microsoft
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Logging
+    name: Logging
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging
+- uid: Microsoft.Extensions.Options.IOptions`1
+  commentId: T:Microsoft.Extensions.Options.IOptions`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1
+  name: IOptions<TOptions>
+  nameWithType: IOptions<TOptions>
+  fullName: Microsoft.Extensions.Options.IOptions<TOptions>
+  nameWithType.vb: IOptions(Of TOptions)
+  fullName.vb: Microsoft.Extensions.Options.IOptions(Of TOptions)
+  name.vb: IOptions(Of TOptions)
+  spec.csharp:
+  - uid: Microsoft.Extensions.Options.IOptions`1
+    name: IOptions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1
+  - name: <
+  - name: TOptions
+  - name: '>'
+  spec.vb:
+  - uid: Microsoft.Extensions.Options.IOptions`1
+    name: IOptions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.options.ioptions-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TOptions
+  - name: )
+- uid: Microsoft.Extensions.Options
+  commentId: N:Microsoft.Extensions.Options
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft
+  name: Microsoft.Extensions.Options
+  nameWithType: Microsoft.Extensions.Options
+  fullName: Microsoft.Extensions.Options
+  spec.csharp:
+  - uid: Microsoft
+    name: Microsoft
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Options
+    name: Options
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.options
+  spec.vb:
+  - uid: Microsoft
+    name: Microsoft
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Options
+    name: Options
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.options
+- uid: Microsoft.Extensions.Configuration
+  commentId: N:Microsoft.Extensions.Configuration
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft
+  name: Microsoft.Extensions.Configuration
+  nameWithType: Microsoft.Extensions.Configuration
+  fullName: Microsoft.Extensions.Configuration
+  spec.csharp:
+  - uid: Microsoft
+    name: Microsoft
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Configuration
+    name: Configuration
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.configuration
+  spec.vb:
+  - uid: Microsoft
+    name: Microsoft
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.Configuration
+    name: Configuration
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.configuration
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.AppendAsync*
+  commentId: Overload:Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.AppendAsync
+  href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html#Sora_Data_Cqrs_Outbox_Mongo_MongoOutboxStore_AppendAsync_Sora_Data_Cqrs_OutboxEntry_System_Threading_CancellationToken_
+  name: AppendAsync
+  nameWithType: MongoOutboxStore.AppendAsync
+  fullName: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.AppendAsync
+- uid: Sora.Data.Cqrs.IOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Cqrs.IOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry,System.Threading.CancellationToken)
+  parent: Sora.Data.Cqrs.IOutboxStore
+  isExternal: true
+  href: Sora.Data.Cqrs.IOutboxStore.html#Sora_Data_Cqrs_IOutboxStore_AppendAsync_Sora_Data_Cqrs_OutboxEntry_System_Threading_CancellationToken_
+  name: AppendAsync(OutboxEntry, CancellationToken)
+  nameWithType: IOutboxStore.AppendAsync(OutboxEntry, CancellationToken)
+  fullName: Sora.Data.Cqrs.IOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry, System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Cqrs.IOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry,System.Threading.CancellationToken)
+    name: AppendAsync
+    href: Sora.Data.Cqrs.IOutboxStore.html#Sora_Data_Cqrs_IOutboxStore_AppendAsync_Sora_Data_Cqrs_OutboxEntry_System_Threading_CancellationToken_
+  - name: (
+  - uid: Sora.Data.Cqrs.OutboxEntry
+    name: OutboxEntry
+    href: Sora.Data.Cqrs.OutboxEntry.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Cqrs.IOutboxStore.AppendAsync(Sora.Data.Cqrs.OutboxEntry,System.Threading.CancellationToken)
+    name: AppendAsync
+    href: Sora.Data.Cqrs.IOutboxStore.html#Sora_Data_Cqrs_IOutboxStore_AppendAsync_Sora_Data_Cqrs_OutboxEntry_System_Threading_CancellationToken_
+  - name: (
+  - uid: Sora.Data.Cqrs.OutboxEntry
+    name: OutboxEntry
+    href: Sora.Data.Cqrs.OutboxEntry.html
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Cqrs.OutboxEntry
+  commentId: T:Sora.Data.Cqrs.OutboxEntry
+  parent: Sora.Data.Cqrs
+  href: Sora.Data.Cqrs.OutboxEntry.html
+  name: OutboxEntry
+  nameWithType: OutboxEntry
+  fullName: Sora.Data.Cqrs.OutboxEntry
+- uid: System.Threading.CancellationToken
+  commentId: T:System.Threading.CancellationToken
+  parent: System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  name: CancellationToken
+  nameWithType: CancellationToken
+  fullName: System.Threading.CancellationToken
+- uid: System.Threading.Tasks.Task
+  commentId: T:System.Threading.Tasks.Task
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task
+  name: Task
+  nameWithType: Task
+  fullName: System.Threading.Tasks.Task
+- uid: System.Threading
+  commentId: N:System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading
+  nameWithType: System.Threading
+  fullName: System.Threading
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+- uid: System.Threading.Tasks
+  commentId: N:System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading.Tasks
+  nameWithType: System.Threading.Tasks
+  fullName: System.Threading.Tasks
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.DequeueAsync*
+  commentId: Overload:Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.DequeueAsync
+  href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html#Sora_Data_Cqrs_Outbox_Mongo_MongoOutboxStore_DequeueAsync_System_Int32_System_Threading_CancellationToken_
+  name: DequeueAsync
+  nameWithType: MongoOutboxStore.DequeueAsync
+  fullName: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.DequeueAsync
+- uid: Sora.Data.Cqrs.IOutboxStore.DequeueAsync(System.Int32,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Cqrs.IOutboxStore.DequeueAsync(System.Int32,System.Threading.CancellationToken)
+  parent: Sora.Data.Cqrs.IOutboxStore
+  isExternal: true
+  href: Sora.Data.Cqrs.IOutboxStore.html#Sora_Data_Cqrs_IOutboxStore_DequeueAsync_System_Int32_System_Threading_CancellationToken_
+  name: DequeueAsync(int, CancellationToken)
+  nameWithType: IOutboxStore.DequeueAsync(int, CancellationToken)
+  fullName: Sora.Data.Cqrs.IOutboxStore.DequeueAsync(int, System.Threading.CancellationToken)
+  nameWithType.vb: IOutboxStore.DequeueAsync(Integer, CancellationToken)
+  fullName.vb: Sora.Data.Cqrs.IOutboxStore.DequeueAsync(Integer, System.Threading.CancellationToken)
+  name.vb: DequeueAsync(Integer, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Cqrs.IOutboxStore.DequeueAsync(System.Int32,System.Threading.CancellationToken)
+    name: DequeueAsync
+    href: Sora.Data.Cqrs.IOutboxStore.html#Sora_Data_Cqrs_IOutboxStore_DequeueAsync_System_Int32_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Cqrs.IOutboxStore.DequeueAsync(System.Int32,System.Threading.CancellationToken)
+    name: DequeueAsync
+    href: Sora.Data.Cqrs.IOutboxStore.html#Sora_Data_Cqrs_IOutboxStore_DequeueAsync_System_Int32_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{Sora.Data.Cqrs.OutboxEntry}}
+  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{Sora.Data.Cqrs.OutboxEntry}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<IReadOnlyList<OutboxEntry>>
+  nameWithType: Task<IReadOnlyList<OutboxEntry>>
+  fullName: System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Sora.Data.Cqrs.OutboxEntry>>
+  nameWithType.vb: Task(Of IReadOnlyList(Of OutboxEntry))
+  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.IReadOnlyList(Of Sora.Data.Cqrs.OutboxEntry))
+  name.vb: Task(Of IReadOnlyList(Of OutboxEntry))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: Sora.Data.Cqrs.OutboxEntry
+    name: OutboxEntry
+    href: Sora.Data.Cqrs.OutboxEntry.html
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Cqrs.OutboxEntry
+    name: OutboxEntry
+    href: Sora.Data.Cqrs.OutboxEntry.html
+  - name: )
+  - name: )
+- uid: System.Threading.Tasks.Task`1
+  commentId: T:System.Threading.Tasks.Task`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<TResult>
+  nameWithType: Task<TResult>
+  fullName: System.Threading.Tasks.Task<TResult>
+  nameWithType.vb: Task(Of TResult)
+  fullName.vb: System.Threading.Tasks.Task(Of TResult)
+  name.vb: Task(Of TResult)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MarkProcessedAsync*
+  commentId: Overload:Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MarkProcessedAsync
+  href: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.html#Sora_Data_Cqrs_Outbox_Mongo_MongoOutboxStore_MarkProcessedAsync_System_String_System_Threading_CancellationToken_
+  name: MarkProcessedAsync
+  nameWithType: MongoOutboxStore.MarkProcessedAsync
+  fullName: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore.MarkProcessedAsync
+- uid: Sora.Data.Cqrs.IOutboxStore.MarkProcessedAsync(System.String,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Cqrs.IOutboxStore.MarkProcessedAsync(System.String,System.Threading.CancellationToken)
+  parent: Sora.Data.Cqrs.IOutboxStore
+  isExternal: true
+  href: Sora.Data.Cqrs.IOutboxStore.html#Sora_Data_Cqrs_IOutboxStore_MarkProcessedAsync_System_String_System_Threading_CancellationToken_
+  name: MarkProcessedAsync(string, CancellationToken)
+  nameWithType: IOutboxStore.MarkProcessedAsync(string, CancellationToken)
+  fullName: Sora.Data.Cqrs.IOutboxStore.MarkProcessedAsync(string, System.Threading.CancellationToken)
+  nameWithType.vb: IOutboxStore.MarkProcessedAsync(String, CancellationToken)
+  fullName.vb: Sora.Data.Cqrs.IOutboxStore.MarkProcessedAsync(String, System.Threading.CancellationToken)
+  name.vb: MarkProcessedAsync(String, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Cqrs.IOutboxStore.MarkProcessedAsync(System.String,System.Threading.CancellationToken)
+    name: MarkProcessedAsync
+    href: Sora.Data.Cqrs.IOutboxStore.html#Sora_Data_Cqrs_IOutboxStore_MarkProcessedAsync_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Cqrs.IOutboxStore.MarkProcessedAsync(System.String,System.Threading.CancellationToken)
+    name: MarkProcessedAsync
+    href: Sora.Data.Cqrs.IOutboxStore.html#Sora_Data_Cqrs_IOutboxStore_MarkProcessedAsync_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String

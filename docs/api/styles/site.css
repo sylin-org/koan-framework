@@ -1,30 +1,126 @@
 :root{
-  --bg-primary:#0d1117;
-  --bg-secondary:#161b22;
-  --bg-tertiary:#21262d;
-  --text-primary:#f0f6fc;
-  --text-secondary:#8b949e;
-  --accent-green:#39d353;
-  --accent-blue:#58a6ff;
-  --accent-purple:#bc8cff;
-  --accent-orange:#ff9500;
-  --border-color:#30363d;
-  --code-bg:#161b22;
+  --bg-primary:#1a1e23;
+  --bg-secondary:#252a32;
+  --bg-tertiary:#2d3238;
+  --text-primary:#e8eaed;
+  --text-secondary:#9aa0a6;
+  --accent-green:#00d4aa;
+  --accent-blue:#4285f4;
+  --accent-purple:#ab47bc;
+  --accent-orange:#ff6d00;
+  --border-color:#3c4043;
+  --code-bg:#252a32;
+  --card-bg:#2d3238;
+  --hover-bg:#3c4043;
+  --code-inline-bg:#2a2f35; /* slightly above primary, below tertiary */
+  --code-inline-text:#e0e3e7;
 }
 
-html,body{background:var(--bg-primary);color:var(--text-primary);}
+html,body{background:var(--bg-primary);color:var(--text-primary);} 
 
 /* Typography to match Inter + JetBrains Mono */
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 body{font-family:'Inter',sans-serif;}
 code,pre,.lang-cs,.lang-json{font-family:'JetBrains Mono',monospace;}
 
+/* Inline code (not in pre) */
+:not(pre) > code{
+  background:var(--code-inline-bg) !important;
+  color:var(--code-inline-text) !important;
+  border:1px solid var(--border-color) !important;
+  border-radius:4px;
+  padding:2px 6px;
+}
+
 /* Header */
+.navbar{
+  background:var(--bg-secondary)!important;
+  border-bottom:1px solid var(--border-color);
+  position:relative; /* keep default flow to avoid overlap */
+  z-index:1030;
+  overflow:hidden; /* prevent oversized logo bleeding */
+}
+.navbar .container{
+  background:transparent!important;
+  max-width:1200px;
+}
+.navbar-brand, .navbar-brand a{
+  color:var(--accent-green)!important;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  padding:8px 15px; /* keep navbar height compact */
+}
+#logo, .navbar-brand img{
+  height:28px !important;
+  max-height:28px !important;
+  width:auto !important;
+  margin-right:8px;
+  display:block;
+}
+/* Safety catch: any images/SVGs inside header are constrained */
+header img, header svg{
+  max-height:32px !important;
+  height:32px !important;
+  width:auto !important;
+}
+.navbar-brand{ overflow:hidden; }
+.navbar-nav{
+  background:var(--bg-secondary)!important;
+}
+.navbar-nav > li > a{
+  color:var(--text-secondary)!important;
+}
+.navbar-nav > li > a:hover{
+  color:var(--accent-blue)!important;
+}
+
+/* Hide side-toc expand markers in top navbar */
+#navbar .expand-stub { display: none !important; }
+
+/* Dropdown should appear above subnav */
+.subnav { z-index: 1000; position: relative; }
+
+/* Convert nested items in top navbar to dropdowns */
+#navbar > ul.navbar-nav > li { position: relative; }
+#navbar > ul.navbar-nav > li > ul { /* level-2 */
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  min-width: 220px;
+  padding: 6px 0;
+  z-index: 1040;
+}
+#navbar > ul.navbar-nav > li:hover > ul { display: block; }
+#navbar > ul.navbar-nav > li > ul li { float: none; }
+#navbar > ul.navbar-nav > li > ul a { display: block; padding: 6px 16px; }
+
+/* Fix navbar toggle for mobile */
+.navbar-toggler{
+  border-color:var(--border-color);
+}
+.navbar-toggler-icon{
+  background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2892, 160, 166, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='m4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+/* Restore Bootstrap collapse and dropdown behavior */
+#navbar.collapse { display:none; }
+#navbar.collapse.in { display:block; }
+.navbar-nav > li.dropdown:hover > .dropdown-menu{ display:block; }
+.dropdown-menu{ background:var(--bg-secondary); border:1px solid var(--border-color); }
+.dropdown-menu > li > a{ color:var(--text-primary); }
+.dropdown-menu > li > a:hover{ background:var(--hover-bg); color:var(--accent-blue); }
+
+/* Ensure main content doesn't overlap with navbar */
+body{ padding-top:0; }
+.subnav + .container.body-content{ margin-top:12px; }
+header + .container.body-content{ margin-top:12px; }
+
 .toc .nav > li > a, .sidetoc .nav > li > a{color:var(--text-secondary);} 
 .toc .nav > li > a:hover, .sidetoc .nav > li > a:hover{color:var(--accent-blue);} 
-
-.navbar, .navbar .container{background:var(--bg-secondary)!important;border-bottom:1px solid var(--border-color);} 
-.navbar-brand, .navbar-brand a{color:var(--accent-green)!important;font-weight:700;}
 
 /* Links */
 a{color:var(--accent-blue);} a:hover{color:#7bb6ff;}
@@ -33,12 +129,29 @@ a{color:var(--accent-blue);} a:hover{color:#7bb6ff;}
 .article{background:var(--bg-primary);} 
 .article .content{color:var(--text-primary);} 
 .article h1,.article h2,.article h3{color:var(--text-primary);} 
-.article blockquote{border-left:3px solid var(--accent-blue);background:var(--bg-secondary);}
+.article blockquote{border-left:3px solid var(--accent-blue);background:var(--bg-secondary);} 
 
 /* Code Blocks */
 .hljs,.codeHeader+pre{background:var(--code-bg)!important;border:1px solid var(--border-color);} 
 pre code{color:var(--text-primary);} 
 .codeHeader{background:var(--bg-tertiary);border:1px solid var(--border-color);} 
+
+/* Syntax highlighting (dark, high-contrast) */
+.hljs { color: var(--text-primary); }
+.hljs-comment, .hljs-quote { color: #9aa0a6; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name { color: #82aaff; }
+.hljs-type, .hljs-class .hljs-title, .hljs-title.class_ { color: #89ddff; }
+.hljs-attr, .hljs-attribute { color: #c792ea; }
+.hljs-string, .hljs-doctag { color: #ffd580; }
+.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: #ffab70; }
+.hljs-meta, .hljs-meta .hljs-keyword { color: #89ddff; }
+.hljs-subst, .hljs-template-variable, .hljs-variable { color: #ffd580; }
+.hljs-regexp, .hljs-link { color: #c3e88d; }
+.hljs-section, .hljs-title { color: #e8eaed; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+.hljs {color:#bbb;}
+pre {background-color: #141414;}
 
 /* Tables */
 table{background:var(--bg-secondary);border-color:var(--border-color);} 

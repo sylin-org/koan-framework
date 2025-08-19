@@ -8,5 +8,20 @@
   href: well-known-endpoints.md
 - name: OpenAPI generation
   href: openapi-generation.md
+- name: Quick Start
+  href: quickstart/index.md
+  items:
+    - name: Module 1 - Hello Sora API
+      href: quickstart/01-hello-sora-api.md
+    - name: Module 2 - SQLite Upgrade
+      href: quickstart/02-sqlite-upgrade.md
+    - name: Module 3 - Production APIs
+      href: quickstart/03-proper-apis.md
+    - name: Module 4 - Commands & Events
+      href: quickstart/04-commands-and-events.md
+    - name: Module 5 - Production Ready
+      href: quickstart/05-production-ready.md
+    - name: Module 6 - Capstone Project
+      href: quickstart/06-capstone-project.md
 - name: Reference
-  href: api/index.md
+  href: assemblies.md

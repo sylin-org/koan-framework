@@ -18,14 +18,17 @@
     ],
     "resource": [
       { "files": ["**/images/**"] },
-      { "src": ".", "files": ["styles/**"] }
+      { "src": ".", "files": ["styles/**"] },
+      { "src": "../../other/website/assets", "files": ["**/*"], "dest": "." }
     ],
-  "dest": "../../resources/website/docs",
+    "dest": "../../other/website/docs",
     "globalMetadata": {
-      "_appTitle": "Sora Framework API"
+      "_appTitle": "Sora Framework API",
+      "_appLogoPath": "logo.svg",
+      "_appFaviconPath": "favicon.ico"
     },
     "xref": [],
-    "template": ["default"],
-    "styles": [ "styles/site.css" ]
+  "template": ["default"],
+  "styles": [ "styles/site.css", "styles/main.css" ]
   }
 }

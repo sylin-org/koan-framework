@@ -1,0 +1,118 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Abstractions.Annotations
+  commentId: N:Sora.Data.Abstractions.Annotations
+  id: Sora.Data.Abstractions.Annotations
+  children:
+  - Sora.Data.Abstractions.Annotations.DataAdapterAttribute
+  - Sora.Data.Abstractions.Annotations.DataSourceAttribute
+  - Sora.Data.Abstractions.Annotations.IdentifierAttribute
+  - Sora.Data.Abstractions.Annotations.IgnoreStorageAttribute
+  - Sora.Data.Abstractions.Annotations.IndexAttribute
+  - Sora.Data.Abstractions.Annotations.RenamedFromAttribute
+  - Sora.Data.Abstractions.Annotations.StorageAttribute
+  - Sora.Data.Abstractions.Annotations.StorageNameAttribute
+  - Sora.Data.Abstractions.Annotations.StorageNamingAttribute
+  langs:
+  - csharp
+  - vb
+  name: Sora.Data.Abstractions.Annotations
+  nameWithType: Sora.Data.Abstractions.Annotations
+  fullName: Sora.Data.Abstractions.Annotations
+  type: Namespace
+  assemblies:
+  - Sora.Data.Abstractions
+references:
+- uid: Sora.Data.Abstractions.Annotations.DataSourceAttribute
+  commentId: T:Sora.Data.Abstractions.Annotations.DataSourceAttribute
+  href: Sora.Data.Abstractions.Annotations.DataSourceAttribute.html
+  name: DataSourceAttribute
+  nameWithType: DataSourceAttribute
+  fullName: Sora.Data.Abstractions.Annotations.DataSourceAttribute
+- uid: Sora.Data.Abstractions.Annotations.IgnoreStorageAttribute
+  commentId: T:Sora.Data.Abstractions.Annotations.IgnoreStorageAttribute
+  href: Sora.Data.Abstractions.Annotations.IgnoreStorageAttribute.html
+  name: IgnoreStorageAttribute
+  nameWithType: IgnoreStorageAttribute
+  fullName: Sora.Data.Abstractions.Annotations.IgnoreStorageAttribute
+- uid: Sora.Data.Abstractions.Annotations.IndexAttribute
+  commentId: T:Sora.Data.Abstractions.Annotations.IndexAttribute
+  parent: Sora.Data.Abstractions.Annotations
+  href: Sora.Data.Abstractions.Annotations.IndexAttribute.html
+  name: IndexAttribute
+  nameWithType: IndexAttribute
+  fullName: Sora.Data.Abstractions.Annotations.IndexAttribute
+- uid: Sora.Data.Abstractions.Annotations.RenamedFromAttribute
+  commentId: T:Sora.Data.Abstractions.Annotations.RenamedFromAttribute
+  href: Sora.Data.Abstractions.Annotations.RenamedFromAttribute.html
+  name: RenamedFromAttribute
+  nameWithType: RenamedFromAttribute
+  fullName: Sora.Data.Abstractions.Annotations.RenamedFromAttribute
+- uid: Sora.Data.Abstractions.Annotations.StorageAttribute
+  commentId: T:Sora.Data.Abstractions.Annotations.StorageAttribute
+  href: Sora.Data.Abstractions.Annotations.StorageAttribute.html
+  name: StorageAttribute
+  nameWithType: StorageAttribute
+  fullName: Sora.Data.Abstractions.Annotations.StorageAttribute
+- uid: Sora.Data.Abstractions.Annotations.StorageNameAttribute
+  commentId: T:Sora.Data.Abstractions.Annotations.StorageNameAttribute
+  href: Sora.Data.Abstractions.Annotations.StorageNameAttribute.html
+  name: StorageNameAttribute
+  nameWithType: StorageNameAttribute
+  fullName: Sora.Data.Abstractions.Annotations.StorageNameAttribute
+- uid: Sora.Data.Abstractions.Annotations.StorageNamingAttribute
+  commentId: T:Sora.Data.Abstractions.Annotations.StorageNamingAttribute
+  href: Sora.Data.Abstractions.Annotations.StorageNamingAttribute.html
+  name: StorageNamingAttribute
+  nameWithType: StorageNamingAttribute
+  fullName: Sora.Data.Abstractions.Annotations.StorageNamingAttribute
+- uid: Sora.Data.Abstractions.Annotations.DataAdapterAttribute
+  commentId: T:Sora.Data.Abstractions.Annotations.DataAdapterAttribute
+  href: Sora.Data.Abstractions.Annotations.DataAdapterAttribute.html
+  name: DataAdapterAttribute
+  nameWithType: DataAdapterAttribute
+  fullName: Sora.Data.Abstractions.Annotations.DataAdapterAttribute
+- uid: Sora.Data.Abstractions.Annotations.IdentifierAttribute
+  commentId: T:Sora.Data.Abstractions.Annotations.IdentifierAttribute
+  href: Sora.Data.Abstractions.Annotations.IdentifierAttribute.html
+  name: IdentifierAttribute
+  nameWithType: IdentifierAttribute
+  fullName: Sora.Data.Abstractions.Annotations.IdentifierAttribute
+- uid: Sora.Data.Abstractions.Annotations
+  commentId: N:Sora.Data.Abstractions.Annotations
+  href: Sora.html
+  name: Sora.Data.Abstractions.Annotations
+  nameWithType: Sora.Data.Abstractions.Annotations
+  fullName: Sora.Data.Abstractions.Annotations
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Abstractions
+    name: Abstractions
+    href: Sora.Data.Abstractions.html
+  - name: .
+  - uid: Sora.Data.Abstractions.Annotations
+    name: Annotations
+    href: Sora.Data.Abstractions.Annotations.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Abstractions
+    name: Abstractions
+    href: Sora.Data.Abstractions.html
+  - name: .
+  - uid: Sora.Data.Abstractions.Annotations
+    name: Annotations
+    href: Sora.Data.Abstractions.Annotations.html

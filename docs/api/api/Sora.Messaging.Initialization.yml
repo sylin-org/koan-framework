@@ -1,0 +1,23 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Messaging.Initialization
+  commentId: N:Sora.Messaging.Initialization
+  id: Sora.Messaging.Initialization
+  children:
+  - Sora.Messaging.Initialization.SoraAutoRegistrar
+  langs:
+  - csharp
+  - vb
+  name: Sora.Messaging.Initialization
+  nameWithType: Sora.Messaging.Initialization
+  fullName: Sora.Messaging.Initialization
+  type: Namespace
+  assemblies:
+  - Sora.Messaging.Core
+references:
+- uid: Sora.Messaging.Initialization.SoraAutoRegistrar
+  commentId: T:Sora.Messaging.Initialization.SoraAutoRegistrar
+  href: Sora.Messaging.Initialization.SoraAutoRegistrar.html
+  name: SoraAutoRegistrar
+  nameWithType: SoraAutoRegistrar
+  fullName: Sora.Messaging.Initialization.SoraAutoRegistrar

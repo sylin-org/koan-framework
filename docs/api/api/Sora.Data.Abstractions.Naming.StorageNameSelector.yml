@@ -1,0 +1,498 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Abstractions.Naming.StorageNameSelector
+  commentId: T:Sora.Data.Abstractions.Naming.StorageNameSelector
+  id: StorageNameSelector
+  parent: Sora.Data.Abstractions.Naming
+  children:
+  - Sora.Data.Abstractions.Naming.StorageNameSelector.ResolveName(System.Object,Sora.Data.Abstractions.Naming.IStorageNameResolver,System.Type,Sora.Data.Abstractions.Naming.StorageNameResolver.Convention,System.Func{System.Type,System.String})
+  langs:
+  - csharp
+  - vb
+  name: StorageNameSelector
+  nameWithType: StorageNameSelector
+  fullName: Sora.Data.Abstractions.Naming.StorageNameSelector
+  type: Class
+  source:
+    remote:
+      path: src/Sora.Data.Abstractions/Naming/StorageNameSelector.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: StorageNameSelector
+    path: ../../src/Sora.Data.Abstractions/Naming/StorageNameSelector.cs
+    startLine: 8
+  assemblies:
+  - Sora.Data.Abstractions
+  namespace: Sora.Data.Abstractions.Naming
+  summary: >-
+    Centralized helper to select the storage name using a consistent precedence:
+
+    adapter override -&gt; repository-level override -&gt; DI resolver.
+  example: []
+  syntax:
+    content: public static class StorageNameSelector
+    content.vb: Public Module StorageNameSelector
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: Sora.Data.Abstractions.Naming.StorageNameSelector.ResolveName(System.Object,Sora.Data.Abstractions.Naming.IStorageNameResolver,System.Type,Sora.Data.Abstractions.Naming.StorageNameResolver.Convention,System.Func{System.Type,System.String})
+  commentId: M:Sora.Data.Abstractions.Naming.StorageNameSelector.ResolveName(System.Object,Sora.Data.Abstractions.Naming.IStorageNameResolver,System.Type,Sora.Data.Abstractions.Naming.StorageNameResolver.Convention,System.Func{System.Type,System.String})
+  id: ResolveName(System.Object,Sora.Data.Abstractions.Naming.IStorageNameResolver,System.Type,Sora.Data.Abstractions.Naming.StorageNameResolver.Convention,System.Func{System.Type,System.String})
+  parent: Sora.Data.Abstractions.Naming.StorageNameSelector
+  langs:
+  - csharp
+  - vb
+  name: ResolveName(object?, IStorageNameResolver, Type, Convention, Func<Type, string?>?)
+  nameWithType: StorageNameSelector.ResolveName(object?, IStorageNameResolver, Type, StorageNameResolver.Convention, Func<Type, string?>?)
+  fullName: Sora.Data.Abstractions.Naming.StorageNameSelector.ResolveName(object?, Sora.Data.Abstractions.Naming.IStorageNameResolver, System.Type, Sora.Data.Abstractions.Naming.StorageNameResolver.Convention, System.Func<System.Type, string?>?)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Data.Abstractions/Naming/StorageNameSelector.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: ResolveName
+    path: ../../src/Sora.Data.Abstractions/Naming/StorageNameSelector.cs
+    startLine: 10
+  assemblies:
+  - Sora.Data.Abstractions
+  namespace: Sora.Data.Abstractions.Naming
+  syntax:
+    content: public static string ResolveName(object? repository, IStorageNameResolver diResolver, Type entityType, StorageNameResolver.Convention defaults, Func<Type, string?>? adapterOverride = null)
+    parameters:
+    - id: repository
+      type: System.Object
+    - id: diResolver
+      type: Sora.Data.Abstractions.Naming.IStorageNameResolver
+    - id: entityType
+      type: System.Type
+    - id: defaults
+      type: Sora.Data.Abstractions.Naming.StorageNameResolver.Convention
+    - id: adapterOverride
+      type: System.Func{System.Type,System.String}
+    return:
+      type: System.String
+    content.vb: Public Shared Function ResolveName(repository As Object, diResolver As IStorageNameResolver, entityType As Type, defaults As StorageNameResolver.Convention, adapterOverride As Func(Of Type, String) = Nothing) As String
+  overload: Sora.Data.Abstractions.Naming.StorageNameSelector.ResolveName*
+  nameWithType.vb: StorageNameSelector.ResolveName(Object, IStorageNameResolver, Type, StorageNameResolver.Convention, Func(Of Type, String))
+  fullName.vb: Sora.Data.Abstractions.Naming.StorageNameSelector.ResolveName(Object, Sora.Data.Abstractions.Naming.IStorageNameResolver, System.Type, Sora.Data.Abstractions.Naming.StorageNameResolver.Convention, System.Func(Of System.Type, String))
+  name.vb: ResolveName(Object, IStorageNameResolver, Type, Convention, Func(Of Type, String))
+references:
+- uid: Sora.Data.Abstractions.Naming
+  commentId: N:Sora.Data.Abstractions.Naming
+  href: Sora.html
+  name: Sora.Data.Abstractions.Naming
+  nameWithType: Sora.Data.Abstractions.Naming
+  fullName: Sora.Data.Abstractions.Naming
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Abstractions
+    name: Abstractions
+    href: Sora.Data.Abstractions.html
+  - name: .
+  - uid: Sora.Data.Abstractions.Naming
+    name: Naming
+    href: Sora.Data.Abstractions.Naming.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Abstractions
+    name: Abstractions
+    href: Sora.Data.Abstractions.html
+  - name: .
+  - uid: Sora.Data.Abstractions.Naming
+    name: Naming
+    href: Sora.Data.Abstractions.Naming.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sora.Data.Abstractions.Naming.StorageNameSelector.ResolveName*
+  commentId: Overload:Sora.Data.Abstractions.Naming.StorageNameSelector.ResolveName
+  href: Sora.Data.Abstractions.Naming.StorageNameSelector.html#Sora_Data_Abstractions_Naming_StorageNameSelector_ResolveName_System_Object_Sora_Data_Abstractions_Naming_IStorageNameResolver_System_Type_Sora_Data_Abstractions_Naming_StorageNameResolver_Convention_System_Func_System_Type_System_String__
+  name: ResolveName
+  nameWithType: StorageNameSelector.ResolveName
+  fullName: Sora.Data.Abstractions.Naming.StorageNameSelector.ResolveName
+- uid: Sora.Data.Abstractions.Naming.IStorageNameResolver
+  commentId: T:Sora.Data.Abstractions.Naming.IStorageNameResolver
+  parent: Sora.Data.Abstractions.Naming
+  href: Sora.Data.Abstractions.Naming.IStorageNameResolver.html
+  name: IStorageNameResolver
+  nameWithType: IStorageNameResolver
+  fullName: Sora.Data.Abstractions.Naming.IStorageNameResolver
+- uid: System.Type
+  commentId: T:System.Type
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.type
+  name: Type
+  nameWithType: Type
+  fullName: System.Type
+- uid: Sora.Data.Abstractions.Naming.StorageNameResolver.Convention
+  commentId: T:Sora.Data.Abstractions.Naming.StorageNameResolver.Convention
+  parent: Sora.Data.Abstractions.Naming
+  href: Sora.Data.Abstractions.Naming.StorageNameResolver.html
+  name: StorageNameResolver.Convention
+  nameWithType: StorageNameResolver.Convention
+  fullName: Sora.Data.Abstractions.Naming.StorageNameResolver.Convention
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.Naming.StorageNameResolver
+    name: StorageNameResolver
+    href: Sora.Data.Abstractions.Naming.StorageNameResolver.html
+  - name: .
+  - uid: Sora.Data.Abstractions.Naming.StorageNameResolver.Convention
+    name: Convention
+    href: Sora.Data.Abstractions.Naming.StorageNameResolver.Convention.html
+  spec.vb:
+  - uid: Sora.Data.Abstractions.Naming.StorageNameResolver
+    name: StorageNameResolver
+    href: Sora.Data.Abstractions.Naming.StorageNameResolver.html
+  - name: .
+  - uid: Sora.Data.Abstractions.Naming.StorageNameResolver.Convention
+    name: Convention
+    href: Sora.Data.Abstractions.Naming.StorageNameResolver.Convention.html
+- uid: System.Func{System.Type,System.String}
+  commentId: T:System.Func{System.Type,System.String}
+  parent: System
+  definition: System.Func`2
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<Type, string>
+  nameWithType: Func<Type, string>
+  fullName: System.Func<System.Type, string>
+  nameWithType.vb: Func(Of Type, String)
+  fullName.vb: System.Func(Of System.Type, String)
+  name.vb: Func(Of Type, String)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Type
+    name: Type
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.type
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System.Func`2
+  commentId: T:System.Func`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<T, TResult>
+  nameWithType: Func<T, TResult>
+  fullName: System.Func<T, TResult>
+  nameWithType.vb: Func(Of T, TResult)
+  fullName.vb: System.Func(Of T, TResult)
+  name.vb: Func(Of T, TResult)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: )

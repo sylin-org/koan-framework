@@ -1,0 +1,95 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Relational.Linq
+  commentId: N:Sora.Data.Relational.Linq
+  id: Sora.Data.Relational.Linq
+  children:
+  - Sora.Data.Relational.Linq.ILinqSqlDialect
+  - Sora.Data.Relational.Linq.LinqWhereTranslator`1
+  - Sora.Data.Relational.Linq.RelationalCommandCache
+  langs:
+  - csharp
+  - vb
+  name: Sora.Data.Relational.Linq
+  nameWithType: Sora.Data.Relational.Linq
+  fullName: Sora.Data.Relational.Linq
+  type: Namespace
+  assemblies:
+  - Sora.Data.Relational
+references:
+- uid: Sora.Data.Relational.Linq.ILinqSqlDialect
+  commentId: T:Sora.Data.Relational.Linq.ILinqSqlDialect
+  parent: Sora.Data.Relational.Linq
+  href: Sora.Data.Relational.Linq.ILinqSqlDialect.html
+  name: ILinqSqlDialect
+  nameWithType: ILinqSqlDialect
+  fullName: Sora.Data.Relational.Linq.ILinqSqlDialect
+- uid: Sora.Data.Relational.Linq.LinqWhereTranslator`1
+  commentId: T:Sora.Data.Relational.Linq.LinqWhereTranslator`1
+  href: Sora.Data.Relational.Linq.LinqWhereTranslator-1.html
+  name: LinqWhereTranslator<TEntity>
+  nameWithType: LinqWhereTranslator<TEntity>
+  fullName: Sora.Data.Relational.Linq.LinqWhereTranslator<TEntity>
+  nameWithType.vb: LinqWhereTranslator(Of TEntity)
+  fullName.vb: Sora.Data.Relational.Linq.LinqWhereTranslator(Of TEntity)
+  name.vb: LinqWhereTranslator(Of TEntity)
+  spec.csharp:
+  - uid: Sora.Data.Relational.Linq.LinqWhereTranslator`1
+    name: LinqWhereTranslator
+    href: Sora.Data.Relational.Linq.LinqWhereTranslator-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  spec.vb:
+  - uid: Sora.Data.Relational.Linq.LinqWhereTranslator`1
+    name: LinqWhereTranslator
+    href: Sora.Data.Relational.Linq.LinqWhereTranslator-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+- uid: Sora.Data.Relational.Linq.RelationalCommandCache
+  commentId: T:Sora.Data.Relational.Linq.RelationalCommandCache
+  href: Sora.Data.Relational.Linq.RelationalCommandCache.html
+  name: RelationalCommandCache
+  nameWithType: RelationalCommandCache
+  fullName: Sora.Data.Relational.Linq.RelationalCommandCache
+- uid: Sora.Data.Relational.Linq
+  commentId: N:Sora.Data.Relational.Linq
+  href: Sora.html
+  name: Sora.Data.Relational.Linq
+  nameWithType: Sora.Data.Relational.Linq
+  fullName: Sora.Data.Relational.Linq
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Relational
+    name: Relational
+    href: Sora.Data.Relational.html
+  - name: .
+  - uid: Sora.Data.Relational.Linq
+    name: Linq
+    href: Sora.Data.Relational.Linq.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Relational
+    name: Relational
+    href: Sora.Data.Relational.html
+  - name: .
+  - uid: Sora.Data.Relational.Linq
+    name: Linq
+    href: Sora.Data.Relational.Linq.html

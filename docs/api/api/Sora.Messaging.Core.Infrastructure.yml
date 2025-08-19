@@ -1,0 +1,108 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Messaging.Core.Infrastructure
+  commentId: N:Sora.Messaging.Core.Infrastructure
+  id: Sora.Messaging.Core.Infrastructure
+  children:
+  - Sora.Messaging.Core.Infrastructure.Constants
+  - Sora.Messaging.Core.Infrastructure.Constants.Configuration
+  - Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery
+  - Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox
+  langs:
+  - csharp
+  - vb
+  name: Sora.Messaging.Core.Infrastructure
+  nameWithType: Sora.Messaging.Core.Infrastructure
+  fullName: Sora.Messaging.Core.Infrastructure
+  type: Namespace
+  assemblies:
+  - Sora.Messaging.Core
+references:
+- uid: Sora.Messaging.Core.Infrastructure.Constants
+  commentId: T:Sora.Messaging.Core.Infrastructure.Constants
+  href: Sora.Messaging.Core.Infrastructure.Constants.html
+  name: Constants
+  nameWithType: Constants
+  fullName: Sora.Messaging.Core.Infrastructure.Constants
+- uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration
+  commentId: T:Sora.Messaging.Core.Infrastructure.Constants.Configuration
+  href: Sora.Messaging.Core.Infrastructure.Constants.html
+  name: Constants.Configuration
+  nameWithType: Constants.Configuration
+  fullName: Sora.Messaging.Core.Infrastructure.Constants.Configuration
+  spec.csharp:
+  - uid: Sora.Messaging.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Messaging.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.html
+  spec.vb:
+  - uid: Sora.Messaging.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Messaging.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.html
+- uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox
+  commentId: T:Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox
+  href: Sora.Messaging.Core.Infrastructure.Constants.html
+  name: Constants.Configuration.Inbox
+  nameWithType: Constants.Configuration.Inbox
+  fullName: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox
+  spec.csharp:
+  - uid: Sora.Messaging.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Messaging.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox
+    name: Inbox
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.html
+  spec.vb:
+  - uid: Sora.Messaging.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Messaging.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox
+    name: Inbox
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.html
+- uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery
+  commentId: T:Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery
+  href: Sora.Messaging.Core.Infrastructure.Constants.html
+  name: Constants.Configuration.Discovery
+  nameWithType: Constants.Configuration.Discovery
+  fullName: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery
+  spec.csharp:
+  - uid: Sora.Messaging.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Messaging.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery
+    name: Discovery
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery.html
+  spec.vb:
+  - uid: Sora.Messaging.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Messaging.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery
+    name: Discovery
+    href: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery.html

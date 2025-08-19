@@ -1,0 +1,256 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Core.Infrastructure
+  commentId: N:Sora.Core.Infrastructure
+  id: Sora.Core.Infrastructure
+  children:
+  - Sora.Core.Infrastructure.Constants
+  - Sora.Core.Infrastructure.Constants.Configuration
+  - Sora.Core.Infrastructure.Constants.Configuration.Env
+  - Sora.Core.Infrastructure.Constants.Configuration.Observability
+  - Sora.Core.Infrastructure.Constants.Configuration.Otel
+  - Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter
+  - Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp
+  - Sora.Core.Infrastructure.Constants.Configuration.Sora
+  langs:
+  - csharp
+  - vb
+  name: Sora.Core.Infrastructure
+  nameWithType: Sora.Core.Infrastructure
+  fullName: Sora.Core.Infrastructure
+  type: Namespace
+  assemblies:
+  - Sora.Core
+references:
+- uid: Sora.Core.Infrastructure.Constants
+  commentId: T:Sora.Core.Infrastructure.Constants
+  href: Sora.Core.Infrastructure.Constants.html
+  name: Constants
+  nameWithType: Constants
+  fullName: Sora.Core.Infrastructure.Constants
+- uid: Sora.Core.Infrastructure.Constants.Configuration
+  commentId: T:Sora.Core.Infrastructure.Constants.Configuration
+  href: Sora.Core.Infrastructure.Constants.html
+  name: Constants.Configuration
+  nameWithType: Constants.Configuration
+  fullName: Sora.Core.Infrastructure.Constants.Configuration
+  spec.csharp:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  spec.vb:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+- uid: Sora.Core.Infrastructure.Constants.Configuration.Sora
+  commentId: T:Sora.Core.Infrastructure.Constants.Configuration.Sora
+  href: Sora.Core.Infrastructure.Constants.html
+  name: Constants.Configuration.Sora
+  nameWithType: Constants.Configuration.Sora
+  fullName: Sora.Core.Infrastructure.Constants.Configuration.Sora
+  spec.csharp:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Sora
+    name: Sora
+    href: Sora.Core.Infrastructure.Constants.Configuration.Sora.html
+  spec.vb:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Sora
+    name: Sora
+    href: Sora.Core.Infrastructure.Constants.Configuration.Sora.html
+- uid: Sora.Core.Infrastructure.Constants.Configuration.Observability
+  commentId: T:Sora.Core.Infrastructure.Constants.Configuration.Observability
+  href: Sora.Core.Infrastructure.Constants.html
+  name: Constants.Configuration.Observability
+  nameWithType: Constants.Configuration.Observability
+  fullName: Sora.Core.Infrastructure.Constants.Configuration.Observability
+  spec.csharp:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Observability
+    name: Observability
+    href: Sora.Core.Infrastructure.Constants.Configuration.Observability.html
+  spec.vb:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Observability
+    name: Observability
+    href: Sora.Core.Infrastructure.Constants.Configuration.Observability.html
+- uid: Sora.Core.Infrastructure.Constants.Configuration.Otel
+  commentId: T:Sora.Core.Infrastructure.Constants.Configuration.Otel
+  href: Sora.Core.Infrastructure.Constants.html
+  name: Constants.Configuration.Otel
+  nameWithType: Constants.Configuration.Otel
+  fullName: Sora.Core.Infrastructure.Constants.Configuration.Otel
+  spec.csharp:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel
+    name: Otel
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.html
+  spec.vb:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel
+    name: Otel
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.html
+- uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter
+  commentId: T:Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter
+  href: Sora.Core.Infrastructure.Constants.html
+  name: Constants.Configuration.Otel.Exporter
+  nameWithType: Constants.Configuration.Otel.Exporter
+  fullName: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter
+  spec.csharp:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel
+    name: Otel
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter
+    name: Exporter
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.html
+  spec.vb:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel
+    name: Otel
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter
+    name: Exporter
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.html
+- uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp
+  commentId: T:Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp
+  href: Sora.Core.Infrastructure.Constants.html
+  name: Constants.Configuration.Otel.Exporter.Otlp
+  nameWithType: Constants.Configuration.Otel.Exporter.Otlp
+  fullName: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp
+  spec.csharp:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel
+    name: Otel
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter
+    name: Exporter
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp
+    name: Otlp
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.html
+  spec.vb:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel
+    name: Otel
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter
+    name: Exporter
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp
+    name: Otlp
+    href: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.html
+- uid: Sora.Core.Infrastructure.Constants.Configuration.Env
+  commentId: T:Sora.Core.Infrastructure.Constants.Configuration.Env
+  href: Sora.Core.Infrastructure.Constants.html
+  name: Constants.Configuration.Env
+  nameWithType: Constants.Configuration.Env
+  fullName: Sora.Core.Infrastructure.Constants.Configuration.Env
+  spec.csharp:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Env
+    name: Env
+    href: Sora.Core.Infrastructure.Constants.Configuration.Env.html
+  spec.vb:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    href: Sora.Core.Infrastructure.Constants.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Configuration
+    href: Sora.Core.Infrastructure.Constants.Configuration.html
+  - name: .
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Env
+    name: Env
+    href: Sora.Core.Infrastructure.Constants.Configuration.Env.html
