@@ -71,10 +71,13 @@ internal sealed class SqliteOptionsConfigurator(IConfiguration config) : IConfig
 {
     public void Configure(SqliteOptions options)
     {
-        config.GetSection("Sora:Data:Sqlite").Bind(options);
-        config.GetSection("Sora:Data:Sources:Default:sqlite").Bind(options);
-        var cs = config.GetConnectionString("Default");
-        if (!string.IsNullOrWhiteSpace(cs)) options.ConnectionString = cs!;
+        options.ConnectionString = Sora.Core.Configuration.ReadFirst(
+            config,
+            defaultValue: options.ConnectionString,
+            "Sora:Data:Sqlite:ConnectionString",
+            "Sora:Data:Sources:Default:sqlite:ConnectionString",
+            "ConnectionStrings:Sqlite",
+            "ConnectionStrings:Default");
     }
 }
 

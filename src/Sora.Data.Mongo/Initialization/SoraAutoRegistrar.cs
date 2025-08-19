@@ -26,12 +26,20 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var o = new MongoOptions();
-        cfg.GetSection("Sora:Data:Mongo").Bind(o);
-        cfg.GetSection("Sora:Data:Sources:Default:mongo").Bind(o);
+        var o = new MongoOptions
+        {
+            ConnectionString = Sora.Core.Configuration.ReadFirst(cfg, MongoConstants.DefaultLocalUri,
+                "Sora:Data:Mongo:ConnectionString",
+                "Sora:Data:Sources:Default:mongo:ConnectionString",
+                "ConnectionStrings:Mongo",
+                "ConnectionStrings:Default"),
+            Database = Sora.Core.Configuration.ReadFirst(cfg, "sora",
+                "Sora:Data:Mongo:Database",
+                "Sora:Data:Sources:Default:mongo:Database")
+        };
         // Resolve connection string similarly to configurator: fallback to ConnectionStrings:Default if unset
         var cs = o.ConnectionString;
-        var csByName = cfg.GetConnectionString("Default");
+    var csByName = Sora.Core.Configuration.Read(cfg, "ConnectionStrings:Default", (string?)null);
         if (string.IsNullOrWhiteSpace(cs) && !string.IsNullOrWhiteSpace(csByName)) cs = csByName;
         if (string.IsNullOrWhiteSpace(cs))
         {

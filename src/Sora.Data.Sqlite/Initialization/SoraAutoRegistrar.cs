@@ -28,12 +28,15 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var o = new SqliteOptions();
-        cfg.GetSection("Sora:Data:Sqlite").Bind(o);
-        cfg.GetSection("Sora:Data:Sources:Default:sqlite").Bind(o);
+        var o = new SqliteOptions
+        {
+            ConnectionString = Sora.Core.Configuration.ReadFirst(cfg, "Data Source=./data/app.db",
+                "Sora:Data:Sqlite:ConnectionString",
+                "Sora:Data:Sources:Default:sqlite:ConnectionString",
+                "ConnectionStrings:Sqlite",
+                "ConnectionStrings:Default")
+        };
         var cs = o.ConnectionString;
-        var csByName = cfg.GetConnectionString("Default");
-        if (string.IsNullOrWhiteSpace(cs) && !string.IsNullOrWhiteSpace(csByName)) cs = csByName;
         report.AddSetting("ConnectionString", cs, isSecret: true);
         report.AddSetting("NamingStyle", o.NamingStyle.ToString());
         report.AddSetting("Separator", o.Separator);

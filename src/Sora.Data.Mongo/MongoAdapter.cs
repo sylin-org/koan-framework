@@ -71,12 +71,22 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
 {
     public void Configure(MongoOptions options)
     {
-        // Bind provider-specific options first
-        config.GetSection("Sora:Data:Mongo").Bind(options);
-        config.GetSection("Sora:Data:Sources:Default:mongo").Bind(options);
+        // Bind provider-specific options using Configuration helper (ADR-0040)
+        options.ConnectionString = Sora.Core.Configuration.ReadFirst(
+            config,
+            defaultValue: options.ConnectionString,
+            "Sora:Data:Mongo:ConnectionString",
+            "Sora:Data:Sources:Default:mongo:ConnectionString",
+            "ConnectionStrings:Mongo",
+            "ConnectionStrings:Default");
+        options.Database = Sora.Core.Configuration.ReadFirst(
+            config,
+            defaultValue: options.Database,
+            "Sora:Data:Mongo:Database",
+            "Sora:Data:Sources:Default:mongo:Database");
 
         // Resolve from ConnectionStrings:Default when present. Override placeholder/empty.
-        var cs = config.GetConnectionString("Default");
+        var cs = Sora.Core.Configuration.Read(config, "ConnectionStrings:Default", (string?)null);
         if (!string.IsNullOrWhiteSpace(cs))
         {
             if (string.IsNullOrWhiteSpace(options.ConnectionString) || string.Equals(options.ConnectionString.Trim(), MongoConstants.DefaultLocalUri, StringComparison.OrdinalIgnoreCase))
