@@ -328,8 +328,65 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 }
             }
             if (_ops.Count == 0) return new BatchResult(0, 0, 0);
-            var res = await _repo.GetCollection().BulkWriteAsync(_ops, cancellationToken: ct);
-            return new BatchResult((int)res.Upserts.Count, (int)res.ModifiedCount, 0); // deletes included in modified count indirectly
+            var collection = _repo.GetCollection();
+
+            // Honor RequireAtomic when requested
+            var requireAtomic = options?.RequireAtomic == true;
+            if (requireAtomic)
+            {
+                // Attempt transactional execution. Transactions require replica set/sharded cluster.
+                // If not supported by the deployment, signal NotSupported as per acceptance criteria.
+                var db = GetDatabase(collection);
+                var client = db.Client;
+                IClientSessionHandle? session = null;
+                try
+                {
+                    session = await client.StartSessionAsync(cancellationToken: ct).ConfigureAwait(false);
+                    try
+                    {
+                        session.StartTransaction();
+                    }
+                    catch (MongoClientException ex) when (ex.Message.Contains("Transactions are not supported", StringComparison.OrdinalIgnoreCase))
+                    {
+                        session.Dispose();
+                        throw new NotSupportedException("MongoDB deployment does not support transactions; cannot honor RequireAtomic=true.", ex);
+                    }
+
+                    var resTx = await collection.BulkWriteAsync(session, _ops, cancellationToken: ct).ConfigureAwait(false);
+                    await session.CommitTransactionAsync(ct).ConfigureAwait(false);
+                    return new BatchResult((int)resTx.Upserts.Count, (int)resTx.ModifiedCount, (int)resTx.DeletedCount);
+                }
+                catch
+                {
+                    if (session is not null)
+                    {
+                        try { await session.AbortTransactionAsync(ct).ConfigureAwait(false); } catch { /* swallow */ }
+                        session.Dispose();
+                    }
+                    throw;
+                }
+            }
+            else
+            {
+                // Best-effort bulk write
+                var res = await collection.BulkWriteAsync(_ops, cancellationToken: ct).ConfigureAwait(false);
+                return new BatchResult((int)res.Upserts.Count, (int)res.ModifiedCount, (int)res.DeletedCount);
+            }
+        }
+
+        private static IMongoDatabase GetDatabase(IMongoCollection<TEntity> collection)
+        {
+            // Prefer direct property when available; fall back to reflection if needed.
+            try
+            {
+                return collection.Database;
+            }
+            catch
+            {
+                var prop = typeof(IMongoCollection<TEntity>).GetProperty("Database");
+                if (prop?.GetValue(collection) is IMongoDatabase db) return db;
+                throw new InvalidOperationException("Unable to obtain Mongo database from collection.");
+            }
         }
     }
 }
