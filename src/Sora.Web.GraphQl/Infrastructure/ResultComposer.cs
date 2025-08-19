@@ -4,7 +4,7 @@ using System.Diagnostics;
 
 namespace Sora.Web.GraphQl.Infrastructure;
 
-internal static class ResultComposer
+public static class ResultComposer
 {
     public static object Compose(IExecutionResult result, HttpContext http, IReadOnlyDictionary<string, object?>? normalizedVars, object? originalVars)
     {

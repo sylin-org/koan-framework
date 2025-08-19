@@ -47,7 +47,7 @@ public static class AddSoraGraphQlExtensions
             .AddGraphQLServer()
             .SetRequestOptions(_ => new RequestExecutorOptions { ExecutionTimeout = TimeSpan.FromSeconds(10) })
             // Add a safe error filter that enriches errors with diagnostics in extensions
-            .AddErrorFilter<SoraGraphQlErrorFilter>()
+            .AddErrorFilter<Errors.SoraGraphQlErrorFilter>()
             .AddQueryType(d =>
             {
                 d.Name("Query");
