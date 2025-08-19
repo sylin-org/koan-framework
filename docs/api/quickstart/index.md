@@ -142,6 +142,10 @@ curl http://localhost:5000/api/todos/<returned-id>
 
 **That's it.** Health checks, clean routing—and real model data—all working.
 
+Click to try (when the app is running locally):
+
+- [http://localhost:5000/api/todos](http://localhost:5000/api/todos)
+
 ### What just happened?
 - The generic `EntityController<T>` exposed CRUD endpoints at `api/todos` with zero boilerplate.
 
@@ -178,7 +182,7 @@ app.UseSora();
 app.Run();
 ```
 
-Now open http://localhost:5000/swagger (in Development) to explore and try your endpoints.
+Now open [http://localhost:5000/swagger](http://localhost:5000/swagger) (in Development) to explore and try your endpoints.
 
 ## What you just experienced
 
