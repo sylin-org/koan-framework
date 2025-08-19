@@ -55,6 +55,7 @@ try {
     $destFromConfig = $json.build.dest
   } catch { }
 
+  $explicitOutput = $PSBoundParameters.ContainsKey('OutputDir')
   if (-not $OutputDir) { $OutputDir = if ($destFromConfig) { $destFromConfig } else { "_site" } }
   $targetDest = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($configDir, $OutputDir))
   Write-Host "Target  : $targetDest"
@@ -66,27 +67,23 @@ try {
   }
   Write-Host "Target (repo-relative): $targetRel"
 
-  # Staging directory for clean build output
-  $artifactsRoot = Join-Path $repoRoot 'artifacts/docs'
-  if (-not (Test-Path $artifactsRoot)) { New-Item -ItemType Directory -Path $artifactsRoot | Out-Null }
-  $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-  $stagingDir = Join-Path $artifactsRoot "site-$stamp"
-  if (Test-Path $stagingDir) { Remove-Item -Recurse -Force $stagingDir }
-  New-Item -ItemType Directory -Path $stagingDir | Out-Null
-
   if ($Clean) {
     Write-Heading "Cleaning target directory"
     if (Test-Path $targetDest) { Remove-Item -Recurse -Force $targetDest }
   }
 
+  # Logs directory
+  $artifactsRoot = Join-Path $repoRoot 'artifacts/docs'
+  if (-not (Test-Path $artifactsRoot)) { New-Item -ItemType Directory -Path $artifactsRoot | Out-Null }
+  $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
   $logFile = Join-Path $artifactsRoot "build-$stamp.log"
 
   Write-Heading "Building docs with DocFX ($LogLevel)"
-  $docfxArgs = @(
-    'build', $configFullPath,
-    '--logLevel', $LogLevel,
-    '--output', $stagingDir
-  )
+  $docfxArgs = @('build', $configFullPath, '--logLevel', $LogLevel)
+  # Only override output when user explicitly asked, otherwise let docfx.json 'dest' control
+  if ($explicitOutput -or -not $destFromConfig) {
+    $docfxArgs += @('-o', $targetDest)
+  }
 
   $buildSucceeded = $false
   $output = & $docfx @docfxArgs 2>&1 | Tee-Object -FilePath $logFile
@@ -116,22 +113,30 @@ try {
   Write-Heading "Build complete"
   Write-Host "Log file: $logFile"
 
-  # Wipe target and copy staging output
-  Write-Heading "Publishing to target"
-  if (Test-Path $targetDest) {
-    Write-Host "Wiping: $targetDest" -ForegroundColor Yellow
-    Remove-Item -Recurse -Force $targetDest
-  }
-  New-Item -ItemType Directory -Path $targetDest | Out-Null
-  Write-Host "Copying from staging: $stagingDir" -ForegroundColor Cyan
-  Copy-Item -Path (Join-Path $stagingDir '*') -Destination $targetDest -Recurse -Force
-
-  # Quick verification to reduce confusion about publish location
-  $indexPath = Join-Path $targetDest 'index.html'
-  if (Test-Path $indexPath) {
-    Write-Host "Published index: $indexPath" -ForegroundColor Green
+  # Output verification
+  Write-Heading "Output verification"
+  if (-not (Test-Path $targetDest)) {
+    Write-Warning "Target path not found after build: $targetDest"
   } else {
-    Write-Warning "index.html not found under target. Contents may differ from expectation."
+    $targetCount  = (Get-ChildItem -Path $targetDest  -Recurse -Force | Measure-Object).Count
+    Write-Host "Items in target: $targetCount" -ForegroundColor DarkGray
+  }
+
+  # Quick verification to reduce confusion about publish location (with short retry)
+  $candidates = @('index.html','toc.html','README.html')
+  $found = $false
+  $hit = $null
+  for ($i = 0; $i -lt 12 -and -not $found; $i++) {
+    foreach ($name in $candidates) {
+      $p = Join-Path $targetDest $name
+      if (Test-Path $p) { $found = $true; $hit = $p; break }
+    }
+    if (-not $found) { Start-Sleep -Milliseconds 250 }
+  }
+  if ($found) {
+    Write-Host "Published root doc: $hit" -ForegroundColor Green
+  } else {
+    Write-Warning "No top-level doc file (index/toc/README) found under target. Contents may differ from expectation."
   }
 
   if ($Serve) {
