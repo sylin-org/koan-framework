@@ -23,6 +23,10 @@ Learning Path: progressive tutorials you can complete in focused sessions.
 - [Module 5: Production Patterns — Observability and health](05-production-ready.md)
 - [Module 6 (optional): Advanced Capstone — Microservices with containers](06-capstone-project.md)
 
+Bonus:
+
+- [Add another database (Mongo) and copy data between stores](02b-mongo-and-migration.md)
+
 If you’re short on time, do Modules 0, 1, 3, and 5 for the essentials.
 
 ---
