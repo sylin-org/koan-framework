@@ -1,44 +1,3 @@
-# Sora Framework Quick Start
-
-<div class="quickstart-hero">
-  <h1>Learn Sora Framework by Building</h1>
-  <p class="lead">Master Sora Framework in 2 hours by building TaskFlow API from scratch to production-ready. Each tutorial builds on the previous one, introducing concepts as you need them.</p>
-  </div>
-
-## What You'll Build
-
-Primary Project: TaskFlow API — a task management API that evolves from JSON-backed to production-ready.
-
-Learning Path: progressive tutorials you can complete in focused sessions.
-
----
-
-## Tutorial Series
-
-- [Module 0: Setup & Orientation](#prerequisites) — Start here (environment + orientation)
-- [Module 1: Hello Sora API](01-hello-sora-api.md) — JSON storage
-- [Module 2: Data & Storage — Upgrade to SQLite with querying](02-sqlite-upgrade.md)
-- [Module 3: Web APIs — DTOs, validation, and error handling](03-proper-apis.md)
-- [Module 4: CQRS & Messaging — Commands, queries, events](04-commands-and-events.md)
-- [Module 5: Production Patterns — Observability and health](05-production-ready.md)
-- [Module 6 (optional): Advanced Capstone — Microservices with containers](06-capstone-project.md)
-  
-Continuations:
-
-- [Quick Start Part 2: Add another database (Mongo) and copy data between stores](02-quickstart-part-2.md)
-
-If you’re short on time, do Modules 0, 1, 3, and 5 for the essentials.
-
----
-
-## Prerequisites
-
-- .NET 9 SDK
-- A code editor (VS Code, Visual Studio, or Rider)
-
----
-
-## Ready to start?
 # Welcome to Sora!
 
 Building backend services shouldn't feel like assembling a puzzle with missing pieces. Sora is designed to feel natural—like having a conversation with your code rather than wrestling with it.
@@ -197,29 +156,11 @@ Now open [http://localhost:5000/swagger](http://localhost:5000/swagger) (in Deve
 
 **Predictable patterns:** Controllers are controllers. Configuration follows .NET conventions. No magical discovery or hidden behavior.
 
-## Where to go next
-
-**If you're curious about the concepts:**  
-Explore the docs sections in this folder to understand the "why" behind Sora's design choices.
-
-**If you want to build something:**  
-Continue with the next modules for practical, copy-pasteable solutions.
-
-**If you're ready to dive deep:**  
-Check out the other samples in this repo—they show real patterns for data, messaging, and service composition.
-
-## Questions or stuck?
-
-**Browse the samples:** `samples/` folder has working examples of different patterns  
-**Check the concepts:** Each major idea has its own page explaining the reasoning  
-**Try the how-to guides:** Step-by-step instructions for common tasks
 
 Welcome to building with Sora. We think you'll like it here.
 
 ---
 
-## Next: Quick Start Part 2
+## Next: [Quick Start Part 2](02-quickstart-part-2.md)
 
-When you’re ready to add another database and copy data between stores, continue here:
-
-- [Quick Start Part 2](02-quickstart-part-2.md)
+When you’re ready to add another database and copy data between stores.

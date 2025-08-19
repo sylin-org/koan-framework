@@ -31,9 +31,22 @@ function Get-DocfxCommand() {
 Push-Location (Resolve-Path "$PSScriptRoot\..\")
 try {
   $repoRoot = Get-Location
-  $configFullPath = Resolve-Path $ConfigPath -ErrorAction Stop
+  # Resolve config; if default not found, auto-discover under docs/**/docfx.json
+  $configFullPath = $null
+  try {
+    $configFullPath = Resolve-Path $ConfigPath -ErrorAction Stop
+  } catch {
+    # Try discovery
+    $candidate = Get-ChildItem -Path $repoRoot -Recurse -Filter 'docfx.json' -File -ErrorAction SilentlyContinue \
+      | Where-Object { $_.FullName -like '*\docs\*' } \
+      | Select-Object -First 1
+    if ($candidate) {
+      $configFullPath = $candidate.FullName
+    } else {
+      throw "DocFX config not found. Tried '$ConfigPath' and discovery under 'docs/**/docfx.json'."
+    }
+  }
   $configDir = Split-Path -Parent $configFullPath
-  Assert-FileExists $configFullPath
 
   Write-Heading "Sora Docs Build"
   Write-Host "Repo Root: $repoRoot"

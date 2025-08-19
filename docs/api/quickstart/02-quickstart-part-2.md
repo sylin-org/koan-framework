@@ -1,10 +1,10 @@
-# Quick Start Part 2 — Add another database (Mongo) and copy data between stores
+# Quick Start Part 2 — Add another database and copy data!
 
 In this part, you’ll: (1) add MongoDB as another data store, (2) map a model to Mongo with attributes, and (3) copy data from SQLite to Mongo.
 
 ## 1) Add the Mongo adapter
 
-Install the package (no extra wiring needed — it self-registers when referenced):
+Install the package (again, no extra wiring needed; it self-registers when referenced):
 
 ```bash
 dotnet add package Sora.Data.Mongo
@@ -12,36 +12,20 @@ dotnet add package Sora.Data.Mongo
 
 ## 2) Point Sora to your Mongo database
 
-Minimal config via appsettings.json (keep your existing SQLite connection for the default store):
+Add MongoDB to your existing config in appsettings.json:
 
 ```json
 {
   "ConnectionStrings": {
-    "Default": "Data Source=C:\\data\\myapp.db",
-    "reporting": "mongodb://localhost:27017"
-  },
-  "Sora": {
-    "Data": {
-      "Mongo": {
-        "Database": "sora_dev"  // default database for Mongo (optional)
-      },
-      "Sources": {
-        "reporting": {
-          "mongo": {
-            "Database": "reportsdb"
-            // ConnectionString omitted -> falls back to ConnectionStrings:reporting
-          }
-        }
-      }
-    }
+    "sqlite": "Data Source=C:\\data\\myapp.db",     // ← existing from Part 1
+    "mongodb": "mongodb://localhost:27017"         // ← new for Part 2
   }
 }
 ```
 
 Environment variable alternatives:
 
-- ConnectionStrings__reporting=mongodb://localhost:27017
-- Sora__Data__Sources__reporting__mongo__Database=reportsdb
+- ConnectionStrings__mongodb=mongodb://localhost:27017
 
 ## 3) Choose the database per model with attributes
 
@@ -52,6 +36,7 @@ using Sora.Data.Abstractions.Annotations;
 using Sora.Domain;
 
 // Stays on the default adapter (SQLite)
+[DataAdapter("sqlite")]
 public class Todo : Entity<Todo>
 {
     public string Title { get; set; } = string.Empty;
@@ -59,10 +44,8 @@ public class Todo : Entity<Todo>
 }
 
 // A Mongo-backed read/reporting projection
-[DataAdapter("mongo")]           // choose the provider
-[DataSource("reporting")]        // logical source name -> resolves connection by convention
-[Storage(Namespace = "reportsdb", // database (optional if configured at Sora:Data:Mongo:Database)
-         Name = "todos")]        // collection name
+[DataAdapter("mongo")]
+[Storage(Name = "TodoProjection", Namespace="ReportDb")]
 public class TodoDoc : Entity<TodoDoc>
 {
     public string Title { get; set; } = string.Empty;
@@ -72,18 +55,14 @@ public class TodoDoc : Entity<TodoDoc>
 
 What’s happening:
 
-- [DataAdapter("mongo")] selects the Mongo provider for this model.
-- [DataSource("reporting")] tells Sora to use the named source “reporting”.
-  - Connection resolution falls back to ConnectionStrings:reporting if Sora:Data:Sources:reporting:mongo:ConnectionString is not set.
-- [Storage] maps to provider-appropriate concepts: Database/Collection for Mongo; Schema/Table for relational.
+- [DataAdapter("mongo")] selects the Mongo provider for the TodoDoc model.
+- [Storage] maps to provider-appropriate concepts: `Name` is the Collection for Mongo and Table for relational, while `Namespace` is the database.
 
 ## 4) Copy data from SQLite -> Mongo
 
-Create a tiny migration helper you can run once (for example, in a background task or a throwaway console command). Here’s a simple static method you can call from anywhere after the app boots:
+Let's create a tiny migration helper you can run once (for example, in a background task or a throwaway console command). Here’s a simple static method you can call from anywhere after the app boots:
 
 ```csharp
-using Sora.Data.Core; // for Data<TEntity, TKey>
-
 public static class Seed
 {
     public static async Task CopyTodosToMongo(CancellationToken ct = default)
@@ -92,26 +71,31 @@ public static class Seed
         var todos = await Todo.All(ct);
 
         // 2) Project into the Mongo-backed model
-        var docs = todos.Select(t => new TodoDoc { Title = t.Title, IsDone = t.IsDone });
+        var docs = todos.Select(t => new TodoDoc { 
+                            Id = t.Id, 
+                            Title = t.Title, 
+                            IsDone = t.IsDone }
+                        );
 
         // 3) Bulk upsert into Mongo
-        var upserted = await Data<TodoDoc, string>.UpsertManyAsync(docs, ct);
-        Console.WriteLine($"Migrated {upserted} docs to Mongo.");
+        await docs.Save(ct);
+
+        Console.WriteLine($"Migrated {todos.Count()} docs to Mongo.");
     }
 }
 ```
 
-Call it once (choose one option):
+You can call this once after app startup. For example, add a simple admin endpoint to your controller:
 
-- Add a temporary endpoint in your controller for local use.
-- Add a hosted service that runs on startup and then disables itself.
-- Run it from a console app referencing the same project.
+```csharp
+[HttpGet("migrate-to-mongo")]
+public async Task<IActionResult> MigrateTodos()
+{
+    await Seed.CopyTodosToMongo();
+    return Ok("Migration complete");
+}
+```
 
-## Recap
+That's it! No complex migration frameworks or ceremony - just straightforward data movement.
 
-- Add Sora.Data.Mongo to enable Mongo support.
-- Use attributes to steer models per provider and per source.
-- Storage maps cleanly across providers (table/collection) with [Storage].
-- You can move data by querying from one model and upserting into another — with one line for the bulk save.
-
-Next: continue with Production APIs in [Module 3](03-proper-apis.md).
+Next: Ready for production-grade APIs? Continue with [Module 3 - Production APIs](03-proper-apis.md), where you'll learn about custom controllers, validation, and error handling.
