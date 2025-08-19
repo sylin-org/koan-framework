@@ -19,6 +19,12 @@ public static class Constants
             public const string AltDefaultPageSize = AltSection + ":DefaultPageSize";
             public const string MaxPageSize = Section + ":MaxPageSize";
             public const string AltMaxPageSize = AltSection + ":MaxPageSize";
+
+            // Schema governance
+            public const string DdlPolicy = Section + ":DdlPolicy"; // AutoCreate | Validate | NoDdl
+            public const string AltDdlPolicy = AltSection + ":DdlPolicy";
+            public const string SchemaMatchingMode = Section + ":SchemaMatchingMode"; // Relaxed | Strict
+            public const string AltSchemaMatchingMode = AltSection + ":SchemaMatchingMode";
         }
     }
 
