@@ -1,0 +1,23 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Sqlite.Initialization
+  commentId: N:Sora.Data.Sqlite.Initialization
+  id: Sora.Data.Sqlite.Initialization
+  children:
+  - Sora.Data.Sqlite.Initialization.SoraAutoRegistrar
+  langs:
+  - csharp
+  - vb
+  name: Sora.Data.Sqlite.Initialization
+  nameWithType: Sora.Data.Sqlite.Initialization
+  fullName: Sora.Data.Sqlite.Initialization
+  type: Namespace
+  assemblies:
+  - Sora.Data.Sqlite
+references:
+- uid: Sora.Data.Sqlite.Initialization.SoraAutoRegistrar
+  commentId: T:Sora.Data.Sqlite.Initialization.SoraAutoRegistrar
+  href: Sora.Data.Sqlite.Initialization.SoraAutoRegistrar.html
+  name: SoraAutoRegistrar
+  nameWithType: SoraAutoRegistrar
+  fullName: Sora.Data.Sqlite.Initialization.SoraAutoRegistrar

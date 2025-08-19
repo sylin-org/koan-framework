@@ -1,0 +1,975 @@
+### YamlMime:TableOfContent
+items:
+- uid: Sora.Core
+  name: Sora.Core
+  type: Namespace
+  items:
+  - uid: Sora.Core.Configuration
+    name: Configuration
+    type: Class
+  - uid: Sora.Core.ConfigurationExtensions
+    name: ConfigurationExtensions
+    type: Class
+  - uid: Sora.Core.HealthReport
+    name: HealthReport
+    type: Class
+  - uid: Sora.Core.HealthReporter
+    name: HealthReporter
+    type: Class
+  - uid: Sora.Core.HealthState
+    name: HealthState
+    type: Enum
+  - uid: Sora.Core.IHealthAnnouncer
+    name: IHealthAnnouncer
+    type: Interface
+  - uid: Sora.Core.IHealthContributor
+    name: IHealthContributor
+    type: Interface
+  - uid: Sora.Core.IHealthService
+    name: IHealthService
+    type: Interface
+  - uid: Sora.Core.ISoraAutoRegistrar
+    name: ISoraAutoRegistrar
+    type: Interface
+  - uid: Sora.Core.ISoraInitializer
+    name: ISoraInitializer
+    type: Interface
+  - uid: Sora.Core.ISoraRuntime
+    name: ISoraRuntime
+    type: Interface
+  - uid: Sora.Core.OptionsValidation
+    name: OptionsValidation
+    type: Class
+  - uid: Sora.Core.Redaction
+    name: Redaction
+    type: Class
+  - uid: Sora.Core.ServiceCollectionDecoratorExtensions
+    name: ServiceCollectionDecoratorExtensions
+    type: Class
+  - uid: Sora.Core.ServiceCollectionExtensions
+    name: ServiceCollectionExtensions
+    type: Class
+  - uid: Sora.Core.SoraApp
+    name: SoraApp
+    type: Class
+  - uid: Sora.Core.SoraBootstrapReport
+    name: SoraBootstrapReport
+    type: Class
+  - uid: Sora.Core.SoraEnv
+    name: SoraEnv
+    type: Class
+  - uid: Sora.Core.SoraInitialization
+    name: SoraInitialization
+    type: Class
+  - uid: Sora.Core.SoraInitialization.SoraOptions
+    name: SoraInitialization.SoraOptions
+    type: Class
+  - uid: Sora.Core.SoraRuntimeExtensions
+    name: SoraRuntimeExtensions
+    type: Class
+- uid: Sora.Core.Infrastructure
+  name: Sora.Core.Infrastructure
+  type: Namespace
+  items:
+  - uid: Sora.Core.Infrastructure.Constants
+    name: Constants
+    type: Class
+  - uid: Sora.Core.Infrastructure.Constants.Configuration
+    name: Constants.Configuration
+    type: Class
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Env
+    name: Constants.Configuration.Env
+    type: Class
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Observability
+    name: Constants.Configuration.Observability
+    type: Class
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel
+    name: Constants.Configuration.Otel
+    type: Class
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter
+    name: Constants.Configuration.Otel.Exporter
+    type: Class
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp
+    name: Constants.Configuration.Otel.Exporter.Otlp
+    type: Class
+  - uid: Sora.Core.Infrastructure.Constants.Configuration.Sora
+    name: Constants.Configuration.Sora
+    type: Class
+- uid: Sora.Core.Observability
+  name: Sora.Core.Observability
+  type: Namespace
+  items:
+  - uid: Sora.Core.Observability.ObservabilityOptions
+    name: ObservabilityOptions
+    type: Class
+  - uid: Sora.Core.Observability.ObservabilityOptions.MetricsOptions
+    name: ObservabilityOptions.MetricsOptions
+    type: Class
+  - uid: Sora.Core.Observability.ObservabilityOptions.OtlpOptions
+    name: ObservabilityOptions.OtlpOptions
+    type: Class
+  - uid: Sora.Core.Observability.ObservabilityOptions.TracesOptions
+    name: ObservabilityOptions.TracesOptions
+    type: Class
+  - uid: Sora.Core.Observability.ServiceCollectionExtensions
+    name: ServiceCollectionExtensions
+    type: Class
+- uid: Sora.Core.Primitives
+  name: Sora.Core.Primitives
+  type: Namespace
+  items:
+  - uid: Sora.Core.Primitives.StringId
+    name: StringId
+    type: Class
+- uid: Sora.Data.Abstractions
+  name: Sora.Data.Abstractions
+  type: Namespace
+  items:
+  - uid: Sora.Data.Abstractions.BatchOptions
+    name: BatchOptions
+    type: Class
+  - uid: Sora.Data.Abstractions.BatchResult
+    name: BatchResult
+    type: Class
+  - uid: Sora.Data.Abstractions.IBatchSet`2
+    name: IBatchSet<TEntity, TKey>
+    type: Interface
+  - uid: Sora.Data.Abstractions.IBulkDelete`1
+    name: IBulkDelete<TKey>
+    type: Interface
+  - uid: Sora.Data.Abstractions.IBulkUpsert`1
+    name: IBulkUpsert<TKey>
+    type: Interface
+  - uid: Sora.Data.Abstractions.IDataAdapterFactory
+    name: IDataAdapterFactory
+    type: Interface
+  - uid: Sora.Data.Abstractions.IDataRepository`2
+    name: IDataRepository<TEntity, TKey>
+    type: Interface
+  - uid: Sora.Data.Abstractions.IEntity`1
+    name: IEntity<TKey>
+    type: Interface
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository<TEntity, TKey>
+    type: Interface
+  - uid: Sora.Data.Abstractions.IQueryCapabilities
+    name: IQueryCapabilities
+    type: Interface
+  - uid: Sora.Data.Abstractions.IStringQueryRepository`2
+    name: IStringQueryRepository<TEntity, TKey>
+    type: Interface
+  - uid: Sora.Data.Abstractions.IWriteCapabilities
+    name: IWriteCapabilities
+    type: Interface
+  - uid: Sora.Data.Abstractions.ProviderPriorityAttribute
+    name: ProviderPriorityAttribute
+    type: Class
+  - uid: Sora.Data.Abstractions.QueryCapabilities
+    name: QueryCapabilities
+    type: Enum
+  - uid: Sora.Data.Abstractions.TypeClassification
+    name: TypeClassification
+    type: Class
+  - uid: Sora.Data.Abstractions.WriteCapabilities
+    name: WriteCapabilities
+    type: Enum
+- uid: Sora.Data.Abstractions.Annotations
+  name: Sora.Data.Abstractions.Annotations
+  type: Namespace
+  items:
+  - uid: Sora.Data.Abstractions.Annotations.DataAdapterAttribute
+    name: DataAdapterAttribute
+    type: Class
+  - uid: Sora.Data.Abstractions.Annotations.DataSourceAttribute
+    name: DataSourceAttribute
+    type: Class
+  - uid: Sora.Data.Abstractions.Annotations.IdentifierAttribute
+    name: IdentifierAttribute
+    type: Class
+  - uid: Sora.Data.Abstractions.Annotations.IgnoreStorageAttribute
+    name: IgnoreStorageAttribute
+    type: Class
+  - uid: Sora.Data.Abstractions.Annotations.IndexAttribute
+    name: IndexAttribute
+    type: Class
+  - uid: Sora.Data.Abstractions.Annotations.RenamedFromAttribute
+    name: RenamedFromAttribute
+    type: Class
+  - uid: Sora.Data.Abstractions.Annotations.StorageAttribute
+    name: StorageAttribute
+    type: Class
+  - uid: Sora.Data.Abstractions.Annotations.StorageNameAttribute
+    name: StorageNameAttribute
+    type: Class
+  - uid: Sora.Data.Abstractions.Annotations.StorageNamingAttribute
+    name: StorageNamingAttribute
+    type: Class
+- uid: Sora.Data.Abstractions.Instructions
+  name: Sora.Data.Abstractions.Instructions
+  type: Namespace
+  items:
+  - uid: Sora.Data.Abstractions.Instructions.IInstructionExecutor`1
+    name: IInstructionExecutor<TEntity>
+    type: Interface
+  - uid: Sora.Data.Abstractions.Instructions.Instruction
+    name: Instruction
+    type: Class
+  - uid: Sora.Data.Abstractions.Instructions.InstructionSql
+    name: InstructionSql
+    type: Class
+- uid: Sora.Data.Abstractions.Naming
+  name: Sora.Data.Abstractions.Naming
+  type: Namespace
+  items:
+  - uid: Sora.Data.Abstractions.Naming.DefaultStorageNameResolver
+    name: DefaultStorageNameResolver
+    type: Class
+  - uid: Sora.Data.Abstractions.Naming.INamingDefaultsProvider
+    name: INamingDefaultsProvider
+    type: Interface
+  - uid: Sora.Data.Abstractions.Naming.IStorageNameResolver
+    name: IStorageNameResolver
+    type: Interface
+  - uid: Sora.Data.Abstractions.Naming.IStorageNamingPolicy
+    name: IStorageNamingPolicy
+    type: Interface
+  - uid: Sora.Data.Abstractions.Naming.NameCasing
+    name: NameCasing
+    type: Enum
+  - uid: Sora.Data.Abstractions.Naming.NamingUtils
+    name: NamingUtils
+    type: Class
+  - uid: Sora.Data.Abstractions.Naming.StorageNameResolver
+    name: StorageNameResolver
+    type: Class
+  - uid: Sora.Data.Abstractions.Naming.StorageNameResolver.Convention
+    name: StorageNameResolver.Convention
+    type: Struct
+  - uid: Sora.Data.Abstractions.Naming.StorageNameSelector
+    name: StorageNameSelector
+    type: Class
+  - uid: Sora.Data.Abstractions.Naming.StorageNamingStyle
+    name: StorageNamingStyle
+    type: Enum
+  - uid: Sora.Data.Abstractions.Naming.StorageResolvedName
+    name: StorageResolvedName
+    type: Struct
+- uid: Sora.Data.Core
+  name: Sora.Data.Core
+  type: Namespace
+  items:
+  - uid: Sora.Data.Core.AggregateExtensions
+    name: AggregateExtensions
+    type: Class
+  - uid: Sora.Data.Core.AggregateIdentityManager
+    name: AggregateIdentityManager
+    type: Class
+  - uid: Sora.Data.Core.BatchExtensions
+    name: BatchExtensions
+    type: Class
+  - uid: Sora.Data.Core.DataRuntimeOptions
+    name: DataRuntimeOptions
+    type: Class
+  - uid: Sora.Data.Core.DataService
+    name: DataService
+    type: Class
+  - uid: Sora.Data.Core.DataServiceExecuteExtensions
+    name: DataServiceExecuteExtensions
+    type: Class
+  - uid: Sora.Data.Core.DataSetContext
+    name: DataSetContext
+    type: Class
+  - uid: Sora.Data.Core.Data`1
+    name: Data<TEntity>
+    type: Class
+  - uid: Sora.Data.Core.Data`2
+    name: Data<TEntity, TKey>
+    type: Class
+  - uid: Sora.Data.Core.EntityConfigInfo
+    name: EntityConfigInfo
+    type: Class
+  - uid: Sora.Data.Core.EntitySetMoveExtensions
+    name: EntitySetMoveExtensions
+    type: Class
+  - uid: Sora.Data.Core.IAggregateIdentityManager
+    name: IAggregateIdentityManager
+    type: Interface
+  - uid: Sora.Data.Core.IDataDiagnostics
+    name: IDataDiagnostics
+    type: Interface
+  - uid: Sora.Data.Core.IDataService
+    name: IDataService
+    type: Interface
+  - uid: Sora.Data.Core.IndexMetadata
+    name: IndexMetadata
+    type: Class
+  - uid: Sora.Data.Core.IndexSpec
+    name: IndexSpec
+    type: Class
+  - uid: Sora.Data.Core.ServiceCollectionExtensions
+    name: ServiceCollectionExtensions
+    type: Class
+  - uid: Sora.Data.Core.SetMoveBuilder`2
+    name: SetMoveBuilder<TEntity, TKey>
+    type: Class
+  - uid: Sora.Data.Core.TestHooks
+    name: TestHooks
+    type: Class
+- uid: Sora.Data.Core.Configuration
+  name: Sora.Data.Core.Configuration
+  type: Namespace
+  items:
+  - uid: Sora.Data.Core.Configuration.AggregateBags
+    name: AggregateBags
+    type: Class
+  - uid: Sora.Data.Core.Configuration.IDataConnectionResolver
+    name: IDataConnectionResolver
+    type: Interface
+  - uid: Sora.Data.Core.Configuration.StorageNameRegistry
+    name: StorageNameRegistry
+    type: Class
+- uid: Sora.Data.Core.Initialization
+  name: Sora.Data.Core.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Data.Core.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Data.Core.Metadata
+  name: Sora.Data.Core.Metadata
+  type: Namespace
+  items:
+  - uid: Sora.Data.Core.Metadata.AggregateMetadata
+    name: AggregateMetadata
+    type: Class
+  - uid: Sora.Data.Core.Metadata.AggregateMetadata.IdSpec
+    name: AggregateMetadata.IdSpec
+    type: Class
+- uid: Sora.Data.Core.Model
+  name: Sora.Data.Core.Model
+  type: Namespace
+  items:
+  - uid: Sora.Data.Core.Model.Data`1
+    name: Data<TEntity>
+    type: Class
+  - uid: Sora.Data.Core.Model.Data`2
+    name: Data<TEntity, TKey>
+    type: Class
+- uid: Sora.Data.Core.Naming
+  name: Sora.Data.Core.Naming
+  type: Namespace
+  items:
+  - uid: Sora.Data.Core.Naming.NamingFallbackOptions
+    name: NamingFallbackOptions
+    type: Class
+  - uid: Sora.Data.Core.Naming.NamingOverrideExtensions
+    name: NamingOverrideExtensions
+    type: Class
+- uid: Sora.Data.Cqrs
+  name: Sora.Data.Cqrs
+  type: Namespace
+  items:
+  - uid: Sora.Data.Cqrs.CqrsAttribute
+    name: CqrsAttribute
+    type: Class
+  - uid: Sora.Data.Cqrs.CqrsEndpoint
+    name: CqrsEndpoint
+    type: Class
+  - uid: Sora.Data.Cqrs.CqrsEntityRoute
+    name: CqrsEntityRoute
+    type: Class
+  - uid: Sora.Data.Cqrs.CqrsMessaging
+    name: CqrsMessaging
+    type: Class
+  - uid: Sora.Data.Cqrs.CqrsOptions
+    name: CqrsOptions
+    type: Class
+  - uid: Sora.Data.Cqrs.CqrsProfile
+    name: CqrsProfile
+    type: Class
+  - uid: Sora.Data.Cqrs.ICqrsRouting
+    name: ICqrsRouting
+    type: Interface
+  - uid: Sora.Data.Cqrs.IOutboxStore
+    name: IOutboxStore
+    type: Interface
+  - uid: Sora.Data.Cqrs.IOutboxStoreFactory
+    name: IOutboxStoreFactory
+    type: Interface
+  - uid: Sora.Data.Cqrs.InMemoryOutboxFactory
+    name: InMemoryOutboxFactory
+    type: Class
+  - uid: Sora.Data.Cqrs.InMemoryOutboxOptions
+    name: InMemoryOutboxOptions
+    type: Class
+  - uid: Sora.Data.Cqrs.InMemoryOutboxRegistration
+    name: InMemoryOutboxRegistration
+    type: Class
+  - uid: Sora.Data.Cqrs.InMemoryOutboxStore
+    name: InMemoryOutboxStore
+    type: Class
+  - uid: Sora.Data.Cqrs.LoggingOutboxStore
+    name: LoggingOutboxStore
+    type: Class
+  - uid: Sora.Data.Cqrs.OutboxConfig
+    name: OutboxConfig
+    type: Class
+  - uid: Sora.Data.Cqrs.OutboxEntry
+    name: OutboxEntry
+    type: Class
+- uid: Sora.Data.Cqrs.Initialization
+  name: Sora.Data.Cqrs.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Data.Cqrs.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Data.Cqrs.Outbox.Mongo
+  name: Sora.Data.Cqrs.Outbox.Mongo
+  type: Namespace
+  items:
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxFactory
+    name: MongoOutboxFactory
+    type: Class
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxOptions
+    name: MongoOutboxOptions
+    type: Class
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxRegistration
+    name: MongoOutboxRegistration
+    type: Class
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.MongoOutboxStore
+    name: MongoOutboxStore
+    type: Class
+- uid: Sora.Data.Cqrs.Outbox.Mongo.Initialization
+  name: Sora.Data.Cqrs.Outbox.Mongo.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Data.Cqrs.Outbox.Mongo.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Data.Json
+  name: Sora.Data.Json
+  type: Namespace
+  items:
+  - uid: Sora.Data.Json.JsonAdapterFactory
+    name: JsonAdapterFactory
+    type: Class
+  - uid: Sora.Data.Json.JsonAdapterRegistration
+    name: JsonAdapterRegistration
+    type: Class
+  - uid: Sora.Data.Json.JsonDataOptions
+    name: JsonDataOptions
+    type: Class
+  - uid: Sora.Data.Json.JsonDataServiceCollectionExtensions
+    name: JsonDataServiceCollectionExtensions
+    type: Class
+  - uid: Sora.Data.Json.JsonRepo
+    name: JsonRepo
+    type: Class
+- uid: Sora.Data.Json.Initialization
+  name: Sora.Data.Json.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Data.Json.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Data.Mongo
+  name: Sora.Data.Mongo
+  type: Namespace
+  items:
+  - uid: Sora.Data.Mongo.MongoAdapterFactory
+    name: MongoAdapterFactory
+    type: Class
+  - uid: Sora.Data.Mongo.MongoOptions
+    name: MongoOptions
+    type: Class
+  - uid: Sora.Data.Mongo.MongoRegistration
+    name: MongoRegistration
+    type: Class
+- uid: Sora.Data.Mongo.Initialization
+  name: Sora.Data.Mongo.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Data.Mongo.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Data.Relational.Initialization
+  name: Sora.Data.Relational.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Data.Relational.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Data.Relational.Linq
+  name: Sora.Data.Relational.Linq
+  type: Namespace
+  items:
+  - uid: Sora.Data.Relational.Linq.ILinqSqlDialect
+    name: ILinqSqlDialect
+    type: Interface
+  - uid: Sora.Data.Relational.Linq.LinqWhereTranslator`1
+    name: LinqWhereTranslator<TEntity>
+    type: Class
+  - uid: Sora.Data.Relational.Linq.RelationalCommandCache
+    name: RelationalCommandCache
+    type: Class
+- uid: Sora.Data.Relational.Schema
+  name: Sora.Data.Relational.Schema
+  type: Namespace
+  items:
+  - uid: Sora.Data.Relational.Schema.IRelationalDialect
+    name: IRelationalDialect
+    type: Interface
+  - uid: Sora.Data.Relational.Schema.IRelationalSchemaModel
+    name: IRelationalSchemaModel
+    type: Interface
+  - uid: Sora.Data.Relational.Schema.IRelationalSchemaReader
+    name: IRelationalSchemaReader
+    type: Interface
+  - uid: Sora.Data.Relational.Schema.IRelationalSchemaSynchronizer
+    name: IRelationalSchemaSynchronizer
+    type: Interface
+  - uid: Sora.Data.Relational.Schema.RelationalColumn
+    name: RelationalColumn
+    type: Class
+  - uid: Sora.Data.Relational.Schema.RelationalIndex
+    name: RelationalIndex
+    type: Class
+  - uid: Sora.Data.Relational.Schema.RelationalModelBuilder
+    name: RelationalModelBuilder
+    type: Class
+  - uid: Sora.Data.Relational.Schema.RelationalSchemaModel
+    name: RelationalSchemaModel
+    type: Class
+  - uid: Sora.Data.Relational.Schema.RelationalSchemaSynchronizer
+    name: RelationalSchemaSynchronizer
+    type: Class
+  - uid: Sora.Data.Relational.Schema.RelationalTable
+    name: RelationalTable
+    type: Class
+- uid: Sora.Data.Sqlite
+  name: Sora.Data.Sqlite
+  type: Namespace
+  items:
+  - uid: Sora.Data.Sqlite.SqliteAdapterFactory
+    name: SqliteAdapterFactory
+    type: Class
+  - uid: Sora.Data.Sqlite.SqliteOptions
+    name: SqliteOptions
+    type: Class
+  - uid: Sora.Data.Sqlite.SqliteRegistration
+    name: SqliteRegistration
+    type: Class
+- uid: Sora.Data.Sqlite.Initialization
+  name: Sora.Data.Sqlite.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Data.Sqlite.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Domain
+  name: Sora.Domain
+  type: Namespace
+  items:
+  - uid: Sora.Domain.Entity`1
+    name: Entity<TEntity>
+    type: Class
+  - uid: Sora.Domain.Entity`2
+    name: Entity<TEntity, TKey>
+    type: Class
+- uid: Sora.Messaging
+  name: Sora.Messaging
+  type: Namespace
+  items:
+  - uid: Sora.Messaging.Batch`1
+    name: Batch<T>
+    type: Class
+  - uid: Sora.Messaging.DelaySecondsAttribute
+    name: DelaySecondsAttribute
+    type: Class
+  - uid: Sora.Messaging.DiscoveryOptions
+    name: DiscoveryOptions
+    type: Class
+  - uid: Sora.Messaging.DlqOptions
+    name: DlqOptions
+    type: Class
+  - uid: Sora.Messaging.EffectiveMessagingPlan
+    name: EffectiveMessagingPlan
+    type: Class
+  - uid: Sora.Messaging.HeaderAttribute
+    name: HeaderAttribute
+    type: Class
+  - uid: Sora.Messaging.IInboxDiscoveryClient
+    name: IInboxDiscoveryClient
+    type: Interface
+  - uid: Sora.Messaging.IInboxDiscoveryPolicy
+    name: IInboxDiscoveryPolicy
+    type: Interface
+  - uid: Sora.Messaging.IInboxStore
+    name: IInboxStore
+    type: Interface
+  - uid: Sora.Messaging.IMessageBus
+    name: IMessageBus
+    type: Interface
+  - uid: Sora.Messaging.IMessageBusFactory
+    name: IMessageBusFactory
+    type: Interface
+  - uid: Sora.Messaging.IMessageBusSelector
+    name: IMessageBusSelector
+    type: Interface
+  - uid: Sora.Messaging.IMessageHandler`1
+    name: IMessageHandler<T>
+    type: Interface
+  - uid: Sora.Messaging.IMessagingCapabilities
+    name: IMessagingCapabilities
+    type: Interface
+  - uid: Sora.Messaging.IMessagingDiagnostics
+    name: IMessagingDiagnostics
+    type: Interface
+  - uid: Sora.Messaging.ITypeAliasRegistry
+    name: ITypeAliasRegistry
+    type: Interface
+  - uid: Sora.Messaging.IdempotencyKeyAttribute
+    name: IdempotencyKeyAttribute
+    type: Class
+  - uid: Sora.Messaging.InboxClientOptions
+    name: InboxClientOptions
+    type: Class
+  - uid: Sora.Messaging.InboxConfigurationExtensions
+    name: InboxConfigurationExtensions
+    type: Class
+  - uid: Sora.Messaging.InboxDiscoveryPolicy
+    name: InboxDiscoveryPolicy
+    type: Class
+  - uid: Sora.Messaging.MessageAttribute
+    name: MessageAttribute
+    type: Class
+  - uid: Sora.Messaging.MessageEnvelope
+    name: MessageEnvelope
+    type: Class
+  - uid: Sora.Messaging.MessagingExtensions
+    name: MessagingExtensions
+    type: Class
+  - uid: Sora.Messaging.MessagingExtensions.MessageHandlerBuilder
+    name: MessagingExtensions.MessageHandlerBuilder
+    type: Class
+  - uid: Sora.Messaging.MessagingOptions
+    name: MessagingOptions
+    type: Class
+  - uid: Sora.Messaging.MessagingServiceCollectionExtensions
+    name: MessagingServiceCollectionExtensions
+    type: Class
+  - uid: Sora.Messaging.Negotiation
+    name: Negotiation
+    type: Class
+  - uid: Sora.Messaging.PartitionKeyAttribute
+    name: PartitionKeyAttribute
+    type: Class
+  - uid: Sora.Messaging.RetryOptions
+    name: RetryOptions
+    type: Class
+  - uid: Sora.Messaging.SensitiveAttribute
+    name: SensitiveAttribute
+    type: Class
+- uid: Sora.Messaging.Core.Infrastructure
+  name: Sora.Messaging.Core.Infrastructure
+  type: Namespace
+  items:
+  - uid: Sora.Messaging.Core.Infrastructure.Constants
+    name: Constants
+    type: Class
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration
+    name: Constants.Configuration
+    type: Class
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery
+    name: Constants.Configuration.Discovery
+    type: Class
+  - uid: Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox
+    name: Constants.Configuration.Inbox
+    type: Class
+- uid: Sora.Messaging.Inbox
+  name: Sora.Messaging.Inbox
+  type: Namespace
+  items:
+  - uid: Sora.Messaging.Inbox.InMemoryInboxRegistration
+    name: InMemoryInboxRegistration
+    type: Class
+  - uid: Sora.Messaging.Inbox.InMemoryInboxStore
+    name: InMemoryInboxStore
+    type: Class
+- uid: Sora.Messaging.Inbox.Http
+  name: Sora.Messaging.Inbox.Http
+  type: Namespace
+  items:
+  - uid: Sora.Messaging.Inbox.Http.HttpInboxServiceCollectionExtensions
+    name: HttpInboxServiceCollectionExtensions
+    type: Class
+  - uid: Sora.Messaging.Inbox.Http.HttpInboxStore
+    name: HttpInboxStore
+    type: Class
+- uid: Sora.Messaging.Inbox.Http.Initialization
+  name: Sora.Messaging.Inbox.Http.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Messaging.Inbox.Http.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Messaging.Inbox.Initialization
+  name: Sora.Messaging.Inbox.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Messaging.Inbox.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Messaging.Initialization
+  name: Sora.Messaging.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Messaging.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Messaging.RabbitMq
+  name: Sora.Messaging.RabbitMq
+  type: Namespace
+  items:
+  - uid: Sora.Messaging.RabbitMq.RabbitMqCapabilities
+    name: RabbitMqCapabilities
+    type: Class
+  - uid: Sora.Messaging.RabbitMq.RabbitMqFactory
+    name: RabbitMqFactory
+    type: Class
+  - uid: Sora.Messaging.RabbitMq.RabbitMqServiceCollectionExtensions
+    name: RabbitMqServiceCollectionExtensions
+    type: Class
+- uid: Sora.Messaging.RabbitMq.Initialization
+  name: Sora.Messaging.RabbitMq.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Messaging.RabbitMq.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Service.Inbox.Redis.Controllers
+  name: Sora.Service.Inbox.Redis.Controllers
+  type: Namespace
+  items:
+  - uid: Sora.Service.Inbox.Redis.Controllers.HealthController
+    name: HealthController
+    type: Class
+  - uid: Sora.Service.Inbox.Redis.Controllers.InboxController
+    name: InboxController
+    type: Class
+  - uid: Sora.Service.Inbox.Redis.Controllers.InboxController.MarkRequest
+    name: InboxController.MarkRequest
+    type: Class
+- uid: Sora.Web
+  name: Sora.Web
+  type: Namespace
+  items:
+  - uid: Sora.Web.ApplicationBuilderExtensions
+    name: ApplicationBuilderExtensions
+    type: Class
+  - uid: Sora.Web.ServiceCollectionExtensions
+    name: ServiceCollectionExtensions
+    type: Class
+  - uid: Sora.Web.SoraWebOptions
+    name: SoraWebOptions
+    type: Class
+  - uid: Sora.Web.WebPipelineOptions
+    name: WebPipelineOptions
+    type: Class
+- uid: Sora.Web.Controllers
+  name: Sora.Web.Controllers
+  type: Namespace
+  items:
+  - uid: Sora.Web.Controllers.EntityController`1
+    name: EntityController<TEntity>
+    type: Class
+  - uid: Sora.Web.Controllers.EntityController`2
+    name: EntityController<TEntity, TKey>
+    type: Class
+  - uid: Sora.Web.Controllers.HealthController
+    name: HealthController
+    type: Class
+  - uid: Sora.Web.Controllers.SoraDataBehaviorAttribute
+    name: SoraDataBehaviorAttribute
+    type: Class
+  - uid: Sora.Web.Controllers.WellKnownController
+    name: WellKnownController
+    type: Class
+- uid: Sora.Web.Filtering
+  name: Sora.Web.Filtering
+  type: Namespace
+  items:
+  - uid: Sora.Web.Filtering.JsonFilterBuilder
+    name: JsonFilterBuilder
+    type: Class
+  - uid: Sora.Web.Filtering.JsonFilterBuilder.BuildOptions
+    name: JsonFilterBuilder.BuildOptions
+    type: Class
+- uid: Sora.Web.Hooks
+  name: Sora.Web.Hooks
+  type: Namespace
+  items:
+  - uid: Sora.Web.Hooks.ActionScope
+    name: ActionScope
+    type: Enum
+  - uid: Sora.Web.Hooks.ActionType
+    name: ActionType
+    type: Enum
+  - uid: Sora.Web.Hooks.AuthorizeDecision
+    name: AuthorizeDecision
+    type: Class
+  - uid: Sora.Web.Hooks.AuthorizeDecision.Allow
+    name: AuthorizeDecision.Allow
+    type: Class
+  - uid: Sora.Web.Hooks.AuthorizeDecision.Challenge
+    name: AuthorizeDecision.Challenge
+    type: Class
+  - uid: Sora.Web.Hooks.AuthorizeDecision.Forbid
+    name: AuthorizeDecision.Forbid
+    type: Class
+  - uid: Sora.Web.Hooks.AuthorizeRequest
+    name: AuthorizeRequest
+    type: Class
+  - uid: Sora.Web.Hooks.EmitDecision
+    name: EmitDecision
+    type: Class
+  - uid: Sora.Web.Hooks.EmitDecision.Continue
+    name: EmitDecision.Continue
+    type: Class
+  - uid: Sora.Web.Hooks.EmitDecision.Replace
+    name: EmitDecision.Replace
+    type: Class
+  - uid: Sora.Web.Hooks.HookContext`1
+    name: HookContext<TEntity>
+    type: Class
+  - uid: Sora.Web.Hooks.IAuthorizeHook`1
+    name: IAuthorizeHook<TEntity>
+    type: Interface
+  - uid: Sora.Web.Hooks.ICollectionHook`1
+    name: ICollectionHook<TEntity>
+    type: Interface
+  - uid: Sora.Web.Hooks.IEmitHook`1
+    name: IEmitHook<TEntity>
+    type: Interface
+  - uid: Sora.Web.Hooks.IModelHook`1
+    name: IModelHook<TEntity>
+    type: Interface
+  - uid: Sora.Web.Hooks.IOrderedHook
+    name: IOrderedHook
+    type: Interface
+  - uid: Sora.Web.Hooks.IRequestOptionsHook`1
+    name: IRequestOptionsHook<TEntity>
+    type: Interface
+  - uid: Sora.Web.Hooks.QueryOptions
+    name: QueryOptions
+    type: Class
+  - uid: Sora.Web.Hooks.SortSpec
+    name: SortSpec
+    type: Class
+- uid: Sora.Web.Hosting
+  name: Sora.Web.Hosting
+  type: Namespace
+  items:
+  - uid: Sora.Web.Hosting.ApplicationBuilderExtensions
+    name: ApplicationBuilderExtensions
+    type: Class
+- uid: Sora.Web.Infrastructure
+  name: Sora.Web.Infrastructure
+  type: Namespace
+  items:
+  - uid: Sora.Web.Infrastructure.SoraWebConstants
+    name: SoraWebConstants
+    type: Class
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Defaults
+    name: SoraWebConstants.Defaults
+    type: Class
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Headers
+    name: SoraWebConstants.Headers
+    type: Class
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Policies
+    name: SoraWebConstants.Policies
+    type: Class
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Routes
+    name: SoraWebConstants.Routes
+    type: Class
+- uid: Sora.Web.Initialization
+  name: Sora.Web.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Web.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Web.Swagger
+  name: Sora.Web.Swagger
+  type: Namespace
+  items:
+  - uid: Sora.Web.Swagger.AddSoraSwaggerExtensions
+    name: AddSoraSwaggerExtensions
+    type: Class
+  - uid: Sora.Web.Swagger.SoraHeadersOperationFilter
+    name: SoraHeadersOperationFilter
+    type: Class
+  - uid: Sora.Web.Swagger.SoraWebSwaggerOptions
+    name: SoraWebSwaggerOptions
+    type: Class
+- uid: Sora.Web.Swagger.Infrastructure
+  name: Sora.Web.Swagger.Infrastructure
+  type: Namespace
+  items:
+  - uid: Sora.Web.Swagger.Infrastructure.Constants
+    name: Constants
+    type: Class
+  - uid: Sora.Web.Swagger.Infrastructure.Constants.Configuration
+    name: Constants.Configuration
+    type: Class
+- uid: Sora.Web.Swagger.Initialization
+  name: Sora.Web.Swagger.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Web.Swagger.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+- uid: Sora.Web.Transformers
+  name: Sora.Web.Transformers
+  type: Namespace
+  items:
+  - uid: Sora.Web.Transformers.EnableEntityTransformersAttribute
+    name: EnableEntityTransformersAttribute
+    type: Class
+  - uid: Sora.Web.Transformers.IEntityTransformer`2
+    name: IEntityTransformer<TEntity, TShape>
+    type: Interface
+  - uid: Sora.Web.Transformers.ITransformerRegistry
+    name: ITransformerRegistry
+    type: Interface
+  - uid: Sora.Web.Transformers.TransformerMatch`1
+    name: TransformerMatch<TEntity>
+    type: Class
+  - uid: Sora.Web.Transformers.TransformerPriority
+    name: TransformerPriority
+    type: Enum
+  - uid: Sora.Web.Transformers.TransformerServiceCollectionExtensions
+    name: TransformerServiceCollectionExtensions
+    type: Class
+- uid: Sora.Web.Transformers.Infrastructure
+  name: Sora.Web.Transformers.Infrastructure
+  type: Namespace
+  items:
+  - uid: Sora.Web.Transformers.Infrastructure.Constants
+    name: Constants
+    type: Class
+  - uid: Sora.Web.Transformers.Infrastructure.Constants.Configuration
+    name: Constants.Configuration
+    type: Class
+  - uid: Sora.Web.Transformers.Infrastructure.Constants.Configuration.Transformers
+    name: Constants.Configuration.Transformers
+    type: Class
+- uid: Sora.Web.Transformers.Initialization
+  name: Sora.Web.Transformers.Initialization
+  type: Namespace
+  items:
+  - uid: Sora.Web.Transformers.Initialization.SoraAutoRegistrar
+    name: SoraAutoRegistrar
+    type: Class
+memberLayout: SamePage

@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace Sora.Data.Abstractions;
 
+// Minimal paging options that can flow through repositories without depending on web-layer types
+public sealed record DataQueryOptions(int? Page = null, int? PageSize = null);
+
 public interface IDataRepository<TEntity, TKey> where TEntity : IEntity<TKey>
 {
     Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default);
@@ -21,6 +24,14 @@ public interface IDataRepository<TEntity, TKey> where TEntity : IEntity<TKey>
     Task<int> DeleteAllAsync(CancellationToken ct = default);
 
     IBatchSet<TEntity, TKey> CreateBatch();
+}
+
+// Optional: paging-aware base repository contract, enabling server-side pushdown
+public interface IDataRepositoryWithOptions<TEntity, TKey> : IDataRepository<TEntity, TKey>
+    where TEntity : IEntity<TKey>
+    where TKey : notnull
+{
+    Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default);
 }
 
 public interface IBatchSet<TEntity, TKey>
@@ -49,6 +60,15 @@ public interface IStringQueryRepository<TEntity, TKey> : IDataRepository<TEntity
     Task<int> CountAsync(string query, object? parameters, CancellationToken ct = default);
 }
 
+// Optional: paging-aware string-query contract
+public interface IStringQueryRepositoryWithOptions<TEntity, TKey> : IStringQueryRepository<TEntity, TKey>
+    where TEntity : IEntity<TKey>
+    where TKey : notnull
+{
+    Task<IReadOnlyList<TEntity>> QueryAsync(string query, DataQueryOptions? options, CancellationToken ct = default);
+    Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default);
+}
+
 // Optional query capability: LINQ predicate
 public interface ILinqQueryRepository<TEntity, TKey> : IDataRepository<TEntity, TKey>
     where TEntity : IEntity<TKey>
@@ -56,4 +76,12 @@ public interface ILinqQueryRepository<TEntity, TKey> : IDataRepository<TEntity, 
 {
     Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default);
     Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default);
+}
+
+// Optional: paging-aware LINQ contract
+public interface ILinqQueryRepositoryWithOptions<TEntity, TKey> : ILinqQueryRepository<TEntity, TKey>
+    where TEntity : IEntity<TKey>
+    where TKey : notnull
+{
+    Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default);
 }

@@ -1,0 +1,23 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Core.Primitives
+  commentId: N:Sora.Core.Primitives
+  id: Sora.Core.Primitives
+  children:
+  - Sora.Core.Primitives.StringId
+  langs:
+  - csharp
+  - vb
+  name: Sora.Core.Primitives
+  nameWithType: Sora.Core.Primitives
+  fullName: Sora.Core.Primitives
+  type: Namespace
+  assemblies:
+  - Sora.Core
+references:
+- uid: Sora.Core.Primitives.StringId
+  commentId: T:Sora.Core.Primitives.StringId
+  href: Sora.Core.Primitives.StringId.html
+  name: StringId
+  nameWithType: StringId
+  fullName: Sora.Core.Primitives.StringId

@@ -26,14 +26,44 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var o = new MongoOptions();
-        cfg.GetSection("Sora:Data:Mongo").Bind(o);
-        cfg.GetSection("Sora:Data:Sources:Default:mongo").Bind(o);
-        // Resolve connection string similarly to configurator
+        var o = new MongoOptions
+        {
+            ConnectionString = Sora.Core.Configuration.ReadFirst(cfg, MongoConstants.DefaultLocalUri,
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionString,
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
+            Database = Sora.Core.Configuration.ReadFirst(cfg, "sora",
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.Database,
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltDatabase)
+        };
+        // Resolve connection string similarly to configurator: fallback to ConnectionStrings:Default if unset
         var cs = o.ConnectionString;
-        var csByName = cfg.GetConnectionString("Default");
+    var csByName = Sora.Core.Configuration.Read(cfg, Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, (string?)null);
         if (string.IsNullOrWhiteSpace(cs) && !string.IsNullOrWhiteSpace(csByName)) cs = csByName;
-        report.AddSetting("Database", o.Database);
-        report.AddSetting("ConnectionString", cs, isSecret: true);
+        if (string.IsNullOrWhiteSpace(cs))
+        {
+            var inContainer = Sora.Core.SoraEnv.InContainer;
+            cs = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
+        }
+        if (!string.IsNullOrWhiteSpace(cs) &&
+            !cs.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) &&
+            !cs.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase))
+        {
+            cs = "mongodb://" + cs.Trim();
+        }
+    report.AddSetting("Database", o.Database);
+    report.AddSetting("ConnectionString", cs, isSecret: true);
+    // Announce schema capability per acceptance criteria
+    report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+    // Announce paging guardrails (decision 0044)
+    var defSize = Sora.Core.Configuration.ReadFirst(cfg, o.DefaultPageSize,
+        Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+        Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+    var maxSize = Sora.Core.Configuration.ReadFirst(cfg, o.MaxPageSize,
+        Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+        Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
+    report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.DefaultPageSize, defSize.ToString());
+    report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.MaxPageSize, maxSize.ToString());
     }
 }

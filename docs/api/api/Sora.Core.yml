@@ -1,0 +1,206 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Core
+  commentId: N:Sora.Core
+  id: Sora.Core
+  children:
+  - Sora.Core.Configuration
+  - Sora.Core.ConfigurationExtensions
+  - Sora.Core.HealthReport
+  - Sora.Core.HealthReporter
+  - Sora.Core.HealthState
+  - Sora.Core.IHealthAnnouncer
+  - Sora.Core.IHealthContributor
+  - Sora.Core.IHealthService
+  - Sora.Core.ISoraAutoRegistrar
+  - Sora.Core.ISoraInitializer
+  - Sora.Core.ISoraRuntime
+  - Sora.Core.OptionsValidation
+  - Sora.Core.Redaction
+  - Sora.Core.ServiceCollectionDecoratorExtensions
+  - Sora.Core.ServiceCollectionExtensions
+  - Sora.Core.SoraApp
+  - Sora.Core.SoraBootstrapReport
+  - Sora.Core.SoraEnv
+  - Sora.Core.SoraInitialization
+  - Sora.Core.SoraInitialization.SoraOptions
+  - Sora.Core.SoraRuntimeExtensions
+  langs:
+  - csharp
+  - vb
+  name: Sora.Core
+  nameWithType: Sora.Core
+  fullName: Sora.Core
+  type: Namespace
+  assemblies:
+  - Sora.Core
+references:
+- uid: Sora.Core.ISoraAutoRegistrar
+  commentId: T:Sora.Core.ISoraAutoRegistrar
+  parent: Sora.Core
+  href: Sora.Core.ISoraAutoRegistrar.html
+  name: ISoraAutoRegistrar
+  nameWithType: ISoraAutoRegistrar
+  fullName: Sora.Core.ISoraAutoRegistrar
+- uid: Sora.Core.SoraBootstrapReport
+  commentId: T:Sora.Core.SoraBootstrapReport
+  parent: Sora.Core
+  href: Sora.Core.SoraBootstrapReport.html
+  name: SoraBootstrapReport
+  nameWithType: SoraBootstrapReport
+  fullName: Sora.Core.SoraBootstrapReport
+- uid: Sora.Core.Configuration
+  commentId: T:Sora.Core.Configuration
+  href: Sora.Core.Configuration.html
+  name: Configuration
+  nameWithType: Configuration
+  fullName: Sora.Core.Configuration
+- uid: Sora.Core.ServiceCollectionDecoratorExtensions
+  commentId: T:Sora.Core.ServiceCollectionDecoratorExtensions
+  href: Sora.Core.ServiceCollectionDecoratorExtensions.html
+  name: ServiceCollectionDecoratorExtensions
+  nameWithType: ServiceCollectionDecoratorExtensions
+  fullName: Sora.Core.ServiceCollectionDecoratorExtensions
+- uid: Sora.Core.ConfigurationExtensions
+  commentId: T:Sora.Core.ConfigurationExtensions
+  href: Sora.Core.ConfigurationExtensions.html
+  name: ConfigurationExtensions
+  nameWithType: ConfigurationExtensions
+  fullName: Sora.Core.ConfigurationExtensions
+- uid: Sora.Core.HealthState
+  commentId: T:Sora.Core.HealthState
+  parent: Sora.Core
+  href: Sora.Core.HealthState.html
+  name: HealthState
+  nameWithType: HealthState
+  fullName: Sora.Core.HealthState
+- uid: Sora.Core.HealthReport
+  commentId: T:Sora.Core.HealthReport
+  href: Sora.Core.HealthReport.html
+  name: HealthReport
+  nameWithType: HealthReport
+  fullName: Sora.Core.HealthReport
+- uid: Sora.Core.IHealthContributor
+  commentId: T:Sora.Core.IHealthContributor
+  href: Sora.Core.IHealthContributor.html
+  name: IHealthContributor
+  nameWithType: IHealthContributor
+  fullName: Sora.Core.IHealthContributor
+- uid: Sora.Core.IHealthService
+  commentId: T:Sora.Core.IHealthService
+  parent: Sora.Core
+  href: Sora.Core.IHealthService.html
+  name: IHealthService
+  nameWithType: IHealthService
+  fullName: Sora.Core.IHealthService
+- uid: Sora.Core.IHealthAnnouncer
+  commentId: T:Sora.Core.IHealthAnnouncer
+  href: Sora.Core.IHealthAnnouncer.html
+  name: IHealthAnnouncer
+  nameWithType: IHealthAnnouncer
+  fullName: Sora.Core.IHealthAnnouncer
+- uid: Sora.Core.HealthReporter
+  commentId: T:Sora.Core.HealthReporter
+  href: Sora.Core.HealthReporter.html
+  name: HealthReporter
+  nameWithType: HealthReporter
+  fullName: Sora.Core.HealthReporter
+- uid: Sora.Core.ISoraInitializer
+  commentId: T:Sora.Core.ISoraInitializer
+  parent: Sora.Core
+  href: Sora.Core.ISoraInitializer.html
+  name: ISoraInitializer
+  nameWithType: ISoraInitializer
+  fullName: Sora.Core.ISoraInitializer
+- uid: Sora.Core.SoraInitialization
+  commentId: T:Sora.Core.SoraInitialization
+  href: Sora.Core.SoraInitialization.html
+  name: SoraInitialization
+  nameWithType: SoraInitialization
+  fullName: Sora.Core.SoraInitialization
+- uid: Sora.Core.SoraInitialization.SoraOptions
+  commentId: T:Sora.Core.SoraInitialization.SoraOptions
+  href: Sora.Core.SoraInitialization.html
+  name: SoraInitialization.SoraOptions
+  nameWithType: SoraInitialization.SoraOptions
+  fullName: Sora.Core.SoraInitialization.SoraOptions
+  spec.csharp:
+  - uid: Sora.Core.SoraInitialization
+    name: SoraInitialization
+    href: Sora.Core.SoraInitialization.html
+  - name: .
+  - uid: Sora.Core.SoraInitialization.SoraOptions
+    name: SoraOptions
+    href: Sora.Core.SoraInitialization.SoraOptions.html
+  spec.vb:
+  - uid: Sora.Core.SoraInitialization
+    name: SoraInitialization
+    href: Sora.Core.SoraInitialization.html
+  - name: .
+  - uid: Sora.Core.SoraInitialization.SoraOptions
+    name: SoraOptions
+    href: Sora.Core.SoraInitialization.SoraOptions.html
+- uid: Sora.Core.OptionsValidation
+  commentId: T:Sora.Core.OptionsValidation
+  href: Sora.Core.OptionsValidation.html
+  name: OptionsValidation
+  nameWithType: OptionsValidation
+  fullName: Sora.Core.OptionsValidation
+- uid: Sora.Core.Redaction
+  commentId: T:Sora.Core.Redaction
+  href: Sora.Core.Redaction.html
+  name: Redaction
+  nameWithType: Redaction
+  fullName: Sora.Core.Redaction
+- uid: Sora.Core.ISoraRuntime
+  commentId: T:Sora.Core.ISoraRuntime
+  href: Sora.Core.ISoraRuntime.html
+  name: ISoraRuntime
+  nameWithType: ISoraRuntime
+  fullName: Sora.Core.ISoraRuntime
+- uid: Sora.Core.SoraRuntimeExtensions
+  commentId: T:Sora.Core.SoraRuntimeExtensions
+  href: Sora.Core.SoraRuntimeExtensions.html
+  name: SoraRuntimeExtensions
+  nameWithType: SoraRuntimeExtensions
+  fullName: Sora.Core.SoraRuntimeExtensions
+- uid: Sora.Core.SoraApp
+  commentId: T:Sora.Core.SoraApp
+  href: Sora.Core.SoraApp.html
+  name: SoraApp
+  nameWithType: SoraApp
+  fullName: Sora.Core.SoraApp
+- uid: Sora.Core.SoraEnv
+  commentId: T:Sora.Core.SoraEnv
+  href: Sora.Core.SoraEnv.html
+  name: SoraEnv
+  nameWithType: SoraEnv
+  fullName: Sora.Core.SoraEnv
+- uid: Sora.Core.ServiceCollectionExtensions
+  commentId: T:Sora.Core.ServiceCollectionExtensions
+  href: Sora.Core.ServiceCollectionExtensions.html
+  name: ServiceCollectionExtensions
+  nameWithType: ServiceCollectionExtensions
+  fullName: Sora.Core.ServiceCollectionExtensions
+- uid: Sora.Core
+  commentId: N:Sora.Core
+  href: Sora.html
+  name: Sora.Core
+  nameWithType: Sora.Core
+  fullName: Sora.Core
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Core
+    name: Core
+    href: Sora.Core.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Core
+    name: Core
+    href: Sora.Core.html

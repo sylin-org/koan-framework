@@ -1,0 +1,115 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Web.Infrastructure
+  commentId: N:Sora.Web.Infrastructure
+  id: Sora.Web.Infrastructure
+  children:
+  - Sora.Web.Infrastructure.SoraWebConstants
+  - Sora.Web.Infrastructure.SoraWebConstants.Defaults
+  - Sora.Web.Infrastructure.SoraWebConstants.Headers
+  - Sora.Web.Infrastructure.SoraWebConstants.Policies
+  - Sora.Web.Infrastructure.SoraWebConstants.Routes
+  langs:
+  - csharp
+  - vb
+  name: Sora.Web.Infrastructure
+  nameWithType: Sora.Web.Infrastructure
+  fullName: Sora.Web.Infrastructure
+  type: Namespace
+  assemblies:
+  - Sora.Web
+references:
+- uid: Sora.Web.Infrastructure.SoraWebConstants
+  commentId: T:Sora.Web.Infrastructure.SoraWebConstants
+  href: Sora.Web.Infrastructure.SoraWebConstants.html
+  name: SoraWebConstants
+  nameWithType: SoraWebConstants
+  fullName: Sora.Web.Infrastructure.SoraWebConstants
+- uid: Sora.Web.Infrastructure.SoraWebConstants.Headers
+  commentId: T:Sora.Web.Infrastructure.SoraWebConstants.Headers
+  href: Sora.Web.Infrastructure.SoraWebConstants.html
+  name: SoraWebConstants.Headers
+  nameWithType: SoraWebConstants.Headers
+  fullName: Sora.Web.Infrastructure.SoraWebConstants.Headers
+  spec.csharp:
+  - uid: Sora.Web.Infrastructure.SoraWebConstants
+    name: SoraWebConstants
+    href: Sora.Web.Infrastructure.SoraWebConstants.html
+  - name: .
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Headers
+    name: Headers
+    href: Sora.Web.Infrastructure.SoraWebConstants.Headers.html
+  spec.vb:
+  - uid: Sora.Web.Infrastructure.SoraWebConstants
+    name: SoraWebConstants
+    href: Sora.Web.Infrastructure.SoraWebConstants.html
+  - name: .
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Headers
+    name: Headers
+    href: Sora.Web.Infrastructure.SoraWebConstants.Headers.html
+- uid: Sora.Web.Infrastructure.SoraWebConstants.Policies
+  commentId: T:Sora.Web.Infrastructure.SoraWebConstants.Policies
+  href: Sora.Web.Infrastructure.SoraWebConstants.html
+  name: SoraWebConstants.Policies
+  nameWithType: SoraWebConstants.Policies
+  fullName: Sora.Web.Infrastructure.SoraWebConstants.Policies
+  spec.csharp:
+  - uid: Sora.Web.Infrastructure.SoraWebConstants
+    name: SoraWebConstants
+    href: Sora.Web.Infrastructure.SoraWebConstants.html
+  - name: .
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Policies
+    name: Policies
+    href: Sora.Web.Infrastructure.SoraWebConstants.Policies.html
+  spec.vb:
+  - uid: Sora.Web.Infrastructure.SoraWebConstants
+    name: SoraWebConstants
+    href: Sora.Web.Infrastructure.SoraWebConstants.html
+  - name: .
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Policies
+    name: Policies
+    href: Sora.Web.Infrastructure.SoraWebConstants.Policies.html
+- uid: Sora.Web.Infrastructure.SoraWebConstants.Routes
+  commentId: T:Sora.Web.Infrastructure.SoraWebConstants.Routes
+  href: Sora.Web.Infrastructure.SoraWebConstants.html
+  name: SoraWebConstants.Routes
+  nameWithType: SoraWebConstants.Routes
+  fullName: Sora.Web.Infrastructure.SoraWebConstants.Routes
+  spec.csharp:
+  - uid: Sora.Web.Infrastructure.SoraWebConstants
+    name: SoraWebConstants
+    href: Sora.Web.Infrastructure.SoraWebConstants.html
+  - name: .
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Routes
+    name: Routes
+    href: Sora.Web.Infrastructure.SoraWebConstants.Routes.html
+  spec.vb:
+  - uid: Sora.Web.Infrastructure.SoraWebConstants
+    name: SoraWebConstants
+    href: Sora.Web.Infrastructure.SoraWebConstants.html
+  - name: .
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Routes
+    name: Routes
+    href: Sora.Web.Infrastructure.SoraWebConstants.Routes.html
+- uid: Sora.Web.Infrastructure.SoraWebConstants.Defaults
+  commentId: T:Sora.Web.Infrastructure.SoraWebConstants.Defaults
+  href: Sora.Web.Infrastructure.SoraWebConstants.html
+  name: SoraWebConstants.Defaults
+  nameWithType: SoraWebConstants.Defaults
+  fullName: Sora.Web.Infrastructure.SoraWebConstants.Defaults
+  spec.csharp:
+  - uid: Sora.Web.Infrastructure.SoraWebConstants
+    name: SoraWebConstants
+    href: Sora.Web.Infrastructure.SoraWebConstants.html
+  - name: .
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Defaults
+    name: Defaults
+    href: Sora.Web.Infrastructure.SoraWebConstants.Defaults.html
+  spec.vb:
+  - uid: Sora.Web.Infrastructure.SoraWebConstants
+    name: SoraWebConstants
+    href: Sora.Web.Infrastructure.SoraWebConstants.html
+  - name: .
+  - uid: Sora.Web.Infrastructure.SoraWebConstants.Defaults
+    name: Defaults
+    href: Sora.Web.Infrastructure.SoraWebConstants.Defaults.html

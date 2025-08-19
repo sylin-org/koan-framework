@@ -1,0 +1,163 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Cqrs
+  commentId: N:Sora.Data.Cqrs
+  id: Sora.Data.Cqrs
+  children:
+  - Sora.Data.Cqrs.CqrsAttribute
+  - Sora.Data.Cqrs.CqrsEndpoint
+  - Sora.Data.Cqrs.CqrsEntityRoute
+  - Sora.Data.Cqrs.CqrsMessaging
+  - Sora.Data.Cqrs.CqrsOptions
+  - Sora.Data.Cqrs.CqrsProfile
+  - Sora.Data.Cqrs.ICqrsRouting
+  - Sora.Data.Cqrs.IOutboxStore
+  - Sora.Data.Cqrs.IOutboxStoreFactory
+  - Sora.Data.Cqrs.InMemoryOutboxFactory
+  - Sora.Data.Cqrs.InMemoryOutboxOptions
+  - Sora.Data.Cqrs.InMemoryOutboxRegistration
+  - Sora.Data.Cqrs.InMemoryOutboxStore
+  - Sora.Data.Cqrs.LoggingOutboxStore
+  - Sora.Data.Cqrs.OutboxConfig
+  - Sora.Data.Cqrs.OutboxEntry
+  langs:
+  - csharp
+  - vb
+  name: Sora.Data.Cqrs
+  nameWithType: Sora.Data.Cqrs
+  fullName: Sora.Data.Cqrs
+  type: Namespace
+  assemblies:
+  - Sora.Data.Cqrs
+references:
+- uid: Sora.Data.Cqrs.CqrsAttribute
+  commentId: T:Sora.Data.Cqrs.CqrsAttribute
+  href: Sora.Data.Cqrs.CqrsAttribute.html
+  name: CqrsAttribute
+  nameWithType: CqrsAttribute
+  fullName: Sora.Data.Cqrs.CqrsAttribute
+- uid: Sora.Data.Cqrs.CqrsOptions
+  commentId: T:Sora.Data.Cqrs.CqrsOptions
+  href: Sora.Data.Cqrs.CqrsOptions.html
+  name: CqrsOptions
+  nameWithType: CqrsOptions
+  fullName: Sora.Data.Cqrs.CqrsOptions
+- uid: Sora.Data.Cqrs.CqrsProfile
+  commentId: T:Sora.Data.Cqrs.CqrsProfile
+  href: Sora.Data.Cqrs.CqrsProfile.html
+  name: CqrsProfile
+  nameWithType: CqrsProfile
+  fullName: Sora.Data.Cqrs.CqrsProfile
+- uid: Sora.Data.Cqrs.CqrsEntityRoute
+  commentId: T:Sora.Data.Cqrs.CqrsEntityRoute
+  href: Sora.Data.Cqrs.CqrsEntityRoute.html
+  name: CqrsEntityRoute
+  nameWithType: CqrsEntityRoute
+  fullName: Sora.Data.Cqrs.CqrsEntityRoute
+- uid: Sora.Data.Cqrs.CqrsEndpoint
+  commentId: T:Sora.Data.Cqrs.CqrsEndpoint
+  parent: Sora.Data.Cqrs
+  href: Sora.Data.Cqrs.CqrsEndpoint.html
+  name: CqrsEndpoint
+  nameWithType: CqrsEndpoint
+  fullName: Sora.Data.Cqrs.CqrsEndpoint
+- uid: Sora.Data.Cqrs.CqrsMessaging
+  commentId: T:Sora.Data.Cqrs.CqrsMessaging
+  parent: Sora.Data.Cqrs
+  href: Sora.Data.Cqrs.CqrsMessaging.html
+  name: CqrsMessaging
+  nameWithType: CqrsMessaging
+  fullName: Sora.Data.Cqrs.CqrsMessaging
+- uid: Sora.Data.Cqrs.OutboxEntry
+  commentId: T:Sora.Data.Cqrs.OutboxEntry
+  parent: Sora.Data.Cqrs
+  href: Sora.Data.Cqrs.OutboxEntry.html
+  name: OutboxEntry
+  nameWithType: OutboxEntry
+  fullName: Sora.Data.Cqrs.OutboxEntry
+- uid: Sora.Data.Cqrs.IOutboxStore
+  commentId: T:Sora.Data.Cqrs.IOutboxStore
+  parent: Sora.Data.Cqrs
+  href: Sora.Data.Cqrs.IOutboxStore.html
+  name: IOutboxStore
+  nameWithType: IOutboxStore
+  fullName: Sora.Data.Cqrs.IOutboxStore
+- uid: Sora.Data.Cqrs.IOutboxStoreFactory
+  commentId: T:Sora.Data.Cqrs.IOutboxStoreFactory
+  parent: Sora.Data.Cqrs
+  href: Sora.Data.Cqrs.IOutboxStoreFactory.html
+  name: IOutboxStoreFactory
+  nameWithType: IOutboxStoreFactory
+  fullName: Sora.Data.Cqrs.IOutboxStoreFactory
+- uid: Sora.Data.Cqrs.InMemoryOutboxOptions
+  commentId: T:Sora.Data.Cqrs.InMemoryOutboxOptions
+  href: Sora.Data.Cqrs.InMemoryOutboxOptions.html
+  name: InMemoryOutboxOptions
+  nameWithType: InMemoryOutboxOptions
+  fullName: Sora.Data.Cqrs.InMemoryOutboxOptions
+- uid: Sora.Data.Cqrs.InMemoryOutboxStore
+  commentId: T:Sora.Data.Cqrs.InMemoryOutboxStore
+  href: Sora.Data.Cqrs.InMemoryOutboxStore.html
+  name: InMemoryOutboxStore
+  nameWithType: InMemoryOutboxStore
+  fullName: Sora.Data.Cqrs.InMemoryOutboxStore
+- uid: Sora.Data.Cqrs.InMemoryOutboxFactory
+  commentId: T:Sora.Data.Cqrs.InMemoryOutboxFactory
+  href: Sora.Data.Cqrs.InMemoryOutboxFactory.html
+  name: InMemoryOutboxFactory
+  nameWithType: InMemoryOutboxFactory
+  fullName: Sora.Data.Cqrs.InMemoryOutboxFactory
+- uid: Sora.Data.Cqrs.InMemoryOutboxRegistration
+  commentId: T:Sora.Data.Cqrs.InMemoryOutboxRegistration
+  href: Sora.Data.Cqrs.InMemoryOutboxRegistration.html
+  name: InMemoryOutboxRegistration
+  nameWithType: InMemoryOutboxRegistration
+  fullName: Sora.Data.Cqrs.InMemoryOutboxRegistration
+- uid: Sora.Data.Cqrs.LoggingOutboxStore
+  commentId: T:Sora.Data.Cqrs.LoggingOutboxStore
+  href: Sora.Data.Cqrs.LoggingOutboxStore.html
+  name: LoggingOutboxStore
+  nameWithType: LoggingOutboxStore
+  fullName: Sora.Data.Cqrs.LoggingOutboxStore
+- uid: Sora.Data.Cqrs.OutboxConfig
+  commentId: T:Sora.Data.Cqrs.OutboxConfig
+  href: Sora.Data.Cqrs.OutboxConfig.html
+  name: OutboxConfig
+  nameWithType: OutboxConfig
+  fullName: Sora.Data.Cqrs.OutboxConfig
+- uid: Sora.Data.Cqrs.ICqrsRouting
+  commentId: T:Sora.Data.Cqrs.ICqrsRouting
+  href: Sora.Data.Cqrs.ICqrsRouting.html
+  name: ICqrsRouting
+  nameWithType: ICqrsRouting
+  fullName: Sora.Data.Cqrs.ICqrsRouting
+- uid: Sora.Data.Cqrs
+  commentId: N:Sora.Data.Cqrs
+  href: Sora.html
+  name: Sora.Data.Cqrs
+  nameWithType: Sora.Data.Cqrs
+  fullName: Sora.Data.Cqrs
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Cqrs
+    name: Cqrs
+    href: Sora.Data.Cqrs.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Cqrs
+    name: Cqrs
+    href: Sora.Data.Cqrs.html

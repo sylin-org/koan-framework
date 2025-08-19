@@ -1,0 +1,129 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Relational.Schema
+  commentId: N:Sora.Data.Relational.Schema
+  id: Sora.Data.Relational.Schema
+  children:
+  - Sora.Data.Relational.Schema.IRelationalDialect
+  - Sora.Data.Relational.Schema.IRelationalSchemaModel
+  - Sora.Data.Relational.Schema.IRelationalSchemaReader
+  - Sora.Data.Relational.Schema.IRelationalSchemaSynchronizer
+  - Sora.Data.Relational.Schema.RelationalColumn
+  - Sora.Data.Relational.Schema.RelationalIndex
+  - Sora.Data.Relational.Schema.RelationalModelBuilder
+  - Sora.Data.Relational.Schema.RelationalSchemaModel
+  - Sora.Data.Relational.Schema.RelationalSchemaSynchronizer
+  - Sora.Data.Relational.Schema.RelationalTable
+  langs:
+  - csharp
+  - vb
+  name: Sora.Data.Relational.Schema
+  nameWithType: Sora.Data.Relational.Schema
+  fullName: Sora.Data.Relational.Schema
+  type: Namespace
+  assemblies:
+  - Sora.Data.Relational
+references:
+- uid: Sora.Data.Relational.Schema.RelationalTable
+  commentId: T:Sora.Data.Relational.Schema.RelationalTable
+  parent: Sora.Data.Relational.Schema
+  href: Sora.Data.Relational.Schema.RelationalTable.html
+  name: RelationalTable
+  nameWithType: RelationalTable
+  fullName: Sora.Data.Relational.Schema.RelationalTable
+- uid: Sora.Data.Relational.Schema.RelationalColumn
+  commentId: T:Sora.Data.Relational.Schema.RelationalColumn
+  parent: Sora.Data.Relational.Schema
+  href: Sora.Data.Relational.Schema.RelationalColumn.html
+  name: RelationalColumn
+  nameWithType: RelationalColumn
+  fullName: Sora.Data.Relational.Schema.RelationalColumn
+- uid: Sora.Data.Relational.Schema.RelationalIndex
+  commentId: T:Sora.Data.Relational.Schema.RelationalIndex
+  href: Sora.Data.Relational.Schema.RelationalIndex.html
+  name: RelationalIndex
+  nameWithType: RelationalIndex
+  fullName: Sora.Data.Relational.Schema.RelationalIndex
+- uid: Sora.Data.Relational.Schema.IRelationalSchemaModel
+  commentId: T:Sora.Data.Relational.Schema.IRelationalSchemaModel
+  parent: Sora.Data.Relational.Schema
+  href: Sora.Data.Relational.Schema.IRelationalSchemaModel.html
+  name: IRelationalSchemaModel
+  nameWithType: IRelationalSchemaModel
+  fullName: Sora.Data.Relational.Schema.IRelationalSchemaModel
+- uid: Sora.Data.Relational.Schema.IRelationalDialect
+  commentId: T:Sora.Data.Relational.Schema.IRelationalDialect
+  parent: Sora.Data.Relational.Schema
+  href: Sora.Data.Relational.Schema.IRelationalDialect.html
+  name: IRelationalDialect
+  nameWithType: IRelationalDialect
+  fullName: Sora.Data.Relational.Schema.IRelationalDialect
+- uid: Sora.Data.Relational.Schema.IRelationalSchemaReader
+  commentId: T:Sora.Data.Relational.Schema.IRelationalSchemaReader
+  href: Sora.Data.Relational.Schema.IRelationalSchemaReader.html
+  name: IRelationalSchemaReader
+  nameWithType: IRelationalSchemaReader
+  fullName: Sora.Data.Relational.Schema.IRelationalSchemaReader
+- uid: Sora.Data.Relational.Schema.IRelationalSchemaSynchronizer
+  commentId: T:Sora.Data.Relational.Schema.IRelationalSchemaSynchronizer
+  parent: Sora.Data.Relational.Schema
+  href: Sora.Data.Relational.Schema.IRelationalSchemaSynchronizer.html
+  name: IRelationalSchemaSynchronizer
+  nameWithType: IRelationalSchemaSynchronizer
+  fullName: Sora.Data.Relational.Schema.IRelationalSchemaSynchronizer
+- uid: Sora.Data.Relational.Schema.RelationalSchemaModel
+  commentId: T:Sora.Data.Relational.Schema.RelationalSchemaModel
+  href: Sora.Data.Relational.Schema.RelationalSchemaModel.html
+  name: RelationalSchemaModel
+  nameWithType: RelationalSchemaModel
+  fullName: Sora.Data.Relational.Schema.RelationalSchemaModel
+- uid: Sora.Data.Relational.Schema.RelationalModelBuilder
+  commentId: T:Sora.Data.Relational.Schema.RelationalModelBuilder
+  href: Sora.Data.Relational.Schema.RelationalModelBuilder.html
+  name: RelationalModelBuilder
+  nameWithType: RelationalModelBuilder
+  fullName: Sora.Data.Relational.Schema.RelationalModelBuilder
+- uid: Sora.Data.Relational.Schema.RelationalSchemaSynchronizer
+  commentId: T:Sora.Data.Relational.Schema.RelationalSchemaSynchronizer
+  href: Sora.Data.Relational.Schema.RelationalSchemaSynchronizer.html
+  name: RelationalSchemaSynchronizer
+  nameWithType: RelationalSchemaSynchronizer
+  fullName: Sora.Data.Relational.Schema.RelationalSchemaSynchronizer
+- uid: Sora.Data.Relational.Schema
+  commentId: N:Sora.Data.Relational.Schema
+  href: Sora.html
+  name: Sora.Data.Relational.Schema
+  nameWithType: Sora.Data.Relational.Schema
+  fullName: Sora.Data.Relational.Schema
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Relational
+    name: Relational
+    href: Sora.Data.Relational.html
+  - name: .
+  - uid: Sora.Data.Relational.Schema
+    name: Schema
+    href: Sora.Data.Relational.Schema.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Relational
+    name: Relational
+    href: Sora.Data.Relational.html
+  - name: .
+  - uid: Sora.Data.Relational.Schema
+    name: Schema
+    href: Sora.Data.Relational.Schema.html

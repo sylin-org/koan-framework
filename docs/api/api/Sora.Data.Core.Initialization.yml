@@ -1,0 +1,23 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Core.Initialization
+  commentId: N:Sora.Data.Core.Initialization
+  id: Sora.Data.Core.Initialization
+  children:
+  - Sora.Data.Core.Initialization.SoraAutoRegistrar
+  langs:
+  - csharp
+  - vb
+  name: Sora.Data.Core.Initialization
+  nameWithType: Sora.Data.Core.Initialization
+  fullName: Sora.Data.Core.Initialization
+  type: Namespace
+  assemblies:
+  - Sora.Data.Core
+references:
+- uid: Sora.Data.Core.Initialization.SoraAutoRegistrar
+  commentId: T:Sora.Data.Core.Initialization.SoraAutoRegistrar
+  href: Sora.Data.Core.Initialization.SoraAutoRegistrar.html
+  name: SoraAutoRegistrar
+  nameWithType: SoraAutoRegistrar
+  fullName: Sora.Data.Core.Initialization.SoraAutoRegistrar

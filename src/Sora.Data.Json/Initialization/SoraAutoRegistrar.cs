@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Data.Abstractions;
+using Sora.Data.Json.Infrastructure;
 
 namespace Sora.Data.Json.Initialization;
 
@@ -25,12 +26,12 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var o = new JsonDataOptions();
-        cfg.GetSection("Sora:Data:Json").Bind(o);
-        // Also check default data source pattern
-        var alt = new JsonDataOptions();
-        cfg.GetSection("Sora:Data:Sources:Default:json").Bind(alt);
-        var dir = !string.IsNullOrWhiteSpace(o.DirectoryPath) ? o.DirectoryPath : alt.DirectoryPath;
-        report.AddSetting("DirectoryPath", dir);
+        // ADR-0040: use helper to read DirectoryPath from either primary or default source sections
+        var dir = Sora.Core.Configuration.ReadFirst(cfg, new[]
+        {
+            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DirectoryPath}",
+            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DirectoryPath}"
+        });
+        report.AddSetting(Constants.Bootstrap.DirectoryPath, dir ?? string.Empty);
     }
 }

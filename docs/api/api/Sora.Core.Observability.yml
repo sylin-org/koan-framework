@@ -1,0 +1,132 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Core.Observability
+  commentId: N:Sora.Core.Observability
+  id: Sora.Core.Observability
+  children:
+  - Sora.Core.Observability.ObservabilityOptions
+  - Sora.Core.Observability.ObservabilityOptions.MetricsOptions
+  - Sora.Core.Observability.ObservabilityOptions.OtlpOptions
+  - Sora.Core.Observability.ObservabilityOptions.TracesOptions
+  - Sora.Core.Observability.ServiceCollectionExtensions
+  langs:
+  - csharp
+  - vb
+  name: Sora.Core.Observability
+  nameWithType: Sora.Core.Observability
+  fullName: Sora.Core.Observability
+  type: Namespace
+  assemblies:
+  - Sora.Core
+references:
+- uid: Sora.Core.Observability.ObservabilityOptions
+  commentId: T:Sora.Core.Observability.ObservabilityOptions
+  href: Sora.Core.Observability.ObservabilityOptions.html
+  name: ObservabilityOptions
+  nameWithType: ObservabilityOptions
+  fullName: Sora.Core.Observability.ObservabilityOptions
+- uid: Sora.Core.Observability.ObservabilityOptions.TracesOptions
+  commentId: T:Sora.Core.Observability.ObservabilityOptions.TracesOptions
+  parent: Sora.Core.Observability
+  href: Sora.Core.Observability.ObservabilityOptions.html
+  name: ObservabilityOptions.TracesOptions
+  nameWithType: ObservabilityOptions.TracesOptions
+  fullName: Sora.Core.Observability.ObservabilityOptions.TracesOptions
+  spec.csharp:
+  - uid: Sora.Core.Observability.ObservabilityOptions
+    name: ObservabilityOptions
+    href: Sora.Core.Observability.ObservabilityOptions.html
+  - name: .
+  - uid: Sora.Core.Observability.ObservabilityOptions.TracesOptions
+    name: TracesOptions
+    href: Sora.Core.Observability.ObservabilityOptions.TracesOptions.html
+  spec.vb:
+  - uid: Sora.Core.Observability.ObservabilityOptions
+    name: ObservabilityOptions
+    href: Sora.Core.Observability.ObservabilityOptions.html
+  - name: .
+  - uid: Sora.Core.Observability.ObservabilityOptions.TracesOptions
+    name: TracesOptions
+    href: Sora.Core.Observability.ObservabilityOptions.TracesOptions.html
+- uid: Sora.Core.Observability.ObservabilityOptions.MetricsOptions
+  commentId: T:Sora.Core.Observability.ObservabilityOptions.MetricsOptions
+  parent: Sora.Core.Observability
+  href: Sora.Core.Observability.ObservabilityOptions.html
+  name: ObservabilityOptions.MetricsOptions
+  nameWithType: ObservabilityOptions.MetricsOptions
+  fullName: Sora.Core.Observability.ObservabilityOptions.MetricsOptions
+  spec.csharp:
+  - uid: Sora.Core.Observability.ObservabilityOptions
+    name: ObservabilityOptions
+    href: Sora.Core.Observability.ObservabilityOptions.html
+  - name: .
+  - uid: Sora.Core.Observability.ObservabilityOptions.MetricsOptions
+    name: MetricsOptions
+    href: Sora.Core.Observability.ObservabilityOptions.MetricsOptions.html
+  spec.vb:
+  - uid: Sora.Core.Observability.ObservabilityOptions
+    name: ObservabilityOptions
+    href: Sora.Core.Observability.ObservabilityOptions.html
+  - name: .
+  - uid: Sora.Core.Observability.ObservabilityOptions.MetricsOptions
+    name: MetricsOptions
+    href: Sora.Core.Observability.ObservabilityOptions.MetricsOptions.html
+- uid: Sora.Core.Observability.ObservabilityOptions.OtlpOptions
+  commentId: T:Sora.Core.Observability.ObservabilityOptions.OtlpOptions
+  parent: Sora.Core.Observability
+  href: Sora.Core.Observability.ObservabilityOptions.html
+  name: ObservabilityOptions.OtlpOptions
+  nameWithType: ObservabilityOptions.OtlpOptions
+  fullName: Sora.Core.Observability.ObservabilityOptions.OtlpOptions
+  spec.csharp:
+  - uid: Sora.Core.Observability.ObservabilityOptions
+    name: ObservabilityOptions
+    href: Sora.Core.Observability.ObservabilityOptions.html
+  - name: .
+  - uid: Sora.Core.Observability.ObservabilityOptions.OtlpOptions
+    name: OtlpOptions
+    href: Sora.Core.Observability.ObservabilityOptions.OtlpOptions.html
+  spec.vb:
+  - uid: Sora.Core.Observability.ObservabilityOptions
+    name: ObservabilityOptions
+    href: Sora.Core.Observability.ObservabilityOptions.html
+  - name: .
+  - uid: Sora.Core.Observability.ObservabilityOptions.OtlpOptions
+    name: OtlpOptions
+    href: Sora.Core.Observability.ObservabilityOptions.OtlpOptions.html
+- uid: Sora.Core.Observability.ServiceCollectionExtensions
+  commentId: T:Sora.Core.Observability.ServiceCollectionExtensions
+  href: Sora.Core.Observability.ServiceCollectionExtensions.html
+  name: ServiceCollectionExtensions
+  nameWithType: ServiceCollectionExtensions
+  fullName: Sora.Core.Observability.ServiceCollectionExtensions
+- uid: Sora.Core.Observability
+  commentId: N:Sora.Core.Observability
+  href: Sora.html
+  name: Sora.Core.Observability
+  nameWithType: Sora.Core.Observability
+  fullName: Sora.Core.Observability
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Core
+    name: Core
+    href: Sora.Core.html
+  - name: .
+  - uid: Sora.Core.Observability
+    name: Observability
+    href: Sora.Core.Observability.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Core
+    name: Core
+    href: Sora.Core.html
+  - name: .
+  - uid: Sora.Core.Observability
+    name: Observability
+    href: Sora.Core.Observability.html

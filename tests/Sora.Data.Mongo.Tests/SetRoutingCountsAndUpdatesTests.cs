@@ -101,6 +101,7 @@ public class SetRoutingCountsAndUpdatesTests
             (await repo.QueryAsync((object?)null)).Should().BeEmpty();
         }
 
-        (await repo.QueryAsync((object?)null)).Count.Should().Be(rootCount + 1);
+    (await repo.QueryAsync((object?)null)).Count.Should().Be(rootCount + 1);
+    await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }

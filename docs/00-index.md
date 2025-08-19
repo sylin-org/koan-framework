@@ -23,6 +23,8 @@ Additional guides:
  - 12-cqrs-for-humans.md — A gentle introduction to CQRS in Sora (where it plugs in, how to implement, how to use)
  - 15-entity-filtering-and-query.md — Filtering via JSON filters and query endpoints with examples
  - 16-working-with-entity-data.md — Developer guide to reading, filtering, sets, and migrations
+- 17-sqlite-logging-and-governance.md — SQLite adapter logging, tracing, and DDL governance
+ - 18-sqlserver-adapter.md — SQL Server adapter: setup, options, capabilities, and testing
  - ddd/00-index.md — Domain-Driven Design in Sora: ubiquitous language, tactical design, CQRS/eventing, and more
 
 See also: `docs/decisions` for ADRs tracking key architecture choices (capabilities, markers, naming). Notable:
@@ -34,3 +36,4 @@ See also: `docs/decisions` for ADRs tracking key architecture choices (capabilit
 
 Support docs:
 - support/README.md — maintenance, adapters, testing, releases, migration
+ - support/08-data-adapter-acceptance-criteria.md — acceptance criteria for all Data adapters

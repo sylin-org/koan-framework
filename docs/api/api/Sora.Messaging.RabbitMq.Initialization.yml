@@ -1,0 +1,23 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Messaging.RabbitMq.Initialization
+  commentId: N:Sora.Messaging.RabbitMq.Initialization
+  id: Sora.Messaging.RabbitMq.Initialization
+  children:
+  - Sora.Messaging.RabbitMq.Initialization.SoraAutoRegistrar
+  langs:
+  - csharp
+  - vb
+  name: Sora.Messaging.RabbitMq.Initialization
+  nameWithType: Sora.Messaging.RabbitMq.Initialization
+  fullName: Sora.Messaging.RabbitMq.Initialization
+  type: Namespace
+  assemblies:
+  - Sora.Messaging.RabbitMq
+references:
+- uid: Sora.Messaging.RabbitMq.Initialization.SoraAutoRegistrar
+  commentId: T:Sora.Messaging.RabbitMq.Initialization.SoraAutoRegistrar
+  href: Sora.Messaging.RabbitMq.Initialization.SoraAutoRegistrar.html
+  name: SoraAutoRegistrar
+  nameWithType: SoraAutoRegistrar
+  fullName: Sora.Messaging.RabbitMq.Initialization.SoraAutoRegistrar

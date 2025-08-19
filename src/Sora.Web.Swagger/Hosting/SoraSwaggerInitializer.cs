@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using Swashbuckle.AspNetCore.Swagger;
+using Sora.Web.Swagger.Infrastructure;
 
 namespace Sora.Web.Swagger.Hosting;
 
@@ -78,10 +79,15 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
     private static SoraWebSwaggerOptions GetOptions(IConfiguration? cfg)
     {
         var o = new SoraWebSwaggerOptions();
-        try { cfg?.GetSection("Sora:Web:Swagger").Bind(o); } catch { }
-    var envEnabled = cfg.Read<bool?>(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled);
-        if (envEnabled.HasValue) o.Enabled = envEnabled;
-    var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
+        if (cfg is not null)
+        {
+            // ADR-0040: read individual keys
+            o.Enabled = cfg.Read<bool?>(Constants.Configuration.Enabled);
+            o.RoutePrefix = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RoutePrefix}", o.RoutePrefix)!;
+            o.IncludeXmlComments = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.IncludeXmlComments}", o.IncludeXmlComments);
+            o.RequireAuthOutsideDevelopment = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RequireAuthOutsideDevelopment}", o.RequireAuthOutsideDevelopment);
+        }
+        var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
         if (magic == true) o.Enabled = true;
         return o;
     }

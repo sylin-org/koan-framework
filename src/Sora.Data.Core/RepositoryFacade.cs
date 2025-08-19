@@ -19,6 +19,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
+    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
+    IStringQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     IInstructionExecutor<TEntity>
@@ -44,11 +46,26 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default) => _inner.GetAsync(id, ct);
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default) => _inner.QueryAsync(query, ct);
+    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    {
+        if (_inner is IDataRepositoryWithOptions<TEntity, TKey> with)
+            return await with.QueryAsync(query, options, ct);
+        // Fallback: ignore options and use base method; adapters will apply guardrails
+        return await _inner.QueryAsync(query, ct);
+    }
     public Task<int> CountAsync(object? query, CancellationToken ct = default) => _inner.CountAsync(query, ct);
     public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
         => _inner is ILinqQueryRepository<TEntity, TKey> linq
             ? linq.QueryAsync(predicate, ct)
             : throw new NotSupportedException("LINQ queries are not supported by this repository.");
+    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+    {
+        if (_inner is ILinqQueryRepositoryWithOptions<TEntity, TKey> linq)
+            return await linq.QueryAsync(predicate, options, ct);
+        if (_inner is ILinqQueryRepository<TEntity, TKey> linqb)
+            return await linqb.QueryAsync(predicate, ct);
+        throw new NotSupportedException("LINQ queries are not supported by this repository.");
+    }
     public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
         => _inner is ILinqQueryRepository<TEntity, TKey> linq
             ? linq.CountAsync(predicate, ct)
@@ -58,11 +75,27 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         => _inner is IStringQueryRepository<TEntity, TKey> raw
             ? raw.QueryAsync(query, ct)
             : throw new NotSupportedException("String queries are not supported by this repository.");
+    public async Task<IReadOnlyList<TEntity>> QueryAsync(string query, DataQueryOptions? options, CancellationToken ct = default)
+    {
+        if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> raw)
+            return await raw.QueryAsync(query, options, ct);
+        if (_inner is IStringQueryRepository<TEntity, TKey> rawb)
+            return await rawb.QueryAsync(query, ct);
+        throw new NotSupportedException("String queries are not supported by this repository.");
+    }
 
     public Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, CancellationToken ct = default)
         => _inner is IStringQueryRepository<TEntity, TKey> rawp
             ? rawp.QueryAsync(query, parameters, ct)
             : throw new NotSupportedException("String queries are not supported by this repository.");
+    public async Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    {
+        if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> rawp)
+            return await rawp.QueryAsync(query, parameters, options, ct);
+        if (_inner is IStringQueryRepository<TEntity, TKey> rawpb)
+            return await rawpb.QueryAsync(query, parameters, ct);
+        throw new NotSupportedException("String queries are not supported by this repository.");
+    }
     public Task<int> CountAsync(string query, CancellationToken ct = default)
         => _inner is IStringQueryRepository<TEntity, TKey> rawc
             ? rawc.CountAsync(query, ct)
@@ -178,18 +211,12 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
                 }
             }
 
-            var upserts = _adds.Concat(_updates);
-            if (upserts.Any())
-            {
-                ct.ThrowIfCancellationRequested();
-                await _outer._inner.UpsertManyAsync(upserts, ct);
-            }
-            if (_deletes.Any())
-            {
-                ct.ThrowIfCancellationRequested();
-                await _outer._inner.DeleteManyAsync(_deletes, ct);
-            }
-            return new BatchResult(_adds.Count, _updates.Count, _deletes.Count);
+            // Delegate to adapter-native batch to enable provider semantics (e.g., transactions, accurate counts)
+            var native = _outer._inner.CreateBatch();
+            foreach (var e in _adds) native.Add(e);
+            foreach (var e in _updates) native.Update(e);
+            foreach (var id in _deletes) native.Delete(id);
+            return await native.SaveAsync(options, ct);
         }
     }
 }

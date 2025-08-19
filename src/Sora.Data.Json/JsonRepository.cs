@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Sora.Data.Abstractions;
 using Sora.Core;
 using System.ComponentModel.DataAnnotations;
+using Sora.Data.Json.Infrastructure;
 
 namespace Sora.Data.Json;
 
@@ -80,10 +81,15 @@ internal sealed class JsonDataOptionsConfigurator(IConfiguration config) : Micro
 {
     public void Configure(JsonDataOptions options)
     {
-        // Primary: Sora:Data:Json
-        config.GetSection("Sora:Data:Json").Bind(options);
-        // Also support named default source pattern for consistency
-        config.GetSection("Sora:Data:Sources:Default:json").Bind(options);
+        // ADR-0040: avoid Bind; read via helper with centralized keys
+        // Prefer explicit DirectoryPath if provided in either section, otherwise keep default
+        var dir = Sora.Core.Configuration.ReadFirst(config, new[]
+        {
+            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DirectoryPath}",
+            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DirectoryPath}"
+        });
+        if (!string.IsNullOrWhiteSpace(dir))
+            options.DirectoryPath = dir!;
     }
 }
 

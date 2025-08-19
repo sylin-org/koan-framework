@@ -18,6 +18,14 @@ builder.Services.AddSora()
 
 // Transformers disabled in S1: keep API simple here.
 
+// Dev helper (optional): enable Debug console logging and allow DDL in a dev/prod shell
+// Uncomment to see SQLite ensure/validate breadcrumbs (EventIds 1000-1200)
+// builder.Logging.ClearProviders();
+// builder.Logging.AddSimpleConsole(o => o.SingleLine = true);
+// builder.Logging.SetMinimumLevel(LogLevel.Debug);
+// // Allow DDL in Production shell for local dev
+// builder.Configuration["Sora:AllowMagicInProduction"] = "true";
+
 // App policy: register a rate limiter (pipeline toggle enables UseRateLimiter)
 builder.Services.AddRateLimiter(options =>
 {

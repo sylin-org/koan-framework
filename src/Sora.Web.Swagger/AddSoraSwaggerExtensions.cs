@@ -6,6 +6,7 @@ using Sora.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Swagger;
+using Sora.Web.Swagger.Infrastructure;
 
 namespace Sora.Web.Swagger;
 
@@ -100,15 +101,16 @@ public static class AddSoraSwaggerExtensions
 
     private static SoraWebSwaggerOptions GetOptions(IConfiguration cfg)
     {
-        var o = new SoraWebSwaggerOptions();
-        cfg.GetSection("Sora:Web:Swagger").Bind(o);
-    // also support Sora__Web__Swagger__Enabled env var
-    var envEnabled = cfg.Read<bool?>(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled);
-        if (envEnabled.HasValue) o.Enabled = envEnabled;
+    var o = new SoraWebSwaggerOptions();
+    // ADR-0040: read explicit keys instead of binding
+    o.Enabled = cfg.Read<bool?>(Constants.Configuration.Enabled);
+    o.RoutePrefix = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RoutePrefix}", o.RoutePrefix)!;
+    o.IncludeXmlComments = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.IncludeXmlComments}", o.IncludeXmlComments);
+    o.RequireAuthOutsideDevelopment = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RequireAuthOutsideDevelopment}", o.RequireAuthOutsideDevelopment);
     // magic flag unified across Sora
     var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
     if (magic == true) o.Enabled = true;
-        return o;
+    return o;
     }
 
     private static IEnumerable<string> GetXmlDocFiles()

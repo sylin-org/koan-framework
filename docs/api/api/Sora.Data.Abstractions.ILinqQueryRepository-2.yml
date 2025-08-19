@@ -1,0 +1,2417 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+  commentId: T:Sora.Data.Abstractions.ILinqQueryRepository`2
+  id: ILinqQueryRepository`2
+  parent: Sora.Data.Abstractions
+  children:
+  - Sora.Data.Abstractions.ILinqQueryRepository`2.CountAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}},System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.ILinqQueryRepository`2.QueryAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}},System.Threading.CancellationToken)
+  langs:
+  - csharp
+  - vb
+  name: ILinqQueryRepository<TEntity, TKey>
+  nameWithType: ILinqQueryRepository<TEntity, TKey>
+  fullName: Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>
+  type: Interface
+  source:
+    remote:
+      path: src/Sora.Data.Abstractions/Repositories.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: ILinqQueryRepository
+    path: ../../src/Sora.Data.Abstractions/Repositories.cs
+    startLine: 52
+  assemblies:
+  - Sora.Data.Abstractions
+  namespace: Sora.Data.Abstractions
+  syntax:
+    content: 'public interface ILinqQueryRepository<TEntity, TKey> : IDataRepository<TEntity, TKey> where TEntity : IEntity<TKey> where TKey : notnull'
+    typeParameters:
+    - id: TEntity
+    - id: TKey
+    content.vb: Public Interface ILinqQueryRepository(Of TEntity As IEntity(Of TKey), TKey) Inherits IDataRepository(Of TEntity, TKey)
+  inheritedMembers:
+  - Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.GetAsync({TKey},System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.QueryAsync(System.Object,System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.CountAsync(System.Object,System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.UpsertAsync({TEntity},System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.DeleteAsync({TKey},System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.UpsertManyAsync(System.Collections.Generic.IEnumerable{{TEntity}},System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.DeleteManyAsync(System.Collections.Generic.IEnumerable{{TKey}},System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.DeleteAllAsync(System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.CreateBatch
+  extensionMethods:
+  - Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.AggregateExtensions.Remove``2(System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.AggregateExtensions.Save``2(System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.AggregateExtensions.UpsertId``2(System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.AggregateExtensions.Upsert``2(System.Threading.CancellationToken)
+  - Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  - System.Object.Sora.Data.Core.AggregateExtensions.Delete(System.Threading.CancellationToken)
+  - System.Object.Sora.Data.Core.AggregateExtensions.Upsert(System.Threading.CancellationToken)
+  - System.Object.Sora.Messaging.MessagingExtensions.Send(System.Threading.CancellationToken)
+  - System.Object.Sora.Messaging.MessagingExtensions.SendTo(System.String,System.Threading.CancellationToken)
+  nameWithType.vb: ILinqQueryRepository(Of TEntity, TKey)
+  fullName.vb: Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey)
+  name.vb: ILinqQueryRepository(Of TEntity, TKey)
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2.QueryAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.ILinqQueryRepository`2.QueryAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}},System.Threading.CancellationToken)
+  id: QueryAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}},System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.ILinqQueryRepository`2
+  langs:
+  - csharp
+  - vb
+  name: QueryAsync(Expression<Func<TEntity, bool>>, CancellationToken)
+  nameWithType: ILinqQueryRepository<TEntity, TKey>.QueryAsync(Expression<Func<TEntity, bool>>, CancellationToken)
+  fullName: Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>.QueryAsync(System.Linq.Expressions.Expression<System.Func<TEntity, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Data.Abstractions/Repositories.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: QueryAsync
+    path: ../../src/Sora.Data.Abstractions/Repositories.cs
+    startLine: 56
+  assemblies:
+  - Sora.Data.Abstractions
+  namespace: Sora.Data.Abstractions
+  syntax:
+    content: Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    parameters:
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{{TEntity}}}
+    content.vb: Function QueryAsync(predicate As Expression(Of Func(Of TEntity, Boolean)), ct As CancellationToken = Nothing) As Task(Of IReadOnlyList(Of TEntity))
+  overload: Sora.Data.Abstractions.ILinqQueryRepository`2.QueryAsync*
+  nameWithType.vb: ILinqQueryRepository(Of TEntity, TKey).QueryAsync(Expression(Of Func(Of TEntity, Boolean)), CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey).QueryAsync(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Boolean)), System.Threading.CancellationToken)
+  name.vb: QueryAsync(Expression(Of Func(Of TEntity, Boolean)), CancellationToken)
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2.CountAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}},System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.ILinqQueryRepository`2.CountAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}},System.Threading.CancellationToken)
+  id: CountAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}},System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.ILinqQueryRepository`2
+  langs:
+  - csharp
+  - vb
+  name: CountAsync(Expression<Func<TEntity, bool>>, CancellationToken)
+  nameWithType: ILinqQueryRepository<TEntity, TKey>.CountAsync(Expression<Func<TEntity, bool>>, CancellationToken)
+  fullName: Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>.CountAsync(System.Linq.Expressions.Expression<System.Func<TEntity, bool>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Data.Abstractions/Repositories.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: CountAsync
+    path: ../../src/Sora.Data.Abstractions/Repositories.cs
+    startLine: 57
+  assemblies:
+  - Sora.Data.Abstractions
+  namespace: Sora.Data.Abstractions
+  syntax:
+    content: Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    parameters:
+    - id: predicate
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Boolean}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Function CountAsync(predicate As Expression(Of Func(Of TEntity, Boolean)), ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: Sora.Data.Abstractions.ILinqQueryRepository`2.CountAsync*
+  nameWithType.vb: ILinqQueryRepository(Of TEntity, TKey).CountAsync(Expression(Of Func(Of TEntity, Boolean)), CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey).CountAsync(System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Boolean)), System.Threading.CancellationToken)
+  name.vb: CountAsync(Expression(Of Func(Of TEntity, Boolean)), CancellationToken)
+references:
+- uid: Sora.Data.Abstractions
+  commentId: N:Sora.Data.Abstractions
+  href: Sora.html
+  name: Sora.Data.Abstractions
+  nameWithType: Sora.Data.Abstractions
+  fullName: Sora.Data.Abstractions
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Abstractions
+    name: Abstractions
+    href: Sora.Data.Abstractions.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Abstractions
+    name: Abstractions
+    href: Sora.Data.Abstractions.html
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.GetAsync({TKey},System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository{`0,`1}.GetAsync(`1,System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  definition: Sora.Data.Abstractions.IDataRepository`2.GetAsync(`1,System.Threading.CancellationToken)
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_GetAsync__1_System_Threading_CancellationToken_
+  name: GetAsync(TKey, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.GetAsync(TKey, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.GetAsync(TKey, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).GetAsync(TKey, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).GetAsync(TKey, System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.GetAsync(`1,System.Threading.CancellationToken)
+    name: GetAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_GetAsync__1_System_Threading_CancellationToken_
+  - name: (
+  - name: TKey
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.GetAsync(`1,System.Threading.CancellationToken)
+    name: GetAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_GetAsync__1_System_Threading_CancellationToken_
+  - name: (
+  - name: TKey
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.QueryAsync(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository{`0,`1}.QueryAsync(System.Object,System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  definition: Sora.Data.Abstractions.IDataRepository`2.QueryAsync(System.Object,System.Threading.CancellationToken)
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_QueryAsync_System_Object_System_Threading_CancellationToken_
+  name: QueryAsync(object, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.QueryAsync(object, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.QueryAsync(object, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).QueryAsync(Object, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).QueryAsync(Object, System.Threading.CancellationToken)
+  name.vb: QueryAsync(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.QueryAsync(System.Object,System.Threading.CancellationToken)
+    name: QueryAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_QueryAsync_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.QueryAsync(System.Object,System.Threading.CancellationToken)
+    name: QueryAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_QueryAsync_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.CountAsync(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository{`0,`1}.CountAsync(System.Object,System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  definition: Sora.Data.Abstractions.IDataRepository`2.CountAsync(System.Object,System.Threading.CancellationToken)
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CountAsync_System_Object_System_Threading_CancellationToken_
+  name: CountAsync(object, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.CountAsync(object, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.CountAsync(object, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).CountAsync(Object, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).CountAsync(Object, System.Threading.CancellationToken)
+  name.vb: CountAsync(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.CountAsync(System.Object,System.Threading.CancellationToken)
+    name: CountAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CountAsync_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.CountAsync(System.Object,System.Threading.CancellationToken)
+    name: CountAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CountAsync_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.UpsertAsync({TEntity},System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository{`0,`1}.UpsertAsync(`0,System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  definition: Sora.Data.Abstractions.IDataRepository`2.UpsertAsync(`0,System.Threading.CancellationToken)
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertAsync__0_System_Threading_CancellationToken_
+  name: UpsertAsync(TEntity, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.UpsertAsync(TEntity, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.UpsertAsync(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).UpsertAsync(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).UpsertAsync(TEntity, System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.UpsertAsync(`0,System.Threading.CancellationToken)
+    name: UpsertAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertAsync__0_System_Threading_CancellationToken_
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.UpsertAsync(`0,System.Threading.CancellationToken)
+    name: UpsertAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertAsync__0_System_Threading_CancellationToken_
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.DeleteAsync({TKey},System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository{`0,`1}.DeleteAsync(`1,System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  definition: Sora.Data.Abstractions.IDataRepository`2.DeleteAsync(`1,System.Threading.CancellationToken)
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAsync__1_System_Threading_CancellationToken_
+  name: DeleteAsync(TKey, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.DeleteAsync(TKey, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.DeleteAsync(TKey, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).DeleteAsync(TKey, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).DeleteAsync(TKey, System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.DeleteAsync(`1,System.Threading.CancellationToken)
+    name: DeleteAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAsync__1_System_Threading_CancellationToken_
+  - name: (
+  - name: TKey
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.DeleteAsync(`1,System.Threading.CancellationToken)
+    name: DeleteAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAsync__1_System_Threading_CancellationToken_
+  - name: (
+  - name: TKey
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.UpsertManyAsync(System.Collections.Generic.IEnumerable{{TEntity}},System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository{`0,`1}.UpsertManyAsync(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  definition: Sora.Data.Abstractions.IDataRepository`2.UpsertManyAsync(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken)
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertManyAsync_System_Collections_Generic_IEnumerable__0__System_Threading_CancellationToken_
+  name: UpsertManyAsync(IEnumerable<TEntity>, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.UpsertManyAsync(IEnumerable<TEntity>, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.UpsertManyAsync(System.Collections.Generic.IEnumerable<TEntity>, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).UpsertManyAsync(IEnumerable(Of TEntity), CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).UpsertManyAsync(System.Collections.Generic.IEnumerable(Of TEntity), System.Threading.CancellationToken)
+  name.vb: UpsertManyAsync(IEnumerable(Of TEntity), CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.UpsertManyAsync(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken)
+    name: UpsertManyAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertManyAsync_System_Collections_Generic_IEnumerable__0__System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.UpsertManyAsync(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken)
+    name: UpsertManyAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertManyAsync_System_Collections_Generic_IEnumerable__0__System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.DeleteManyAsync(System.Collections.Generic.IEnumerable{{TKey}},System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository{`0,`1}.DeleteManyAsync(System.Collections.Generic.IEnumerable{`1},System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  definition: Sora.Data.Abstractions.IDataRepository`2.DeleteManyAsync(System.Collections.Generic.IEnumerable{`1},System.Threading.CancellationToken)
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteManyAsync_System_Collections_Generic_IEnumerable__1__System_Threading_CancellationToken_
+  name: DeleteManyAsync(IEnumerable<TKey>, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.DeleteManyAsync(IEnumerable<TKey>, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.DeleteManyAsync(System.Collections.Generic.IEnumerable<TKey>, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).DeleteManyAsync(IEnumerable(Of TKey), CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).DeleteManyAsync(System.Collections.Generic.IEnumerable(Of TKey), System.Threading.CancellationToken)
+  name.vb: DeleteManyAsync(IEnumerable(Of TKey), CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.DeleteManyAsync(System.Collections.Generic.IEnumerable{`1},System.Threading.CancellationToken)
+    name: DeleteManyAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteManyAsync_System_Collections_Generic_IEnumerable__1__System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.DeleteManyAsync(System.Collections.Generic.IEnumerable{`1},System.Threading.CancellationToken)
+    name: DeleteManyAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteManyAsync_System_Collections_Generic_IEnumerable__1__System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.DeleteAllAsync(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository{`0,`1}.DeleteAllAsync(System.Threading.CancellationToken)
+  parent: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  definition: Sora.Data.Abstractions.IDataRepository`2.DeleteAllAsync(System.Threading.CancellationToken)
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAllAsync_System_Threading_CancellationToken_
+  name: DeleteAllAsync(CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.DeleteAllAsync(CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.DeleteAllAsync(System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).DeleteAllAsync(CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).DeleteAllAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.DeleteAllAsync(System.Threading.CancellationToken)
+    name: DeleteAllAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAllAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.DeleteAllAsync(System.Threading.CancellationToken)
+    name: DeleteAllAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAllAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}.CreateBatch
+  commentId: M:Sora.Data.Abstractions.IDataRepository{`0,`1}.CreateBatch
+  parent: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  definition: Sora.Data.Abstractions.IDataRepository`2.CreateBatch
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CreateBatch
+  name: CreateBatch()
+  nameWithType: IDataRepository<TEntity, TKey>.CreateBatch()
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.CreateBatch()
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).CreateBatch()
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).CreateBatch()
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.CreateBatch
+    name: CreateBatch
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CreateBatch
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository{`0,`1}.CreateBatch
+    name: CreateBatch
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CreateBatch
+  - name: (
+  - name: )
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.AggregateExtensions.Remove``2(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  name: Remove<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, CancellationToken)
+  nameWithType: AggregateExtensions.Remove<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Remove<Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, TKey>(Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Remove(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Remove(Of Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), TKey)(Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), System.Threading.CancellationToken)
+  name.vb: Remove(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Remove``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.Threading.CancellationToken)
+    name: Remove
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Remove``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.Threading.CancellationToken)
+    name: Remove
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.AggregateExtensions.Save``2(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  name: Save<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, CancellationToken)
+  nameWithType: AggregateExtensions.Save<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Save<Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, TKey>(Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Save(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Save(Of Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), TKey)(Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), System.Threading.CancellationToken)
+  name.vb: Save(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Save``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.Threading.CancellationToken)
+    name: Save
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Save``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.Threading.CancellationToken)
+    name: Save
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.AggregateExtensions.UpsertId``2(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  name: UpsertId<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, CancellationToken)
+  nameWithType: AggregateExtensions.UpsertId<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.UpsertId<Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, TKey>(Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.UpsertId(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.UpsertId(Of Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), TKey)(Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), System.Threading.CancellationToken)
+  name.vb: UpsertId(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.Threading.CancellationToken)
+    name: UpsertId
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.Threading.CancellationToken)
+    name: UpsertId
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.AggregateExtensions.Upsert``2(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  name: Upsert<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, CancellationToken)
+  nameWithType: AggregateExtensions.Upsert<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Upsert<Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, TKey>(Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Upsert(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Upsert(Of Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), TKey)(Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), System.Threading.CancellationToken)
+  name.vb: Upsert(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2.Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.EntitySetMoveExtensions
+  definition: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  name: MoveToSet<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, string, string, bool, CancellationToken)
+  nameWithType: EntitySetMoveExtensions.MoveToSet<ILinqQueryRepository<TEntity, TKey>, TKey>(ILinqQueryRepository<TEntity, TKey>, string, string, bool, CancellationToken)
+  fullName: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet<Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, TKey>(Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>, string, string, bool, System.Threading.CancellationToken)
+  nameWithType.vb: EntitySetMoveExtensions.MoveToSet(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), String, String, Boolean, CancellationToken)
+  fullName.vb: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet(Of Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), TKey)(Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey), String, String, Boolean, System.Threading.CancellationToken)
+  name.vb: MoveToSet(Of ILinqQueryRepository(Of TEntity, TKey), TKey)(ILinqQueryRepository(Of TEntity, TKey), String, String, Boolean, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+    name: MoveToSet
+    href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  - name: <
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(Sora.Data.Abstractions.ILinqQueryRepository{`0,`1},System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+    name: MoveToSet
+    href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - uid: Sora.Data.Abstractions.ILinqQueryRepository`2
+    name: ILinqQueryRepository
+    href: Sora.Data.Abstractions.ILinqQueryRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Object.Sora.Data.Core.AggregateExtensions.Delete(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  name: Delete(object, CancellationToken)
+  nameWithType: AggregateExtensions.Delete(object, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Delete(object, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Delete(Object, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Delete(Object, System.Threading.CancellationToken)
+  name.vb: Delete(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+    name: Delete
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+    name: Delete
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Object.Sora.Data.Core.AggregateExtensions.Upsert(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+  parent: Sora.Data.Core.AggregateExtensions
+  definition: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  name: Upsert(object, CancellationToken)
+  nameWithType: AggregateExtensions.Upsert(object, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Upsert(object, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Upsert(Object, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Upsert(Object, System.Threading.CancellationToken)
+  name.vb: Upsert(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Object.Sora.Messaging.MessagingExtensions.Send(System.Threading.CancellationToken)
+  commentId: M:Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+  parent: Sora.Messaging.MessagingExtensions
+  definition: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+  href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  name: Send(object, CancellationToken)
+  nameWithType: MessagingExtensions.Send(object, CancellationToken)
+  fullName: Sora.Messaging.MessagingExtensions.Send(object, System.Threading.CancellationToken)
+  nameWithType.vb: MessagingExtensions.Send(Object, CancellationToken)
+  fullName.vb: Sora.Messaging.MessagingExtensions.Send(Object, System.Threading.CancellationToken)
+  name.vb: Send(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+    name: Send
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+    name: Send
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Object.Sora.Messaging.MessagingExtensions.SendTo(System.String,System.Threading.CancellationToken)
+  commentId: M:Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+  parent: Sora.Messaging.MessagingExtensions
+  definition: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+  href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  name: SendTo(object, string, CancellationToken)
+  nameWithType: MessagingExtensions.SendTo(object, string, CancellationToken)
+  fullName: Sora.Messaging.MessagingExtensions.SendTo(object, string, System.Threading.CancellationToken)
+  nameWithType.vb: MessagingExtensions.SendTo(Object, String, CancellationToken)
+  fullName.vb: Sora.Messaging.MessagingExtensions.SendTo(Object, String, System.Threading.CancellationToken)
+  name.vb: SendTo(Object, String, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+    name: SendTo
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+    name: SendTo
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2.GetAsync(`1,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository`2.GetAsync(`1,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_GetAsync__1_System_Threading_CancellationToken_
+  name: GetAsync(TKey, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.GetAsync(TKey, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.GetAsync(TKey, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).GetAsync(TKey, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).GetAsync(TKey, System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.GetAsync(`1,System.Threading.CancellationToken)
+    name: GetAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_GetAsync__1_System_Threading_CancellationToken_
+  - name: (
+  - name: TKey
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.GetAsync(`1,System.Threading.CancellationToken)
+    name: GetAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_GetAsync__1_System_Threading_CancellationToken_
+  - name: (
+  - name: TKey
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository{{TEntity},{TKey}}
+  commentId: T:Sora.Data.Abstractions.IDataRepository{``0,``1}
+  parent: Sora.Data.Abstractions
+  definition: Sora.Data.Abstractions.IDataRepository`2
+  href: Sora.Data.Abstractions.IDataRepository-2.html
+  name: IDataRepository<TEntity, TKey>
+  nameWithType: IDataRepository<TEntity, TKey>
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>
+  nameWithType.vb: IDataRepository(Of TEntity, TKey)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey)
+  name.vb: IDataRepository(Of TEntity, TKey)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2
+    name: IDataRepository
+    href: Sora.Data.Abstractions.IDataRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2
+    name: IDataRepository
+    href: Sora.Data.Abstractions.IDataRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2.QueryAsync(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository`2.QueryAsync(System.Object,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_QueryAsync_System_Object_System_Threading_CancellationToken_
+  name: QueryAsync(object, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.QueryAsync(object, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.QueryAsync(object, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).QueryAsync(Object, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).QueryAsync(Object, System.Threading.CancellationToken)
+  name.vb: QueryAsync(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.QueryAsync(System.Object,System.Threading.CancellationToken)
+    name: QueryAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_QueryAsync_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.QueryAsync(System.Object,System.Threading.CancellationToken)
+    name: QueryAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_QueryAsync_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2.CountAsync(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository`2.CountAsync(System.Object,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CountAsync_System_Object_System_Threading_CancellationToken_
+  name: CountAsync(object, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.CountAsync(object, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.CountAsync(object, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).CountAsync(Object, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).CountAsync(Object, System.Threading.CancellationToken)
+  name.vb: CountAsync(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.CountAsync(System.Object,System.Threading.CancellationToken)
+    name: CountAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CountAsync_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.CountAsync(System.Object,System.Threading.CancellationToken)
+    name: CountAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CountAsync_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2.UpsertAsync(`0,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository`2.UpsertAsync(`0,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertAsync__0_System_Threading_CancellationToken_
+  name: UpsertAsync(TEntity, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.UpsertAsync(TEntity, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.UpsertAsync(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).UpsertAsync(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).UpsertAsync(TEntity, System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.UpsertAsync(`0,System.Threading.CancellationToken)
+    name: UpsertAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertAsync__0_System_Threading_CancellationToken_
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.UpsertAsync(`0,System.Threading.CancellationToken)
+    name: UpsertAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertAsync__0_System_Threading_CancellationToken_
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2.DeleteAsync(`1,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository`2.DeleteAsync(`1,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAsync__1_System_Threading_CancellationToken_
+  name: DeleteAsync(TKey, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.DeleteAsync(TKey, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.DeleteAsync(TKey, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).DeleteAsync(TKey, CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).DeleteAsync(TKey, System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.DeleteAsync(`1,System.Threading.CancellationToken)
+    name: DeleteAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAsync__1_System_Threading_CancellationToken_
+  - name: (
+  - name: TKey
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.DeleteAsync(`1,System.Threading.CancellationToken)
+    name: DeleteAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAsync__1_System_Threading_CancellationToken_
+  - name: (
+  - name: TKey
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2.UpsertManyAsync(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository`2.UpsertManyAsync(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertManyAsync_System_Collections_Generic_IEnumerable__0__System_Threading_CancellationToken_
+  name: UpsertManyAsync(IEnumerable<TEntity>, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.UpsertManyAsync(IEnumerable<TEntity>, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.UpsertManyAsync(System.Collections.Generic.IEnumerable<TEntity>, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).UpsertManyAsync(IEnumerable(Of TEntity), CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).UpsertManyAsync(System.Collections.Generic.IEnumerable(Of TEntity), System.Threading.CancellationToken)
+  name.vb: UpsertManyAsync(IEnumerable(Of TEntity), CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.UpsertManyAsync(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken)
+    name: UpsertManyAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertManyAsync_System_Collections_Generic_IEnumerable__0__System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.UpsertManyAsync(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken)
+    name: UpsertManyAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_UpsertManyAsync_System_Collections_Generic_IEnumerable__0__System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2.DeleteManyAsync(System.Collections.Generic.IEnumerable{`1},System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository`2.DeleteManyAsync(System.Collections.Generic.IEnumerable{`1},System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteManyAsync_System_Collections_Generic_IEnumerable__1__System_Threading_CancellationToken_
+  name: DeleteManyAsync(IEnumerable<TKey>, CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.DeleteManyAsync(IEnumerable<TKey>, CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.DeleteManyAsync(System.Collections.Generic.IEnumerable<TKey>, System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).DeleteManyAsync(IEnumerable(Of TKey), CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).DeleteManyAsync(System.Collections.Generic.IEnumerable(Of TKey), System.Threading.CancellationToken)
+  name.vb: DeleteManyAsync(IEnumerable(Of TKey), CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.DeleteManyAsync(System.Collections.Generic.IEnumerable{`1},System.Threading.CancellationToken)
+    name: DeleteManyAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteManyAsync_System_Collections_Generic_IEnumerable__1__System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: <
+  - name: TKey
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.DeleteManyAsync(System.Collections.Generic.IEnumerable{`1},System.Threading.CancellationToken)
+    name: DeleteManyAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteManyAsync_System_Collections_Generic_IEnumerable__1__System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Collections.Generic.IEnumerable`1
+    name: IEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2.DeleteAllAsync(System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Abstractions.IDataRepository`2.DeleteAllAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAllAsync_System_Threading_CancellationToken_
+  name: DeleteAllAsync(CancellationToken)
+  nameWithType: IDataRepository<TEntity, TKey>.DeleteAllAsync(CancellationToken)
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.DeleteAllAsync(System.Threading.CancellationToken)
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).DeleteAllAsync(CancellationToken)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).DeleteAllAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.DeleteAllAsync(System.Threading.CancellationToken)
+    name: DeleteAllAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAllAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.DeleteAllAsync(System.Threading.CancellationToken)
+    name: DeleteAllAsync
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_DeleteAllAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2.CreateBatch
+  commentId: M:Sora.Data.Abstractions.IDataRepository`2.CreateBatch
+  href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CreateBatch
+  name: CreateBatch()
+  nameWithType: IDataRepository<TEntity, TKey>.CreateBatch()
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>.CreateBatch()
+  nameWithType.vb: IDataRepository(Of TEntity, TKey).CreateBatch()
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey).CreateBatch()
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.CreateBatch
+    name: CreateBatch
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CreateBatch
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2.CreateBatch
+    name: CreateBatch
+    href: Sora.Data.Abstractions.IDataRepository-2.html#Sora_Data_Abstractions_IDataRepository_2_CreateBatch
+  - name: (
+  - name: )
+- uid: Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  name: Remove<TEntity, TKey>(TEntity, CancellationToken)
+  nameWithType: AggregateExtensions.Remove<TEntity, TKey>(TEntity, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Remove<TEntity, TKey>(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Remove(Of TEntity, TKey)(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Remove(Of TEntity, TKey)(TEntity, System.Threading.CancellationToken)
+  name.vb: Remove(Of TEntity, TKey)(TEntity, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+    name: Remove
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Remove``2(``0,System.Threading.CancellationToken)
+    name: Remove
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Remove__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.AggregateExtensions
+  commentId: T:Sora.Data.Core.AggregateExtensions
+  parent: Sora.Data.Core
+  href: Sora.Data.Core.AggregateExtensions.html
+  name: AggregateExtensions
+  nameWithType: AggregateExtensions
+  fullName: Sora.Data.Core.AggregateExtensions
+- uid: Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  name: Save<TEntity, TKey>(TEntity, CancellationToken)
+  nameWithType: AggregateExtensions.Save<TEntity, TKey>(TEntity, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Save<TEntity, TKey>(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Save(Of TEntity, TKey)(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Save(Of TEntity, TKey)(TEntity, System.Threading.CancellationToken)
+  name.vb: Save(Of TEntity, TKey)(TEntity, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+    name: Save
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Save``2(``0,System.Threading.CancellationToken)
+    name: Save
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Save__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  name: UpsertId<TEntity, TKey>(TEntity, CancellationToken)
+  nameWithType: AggregateExtensions.UpsertId<TEntity, TKey>(TEntity, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.UpsertId<TEntity, TKey>(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.UpsertId(Of TEntity, TKey)(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.UpsertId(Of TEntity, TKey)(TEntity, System.Threading.CancellationToken)
+  name.vb: UpsertId(Of TEntity, TKey)(TEntity, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+    name: UpsertId
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.UpsertId``2(``0,System.Threading.CancellationToken)
+    name: UpsertId
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_UpsertId__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  name: Upsert<TEntity, TKey>(TEntity, CancellationToken)
+  nameWithType: AggregateExtensions.Upsert<TEntity, TKey>(TEntity, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Upsert<TEntity, TKey>(TEntity, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Upsert(Of TEntity, TKey)(TEntity, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Upsert(Of TEntity, TKey)(TEntity, System.Threading.CancellationToken)
+  name.vb: Upsert(Of TEntity, TKey)(TEntity, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert``2(``0,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert__2___0_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  name: MoveToSet<TEntity, TKey>(TEntity, string, string, bool, CancellationToken)
+  nameWithType: EntitySetMoveExtensions.MoveToSet<TEntity, TKey>(TEntity, string, string, bool, CancellationToken)
+  fullName: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet<TEntity, TKey>(TEntity, string, string, bool, System.Threading.CancellationToken)
+  nameWithType.vb: EntitySetMoveExtensions.MoveToSet(Of TEntity, TKey)(TEntity, String, String, Boolean, CancellationToken)
+  fullName.vb: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet(Of TEntity, TKey)(TEntity, String, String, Boolean, System.Threading.CancellationToken)
+  name.vb: MoveToSet(Of TEntity, TKey)(TEntity, String, String, Boolean, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+    name: MoveToSet
+    href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.EntitySetMoveExtensions.MoveToSet``2(``0,System.String,System.String,System.Boolean,System.Threading.CancellationToken)
+    name: MoveToSet
+    href: Sora.Data.Core.EntitySetMoveExtensions.html#Sora_Data_Core_EntitySetMoveExtensions_MoveToSet__2___0_System_String_System_String_System_Boolean_System_Threading_CancellationToken_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+  - name: (
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.EntitySetMoveExtensions
+  commentId: T:Sora.Data.Core.EntitySetMoveExtensions
+  parent: Sora.Data.Core
+  href: Sora.Data.Core.EntitySetMoveExtensions.html
+  name: EntitySetMoveExtensions
+  nameWithType: EntitySetMoveExtensions
+  fullName: Sora.Data.Core.EntitySetMoveExtensions
+- uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  name: Delete(object, CancellationToken)
+  nameWithType: AggregateExtensions.Delete(object, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Delete(object, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Delete(Object, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Delete(Object, System.Threading.CancellationToken)
+  name.vb: Delete(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+    name: Delete
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Delete(System.Object,System.Threading.CancellationToken)
+    name: Delete
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Delete_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  name: Upsert(object, CancellationToken)
+  nameWithType: AggregateExtensions.Upsert(object, CancellationToken)
+  fullName: Sora.Data.Core.AggregateExtensions.Upsert(object, System.Threading.CancellationToken)
+  nameWithType.vb: AggregateExtensions.Upsert(Object, CancellationToken)
+  fullName.vb: Sora.Data.Core.AggregateExtensions.Upsert(Object, System.Threading.CancellationToken)
+  name.vb: Upsert(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Data.Core.AggregateExtensions.Upsert(System.Object,System.Threading.CancellationToken)
+    name: Upsert
+    href: Sora.Data.Core.AggregateExtensions.html#Sora_Data_Core_AggregateExtensions_Upsert_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+  commentId: M:Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  name: Send(object, CancellationToken)
+  nameWithType: MessagingExtensions.Send(object, CancellationToken)
+  fullName: Sora.Messaging.MessagingExtensions.Send(object, System.Threading.CancellationToken)
+  nameWithType.vb: MessagingExtensions.Send(Object, CancellationToken)
+  fullName.vb: Sora.Messaging.MessagingExtensions.Send(Object, System.Threading.CancellationToken)
+  name.vb: Send(Object, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+    name: Send
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Messaging.MessagingExtensions.Send(System.Object,System.Threading.CancellationToken)
+    name: Send
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_Send_System_Object_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Messaging.MessagingExtensions
+  commentId: T:Sora.Messaging.MessagingExtensions
+  parent: Sora.Messaging
+  href: Sora.Messaging.MessagingExtensions.html
+  name: MessagingExtensions
+  nameWithType: MessagingExtensions
+  fullName: Sora.Messaging.MessagingExtensions
+- uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+  commentId: M:Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+  isExternal: true
+  href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  name: SendTo(object, string, CancellationToken)
+  nameWithType: MessagingExtensions.SendTo(object, string, CancellationToken)
+  fullName: Sora.Messaging.MessagingExtensions.SendTo(object, string, System.Threading.CancellationToken)
+  nameWithType.vb: MessagingExtensions.SendTo(Object, String, CancellationToken)
+  fullName.vb: Sora.Messaging.MessagingExtensions.SendTo(Object, String, System.Threading.CancellationToken)
+  name.vb: SendTo(Object, String, CancellationToken)
+  spec.csharp:
+  - uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+    name: SendTo
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: Sora.Messaging.MessagingExtensions.SendTo(System.Object,System.String,System.Threading.CancellationToken)
+    name: SendTo
+    href: Sora.Messaging.MessagingExtensions.html#Sora_Messaging_MessagingExtensions_SendTo_System_Object_System_String_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: Sora.Data.Abstractions.IDataRepository`2
+  commentId: T:Sora.Data.Abstractions.IDataRepository`2
+  href: Sora.Data.Abstractions.IDataRepository-2.html
+  name: IDataRepository<TEntity, TKey>
+  nameWithType: IDataRepository<TEntity, TKey>
+  fullName: Sora.Data.Abstractions.IDataRepository<TEntity, TKey>
+  nameWithType.vb: IDataRepository(Of TEntity, TKey)
+  fullName.vb: Sora.Data.Abstractions.IDataRepository(Of TEntity, TKey)
+  name.vb: IDataRepository(Of TEntity, TKey)
+  spec.csharp:
+  - uid: Sora.Data.Abstractions.IDataRepository`2
+    name: IDataRepository
+    href: Sora.Data.Abstractions.IDataRepository-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: '>'
+  spec.vb:
+  - uid: Sora.Data.Abstractions.IDataRepository`2
+    name: IDataRepository
+    href: Sora.Data.Abstractions.IDataRepository-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TKey
+  - name: )
+- uid: Sora.Data.Core
+  commentId: N:Sora.Data.Core
+  href: Sora.html
+  name: Sora.Data.Core
+  nameWithType: Sora.Data.Core
+  fullName: Sora.Data.Core
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Core
+    name: Core
+    href: Sora.Data.Core.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Core
+    name: Core
+    href: Sora.Data.Core.html
+- uid: Sora.Messaging
+  commentId: N:Sora.Messaging
+  href: Sora.html
+  name: Sora.Messaging
+  nameWithType: Sora.Messaging
+  fullName: Sora.Messaging
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Messaging
+    name: Messaging
+    href: Sora.Messaging.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Messaging
+    name: Messaging
+    href: Sora.Messaging.html
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2.QueryAsync*
+  commentId: Overload:Sora.Data.Abstractions.ILinqQueryRepository`2.QueryAsync
+  href: Sora.Data.Abstractions.ILinqQueryRepository-2.html#Sora_Data_Abstractions_ILinqQueryRepository_2_QueryAsync_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___System_Threading_CancellationToken_
+  name: QueryAsync
+  nameWithType: ILinqQueryRepository<TEntity, TKey>.QueryAsync
+  fullName: Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>.QueryAsync
+  nameWithType.vb: ILinqQueryRepository(Of TEntity, TKey).QueryAsync
+  fullName.vb: Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey).QueryAsync
+- uid: System.Linq.Expressions.Expression{System.Func{{TEntity},System.Boolean}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TEntity, bool>>
+  nameWithType: Expression<Func<TEntity, bool>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TEntity, bool>>
+  nameWithType.vb: Expression(Of Func(Of TEntity, Boolean))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TEntity, Boolean))
+  name.vb: Expression(Of Func(Of TEntity, Boolean))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  - name: )
+- uid: System.Threading.CancellationToken
+  commentId: T:System.Threading.CancellationToken
+  parent: System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  name: CancellationToken
+  nameWithType: CancellationToken
+  fullName: System.Threading.CancellationToken
+- uid: System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{{TEntity}}}
+  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{`0}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<IReadOnlyList<TEntity>>
+  nameWithType: Task<IReadOnlyList<TEntity>>
+  fullName: System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TEntity>>
+  nameWithType.vb: Task(Of IReadOnlyList(Of TEntity))
+  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.IReadOnlyList(Of TEntity))
+  name.vb: Task(Of IReadOnlyList(Of TEntity))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: )
+- uid: System.Linq.Expressions.Expression`1
+  commentId: T:System.Linq.Expressions.Expression`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<TDelegate>
+  nameWithType: Expression<TDelegate>
+  fullName: System.Linq.Expressions.Expression<TDelegate>
+  nameWithType.vb: Expression(Of TDelegate)
+  fullName.vb: System.Linq.Expressions.Expression(Of TDelegate)
+  name.vb: Expression(Of TDelegate)
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - name: TDelegate
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDelegate
+  - name: )
+- uid: System.Linq.Expressions
+  commentId: N:System.Linq.Expressions
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Linq.Expressions
+  nameWithType: System.Linq.Expressions
+  fullName: System.Linq.Expressions
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+- uid: System.Threading
+  commentId: N:System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading
+  nameWithType: System.Threading
+  fullName: System.Threading
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+- uid: System.Threading.Tasks.Task`1
+  commentId: T:System.Threading.Tasks.Task`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<TResult>
+  nameWithType: Task<TResult>
+  fullName: System.Threading.Tasks.Task<TResult>
+  nameWithType.vb: Task(Of TResult)
+  fullName.vb: System.Threading.Tasks.Task(Of TResult)
+  name.vb: Task(Of TResult)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: System.Threading.Tasks
+  commentId: N:System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading.Tasks
+  nameWithType: System.Threading.Tasks
+  fullName: System.Threading.Tasks
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: Sora.Data.Abstractions.ILinqQueryRepository`2.CountAsync*
+  commentId: Overload:Sora.Data.Abstractions.ILinqQueryRepository`2.CountAsync
+  href: Sora.Data.Abstractions.ILinqQueryRepository-2.html#Sora_Data_Abstractions_ILinqQueryRepository_2_CountAsync_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___System_Threading_CancellationToken_
+  name: CountAsync
+  nameWithType: ILinqQueryRepository<TEntity, TKey>.CountAsync
+  fullName: Sora.Data.Abstractions.ILinqQueryRepository<TEntity, TKey>.CountAsync
+  nameWithType.vb: ILinqQueryRepository(Of TEntity, TKey).CountAsync
+  fullName.vb: Sora.Data.Abstractions.ILinqQueryRepository(Of TEntity, TKey).CountAsync
+- uid: System.Threading.Tasks.Task{System.Int32}
+  commentId: T:System.Threading.Tasks.Task{System.Int32}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<int>
+  nameWithType: Task<int>
+  fullName: System.Threading.Tasks.Task<int>
+  nameWithType.vb: Task(Of Integer)
+  fullName.vb: System.Threading.Tasks.Task(Of Integer)
+  name.vb: Task(Of Integer)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )

@@ -65,3 +65,7 @@ Relational adapters benefit from LINQ predicates for ergonomics, but full LINQ p
 - RepoDB (Apache-2.0): hybrid ORM with expression support and robust bulk operations. Pros: practical, battle-tested; SQLite provider exists. Cons: becomes the data layer; overlaps with Sora’s repository model.
 - ServiceStack OrmLite: fast typed ORM with LINQ-ish API. Pros: ergonomic. Cons: repo archived/moved; licensing/commercial concerns; not ideal as a core dependency.
 - SqlKata (MIT): fluent SQL builder (no LINQ). Pros: clean, DB-agnostic, works well with Dapper. Cons: no expression parsing; could be used as the target builder for our minimal translator.
+
+## See also
+
+- Data Adapter Acceptance Criteria: ../support/08-data-adapter-acceptance-criteria.md

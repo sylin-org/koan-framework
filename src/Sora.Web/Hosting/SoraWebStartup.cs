@@ -30,56 +30,7 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                 app.Properties[appliedKey] = true;
                 app.ApplicationServices.UseSora().StartSora();
 
-                // Dev-only: log effective data adapter configuration (masked)
-                try
-                {
-                    var env = app.ApplicationServices.GetService<IHostEnvironment>();
-                    if (env?.IsDevelopment() == true)
-                    {
-                        var cfg = app.ApplicationServices.GetService<IConfiguration>();
-                        var lf = app.ApplicationServices.GetService<ILoggerFactory>();
-                        if (cfg is not null && lf is not null)
-                        {
-                            var log = lf.CreateLogger("Sora.Data.Config");
-                            string Mask(string? s) => Redaction.DeIdentify(s);
-
-                            var csDefault = cfg.GetConnectionString("Default");
-                            if (!string.IsNullOrWhiteSpace(csDefault))
-                                log.LogInformation("[Sora] Dev data config: ConnectionStrings:Default={Conn}", Mask(csDefault));
-
-                            var mongo = cfg.GetSection("Sora:Data:Mongo");
-                            var mongoDb = mongo["Database"]; var mongoCs = mongo["ConnectionString"] ?? csDefault;
-                            if (!string.IsNullOrWhiteSpace(mongoDb) || !string.IsNullOrWhiteSpace(mongoCs))
-                                log.LogInformation("[Sora] Dev data config: mongo Database={Db} Conn={Conn}", mongoDb ?? "(null)", Mask(mongoCs));
-
-                            var sqlite = cfg.GetSection("Sora:Data:Sqlite");
-                            var sqliteCs = sqlite["ConnectionString"] ?? csDefault;
-                            if (!string.IsNullOrWhiteSpace(sqliteCs))
-                                log.LogInformation("[Sora] Dev data config: sqlite Conn={Conn}", Mask(sqliteCs));
-
-                            var json = cfg.GetSection("Sora:Data:Json");
-                            var jsonDir = json["DirectoryPath"];
-                            if (!string.IsNullOrWhiteSpace(jsonDir))
-                                log.LogInformation("[Sora] Dev data config: json DirectoryPath={Dir}", jsonDir);
-
-                            // Enumerate named sources if present
-                            var sources = cfg.GetSection("Sora:Data:Sources");
-                            foreach (var src in sources.GetChildren())
-                            {
-                                var name = src.Key;
-                                foreach (var provider in src.GetChildren())
-                                {
-                                    var providerId = provider.Key;
-                                    var pCs = provider["ConnectionString"];
-                                    var pDb = provider["Database"];
-                                    if (!string.IsNullOrWhiteSpace(pCs) || !string.IsNullOrWhiteSpace(pDb))
-                                        log.LogInformation("[Sora] Dev data source: {Name}:{Provider} Conn={Conn} Db={Db}", name, providerId, Mask(pCs), pDb ?? "(null)");
-                                }
-                            }
-                        }
-                    }
-                }
-                catch { /* best-effort only */ }
+                // Dev-only: reserve space for future diagnostics (SoC: data modules own their config and reporting)
                 if (pipeline.UseExceptionHandler)
                 {
                     app.UseExceptionHandler();

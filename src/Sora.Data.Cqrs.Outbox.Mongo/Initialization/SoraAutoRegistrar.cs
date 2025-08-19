@@ -21,7 +21,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var s = cfg.GetSection("Sora:Cqrs:Profiles");
+    var s = cfg.GetSection(Sora.Data.Cqrs.Infrastructure.Constants.Configuration.Profiles.Section);
         var profiles = s.GetChildren().Select(c => c.Key).ToArray();
         report.AddSetting("Profiles", string.Join(",", profiles));
         var mongo = new MongoOutboxOptions();

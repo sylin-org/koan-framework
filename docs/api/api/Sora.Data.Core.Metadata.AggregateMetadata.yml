@@ -1,0 +1,424 @@
+### YamlMime:ManagedReference
+items:
+- uid: Sora.Data.Core.Metadata.AggregateMetadata
+  commentId: T:Sora.Data.Core.Metadata.AggregateMetadata
+  id: AggregateMetadata
+  parent: Sora.Data.Core.Metadata
+  children:
+  - Sora.Data.Core.Metadata.AggregateMetadata.GetIdSpec(System.Type)
+  - Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue(System.Object)
+  langs:
+  - csharp
+  - vb
+  name: AggregateMetadata
+  nameWithType: AggregateMetadata
+  fullName: Sora.Data.Core.Metadata.AggregateMetadata
+  type: Class
+  source:
+    remote:
+      path: src/Sora.Data.Core/TypeMetadata.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: AggregateMetadata
+    path: ../../src/Sora.Data.Core/TypeMetadata.cs
+    startLine: 8
+  assemblies:
+  - Sora.Data.Core
+  namespace: Sora.Data.Core.Metadata
+  syntax:
+    content: public static class AggregateMetadata
+    content.vb: Public Module AggregateMetadata
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: Sora.Data.Core.Metadata.AggregateMetadata.GetIdSpec(System.Type)
+  commentId: M:Sora.Data.Core.Metadata.AggregateMetadata.GetIdSpec(System.Type)
+  id: GetIdSpec(System.Type)
+  parent: Sora.Data.Core.Metadata.AggregateMetadata
+  langs:
+  - csharp
+  - vb
+  name: GetIdSpec(Type)
+  nameWithType: AggregateMetadata.GetIdSpec(Type)
+  fullName: Sora.Data.Core.Metadata.AggregateMetadata.GetIdSpec(System.Type)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Data.Core/TypeMetadata.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: GetIdSpec
+    path: ../../src/Sora.Data.Core/TypeMetadata.cs
+    startLine: 14
+  assemblies:
+  - Sora.Data.Core
+  namespace: Sora.Data.Core.Metadata
+  syntax:
+    content: public static AggregateMetadata.IdSpec? GetIdSpec(Type aggregateType)
+    parameters:
+    - id: aggregateType
+      type: System.Type
+    return:
+      type: Sora.Data.Core.Metadata.AggregateMetadata.IdSpec
+    content.vb: Public Shared Function GetIdSpec(aggregateType As Type) As AggregateMetadata.IdSpec
+  overload: Sora.Data.Core.Metadata.AggregateMetadata.GetIdSpec*
+- uid: Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue(System.Object)
+  commentId: M:Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue(System.Object)
+  id: GetIdValue(System.Object)
+  parent: Sora.Data.Core.Metadata.AggregateMetadata
+  langs:
+  - csharp
+  - vb
+  name: GetIdValue(object)
+  nameWithType: AggregateMetadata.GetIdValue(object)
+  fullName: Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue(object)
+  type: Method
+  source:
+    remote:
+      path: src/Sora.Data.Core/TypeMetadata.cs
+      branch: dev
+      repo: https://github.com/sylin-labs/sora-framework.git
+    id: GetIdValue
+    path: ../../src/Sora.Data.Core/TypeMetadata.cs
+    startLine: 27
+  assemblies:
+  - Sora.Data.Core
+  namespace: Sora.Data.Core.Metadata
+  syntax:
+    content: public static object? GetIdValue(object aggregate)
+    parameters:
+    - id: aggregate
+      type: System.Object
+    return:
+      type: System.Object
+    content.vb: Public Shared Function GetIdValue(aggregate As Object) As Object
+  overload: Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue*
+  nameWithType.vb: AggregateMetadata.GetIdValue(Object)
+  fullName.vb: Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue(Object)
+  name.vb: GetIdValue(Object)
+references:
+- uid: Sora.Data.Core.Metadata
+  commentId: N:Sora.Data.Core.Metadata
+  href: Sora.html
+  name: Sora.Data.Core.Metadata
+  nameWithType: Sora.Data.Core.Metadata
+  fullName: Sora.Data.Core.Metadata
+  spec.csharp:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Core
+    name: Core
+    href: Sora.Data.Core.html
+  - name: .
+  - uid: Sora.Data.Core.Metadata
+    name: Metadata
+    href: Sora.Data.Core.Metadata.html
+  spec.vb:
+  - uid: Sora
+    name: Sora
+    href: Sora.html
+  - name: .
+  - uid: Sora.Data
+    name: Data
+    href: Sora.Data.html
+  - name: .
+  - uid: Sora.Data.Core
+    name: Core
+    href: Sora.Data.Core.html
+  - name: .
+  - uid: Sora.Data.Core.Metadata
+    name: Metadata
+    href: Sora.Data.Core.Metadata.html
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: Sora.Data.Core.Metadata.AggregateMetadata.GetIdSpec*
+  commentId: Overload:Sora.Data.Core.Metadata.AggregateMetadata.GetIdSpec
+  href: Sora.Data.Core.Metadata.AggregateMetadata.html#Sora_Data_Core_Metadata_AggregateMetadata_GetIdSpec_System_Type_
+  name: GetIdSpec
+  nameWithType: AggregateMetadata.GetIdSpec
+  fullName: Sora.Data.Core.Metadata.AggregateMetadata.GetIdSpec
+- uid: System.Type
+  commentId: T:System.Type
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.type
+  name: Type
+  nameWithType: Type
+  fullName: System.Type
+- uid: Sora.Data.Core.Metadata.AggregateMetadata.IdSpec
+  commentId: T:Sora.Data.Core.Metadata.AggregateMetadata.IdSpec
+  parent: Sora.Data.Core.Metadata
+  href: Sora.Data.Core.Metadata.AggregateMetadata.html
+  name: AggregateMetadata.IdSpec
+  nameWithType: AggregateMetadata.IdSpec
+  fullName: Sora.Data.Core.Metadata.AggregateMetadata.IdSpec
+  spec.csharp:
+  - uid: Sora.Data.Core.Metadata.AggregateMetadata
+    name: AggregateMetadata
+    href: Sora.Data.Core.Metadata.AggregateMetadata.html
+  - name: .
+  - uid: Sora.Data.Core.Metadata.AggregateMetadata.IdSpec
+    name: IdSpec
+    href: Sora.Data.Core.Metadata.AggregateMetadata.IdSpec.html
+  spec.vb:
+  - uid: Sora.Data.Core.Metadata.AggregateMetadata
+    name: AggregateMetadata
+    href: Sora.Data.Core.Metadata.AggregateMetadata.html
+  - name: .
+  - uid: Sora.Data.Core.Metadata.AggregateMetadata.IdSpec
+    name: IdSpec
+    href: Sora.Data.Core.Metadata.AggregateMetadata.IdSpec.html
+- uid: Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue*
+  commentId: Overload:Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue
+  href: Sora.Data.Core.Metadata.AggregateMetadata.html#Sora_Data_Core_Metadata_AggregateMetadata_GetIdValue_System_Object_
+  name: GetIdValue
+  nameWithType: AggregateMetadata.GetIdValue
+  fullName: Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue

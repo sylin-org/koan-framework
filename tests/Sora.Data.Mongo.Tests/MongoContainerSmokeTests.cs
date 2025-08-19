@@ -84,7 +84,9 @@ public class MongoContainerSmokeTests : IAsyncLifetime
         var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MongoOptions>>().Value;
         var client = new MongoClient(opts.ConnectionString);
         var db = client.GetDatabase(opts.Database);
-        var ping = await db.RunCommandAsync((Command<BsonDocument>)new BsonDocument("ping", 1));
+    var ping = await db.RunCommandAsync((Command<BsonDocument>)new BsonDocument("ping", 1));
         ping.Should().NotBeNull();
+
+    await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }
