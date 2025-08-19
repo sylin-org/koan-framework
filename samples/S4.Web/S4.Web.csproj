@@ -16,6 +16,6 @@
     <ProjectReference Include="..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="wwwroot/**" CopyToOutputDirectory="PreserveNewest" />
+  <Content Include="wwwroot/**" CopyToPublishDirectory="Always" />
   </ItemGroup>
 </Project>

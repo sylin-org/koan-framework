@@ -30,4 +30,6 @@ Index of decisions:
 
 - 0041: GraphQL module (Sora.Web.GraphQl): controller-hosted schema from IEntity<>, typed filters/sorts, display field
 
+- 0042: GraphQL naming & discovery policy: storage-based names, IEntity-only, collision handling
+
 Template: see `0000-template.md`.

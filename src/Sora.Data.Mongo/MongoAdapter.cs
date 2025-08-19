@@ -25,13 +25,19 @@ namespace Sora.Data.Mongo;
 public sealed class MongoOptions
 {
     [Required]
-    public string ConnectionString { get; set; } = "mongodb://localhost:27017";
+    public string ConnectionString { get; set; } = string.Empty; // resolved by configurator
     [Required]
     public string Database { get; set; } = "sora";
     public Func<Type,string>? CollectionName { get; set; }
     // Naming policy controls
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
     public string Separator { get; set; } = "."; // used when composing namespace + entity
+}
+
+internal static class MongoConstants
+{
+    public const string DefaultLocalUri = "mongodb://localhost:27017";
+    public const string DefaultComposeUri = "mongodb://mongodb:27017";
 }
 
 public static class MongoRegistration
@@ -58,11 +64,39 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
 {
     public void Configure(MongoOptions options)
     {
+        // Bind provider-specific options first
         config.GetSection("Sora:Data:Mongo").Bind(options);
         config.GetSection("Sora:Data:Sources:Default:mongo").Bind(options);
+
+        // Resolve from ConnectionStrings:Default when present. Override placeholder/empty.
         var cs = config.GetConnectionString("Default");
-        if (!string.IsNullOrWhiteSpace(cs)) options.ConnectionString = cs!;
+        if (!string.IsNullOrWhiteSpace(cs))
+        {
+            if (string.IsNullOrWhiteSpace(options.ConnectionString) || string.Equals(options.ConnectionString.Trim(), MongoConstants.DefaultLocalUri, StringComparison.OrdinalIgnoreCase))
+            {
+                options.ConnectionString = cs!;
+            }
+        }
+        // Final safety default if still unset: prefer docker compose host when containerized
+        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            var inContainer = Sora.Core.SoraEnv.InContainer;
+            options.ConnectionString = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
+        }
+
+        // Normalize: ensure mongodb scheme is present to avoid driver showing "Unspecified/host:port"
+        if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            var v = options.ConnectionString.Trim();
+            if (!v.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) &&
+                !v.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase))
+            {
+                options.ConnectionString = "mongodb://" + v;
+            }
+        }
     }
+
+    // Container detection uses SoraEnv static runtime snapshot per ADR-0039
 }
 
 /// <summary>

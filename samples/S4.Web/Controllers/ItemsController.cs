@@ -26,6 +26,8 @@ public sealed class ItemsController : EntityController<Item>
     }
 }
 
+// GraphQL endpoint is provided by Sora.Web.GraphQl's centralized controller (/graphql).
+
 [DataAdapter("mongo")]
 public sealed class Item : Sora.Domain.Entity<Item>
 {

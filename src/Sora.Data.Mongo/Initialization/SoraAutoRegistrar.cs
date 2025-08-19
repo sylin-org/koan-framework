@@ -29,10 +29,21 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         var o = new MongoOptions();
         cfg.GetSection("Sora:Data:Mongo").Bind(o);
         cfg.GetSection("Sora:Data:Sources:Default:mongo").Bind(o);
-        // Resolve connection string similarly to configurator
+        // Resolve connection string similarly to configurator: fallback to ConnectionStrings:Default if unset
         var cs = o.ConnectionString;
         var csByName = cfg.GetConnectionString("Default");
         if (string.IsNullOrWhiteSpace(cs) && !string.IsNullOrWhiteSpace(csByName)) cs = csByName;
+        if (string.IsNullOrWhiteSpace(cs))
+        {
+            var inContainer = Sora.Core.SoraEnv.InContainer;
+            cs = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
+        }
+        if (!string.IsNullOrWhiteSpace(cs) &&
+            !cs.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) &&
+            !cs.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase))
+        {
+            cs = "mongodb://" + cs.Trim();
+        }
         report.AddSetting("Database", o.Database);
         report.AddSetting("ConnectionString", cs, isSecret: true);
     }

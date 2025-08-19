@@ -6,17 +6,10 @@ using Sora.Web.GraphQl;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSora()
-    .AsWebApi()
-    .AsProxiedApi()
-    .WithRateLimit();
-
-builder.Services.AddSoraObservability();
-builder.Services.AddSoraGraphQl();
+builder.Services.AddSora();
 
 var app = builder.Build();
-app.UseSoraSwagger();
-app.UseSoraGraphQl();
+
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.Run();

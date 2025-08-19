@@ -11,11 +11,48 @@
   <div class="container" x-data="itemsApp()" x-init="init()">
     <h1>Items (GraphQL)</h1>
 
+    <div class="panel" style="margin:.5rem 0; padding:.5rem; border:1px solid #ddd; border-radius:6px; background:#fafafa">
+      <div style="margin-bottom:.25rem">
+        <strong>GraphQL</strong>
+        <span style="margin-left:.5rem">Status: <code x-text="status || '…'"></code></span>
+        <button style="margin-left:.5rem" @click="loadInfo()" :disabled="infoLoading">Refresh</button>
+      </div>
+      <div>
+        <span>Entities:</span>
+        <span x-show="infoLoading" style="margin-left:.5rem">Loading…</span>
+        <span x-show="!infoLoading && entities.length===0" style="margin-left:.5rem;color:#666">(none)</span>
+        <span x-show="!infoLoading && entities.length>0" style="margin-left:.5rem">
+          <template x-for="e in entities" :key="e"><code style="margin-right:.5rem" x-text="e"></code></template>
+        </span>
+      </div>
+      <div x-show="infoError" style="color:#b00020; margin-top:.25rem" x-text="infoError"></div>
+    </div>
+
     <div class="actions">
       <button @click="seed(5)">Seed 5</button>
       <button @click="clearAll()">Clear</button>
       <input x-model="name" placeholder="New item name" />
       <button @click="add()">Add</button>
+    </div>
+
+    <div class="actions" style="margin-top:.5rem">
+      <input x-model="search" placeholder="Search (q)" />
+  <input x-model="filterText" placeholder='Filter (plain text or JSON, e.g., {"name": {"contains": "a"}})' style="flex:1" />
+      <label><input type="checkbox" x-model="ignoreCase" /> ignoreCase</label>
+      <label>size <input type="number" min="1" max="200" x-model.number="size" style="width:5rem" /></label>
+      <button @click="page=1; load()">Search</button>
+    </div>
+
+    <div class="meta" style="margin:.5rem 0" x-show="!loading">
+      <span>Total: <strong x-text="totalCount"></strong></span>
+      <span style="margin-left:1rem">Page <strong x-text="page"></strong> / <strong x-text="totalPages()"></strong></span>
+    </div>
+
+    <div class="pager" style="margin-bottom:.5rem">
+      <button @click="prev()" :disabled="page<=1 || loading">Prev</button>
+      <button @click="next()" :disabled="page>=totalPages() || loading">Next</button>
+      <span x-show="loading" style="margin-left:1rem">Loading…</span>
+      <span x-show="error" style="margin-left:1rem;color:#b00020" x-text="error"></span>
     </div>
 
     <div class="list">
@@ -29,34 +66,69 @@
     function itemsApp() {
       const endpoint = '/graphql';
       async function gql(query, variables) {
-        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) });
+        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Sora-Debug': 'true' }, body: JSON.stringify({ query, variables }) });
         const data = await res.json();
         if (data.errors) throw new Error(data.errors.map(e => e.message).join('; '));
         return data.data;
       }
       return {
         items: [], name: '',
-        async init() { await this.load(); },
+        status: '', entities: [], infoLoading: false, infoError: '',
+        search: '', filterText: '', ignoreCase: false, page: 1, size: 10, totalCount: 0, loading: false, error: '',
+        async init() { await this.loadInfo(); await this.load(); },
+        async loadInfo() {
+          this.infoLoading = true; this.infoError = '';
+          try {
+            const data = await gql(`{ status entities }`);
+            this.status = data.status;
+            this.entities = data.entities || [];
+          } catch (e) {
+            this.infoError = (e && e.message) ? e.message : 'Error';
+          } finally {
+            this.infoLoading = false;
+          }
+        },
+        totalPages() {
+          if (!this.size) return 1;
+          return Math.max(1, Math.ceil(this.totalCount / this.size));
+        },
         async load() {
-          const q = `query($page:Int,$size:Int){ items(page:$page,size:$size){ items{ id name display } totalCount } }`;
-          const data = await gql(q, { page: 1, size: 50 });
-          this.items = data.items.items;
+          this.loading = true; this.error='';
+          try {
+            const q = `query($q:String,$filter:String,$filterObj:Any,$ignoreCase:Boolean,$page:Int,$size:Int){ items(q:$q,filter:$filter,filterObj:$filterObj,ignoreCase:$ignoreCase,page:$page,size:$size){ items{ id name display } totalCount } }`;
+            let fstr = (this.filterText && this.filterText.trim().length > 0) ? this.filterText.trim() : null;
+            let fobj = null;
+            if (fstr && (fstr.startsWith('{') || fstr.startsWith('['))) {
+              try { fobj = JSON.parse(fstr); fstr = null; } catch { /* keep as string */ }
+            }
+            const vars = { q: this.search || null, filter: fstr, filterObj: fobj, ignoreCase: this.ignoreCase, page: this.page, size: this.size };
+            const data = await gql(q, vars);
+            this.items = data.items.items;
+            this.totalCount = data.items.totalCount ?? this.items.length;
+          } catch (e) {
+            this.error = (e && e.message) ? e.message : 'Error';
+          } finally {
+            this.loading = false;
+          }
         },
         async add() {
           if (!this.name) return;
           const m = `mutation($input: ItemInput!){ upsertItem(input:$input){ id name display } }`;
           await gql(m, { input: { name: this.name } });
           this.name = '';
-          await this.load();
+          // reload first page to see new item easily
+          this.page = 1; await this.load();
         },
         async seed(n) {
           await fetch('/api/items/seed/' + n, { method: 'POST' });
-          await this.load();
+          this.page = 1; await this.load();
         },
         async clearAll() {
           await fetch('/api/items/clear', { method: 'DELETE' });
           await this.load();
-        }
+        },
+        async next() { if (this.page < this.totalPages()) { this.page++; await this.load(); } },
+        async prev() { if (this.page > 1) { this.page--; await this.load(); } }
       }
     }
   </script>
