@@ -1,0 +1,10 @@
+- name: Adapters
+  href: index.md
+- name: SQLite logging and governance
+  href: sqlite-logging-and-governance.md
+- name: SQL Server adapter
+  href: sqlserver-adapter.md
+- name: PostgreSQL adapter
+  href: postgres-adapter.md
+- name: Authoring adapters
+  href: adapter-authoring-guide.md
