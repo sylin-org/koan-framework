@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Docker.DotNet;
-using Docker.DotNet.Models;
+using Sora.Testing;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Microsoft.Extensions.Configuration;
@@ -31,7 +30,7 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
     Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
 
     // Probe Docker daemon robustly and derive a stable endpoint string for Testcontainers
-    var dockerEndpoint = await GetDockerEndpointAsync();
+    var probe = await DockerEnvironment.ProbeAsync();
 
         var envCxn = Environment.GetEnvironmentVariable("SORA_POSTGRES__CONNECTION_STRING")
             ?? Environment.GetEnvironmentVariable("ConnectionStrings__Postgres");
@@ -46,7 +45,7 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
             {
                 var password = "postgres";
                 var builder = new TestcontainersBuilder<TestcontainersContainer>()
-                    .WithDockerEndpoint(dockerEndpoint)
+                    .WithDockerEndpoint(probe.Endpoint!)
                     .WithImage("postgres:16-alpine")
                     .WithEnvironment("POSTGRES_PASSWORD", password)
                     .WithEnvironment("POSTGRES_DB", "sora")
@@ -84,71 +83,7 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
     Data = ServiceProvider.GetRequiredService<IDataService>();
     }
 
-    private static async Task<string> GetDockerEndpointAsync()
-    {
-        // Prefer environment override if provided
-        var env = Environment.GetEnvironmentVariable("DOCKER_HOST");
-        if (!string.IsNullOrWhiteSpace(env))
-        {
-            if (await PingDockerAsync(env!)) return env!;
-        }
-
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            var npipe = "npipe://./pipe/docker_engine";
-            if (await PingDockerAsync(npipe)) return npipe;
-            // Some Windows setups expose Docker over TCP
-            var tcp = "http://localhost:2375";
-            if (await PingDockerAsync(tcp)) return tcp;
-        }
-        else
-        {
-            var unix = "unix:///var/run/docker.sock";
-            if (await PingDockerAsync(unix)) return unix;
-            var tcp = "http://localhost:2375";
-            if (await PingDockerAsync(tcp)) return tcp;
-        }
-
-        // Fallback to default and let Testcontainers try; caller will catch exceptions
-        return RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? "npipe://./pipe/docker_engine"
-            : "unix:///var/run/docker.sock";
-    }
-
-    private static async Task<bool> PingDockerAsync(string endpoint)
-    {
-        try
-        {
-            using var client = CreateDockerClient(endpoint);
-            // Simple ping
-            await client.System.PingAsync();
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static DockerClient CreateDockerClient(string endpoint)
-    {
-        DockerClientConfiguration config;
-        if (endpoint.StartsWith("npipe://", StringComparison.OrdinalIgnoreCase))
-        {
-            config = new DockerClientConfiguration(new Uri(endpoint));
-        }
-        else if (endpoint.StartsWith("unix://", StringComparison.OrdinalIgnoreCase))
-        {
-            // Docker.DotNet expects the unix socket path without the scheme in some versions, but configuration accepts the full URI
-            config = new DockerClientConfiguration(new Uri(endpoint));
-        }
-        else
-        {
-            // http(s)://
-            config = new DockerClientConfiguration(new Uri(endpoint));
-        }
-        return config.CreateClient();
-    }
+    // Docker probing moved to Sora.Testing.DockerEnvironment
 
     public async Task DisposeAsync()
     {
