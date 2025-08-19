@@ -69,11 +69,16 @@ If the backing database does not expose native bulk operations:
 - MUST resolve physical names via `StorageNameRegistry` and the provider’s `INamingDefaultsProvider`; do not implement parallel naming logic inside repositories (see decisions 0017, 0018, 0030).
 - Relational adapters SHOULD use the shared relational schema toolkit to generate/apply schema and indexes.
 - MUST honor DataAnnotations where feasible: Required, DefaultValue, MaxLength, and Index. Where the store cannot enforce a constraint, MUST preserve data fidelity and document the limitation.
+- MUST explicitly announce whether the adapter can create or migrate schema, and expose an idempotent ensure-created path when supported. If schema creation/migration is not supported or not permitted in the environment, MUST return a clear NotSupported response.
+- SHOULD favor a least-impedance schema for root aggregates: map primitive root properties to native columns; persist complex roots as JSON (per decision 0004) unless the provider has a first-class feature that better preserves fidelity. Index the identifier and commonly filtered primitive columns. Document any deviations.
+- MUST NOT perform destructive changes (drops or incompatible alters) during ensure-created by default. Destructive migrations MUST require an explicit, documented opt-in (e.g., an `AllowDestructive` option) and SHOULD be confined to dedicated migration instructions.
 
 ## 8) Instruction execution
 
-- If the provider supports executing SQL/commands: SHOULD implement `IInstructionExecutor<TEntity>` to enable ensureCreated/migrations/non-query/scalar/reader operations with parameter binding.
+- If the provider supports executing SQL/commands: SHOULD implement `IInstructionExecutor<TEntity>` to enable ensure-created/migrations/non-query/scalar/reader operations with parameter binding.
+- Adapters that support schema actions MUST implement an idempotent ensure-created instruction (e.g., `data.ensureCreated` or `relational.schema.ensureCreated`). Migrations MAY be supported but MUST be explicit opt-in and documented.
 - MUST parameterize inputs (e.g., via Dapper) to avoid injection vulnerabilities.
+- If an instruction is unsupported or disallowed by configuration/policy, MUST return a clear NotSupported result/exception with actionable guidance.
 
 ## 9) Diagnostics, health, and observability
 
@@ -102,7 +107,7 @@ Adapters MUST include tests that verify the following:
 - Batch: RequireAtomic=true transaction success and failure rollback; RequireAtomic=false best-effort with partial failures and counts.
 - Query: LINQ and/or string queries for common predicates; paging pushdown; `CountAsync` accuracy for totals.
 - Naming: provider registers `INamingDefaultsProvider`; repositories consume `StorageNameRegistry`; set-based routing/suffixing.
-- Instruction: ensureCreated, scalar, nonquery execute with parameter binding.
+- Instruction: ensureCreated is idempotent; scalar and nonquery execute with parameter binding; unsupported instructions return NotSupported with clear diagnostics.
 - Cancellation: mid-batch and mid-query cancellation raises `TaskCanceledException` and aborts work.
 - Health: health contributor passes under normal conditions and fails with clear diagnostics when broken.
 
@@ -118,7 +123,8 @@ Use this checklist in PRs for new or updated adapters. All MUST items are requir
 - [ ] Concurrency tokens implemented (if store supports)
 - [ ] Query pushdown for supported shapes; safe fallback documented; paging
 - [ ] Naming via `StorageNameRegistry`/`INamingDefaultsProvider`
-- [ ] Instruction executor (if applicable) with parameterization
+- [ ] Instruction executor (if applicable) with parameterization; ensureCreated is idempotent; unsupported instructions return NotSupported
+- [ ] Destructive schema changes are opt-in only and documented; default ensure-created is non-destructive
 - [ ] Health contributor registered
 - [ ] Tests cover capabilities, CRUD, bulk, batch, query, naming, instruction, cancellation, health
 - [ ] Docs updated (adapter README/notes if applicable)
