@@ -1,9 +1,15 @@
+---
+id: DATA-0017
+slug: DATA-0017-storage-naming-conventions
+domain: DATA
+status: Accepted
+date: 2025-08-17
+title: Storage naming conventions (adapter defaults and overrides)
+---
+ 
 # 0017: Storage naming conventions (adapter defaults and overrides)
 
-Date: 2025-08-17
-
-## Status
-Accepted
+ 
 
 ## Context
 Providers need consistent, overridable conventions for deriving table/collection names from entity types. Explicit mappings must remain authoritative.

@@ -1,9 +1,13 @@
+---
+id: DATA-0008
+slug: DATA-0008-relational-command-caching
+domain: DATA
+status: Accepted
+date: 2025-08-16
+---
+
 # 0008: Relational command caching (dialect templates + per-entity rendered commands)
-
-Date: 2025-08-16
-
-## Status
-Accepted
+ 
 
 ## Context
 Rendering SQL repeatedly (SELECT lists, WHERE scaffolds, DELETE/UPSERT statements) incurs overhead. We want predictable performance without adopting a heavy ORM. A small, layered cache keeps rendering costs near-zero after warmup and stays simple to reason about.

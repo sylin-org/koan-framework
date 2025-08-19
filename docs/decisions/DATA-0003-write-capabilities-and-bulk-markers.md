@@ -1,9 +1,12 @@
+---
+id: DATA-0003
+slug: DATA-0003-write-capabilities-and-bulk-markers
+domain: DATA
+status: Accepted
+date: 2025-08-16
+---
+
 # 0003: Write capabilities and bulk markers
-
-Date: 2025-08-16
-
-## Status
-Accepted
 
 ## Context
 We want providers to declare support for native bulk operations (upsert/delete) and optionally atomic batches. Controllers and domain helpers should remain simple and defer to the data layer to choose the optimal path based on provider capabilities.

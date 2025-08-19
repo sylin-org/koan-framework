@@ -1,8 +1,12 @@
+---
+id: DATA-0005
+slug: DATA-0005-relational-schema-toolkit
+domain: DATA
+status: Accepted
+date: 2025-08-16
+---
+
 # 0005: Relational schema toolkit (model, dialect, synchronizer)
-
-Date: 2025-08-16
-
-Status: Accepted
 
 ## Context
 - We want relational adapters to share a consistent way to generate and apply schema from entity metadata without polluting the agnostic core.

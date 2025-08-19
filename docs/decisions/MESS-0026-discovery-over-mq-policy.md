@@ -1,6 +1,12 @@
+---
+id: MESS-0026
+slug: MESS-0026-discovery-over-mq-policy
+domain: MESS
+status: Accepted
+title: Optional discovery-over-MQ (ping/announce) policy and gating
+---
+ 
 # 0026 — Optional discovery-over-MQ (ping/announce) policy and gating
-
-Status: Accepted
 
 Context
 - In compose/dev, auto-discovering ancillary services (e.g., Inbox microservice) reduces config and improves DX.

@@ -6,7 +6,7 @@ status: Accepted
 date: 2025-08-19
 title: Standardize Docker environment discovery for integration tests
 ---
- 
+
 # ADR 0048: Standardize Docker environment discovery for integration tests
 
 ## Context

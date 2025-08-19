@@ -1,14 +1,13 @@
 ---
 id: DATA-0049
-slug: DATA-0049-direct-commands-api
+slug: DATA-0049-direct-commands-api-legacy
 domain: DATA
 status: Accepted
 date: 2025-08-19
 title: Direct data commands API (escape hatch)
 ---
- 
-# ADR 0049: Direct data commands API (escape hatch)
 
+# ADR 0049: Direct data commands API (escape hatch)
 
 ## Context
 

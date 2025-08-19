@@ -1,6 +1,11 @@
-# ADR 0007: Transactional batch semantics and optimistic concurrency tokens
+---
+id: DATA-0007
+slug: DATA-0007-transactional-batch-and-concurrency
+domain: DATA
+status: Proposed
+---
 
-Status: Proposed (Aug 2025)
+# ADR 0007: Transactional batch semantics and optimistic concurrency tokens
 
 Context
 - Batches (IBatchSet) currently aggregate Add/Update/Delete operations, but atomicity vs best-effort behavior needs to be explicit and testable.

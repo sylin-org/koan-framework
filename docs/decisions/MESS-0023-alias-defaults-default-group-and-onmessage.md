@@ -1,8 +1,14 @@
+---
+id: MESS-0023
+slug: MESS-0023-alias-defaults-default-group-and-onmessage
+domain: MESS
+status: Accepted
+date: 2025-08-17
+title: Alias defaults, default group, auto-subscribe, and OnMessage sugar
+---
+ 
 # ADR 0023: Alias defaults, default group, auto-subscribe, and OnMessage sugar
-
-Date: 2025-08-17
-
-Status: Accepted
+ 
 
 Context
 - We want minimal configuration for messaging that “just works” while keeping explicit control easy.

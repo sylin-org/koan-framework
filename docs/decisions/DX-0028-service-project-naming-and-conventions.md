@@ -1,8 +1,15 @@
+---
+id: DX-0028
+slug: DX-0028-service-project-naming-and-conventions
+domain: DX
+status: Accepted
+date: 2025-08-17
+title: Service project naming and conventions (Sora.Service.*)
+---
+ 
 # 0028: Service project naming and conventions (Sora.Service.*)
 
-- Status: Accepted
-- Date: 2025-08-17
-- Owners: Sora Core
+Owners: Sora Core
 
 ## Context
 

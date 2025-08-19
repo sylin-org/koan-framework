@@ -1,9 +1,12 @@
+---
+id: ARCH-0039
+slug: ARCH-0039-soraenv-static-runtime
+domain: ARCH
+status: Accepted
+date: 2025-08-18
+---
+
 # ADR-00xy: Static runtime snapshot (SoraEnv) for environment flags
-
-Date: 2025-08-18
-
-## Status
-Accepted
 
 ## Context
 Environment checks (development/production, container, CI, feature flags) were implemented inconsistently across modules, mixing IHostEnvironment, raw env var reads, and ad-hoc config probes. This led to drift and brittle behavior.

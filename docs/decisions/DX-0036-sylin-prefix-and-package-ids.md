@@ -1,7 +1,13 @@
+---
+id: DX-0036
+slug: DX-0036-sylin-prefix-and-package-ids
+domain: DX
+status: Accepted
+date: 2025-08-17
+title: Sylin.* prefix for NuGet package IDs
+---
+ 
 # 0036: Sylin.* prefix for NuGet package IDs
-
-Status: Accepted
-Date: 2025-08-17
 
 Context
 - We own sylin.org and will publish packages under a verified "Sylin" NuGet publisher.

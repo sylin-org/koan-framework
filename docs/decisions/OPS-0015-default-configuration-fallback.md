@@ -1,9 +1,13 @@
+---
+id: OPS-0015
+slug: OPS-0015-default-configuration-fallback
+domain: OPS
+status: Accepted
+date: 2025-08-16
+title: Default IConfiguration fallback in Sora
+---
+ 
 # 0015: Default IConfiguration fallback in Sora
-
-Date: 2025-08-16
-
-## Status
-Accepted
 
 ## Context
 Adapters and modules bind options from `IConfiguration`. In host-based apps (ASP.NET Core), the host builds and registers `IConfiguration`. In console or non-host scenarios, `IConfiguration` might be absent, causing option configurators to fail.

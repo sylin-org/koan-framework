@@ -1,6 +1,12 @@
+---
+id: MESS-0021
+slug: MESS-0021-messaging-capabilities-and-negotiation
+domain: MESS
+status: Accepted
+title: Messaging capabilities and framework negotiation
+---
+ 
 # 0021 — Messaging capabilities and framework negotiation
-
-Status: Accepted
 
 Context
 - Sora.Mq aims for low-friction, semantic APIs (Send/On<T>) over multiple brokers.

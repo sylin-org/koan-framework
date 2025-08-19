@@ -1,7 +1,14 @@
-# 0037: Tiny* template family (TinyApi, TinyApp, TinyDockerApp, TinyWorker)
+---
+id: DX-0037
+slug: DX-0037-tiny-templates-family
+domain: DX
 
-Status: Accepted
-Date: 2025-08-17
+title: Tiny* template family (TinyApi, TinyApp, TinyDockerApp, TinyWorker)
+status: Accepted
+date: 2025-08-17
+---
+ 
+# 0037: Tiny* template family (TinyApi, TinyApp, TinyDockerApp, TinyWorker)
 
 Context
 - We want a frictionless "dotnet new" experience that showcases Sora quickly.

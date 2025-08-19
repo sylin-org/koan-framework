@@ -1,9 +1,14 @@
+---
+id: ARCH-0034
+slug: ARCH-0034-ddd-documentation-and-glossary
+domain: ARCH
+status: Accepted
+date: 2025-08-17
+---
+
 # 0034 — DDD documentation section and plain-language glossaries
 
-Date: 2025-08-17
-
-## Status
-Accepted
+ 
 
 ## Context
 Developers using Sora asked for a practical DDD perspective with a beginner-friendly on-ramp. While existing docs cover core contracts, CQRS, and adapters, they didn’t frame Sora explicitly in DDD terms or define a consistent ubiquitous language. Newcomers also benefit from brief, plain-language definitions near where terms are introduced.

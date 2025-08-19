@@ -1,6 +1,12 @@
+---
+id: MESS-0025
+slug: MESS-0025-inbox-contract-and-client
+domain: MESS
+status: Accepted
+title: Inbox contract, client behavior, and provider discovery
+---
+ 
 # 0025 — Inbox contract, client behavior, and provider discovery
-
-Status: Accepted
 
 Context
 - Sora supports consumer-side idempotency via an Inbox. We need a portable contract so providers (Redis/SQL/Mongo/microservice) remain pluggable.

@@ -1,3 +1,12 @@
+---
+# Fill these fields for new ADRs
+id: PREFIX-XXXX
+slug: PREFIX-XXXX-short-title
+domain: ARCH | DATA | WEB | MESS | OPS | DX
+status: Proposed | Accepted | Superseded
+date: 2025-08-16
+---
+
 # ADR NNNN: Title
 
 Date: 2025-08-16

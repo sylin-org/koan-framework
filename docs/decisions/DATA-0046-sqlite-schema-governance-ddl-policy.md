@@ -1,8 +1,13 @@
+---
+id: DATA-0046
+slug: DATA-0046-sqlite-schema-governance-ddl-policy
+domain: DATA
+status: Proposed
+date: 2025-08-19
+title: SQLite schema governance (DDL policy, matching mode, and magic gating)
+---
+
 # ADR 0046: SQLite schema governance (DDL policy, matching mode, and magic gating)
-
-Date: 2025-08-19
-
-Status: Proposed
 
 ## Context
 

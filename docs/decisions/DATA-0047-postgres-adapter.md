@@ -1,4 +1,7 @@
 ---
+id: DATA-0047
+slug: DATA-0047-postgres-adapter
+domain: DATA
 title: PostgreSQL Adapter
 status: Accepted
 date: 2025-08-19

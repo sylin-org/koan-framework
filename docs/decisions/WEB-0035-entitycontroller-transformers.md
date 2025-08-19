@@ -1,6 +1,9 @@
 ---
+id: WEB-0035
+slug: WEB-0035-entitycontroller-transformers
+domain: WEB
 title: EntityController transformers (content-negotiated output/input)
-status: accepted
+status: Accepted
 date: 2025-08-17
 ---
 

@@ -1,9 +1,13 @@
+---
+id: OPS-0043
+slug: OPS-0043-mongo-container-default-host
+domain: OPS
+status: Accepted
+date: 2025-08-19
+title: Mongo default host when containerized
+---
+ 
 # 0043 – Mongo default host when containerized
-
-Date: 2025-08-19
-
-## Status
-Accepted
 
 ## Context
 The S4 sample uses the MongoDB adapter. In container-based setups (Docker Compose), the Mongo service is commonly reachable at the hostname `mongodb`. When no explicit Mongo connection string is configured, discovery previously defaulted to `mongodb://localhost:27017`, which fails inside containers or cross-container calls.

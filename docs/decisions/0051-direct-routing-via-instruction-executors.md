@@ -1,6 +1,6 @@
 ---
 id: DATA-0051
-slug: DATA-0051-direct-routing-via-instruction-executors
+slug: DATA-0051-direct-routing-via-instruction-executors-legacy
 domain: DATA
 status: Accepted
 date: 2025-08-19

@@ -1,8 +1,14 @@
+---
+id: DATA-0006
+slug: DATA-0006-instruction-execution-api
+domain: DATA
+status: Accepted
+date: 2025-08-16
+---
+
 # 0006: Instruction Execution API (Entity.Execute / Adapter passthrough)
 
-Date: 2025-08-16
-
-Status: Accepted
+ 
 
 ## Context
 

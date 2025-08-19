@@ -1,8 +1,13 @@
+---
+id: WEB-0041
+slug: WEB-0041-graphql-module-and-controller
+domain: WEB
+status: Accepted
+date: 2025-08-19
+title: GraphQL module (Sora.Web.GraphQl) — controller-hosted schema from IEntity<>, typed filters/sorts, display field
+---
+ 
 # ADR 0041: GraphQL module (Sora.Web.GraphQl) — controller-hosted schema from IEntity<>, typed filters/sorts, display field
-
-Date: 2025-08-19
-
-Status: Accepted
 
 ## Context
 

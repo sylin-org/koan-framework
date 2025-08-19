@@ -1,8 +1,13 @@
+---
+id: DATA-0029
+slug: DATA-0029-json-filter-language-and-endpoint
+domain: DATA
+status: Accepted
+---
+
+# 0029: JSON filter language and endpoint
 # ADR 0029: JSON Filter Language and Query Endpoint
-
-Date: 2025-08-17
-
-Status: Accepted
+ 
 
 Context
 - We need a provider-agnostic, user-friendly way to express filters that can be translated to LINQ and pushed down to adapters when supported.

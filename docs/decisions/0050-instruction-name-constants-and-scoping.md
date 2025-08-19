@@ -1,6 +1,6 @@
 ---
 id: DATA-0050
-slug: DATA-0050-instruction-name-constants-and-scoping
+slug: DATA-0050-instruction-name-constants-and-scoping-legacy
 domain: DATA
 status: Accepted
 date: 2025-08-19

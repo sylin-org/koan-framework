@@ -1,9 +1,15 @@
+---
+id: DATA-0016
+slug: DATA-0016-entity-extensions-naming-and-parity
+domain: DATA
+status: Accepted
+date: 2025-08-16
+title: Entity extension naming and parity
+---
+ 
 # 0016: Entity extension naming and parity
 
-Date: 2025-08-16
-
-## Status
-Accepted
+ 
 
 ## Context
 We expose first-level conveniences as extensions over `IEntity<TKey>` and sequences of entities.

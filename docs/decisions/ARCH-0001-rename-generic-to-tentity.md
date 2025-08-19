@@ -1,8 +1,12 @@
+---
+id: ARCH-0001
+slug: ARCH-0001-rename-generic-to-tentity
+domain: ARCH
+status: Accepted
+date: 2025-08-16
+---
+
 # ADR 0001: Rename public generic parameter from TAggregate to TEntity
-
-Date: 2025-08-16
-
-Status: Accepted
 
 Context
 - Public APIs used `TAggregate` historically, but the domain-facing base is `Entity<T>`, and the codebase moved to a domain-centric vocabulary.

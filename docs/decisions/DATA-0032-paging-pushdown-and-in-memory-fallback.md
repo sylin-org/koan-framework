@@ -1,8 +1,12 @@
+---
+id: DATA-0032
+slug: DATA-0032-paging-pushdown-and-in-memory-fallback
+domain: DATA
+status: Accepted
+date: 2025-08-17
+---
+
 # ADR 0032: Paging pushdown and in-memory fallback
-
-Date: 2025-08-17
-
-Status: Accepted
 
 ## Context
 

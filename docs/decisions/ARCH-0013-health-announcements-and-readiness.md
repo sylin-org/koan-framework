@@ -1,6 +1,12 @@
-# 0013 — Health announcements (push) with static one-liners; merged into readiness
+---
+id: ARCH-0013
+slug: ARCH-0013-health-announcements-and-readiness
+domain: ARCH
+status: Accepted
+date: 2025-08-16
+---
 
-Status: Accepted
+# 0013 — Health announcements (push) with static one-liners; merged into readiness
 
 Context
 - We already support pull checks via `IHealthContributor` and aggregate them in `IHealthService` for readiness.

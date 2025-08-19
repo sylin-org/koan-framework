@@ -1,7 +1,13 @@
+---
+id: OPS-0014
+slug: OPS-0014-samples-port-allocation
+domain: OPS
+status: Accepted
+date: 2025-08-17
+title: Samples port allocation scheme
+---
+ 
 # ADR-0014: Samples port allocation scheme
-
-- Status: Accepted
-- Date: 2025-08-17
 
 ## Context
 Common ports like 5000/8080/27017 often collide with local services. We want predictable, low-conflict ports for all Sora samples, across local runs and compose.

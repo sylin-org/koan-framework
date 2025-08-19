@@ -1,7 +1,13 @@
 # 0033 — OpenTelemetry integration (tracing + metrics)
 
-- Status: Accepted
-- Date: 2025-08-17
+---
+id: ARCH-0033
+slug: ARCH-0033-opentelemetry-integration
+domain: ARCH
+status: Accepted
+date: 2025-08-17
+---
+
 
 ## Context
 

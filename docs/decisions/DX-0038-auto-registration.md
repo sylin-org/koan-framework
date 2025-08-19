@@ -1,9 +1,13 @@
+---
+id: DX-0038
+slug: DX-0038-auto-registration
+domain: DX
+status: Accepted
+date: 2025-08-18
+title: Auto-registration and Bootstrap Reporting
+---
+ 
 # ADR-00xx: Auto-registration and Bootstrap Reporting
-
-Date: 2025-08-18
-
-## Status
-Accepted
 
 ## Context
 We want Sora modules to "just work" when referenced, with minimal host boilerplate and clear visibility at startup. We also want a uniform place for modules to describe their effective settings without leaking secrets.

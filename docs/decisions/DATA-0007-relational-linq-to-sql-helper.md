@@ -1,9 +1,13 @@
+---
+id: DATA-0007
+slug: DATA-0007-relational-linq-to-sql-helper
+domain: DATA
+status: Accepted
+---
+
 # 0007: Minimal LINQ-to-SQL helper for relational adapters
 
-Date: 2025-08-16
-
-## Status
-Accepted (MVP implemented)
+ 
 
 ## Context
 Relational adapters benefit from LINQ predicates for ergonomics, but full LINQ providers are heavy to build and maintain. We want a pragmatic middle ground that covers common predicates while preserving safety and simplicity.

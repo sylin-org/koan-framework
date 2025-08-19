@@ -1,8 +1,13 @@
+---
+id: DATA-0044
+slug: DATA-0044-paging-guardrails-and-tracing-must
+domain: DATA
+status: Accepted
+date: 2025-08-19
+---
+
 # 0044 — Paging pushdown and tracing elevated to MUST; paging guardrails
 
-Date: 2025-08-19
-
-Status: Accepted
 
 ## Context
 

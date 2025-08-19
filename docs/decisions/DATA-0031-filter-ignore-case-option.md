@@ -1,8 +1,13 @@
+---
+id: DATA-0031
+slug: DATA-0031-filter-ignore-case-option
+domain: DATA
+status: Accepted
+date: 2025-08-17
+---
+
 # 0031: JSON Filter $options.ignoreCase
-
-Status: Accepted
-
-Date: 2025-08-17
+ 
 
 ## Context
 

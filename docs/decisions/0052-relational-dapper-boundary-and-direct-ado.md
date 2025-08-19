@@ -1,12 +1,12 @@
 ---
 id: DATA-0052
-slug: DATA-0052-relational-dapper-boundary-and-direct-ado
+slug: DATA-0052-relational-dapper-boundary-and-direct-ado-legacy
 domain: DATA
 status: Accepted
 date: 2025-08-19
 title: Constrain Dapper to relational adapters; Direct uses ADO.NET + Newtonsoft
 ---
- 
+
 # ADR 0052: Constrain Dapper to relational adapters; Direct uses ADO.NET + Newtonsoft
 
 ## Context

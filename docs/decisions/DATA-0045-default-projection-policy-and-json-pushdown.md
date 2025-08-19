@@ -1,7 +1,13 @@
+---
+id: DATA-0045
+slug: DATA-0045-default-projection-policy-and-json-pushdown
+domain: DATA
+status: Accepted
+date: 2025-08-19
+---
+
 # 0045: Default projection policy and JSON pushdown
 
-## Status
-Accepted
 
 ## Context
 Adapters should avoid in-memory filtering when server-side pushdown is reasonably possible. For document-like storage on relational engines (e.g., SQLite), we keep full-fidelity JSON while enabling efficient querying and paging.

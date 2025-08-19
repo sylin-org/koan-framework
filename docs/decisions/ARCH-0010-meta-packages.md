@@ -1,7 +1,12 @@
-# 0010: Introduce meta packages (Sora, Sora.App)
+---
+id: ARCH-0010
+slug: ARCH-0010-meta-packages
+domain: ARCH
+status: Accepted
+date: 2025-08-16
+---
 
-Status: Accepted
-Date: 2025-08-16
+# 0010: Introduce meta packages (Sora, Sora.App)
 
 Context
 - We want a one-NuGet out-of-the-box experience without coupling core to any storage implementation.

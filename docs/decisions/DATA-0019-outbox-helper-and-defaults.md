@@ -1,8 +1,14 @@
+---
+id: DATA-0019
+slug: DATA-0019-outbox-helper-and-defaults
+domain: DATA
+status: Accepted
+date: 2025-08-17
+title: Outbox helper conventions and defaults
+---
+ 
 # 0019: Outbox helper conventions and defaults
-
-Date: 2025-08-17
-
-Status: Accepted
+ 
 
 ## Context
 

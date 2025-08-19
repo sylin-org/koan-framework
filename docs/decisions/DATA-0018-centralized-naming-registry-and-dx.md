@@ -1,8 +1,14 @@
+---
+id: DATA-0018
+slug: DATA-0018-centralized-naming-registry-and-dx
+domain: DATA
+status: Accepted
+date: 2025-08-17
+title: Centralized storage naming registry and developer ergonomics
+---
+ 
 # 0018: Centralized storage naming registry and developer ergonomics
-
-Date: 2025-08-17
-
-Status: Accepted
+ 
 
 ## Context
 

@@ -1,6 +1,13 @@
-# 0012 — Web launch templates and rate limiter registration
+---
+id: WEB-0012
+slug: WEB-0012-web-templates-and-rate-limiters
+domain: WEB
+status: Accepted
+date: 2025-08-16
+---
 
-Status: Accepted
+# 0012: Web launch templates and rate limiters
+# 0012 — Web launch templates and rate limiter registration
 
 Context
 - We introduced simple launch templates for ASP.NET Core apps to reduce boilerplate: `AsWebApi()`, `WithExceptionHandler()`, and `WithRateLimit()`.

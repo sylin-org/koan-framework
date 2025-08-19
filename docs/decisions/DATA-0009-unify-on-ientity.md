@@ -1,6 +1,13 @@
+---
+id: DATA-0009
+slug: DATA-0009-unify-on-ientity
+domain: DATA
+status: Accepted
+title: Unify on IEntity<TKey>; remove IAggregateRoot<TKey>
+---
+ 
 # 0009 — Unify on IEntity<TKey>; remove IAggregateRoot<TKey>
-
-Status: Accepted
+ 
 
 ## Context
 - We originally exposed both IEntity<TKey> and IAggregateRoot<TKey> (which extended IEntity<TKey>).

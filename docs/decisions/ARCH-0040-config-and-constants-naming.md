@@ -1,7 +1,12 @@
-# ADR: Naming simplification for configuration helper and per-assembly constants
+---
+id: ARCH-0040
+slug: ARCH-0040-config-and-constants-naming
+domain: ARCH
+status: Accepted
+date: 2025-08-18
+---
 
-- Status: Accepted
-- Date: 2025-08-18
+# ADR: Naming simplification for configuration helper and per-assembly constants
 
 ## Context
 SoraConfig provided resilient configuration access. Call sites were verbose (Sora.Core.Configuration.SoraConfig.Read). Per-assembly constants were named with long prefixes (e.g., WebSwaggerConstants), which made usage noisy and inconsistent.

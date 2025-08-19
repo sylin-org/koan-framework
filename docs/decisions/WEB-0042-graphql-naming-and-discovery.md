@@ -1,8 +1,13 @@
+---
+id: WEB-0042
+slug: WEB-0042-graphql-naming-and-discovery
+domain: WEB
+status: Accepted
+date: 2025-08-19
+title: GraphQL naming & discovery policy — storage-based names, IEntity-only, collision handling
+---
+ 
 # ADR 0042: GraphQL naming & discovery policy — storage-based names, IEntity-only, collision handling
-
-Date: 2025-08-19
-
-Status: Accepted
 
 ## Context
 

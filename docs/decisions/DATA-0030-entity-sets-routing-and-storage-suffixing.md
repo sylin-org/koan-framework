@@ -1,8 +1,13 @@
+---
+id: DATA-0030
+slug: DATA-0030-entity-sets-routing-and-storage-suffixing
+domain: DATA
+status: Accepted
+date: 2025-08-17
+---
+
 # ADR 0030: Entity Sets (Logical Storage Routing)
-
-Date: 2025-08-17
-
-Status: Accepted
+ 
 
 Context
 - We want the same entity type to be stored in different logical "sets" (e.g., root, backup) that route to distinct physical storages/collections/tables.

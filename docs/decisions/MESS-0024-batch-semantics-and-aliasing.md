@@ -1,6 +1,13 @@
+---
+id: MESS-0024
+slug: MESS-0024-batch-semantics-and-aliasing
+domain: MESS
+status: Accepted
+title: Batch semantics, handlers, and aliasing
+---
+ 
 # 0024 — Batch semantics, handlers, and aliasing
-
-Status: Accepted
+ 
 
 Context
 - We want simple, explicit grouped processing for large/paginated payloads.

@@ -1,7 +1,12 @@
-# 0011: Layering for logging and response headers
+---
+id: ARCH-0011
+slug: ARCH-0011-logging-and-headers-layering
+domain: ARCH
+status: Accepted
+date: 2025-08-16
+---
 
-Status: Accepted
-Date: 2025-08-16
+# 0011: Layering for logging and response headers
 
 Context
 - Logging setup lived inside the S1 sample app and varied per application.

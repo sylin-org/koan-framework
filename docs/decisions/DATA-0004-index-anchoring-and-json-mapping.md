@@ -1,8 +1,14 @@
+---
+id: DATA-0004
+slug: DATA-0004-index-anchoring-and-json-mapping
+domain: DATA
+status: Accepted
+date: 2025-08-16
+title: Index anchoring and automatic JSON mapping policy
+---
+ 
 # 0004: Index anchoring and automatic JSON mapping policy
-
-Date: 2025-08-16
-
-Status: Accepted
+ 
 
 ## Context
 

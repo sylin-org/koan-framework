@@ -1,8 +1,14 @@
+---
+id: DATA-0020
+slug: DATA-0020-outbox-provider-discovery-and-priority
+domain: DATA
+status: Accepted
+date: 2025-08-17
+title: Outbox provider discovery and priority selection
+---
+ 
 # 0020: Outbox provider discovery and priority selection
-
-Date: 2025-08-17
-
-Status: Accepted
+ 
 
 ## Context
 

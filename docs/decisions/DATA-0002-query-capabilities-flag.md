@@ -1,8 +1,12 @@
+---
+id: DATA-0002
+slug: DATA-0002-query-capabilities-flag
+domain: DATA
+status: Accepted
+date: 2025-08-16
+---
+
 # ADR 0002: Introduce QueryCapabilities flags and IQueryCapabilities
-
-Date: 2025-08-16
-
-Status: Accepted
 
 Context
 - Providers have different query features (e.g., raw string queries vs LINQ predicates). We need a discoverable way to expose capabilities.
