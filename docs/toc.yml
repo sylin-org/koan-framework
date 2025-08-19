@@ -1,5 +1,7 @@
 - name: Overview
   href: README.md
+- name: Feature Catalog
+  href: feature-catalog.md
 - name: Guides
   items:
     - name: Core
