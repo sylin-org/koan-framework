@@ -31,16 +31,16 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         var o = new SqliteOptions
         {
             ConnectionString = Sora.Core.Configuration.ReadFirst(cfg, "Data Source=./data/app.db",
-                "Sora:Data:Sqlite:ConnectionString",
-                "Sora:Data:Sources:Default:sqlite:ConnectionString",
-                "ConnectionStrings:Sqlite",
-                "ConnectionStrings:Default")
+                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionString,
+                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
+                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault)
         };
         var cs = o.ConnectionString;
-        report.AddSetting("ConnectionString", cs, isSecret: true);
+    report.AddSetting("ConnectionString", cs, isSecret: true);
         report.AddSetting("NamingStyle", o.NamingStyle.ToString());
         report.AddSetting("Separator", o.Separator);
     // Announce schema capability per acceptance criteria
-    report.AddSetting("EnsureCreatedSupported", true.ToString());
+    report.AddSetting(Sora.Data.Sqlite.Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
     }
 }

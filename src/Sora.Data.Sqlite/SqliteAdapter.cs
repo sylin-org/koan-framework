@@ -74,10 +74,10 @@ internal sealed class SqliteOptionsConfigurator(IConfiguration config) : IConfig
         options.ConnectionString = Sora.Core.Configuration.ReadFirst(
             config,
             defaultValue: options.ConnectionString,
-            "Sora:Data:Sqlite:ConnectionString",
-            "Sora:Data:Sources:Default:sqlite:ConnectionString",
-            "ConnectionStrings:Sqlite",
-            "ConnectionStrings:Default");
+            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
+            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
     }
 }
 

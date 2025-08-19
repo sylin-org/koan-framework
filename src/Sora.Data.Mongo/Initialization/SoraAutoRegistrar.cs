@@ -29,17 +29,17 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         var o = new MongoOptions
         {
             ConnectionString = Sora.Core.Configuration.ReadFirst(cfg, MongoConstants.DefaultLocalUri,
-                "Sora:Data:Mongo:ConnectionString",
-                "Sora:Data:Sources:Default:mongo:ConnectionString",
-                "ConnectionStrings:Mongo",
-                "ConnectionStrings:Default"),
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionString,
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
             Database = Sora.Core.Configuration.ReadFirst(cfg, "sora",
-                "Sora:Data:Mongo:Database",
-                "Sora:Data:Sources:Default:mongo:Database")
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.Database,
+                Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltDatabase)
         };
         // Resolve connection string similarly to configurator: fallback to ConnectionStrings:Default if unset
         var cs = o.ConnectionString;
-    var csByName = Sora.Core.Configuration.Read(cfg, "ConnectionStrings:Default", (string?)null);
+    var csByName = Sora.Core.Configuration.Read(cfg, Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, (string?)null);
         if (string.IsNullOrWhiteSpace(cs) && !string.IsNullOrWhiteSpace(csByName)) cs = csByName;
         if (string.IsNullOrWhiteSpace(cs))
         {
@@ -52,9 +52,9 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         {
             cs = "mongodb://" + cs.Trim();
         }
-        report.AddSetting("Database", o.Database);
-        report.AddSetting("ConnectionString", cs, isSecret: true);
+    report.AddSetting("Database", o.Database);
+    report.AddSetting("ConnectionString", cs, isSecret: true);
     // Announce schema capability per acceptance criteria
-    report.AddSetting("EnsureCreatedSupported", true.ToString());
+    report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
     }
 }

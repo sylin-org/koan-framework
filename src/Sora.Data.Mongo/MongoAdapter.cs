@@ -75,18 +75,18 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
         options.ConnectionString = Sora.Core.Configuration.ReadFirst(
             config,
             defaultValue: options.ConnectionString,
-            "Sora:Data:Mongo:ConnectionString",
-            "Sora:Data:Sources:Default:mongo:ConnectionString",
-            "ConnectionStrings:Mongo",
-            "ConnectionStrings:Default");
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
         options.Database = Sora.Core.Configuration.ReadFirst(
             config,
             defaultValue: options.Database,
-            "Sora:Data:Mongo:Database",
-            "Sora:Data:Sources:Default:mongo:Database");
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.Database,
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
         // Resolve from ConnectionStrings:Default when present. Override placeholder/empty.
-        var cs = Sora.Core.Configuration.Read(config, "ConnectionStrings:Default", (string?)null);
+    var cs = Sora.Core.Configuration.Read(config, Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, (string?)null);
         if (!string.IsNullOrWhiteSpace(cs))
         {
             if (string.IsNullOrWhiteSpace(options.ConnectionString) || string.Equals(options.ConnectionString.Trim(), MongoConstants.DefaultLocalUri, StringComparison.OrdinalIgnoreCase))
