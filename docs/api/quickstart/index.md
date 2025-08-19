@@ -142,9 +142,10 @@ curl http://localhost:5000/api/todos/<returned-id>
 
 **That's it.** Health checks, clean routing—and real model data—all working.
 
-Click to try (when the app is running locally):
+If your app is running right now, click to see it working:
 
 - [http://localhost:5000/api/todos](http://localhost:5000/api/todos)
+- [http://localhost:5000/swagger](http://localhost:5000/swagger)
 
 ### What just happened?
 - The generic `EntityController<T>` exposed CRUD endpoints at `api/todos` with zero boilerplate.
