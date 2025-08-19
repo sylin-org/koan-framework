@@ -178,18 +178,12 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
                 }
             }
 
-            var upserts = _adds.Concat(_updates);
-            if (upserts.Any())
-            {
-                ct.ThrowIfCancellationRequested();
-                await _outer._inner.UpsertManyAsync(upserts, ct);
-            }
-            if (_deletes.Any())
-            {
-                ct.ThrowIfCancellationRequested();
-                await _outer._inner.DeleteManyAsync(_deletes, ct);
-            }
-            return new BatchResult(_adds.Count, _updates.Count, _deletes.Count);
+            // Delegate to adapter-native batch to enable provider semantics (e.g., transactions, accurate counts)
+            var native = _outer._inner.CreateBatch();
+            foreach (var e in _adds) native.Add(e);
+            foreach (var e in _updates) native.Update(e);
+            foreach (var id in _deletes) native.Delete(id);
+            return await native.SaveAsync(options, ct);
         }
     }
 }

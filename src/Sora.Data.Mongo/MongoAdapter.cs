@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Sora.Core;
@@ -18,6 +19,10 @@ using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
 
 namespace Sora.Data.Mongo;
+internal static class MongoTelemetry
+{
+    public static readonly System.Diagnostics.ActivitySource Activity = new("Sora.Data.Mongo");
+}
 
 /// <summary>
 /// MongoDB adapter options (connection string, database, and optional collection naming).
@@ -163,11 +168,13 @@ internal sealed class MongoRepository<TEntity, TKey> :
     private readonly Sora.Data.Abstractions.Naming.IStorageNameResolver _nameResolver;
     private readonly IServiceProvider _sp;
     private readonly Sora.Data.Abstractions.Naming.StorageNameResolver.Convention _nameConv;
+    private readonly ILogger? _logger;
 
     public MongoRepository(MongoOptions options, Sora.Data.Abstractions.Naming.IStorageNameResolver nameResolver, IServiceProvider sp)
     {
         _nameResolver = nameResolver;
         _sp = sp;
+    _logger = sp.GetService<ILogger<MongoRepository<TEntity, TKey>>>();
         var client = new MongoClient(options.ConnectionString);
         var db = client.GetDatabase(options.Database);
         _nameConv = new Sora.Data.Abstractions.Naming.StorageNameResolver.Convention(options.NamingStyle, options.Separator ?? ".", Sora.Data.Abstractions.Naming.NameCasing.AsIs);
@@ -212,53 +219,90 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
     public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
     {
+    using var act = MongoTelemetry.Activity.StartActivity("mongo.get");
+    act?.SetTag("entity", typeof(TEntity).FullName);
     var col = GetCollection();
     var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
-    return await col.Find(filter).FirstOrDefaultAsync(ct);
+    var result = await col.Find(filter).FirstOrDefaultAsync(ct);
+    _logger?.LogDebug("Mongo get {Entity} id={Id} found={Found}", typeof(TEntity).Name, id, result is not null);
+    return result;
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
-    => await GetCollection().Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct);
+    {
+        using var act = MongoTelemetry.Activity.StartActivity("mongo.query.all");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        return await GetCollection().Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct);
+    }
 
     public async Task<int> CountAsync(object? query, CancellationToken ct = default)
-    => (int)await GetCollection().CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct);
+    {
+        using var act = MongoTelemetry.Activity.StartActivity("mongo.count");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        var count = await GetCollection().CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct);
+        return (int)count;
+    }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    => await GetCollection().Find(predicate).ToListAsync(ct);
+    {
+        using var act = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        return await GetCollection().Find(predicate).ToListAsync(ct);
+    }
 
     public async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    => (int)await GetCollection().CountDocumentsAsync(predicate, cancellationToken: ct);
+    {
+        using var act = MongoTelemetry.Activity.StartActivity("mongo.count.linq");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        var count = await GetCollection().CountDocumentsAsync(predicate, cancellationToken: ct);
+        return (int)count;
+    }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     {
+    using var act = MongoTelemetry.Activity.StartActivity("mongo.upsert");
+    act?.SetTag("entity", typeof(TEntity).FullName);
     var col = GetCollection();
     var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
     await col.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct);
+    _logger?.LogDebug("Mongo upsert {Entity} id={Id}", typeof(TEntity).Name, model.Id);
         return model;
     }
 
     public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
     {
+    using var act = MongoTelemetry.Activity.StartActivity("mongo.delete");
+    act?.SetTag("entity", typeof(TEntity).FullName);
     var col = GetCollection();
     var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
     var result = await col.DeleteOneAsync(filter, ct);
-        return result.DeletedCount > 0;
+    var deleted = result.DeletedCount > 0;
+    _logger?.LogDebug("Mongo delete {Entity} id={Id} deleted={Deleted}", typeof(TEntity).Name, id, deleted);
+    return deleted;
     }
 
     public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
-    var col = GetCollection();
-    var writes = models.Select(m => new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, m.Id), m) { IsUpsert = true });
-    var res = await col.BulkWriteAsync(writes, cancellationToken: ct);
-        return (int)(res.ModifiedCount + res.Upserts.Count);
+        using var act = MongoTelemetry.Activity.StartActivity("mongo.bulk.upsert");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        var col = GetCollection();
+        var writes = models.Select(m => new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, m.Id), m) { IsUpsert = true });
+        var res = await col.BulkWriteAsync(writes, cancellationToken: ct);
+        var count = (int)(res.ModifiedCount + res.Upserts.Count);
+        _logger?.LogInformation("Mongo bulk upsert {Entity} count={Count}", typeof(TEntity).Name, count);
+        return count;
     }
 
     public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
-    var col = GetCollection();
-    var filter = Builders<TEntity>.Filter.In(x => x.Id, ids);
-    var res = await col.DeleteManyAsync(filter, ct);
-        return (int)res.DeletedCount;
+        using var act = MongoTelemetry.Activity.StartActivity("mongo.bulk.delete");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        var col = GetCollection();
+        var filter = Builders<TEntity>.Filter.In(x => x.Id, ids);
+        var res = await col.DeleteManyAsync(filter, ct);
+        var count = (int)res.DeletedCount;
+        _logger?.LogInformation("Mongo bulk delete {Entity} count={Count}", typeof(TEntity).Name, count);
+        return count;
     }
 
     public async Task<int> DeleteAllAsync(CancellationToken ct = default)
@@ -273,8 +317,33 @@ internal sealed class MongoRepository<TEntity, TKey> :
     // Instruction execution for fast-path operations
     public async Task<TResult> ExecuteAsync<TResult>(Sora.Data.Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
     {
+        using var act = MongoTelemetry.Activity.StartActivity("mongo.instruction");
+        act?.SetTag("entity", typeof(TEntity).FullName);
         switch (instruction.Name)
         {
+            case "data.ensureCreated":
+            {
+                var col = GetCollection();
+                var db = GetDatabase(col);
+                // Ensure collection exists (will no-op if it already exists)
+                var name = _collectionName;
+                try
+                {
+                    var existing = await db.ListCollectionNamesAsync(cancellationToken: ct);
+                    var names = await existing.ToListAsync(ct);
+                    if (!names.Contains(name, StringComparer.Ordinal))
+                    {
+                        await db.CreateCollectionAsync(name, cancellationToken: ct);
+                        _logger?.LogInformation("Mongo ensureCreated created collection {Name}", name);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", name);
+                }
+                object ok = true;
+                return (TResult)ok;
+            }
             case "data.clear":
             {
                 var col = GetCollection();
@@ -284,6 +353,21 @@ internal sealed class MongoRepository<TEntity, TKey> :
             }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Mongo adapter for {typeof(TEntity).Name}.");
+        }
+    }
+
+    private static IMongoDatabase GetDatabase(IMongoCollection<TEntity> collection)
+    {
+        // Prefer direct property when available; fall back to reflection if needed.
+        try
+        {
+            return collection.Database;
+        }
+        catch
+        {
+            var prop = typeof(IMongoCollection<TEntity>).GetProperty("Database");
+            if (prop?.GetValue(collection) is IMongoDatabase db) return db;
+            throw new InvalidOperationException("Unable to obtain Mongo database from collection.");
         }
     }
 
