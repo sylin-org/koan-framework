@@ -1,13 +1,3 @@
-- name: Overview
-  href: index.md
-- name: Assemblies
-  href: assemblies.md
-- name: HTTP API
-  href: web-http-api.md
-- name: Well-known endpoints
-  href: well-known-endpoints.md
-- name: OpenAPI generation
-  href: openapi-generation.md
 - name: Quick Start
   href: quickstart/index.md
   items:
@@ -25,5 +15,15 @@
       href: quickstart/05-production-ready.md
     - name: Module 6 - Capstone Project
       href: quickstart/06-capstone-project.md
+- name: Overview
+  href: index.md
+- name: Assemblies
+  href: assemblies.md
+- name: HTTP API
+  href: web-http-api.md
+- name: Well-known endpoints
+  href: well-known-endpoints.md
+- name: OpenAPI generation
+  href: openapi-generation.md
 - name: Reference
   href: assemblies.md

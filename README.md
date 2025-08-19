@@ -1,103 +1,88 @@
 # Sora Framework
 
-Sora is a modern, modular .NET framework for building applications with clarity and flexibility—heavily inspired by Zen’s best ideas, with simpler contracts and better DX.
+**Stop fighting your framework. Start building.**
 
-- .NET 9 first. Minimal magic, clear composition.
-- Modular data adapters (JSON for dev, SQLite via Dapper), web bootstrap, and pragmatic “escape hatches.”
-- Always-on discovery (with a production warning); explicit config always wins.
+Sora is a modern .NET framework that gets out of your way and lets you focus on what matters—your application logic. No complex configuration, no hidden magic, just clean, predictable code that works the way you expect.
 
-See `docs/` for design/ADRs. Start with `docs/00-index.md` and `docs/08-engineering-guardrails.md`.
+## The Problem We Solve
 
-Layering defaults: logging defaults live in Core, and secure headers in Web (see `docs/decisions/0011-logging-and-headers-layering.md`).
-
-New to Sora? Read the step-by-step `docs/11-getting-started.md`.
-
-## Features
-
-- Data abstractions: `IDataRepository<TEntity, TKey>`, `IBatchSet`, capability flags.
-- Built-in adapters: JSON (dev), SQLite (Dapper) with schema sync and optional string queries.
-- Repo pipeline conveniences: identity assignment for string/Guid keys, batch helpers.
-- Instruction API: execute provider-specific instructions safely (e.g., raw SQL nonquery/scalar).
-- Web module: minimal auto-wiring for controllers/static files and health.
-- Discovery & precedence: modules self-register; production logs a warning; explicit config overrides discovery.
-- Provider priority: `ProviderPriorityAttribute` selects default adapter when more than one is present.
-
-## Requirements
-
-- .NET 9 SDK
-- Optional: Docker/WSL2 for containerized samples
-
-## Quickstart
-
-Build and run the S0 console sample (JSON adapter):
-
-```powershell
-dotnet build
-dotnet run --project .\samples\S0.ConsoleJsonRepo\S0.ConsoleJsonRepo.csproj
-```
-
-Run the S1 web sample (SQLite optional):
-
-```powershell
-dotnet run --project .\samples\S1.Web\S1.Web.csproj
-```
-
-- SQLite adapter self-registers via discovery. To set a connection string explicitly:
+Most frameworks force you to choose: either simple but limited, or powerful but complex. Sora gives you both—start with a three-file API, scale to enterprise patterns when you need them.
 
 ```csharp
-// in Program.cs (S1.Web)
-// builder.Services.AddSqliteAdapter(o => o.ConnectionString = "Data Source=.\\data\\s1.sqlite");
+// This is a complete, working API with persistence
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSora();
+
+var app = builder.Build();
+app.UseSora();
+app.Run();
 ```
 
-## Using data APIs
+## Why Developers Choose Sora
 
-Terse static facade for common string-key entities:
+🚀 **Zero to API in minutes** — Real CRUD endpoints with just `EntityController<T>`  
+🔧 **Escape hatches everywhere** — Drop to raw SQL, custom controllers, or provider-specific features  
+📦 **Modular architecture** — Add JSON, SQLite, MongoDB, or messaging as your needs grow  
+✅ **Production ready** — Health checks, OpenAPI docs, and observability built-in  
+🎯 **Predictable** — Convention over configuration, but configuration always wins  
+
+## Core Philosophy
+
+- **Start simple, grow smart** — Begin with basics, add complexity only when needed
+- **Familiarity first** — Uses patterns you already know (Controllers, DI, EF-style entities)
+- **Developer experience** — Clear error messages, helpful defaults, minimal friction
+- **Flexibility** — Multiple data providers, pluggable components, custom implementations welcome
+
+## Real-World Example
 
 ```csharp
-// Upsert and fetch
-var todo = await new Todo { Title = "buy milk" }.Save();
-var item = await Todo.Get(todo.Id);
+// Define your model
+public class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = string.Empty;
+    public bool IsDone { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
 
-// Batch
-var result = await Todo.Batch()
-	.Add(new Todo { Title = "task 1" })
-	.Update(todo.Id, t => t.Title = "buy more" )
-	.Save();
+// Get a full REST API
+[Route("api/[controller]")]
+public class TodosController : EntityController<Todo> { }
+
+// Use it naturally
+var todo = await new Todo { Title = "Learn Sora" }.Save();
+var todos = await Todo.Where(t => !t.IsDone);
 ```
 
-SQLite optional string queries (safe parameterization via Dapper):
+That's it. You now have:
+- `GET /api/todos` — List all todos
+- `POST /api/todos` — Create new todo  
+- `GET /api/todos/{id}` — Get specific todo
+- `PUT /api/todos/{id}` — Update todo
+- `DELETE /api/todos/{id}` — Delete todo
+- Automatic health checks at `/health`
+- OpenAPI documentation at `/swagger`
 
-```csharp
-var items = await Sora.Data.Core.Data<Todo, string>.Query("Title LIKE '%milk%'"); // WHERE suffix
-// or full SELECT if preferred
-var items2 = await Sora.Data.Core.Data<Todo, string>.Query("SELECT Id, Title FROM Todo WHERE Title LIKE '%milk%'");
-```
+## Getting Started
 
-Instruction escape hatch (SQL): see `docs/10-execute-instructions.md`.
+1. **Quick Start** — [3-minute tutorial](docs/api/quickstart/) from zero to working API
+2. **Documentation** — [Complete guides](docs/api/) for all features
+3. **Examples** — Real applications in the `samples/` directory
 
-More walkthroughs: `docs/11-getting-started.md`.
+## Built For
 
-## Tests
+- **Rapid prototyping** — Get ideas into code fast
+- **Microservices** — Lightweight, focused services  
+- **CRUD APIs** — Perfect for data-driven applications
+- **Enterprise applications** — Scales to complex patterns (CQRS, Event Sourcing)
 
-```powershell
-dotnet test -c Release -v minimal
-```
+## Community & Support
 
-CI runs on push via `.github/workflows/ci.yml`.
+- **GitHub Issues** — Bug reports and feature requests
+- **Discussions** — Questions and community help
+- **Contributing** — See our [guidelines](docs/08-engineering-guardrails.md)
 
-## Contributing
+Built with ❤️ for .NET developers who want to focus on solving problems, not fighting frameworks.
 
-We welcome issues and PRs. Start with `docs/support/03-adapter-checklist.md` and `docs/08-engineering-guardrails.md`.
+---
 
-DCO sign-off: include a Signed-off-by line in each commit. Example:
-
-Signed-off-by: Your Name <your.email@example.com>
-
-See the `DCO` file for the certificate text.
-
-## License
-
-- Code: Apache License 2.0 — see `LICENSE` and `NOTICE`.
-- Documentation: Creative Commons Attribution 4.0 — see `docs/LICENSE-DOCS.md`.
-
-Trademarks: see `TRADEMARKS.md` for simple usage guidelines.
+**License:** Apache 2.0 | **Requirements:** .NET 9 SDK
