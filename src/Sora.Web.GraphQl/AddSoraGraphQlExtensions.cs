@@ -32,6 +32,7 @@ public static class AddSoraGraphQlExtensions
         _registered = true;
 
         services.AddHttpContextAccessor();
+    services.AddSingleton<Execution.IGraphQlExecutor, Execution.GraphQlExecutor>();
 
         var entityTypes = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic)
