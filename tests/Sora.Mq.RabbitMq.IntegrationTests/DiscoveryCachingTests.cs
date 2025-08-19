@@ -10,18 +10,25 @@ using RabbitMQ.Client.Events;
 using Sora.Messaging;
 using System.Text.Json;
 using Xunit;
+using Sora.Testing;
 
 public class DiscoveryCachingTests : IAsyncLifetime
 {
     private TestcontainersContainer? _rabbit;
     private int _hostPort = 5677;
     private bool _available;
+    private string? _dockerEndpoint;
 
     public async Task InitializeAsync()
     {
+        Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
+        var probe = await DockerEnvironment.ProbeAsync();
+        if (!probe.Available) { _available = false; return; }
+        _dockerEndpoint = probe.Endpoint;
         try
         {
             _rabbit = new TestcontainersBuilder<TestcontainersContainer>()
+                .WithDockerEndpoint(_dockerEndpoint)
                 .WithImage("rabbitmq:3.13-management")
                 .WithPortBinding(_hostPort, 5672)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5672))
