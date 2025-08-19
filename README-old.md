@@ -8,7 +8,7 @@ Sora is a modern, modular .NET framework for building applications with clarity 
 
 See `docs/` for design/ADRs. Start with `docs/00-index.md` and `docs/08-engineering-guardrails.md`.
 
-Layering defaults: logging defaults live in Core, and secure headers in Web (see `docs/decisions/0011-logging-and-headers-layering.md`).
+Layering defaults: logging defaults live in Core, and secure headers in Web (see `docs/decisions/ARCH-0011-logging-and-headers-layering.md`).
 
 New to Sora? Read the step-by-step `docs/11-getting-started.md`.
 

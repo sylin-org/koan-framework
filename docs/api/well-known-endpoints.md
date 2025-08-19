@@ -38,4 +38,4 @@ Notes
 - The client sample proxies these routes and shows a small status card.
 
 References
-- docs/decisions/0033-opentelemetry-integration.md
+- docs/decisions/ARCH-0033-opentelemetry-integration.md
