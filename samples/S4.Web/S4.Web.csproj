@@ -5,10 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>preview</LangVersion>
     <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+  <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sora.Core\Sora.Core.csproj" />
     <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.GraphQl\Sora.Web.GraphQl.csproj" />
     <ProjectReference Include="..\..\src\Sora.Web.Swagger\Sora.Web.Swagger.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
