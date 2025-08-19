@@ -58,6 +58,13 @@ try {
   if (-not $OutputDir) { $OutputDir = if ($destFromConfig) { $destFromConfig } else { "_site" } }
   $targetDest = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($configDir, $OutputDir))
   Write-Host "Target  : $targetDest"
+  # Also print repo-relative path for clarity
+  $repoRootPath = $repoRoot.Path
+  $targetRel = $targetDest
+  if ($targetRel.StartsWith($repoRootPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $targetRel = $targetRel.Substring($repoRootPath.Length).TrimStart('\\')
+  }
+  Write-Host "Target (repo-relative): $targetRel"
 
   # Staging directory for clean build output
   $artifactsRoot = Join-Path $repoRoot 'artifacts/docs'
@@ -118,6 +125,14 @@ try {
   New-Item -ItemType Directory -Path $targetDest | Out-Null
   Write-Host "Copying from staging: $stagingDir" -ForegroundColor Cyan
   Copy-Item -Path (Join-Path $stagingDir '*') -Destination $targetDest -Recurse -Force
+
+  # Quick verification to reduce confusion about publish location
+  $indexPath = Join-Path $targetDest 'index.html'
+  if (Test-Path $indexPath) {
+    Write-Host "Published index: $indexPath" -ForegroundColor Green
+  } else {
+    Write-Warning "index.html not found under target. Contents may differ from expectation."
+  }
 
   if ($Serve) {
   Write-Heading "Starting DocFX server"
