@@ -25,7 +25,7 @@ Use this when creating a new provider adapter.
   - Naming: verify provider registers an `INamingDefaultsProvider` and repository uses `StorageNameRegistry` for table/collection names.
   
 - Health
-  - Provide a tiny `IHealthContributor` that performs a lightweight pull check:
+  - Provide a tiny `IHealthContributor` that performs a lightweight pull check. For example:
     - JSON: verify data directory exists and is writable (probe file create/delete).
     - SQLite: open a connection and run a trivial PRAGMA; if file-based, ensure directory exists.
   - Auto-register the contributor in your module initializer (e.g., `*SoraInitializer.Initialize`) so apps get it by default when the adapter is discovered.

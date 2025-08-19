@@ -34,3 +34,4 @@ See also: `docs/decisions` for ADRs tracking key architecture choices (capabilit
 
 Support docs:
 - support/README.md — maintenance, adapters, testing, releases, migration
+ - support/08-data-adapter-acceptance-criteria.md — acceptance criteria for all Data adapters
