@@ -15,13 +15,13 @@ Learning Path: progressive tutorials you can complete in focused sessions.
 
 ## Tutorial Series
 
-- Module 0: Setup & Orientation — Start here (environment + orientation)
-- Module 1: Foundation — Hello Sora API (JSON storage)
-- Module 2: Data & Storage — Upgrade to SQLite with querying
-- Module 3: Web APIs — DTOs, validation, and error handling
-- Module 4: CQRS & Messaging — Commands, queries, events
-- Module 5: Production Patterns — Observability and health
-- Module 6 (optional): Advanced Capstone — Microservices with containers
+- [Module 0: Setup & Orientation](#prerequisites) — Start here (environment + orientation)
+- [Module 1: Hello Sora API](01-hello-sora-api.md) — JSON storage
+- [Module 2: Data & Storage — Upgrade to SQLite with querying](02-sqlite-upgrade.md)
+- [Module 3: Web APIs — DTOs, validation, and error handling](03-proper-apis.md)
+- [Module 4: CQRS & Messaging — Commands, queries, events](04-commands-and-events.md)
+- [Module 5: Production Patterns — Observability and health](05-production-ready.md)
+- [Module 6 (optional): Advanced Capstone — Microservices with containers](06-capstone-project.md)
 
 If you’re short on time, do Modules 0, 1, 3, and 5 for the essentials.
 
@@ -36,7 +36,7 @@ If you’re short on time, do Modules 0, 1, 3, and 5 for the essentials.
 
 ## Ready to start?
 
-Head to Module 1: Hello Sora API to build your first app and see Sora in action.
+Head to [Module 1: Hello Sora API](01-hello-sora-api.md) to build your first app and see Sora in action.
 # Welcome to Sora!
 
 Building backend services shouldn't feel like assembling a puzzle with missing pieces. Sora is designed to feel natural—like having a conversation with your code rather than wrestling with it.
@@ -52,7 +52,7 @@ Controllers work like you expect. Configuration follows .NET conventions. No mag
 **Batteries included, assembly optional**  
 Health checks, OpenAPI docs, flexible data access, and message handling all work out of the box. Use what you need, ignore the rest.
 
-## See it in action (2 minutes)
+## See it in action
 
 Let's experience what Sora feels like rather than just reading about it.
 
@@ -62,7 +62,7 @@ Let's experience what Sora feels like rather than just reading about it.
 
 You'll create a tiny API from scratch below—no cloning required.
 
-## Your first Sora API (5 minutes)
+## Your first Sora API
 
 Now let's build one from scratch and expose a tiny entity so you can see model data flowing end-to-end:
 
@@ -157,8 +157,8 @@ builder.Services.Configure<SqliteOptions>(o =>
     o.ConnectionString = "Data Source=C:\\data\\myapp.db");
 ```
 You can also set it via configuration:
-- appsettings.json: `{"ConnectionStrings":{"Default":"Data Source=C:\\data\\myapp.db"}}`
-- or environment: `ConnectionStrings__Default=Data Source=C:\\data\\myapp.db`
+- appsettings.json: `{"ConnectionStrings":{"sqlite":"Data Source=C:\\data\\myapp.db"}}`
+- or environment: `ConnectionStrings__sqlite=Data Source=C:\\data\\myapp.db`
 
 ## Add Swagger (when you're ready)
 
@@ -170,10 +170,10 @@ dotnet add package Sora.Web.Swagger
 Update `Program.cs`:
 
 ```csharp
-// Swagger services are auto-registered when the package is referenced.
-// UI is enabled automatically in Development; you can also call UseSoraSwagger() explicitly if you want to force it.
 using Sora.Web.Swagger;
 
+// Swagger services are auto-registered when the package is referenced.
+// UI is enabled automatically in Development; you can also call UseSoraSwagger() explicitly if you want to force it in Production.
 app.UseSora();
 app.Run();
 ```
