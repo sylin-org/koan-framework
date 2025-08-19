@@ -9,3 +9,5 @@ This folder collects practical guides to help maintain and evolve Sora as a stan
 - 05-release-process.md — versioning, changelogs, and publishing
 - 06-migration-from-zen.md — moving concepts/code from Zen to Sora safely
  - 08-data-adapter-acceptance-criteria.md — normative, testable requirements for Data adapters
+ 
+Adapters available today: SQLite, SQL Server; Messaging inboxes: HTTP, InMemory; MQ: RabbitMQ; Cache/Inbox: Redis.

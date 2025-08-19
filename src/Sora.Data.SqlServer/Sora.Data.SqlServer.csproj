@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>SQL Server provider for Sora relational data with JSON-projection pushdowns, guardrails, and governance.</Description>
+    <PackageTags>$(CommonPackageTags);data;sqlserver;relational</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
+    <ProjectReference Include="..\Sora.Data.Relational\Sora.Data.Relational.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="Dapper" Version="2.1.35" />
+  </ItemGroup>
+</Project>
