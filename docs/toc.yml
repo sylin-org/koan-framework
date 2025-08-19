@@ -1,0 +1,20 @@
+- name: Overview
+  href: README.md
+- name: Guides
+  items:
+    - name: Core
+      href: guides/core/index.md
+    - name: Data
+      href: guides/data/index.md
+    - name: Web
+      href: guides/web/index.md
+    - name: Messaging
+      href: guides/messaging/index.md
+    - name: Adapters
+      href: guides/adapters/index.md
+- name: Support
+  href: support/index.md
+- name: Decisions
+  href: decisions/index.md
+- name: API Reference
+  href: api/index.md
