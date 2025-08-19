@@ -39,8 +39,6 @@ If you’re short on time, do Modules 0, 1, 3, and 5 for the essentials.
 ---
 
 ## Ready to start?
-
-Head to [Quick Start Part 2](02-quickstart-part-2.md) to add another database and copy data between stores.
 # Welcome to Sora!
 
 Building backend services shouldn't feel like assembling a puzzle with missing pieces. Sora is designed to feel natural—like having a conversation with your code rather than wrestling with it.
@@ -217,3 +215,11 @@ Check out the other samples in this repo—they show real patterns for data, mes
 **Try the how-to guides:** Step-by-step instructions for common tasks
 
 Welcome to building with Sora. We think you'll like it here.
+
+---
+
+## Next: Quick Start Part 2
+
+When you’re ready to add another database and copy data between stores, continue here:
+
+- [Quick Start Part 2](02-quickstart-part-2.md)
