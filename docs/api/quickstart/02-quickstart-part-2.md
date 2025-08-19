@@ -1,8 +1,6 @@
-# Moved — see Quick Start Part 2
+# Quick Start Part 2 — Add another database (Mongo) and copy data between stores
 
-This content has moved to [02-quickstart-part-2.md](02-quickstart-part-2.md).
-
-In this bonus step, you’ll: (1) add MongoDB as another data store, (2) map a model to Mongo with attributes, and (3) copy data from SQLite to Mongo.
+In this part, you’ll: (1) add MongoDB as another data store, (2) map a model to Mongo with attributes, and (3) copy data from SQLite to Mongo.
 
 ## 1) Add the Mongo adapter
 
@@ -47,13 +45,13 @@ Environment variable alternatives:
 
 ## 3) Choose the database per model with attributes
 
-Use attributes to direct a model to Mongo and specify its storage mapping. Models without an explicit adapter keep using your default (SQLite from Module 2).
+Use attributes to direct a model to Mongo and specify its storage mapping. Models without an explicit adapter keep using your default (SQLite from Part 1/Module 2).
 
 ```csharp
 using Sora.Data.Abstractions.Annotations;
 using Sora.Domain;
 
-// Stays on the default adapter (SQLite) from Module 2
+// Stays on the default adapter (SQLite)
 public class Todo : Entity<Todo>
 {
     public string Title { get; set; } = string.Empty;
@@ -116,4 +114,4 @@ Call it once (choose one option):
 - Storage maps cleanly across providers (table/collection) with [Storage].
 - You can move data by querying from one model and upserting into another — with one line for the bulk save.
 
-Next idea: keep SQLite for transactional writes, Mongo for read/reporting, and wire your controllers to the right models for each use case.
+Next: continue with Production APIs in [Module 3](03-proper-apis.md).

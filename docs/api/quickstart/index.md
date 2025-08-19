@@ -25,7 +25,7 @@ Learning Path: progressive tutorials you can complete in focused sessions.
   
 Continuations:
 
-- [Module 2B: Add another database (Mongo) and copy data between stores](02b-mongo-and-migration.md)
+- [Quick Start Part 2: Add another database (Mongo) and copy data between stores](02-quickstart-part-2.md)
 
 If you’re short on time, do Modules 0, 1, 3, and 5 for the essentials.
 
@@ -40,7 +40,7 @@ If you’re short on time, do Modules 0, 1, 3, and 5 for the essentials.
 
 ## Ready to start?
 
-Head to [Module 1: Hello Sora API](01-hello-sora-api.md) to build your first app and see Sora in action.
+Head to [Quick Start Part 2](02-quickstart-part-2.md) to add another database and copy data between stores.
 # Welcome to Sora!
 
 Building backend services shouldn't feel like assembling a puzzle with missing pieces. Sora is designed to feel natural—like having a conversation with your code rather than wrestling with it.
