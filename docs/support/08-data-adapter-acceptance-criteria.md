@@ -60,9 +60,12 @@ If the backing database does not expose native bulk operations:
   - Relational adapters that do not ship a full LINQ provider SHOULD use the framework's lightweight LINQ-to-expression translator in the relational toolkit (see [decision 0007](../decisions/0007-relational-linq-to-sql-helper.md)) to push down common predicates via the provider dialect (e.g., `ILinqSqlDialect`).
 - String queries:
   - If `QueryCapabilities.String` is set: MUST accept provider-appropriate query strings and parameterization; MUST avoid string interpolation vulnerabilities.
-- JSON filter language and controller usage: adapters SHOULD push down filters, ordering, and paging where possible; otherwise, the framework’s safe in-memory fallback applies (see decisions 0029 and 0032).
+- JSON filter language and controller usage: adapters SHOULD push down filters and ordering where possible; paging pushdown is REQUIRED when the database supports it. When pushdown is not possible, the framework’s safe in-memory fallback applies (see decisions 0029 and 0032), but adapters MUST minimize materialized result sets (stream/chunk and enforce upper bounds).
 - Paging:
-  - SHOULD push down `Skip/Take` (or equivalent LIMIT/OFFSET) natively; if not feasible, MUST maintain correctness via in-memory paging with accurate totals using `CountAsync` when available.
+  - MUST push down `Skip/Take` (or equivalent LIMIT/OFFSET) natively when the backing database supports it (e.g., SQL LIMIT/OFFSET/FETCH, Mongo `limit`/`skip`).
+  - If the database lacks native paging, MUST maintain correctness via in-memory paging, keep memory bounded (stream or chunk), and return accurate totals using `CountAsync` when available.
+  - MUST avoid materializing unbounded result sets; adapters SHOULD apply sensible default limits when no explicit paging is supplied and document the policy.
+  - MUST expose and honor `DefaultPageSize` and `MaxPageSize` options; enforce `MaxPageSize` server-side when pushdown is available, and enforce in fallback paths otherwise.
 
 ## 7) Storage naming and schema
 
@@ -83,7 +86,7 @@ If the backing database does not expose native bulk operations:
 ## 9) Diagnostics, health, and observability
 
 - Logging: SHOULD log at Debug/Information for key lifecycle events and at Warning/Error for failures using consistent categories.
-- Tracing/Metrics: SHOULD participate in OpenTelemetry if present (activity scopes around query/batch/command paths). Avoid mandatory external deps.
+- Tracing/Metrics: MUST participate in OpenTelemetry if present (activity scopes around query/batch/command paths), without introducing a hard dependency. Use `ActivitySource` and standard db.* attributes; avoid sensitive data in spans.
 - Health: MUST provide an `IHealthContributor` that performs a lightweight readiness probe (e.g., directory probe for JSON; trivial command/PRAGMA for SQLite) and register it by default in the adapter’s initializer.
 
 ## 10) Options, configuration, and defaults
@@ -91,6 +94,9 @@ If the backing database does not expose native bulk operations:
 - MUST bind options from configuration sections named consistently (`Sora:Data:<Adapter>` or provider-specific sections) using provided helpers.
 - MUST provide sane dev defaults (e.g., SQLite file path; Mongo default host per decision 0043), and respect environment overrides.
 - MUST fail fast with actionable messages when critical configuration is missing.
+ - MUST provide paging guardrails:
+   - `DefaultPageSize` (applied when the caller does not specify paging) and `MaxPageSize` (an upper bound), with clear documentation of their defaults.
+   - A production safety policy to disable or strictly limit in-memory filtering/paging (fallbacks). Respect the platform-level `Sora:AllowMagicInProduction` if applicable; adapters MAY also expose a provider-specific override.
 
 ## 11) Error semantics and safety
 
@@ -106,6 +112,7 @@ Adapters MUST include tests that verify the following:
 - Bulk: upsert/delete many happy path; large set behavior; flags reflect true native vs fallback coverage.
 - Batch: RequireAtomic=true transaction success and failure rollback; RequireAtomic=false best-effort with partial failures and counts.
 - Query: LINQ and/or string queries for common predicates; paging pushdown; `CountAsync` accuracy for totals.
+  - Paging guardrails: enforcing `DefaultPageSize` when omitted; capping to `MaxPageSize`; no unbounded materialization; fallback paths remain bounded.
 - Naming: provider registers `INamingDefaultsProvider`; repositories consume `StorageNameRegistry`; set-based routing/suffixing.
 - Instruction: ensureCreated is idempotent; scalar and nonquery execute with parameter binding; unsupported instructions return NotSupported with clear diagnostics.
 - Cancellation: mid-batch and mid-query cancellation raises `TaskCanceledException` and aborts work.
@@ -121,7 +128,8 @@ Use this checklist in PRs for new or updated adapters. All MUST items are requir
 - [ ] Bulk upsert/delete (native if supported; fallback otherwise) and flags correct
 - [ ] Batch semantics with RequireAtomic honored; cancellation flows
 - [ ] Concurrency tokens implemented (if store supports)
-- [ ] Query pushdown for supported shapes; safe fallback documented; paging
+- [ ] Query pushdown for supported shapes; paging pushdown required when supported; fallback bounded and documented
+- [ ] Paging guardrails: DefaultPageSize/MaxPageSize options wired; production fallback policy present and documented
 - [ ] Naming via `StorageNameRegistry`/`INamingDefaultsProvider`
 - [ ] Instruction executor (if applicable) with parameterization; ensureCreated is idempotent; unsupported instructions return NotSupported
 - [ ] Destructive schema changes are opt-in only and documented; default ensure-created is non-destructive

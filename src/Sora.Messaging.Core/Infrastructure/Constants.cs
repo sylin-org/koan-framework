@@ -4,8 +4,14 @@ public static class Constants
 {
     public static class Configuration
     {
-    public const string Section = "Sora:Messaging";
-    public const string Buses = "Sora:Messaging:Buses";
+        public const string Section = "Sora:Messaging";
+        public const string Buses = "Sora:Messaging:Buses";
+        public static class Keys
+        {
+            public const string DefaultBus = Section + ":DefaultBus";
+            public const string DefaultGroup = Section + ":DefaultGroup";
+            public const string IncludeVersionInAlias = Section + ":IncludeVersionInAlias";
+        }
         public static class Inbox
         {
             public const string Endpoint = "Sora:Messaging:Inbox:Endpoint";

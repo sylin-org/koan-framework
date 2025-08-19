@@ -61,6 +61,7 @@ public class MongoInstructionTests : IClassFixture<MongoAutoFixture>
         var cleared = await data.Execute<Todo, int>(new Instruction("data.clear"));
         cleared.Should().Be(2);
 
-        (await repo.QueryAsync((object?)null)).Should().BeEmpty();
+    (await repo.QueryAsync((object?)null)).Should().BeEmpty();
+    await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }

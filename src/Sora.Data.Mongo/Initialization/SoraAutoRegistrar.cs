@@ -56,5 +56,14 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     report.AddSetting("ConnectionString", cs, isSecret: true);
     // Announce schema capability per acceptance criteria
     report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+    // Announce paging guardrails (decision 0044)
+    var defSize = Sora.Core.Configuration.ReadFirst(cfg, o.DefaultPageSize,
+        Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+        Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+    var maxSize = Sora.Core.Configuration.ReadFirst(cfg, o.MaxPageSize,
+        Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+        Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
+    report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.DefaultPageSize, defSize.ToString());
+    report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.MaxPageSize, maxSize.ToString());
     }
 }

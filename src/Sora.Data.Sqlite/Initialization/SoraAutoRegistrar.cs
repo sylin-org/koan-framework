@@ -34,7 +34,13 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
                 Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionString,
                 Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
                 Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
-                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault)
+                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
+            DefaultPageSize = Sora.Core.Configuration.ReadFirst(cfg, 50,
+                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize),
+            MaxPageSize = Sora.Core.Configuration.ReadFirst(cfg, 200,
+                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+                Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize)
         };
         var cs = o.ConnectionString;
     report.AddSetting("ConnectionString", cs, isSecret: true);
@@ -42,5 +48,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         report.AddSetting("Separator", o.Separator);
     // Announce schema capability per acceptance criteria
     report.AddSetting(Sora.Data.Sqlite.Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+        report.AddSetting(Sora.Data.Sqlite.Infrastructure.Constants.Bootstrap.DefaultPageSize, o.DefaultPageSize.ToString());
+        report.AddSetting(Sora.Data.Sqlite.Infrastructure.Constants.Bootstrap.MaxPageSize, o.MaxPageSize.ToString());
     }
 }

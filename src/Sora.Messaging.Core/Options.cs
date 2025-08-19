@@ -53,7 +53,8 @@ internal sealed class MessageBusSelector : IMessageBusSelector
             .ThenBy(f => f.ProviderName)
             .FirstOrDefault();
         if (selected is null) throw new InvalidOperationException("No messaging providers registered.");
-    var (bus, caps) = selected.Create(_sp, busCode, _cfg.GetSection($"{Constants.Configuration.Buses}:{busCode}"));
+    var sectionPath = $"{Constants.Configuration.Buses}:{busCode}";
+    var (bus, caps) = selected.Create(_sp, busCode, _cfg.GetSection(sectionPath));
     // Diagnostics are registered by providers when creating the bus
         return bus;
     }

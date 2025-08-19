@@ -159,17 +159,41 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             if (!JsonFilterBuilder.TryBuild<TEntity>(filterQs, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = ignoreCase }))
                 return BadRequest(new { error = error ?? "Invalid filter" });
             builtPredicate = predicate!;
-            items = await lrepo.QueryAsync(builtPredicate, ct);
+            if (repo is ILinqQueryRepositoryWithOptions<TEntity, TKey> lrepoOpts)
+            {
+                var dq = new Sora.Data.Abstractions.DataQueryOptions(opts.Page, opts.PageSize);
+                items = await lrepoOpts.QueryAsync(builtPredicate, dq, ct);
+            }
+            else
+            {
+                items = await lrepo.QueryAsync(builtPredicate, ct);
+            }
             try { total = await lrepo.CountAsync(builtPredicate, ct); } catch { total = items.Count; }
         }
         else if (!string.IsNullOrWhiteSpace(opts.Q) && repo is IStringQueryRepository<TEntity, TKey> srepo)
         {
-            items = await srepo.QueryAsync(opts.Q!, ct);
+            if (repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
+            {
+                var dq = new Sora.Data.Abstractions.DataQueryOptions(opts.Page, opts.PageSize);
+                items = await srepoOpts.QueryAsync(opts.Q!, dq, ct);
+            }
+            else
+            {
+                items = await srepo.QueryAsync(opts.Q!, ct);
+            }
             try { total = await srepo.CountAsync(opts.Q!, ct); } catch { total = items.Count; }
         }
         else
         {
-            items = await repo.QueryAsync(null, ct);
+            if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
+            {
+                var dq = new Sora.Data.Abstractions.DataQueryOptions(opts.Page, opts.PageSize);
+                items = await repoOpts.QueryAsync(null, dq, ct);
+            }
+            else
+            {
+                items = await repo.QueryAsync(null, ct);
+            }
             try { total = await repo.CountAsync((object?)null, ct); } catch { total = items.Count; }
         }
 

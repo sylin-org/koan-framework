@@ -21,6 +21,11 @@ using Sora.Data.Relational.Linq;
 
 namespace Sora.Data.Sqlite;
 
+internal static class SqliteTelemetry
+{
+    public static readonly System.Diagnostics.ActivitySource Activity = new("Sora.Data.Sqlite");
+}
+
 internal sealed class SqliteHealthContributor(IOptions<SqliteOptions> options) : IHealthContributor
 {
     public string Name => "data:sqlite";
@@ -50,6 +55,9 @@ public sealed class SqliteOptions
     public string ConnectionString { get; set; } = "Data Source=./data/app.db";
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
     public string Separator { get; set; } = ".";
+    // Paging guardrails (ADR-0044)
+    public int DefaultPageSize { get; set; } = 50;
+    public int MaxPageSize { get; set; } = 200;
 }
 
 public static class SqliteRegistration
@@ -78,6 +86,17 @@ internal sealed class SqliteOptionsConfigurator(IConfiguration config) : IConfig
             Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
             Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+        // Paging guardrails
+        options.DefaultPageSize = Sora.Core.Configuration.ReadFirst(
+            config,
+            defaultValue: options.DefaultPageSize,
+            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+        options.MaxPageSize = Sora.Core.Configuration.ReadFirst(
+            config,
+            defaultValue: options.MaxPageSize,
+            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
     }
 }
 
@@ -100,6 +119,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
+    IDataRepositoryWithOptions<TEntity, TKey>,
+    ILinqQueryRepositoryWithOptions<TEntity, TKey>,
+    IStringQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
     IBulkUpsert<TKey>,
@@ -109,13 +131,15 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete;
+    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch;
 
     private readonly IServiceProvider _sp;
     private readonly SqliteOptions _options;
     private readonly IStorageNameResolver _nameResolver;
     private readonly StorageNameResolver.Convention _conv;
     private readonly ILinqSqlDialect _dialect = new SqliteDialect();
+    private readonly int _defaultPageSize;
+    private readonly int _maxPageSize;
 
     public SqliteRepository(IServiceProvider sp, SqliteOptions options, IStorageNameResolver resolver)
     {
@@ -123,6 +147,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         _options = options;
         _nameResolver = resolver;
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
+        _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
+        _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
     }
 
     // Use central registry so DataSetContext is honored (set-aware names)
@@ -140,7 +166,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private void EnsureTable(SqliteConnection conn)
     {
         using var cmd = conn.CreateCommand();
-        // Real columns for Id, Title, Meta plus Json for full fidelity. Title/Meta are optional.
+    // Base schema: Id + Json for full fidelity. Title/Meta currently present; will be superseded by ProjectionResolver-generated columns.
         cmd.CommandText = $@"CREATE TABLE IF NOT EXISTS [{TableName}] (
     Id TEXT PRIMARY KEY,
     Title TEXT NULL,
@@ -156,6 +182,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             idx.ExecuteNonQuery();
         }
         catch { /* ignore */ }
+
+    // TODO: Integrate ProjectionResolver here:
+    // - Compute projected properties (excluding [NotMapped])
+    // - For each, ALTER TABLE ADD COLUMN IF NOT EXISTS as a generated column from Json
+    // - Create indexes for properties marked with [Index]
     }
 
     private void EnsureTable(IDbConnection db)
@@ -208,6 +239,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
     {
     ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.get");
+        act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
         var row = await conn.QuerySingleOrDefaultAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE Id = @Id", new { Id = id!.ToString()! });
         return row == default ? null : FromRow(row);
@@ -216,14 +249,30 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
     ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all");
+        act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-        var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}]");
+        var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] LIMIT {_defaultPageSize}");
+        return rows.Select(FromRow).ToList();
+    }
+
+    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all+opts");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        var (offset, limit) = ComputeSkipTake(options);
+        using var conn = Open();
+        var sql = $"SELECT Id, Json FROM [{TableName}] LIMIT {limit} OFFSET {offset}";
+        var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
         return rows.Select(FromRow).ToList();
     }
 
     public async Task<int> CountAsync(object? query, CancellationToken ct = default)
     {
     ct.ThrowIfCancellationRequested();
+    using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:all");
+    act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
         return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}]");
     }
@@ -232,16 +281,27 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     {
         // Translate predicate to SQL WHERE via relational LINQ translator
         ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:linq");
+        act?.SetTag("entity", typeof(TEntity).FullName);
         var translator = new LinqWhereTranslator<TEntity>(_dialect);
         try
         {
             var (whereSql, parameters) = translator.Translate(predicate);
             using var conn = Open();
-            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql}";
+            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} LIMIT {_defaultPageSize}";
             var dyn = new DynamicParameters();
             for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
-            return rows.Select(FromRow).ToList();
+            try
+            {
+                var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+                return rows.Select(FromRow).ToList();
+            }
+            catch (SqliteException ex) when ((ex.SqliteErrorCode == 1) && ex.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase))
+            {
+                // Column not present in the minimal schema; gracefully fallback to in-memory filtering
+                var all = await QueryAsync((object?)null, default(CancellationToken));
+                return all.AsQueryable().Where(predicate).ToList();
+            }
         }
         catch (NotSupportedException)
         {
@@ -251,9 +311,44 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:linq+opts");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        var translator = new LinqWhereTranslator<TEntity>(_dialect);
+        try
+        {
+            var (whereSql, parameters) = translator.Translate(predicate);
+            var (offset, limit) = ComputeSkipTake(options);
+            using var conn = Open();
+            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} LIMIT {limit} OFFSET {offset}";
+            var dyn = new DynamicParameters();
+            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
+            try
+            {
+                var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
+                return rows.Select(FromRow).ToList();
+            }
+            catch (SqliteException ex) when ((ex.SqliteErrorCode == 1) && ex.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase))
+            {
+                // Column not present; gracefully fallback to in-memory filtering with options
+                var all = await QueryAsync((object?)null, options, default(CancellationToken));
+                return all.AsQueryable().Where(predicate).ToList();
+            }
+        }
+        catch (NotSupportedException)
+        {
+            var all = await QueryAsync((object?)null, options, ct);
+            return all.AsQueryable().Where(predicate).ToList();
+        }
+    }
+
+    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    {
+    ct.ThrowIfCancellationRequested();
+    using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:linq");
+    act?.SetTag("entity", typeof(TEntity).FullName);
         var translator = new LinqWhereTranslator<TEntity>(_dialect);
         try
         {
@@ -274,8 +369,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string");
+        act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-        if (IsFullSelect(sql))
+    if (IsFullSelect(sql))
         {
             var rewritten = RewriteEntityToken(sql);
             try
@@ -290,9 +387,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 return MapRowsToEntities(rows);
             }
         }
-        else
+    else
         {
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + sql);
+            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + sql + $" LIMIT {_defaultPageSize}");
             return rows.Select(FromRow).ToList();
         }
     }
@@ -300,8 +397,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, object? parameters, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string:param");
+        act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-        if (IsFullSelect(sql))
+    if (IsFullSelect(sql))
         {
             var rewritten = RewriteEntityToken(sql);
             try
@@ -318,7 +417,47 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
         else
         {
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + sql, parameters);
+            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + sql + $" LIMIT {_defaultPageSize}", parameters);
+            return rows.Select(FromRow).ToList();
+        }
+    }
+
+    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, DataQueryOptions? options, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string+opts");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        using var conn = Open();
+        if (IsFullSelect(sql))
+        {
+            var rewritten = RewriteEntityToken(sql);
+            var rows = await conn.QueryAsync(rewritten);
+            return MapRowsToEntities(rows);
+        }
+        else
+        {
+            var (offset, limit) = ComputeSkipTake(options);
+            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + sql + $" LIMIT {limit} OFFSET {offset}");
+            return rows.Select(FromRow).ToList();
+        }
+    }
+
+    public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string:param+opts");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        using var conn = Open();
+        if (IsFullSelect(sql))
+        {
+            var rewritten = RewriteEntityToken(sql);
+            var rows = await conn.QueryAsync(rewritten, parameters);
+            return MapRowsToEntities(rows);
+        }
+        else
+        {
+            var (offset, limit) = ComputeSkipTake(options);
+            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + sql + $" LIMIT {limit} OFFSET {offset}", parameters);
             return rows.Select(FromRow).ToList();
         }
     }
@@ -326,12 +465,20 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<int> CountAsync(string sql, CancellationToken ct = default)
     {
     ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:string");
+        act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
         return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + sql);
     }
 
-    public Task<int> CountAsync(string sql, object? parameters, CancellationToken ct = default)
-        => Task.FromResult(QueryAsync(sql, parameters, ct).Result.Count);
+    public async Task<int> CountAsync(string sql, object? parameters, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:string:param");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        using var conn = Open();
+        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + sql, parameters);
+    }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     {
@@ -443,10 +590,21 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     // IInstructionExecutor implementation for schema and raw SQL helpers
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     {
-    using var conn = new SqliteConnection(_options.ConnectionString);
+    using var act = SqliteTelemetry.Activity.StartActivity("sqlite.instruction");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+        using var conn = new SqliteConnection(_options.ConnectionString);
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
+            case "data.ensureCreated":
+                EnsureTable(conn);
+                object d_ok = true;
+                return (TResult)d_ok;
+            case "data.clear":
+                EnsureTable(conn);
+                var del = await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
+                object d_res = del;
+                return (TResult)d_res;
             case "relational.schema.ensureCreated":
                 EnsureTable(conn);
                 object ok = true;
@@ -508,6 +666,17 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         if (string.IsNullOrWhiteSpace(sql)) return false;
         var s = sql.TrimStart();
         return s.StartsWith("select ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
+    {
+        // Default page index is 1-based
+        var page = options?.Page is int p && p > 0 ? p : 1;
+        var sizeReq = options?.PageSize;
+        var size = sizeReq is int ps && ps > 0 ? ps : _defaultPageSize;
+        if (size > _maxPageSize) size = _maxPageSize;
+        var offset = (page - 1) * size;
+        return (offset, size);
     }
 
     private string RewriteEntityToken(string sql)

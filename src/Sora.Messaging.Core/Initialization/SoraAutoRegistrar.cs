@@ -19,14 +19,16 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var m = new Sora.Messaging.MessagingOptions();
-        cfg.GetSection("Sora:Messaging").Bind(m);
-        report.AddSetting("DefaultBus", m.DefaultBus);
-        report.AddSetting("DefaultGroup", m.DefaultGroup);
-        report.AddSetting("IncludeVersionInAlias", m.IncludeVersionInAlias.ToString());
-        var discEnabled = cfg["Sora:Messaging:Discovery:Enabled"];
-        report.AddSetting("Discovery.Enabled", discEnabled);
-        var inboxEndpoint = cfg["Sora:Messaging:Inbox:Endpoint"];
-        report.AddSetting("Inbox.Endpoint", inboxEndpoint, isSecret: false);
+    // Read settings via Configuration helper (ADR-0040)
+    var defBus = Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Keys.DefaultBus, null);
+    var defGroup = Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Keys.DefaultGroup, null);
+    var includeAliasVer = Configuration.Read(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Keys.IncludeVersionInAlias, false);
+    report.AddSetting("DefaultBus", defBus);
+    report.AddSetting("DefaultGroup", defGroup);
+    report.AddSetting("IncludeVersionInAlias", includeAliasVer.ToString());
+    var discEnabled = Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery.Enabled, null);
+    report.AddSetting("Discovery.Enabled", discEnabled);
+    var inboxEndpoint = Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
+    report.AddSetting("Inbox.Endpoint", inboxEndpoint, isSecret: false);
     }
 }

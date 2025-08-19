@@ -54,6 +54,7 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
         {
             await batch.SaveAsync(new BatchOptions(RequireAtomic: true));
         });
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 
     [Fact]
@@ -73,6 +74,7 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
         var remaining = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == a.Id);
         remaining.Should().ContainSingle();
         (await repo.GetAsync(b.Id)).Should().BeNull();
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 
     [Fact]
@@ -93,5 +95,6 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
         {
             await batch.SaveAsync(null, cts.Token);
         });
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }

@@ -40,7 +40,7 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
     public async Task Capabilities_flags_are_set_correctly()
     {
         if (!_fx.IsAvailable) return; // skip
-        var sp = BuildServices();
+    var sp = BuildServices();
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
         var caps = (IQueryCapabilities)repo;
@@ -49,18 +49,20 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
         writes.Writes.Should().HaveFlag(WriteCapabilities.BulkUpsert);
         writes.Writes.Should().HaveFlag(WriteCapabilities.BulkDelete);
         writes.Writes.Should().NotHaveFlag(WriteCapabilities.AtomicBatch);
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 
     [Fact]
     public async Task Health_contributor_reports_healthy_when_reachable()
     {
         if (!_fx.IsAvailable) return; // skip
-        var sp = BuildServices();
+    var sp = BuildServices();
         var hc = sp.GetRequiredService<IEnumerable<IHealthContributor>>();
         hc.Should().ContainSingle(h => h.Name == "data:mongo");
         var mongo = hc.Single(h => h.Name == "data:mongo");
         var report = await mongo.CheckAsync();
         report.State.Should().Be(HealthState.Healthy);
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 
     [Fact]
@@ -73,5 +75,6 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
         var mongo = hc.Single(h => h.Name == "data:mongo");
         var report = await mongo.CheckAsync();
         report.State.Should().Be(HealthState.Unhealthy);
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }

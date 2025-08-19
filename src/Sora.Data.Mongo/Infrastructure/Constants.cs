@@ -16,11 +16,19 @@ public static class Constants
 
             public const string Database = Section + ":Database";
             public const string AltDatabase = AltSection + ":Database";
+
+            // Paging guardrails
+            public const string DefaultPageSize = Section + ":DefaultPageSize";
+            public const string MaxPageSize = Section + ":MaxPageSize";
+            public const string AltDefaultPageSize = AltSection + ":DefaultPageSize";
+            public const string AltMaxPageSize = AltSection + ":MaxPageSize";
         }
     }
 
     public static class Bootstrap
     {
         public const string EnsureCreatedSupported = "EnsureCreatedSupported";
+        public const string DefaultPageSize = "DefaultPageSize";
+        public const string MaxPageSize = "MaxPageSize";
     }
 }

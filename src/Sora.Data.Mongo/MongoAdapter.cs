@@ -37,6 +37,10 @@ public sealed class MongoOptions
     // Naming policy controls
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
     public string Separator { get; set; } = "."; // used when composing namespace + entity
+
+    // Paging guardrails (acceptance criteria 0044)
+    public int DefaultPageSize { get; set; } = 50; // mirrors Sora.Web default
+    public int MaxPageSize { get; set; } = 200;
 }
 
 internal static class MongoConstants
@@ -84,6 +88,18 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
             defaultValue: options.Database,
             Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.Database,
             Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltDatabase);
+
+        // Paging guardrails
+        options.DefaultPageSize = Sora.Core.Configuration.ReadFirst(
+            config,
+            defaultValue: options.DefaultPageSize,
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+        options.MaxPageSize = Sora.Core.Configuration.ReadFirst(
+            config,
+            defaultValue: options.MaxPageSize,
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
         // Resolve from ConnectionStrings:Default when present. Override placeholder/empty.
     var cs = Sora.Core.Configuration.Read(config, Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, (string?)null);
@@ -152,7 +168,7 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp) where TEntity : class, IEntity<TKey> where TKey : notnull
     {
-        var opts = sp.GetRequiredService<IOptions<MongoOptions>>().Value;
+    var opts = sp.GetRequiredService<IOptions<MongoOptions>>().Value;
         var resolver = sp.GetRequiredService<Sora.Data.Abstractions.Naming.IStorageNameResolver>();
         return new MongoRepository<TEntity, TKey>(opts, resolver, sp);
     }
@@ -181,6 +197,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
     private readonly IServiceProvider _sp;
     private readonly Sora.Data.Abstractions.Naming.StorageNameResolver.Convention _nameConv;
     private readonly ILogger? _logger;
+    private readonly int _defaultPageSize;
+    private readonly int _maxPageSize;
 
     public MongoRepository(MongoOptions options, Sora.Data.Abstractions.Naming.IStorageNameResolver nameResolver, IServiceProvider sp)
     {
@@ -193,6 +211,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
     // Initial collection name (may be set-scoped); will be recomputed per call if set changes
     _collectionName = Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
     _collection = db.GetCollection<TEntity>(_collectionName);
+        _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
+        _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
         CreateIndexesIfNeeded();
     }
     private IMongoCollection<TEntity> GetCollection()
@@ -244,7 +264,11 @@ internal sealed class MongoRepository<TEntity, TKey> :
     {
         using var act = MongoTelemetry.Activity.StartActivity("mongo.query.all");
         act?.SetTag("entity", typeof(TEntity).FullName);
-        return await GetCollection().Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct);
+    // Guardrails: enforce server-side paging if possible to avoid unbounded materialization.
+    var col = GetCollection();
+    var find = col.Find(Builders<TEntity>.Filter.Empty);
+    find = find.Limit(_defaultPageSize);
+    return await find.ToListAsync(ct);
     }
 
     public async Task<int> CountAsync(object? query, CancellationToken ct = default)
@@ -259,7 +283,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
     {
         using var act = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
         act?.SetTag("entity", typeof(TEntity).FullName);
-        return await GetCollection().Find(predicate).ToListAsync(ct);
+    var col = GetCollection();
+    var find = col.Find(predicate).Limit(_defaultPageSize);
+    return await find.ToListAsync(ct);
     }
 
     public async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
