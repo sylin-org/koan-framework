@@ -202,7 +202,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
     {
         switch (instruction.Name)
         {
-            case "data.clear":
+            case global::Sora.Data.DataInstructions.Clear:
             {
                 var (name, store) = ResolveNameAndStore();
                 var deleted = store.Count;

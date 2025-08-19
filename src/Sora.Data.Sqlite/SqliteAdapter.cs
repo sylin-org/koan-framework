@@ -738,25 +738,25 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case "relational.schema.validate":
+            case global::Sora.Data.Relational.RelationalInstructions.SchemaValidate:
             {
                 var report = ValidateSchema(conn);
                 return (TResult)(object)report;
             }
-            case "data.ensureCreated":
+            case global::Sora.Data.DataInstructions.EnsureCreated:
                 TryEnsureTableWithGovernance(conn);
                 object d_ok = true;
                 return (TResult)d_ok;
-            case "data.clear":
+            case global::Sora.Data.DataInstructions.Clear:
                 TryEnsureTableWithGovernance(conn);
                 var del = await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
                 object d_res = del;
                 return (TResult)d_res;
-            case "relational.schema.ensureCreated":
+            case global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated:
                 TryEnsureTableWithGovernance(conn);
                 object ok = true;
                 return (TResult)ok;
-            case "relational.sql.scalar":
+            case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
             {
         var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                 var p = GetParamsFromInstruction(instruction);
@@ -773,7 +773,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     return CastScalar<TResult>(result);
                 }
             }
-            case "relational.sql.nonquery":
+            case global::Sora.Data.Relational.RelationalInstructions.SqlNonQuery:
             {
                 var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                 sql = MaybeRewriteInsertForProjection(sql);
@@ -793,6 +793,27 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var affected = await conn.ExecuteAsync(sql, p);
                     object res = affected;
                     return (TResult)res;
+                }
+            }
+            case global::Sora.Data.Relational.RelationalInstructions.SqlQuery:
+            {
+                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                var p = GetParamsFromInstruction(instruction);
+                // Best-effort ensure for entity table
+                try { TryEnsureTableWithGovernance(conn); } catch { }
+                try
+                {
+                    var rows = await conn.QueryAsync(sql, p);
+                    var list = MapDynamicRows(rows);
+                    return (TResult)(object)list;
+                }
+                catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+                {
+                    Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                    TryEnsureTableWithGovernance(conn);
+                    var rows = await conn.QueryAsync(sql, p);
+                    var list = MapDynamicRows(rows);
+                    return (TResult)(object)list;
                 }
             }
             default:
@@ -987,6 +1008,30 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var t = typeof(TResult);
         if (t.IsAssignableFrom(value.GetType())) return (TResult)value;
         try { return (TResult)Convert.ChangeType(value, t); } catch { return default!; }
+    }
+
+    private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<dynamic> rows)
+    {
+        var list = new List<Dictionary<string, object?>>();
+        foreach (var row in rows)
+        {
+            if (row is IDictionary<string, object?> map)
+            {
+                list.Add(new Dictionary<string, object?>(map, StringComparer.OrdinalIgnoreCase));
+            }
+            else
+            {
+                var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                var props = ((object)row).GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                foreach (var p in props)
+                {
+                    if (!p.CanRead) continue;
+                    dict[p.Name] = p.GetValue(row);
+                }
+                list.Add(dict);
+            }
+        }
+        return list;
     }
 
     // Projection-aware rewrite: if identifiers are already quoted ([Prop]), only rewrite bracketed tokens.

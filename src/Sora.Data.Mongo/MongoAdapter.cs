@@ -359,7 +359,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
         act?.SetTag("entity", typeof(TEntity).FullName);
         switch (instruction.Name)
         {
-            case "data.ensureCreated":
+            case global::Sora.Data.DataInstructions.EnsureCreated:
             {
                 var col = GetCollection();
                 var db = GetDatabase(col);
@@ -382,7 +382,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 object ok = true;
                 return (TResult)ok;
             }
-            case "data.clear":
+            case global::Sora.Data.DataInstructions.Clear:
             {
                 var col = GetCollection();
                 var res = await col.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);

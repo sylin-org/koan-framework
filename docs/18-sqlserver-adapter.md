@@ -95,12 +95,19 @@ Use the instruction executor for schema and raw SQL helpers:
 - data.clear => delete all rows in the table
 - relational.sql.scalar => execute scalar SQL (full SELECT supported)
 - relational.sql.nonquery => execute non-query SQL
+- relational.sql.query => execute a query and return neutral rows (`IReadOnlyList<Dictionary<string, object?>>`)
 
 ```csharp
 var exec = (IInstructionExecutor<Person>)repo;
 var report = await exec.ExecuteAsync<Dictionary<string, object?>>(Instruction.Create("relational.schema.validate"));
 var count = await exec.ExecuteAsync<int>(Instruction.Create("relational.sql.scalar", new { Sql = "SELECT COUNT(1) FROM Person" }));
 ```
+
+See also:
+
+- ADR-0050 (instruction name constants) — `decisions/0050-instruction-name-constants-and-scoping.md`
+- ADR-0051 (Direct routing via instruction executors) — `decisions/0051-direct-routing-via-instruction-executors.md`
+- ADR-0052 (Dapper boundary; Direct uses ADO.NET) — `decisions/0052-relational-dapper-boundary-and-direct-ado.md`
 
 ## Testing
 

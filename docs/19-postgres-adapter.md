@@ -57,7 +57,13 @@ String query WHERE suffix or full SELECT supported. Property tokens map to proje
 - relational.schema.validate => diagnostics
 - relational.schema.ensureCreated | data.ensureCreated => idempotent ensure
 - relational.schema.clear | data.clear => delete all rows
-- relational.sql.scalar/nonquery => parameterized SQL
+- relational.sql.scalar/nonquery/query => parameterized SQL; `query` returns neutral rows (`IReadOnlyList<Dictionary<string, object?>>`)
+
+See also:
+
+- ADR-0050 (instruction name constants) — `decisions/0050-instruction-name-constants-and-scoping.md`
+- ADR-0051 (Direct routing via instruction executors) — `decisions/0051-direct-routing-via-instruction-executors.md`
+- ADR-0052 (Dapper boundary; Direct uses ADO.NET) — `decisions/0052-relational-dapper-boundary-and-direct-ado.md`
 
 ## Testing
 

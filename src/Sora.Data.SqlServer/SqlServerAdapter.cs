@@ -610,34 +610,42 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case "relational.schema.validate":
+            case global::Sora.Data.Relational.RelationalInstructions.SchemaValidate:
             {
                 var report = ValidateSchema(conn);
                 return (TResult)(object)report;
             }
-            case "data.ensureCreated":
-            case "relational.schema.ensureCreated":
+            case global::Sora.Data.DataInstructions.EnsureCreated:
+            case global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated:
                 EnsureTable(conn);
                 object ok = true; return (TResult)ok;
-            case "data.clear":
+            case global::Sora.Data.DataInstructions.Clear:
             {
                 EnsureTable(conn);
                 var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
                 object res = del; return (TResult)res;
             }
-            case "relational.sql.scalar":
+            case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
             {
                 var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                 var p = GetParamsFromInstruction(instruction);
                 var result = await conn.ExecuteScalarAsync(sql, p);
                 return CastScalar<TResult>(result);
             }
-            case "relational.sql.nonquery":
+            case global::Sora.Data.Relational.RelationalInstructions.SqlNonQuery:
             {
                 var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                 var p = GetParamsFromInstruction(instruction);
                 var affected = await conn.ExecuteAsync(sql, p);
                 object res = affected; return (TResult)res;
+            }
+            case global::Sora.Data.Relational.RelationalInstructions.SqlQuery:
+            {
+                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                var p = GetParamsFromInstruction(instruction);
+                var rows = await conn.QueryAsync(sql, p);
+                var list = MapDynamicRows(rows);
+                return (TResult)(object)list;
             }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by SQL Server adapter for {typeof(TEntity).Name}.");
@@ -790,6 +798,30 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         var t = typeof(TResult);
         if (t.IsAssignableFrom(value.GetType())) return (TResult)value;
         try { return (TResult)Convert.ChangeType(value, t); } catch { return default!; }
+    }
+
+    private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<dynamic> rows)
+    {
+        var list = new List<Dictionary<string, object?>>();
+        foreach (var row in rows)
+        {
+            if (row is IDictionary<string, object?> map)
+            {
+                list.Add(new Dictionary<string, object?>(map, StringComparer.OrdinalIgnoreCase));
+            }
+            else
+            {
+                var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                var props = ((object)row).GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                foreach (var p in props)
+                {
+                    if (!p.CanRead) continue;
+                    dict[p.Name] = p.GetValue(row);
+                }
+                list.Add(dict);
+            }
+        }
+        return list;
     }
 
     private bool IsDdlAllowed(bool entityReadOnly)

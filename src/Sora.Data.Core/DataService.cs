@@ -21,6 +21,12 @@ public interface IDataService
     IDataRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
     where TEntity : class, IEntity<TKey>
         where TKey : notnull;
+
+    /// <summary>
+    /// Escape-hatch entry for direct commands against a named source or adapter.
+    /// Returns a session for running ad-hoc queries/commands with optional connection override.
+    /// </summary>
+    Sora.Data.Core.Direct.IDirectSession Direct(string sourceOrAdapter);
 }
 
 /// <summary>
@@ -43,6 +49,14 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var repo = cfg.Repository;
         _cache[key] = repo;
         return repo;
+    }
+
+    /// <inheritdoc />
+    public Sora.Data.Core.Direct.IDirectSession Direct(string sourceOrAdapter)
+    {
+        var svc = sp.GetService<Sora.Data.Core.Direct.IDirectDataService>()
+            ?? throw new InvalidOperationException("IDirectDataService not registered. AddSoraDataDirect() required.");
+        return svc.Direct(sourceOrAdapter);
     }
     // Provider resolution is now handled by TypeConfigs
 }
