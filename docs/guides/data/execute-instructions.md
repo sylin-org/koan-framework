@@ -55,7 +55,7 @@ If an instruction isn’t supported by the repository/provider, a NotSupportedEx
 
 ## References
 
-- ADR-0049: Direct Commands API (async-only, mapping, connection resolution) — `decisions/0049-direct-commands-api.md`
-- ADR-0050: Instruction name constants and scoping — `decisions/0050-instruction-name-constants-and-scoping.md`
-- ADR-0051: Direct routing via instruction executors — `decisions/0051-direct-routing-via-instruction-executors.md`
-- ADR-0052: Constrain Dapper to relational adapters; Direct uses ADO.NET — `decisions/0052-relational-dapper-boundary-and-direct-ado.md`
+- ADR-0049: Direct Commands API (async-only, mapping, connection resolution) — `decisions/DATA-0049-direct-commands-api.md`
+- ADR-0050: Instruction name constants and scoping — `decisions/DATA-0050-instruction-name-constants-and-scoping.md`
+- ADR-0051: Direct routing via instruction executors — `decisions/DATA-0051-direct-routing-via-instruction-executors.md`
+- ADR-0052: Constrain Dapper to relational adapters; Direct uses ADO.NET — `decisions/DATA-0052-relational-dapper-boundary-and-direct-ado.md`

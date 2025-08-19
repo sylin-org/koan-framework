@@ -17,8 +17,8 @@ Contents
 Related
 - ../12-cqrs-for-humans.md — Intro to CQRS in Sora
 - ../03-core-contracts.md, ../04-adapter-authoring-guide.md — Core contracts and adapters
-- ../decisions/0032-paging-pushdown-and-in-memory-fallback.md
-- ../decisions/0033-opentelemetry-integration.md
+- ../decisions/DATA-0032-paging-pushdown-and-in-memory-fallback.md
+- ../decisions/ARCH-0033-opentelemetry-integration.md
 
 ---
 Applied DDD should feel natural in Sora: model the domain first, keep boundaries explicit, and let infrastructure (adapters, messaging, web) serve the model.

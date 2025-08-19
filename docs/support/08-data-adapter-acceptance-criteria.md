@@ -57,7 +57,7 @@ If the backing database does not expose native bulk operations:
 
 - LINQ support:
   - If `QueryCapabilities.Linq` is set: MUST translate supported predicates to native queries with server-side filtering; on unsupported shapes, either throw NotSupported (strict) or perform mixed pushdown with safe in-memory completion as documented.
-  - Relational adapters that do not ship a full LINQ provider SHOULD use the framework's lightweight LINQ-to-expression translator in the relational toolkit (see [decision 0007](../decisions/0007-relational-linq-to-sql-helper.md)) to push down common predicates via the provider dialect (e.g., `ILinqSqlDialect`).
+  - Relational adapters that do not ship a full LINQ provider SHOULD use the framework's lightweight LINQ-to-expression translator in the relational toolkit (see [decision 0007](../decisions/DATA-0007-relational-linq-to-sql-helper.md)) to push down common predicates via the provider dialect (e.g., `ILinqSqlDialect`).
 - String queries:
   - If `QueryCapabilities.String` is set: MUST accept provider-appropriate query strings and parameterization; MUST avoid string interpolation vulnerabilities.
 - JSON filter language and controller usage: adapters SHOULD push down filters and ordering where possible; paging pushdown is REQUIRED when the database supports it. When pushdown is not possible, the framework’s safe in-memory fallback applies (see decisions 0029 and 0032), but adapters MUST minimize materialized result sets (stream/chunk and enforce upper bounds).
