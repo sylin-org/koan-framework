@@ -28,4 +28,6 @@ Index of decisions:
  - 0036: Sylin.* prefix for NuGet package IDs
  - 0037: Tiny* template family (TinyApi, TinyApp, TinyDockerApp, TinyWorker)
 
+- 0041: GraphQL module (Sora.Web.GraphQl): controller-hosted schema from IEntity<>, typed filters/sorts, display field
+
 Template: see `0000-template.md`.
