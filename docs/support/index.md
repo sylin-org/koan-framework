@@ -11,3 +11,5 @@ Operational docs, environment setup, and troubleshooting.
 - Acceptance Criteria
   - Data Adapters: 08-data-adapter-acceptance-criteria.md
   - Vector Adapters: 09-vector-adapter-acceptance-criteria.md
+- Templates
+  - Vector Adapter template: 09-vector-adapter-template.md
