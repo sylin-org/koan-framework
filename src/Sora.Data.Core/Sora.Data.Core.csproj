@@ -20,10 +20,4 @@
   <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.0" />
   <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
   </ItemGroup>
-
-  <!-- Ensure DirectService is not compiled in Core; implementation lives in Sora.Data.Direct -->
-  <ItemGroup>
-    <Compile Remove="Direct/DirectService.cs" />
-  </ItemGroup>
-
 </Project>
