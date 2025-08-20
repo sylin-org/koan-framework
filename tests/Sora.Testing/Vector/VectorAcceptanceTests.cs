@@ -106,6 +106,38 @@ public abstract class VectorAcceptanceTests<TEntity, TKey>
         Assert.True(res2.Matches.Count == 0 || !EqualityComparer<TKey>.Default.Equals(res2.Matches[0].Id, id));
     }
 
+    [SkippableFact]
+    public async Task Filters_Conformance_JsonShorthand_vs_Operator_vs_Typed()
+    {
+        Skip.IfNot(IsAvailable, "Vector engine not available for tests.");
+        var vec = GetVectorRepo();
+        if (vec is not IVectorCapabilities caps || (caps.Capabilities & VectorCapabilities.Filters) == 0)
+            return; // adapter doesn't support filter pushdown
+
+        // Seed
+        await vec.UpsertAsync(GenerateId(1), EmbedQuery("a"), new { color = "red", price = 10 }, CancellationToken);
+        await vec.UpsertAsync(GenerateId(2), EmbedQuery("b"), new { color = "blue", price = 20 }, CancellationToken);
+
+        var q = EmbedQuery("a");
+        // Equality map shorthand
+        var f1 = new Dictionary<string, object?> { ["color"] = "red" };
+        // Operator JSON DSL
+    var f2 = new { @operator = "And", operands = new object[] { new { path = new[] { "color" }, @operator = "Eq", value = "red" } } };
+        // Typed AST
+        var f3 = VectorFilter.Eq("color", "red");
+
+        var r1 = await vec.SearchAsync(new VectorQueryOptions(q, TopK: 10, Filter: f1), CancellationToken);
+        var r2 = await vec.SearchAsync(new VectorQueryOptions(q, TopK: 10, Filter: f2), CancellationToken);
+        var r3 = await vec.SearchAsync(new VectorQueryOptions(q, TopK: 10, Filter: f3), CancellationToken);
+
+        var s1 = r1.Matches.Select(m => m.Id).OrderBy(x => x?.GetHashCode()).ToArray();
+        var s2 = r2.Matches.Select(m => m.Id).OrderBy(x => x?.GetHashCode()).ToArray();
+        var s3 = r3.Matches.Select(m => m.Id).OrderBy(x => x?.GetHashCode()).ToArray();
+
+        Assert.Equal(s1, s2);
+        Assert.Equal(s1, s3);
+    }
+
     protected virtual TKey GenerateId(int seed)
     {
         if (typeof(TKey) == typeof(string))

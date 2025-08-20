@@ -82,7 +82,12 @@ var primary = data.GetRepository<Person, string>();         // source of truth
 var vectors = (IVectorSearchRepository<Person, string>)primary; // or resolved separately if vector-only
 
 var embedding = await embedder.CreateAsync("search text...");
-var options = new VectorQueryOptions(embedding, TopK: 20, Filter: "country = 'US'");
+// Prefer typed filter AST; JSON-DSL is available for interop/advanced scenarios.
+var filter = Sora.Data.Abstractions.VectorFilter.And(
+  Sora.Data.Abstractions.VectorFilter.Eq("country", "US"),
+  Sora.Data.Abstractions.VectorFilter.Gte("price", 10)
+);
+var options = new VectorQueryOptions(embedding, TopK: 20, Filter: filter);
 
 var result = await vectors.SearchAsync(options, ct);
 var ids = result.Hits.Select(h => h.Id).ToArray();
@@ -102,7 +107,7 @@ Some engines can store full entities (JSON payload) alongside vectors.
 
 ```csharp
 var vectorRepo = sp.GetRequiredService<IVectorSearchRepository<Document, string>>();
-var rsp = await vectorRepo.SearchAsync(new(embedding, TopK: 10, Filter: "tag in ['kb','faq']"));
+var rsp = await vectorRepo.SearchAsync(new(embedding, TopK: 10, Filter: Sora.Data.Abstractions.VectorFilter.Eq("tag", "kb")));
 // engine may also let you fetch documents directly by id from the same store
 ```
 
