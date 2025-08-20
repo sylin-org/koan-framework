@@ -24,14 +24,14 @@ app.UseSora();
 app.Run();
 ```
 
-## Why developers choose Sora
+## Why choose Sora?
 
 🚀 **Zero to API in minutes** — Real CRUD endpoints with just `EntityController<T>`  
 🔧 **Escape hatches everywhere** — Drop to raw SQL, custom controllers, or provider-specific features  
 📦 **Modular by design** — Add SQLite, MongoDB, Redis, RabbitMQ, AI providers, or vector search as you grow  
 🤖 **AI-ready** — Built-in streaming chat, embeddings, vector search, and RAG patterns  
 ✅ **Production ready** — Health checks, OpenAPI docs, observability, and message reliability built-in  
-🎯 **Predictable** — Convention over configuration, but configuration always wins  
+🎯 **Predictable** — Convention over configuration, but configuration always wins
 
 ## Core philosophy
 
@@ -61,8 +61,9 @@ var todos = await Todo.Where(t => !t.IsDone);
 ```
 
 That's it. You now have:
+
 - `GET /api/todos` — List all todos
-- `POST /api/todos` — Create new todo  
+- `POST /api/todos` — Create new todo
 - `GET /api/todos/{id}` — Get specific todo
 - `PUT /api/todos/{id}` — Update todo
 - `DELETE /api/todos/{id}` — Delete todo
@@ -75,6 +76,7 @@ That's it. You now have:
 ## Need more? Just add it
 
 **Want AI chat and embeddings?**
+
 ```bash
 dotnet add package Sora.AI
 dotnet add package Sora.Ai.Provider.Ollama
@@ -83,6 +85,7 @@ dotnet add package Sora.Ai.Provider.Ollama
 Now you have `/ai/chat` with streaming and `/ai/embed` endpoints working with local models.
 
 **Need vector search?**
+
 ```bash
 dotnet add package Sora.Data.Weaviate
 ```
@@ -90,6 +93,7 @@ dotnet add package Sora.Data.Weaviate
 Your entities can now be embedded and searched semantically.
 
 **Want reliable messaging?**
+
 ```bash
 dotnet add package Sora.Messaging.RabbitMq
 ```
@@ -97,6 +101,7 @@ dotnet add package Sora.Messaging.RabbitMq
 Send messages, handle failures, and process with inbox patterns.
 
 **GraphQL from your REST models?**
+
 ```bash
 dotnet add package Sora.Web.GraphQl
 ```
