@@ -2,7 +2,8 @@ name: nuget-release
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 concurrency:
@@ -86,23 +87,6 @@ jobs:
           $simple = & $nbgv get-version -v SimpleVersion
           echo "NUGETVERSION=$nugetVersion" >> $env:GITHUB_OUTPUT
           echo "SIMPLEVERSION=$simple" >> $env:GITHUB_OUTPUT
-
-      - name: Create and push tag (v{SimpleVersion}) if missing
-        shell: pwsh
-        env:
-          SIMPLE: ${{ steps.nbgv.outputs.SIMPLEVERSION }}
-        run: |
-          if (-not $env:SIMPLE) { throw "No SimpleVersion computed" }
-          $tag = "v$env:SIMPLE"
-          git fetch --tags
-          if (git rev-parse -q --verify "refs/tags/$tag") {
-            Write-Host "Tag $tag already exists."
-          } else {
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a $tag -m "Release $tag"
-            git push origin $tag
-          }
 
       - name: Pack all src projects (stable)
         shell: pwsh

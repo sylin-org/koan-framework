@@ -1,0 +1,51 @@
+name: create-tag-on-main
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: tag-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tag-if-needed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Compute SimpleVersion via NBGV
+        id: nbgv
+        run: |
+          dotnet tool update --global nbgv || dotnet tool install --global nbgv
+          echo "PATH=$HOME/.dotnet/tools:$PATH" >> $GITHUB_ENV
+          SIMPLE=$(nbgv get-version -v SimpleVersion)
+          echo "SIMPLE=$SIMPLE" >> $GITHUB_OUTPUT
+
+      - name: Create tag v{SimpleVersion} if missing
+        env:
+          SIMPLE: ${{ steps.nbgv.outputs.SIMPLE }}
+        run: |
+          if [ -z "$SIMPLE" ]; then echo "No SimpleVersion computed"; exit 1; fi
+          TAG="v${SIMPLE}"
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} already exists; skipping."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${TAG}" -m "Release ${TAG}"
+            git push origin "${TAG}"
+          fi
