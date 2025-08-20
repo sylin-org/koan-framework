@@ -6,5 +6,7 @@
   href: sqlserver-adapter.md
 - name: PostgreSQL adapter
   href: postgres-adapter.md
+- name: Redis adapter
+  href: redis-adapter.md
 - name: Authoring adapters
   href: adapter-authoring-guide.md
