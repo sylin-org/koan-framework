@@ -1,9 +1,9 @@
-using System.Net.Http.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sora.Core;
 using Sora.Messaging;
+using System.Net.Http.Json;
 
 namespace Sora.Messaging.Inbox.Http;
 
@@ -16,11 +16,12 @@ public sealed class HttpInboxStore : IInboxStore
     {
         try
         {
-            var resp = await _http.GetAsync($"/v1/inbox/{Uri.EscapeDataString(key)}", ct).ConfigureAwait(false);
+            var route = Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Routes.GetStatus.Replace("{key}", Uri.EscapeDataString(key));
+            var resp = await _http.GetAsync(route, ct).ConfigureAwait(false);
             if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return false;
             resp.EnsureSuccessStatusCode();
             var doc = await resp.Content.ReadFromJsonAsync<InboxStatus>(cancellationToken: ct).ConfigureAwait(false);
-            return string.Equals(doc?.Status, "Processed", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(doc?.Status, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Values.Processed, StringComparison.OrdinalIgnoreCase);
         }
         catch
         {
@@ -30,7 +31,7 @@ public sealed class HttpInboxStore : IInboxStore
 
     public async Task MarkProcessedAsync(string key, CancellationToken ct)
     {
-        var resp = await _http.PostAsJsonAsync("/v1/inbox/mark-processed", new { key }, ct).ConfigureAwait(false);
+        var resp = await _http.PostAsJsonAsync(Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Routes.MarkProcessed, new { key }, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
     }
 
@@ -50,7 +51,7 @@ public static class HttpInboxServiceCollectionExtensions
             var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
             if (string.IsNullOrWhiteSpace(endpoint)) return; // nothing to do
             http.BaseAddress = new Uri(endpoint);
-            http.Timeout = TimeSpan.FromSeconds(5);
+            http.Timeout = TimeSpan.FromSeconds(Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Values.DefaultTimeoutSeconds);
         });
 
         // Auto-discovery initializer: if Endpoint is present, register HttpInboxStore

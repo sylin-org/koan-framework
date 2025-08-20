@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  <Description>Direct-access utilities for Sora Data: helpers for bypass scenarios and config-first resolution.</Description>
+  <PackageTags>$(CommonPackageTags);data;direct;utilities</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+  <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.8" />
+  </ItemGroup>
+</Project>

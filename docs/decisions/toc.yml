@@ -1,0 +1,127 @@
+- name: Decisions
+  href: index.md
+- name: Architecture (ARCH)
+  items:
+    - name: Config and constants naming
+      href: ARCH-0040-config-and-constants-naming.md
+    - name: DDD docs and glossary
+      href: ARCH-0034-ddd-documentation-and-glossary.md
+    - name: SoraEnv static runtime
+      href: ARCH-0039-soraenv-static-runtime.md
+- name: Data (DATA)
+  items:
+    - name: Postgres adapter
+      href: DATA-0047-postgres-adapter.md
+    - name: Instruction constants
+      href: DATA-0050-instruction-name-constants-and-scoping.md
+    - name: Direct commands API
+      href: DATA-0049-direct-commands-api.md
+    - name: Direct routing via instruction executors
+      href: DATA-0051-direct-routing-via-instruction-executors.md
+    - name: Dapper boundary; Direct uses ADO.NET
+      href: DATA-0052-relational-dapper-boundary-and-direct-ado.md
+  - name: DATA-0054 — vector search capability and contracts
+    href: DATA-0054-vector-search-capability-and-contracts.md
+    - name: SQLite DDL policy
+      href: DATA-0046-sqlite-schema-governance-ddl-policy.md
+    - name: Paging guardrails and tracing
+      href: DATA-0044-paging-guardrails-and-tracing-must.md
+    - name: Default projection policy
+      href: DATA-0045-default-projection-policy-and-json-pushdown.md
+    - name: Entity sets routing and suffixing
+      href: DATA-0030-entity-sets-routing-and-storage-suffixing.md
+    - name: JSON filter language
+      href: DATA-0029-json-filter-language-and-endpoint.md
+    - name: Filter ignore-case option
+      href: DATA-0031-filter-ignore-case-option.md
+    - name: Relational schema toolkit
+      href: DATA-0005-relational-schema-toolkit.md
+    - name: Instruction execution API
+      href: DATA-0006-instruction-execution-api.md
+    - name: LINQ-to-SQL helper
+      href: DATA-0007-relational-linq-to-sql-helper.md
+    - name: Transactional batch and concurrency
+      href: DATA-0007-transactional-batch-and-concurrency.md
+    - name: Relational command caching
+      href: DATA-0008-relational-command-caching.md
+    - name: Unify on IEntity
+      href: DATA-0009-unify-on-ientity.md
+    - name: Entity extensions naming
+      href: DATA-0016-entity-extensions-naming-and-parity.md
+    - name: Storage naming conventions
+      href: DATA-0017-storage-naming-conventions.md
+    - name: Centralized naming registry and DX
+      href: DATA-0018-centralized-naming-registry-and-dx.md
+    - name: Outbox helper and defaults
+      href: DATA-0019-outbox-helper-and-defaults.md
+    - name: Outbox provider discovery and priority
+      href: DATA-0020-outbox-provider-discovery-and-priority.md
+    - name: Query capabilities flag
+      href: DATA-0002-query-capabilities-flag.md
+    - name: Write capabilities and bulk markers
+      href: DATA-0003-write-capabilities-and-bulk-markers.md
+    - name: Index anchoring and JSON mapping
+      href: DATA-0004-index-anchoring-and-json-mapping.md
+- name: Web (WEB)
+  items:
+    - name: Web templates and rate limiters
+      href: WEB-0012-web-templates-and-rate-limiters.md
+    - name: GraphQL module and controller
+      href: WEB-0041-graphql-module-and-controller.md
+    - name: GraphQL naming and discovery
+      href: WEB-0042-graphql-naming-and-discovery.md
+    - name: EntityController transformers
+      href: WEB-0035-entitycontroller-transformers.md
+- name: Messaging (MESS)
+  items:
+    - name: Messaging capabilities and negotiation
+      href: MESS-0021-messaging-capabilities-and-negotiation.md
+    - name: MQ provisioning, aliases, dispatcher
+      href: MESS-0022-mq-provisioning-aliases-and-dispatcher.md
+    - name: Alias defaults and DefaultGroup
+      href: MESS-0023-alias-defaults-default-group-and-onmessage.md
+    - name: Batch semantics and aliasing
+      href: MESS-0024-batch-semantics-and-aliasing.md
+    - name: Inbox contract and client
+      href: MESS-0025-inbox-contract-and-client.md
+    - name: Discovery over MQ policy
+      href: MESS-0026-discovery-over-mq-policy.md
+    - name: Standalone MQ services and naming
+      href: MESS-0027-standalone-mq-services-and-naming.md
+- name: Ops (OPS)
+  items:
+    - name: Mongo container default host
+      href: OPS-0043-mongo-container-default-host.md
+    - name: Samples port allocation
+      href: OPS-0014-samples-port-allocation.md
+    - name: Default configuration fallback
+      href: OPS-0015-default-configuration-fallback.md
+  items:
+    - name: Tiny templates family
+      href: DX-0037-tiny-templates-family.md
+    - name: Auto-registration
+      href: DX-0038-auto-registration.md
+    - name: Sylin prefix and package IDs
+      href: DX-0036-sylin-prefix-and-package-ids.md
+ - name: AI (AI)
+   items:
+     - name: Native AI baseline
+       href: AI-0001-ai-baseline.md
+     - name: API contracts and SSE format
+       href: AI-0002-api-contracts-and-sse.md
+     - name: Tokenization and cost
+       href: AI-0003-tokenization-and-cost.md
+     - name: Secrets provider and per-tenant keys
+       href: AI-0004-secrets-provider.md
+     - name: Protocol surfaces (gRPC, OpenAI shim, MCP, AI-RPC)
+       href: AI-0005-protocol-surfaces.md
+     - name: Data formats and grounding (Parquet, JSON-LD, Schema.org)
+       href: AI-0006-data-formats-and-grounding.md
+     - name: Inference servers interop (KServe, vLLM, TGI)
+       href: AI-0007-inference-servers-interop.md
+      - name: Prompt entrypoint and augmentation pipeline
+        href: AI-0010-entrypoint-and-augmentations.md
+     - name: AI adapters and registry
+       href: AI-0008-adapters-and-registry.md
+     - name: Multi-service routing, load balancing, and policies
+       href: AI-0009-multi-service-routing-and-policies.md

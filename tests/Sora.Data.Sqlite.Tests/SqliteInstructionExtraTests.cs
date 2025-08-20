@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +5,9 @@ using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
 using Sora.Data.Sqlite;
+using System;
+using System.IO;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
@@ -23,7 +23,7 @@ public class SqliteInstructionExtraTests
     private static IServiceProvider BuildServices(string file)
     {
         var sc = new ServiceCollection();
-    var cs = $"Data Source={file}";
+        var cs = $"Data Source={file}";
         var cfg = new ConfigurationBuilder()
             .AddInMemoryCollection(new[] {
                 new KeyValuePair<string,string?>("SqliteOptions:ConnectionString", cs),
@@ -56,10 +56,10 @@ public class SqliteInstructionExtraTests
         ensured.Should().BeTrue();
 
         await repo.UpsertAsync(new Todo { Title = "x" });
-        (await repo.CountAsync((object?)null)).Should().BeGreaterThan(0);
+        (await repo.CountAsync(null)).Should().BeGreaterThan(0);
 
         var cleared = await data.Execute<Todo, int>(new Instruction("data.clear"));
         cleared.Should().BeGreaterOrEqualTo(1);
-        (await repo.CountAsync((object?)null)).Should().Be(0);
+        (await repo.CountAsync(null)).Should().Be(0);
     }
 }

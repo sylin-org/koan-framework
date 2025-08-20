@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Contracts for Sora AI: IAi entrypoint, DTOs, and router hints.</Description>
+    <PackageTags>$(CommonPackageTags);ai;contracts;dtos</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
+  </ItemGroup>
+</Project>

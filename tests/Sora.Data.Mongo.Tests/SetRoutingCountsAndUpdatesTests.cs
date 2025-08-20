@@ -1,14 +1,14 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using MongoDB.Driver;
 using MongoDB.Bson;
+using MongoDB.Driver;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.Mongo;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Sdk;
 
@@ -59,8 +59,8 @@ public class SetRoutingCountsAndUpdatesTests
     [Fact]
     public async Task Counts_Clear_Update_Isolation_Across_Sets()
     {
-    var sp = BuildServices();
-    if (!await EnsureMongoAvailableAsync(sp)) return; // skip when Mongo isn't available
+        var sp = BuildServices();
+        if (!await EnsureMongoAvailableAsync(sp)) return; // skip when Mongo isn't available
 
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
@@ -79,10 +79,10 @@ public class SetRoutingCountsAndUpdatesTests
             await repo.UpsertAsync(new Todo { Id = sharedId, Title = "backup-shared" });
         }
 
-        (await repo.QueryAsync((object?)null)).Count.Should().Be(rootCount + 1);
+        (await repo.QueryAsync(null)).Count.Should().Be(rootCount + 1);
         using (Sora.Data.Core.DataSetContext.With("backup"))
         {
-            (await repo.QueryAsync((object?)null)).Count.Should().Be(backupCount + 1);
+            (await repo.QueryAsync(null)).Count.Should().Be(backupCount + 1);
         }
 
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared-updated" });
@@ -96,12 +96,12 @@ public class SetRoutingCountsAndUpdatesTests
 
         using (Sora.Data.Core.DataSetContext.With("backup"))
         {
-            var all = await repo.QueryAsync((object?)null);
+            var all = await repo.QueryAsync(null);
             await repo.DeleteManyAsync(all.Select(i => i.Id));
-            (await repo.QueryAsync((object?)null)).Should().BeEmpty();
+            (await repo.QueryAsync(null)).Should().BeEmpty();
         }
 
-    (await repo.QueryAsync((object?)null)).Count.Should().Be(rootCount + 1);
-    await TestMongoTeardown.DropDatabaseAsync(sp);
+    (await repo.QueryAsync(null)).Count.Should().Be(rootCount + 1);
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }

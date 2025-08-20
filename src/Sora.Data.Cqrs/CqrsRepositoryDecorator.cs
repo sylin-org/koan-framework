@@ -1,11 +1,11 @@
-﻿using System;
+﻿using Sora.Data.Abstractions;
+using Sora.Data.Core;
+using Sora.Data.Core.Configuration;
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Sora.Data.Abstractions;
-using Sora.Data.Core;
-using Sora.Data.Core.Configuration;
 
 namespace Sora.Data.Cqrs;
 
@@ -51,23 +51,23 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     {
-    ct.ThrowIfCancellationRequested();
-    var result = await _routing.GetWriteRepository<TEntity, TKey>().UpsertAsync(model, ct);
+        ct.ThrowIfCancellationRequested();
+        var result = await _routing.GetWriteRepository<TEntity, TKey>().UpsertAsync(model, ct);
         await RecordOutbox("Upsert", result, ct);
         return result;
     }
 
     public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
     {
-    var ok = await _routing.GetWriteRepository<TEntity, TKey>().DeleteAsync(id, ct);
+        var ok = await _routing.GetWriteRepository<TEntity, TKey>().DeleteAsync(id, ct);
         if (ok) await RecordOutbox("Delete", default, ct, id);
         return ok;
     }
 
     public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
-    ct.ThrowIfCancellationRequested();
-    var count = await _routing.GetWriteRepository<TEntity, TKey>().UpsertManyAsync(models, ct);
+        ct.ThrowIfCancellationRequested();
+        var count = await _routing.GetWriteRepository<TEntity, TKey>().UpsertManyAsync(models, ct);
         await RecordOutboxMany("Upsert", models, ct);
         return count;
     }
@@ -86,16 +86,16 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
 
     private async Task RecordOutbox(string op, TEntity? model, CancellationToken ct, TKey? id = default)
     {
-    if (_outbox is null) return;
+        if (_outbox is null) return;
         var entityId = id is not null ? id!.ToString()! : model is not null ? model.Id?.ToString() ?? string.Empty : string.Empty;
         var payload = model is not null ? JsonSerializer.Serialize(model, new JsonSerializerOptions(JsonSerializerDefaults.Web)) : "{}";
-    var entry = new OutboxEntry(Guid.NewGuid().ToString("n"), DateTimeOffset.UtcNow, typeof(TEntity).AssemblyQualifiedName!, op, entityId, payload);
+        var entry = new OutboxEntry(Guid.NewGuid().ToString("n"), DateTimeOffset.UtcNow, typeof(TEntity).AssemblyQualifiedName!, op, entityId, payload);
         await _outbox.AppendAsync(entry, ct);
     }
 
     private async Task RecordOutboxMany(string op, IEnumerable<TEntity> models, CancellationToken ct)
     {
-    if (_outbox is null) return;
+        if (_outbox is null) return;
         foreach (var m in models)
             await RecordOutbox(op, m, ct);
     }

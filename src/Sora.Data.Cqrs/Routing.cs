@@ -1,20 +1,20 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Sora.Data.Cqrs;
 
 public interface ICqrsRouting
 {
     string? GetProfileNameFor(Type entityType);
-    IDataRepository<TEntity,TKey> GetReadRepository<TEntity,TKey>() where TEntity : class, IEntity<TKey> where TKey : notnull;
-    IDataRepository<TEntity,TKey> GetWriteRepository<TEntity,TKey>() where TEntity : class, IEntity<TKey> where TKey : notnull;
+    IDataRepository<TEntity, TKey> GetReadRepository<TEntity, TKey>() where TEntity : class, IEntity<TKey> where TKey : notnull;
+    IDataRepository<TEntity, TKey> GetWriteRepository<TEntity, TKey>() where TEntity : class, IEntity<TKey> where TKey : notnull;
 }
 
 internal sealed class CqrsRouting : ICqrsRouting
@@ -66,9 +66,9 @@ internal sealed class CqrsRouting : ICqrsRouting
 
         // NOTE: Adapters currently bind their options from IConfiguration. For now we assume
         // the endpoint's ConnectionString{,Name} is already in configuration. We keep Create(sp).
-    var resolvedRepo = CreateRepository(factory, entityType, keyType, _sp);
-    _cache[cacheKey] = resolvedRepo;
-    return resolvedRepo;
+        var resolvedRepo = CreateRepository(factory, entityType, keyType, _sp);
+        _cache[cacheKey] = resolvedRepo;
+        return resolvedRepo;
     }
 
     private static object CreateRepository(IDataAdapterFactory factory, Type entityType, Type keyType, IServiceProvider sp)

@@ -1,11 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Data;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +13,15 @@ using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
+using System.Data.Common;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sora.Data.SqlServer;
 
@@ -55,6 +56,7 @@ public static class SqlServerRegistration
         if (configure is not null) services.Configure(configure);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqlServerConnectionFactory>());
         return services;
     }
 }
@@ -137,6 +139,17 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
         return new SqlServerRepository<TEntity, TKey>(sp, opts, resolver);
     }
+}
+
+internal sealed class SqlServerConnectionFactory : Sora.Data.Core.Configuration.IDataProviderConnectionFactory
+{
+    public bool CanHandle(string provider)
+        => provider.Equals("sqlserver", StringComparison.OrdinalIgnoreCase)
+           || provider.Equals("mssql", StringComparison.OrdinalIgnoreCase)
+           || provider.Equals("microsoft.sqlserver", StringComparison.OrdinalIgnoreCase);
+
+    public DbConnection Create(string connectionString)
+        => new SqlConnection(connectionString);
 }
 
 internal sealed class SqlServerRepository<TEntity, TKey> :
@@ -610,35 +623,43 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case "relational.schema.validate":
-            {
-                var report = ValidateSchema(conn);
-                return (TResult)(object)report;
-            }
-            case "data.ensureCreated":
-            case "relational.schema.ensureCreated":
+            case global::Sora.Data.Relational.RelationalInstructions.SchemaValidate:
+                {
+                    var report = ValidateSchema(conn);
+                    return (TResult)report;
+                }
+            case global::Sora.Data.DataInstructions.EnsureCreated:
+            case global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated:
                 EnsureTable(conn);
                 object ok = true; return (TResult)ok;
-            case "data.clear":
-            {
-                EnsureTable(conn);
-                var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
-                object res = del; return (TResult)res;
-            }
-            case "relational.sql.scalar":
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var result = await conn.ExecuteScalarAsync(sql, p);
-                return CastScalar<TResult>(result);
-            }
-            case "relational.sql.nonquery":
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var affected = await conn.ExecuteAsync(sql, p);
-                object res = affected; return (TResult)res;
-            }
+            case global::Sora.Data.DataInstructions.Clear:
+                {
+                    EnsureTable(conn);
+                    var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
+                    object res = del; return (TResult)res;
+                }
+            case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var result = await conn.ExecuteScalarAsync(sql, p);
+                    return CastScalar<TResult>(result);
+                }
+            case global::Sora.Data.Relational.RelationalInstructions.SqlNonQuery:
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var affected = await conn.ExecuteAsync(sql, p);
+                    object res = affected; return (TResult)res;
+                }
+            case global::Sora.Data.Relational.RelationalInstructions.SqlQuery:
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var rows = await conn.QueryAsync(sql, p);
+                    var list = MapDynamicRows(rows);
+                    return (TResult)(object)list;
+                }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by SQL Server adapter for {typeof(TEntity).Name}.");
         }
@@ -756,8 +777,25 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                 var token = m.Groups[1].Value;
                 switch (token.ToUpperInvariant())
                 {
-                    case "AND": case "OR": case "NOT": case "NULL": case "LIKE": case "IN": case "IS": case "BETWEEN": case "EXISTS":
-                    case "SELECT": case "FROM": case "WHERE": case "GROUP": case "BY": case "ORDER": case "OFFSET": case "FETCH": case "ASC": case "DESC":
+                    case "AND":
+                    case "OR":
+                    case "NOT":
+                    case "NULL":
+                    case "LIKE":
+                    case "IN":
+                    case "IS":
+                    case "BETWEEN":
+                    case "EXISTS":
+                    case "SELECT":
+                    case "FROM":
+                    case "WHERE":
+                    case "GROUP":
+                    case "BY":
+                    case "ORDER":
+                    case "OFFSET":
+                    case "FETCH":
+                    case "ASC":
+                    case "DESC":
                         return token;
                 }
                 if (map.ContainsKey(token)) return map[token];
@@ -790,6 +828,30 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         var t = typeof(TResult);
         if (t.IsAssignableFrom(value.GetType())) return (TResult)value;
         try { return (TResult)Convert.ChangeType(value, t); } catch { return default!; }
+    }
+
+    private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<dynamic> rows)
+    {
+        var list = new List<Dictionary<string, object?>>();
+        foreach (var row in rows)
+        {
+            if (row is IDictionary<string, object?> map)
+            {
+                list.Add(new Dictionary<string, object?>(map, StringComparer.OrdinalIgnoreCase));
+            }
+            else
+            {
+                var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                var props = ((object)row).GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                foreach (var p in props)
+                {
+                    if (!p.CanRead) continue;
+                    dict[p.Name] = p.GetValue(row);
+                }
+                list.Add(dict);
+            }
+        }
+        return list;
     }
 
     private bool IsDdlAllowed(bool entityReadOnly)

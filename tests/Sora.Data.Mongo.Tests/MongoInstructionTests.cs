@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +5,8 @@ using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
 using Sora.Data.Mongo;
+using System;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Mongo.Tests;
@@ -56,12 +56,12 @@ public class MongoInstructionTests : IClassFixture<MongoAutoFixture>
         await repo.UpsertAsync(new Todo { Title = "a" });
         await repo.UpsertAsync(new Todo { Title = "b" });
 
-        (await repo.QueryAsync((object?)null)).Count.Should().Be(2);
+        (await repo.QueryAsync(null)).Count.Should().Be(2);
 
         var cleared = await data.Execute<Todo, int>(new Instruction("data.clear"));
         cleared.Should().Be(2);
 
-    (await repo.QueryAsync((object?)null)).Should().BeEmpty();
-    await TestMongoTeardown.DropDatabaseAsync(sp);
+        (await repo.QueryAsync(null)).Should().BeEmpty();
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }

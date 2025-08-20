@@ -1,9 +1,9 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
-using System.Linq;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
+using System;
+using System.Linq;
 
 namespace Sora.Data.Core.Configuration;
 

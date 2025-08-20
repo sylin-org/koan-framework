@@ -28,4 +28,4 @@ Well-known endpoints
 References
 - docs/15-entity-filtering-and-query.md
 - docs/12-cqrs-for-humans.md
-- docs/decisions/0032-paging-pushdown-and-in-memory-fallback.md
+- docs/decisions/DATA-0032-paging-pushdown-and-in-memory-fallback.md

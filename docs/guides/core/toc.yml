@@ -1,0 +1,20 @@
+- name: Core
+  href: index.md
+- name: Getting started
+  href: getting-started.md
+- name: Composition & profiles
+  href: composition-and-profiles.md
+- name: Core contracts
+  href: core-contracts.md
+- name: CQRS for humans
+  href: cqrs-for-humans.md
+- name: Engineering guardrails
+  href: engineering-guardrails.md
+- name: Generators considerations
+  href: generators-considerations.md
+- name: Implementation plan
+  href: implementation-plan.md
+- name: Samples plan
+  href: samples-plan.md
+- name: Executive pitch
+  href: executive-pitch.md

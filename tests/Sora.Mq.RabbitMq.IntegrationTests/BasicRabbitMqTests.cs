@@ -3,9 +3,10 @@ using DotNet.Testcontainers.Containers;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Core;
 using Sora.Core;
+using Sora.Data.Core;
 using Sora.Messaging;
+using Sora.Testing;
 using System.Text.Json;
 using Xunit;
 
@@ -14,12 +15,23 @@ public class BasicRabbitMqTests : IAsyncLifetime
     private TestcontainersContainer? _rabbit;
     private int _hostPort = 5674; // avoid default 5672 to reduce conflicts
     private bool _available;
+    private string? _dockerEndpoint;
 
     public async Task InitializeAsync()
     {
+        // Standardized Docker probing and Ryuk disable
+        Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
+        var probe = await DockerEnvironment.ProbeAsync();
+        if (!probe.Available)
+        {
+            _available = false;
+            return;
+        }
+        _dockerEndpoint = probe.Endpoint;
         try
         {
             _rabbit = new TestcontainersBuilder<TestcontainersContainer>()
+                .WithDockerEndpoint(_dockerEndpoint)
                 .WithImage("rabbitmq:3.13-management")
                 .WithPortBinding(_hostPort, 5672)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5672))
@@ -45,12 +57,12 @@ public class BasicRabbitMqTests : IAsyncLifetime
     [Fact]
     public async Task Send_and_handle_message_via_DI_handler()
     {
-    if (!_available) return; // Skip when Docker/Testcontainers not available.
-    var conn = $"amqp://guest:guest@localhost:{_hostPort}";
+        if (!_available) return; // Skip when Docker/Testcontainers not available.
+        var conn = $"amqp://guest:guest@localhost:{_hostPort}";
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -86,7 +98,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -138,7 +150,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -186,7 +198,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -236,7 +248,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:DefaultGroup"] = "workers",
@@ -268,7 +280,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -339,7 +351,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -353,7 +365,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
         services.AddSingleton<IConfiguration>(cfg);
 
         var handler = new InboxedHandler();
-    services.AddSora();
+        services.AddSora();
         services.AddSingleton<IMessageHandler<InboxSample>>(handler);
 
         var sp = services.BuildServiceProvider();

@@ -77,9 +77,9 @@ internal sealed class HealthService : IHealthService
             }
         }
 
-    var overall = reports.Any(r => r.State == HealthState.Unhealthy) && _registry.All.FirstOrDefault(x => x.IsCritical && reports.Any(r => r.Name == x.Name && r.State == HealthState.Unhealthy)) != null
-            ? HealthState.Unhealthy
-            : reports.Any(r => r.State != HealthState.Healthy) ? HealthState.Degraded : HealthState.Healthy;
+        var overall = reports.Any(r => r.State == HealthState.Unhealthy) && _registry.All.FirstOrDefault(x => x.IsCritical && reports.Any(r => r.Name == x.Name && r.State == HealthState.Unhealthy)) != null
+                ? HealthState.Unhealthy
+                : reports.Any(r => r.State != HealthState.Healthy) ? HealthState.Degraded : HealthState.Healthy;
         return (overall, reports);
     }
 }

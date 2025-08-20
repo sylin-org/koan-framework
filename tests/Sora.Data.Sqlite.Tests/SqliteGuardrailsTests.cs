@@ -1,13 +1,13 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.Sqlite;
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
@@ -53,7 +53,7 @@ public class SqliteGuardrailsTests
         var repo = data.GetRepository<Todo, string>();
         for (int i = 0; i < 20; i++) await repo.UpsertAsync(new Todo { Title = $"t-{i}" });
 
-        var all = await repo.QueryAsync((object?)null);
+        var all = await repo.QueryAsync(null);
         all.Count.Should().Be(5); // DefaultPageSize from config
 
         var srepo = (IStringQueryRepository<Todo, string>)repo;

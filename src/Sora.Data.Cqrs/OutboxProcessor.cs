@@ -1,14 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sora.Data.Cqrs;
 
@@ -91,7 +91,7 @@ internal sealed class OutboxProcessor : BackgroundService
         var profile = _routing.GetProfileNameFor(entityType);
         if (string.IsNullOrWhiteSpace(profile)) return;
 
-    if (string.Equals(entry.Operation, "Upsert", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(entry.Operation, "Upsert", StringComparison.OrdinalIgnoreCase))
         {
             var model = JsonSerializer.Deserialize(entry.PayloadJson, entityType, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             if (model is null) return;

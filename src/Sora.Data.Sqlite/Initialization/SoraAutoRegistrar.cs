@@ -21,7 +21,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
         // Health contributor for readiness checks
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
     }
 
@@ -43,11 +43,11 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
                 Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize)
         };
         var cs = o.ConnectionString;
-    report.AddSetting("ConnectionString", cs, isSecret: true);
+        report.AddSetting("ConnectionString", cs, isSecret: true);
         report.AddSetting("NamingStyle", o.NamingStyle.ToString());
         report.AddSetting("Separator", o.Separator);
-    // Announce schema capability per acceptance criteria
-    report.AddSetting(Sora.Data.Sqlite.Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+        // Announce schema capability per acceptance criteria
+        report.AddSetting(Sora.Data.Sqlite.Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
         report.AddSetting(Sora.Data.Sqlite.Infrastructure.Constants.Bootstrap.DefaultPageSize, o.DefaultPageSize.ToString());
         report.AddSetting(Sora.Data.Sqlite.Infrastructure.Constants.Bootstrap.MaxPageSize, o.MaxPageSize.ToString());
     }

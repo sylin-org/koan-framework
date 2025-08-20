@@ -37,6 +37,6 @@ public static class Constants
             public const string TfBuild = "TF:BUILD";
         }
 
-        
+
     }
 }

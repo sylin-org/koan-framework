@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +5,8 @@ using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
 using Sora.Data.Json;
+using System;
+using System.Threading.Tasks;
 using Xunit;
 
 public class DataServiceTests
@@ -14,12 +14,12 @@ public class DataServiceTests
     [Fact]
     public async Task Resolves_Per_Type_Repository_Via_Provider_Config()
     {
-    var cfg = new ConfigurationBuilder().AddInMemoryCollection(new[] { new KeyValuePair<string,string?>("SORA_DATA_PROVIDER","json") }).Build();
+        var cfg = new ConfigurationBuilder().AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("SORA_DATA_PROVIDER", "json") }).Build();
         var sc = new ServiceCollection();
-    sc.AddSingleton<IConfiguration>(cfg);
-    sc.AddSoraDataCore();
-    sc.AddSingleton<IDataService, DataService>();
-    // Directory can be provided via options if desired; default is .\\data
+        sc.AddSingleton<IConfiguration>(cfg);
+        sc.AddSoraDataCore();
+        sc.AddSingleton<IDataService, DataService>();
+        // Directory can be provided via options if desired; default is .\\data
         var sp = sc.BuildServiceProvider();
 
         var data = sp.GetRequiredService<IDataService>();

@@ -2,9 +2,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Web.Infrastructure;
 using System.Linq;
 using System.Threading.Tasks;
-using Sora.Web.Infrastructure;
 
 namespace Sora.Web.Controllers;
 
@@ -48,7 +48,7 @@ public sealed class HealthController(IHealthService health, IHostEnvironment env
             Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
         }
 
-    Response.Headers["Cache-Control"] = SoraWebConstants.Policies.NoStore;
+        Response.Headers["Cache-Control"] = SoraWebConstants.Policies.NoStore;
         return Ok(payload);
     }
 }

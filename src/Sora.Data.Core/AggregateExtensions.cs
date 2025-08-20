@@ -1,13 +1,13 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sora.Data.Core;
 
@@ -80,13 +80,13 @@ public static class AggregateExtensions
     /// </summary>
     public static async Task<object?> Upsert(this object model, CancellationToken ct = default)
     {
-    if (model is null) throw new System.ArgumentNullException(nameof(model));
+        if (model is null) throw new System.ArgumentNullException(nameof(model));
         var (aggType, keyType) = ResolveAggregateContract(model.GetType());
         var data = DataService();
         var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
-    var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
-    var upsert = repo.GetType().GetMethod("UpsertAsync")!;
-    var task = (Task)upsert.Invoke(repo, new object[] { model, ct })!;
+        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
+        var upsert = repo.GetType().GetMethod("UpsertAsync")!;
+        var task = (Task)upsert.Invoke(repo, new object[] { model, ct })!;
         await task.ConfigureAwait(false);
         var resultProp = task.GetType().GetProperty("Result");
         return resultProp?.GetValue(task);
@@ -98,14 +98,14 @@ public static class AggregateExtensions
     /// </summary>
     public static async Task<bool> Delete(this object model, CancellationToken ct = default)
     {
-    if (model is null) throw new System.ArgumentNullException(nameof(model));
+        if (model is null) throw new System.ArgumentNullException(nameof(model));
         var type = model.GetType();
         var (aggType, keyType) = ResolveAggregateContract(type);
-    var id = Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue(model) ?? throw new System.InvalidOperationException("Model has no identifier");
+        var id = Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue(model) ?? throw new System.InvalidOperationException("Model has no identifier");
         var data = DataService();
         var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
-    var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
-    var del = repo.GetType().GetMethod("DeleteAsync")!;
+        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
+        var del = repo.GetType().GetMethod("DeleteAsync")!;
         var task = (Task)del.Invoke(repo, new object[] { id, ct })!;
         await task.ConfigureAwait(false);
         var resultProp = task.GetType().GetProperty("Result");
@@ -333,23 +333,31 @@ public static class Data<TEntity, TKey>
     { using var _ = WithSet(set); return Repo.GetAsync(id, ct); }
 
     public static Task<IReadOnlyList<TEntity>> All(string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.QueryAsync((object?)null, ct); }
+    { using var _ = WithSet(set); return Repo.QueryAsync(null, ct); }
     public static Task<int> CountAllAsync(string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.CountAsync((object?)null, ct); }
+    { using var _ = WithSet(set); return Repo.CountAsync(null, ct); }
 
     public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.QueryAsync(predicate, ct)
-            ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository."); }
+    {
+        using var _ = WithSet(set); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.QueryAsync(predicate, ct)
+            ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
+    }
     public static Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.CountAsync(predicate, ct)
-            ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository."); }
+    {
+        using var _ = WithSet(set); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.CountAsync(predicate, ct)
+            ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
+    }
 
     public static Task<IReadOnlyList<TEntity>> Query(string query, string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return (Repo as IStringQueryRepository<TEntity, TKey>)?.QueryAsync(query, ct)
-            ?? throw new System.NotSupportedException("String queries are not supported by this repository."); }
+    {
+        using var _ = WithSet(set); return (Repo as IStringQueryRepository<TEntity, TKey>)?.QueryAsync(query, ct)
+            ?? throw new System.NotSupportedException("String queries are not supported by this repository.");
+    }
     public static Task<int> CountAsync(string query, string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return (Repo as IStringQueryRepository<TEntity, TKey>)?.CountAsync(query, ct)
-            ?? throw new System.NotSupportedException("String queries are not supported by this repository."); }
+    {
+        using var _ = WithSet(set); return (Repo as IStringQueryRepository<TEntity, TKey>)?.CountAsync(query, ct)
+            ?? throw new System.NotSupportedException("String queries are not supported by this repository.");
+    }
 
     public static Task<TEntity> UpsertAsync(TEntity model, string set, CancellationToken ct = default)
     { using var _ = WithSet(set); return Repo.UpsertAsync(model, ct); }
@@ -374,7 +382,7 @@ public static class Data<TEntity, TKey>
         }
         else
         {
-            var all = await Repo.QueryAsync((object?)null, ct).ConfigureAwait(false);
+            var all = await Repo.QueryAsync(null, ct).ConfigureAwait(false);
             var filtered = all.AsQueryable().Where(predicate).ToList();
             var ids = filtered.Select(e => e.Id);
             return await Repo.DeleteManyAsync(ids, ct).ConfigureAwait(false);
@@ -442,7 +450,7 @@ public static class Data<TEntity, TKey>
         if (string.Equals(fromSet, toSet, StringComparison.Ordinal)) return 0;
         using var _from = WithSet(fromSet);
         var source = predicate is null
-            ? await Repo.QueryAsync((object?)null, ct).ConfigureAwait(false)
+            ? await Repo.QueryAsync(null, ct).ConfigureAwait(false)
             : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct).ConfigureAwait(false);
         if (source.Count == 0) return 0;
         var total = 0;
@@ -467,7 +475,7 @@ public static class Data<TEntity, TKey>
         if (string.Equals(fromSet, toSet, StringComparison.Ordinal)) return 0;
         using var _from = WithSet(fromSet);
         var source = predicate is null
-            ? await Repo.QueryAsync((object?)null, ct).ConfigureAwait(false)
+            ? await Repo.QueryAsync(null, ct).ConfigureAwait(false)
             : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct).ConfigureAwait(false);
         if (source.Count == 0) return 0;
         var total = 0;

@@ -1,20 +1,20 @@
-using Sora.Data.Core;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using S1.Web;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
+using Sora.Data.Core;
 using Sora.Web;
-using S1.Web;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Framework bootstrap
 builder.Services.AddSora()
-	// Sensible defaults: controllers, static files, secure headers, ProblemDetails
-	.AsWebApi()
-	// Toggle middleware
-	.WithExceptionHandler()
-	.WithRateLimit();
+    // Sensible defaults: controllers, static files, secure headers, ProblemDetails
+    .AsWebApi()
+    // Toggle middleware
+    .WithExceptionHandler()
+    .WithRateLimit();
 
 // Transformers disabled in S1: keep API simple here.
 
@@ -29,17 +29,17 @@ builder.Services.AddSora()
 // App policy: register a rate limiter (pipeline toggle enables UseRateLimiter)
 builder.Services.AddRateLimiter(options =>
 {
-	options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-	options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
-		RateLimitPartition.GetFixedWindowLimiter(
-			partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
-			factory: _ => new FixedWindowRateLimiterOptions
-			{
-				PermitLimit = 200,
-				Window = TimeSpan.FromMinutes(1),
-				QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-				QueueLimit = 0
-			}));
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 200,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
 });
 
 // Optional: use SQLite instead of JSON

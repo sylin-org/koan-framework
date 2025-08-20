@@ -17,3 +17,4 @@ What to look for
 - Sample Stack: a minimal but realistic app to demonstrate the ideas.
 - Adapter: the piece that connects Sora to a specific storage/messaging system.
 - Seed/Clear: create sample data, then delete it to start over.
+f1f1f1f1f1

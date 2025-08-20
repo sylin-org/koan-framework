@@ -16,7 +16,7 @@ public sealed record MessageEnvelope(
     string TypeAlias,
     string? CorrelationId,
     string? CausationId,
-    IReadOnlyDictionary<string,string> Headers,
+    IReadOnlyDictionary<string, string> Headers,
     int Attempt,
     DateTimeOffset Timestamp
 );

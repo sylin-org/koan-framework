@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +6,10 @@ using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
 using Sora.Data.Sqlite;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
@@ -60,7 +60,7 @@ public class SqliteInstructionTests
         var ensured = await data.Execute<Todo, bool>(new Instruction("relational.schema.ensureCreated"));
         ensured.Should().BeTrue();
 
-    await Todo.Execute("INSERT INTO Todo(Id, Title) VALUES(@id,@t)", data, new { id = "1", t = "x" });
+        await Todo.Execute("INSERT INTO Todo(Id, Title) VALUES(@id,@t)", data, new { id = "1", t = "x" });
 
         var count = await data.Execute<Todo, long>(InstructionSql.Scalar("SELECT COUNT(*) FROM Todo"));
         count.Should().Be(1);

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Sora.Data.Weaviate</AssemblyName>
+    <RootNamespace>Sora.Data.Weaviate</RootNamespace>
+  <Description>Weaviate vector adapter for Sora: schema ensure, KNN search, filter pushdown via AST→GraphQL translator, and health checks.</Description>
+  <PackageTags>$(CommonPackageTags);data;vector;weaviate;graphql;knn</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
+  <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
+    <PackageReference Include="System.Net.Http.Json" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+  </ItemGroup>
+</Project>

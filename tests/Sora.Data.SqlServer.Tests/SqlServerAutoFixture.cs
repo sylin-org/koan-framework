@@ -1,7 +1,3 @@
-using System;
-using System.Data.Common;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
@@ -13,6 +9,10 @@ using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.SqlServer;
+using System;
+using System.Collections.Generic;
+using System.Data.Common;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.SqlServer.Tests;
@@ -59,16 +59,16 @@ public sealed class SqlServerAutoFixture : IAsyncLifetime, IDisposable
             })
             .Build();
 
-    var services = new ServiceCollection();
-    services.AddSingleton<IConfiguration>(cfg);
-    services.AddSoraCore();
-    services.AddSoraDataCore();
-    services.AddSqlServerAdapter();
-    ServiceProvider = services.BuildServiceProvider();
-    Data = ServiceProvider.GetRequiredService<IDataService>();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(cfg);
+        services.AddSoraCore();
+        services.AddSoraDataCore();
+        services.AddSqlServerAdapter();
+        ServiceProvider = services.BuildServiceProvider();
+        Data = ServiceProvider.GetRequiredService<IDataService>();
 
         // Smoke probe
-    await using var conn = new SqlConnection(ConnectionString);
+        await using var conn = new SqlConnection(ConnectionString);
         await conn.OpenAsync();
         await using var cmd = new SqlCommand("SELECT 1", conn);
         await cmd.ExecuteScalarAsync();

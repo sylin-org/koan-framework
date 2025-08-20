@@ -4,8 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-  <Description>Core primitives for Sora: configuration helper, environment snapshot (SoraEnv), constants, and foundational abstractions.</Description>
-  <PackageTags>$(CommonPackageTags);core;configuration;options;environment;runtimesnapshot;constants</PackageTags>
+    <Description>Core primitives for Sora: configuration helper, environment snapshot (SoraEnv), constants, and foundational abstractions.</Description>
+    <PackageTags>$(CommonPackageTags);core;configuration;options;environment;runtimesnapshot;constants</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,15 +13,15 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.0" />
-  <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.0" />
-  <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="9.0.8" />
-  <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
-  <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
-  <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
-  <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
-  <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.8.1" />
-  <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.8.1" />
-  <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.8.1" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.8.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.8.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.8.1" />
   </ItemGroup>
 
 </Project>

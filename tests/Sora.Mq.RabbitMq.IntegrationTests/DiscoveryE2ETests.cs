@@ -10,6 +10,7 @@ using Sora.Core;
 using Sora.Data.Core;
 using Sora.Messaging;
 using Sora.Messaging.Inbox.Http;
+using Sora.Testing;
 using System.Text;
 using System.Text.Json;
 using Xunit;
@@ -19,12 +20,18 @@ public class DiscoveryE2ETests : IAsyncLifetime
     private TestcontainersContainer? _rabbit;
     private int _hostPort = 5676;
     private bool _available;
+    private string? _dockerEndpoint;
 
     public async Task InitializeAsync()
     {
+        Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
+        var probe = await DockerEnvironment.ProbeAsync();
+        if (!probe.Available) { _available = false; return; }
+        _dockerEndpoint = probe.Endpoint;
         try
         {
             _rabbit = new TestcontainersBuilder<TestcontainersContainer>()
+                .WithDockerEndpoint(_dockerEndpoint)
                 .WithImage("rabbitmq:3.13-management")
                 .WithPortBinding(_hostPort, 5672)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5672))
@@ -76,14 +83,14 @@ public class DiscoveryE2ETests : IAsyncLifetime
             channel.BasicAck(ea.DeliveryTag, false);
             await Task.CompletedTask;
         };
-    channel.BasicConsume(queue: q, autoAck: false, consumer: consumer);
-    // Give the consumer a tick to attach before publishing test messages
-    await Task.Delay(10);
+        channel.BasicConsume(queue: q, autoAck: false, consumer: consumer);
+        // Give the consumer a tick to attach before publishing test messages
+        await Task.Delay(10);
 
         // Now build a Sora app configured for discovery
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:DefaultGroup"] = group,

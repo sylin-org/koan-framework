@@ -1,10 +1,10 @@
+using FluentAssertions;
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Threading.Tasks;
-using FluentAssertions;
-using Xunit;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+using Xunit;
 
 namespace S0.ConsoleJsonRepo.Tests;
 

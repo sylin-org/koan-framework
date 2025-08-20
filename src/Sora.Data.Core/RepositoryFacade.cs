@@ -1,10 +1,10 @@
+using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Instructions;
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Instructions;
 
 namespace Sora.Data.Core;
 
@@ -17,6 +17,7 @@ namespace Sora.Data.Core;
 ///</summary>
 internal sealed class RepositoryFacade<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
+    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
@@ -141,11 +142,11 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         // Prefer adapter fast-path when available
         if (_inner is IInstructionExecutor<TEntity> exec)
         {
-            try { return await exec.ExecuteAsync<int>(new Instruction("data.clear"), ct); }
+            try { return await exec.ExecuteAsync<int>(new Instruction(global::Sora.Data.DataInstructions.Clear), ct); }
             catch (NotSupportedException) { /* fall back */ }
         }
         // Fallback: enumerate ids then delete
-        var all = await _inner.QueryAsync((object?)null, ct);
+        var all = await _inner.QueryAsync(null, ct);
         var ids = all.Select(e => e.Id);
         return await _inner.DeleteManyAsync(ids, ct);
     }
@@ -170,8 +171,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         private readonly RepositoryFacade<TEntity, TKey> _outer;
         private readonly List<TEntity> _adds = new();
         private readonly List<TEntity> _updates = new();
-    private readonly List<TKey> _deletes = new();
-	private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
+        private readonly List<TKey> _deletes = new();
+        private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
 
         public BatchFacade(RepositoryFacade<TEntity, TKey> outer) => _outer = outer;
 
@@ -181,8 +182,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-    /// <inheritdoc />
-    public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        /// <inheritdoc />
+        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
             foreach (var e in _adds)

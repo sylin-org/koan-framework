@@ -1,6 +1,6 @@
+using Sora.Data.Abstractions.Annotations;
 using System;
 using System.Reflection;
-using Sora.Data.Abstractions.Annotations;
 
 namespace Sora.Data.Abstractions.Naming;
 

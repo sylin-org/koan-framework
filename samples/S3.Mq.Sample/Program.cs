@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
-using Sora.Messaging;
 using Sora.Data.Core;
+using Sora.Messaging;
 
 var services = new ServiceCollection();
 

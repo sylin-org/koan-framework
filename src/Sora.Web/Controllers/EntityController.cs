@@ -1,20 +1,20 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Mime;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Domain;
 using Sora.Web.Filtering;
 using Sora.Web.Hooks;
 using Sora.Web.Infrastructure;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Mime;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sora.Web.Controllers;
 
@@ -54,13 +54,13 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     {
         var q = HttpContext.Request.Query;
         var opts = new QueryOptions();
-    // Apply defaults from attribute
-    var beh = GetType().GetCustomAttributes(typeof(SoraDataBehaviorAttribute), true).FirstOrDefault() as SoraDataBehaviorAttribute;
+        // Apply defaults from attribute
+        var beh = GetType().GetCustomAttributes(typeof(SoraDataBehaviorAttribute), true).FirstOrDefault() as SoraDataBehaviorAttribute;
         if (q.TryGetValue("q", out var vq)) opts.Q = vq.FirstOrDefault();
-    if (q.TryGetValue("page", out var vp) && int.TryParse(vp, out var p) && p > 0) opts.Page = p; else opts.Page = 1;
-    var maxSize = beh?.MaxPageSize ?? SoraWebConstants.Defaults.MaxPageSize;
-    var defSize = beh?.DefaultPageSize ?? SoraWebConstants.Defaults.DefaultPageSize;
-    if (q.TryGetValue("size", out var vs) && int.TryParse(vs, out var s) && s > 0) opts.PageSize = Math.Min(s, maxSize); else opts.PageSize = defSize;
+        if (q.TryGetValue("page", out var vp) && int.TryParse(vp, out var p) && p > 0) opts.Page = p; else opts.Page = 1;
+        var maxSize = beh?.MaxPageSize ?? SoraWebConstants.Defaults.MaxPageSize;
+        var defSize = beh?.DefaultPageSize ?? SoraWebConstants.Defaults.DefaultPageSize;
+        if (q.TryGetValue("size", out var vs) && int.TryParse(vs, out var s) && s > 0) opts.PageSize = Math.Min(s, maxSize); else opts.PageSize = defSize;
         if (q.TryGetValue("sort", out var vsort))
         {
             foreach (var spec in vsort.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -94,11 +94,11 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
     protected virtual ObjectResult PrepareResponse(object content)
     {
-    // Mark Accept as a content-variant
-    Response.Headers["Vary"] = "Accept";
-    Response.Headers["Sora-Access-Read"] = CanRead.ToString().ToLowerInvariant();
-    Response.Headers["Sora-Access-Write"] = CanWrite.ToString().ToLowerInvariant();
-    Response.Headers["Sora-Access-Remove"] = CanRemove.ToString().ToLowerInvariant();
+        // Mark Accept as a content-variant
+        Response.Headers["Vary"] = "Accept";
+        Response.Headers["Sora-Access-Read"] = CanRead.ToString().ToLowerInvariant();
+        Response.Headers["Sora-Access-Write"] = CanWrite.ToString().ToLowerInvariant();
+        Response.Headers["Sora-Access-Remove"] = CanRemove.ToString().ToLowerInvariant();
         return new ObjectResult(content);
     }
 
@@ -131,16 +131,16 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var caps = Capabilities(repo);
         var opts = BuildOptions();
 
-    var ctx = new HookContext<TEntity> { Http = HttpContext, Services = HttpContext.RequestServices, Options = opts, Capabilities = caps, Ct = ct };
+        var ctx = new HookContext<TEntity> { Http = HttpContext, Services = HttpContext.RequestServices, Options = opts, Capabilities = caps, Ct = ct };
         var runner = GetRunner();
 
         if (!await runner.BuildOptionsAsync(ctx, opts)) return ctx.ShortCircuitResult!;
         if (!await runner.BeforeCollectionAsync(ctx, opts)) return ctx.ShortCircuitResult!;
 
         // Accept either string q or JSON filter via querystring: filter={} (URL or single-quoted)
-    IReadOnlyList<TEntity> items;
-    int total = 0;
-    System.Linq.Expressions.Expression<Func<TEntity, bool>>? builtPredicate = null;
+        IReadOnlyList<TEntity> items;
+        int total = 0;
+        System.Linq.Expressions.Expression<Func<TEntity, bool>>? builtPredicate = null;
         var filterQs = HttpContext.Request.Query.TryGetValue("filter", out var f) ? f.ToString() : null;
         var set = HttpContext.Request.Query.TryGetValue("set", out var sVal) ? sVal.ToString() : null;
         // Optional: ignoreCase query parameter (true/1/yes) to enable case-insensitive string matching
@@ -194,12 +194,12 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             {
                 items = await repo.QueryAsync(null, ct);
             }
-            try { total = await repo.CountAsync((object?)null, ct); } catch { total = items.Count; }
+            try { total = await repo.CountAsync(null, ct); } catch { total = items.Count; }
         }
 
-    var list = items.ToList();
+        var list = items.ToList();
         // Server-side pagination (currently in-memory; providers should implement native paging)
-    var beh = GetType().GetCustomAttributes(typeof(SoraDataBehaviorAttribute), true).FirstOrDefault() as SoraDataBehaviorAttribute;
+        var beh = GetType().GetCustomAttributes(typeof(SoraDataBehaviorAttribute), true).FirstOrDefault() as SoraDataBehaviorAttribute;
         if ((beh?.MustPaginate ?? false) || HttpContext.Request.Query.ContainsKey("page") || HttpContext.Request.Query.ContainsKey("size"))
         {
             var skip = (opts.Page - 1) * opts.PageSize;
@@ -238,17 +238,17 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         }
         if (!await runner.AfterCollectionAsync(ctx, list)) return ctx.ShortCircuitResult!;
 
-    object payload = list;
+        object payload = list;
         // Shape mapping
         if (string.Equals(opts.Shape, "map", StringComparison.OrdinalIgnoreCase))
             payload = list.Select(i => new { key = (object?)((dynamic)i).Id, display = GetDisplay(i) }).ToList();
         else if (string.Equals(opts.Shape, "dict", StringComparison.OrdinalIgnoreCase))
             payload = list.ToDictionary(i => (object?)((dynamic)i).Id!, i => (object)GetDisplay(i));
 
-    // Accept/view selection echo
-    var accept = HttpContext.Request.Headers["Accept"].ToString();
-    if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
-    else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
+        // Accept/view selection echo
+        var accept = HttpContext.Request.Headers["Accept"].ToString();
+        if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
+        else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
 
         var (replaced, transformed) = await runner.EmitCollectionAsync(ctx, payload);
         payload = transformed;
@@ -290,9 +290,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         }
         catch { }
 
-    IReadOnlyList<TEntity> items;
-    int total = 0;
-    System.Linq.Expressions.Expression<Func<TEntity, bool>>? builtPredicate = null;
+        IReadOnlyList<TEntity> items;
+        int total = 0;
+        System.Linq.Expressions.Expression<Func<TEntity, bool>>? builtPredicate = null;
         using var _set = Sora.Data.Core.DataSetContext.With(string.IsNullOrWhiteSpace(set) ? null : set);
         if (!string.IsNullOrWhiteSpace(filterJson) && repo is ILinqQueryRepository<TEntity, TKey> lrepo)
         {
@@ -310,7 +310,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         else
         {
             items = await repo.QueryAsync(null, ct);
-            try { total = await repo.CountAsync((object?)null, ct); } catch { total = items.Count; }
+            try { total = await repo.CountAsync(null, ct); } catch { total = items.Count; }
         }
 
         var list = items.ToList();
@@ -331,7 +331,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
         if (!await runner.AfterCollectionAsync(ctx, list)) return ctx.ShortCircuitResult!;
         var (replaced, transformed) = await runner.EmitCollectionAsync(ctx, list);
-    foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
+        foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
         return PrepareResponse(transformed);
     }
 
@@ -348,12 +348,12 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var model = Activator.CreateInstance<TEntity>();
         await runner.AfterModelFetchAsync(ctx, model);
 
-    // Accept/view header
-    var accept = HttpContext.Request.Headers["Accept"].ToString();
-    if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
-    else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
+        // Accept/view header
+        var accept = HttpContext.Request.Headers["Accept"].ToString();
+        if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
+        else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
 
-    var (replaced, transformed) = await runner.EmitModelAsync(ctx, model!);
+        var (replaced, transformed) = await runner.EmitModelAsync(ctx, model!);
         var payload = transformed;
         foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
         return PrepareResponse(payload);
@@ -369,19 +369,19 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var ctx = new HookContext<TEntity> { Http = HttpContext, Services = HttpContext.RequestServices, Options = opts, Capabilities = caps, Ct = ct };
         var runner = GetRunner();
 
-    var idStr = id?.ToString() ?? string.Empty;
-    if (!await runner.BeforeModelFetchAsync(ctx, idStr)) return ctx.ShortCircuitResult!;
+        var idStr = id?.ToString() ?? string.Empty;
+        if (!await runner.BeforeModelFetchAsync(ctx, idStr)) return ctx.ShortCircuitResult!;
 
-    var model = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var model = await Data<TEntity, TKey>.GetAsync(id!, ct);
         await runner.AfterModelFetchAsync(ctx, model);
         if (model == null) return NotFound();
 
-    // Accept/view header
-    var accept = HttpContext.Request.Headers["Accept"].ToString();
-    if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
-    else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
+        // Accept/view header
+        var accept = HttpContext.Request.Headers["Accept"].ToString();
+        if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
+        else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
 
-    var (replaced, transformed) = await runner.EmitModelAsync(ctx, model);
+        var (replaced, transformed) = await runner.EmitModelAsync(ctx, model);
         foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
         return PrepareResponse(transformed);
     }
@@ -389,7 +389,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpPost("")]
     public virtual async Task<IActionResult> Upsert([FromBody][ValidateNever] TEntity model, CancellationToken ct)
     {
-    if (model is null) return BadRequest(new { error = "Request body is required" });
+        if (model is null) return BadRequest(new { error = "Request body is required" });
         if (!CanWrite) return Forbid();
         var repo = HttpContext.RequestServices.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>();
         var caps = Capabilities(repo);
@@ -398,15 +398,15 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var runner = GetRunner();
 
         await runner.BeforeSaveAsync(ctx, model);
-    var saved = await model.Upsert<TEntity, TKey>(ct);
+        var saved = await model.Upsert<TEntity, TKey>(ct);
         await runner.AfterSaveAsync(ctx, saved);
 
-    // Accept/view header
-    var accept = HttpContext.Request.Headers["Accept"].ToString();
-    if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
-    else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
+        // Accept/view header
+        var accept = HttpContext.Request.Headers["Accept"].ToString();
+        if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
+        else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
 
-    var (replaced, transformed) = await runner.EmitModelAsync(ctx, saved);
+        var (replaced, transformed) = await runner.EmitModelAsync(ctx, saved);
         foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
         return PrepareResponse(transformed);
     }
@@ -415,8 +415,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpPost("bulk")]
     public virtual async Task<IActionResult> UpsertMany([FromBody][ValidateNever] IEnumerable<TEntity> models, CancellationToken ct)
     {
-    if (models is null) return BadRequest(new { error = "Request body is required" });
-    if (!CanWrite) return Forbid();
+        if (models is null) return BadRequest(new { error = "Request body is required" });
+        if (!CanWrite) return Forbid();
         var repo = HttpContext.RequestServices.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>();
         var caps = Capabilities(repo);
         var writes = WriteCaps(repo);
@@ -425,9 +425,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var runner = GetRunner();
 
         // Run per-model BeforeSave hooks and ensure IDs via facade
-    var list = models.ToList();
-    if (list.Count == 0) return BadRequest(new { error = "At least one item is required" });
-    if (list.Any(m => m is null)) return BadRequest(new { error = "Null items are not allowed" });
+        var list = models.ToList();
+        if (list.Count == 0) return BadRequest(new { error = "At least one item is required" });
+        if (list.Any(m => m is null)) return BadRequest(new { error = "Null items are not allowed" });
         foreach (var m in list) await runner.BeforeSaveAsync(ctx, m);
 
         var count = await Data<TEntity, TKey>.UpsertManyAsync(list, ct);
@@ -514,9 +514,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
         await runner.BeforePatchAsync(ctx, id?.ToString() ?? string.Empty, patch);
 
-    var original = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var original = await Data<TEntity, TKey>.GetAsync(id!, ct);
         if (original == null) return NotFound();
-    var working = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var working = await Data<TEntity, TKey>.GetAsync(id!, ct);
         patch.ApplyTo(working!);
         // Ensure id consistency
         var idProp = typeof(TEntity).GetProperty("Id");
@@ -526,7 +526,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             if (newId is not null && !Equals(newId, id)) return Conflict();
         }
         await runner.BeforeSaveAsync(ctx, working!);
-    var saved = await working!.Upsert<TEntity, TKey>(ct);
+        var saved = await working!.Upsert<TEntity, TKey>(ct);
         await runner.AfterPatchAsync(ctx, saved);
 
         // Accept/view header
@@ -558,4 +558,5 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 }
 
 public abstract class EntityController<TEntity> : EntityController<TEntity, string>
-    where TEntity : class, IEntity<string> { }
+    where TEntity : class, IEntity<string>
+{ }

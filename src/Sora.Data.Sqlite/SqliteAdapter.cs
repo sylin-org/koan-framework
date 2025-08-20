@@ -1,11 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Data;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
@@ -16,11 +8,20 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Abstractions.Naming;
-using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
+using System.Data.Common;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sora.Data.Sqlite;
 
@@ -75,12 +76,13 @@ public static class SqliteRegistration
 {
     public static IServiceCollection AddSqliteAdapter(this IServiceCollection services, Action<SqliteOptions>? configure = null)
     {
-    services.AddOptions<SqliteOptions>().ValidateDataAnnotations();
-    services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>());
+        services.AddOptions<SqliteOptions>().ValidateDataAnnotations();
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         // Ensure health contributor is available even outside Sora bootstrap
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqliteConnectionFactory>());
         return services;
     }
 }
@@ -151,6 +153,16 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory
     }
 }
 
+internal sealed class SqliteConnectionFactory : Sora.Data.Core.Configuration.IDataProviderConnectionFactory
+{
+    public bool CanHandle(string provider)
+        => provider.Equals("sqlite", StringComparison.OrdinalIgnoreCase)
+           || provider.Contains("sqlite", StringComparison.OrdinalIgnoreCase);
+
+    public DbConnection Create(string connectionString)
+        => new SqliteConnection(connectionString);
+}
+
 internal sealed class SqliteRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
@@ -182,14 +194,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     {
         _sp = sp;
         _options = options;
-      _nameResolver = resolver;
-    // Initialize runtime snapshot so AllowMagicInProduction and environment are honored in tests and apps
-    Sora.Core.SoraEnv.TryInitialize(sp);
-      // Logger: prefer typed logger; fall back to category
-      _logger = (sp.GetService(typeof(ILogger<SqliteRepository<TEntity, TKey>>)) as ILogger)
-            ?? (sp.GetService(typeof(ILoggerFactory)) is ILoggerFactory lf
-                ? lf.CreateLogger($"Sora.Data.Sqlite[{typeof(TEntity).FullName}]")
-                : NullLogger.Instance);
+        _nameResolver = resolver;
+        // Initialize runtime snapshot so AllowMagicInProduction and environment are honored in tests and apps
+        Sora.Core.SoraEnv.TryInitialize(sp);
+        // Logger: prefer typed logger; fall back to category
+        _logger = (sp.GetService(typeof(ILogger<SqliteRepository<TEntity, TKey>>)) as ILogger)
+              ?? (sp.GetService(typeof(ILoggerFactory)) is ILoggerFactory lf
+                  ? lf.CreateLogger($"Sora.Data.Sqlite[{typeof(TEntity).FullName}]")
+                  : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
         _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
@@ -211,7 +223,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     {
         // Respect governance: DDL policy, read-only attribute, and production magic flag
         bool entityReadOnly = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: true).Any();
-    bool allowDdl = IsDdlAllowed(entityReadOnly);
+        bool allowDdl = IsDdlAllowed(entityReadOnly);
 
         Log.EnsureTableStart(_logger, TableName, _options.DdlPolicy.ToString(), allowDdl, entityReadOnly);
 
@@ -231,7 +243,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     Json TEXT NOT NULL DEFAULT '{{}}'
 );";
         cmd.ExecuteNonQuery();
-    Log.EnsureTableCreated(_logger, TableName);
+        Log.EnsureTableCreated(_logger, TableName);
         // Discover existing columns
         var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         using (var schema = conn.CreateCommand())
@@ -284,7 +296,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             AddGeneratedColumnIfMissing("Meta", "$.Meta");
         }
 
-    Log.EnsureTableEnd(_logger, TableName);
+        Log.EnsureTableEnd(_logger, TableName);
     }
 
     private void EnsureTable(IDbConnection db)
@@ -343,7 +355,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
     {
-    ct.ThrowIfCancellationRequested();
+        ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.get");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
@@ -353,7 +365,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
-    ct.ThrowIfCancellationRequested();
+        ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
@@ -375,9 +387,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     public async Task<int> CountAsync(object? query, CancellationToken ct = default)
     {
-    ct.ThrowIfCancellationRequested();
-    using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:all");
-    act?.SetTag("entity", typeof(TEntity).FullName);
+        ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:all");
+        act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
         return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}]");
     }
@@ -450,9 +462,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
-    ct.ThrowIfCancellationRequested();
-    using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:linq");
-    act?.SetTag("entity", typeof(TEntity).FullName);
+        ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:linq");
+        act?.SetTag("entity", typeof(TEntity).FullName);
         var translator = new LinqWhereTranslator<TEntity>(_dialect);
         try
         {
@@ -476,7 +488,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-    if (IsFullSelect(sql))
+        if (IsFullSelect(sql))
         {
             var rewritten = RewriteEntityToken(sql);
             try
@@ -492,7 +504,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 return MapRowsToEntities(rows);
             }
         }
-    else
+        else
         {
             var whereSql = RewriteWhereForProjection(sql);
             var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {_defaultPageSize}");
@@ -506,7 +518,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:string:param");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-    if (IsFullSelect(sql))
+        if (IsFullSelect(sql))
         {
             var rewritten = RewriteEntityToken(sql);
             try
@@ -574,12 +586,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     public async Task<int> CountAsync(string sql, CancellationToken ct = default)
     {
-    ct.ThrowIfCancellationRequested();
+        ct.ThrowIfCancellationRequested();
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:string");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-    var whereSql = RewriteWhereForProjection(sql);
-    return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql);
+        var whereSql = RewriteWhereForProjection(sql);
+        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql);
     }
 
     public async Task<int> CountAsync(string sql, object? parameters, CancellationToken ct = default)
@@ -588,8 +600,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:string:param");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-    var whereSql = RewriteWhereForProjection(sql);
-    return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql, parameters);
+        var whereSql = RewriteWhereForProjection(sql);
+        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql, parameters);
     }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
@@ -621,7 +633,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             }
             catch { /* ignore */ }
         }
-    using var tx = conn.BeginTransaction();
+        using var tx = conn.BeginTransaction();
         var count = 0;
         foreach (var e in models)
         {
@@ -631,12 +643,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             {
                 await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json }, tx);
             }
-        catch (SqliteException ex) when (IsNoSuchTable(ex))
+            catch (SqliteException ex) when (IsNoSuchTable(ex))
             {
                 // Table may not exist yet due to governance gating; ensure then retry once
                 if (conn is SqliteConnection sc)
                 {
-            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                    Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
                     TryEnsureTableWithGovernance(sc);
                 }
                 await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json }, tx);
@@ -675,7 +687,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-    public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
         {
             // Apply mutations by loading entities then queueing as updates
             foreach (var (id, mutate) in _mutations)
@@ -732,69 +744,90 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     // IInstructionExecutor implementation for schema and raw SQL helpers
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     {
-    using var act = SqliteTelemetry.Activity.StartActivity("sqlite.instruction");
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.instruction");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = new SqliteConnection(_options.ConnectionString);
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case "relational.schema.validate":
-            {
-                var report = ValidateSchema(conn);
-                return (TResult)(object)report;
-            }
-            case "data.ensureCreated":
+            case global::Sora.Data.Relational.RelationalInstructions.SchemaValidate:
+                {
+                    var report = ValidateSchema(conn);
+                    return (TResult)report;
+                }
+            case global::Sora.Data.DataInstructions.EnsureCreated:
                 TryEnsureTableWithGovernance(conn);
                 object d_ok = true;
                 return (TResult)d_ok;
-            case "data.clear":
+            case global::Sora.Data.DataInstructions.Clear:
                 TryEnsureTableWithGovernance(conn);
                 var del = await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
                 object d_res = del;
                 return (TResult)d_res;
-            case "relational.schema.ensureCreated":
+            case global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated:
                 TryEnsureTableWithGovernance(conn);
                 object ok = true;
                 return (TResult)ok;
-            case "relational.sql.scalar":
-            {
-        var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                try
+            case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
                 {
-                    var result = await conn.ExecuteScalarAsync(sql, p);
-                    return CastScalar<TResult>(result);
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    try
+                    {
+                        var result = await conn.ExecuteScalarAsync(sql, p);
+                        return CastScalar<TResult>(result);
+                    }
+                    catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+                    {
+                        Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                        TryEnsureTableWithGovernance(conn);
+                        var result = await conn.ExecuteScalarAsync(sql, p);
+                        return CastScalar<TResult>(result);
+                    }
                 }
-                catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+            case global::Sora.Data.Relational.RelationalInstructions.SqlNonQuery:
                 {
-                    Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                    TryEnsureTableWithGovernance(conn);
-                    var result = await conn.ExecuteScalarAsync(sql, p);
-                    return CastScalar<TResult>(result);
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    sql = MaybeRewriteInsertForProjection(sql);
+                    // Ensure table exists if targeting this entity table
+                    try { TryEnsureTableWithGovernance(conn); } catch { }
+                    var p = GetParamsFromInstruction(instruction);
+                    try
+                    {
+                        var affected = await conn.ExecuteAsync(sql, p);
+                        object res = affected;
+                        return (TResult)res;
+                    }
+                    catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+                    {
+                        Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                        TryEnsureTableWithGovernance(conn);
+                        var affected = await conn.ExecuteAsync(sql, p);
+                        object res = affected;
+                        return (TResult)res;
+                    }
                 }
-            }
-            case "relational.sql.nonquery":
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                sql = MaybeRewriteInsertForProjection(sql);
-                // Ensure table exists if targeting this entity table
-                try { TryEnsureTableWithGovernance(conn); } catch { }
-                var p = GetParamsFromInstruction(instruction);
-                try
+            case global::Sora.Data.Relational.RelationalInstructions.SqlQuery:
                 {
-                    var affected = await conn.ExecuteAsync(sql, p);
-                    object res = affected;
-                    return (TResult)res;
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    // Best-effort ensure for entity table
+                    try { TryEnsureTableWithGovernance(conn); } catch { }
+                    try
+                    {
+                        var rows = await conn.QueryAsync(sql, p);
+                        var list = MapDynamicRows(rows);
+                        return (TResult)(object)list;
+                    }
+                    catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+                    {
+                        Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                        TryEnsureTableWithGovernance(conn);
+                        var rows = await conn.QueryAsync(sql, p);
+                        var list = MapDynamicRows(rows);
+                        return (TResult)(object)list;
+                    }
                 }
-                catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-                {
-                    Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                    TryEnsureTableWithGovernance(conn);
-                    var affected = await conn.ExecuteAsync(sql, p);
-                    object res = affected;
-                    return (TResult)res;
-                }
-            }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by SQLite adapter for {typeof(TEntity).Name}.");
         }
@@ -803,11 +836,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private object ValidateSchema(SqliteConnection conn)
     {
         // Compute DDL allowance like EnsureTable
-    bool entityReadOnly = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: true).Any();
-    bool ddlAllowed = IsDdlAllowed(entityReadOnly);
+        bool entityReadOnly = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: true).Any();
+        bool ddlAllowed = IsDdlAllowed(entityReadOnly);
 
-    var table = TableName;
-    Log.ValidateSchemaStart(_logger, table);
+        var table = TableName;
+        Log.ValidateSchemaStart(_logger, table);
         var exists = TableExists(conn);
         var projections = Sora.Data.Core.ProjectionResolver.Get(typeof(TEntity));
         var projectedColumns = projections.Select(p => p.ColumnName).Distinct(StringComparer.Ordinal).ToArray();
@@ -846,7 +879,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         else
             state = "Healthy";
 
-    var dict = new Dictionary<string, object?>
+        var dict = new Dictionary<string, object?>
         {
             ["Provider"] = "sqlite",
             ["Table"] = table,
@@ -858,7 +891,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             ["MatchingMode"] = mode.ToString(),
             ["State"] = state
         };
-    Log.ValidateSchemaResult(_logger, table, exists, missing.Count, _options.DdlPolicy.ToString(), ddlAllowed, mode.ToString(), state);
+        Log.ValidateSchemaResult(_logger, table, exists, missing.Count, _options.DdlPolicy.ToString(), ddlAllowed, mode.ToString(), state);
         return dict;
     }
 
@@ -989,6 +1022,30 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         try { return (TResult)Convert.ChangeType(value, t); } catch { return default!; }
     }
 
+    private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<dynamic> rows)
+    {
+        var list = new List<Dictionary<string, object?>>();
+        foreach (var row in rows)
+        {
+            if (row is IDictionary<string, object?> map)
+            {
+                list.Add(new Dictionary<string, object?>(map, StringComparer.OrdinalIgnoreCase));
+            }
+            else
+            {
+                var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                var props = ((object)row).GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                foreach (var p in props)
+                {
+                    if (!p.CanRead) continue;
+                    dict[p.Name] = p.GetValue(row);
+                }
+                list.Add(dict);
+            }
+        }
+        return list;
+    }
+
     // Projection-aware rewrite: if identifiers are already quoted ([Prop]), only rewrite bracketed tokens.
     // If unquoted, replace bare words with projected columns or JSON1 extraction.
     private string RewriteWhereForProjection(string whereSql)
@@ -1036,8 +1093,25 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 // Leave common SQL keywords/operators untouched
                 switch (token.ToUpperInvariant())
                 {
-                    case "AND": case "OR": case "NOT": case "NULL": case "LIKE": case "IN": case "IS": case "BETWEEN": case "EXISTS":
-                    case "SELECT": case "FROM": case "WHERE": case "GROUP": case "BY": case "ORDER": case "LIMIT": case "OFFSET": case "ASC": case "DESC":
+                    case "AND":
+                    case "OR":
+                    case "NOT":
+                    case "NULL":
+                    case "LIKE":
+                    case "IN":
+                    case "IS":
+                    case "BETWEEN":
+                    case "EXISTS":
+                    case "SELECT":
+                    case "FROM":
+                    case "WHERE":
+                    case "GROUP":
+                    case "BY":
+                    case "ORDER":
+                    case "LIMIT":
+                    case "OFFSET":
+                    case "ASC":
+                    case "DESC":
                         return token;
                 }
                 // If it already got mapped, skip

@@ -1,9 +1,9 @@
+using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Collections.Generic;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Sora.Data.Cqrs;
 

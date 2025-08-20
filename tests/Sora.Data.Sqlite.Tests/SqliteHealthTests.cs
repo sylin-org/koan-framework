@@ -1,13 +1,13 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Abstractions;
 using Sora.Core;
+using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.Sqlite;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
@@ -23,8 +23,8 @@ public class SqliteHealthTests
             })
             .Build();
         sc.AddSingleton<IConfiguration>(cfg);
-    sc.AddSqliteAdapter();
-    sc.AddSoraDataCore();
+        sc.AddSqliteAdapter();
+        sc.AddSoraDataCore();
         return sc.BuildServiceProvider();
     }
 

@@ -13,14 +13,14 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-    // No-op: this assembly already exposes an internal ISoraInitializer (TransformerStartupInitializer)
-    // which SoraInitialization will discover and run. We avoid duplicate registration here.
+        // No-op: this assembly already exposes an internal ISoraInitializer (TransformerStartupInitializer)
+        // which SoraInitialization will discover and run. We avoid duplicate registration here.
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-    var enabled = cfg.Read(Sora.Web.Transformers.Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
-    report.AddSetting("AutoDiscover", enabled.ToString());
+        var enabled = cfg.Read(Sora.Web.Transformers.Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
+        report.AddSetting("AutoDiscover", enabled.ToString());
     }
 }

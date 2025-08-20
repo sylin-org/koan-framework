@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
-using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Sora.Messaging.Core.Infrastructure;
+using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace Sora.Messaging;
 
@@ -42,7 +42,7 @@ internal sealed class MessageBusSelector : IMessageBusSelector
 
     public IMessageBus ResolveDefault(IServiceProvider sp)
     {
-    var code = _opts.Value.DefaultBus ?? "default";
+        var code = _opts.Value.DefaultBus ?? "default";
         return Resolve(sp, code);
     }
 
@@ -53,9 +53,9 @@ internal sealed class MessageBusSelector : IMessageBusSelector
             .ThenBy(f => f.ProviderName)
             .FirstOrDefault();
         if (selected is null) throw new InvalidOperationException("No messaging providers registered.");
-    var sectionPath = $"{Constants.Configuration.Buses}:{busCode}";
-    var (bus, caps) = selected.Create(_sp, busCode, _cfg.GetSection(sectionPath));
-    // Diagnostics are registered by providers when creating the bus
+        var sectionPath = $"{Constants.Configuration.Buses}:{busCode}";
+        var (bus, caps) = selected.Create(_sp, busCode, _cfg.GetSection(sectionPath));
+        // Diagnostics are registered by providers when creating the bus
         return bus;
     }
 }
@@ -64,10 +64,10 @@ public static class MessagingServiceCollectionExtensions
 {
     public static IServiceCollection AddMessagingCore(this IServiceCollection services)
     {
-    services.AddOptions<MessagingOptions>().BindConfiguration(Constants.Configuration.Section);
+        services.AddOptions<MessagingOptions>().BindConfiguration(Constants.Configuration.Section);
         services.TryAddSingleton<IMessageBusSelector, MessageBusSelector>();
         services.TryAddSingleton<ITypeAliasRegistry, DefaultTypeAliasRegistry>();
-    services.TryAddSingleton<IMessagingDiagnostics, MessagingDiagnostics>();
+        services.TryAddSingleton<IMessagingDiagnostics, MessagingDiagnostics>();
         return services;
     }
 }

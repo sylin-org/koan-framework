@@ -3,11 +3,12 @@ using DotNet.Testcontainers.Containers;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Core;
-using Sora.Data.Core;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using Sora.Core;
+using Sora.Data.Core;
 using Sora.Messaging;
+using Sora.Testing;
 using System.Text.Json;
 using Xunit;
 
@@ -16,12 +17,18 @@ public class DiscoveryCachingTests : IAsyncLifetime
     private TestcontainersContainer? _rabbit;
     private int _hostPort = 5677;
     private bool _available;
+    private string? _dockerEndpoint;
 
     public async Task InitializeAsync()
     {
+        Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
+        var probe = await DockerEnvironment.ProbeAsync();
+        if (!probe.Available) { _available = false; return; }
+        _dockerEndpoint = probe.Endpoint;
         try
         {
             _rabbit = new TestcontainersBuilder<TestcontainersContainer>()
+                .WithDockerEndpoint(_dockerEndpoint)
                 .WithImage("rabbitmq:3.13-management")
                 .WithPortBinding(_hostPort, 5672)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5672))
@@ -75,7 +82,7 @@ public class DiscoveryCachingTests : IAsyncLifetime
         // App configured with short timeout and longer cache
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = busCode,
                 ["Sora:Messaging:DefaultGroup"] = group,

@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +5,9 @@ using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
 using Sora.Data.Sqlite;
+using System;
+using System.IO;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
@@ -51,9 +51,9 @@ public class SqliteRepositoryTests
     public async Task Crud_And_Index_Works()
     {
         var file = TempFile();
-    var sp = BuildServices(file);
-    var data = sp.GetRequiredService<IDataService>();
-    var repo = data.GetRepository<Todo, string>();
+        var sp = BuildServices(file);
+        var data = sp.GetRequiredService<IDataService>();
+        var repo = data.GetRepository<Todo, string>();
 
         // Capabilities: should advertise String + Linq and bulk writes
         if (repo is IQueryCapabilities qc)
@@ -99,22 +99,22 @@ public class SqliteRepositoryTests
         await repo.UpsertAsync(new Todo { Title = "milk" });
         await repo.UpsertAsync(new Todo { Title = "bread" });
 
-    var srepo = (IStringQueryRepository<Todo, string>)repo;
-    // WHERE suffix (no param bound here)
-    var whereItems = await srepo.QueryAsync("Title LIKE @p", new { p = "%milk%" });
-    whereItems.Should().ContainSingle(i => i.Title == "milk");
+        var srepo = (IStringQueryRepository<Todo, string>)repo;
+        // WHERE suffix (no param bound here)
+        var whereItems = await srepo.QueryAsync("Title LIKE @p", new { p = "%milk%" });
+        whereItems.Should().ContainSingle(i => i.Title == "milk");
 
-    var items = await srepo.QueryAsync("Title LIKE '%milk%'");
+        var items = await srepo.QueryAsync("Title LIKE '%milk%'");
         items.Should().ContainSingle(i => i.Title == "milk");
 
         // Full select
-    var items2 = await srepo.QueryAsync("SELECT Id, Title, Meta FROM Todo WHERE Title = 'bread'");
+        var items2 = await srepo.QueryAsync("SELECT Id, Title, Meta FROM Todo WHERE Title = 'bread'");
         items2.Should().ContainSingle(i => i.Title == "bread");
 
-    // LINQ predicate over materialized results
-    var linqRepo = (ILinqQueryRepository<Todo, string>)repo;
-    var linqItems = await linqRepo.QueryAsync(x => x.Title.Contains("milk"));
-    linqItems.Should().ContainSingle(i => i.Title == "milk");
+        // LINQ predicate over materialized results
+        var linqRepo = (ILinqQueryRepository<Todo, string>)repo;
+        var linqItems = await linqRepo.QueryAsync(x => x.Title.Contains("milk"));
+        linqItems.Should().ContainSingle(i => i.Title == "milk");
     }
 
     [Fact]
@@ -128,10 +128,10 @@ public class SqliteRepositoryTests
         await repo.UpsertAsync(new Todo { Title = "a'b" });
 
         // We can't pass parameters through the static facade yet; fetch via repository cast
-    repo.Should().BeAssignableTo<IStringQueryRepository<Todo, string>>();
-    var srepo = (IStringQueryRepository<Todo, string>)repo;
-    var results = await srepo.QueryAsync("Title = @t", new { t = "a'b" });
-    results.Should().HaveCount(1);
+        repo.Should().BeAssignableTo<IStringQueryRepository<Todo, string>>();
+        var srepo = (IStringQueryRepository<Todo, string>)repo;
+        var results = await srepo.QueryAsync("Title = @t", new { t = "a'b" });
+        results.Should().HaveCount(1);
     }
 
     [Fact]
@@ -142,13 +142,13 @@ public class SqliteRepositoryTests
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
-    var srepo = (IStringQueryRepository<Todo, string>)repo;
-    var none = await srepo.QueryAsync("Title = 'none'");
+        var srepo = (IStringQueryRepository<Todo, string>)repo;
+        var none = await srepo.QueryAsync("Title = 'none'");
         none.Should().BeEmpty();
 
         using var cts = new System.Threading.CancellationTokenSource();
         cts.Cancel();
-    await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await repo.QueryAsync(null, cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await repo.QueryAsync(null, cts.Token));
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class SqliteRepositoryTests
         var many = Enumerable.Range(0, 100).Select(i => new Todo { Title = $"t-{i}" });
         using var cts = new System.Threading.CancellationTokenSource();
         cts.Cancel();
-    await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await repo.UpsertManyAsync(many, cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await repo.UpsertManyAsync(many, cts.Token));
     }
 
     [Fact]
@@ -177,6 +177,6 @@ public class SqliteRepositoryTests
         for (int i = 0; i < 10; i++) batch.Add(new Todo { Title = $"b-{i}" });
         using var cts = new System.Threading.CancellationTokenSource();
         cts.Cancel();
-    await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await batch.SaveAsync(null, cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await batch.SaveAsync(null, cts.Token));
     }
 }

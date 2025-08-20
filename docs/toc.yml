@@ -1,0 +1,30 @@
+- name: Overview
+  href: README.md
+- name: Feature Catalog
+  href: feature-catalog.md
+- name: Guides
+  items:
+    - name: Core
+      href: guides/core/index.md
+    - name: Data
+      href: guides/data/index.md
+    - name: Web
+      href: guides/web/index.md
+    - name: Messaging
+      href: guides/messaging/index.md
+    - name: Adapters
+      href: guides/adapters/index.md
+    - name: AI
+      items:
+        - name: Overview
+          href: guides/ai/index.md
+        - name: Native AI Sora — Epic
+          href: guides/ai/native-ai-sora-epic.md
+        - name: Interop Matrix (REST/SSE ↔ gRPC/OpenAI/MCP/AI-RPC)
+          href: guides/ai/interop-matrix.md
+- name: Support
+  href: support/index.md
+- name: Decisions
+  href: decisions/index.md
+- name: API Reference
+  href: api/index.md

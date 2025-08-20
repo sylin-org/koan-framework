@@ -78,11 +78,11 @@ public static class MessagingExtensions
         public MessageHandlerBuilder OnBatch<T>(Action<MessageEnvelope, Batch<T>> handler)
         { _services.OnBatch(handler); return this; }
 
-    public MessageHandlerBuilder OnMessages<T>(Func<MessageEnvelope, IReadOnlyList<T>, CancellationToken, Task> handler)
-    { _services.OnMessages(handler); return this; }
+        public MessageHandlerBuilder OnMessages<T>(Func<MessageEnvelope, IReadOnlyList<T>, CancellationToken, Task> handler)
+        { _services.OnMessages(handler); return this; }
 
-    public MessageHandlerBuilder OnMessages<T>(Action<MessageEnvelope, IReadOnlyList<T>> handler)
-    { _services.OnMessages(handler); return this; }
+        public MessageHandlerBuilder OnMessages<T>(Action<MessageEnvelope, IReadOnlyList<T>> handler)
+        { _services.OnMessages(handler); return this; }
     }
 
     // Delegate sugar for Batch<T>

@@ -7,13 +7,13 @@ namespace Sora.Data.Abstractions.Instructions;
 public static class InstructionSql
 {
     public static Instruction NonQuery(string sql, object? parameters = null)
-        => new("relational.sql.nonquery", new { Sql = sql }, ToDictionary(parameters));
+    => new(Sora.Data.Relational.RelationalInstructions.SqlNonQuery, new { Sql = sql }, ToDictionary(parameters));
 
     public static Instruction Scalar(string sql, object? parameters = null)
-        => new("relational.sql.scalar", new { Sql = sql }, ToDictionary(parameters));
+    => new(Sora.Data.Relational.RelationalInstructions.SqlScalar, new { Sql = sql }, ToDictionary(parameters));
 
     public static Instruction Query(string sql, object? parameters = null)
-        => new("relational.sql.query", new { Sql = sql }, ToDictionary(parameters));
+    => new(Sora.Data.Relational.RelationalInstructions.SqlQuery, new { Sql = sql }, ToDictionary(parameters));
 
     internal static IReadOnlyDictionary<string, object?>? ToDictionary(object? parameters)
     {
