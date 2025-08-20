@@ -25,7 +25,7 @@ public sealed class WeaviateAutoFixture : IAsyncLifetime
             .WithName("sora-weaviate-test")
             .WithPortBinding(8085, 8080)
             .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(8080).ForPath("/.well-known/ready")));
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(8080));
 
         _container = builder.Build();
         await _container.StartAsync();

@@ -1,4 +1,4 @@
-using Sora.Data.Abstractions;
+using Sora.Core;
 using Microsoft.Extensions.Options;
 
 namespace Sora.Data.Weaviate;

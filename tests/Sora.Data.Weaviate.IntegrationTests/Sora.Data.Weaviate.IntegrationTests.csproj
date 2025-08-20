@@ -2,6 +2,8 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <IsPackable>false</IsPackable>
+  <Nullable>enable</Nullable>
+  <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sora.Data.Weaviate\Sora.Data.Weaviate.csproj" />
@@ -10,7 +12,8 @@
     <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="xunit" Version="2.9.0" />
+  <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+  <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="DotNet.Testcontainers" Version="1.7.0-beta.2269" />
   </ItemGroup>

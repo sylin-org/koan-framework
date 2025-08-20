@@ -7,6 +7,12 @@ using Xunit;
 
 namespace Sora.Data.Weaviate.IntegrationTests;
 
+public sealed class TestEntity : IEntity<string>
+{
+    public string Id { get; set; } = string.Empty;
+    public float[] Vector { get; set; } = Array.Empty<float>();
+}
+
 public sealed class WeaviateVectorTests : VectorAcceptanceTests<TestEntity, string>, IClassFixture<WeaviateAutoFixture>
 {
     private readonly WeaviateAutoFixture _fx;
@@ -54,9 +60,5 @@ public sealed class WeaviateVectorTests : VectorAcceptanceTests<TestEntity, stri
         yield return new TestEntity { Id = "c", Vector = new float[] { 0.2f, 0.1f, 0.0f, 0.3f, 0.9f } };
     }
 
-    public sealed class TestEntity : IEntity<string>
-    {
-        public string Id { get; set; } = string.Empty;
-        public float[] Vector { get; set; } = Array.Empty<float>();
-    }
+    // TestEntity moved to the namespace scope for use in the base type
 }

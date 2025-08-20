@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
+  <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
     <PackageReference Include="System.Net.Http.Json" Version="9.0.0-preview.7.24405.7" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
   </ItemGroup>

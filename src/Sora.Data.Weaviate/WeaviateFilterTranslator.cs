@@ -1,6 +1,6 @@
 using System;
 using System.Linq;
-using Sora.Data.Abstractions.Vector.Filtering;
+using Sora.Data.Abstractions;
 
 namespace Sora.Data.Weaviate;
 
