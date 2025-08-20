@@ -74,3 +74,16 @@ Canonical ADRs live in this folder. They’re grouped by domain below for quick 
 - 0038 — Auto-registration — DX-0038-auto-registration.md
 
 Template: see 0000-template.md
+
+## AI (AI)
+
+- 0001 — Native AI baseline — AI-0001-ai-baseline.md
+- 0002 — AI API contracts and SSE format — AI-0002-api-contracts-and-sse.md
+- 0003 — Tokenization and cost strategy — AI-0003-tokenization-and-cost.md
+- 0004 — Secrets provider and per-tenant key management — AI-0004-secrets-provider.md
+- 0005 — Protocol surfaces (gRPC, OpenAI shim, MCP, AI-RPC) — AI-0005-protocol-surfaces.md
+- 0006 — Data formats and grounding (Parquet, JSON-LD, Schema.org) — AI-0006-data-formats-and-grounding.md
+- 0007 — Inference servers interop (KServe, vLLM, TGI) — AI-0007-inference-servers-interop.md
+ - 0010 — Prompt entrypoint and augmentation pipeline — AI-0010-entrypoint-and-augmentations.md
+- 0008 — AI adapters and registry — AI-0008-adapters-and-registry.md
+- 0009 — Multi-service routing, load balancing, and policies — AI-0009-multi-service-routing-and-policies.md

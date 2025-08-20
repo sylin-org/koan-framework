@@ -14,6 +14,14 @@
       href: guides/messaging/index.md
     - name: Adapters
       href: guides/adapters/index.md
+    - name: AI
+      items:
+        - name: Overview
+          href: guides/ai/index.md
+        - name: Native AI Sora — Epic
+          href: guides/ai/native-ai-sora-epic.md
+        - name: Interop Matrix (REST/SSE ↔ gRPC/OpenAI/MCP/AI-RPC)
+          href: guides/ai/interop-matrix.md
 - name: Support
   href: support/index.md
 - name: Decisions

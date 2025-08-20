@@ -94,7 +94,6 @@
       href: OPS-0014-samples-port-allocation.md
     - name: Default configuration fallback
       href: OPS-0015-default-configuration-fallback.md
-- name: DevEx (DX)
   items:
     - name: Tiny templates family
       href: DX-0037-tiny-templates-family.md
@@ -102,3 +101,25 @@
       href: DX-0038-auto-registration.md
     - name: Sylin prefix and package IDs
       href: DX-0036-sylin-prefix-and-package-ids.md
+ - name: AI (AI)
+   items:
+     - name: Native AI baseline
+       href: AI-0001-ai-baseline.md
+     - name: API contracts and SSE format
+       href: AI-0002-api-contracts-and-sse.md
+     - name: Tokenization and cost
+       href: AI-0003-tokenization-and-cost.md
+     - name: Secrets provider and per-tenant keys
+       href: AI-0004-secrets-provider.md
+     - name: Protocol surfaces (gRPC, OpenAI shim, MCP, AI-RPC)
+       href: AI-0005-protocol-surfaces.md
+     - name: Data formats and grounding (Parquet, JSON-LD, Schema.org)
+       href: AI-0006-data-formats-and-grounding.md
+     - name: Inference servers interop (KServe, vLLM, TGI)
+       href: AI-0007-inference-servers-interop.md
+      - name: Prompt entrypoint and augmentation pipeline
+        href: AI-0010-entrypoint-and-augmentations.md
+     - name: AI adapters and registry
+       href: AI-0008-adapters-and-registry.md
+     - name: Multi-service routing, load balancing, and policies
+       href: AI-0009-multi-service-routing-and-policies.md
