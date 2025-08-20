@@ -23,6 +23,11 @@ public static class Constants
             public const string AltDdlPolicy = AltSection + ":DdlPolicy";
             public const string SchemaMatchingMode = Section + ":SchemaMatchingMode";
             public const string AltSchemaMatchingMode = AltSection + ":SchemaMatchingMode";
+
+            // Materialization/serialization options
+            public const string JsonCaseInsensitive = Section + ":JsonCaseInsensitive";
+            public const string JsonWriteIndented = Section + ":JsonWriteIndented";
+            public const string JsonIgnoreNullValues = Section + ":JsonIgnoreNullValues";
         }
     }
 }

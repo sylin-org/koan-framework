@@ -58,7 +58,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddOptions<YourDataOptions>().BindConfiguration("Sora:Data:YourData");
         services.AddSingleton<IDataAdapterFactory, YourDataAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<INamingDefaultsProvider, YourDataNamingDefaultsProvider>());
-        services.AddSingleton<IHealthContributor, YourDataHealthContributor>();
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, YourDataHealthContributor>());
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)

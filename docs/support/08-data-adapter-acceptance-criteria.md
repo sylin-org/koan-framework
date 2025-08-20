@@ -70,6 +70,7 @@ If the backing database does not expose native bulk operations:
 ## 7) Storage naming and schema
 
 - MUST resolve physical names via `StorageNameRegistry` and the provider’s `INamingDefaultsProvider`; do not implement parallel naming logic inside repositories (see decisions 0017, 0018, 0030).
+- Relational adapters MUST delegate schema validation/creation and materialization to the shared orchestrator in `Sora.Data.Relational` (do not inline custom ensure/validate logic in adapters). Providers MUST implement small primitives (DDL executor and feature flags) consumed by the orchestrator.
 - Relational adapters SHOULD use the shared relational schema toolkit to generate/apply schema and indexes.
 - MUST honor DataAnnotations where feasible: Required, DefaultValue, MaxLength, and Index. Where the store cannot enforce a constraint, MUST preserve data fidelity and document the limitation.
 - MUST explicitly announce whether the adapter can create or migrate schema, and expose an idempotent ensure-created path when supported. If schema creation/migration is not supported or not permitted in the environment, MUST return a clear NotSupported response.
@@ -82,6 +83,9 @@ If the backing database does not expose native bulk operations:
 - Adapters that support schema actions MUST implement an idempotent ensure-created instruction (e.g., `data.ensureCreated` or `relational.schema.ensureCreated`). Migrations MAY be supported but MUST be explicit opt-in and documented.
 - MUST parameterize inputs (e.g., via Dapper) to avoid injection vulnerabilities.
 - If an instruction is unsupported or disallowed by configuration/policy, MUST return a clear NotSupported result/exception with actionable guidance.
+
+Relational-specific:
+- MUST route `relational.schema.validate`, `relational.schema.ensureCreated`, and related schema/migration instructions to the `Sora.Data.Relational` orchestrator. The orchestrator determines the concrete shape (JSON-first vs. materialized) and uses provider primitives to apply it.
 
 ## 9) Diagnostics, health, and observability
 
@@ -97,6 +101,16 @@ If the backing database does not expose native bulk operations:
  - MUST provide paging guardrails:
    - `DefaultPageSize` (applied when the caller does not specify paging) and `MaxPageSize` (an upper bound), with clear documentation of their defaults.
    - A production safety policy to disable or strictly limit in-memory filtering/paging (fallbacks). Respect the platform-level `Sora:AllowMagicInProduction` if applicable; adapters MAY also expose a provider-specific override.
+
+Relational materialization options and overrides (centralized in `Sora.Data.Relational`):
+- MUST support a `MaterializationPolicy` option with values:
+  - `None` (default): new tables are created as `Id + Json` only; no computed/physical projection columns unless explicitly requested.
+  - `ComputedProjections`: add computed columns (e.g., via `JSON_VALUE`) for projected properties; index columns with `IsIndexed` where supported.
+  - `PhysicalColumns`: add native typed columns for simple primitives in addition to `Json`; writes MUST mirror values to `Json`.
+- MUST support `ProbeOnStartup` (default: true in non-production, false in production) to enable schema probing and state caching.
+- MUST support `FailOnMismatch` (default: true when `MaterializationPolicy != None`) to control whether a detected mismatch causes hard failure or degraded fallback.
+- MUST honor existing `DdlPolicy`, `SchemaMatching`, and production safety flags (`AllowMagicInProduction`).
+ - MUST honor entity-level override via `[RelationalStorage(Shape=...)]` attribute; precedence is: entity attribute > orchestrator options > default. The orchestrator exposes `EnsureCreatedAsync<TEntity,TKey>()` to apply this decision.
 
 ## 11) Error semantics and safety
 
@@ -118,6 +132,16 @@ Adapters MUST include tests that verify the following:
 - Cancellation: mid-batch and mid-query cancellation raises `TaskCanceledException` and aborts work.
 - Health: health contributor passes under normal conditions and fails with clear diagnostics when broken.
 
+Relational materialization (additional tests):
+- Schema orchestration is delegated: adapter routes `relational.schema.*` instructions to the shared orchestrator.
+- Materialization policy:
+  - `None`: ensure-created produces `Id + Json`; validation is Healthy when table matches; queries operate via `JSON_VALUE` fallback when no projection columns exist.
+  - `ComputedProjections`: ensure-created/validate creates or verifies computed columns per projections; indexed columns are present when marked `IsIndexed` and supported; mismatches honor `FailOnMismatch`.
+  - `PhysicalColumns`: ensure-created/validate creates or verifies native columns and ensures write mirroring to `Json`.
+- Probing and caching respect `ProbeOnStartup` and environment gates; failures in production default to safe degraded behavior unless `FailOnMismatch` is set.
+- Failure path: when mismatch and `FailOnMismatch = true`, CRUD/query paths throw a clear `SchemaMismatchException`; health state reports Unhealthy with actionable details.
+ - The orchestrator’s `ValidateAsync` MUST surface `MissingColumns` and policy in its report; providers SHOULD wire repository operations to consult this state and throw `SchemaMismatchException` when `FailOnMismatch` is enabled.
+
 ## 13) Delivery checklist (PR gate)
 
 Use this checklist in PRs for new or updated adapters. All MUST items are required.
@@ -136,5 +160,42 @@ Use this checklist in PRs for new or updated adapters. All MUST items are requir
 - [ ] Health contributor registered
 - [ ] Tests cover capabilities, CRUD, bulk, batch, query, naming, instruction, cancellation, health
 - [ ] Docs updated (adapter README/notes if applicable)
+
+Relational-only (materialization & orchestration):
+- [ ] Adapter delegates schema/materialization to `Sora.Data.Relational` orchestrator (no inline ensure/validate logic)
+- [ ] Provider implements required primitives (DDL executor, feature flags) consumed by the orchestrator
+- [ ] Materialization options bound (`MaterializationPolicy`, `ProbeOnStartup`, `FailOnMismatch`) and respected alongside `DdlPolicy`/`SchemaMatching`
+- [ ] Acceptance tests cover policy shapes, probing, failure/degraded paths, and instruction routing
+
+## 14) Relational schema orchestration and materialization (normative)
+
+This section formalizes relational schema/materialization behavior managed by `Sora.Data.Relational`.
+
+- Central orchestration:
+  - MUST: Relational adapters delegate schema validation/creation and materialization to the shared orchestrator. Adapters SHOULD remain thin and dialect-focused.
+  - MUST: Provider packages expose primitives for DDL and feature discovery used by the orchestrator.
+
+- Supported shapes:
+  - JSON-first (default): Table with `[Id]` as primary key and `[Json]` as the document column. No computed/physical projection columns unless requested by policy.
+  - Computed projections: Computed columns per projection backed by `JSON_VALUE([Json], '$.Prop')`; persist the computed column if supported; index columns marked `IsIndexed` when the database supports indexes on computed columns.
+  - Physical columns: Native typed columns for simple primitives plus `[Json]`; writes MUST mirror values into `Json` to preserve fidelity; reserved for advanced scenarios.
+
+- Probing and state:
+  - MUST: Orchestrator can probe schema at startup when `ProbeOnStartup` is enabled (default on non-production); otherwise probe lazily on first access.
+  - MUST: Cache per-entity schema state (Healthy/Degraded/Failure) to avoid repeated probing.
+
+- Mismatch and failure semantics:
+  - MUST: If `FailOnMismatch = true` and the existing table does not match the required shape, mark Failure and throw a `SchemaMismatchException` on CRUD/query calls; health contributor reports Unhealthy with details (policy, missing/extra columns, `DdlAllowed`, `MatchingMode`).
+  - SHOULD: If `FailOnMismatch = false`, operate in Degraded mode using safe `JSON_VALUE` fallbacks; log actionable guidance and expose Degraded in health.
+
+- Instructions and routing:
+  - MUST: `relational.schema.validate` returns a detailed report describing shape, policy, DDL allowance, and state.
+  - MUST: `relational.schema.ensureCreated` applies the shape per attribute/options precedence (`EnsureCreatedAsync`) and `DdlPolicy`, idempotently.
+  - MAY: `relational.schema.clear` delete-all convenience; MUST be parameterized and safe.
+  - MUST: Providers route these to the orchestrator rather than reimplementing logic.
+
+- Production safety:
+  - MUST: Respect platform-level `Sora:AllowMagicInProduction` and provider overrides before performing DDL in production.
+  - MUST NOT: Perform destructive changes by default; destructive operations require explicit, narrowly scoped opt-ins.
 
 — End —

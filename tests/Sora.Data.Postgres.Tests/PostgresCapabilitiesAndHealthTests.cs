@@ -1,9 +1,10 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Sora.Core;
 using Sora.Data.Abstractions;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Sdk;
 
 namespace Sora.Data.Postgres.Tests;
 
@@ -20,9 +21,11 @@ public class PostgresCapabilitiesAndHealthTests : IClassFixture<PostgresAutoFixt
     public async Task Capabilities_and_health_are_reported()
     {
         if (_fx.SkipTests) return; // environment lacks Docker; treat as skipped
-        var hs = _fx.ServiceProvider.GetRequiredService<Sora.Core.IHealthService>();
-        var health = await hs.CheckAllAsync(default);
-        health.Overall.Should().Be(Sora.Core.HealthState.Healthy);
+    // Greenfield health: validate adapter contributor reports healthy
+    var contributors = _fx.ServiceProvider.GetRequiredService<System.Collections.Generic.IEnumerable<IHealthContributor>>();
+    var pg = contributors.First(c => c.Name == "data:postgres");
+    var report = await pg.CheckAsync(default);
+    report.State.Should().Be(HealthState.Healthy);
 
         var data = _fx.Data;
         var repo = data.GetRepository<TestEntity, string>();

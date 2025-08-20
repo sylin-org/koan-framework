@@ -19,8 +19,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         // Bind options from config and register adapter + health contributor
         services.AddOptions<JsonDataOptions>().ValidateDataAnnotations();
         services.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>, JsonDataOptionsConfigurator>();
-        services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
-        services.AddHealthContributor<JsonHealthContributor>();
+    services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, JsonHealthContributor>());
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)

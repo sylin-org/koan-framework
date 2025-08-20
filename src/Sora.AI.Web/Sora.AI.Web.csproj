@@ -10,6 +10,9 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <Using Include="Sora.Core" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Sora.AI\Sora.AI.csproj" />
     <ProjectReference Include="..\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
   </ItemGroup>

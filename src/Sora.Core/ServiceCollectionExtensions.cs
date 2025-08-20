@@ -25,13 +25,12 @@ public static class ServiceCollectionExtensions
 
         // Best-effort early initialization when provider is built later
 
-        services.AddSingleton<IHealthRegistry, HealthRegistry>();
-        services.AddSingleton<IHealthAnnouncementsStore, HealthAnnouncements>();
-        services.AddSingleton<IHealthAnnouncer>(sp => (HealthAnnouncements)sp.GetRequiredService<IHealthAnnouncementsStore>());
-        services.AddSingleton<IHealthService, HealthService>();
+    // Legacy health registry removed in greenfield; aggregator is the single source of truth
+    // Health Aggregator (push-first)
+    services.AddOptions<HealthAggregatorOptions>().BindConfiguration("Sora:Health:Aggregator");
+    services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HealthAggregatorOptions>>().Value);
+    services.AddSingleton<IHealthAggregator, HealthAggregator>();
+    services.AddHostedService<HealthAggregatorScheduler>();
         return services;
     }
-
-    public static IServiceCollection AddHealthContributor<T>(this IServiceCollection services) where T : class, IHealthContributor
-        => services.AddSingleton<IHealthContributor, T>();
 }

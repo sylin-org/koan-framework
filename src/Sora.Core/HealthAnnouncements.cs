@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sora.Core;
 
@@ -19,53 +16,56 @@ internal interface IHealthAnnouncementsStore
     IReadOnlyList<HealthReport> Snapshot();
 }
 
+// Adapter over the new IHealthAggregator for backward compatibility with HealthReporter
 internal sealed class HealthAnnouncements : IHealthAnnouncer, IHealthAnnouncementsStore
 {
-    private sealed record Entry(HealthState State, string? Description, IReadOnlyDictionary<string, object?>? Data, DateTimeOffset ExpiresAt, DateTimeOffset? LastNonHealthyAt);
-    private readonly ConcurrentDictionary<string, Entry> _items = new();
-    private static readonly TimeSpan DefaultTtl = TimeSpan.FromMinutes(2);
+    private readonly IHealthAggregator _agg;
+    private readonly HealthAggregatorOptions _opt;
+    public HealthAnnouncements(IHealthAggregator agg, HealthAggregatorOptions opt)
+    { _agg = agg; _opt = opt; }
 
     public void Healthy(string name)
-    {
-        // Healthy clears the message immediately
-        _items.TryRemove(name, out _);
-    }
+        => _agg.Push(name, HealthStatus.Healthy, message: null, ttl: null, facts: null);
 
     public void Degraded(string name, string? description = null, IReadOnlyDictionary<string, object?>? data = null, TimeSpan? ttl = null)
-        => Set(name, HealthState.Degraded, description, data, ttl);
+        => _agg.Push(name, HealthStatus.Degraded, description, ttl, ToFacts(data));
 
     public void Unhealthy(string name, string? description = null, IReadOnlyDictionary<string, object?>? data = null, TimeSpan? ttl = null)
-        => Set(name, HealthState.Unhealthy, description, data, ttl);
-
-    private void Set(string name, HealthState state, string? description, IReadOnlyDictionary<string, object?>? data, TimeSpan? ttl)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var expires = now + (ttl ?? DefaultTtl);
-        _items.AddOrUpdate(name,
-            _ => new Entry(state, description, data, expires, now),
-            (_, prev) => new Entry(state, description, data, expires, prev.LastNonHealthyAt ?? now));
-    }
+        => _agg.Push(name, HealthStatus.Unhealthy, description, ttl, ToFacts(data));
 
     public IReadOnlyList<HealthReport> Snapshot()
     {
-        var now = DateTimeOffset.UtcNow;
-        var results = new List<HealthReport>();
-        foreach (var kvp in _items.ToArray())
-        {
-            var name = kvp.Key;
-            var e = kvp.Value;
-            if (e.ExpiresAt <= now)
-            {
-                _items.TryRemove(name, out _);
-                continue;
-            }
-            var data = e.Data ?? (e.LastNonHealthyAt is not null
-                ? new Dictionary<string, object?> { ["lastNonHealthyAt"] = e.LastNonHealthyAt.Value.ToString("O") }
-                : null);
-            results.Add(new HealthReport(name, e.State, e.Description, null, data));
-        }
-        return results;
+        var snap = _agg.GetSnapshot();
+        return snap.Components
+            .Select(s => new HealthReport(
+                s.Component,
+                Map(s.Status),
+                s.Message,
+                null,
+                s.Facts?.ToDictionary(k => (string)k.Key, v => (object?)v.Value)
+            ))
+            .ToList();
     }
+
+    private static IReadOnlyDictionary<string, string>? ToFacts(IReadOnlyDictionary<string, object?>? data)
+    {
+        if (data is null) return null;
+        var dict = new Dictionary<string, string>();
+        foreach (var kv in data)
+        {
+            if (kv.Value is null) continue;
+            dict[kv.Key] = kv.Value.ToString() ?? string.Empty;
+        }
+        return dict;
+    }
+
+    private static HealthState Map(HealthStatus s) => s switch
+    {
+        HealthStatus.Healthy => HealthState.Healthy,
+        HealthStatus.Degraded => HealthState.Degraded,
+        HealthStatus.Unhealthy => HealthState.Unhealthy,
+        _ => HealthState.Degraded,
+    };
 }
 
 public static class HealthReporter
