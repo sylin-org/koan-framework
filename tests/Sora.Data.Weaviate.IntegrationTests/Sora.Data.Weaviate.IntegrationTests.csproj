@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Sora.Data.Weaviate\Sora.Data.Weaviate.csproj" />
+    <ProjectReference Include="..\Sora.Testing\Sora.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="DotNet.Testcontainers" Version="1.7.0-beta.2269" />
+  </ItemGroup>
+</Project>

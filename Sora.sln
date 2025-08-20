@@ -5,6 +5,10 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{5D20AA90-6969-D8BD-9DCD-8634F4692FDA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Data.Weaviate", "src\Sora.Data.Weaviate\Sora.Data.Weaviate.csproj", "{B3D5CFF3-2D8B-4C55-A2D8-0D9D5E3F7C0A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Data.Weaviate.IntegrationTests", "tests\Sora.Data.Weaviate.IntegrationTests\Sora.Data.Weaviate.IntegrationTests.csproj", "{3F11A49F-8D41-4D47-9A99-29F8E33B9E56}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Data.Postgres", "src\Sora.Data.Postgres\Sora.Data.Postgres.csproj", "{D6B0C1E2-ABCD-4F12-9E34-112233445566}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Data.Direct", "src\Sora.Data.Direct\Sora.Data.Direct.csproj", "{4A4F5C3E-1D2B-4C6D-9A15-2F3B4C6D7E8F}"
