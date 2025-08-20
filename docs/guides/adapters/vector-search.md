@@ -4,6 +4,9 @@ Status: Planned (see ADR DATA-0054)
 
 This guide defines Sora’s vector datasource signature and accessory elements. It complements, but does not replace, classic query surfaces (LINQ/string). Vector search is a parallel capability focused on kNN/top‑K similarity.
 
+See also:
+- Support: Vector Adapter Acceptance Criteria (docs/support/09-vector-adapter-acceptance-criteria.md)
+
 ## Contracts (proposed)
 
 - Capability flags (reported by adapters)
