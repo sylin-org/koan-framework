@@ -6,13 +6,10 @@ using System.Threading.Tasks;
 using System.Data.Common;
 using System.Linq;
 using System.Reflection;
-using Microsoft.Data.SqlClient;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
-using Npgsql;
 using Sora.Data.Core.Configuration;
 using Sora.Data.Core.Direct;
 using Sora.Data.Abstractions.Instructions;
@@ -50,8 +47,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public Sora.Data.Core.Direct.IDirectTransaction Begin(CancellationToken ct = default)
     {
-        var (provider, connStr) = Resolve();
-        var conn = CreateConnection(provider, connStr);
+    var (provider, connStr) = Resolve();
+    var conn = CreateConnection(_sp, provider, connStr);
         conn.Open();
         var tx = conn.BeginTransaction();
         return new DirectTransaction(conn, tx, _timeout, _maxRows);
@@ -173,8 +170,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     private async Task<ConnCtx> OpenAsync(CancellationToken ct)
     {
-        var (provider, connStr) = Resolve();
-        var conn = CreateConnection(provider, connStr);
+    var (provider, connStr) = Resolve();
+    var conn = CreateConnection(_sp, provider, connStr);
         await conn.OpenAsync(ct);
         return new ConnCtx(conn);
     }
@@ -232,14 +229,17 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         throw new InvalidOperationException($"Connection string for '{_source}' could not be resolved. Use WithConnectionString(nameOrConnectionString) or configure Sora:Data:Sources");
     }
 
-    private static DbConnection CreateConnection(string provider, string connectionString)
-        => provider.ToLowerInvariant() switch
+    private static DbConnection CreateConnection(IServiceProvider sp, string provider, string connectionString)
+    {
+        var factories = sp.GetServices<Sora.Data.Core.Configuration.IDataProviderConnectionFactory>()
+            ?? Enumerable.Empty<Sora.Data.Core.Configuration.IDataProviderConnectionFactory>();
+        var factory = factories.FirstOrDefault(f => f.CanHandle(provider));
+        if (factory is null)
         {
-            var p when p.Contains("sqlserver") || p.Contains("mssql") => new SqlConnection(connectionString),
-            var p when p.Contains("postgres") || p.Contains("npgsql") => new NpgsqlConnection(connectionString),
-            var p when p.Contains("sqlite") => new SqliteConnection(connectionString),
-            _ => throw new NotSupportedException($"Provider '{provider}' is not supported by DirectSession.")
-        };
+            throw new NotSupportedException($"No IDataProviderConnectionFactory registered for provider '{provider}'. Make sure the corresponding adapter package is referenced and registered.");
+        }
+        return factory.Create(connectionString);
+    }
 
     internal static async Task<IReadOnlyList<object>> MaterializeAsJsonObjects(DbDataReader reader, int maxRows, CancellationToken ct)
     {

@@ -12,4 +12,15 @@ internal static class Constants
         public const int DefaultPort = 11434;
         public const string TagsPath = "/api/tags";
     }
+
+    public static class Api
+    {
+        public const string GeneratePath = "/api/generate";
+        public const string EmbeddingsPath = "/api/embeddings";
+    }
+
+    public static class Adapter
+    {
+        public const string Type = "ollama";
+    }
 }

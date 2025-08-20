@@ -1,4 +1,5 @@
 using System;
+using System.Data.Common;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
@@ -80,7 +81,8 @@ public static class SqliteRegistration
         if (configure is not null) services.Configure(configure);
         // Ensure health contributor is available even outside Sora bootstrap
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
-        services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
+    services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqliteConnectionFactory>());
         return services;
     }
 }
@@ -149,6 +151,16 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
         return new SqliteRepository<TEntity, TKey>(sp, opts, resolver);
     }
+}
+
+internal sealed class SqliteConnectionFactory : Sora.Data.Core.Configuration.IDataProviderConnectionFactory
+{
+    public bool CanHandle(string provider)
+        => provider.Equals("sqlite", StringComparison.OrdinalIgnoreCase)
+           || provider.Contains("sqlite", StringComparison.OrdinalIgnoreCase);
+
+    public DbConnection Create(string connectionString)
+        => new SqliteConnection(connectionString);
 }
 
 internal sealed class SqliteRepository<TEntity, TKey> :

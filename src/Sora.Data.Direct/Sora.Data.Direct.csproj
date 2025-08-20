@@ -10,8 +10,5 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.8" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
-    <PackageReference Include="Npgsql" Version="8.0.3" />
-    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="9.0.0" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 using System;
+using System.Data.Common;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
@@ -54,7 +55,8 @@ public static class SqlServerRegistration
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
-        services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
+    services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqlServerConnectionFactory>());
         return services;
     }
 }
@@ -137,6 +139,17 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
         return new SqlServerRepository<TEntity, TKey>(sp, opts, resolver);
     }
+}
+
+internal sealed class SqlServerConnectionFactory : Sora.Data.Core.Configuration.IDataProviderConnectionFactory
+{
+    public bool CanHandle(string provider)
+        => provider.Equals("sqlserver", StringComparison.OrdinalIgnoreCase)
+           || provider.Equals("mssql", StringComparison.OrdinalIgnoreCase)
+           || provider.Equals("microsoft.sqlserver", StringComparison.OrdinalIgnoreCase);
+
+    public DbConnection Create(string connectionString)
+        => new SqlConnection(connectionString);
 }
 
 internal sealed class SqlServerRepository<TEntity, TKey> :

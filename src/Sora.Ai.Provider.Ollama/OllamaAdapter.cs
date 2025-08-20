@@ -15,7 +15,7 @@ internal sealed class OllamaAdapter : IAiAdapter
     private readonly string _defaultModel;
     public string Id { get; }
     public string Name { get; }
-    public string Type => "ollama";
+    public string Type => Infrastructure.Constants.Adapter.Type;
 
     public OllamaAdapter(string id, string name, HttpClient http, string? defaultModel)
     { Id = id; Name = name; _http = http; _defaultModel = defaultModel ?? string.Empty; }
@@ -39,7 +39,7 @@ internal sealed class OllamaAdapter : IAiAdapter
             stream = false,
             options = MapOptions(request.Options)
         };
-        using var resp = await _http.PostAsJsonAsync("/api/generate", body, ct).ConfigureAwait(false);
+    using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.GeneratePath, body, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         var doc = await resp.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken: ct).ConfigureAwait(false)
                   ?? throw new InvalidOperationException("Empty response from Ollama.");
@@ -58,7 +58,7 @@ internal sealed class OllamaAdapter : IAiAdapter
             throw new InvalidOperationException("Ollama adapter requires a model name.");
         var prompt = BuildPrompt(request);
         var body = JsonSerializer.Serialize(new { model, prompt, stream = true, options = MapOptions(request.Options) });
-        using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/generate")
+    using var httpReq = new HttpRequestMessage(HttpMethod.Post, Infrastructure.Constants.Api.GeneratePath)
         { Content = new StringContent(body, Encoding.UTF8, "application/json") };
         using var resp = await _http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
@@ -82,7 +82,7 @@ internal sealed class OllamaAdapter : IAiAdapter
         foreach (var input in request.Input)
         {
             var body = new { model, input };
-            using var resp = await _http.PostAsJsonAsync("/api/embeddings", body, ct).ConfigureAwait(false);
+            using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.EmbeddingsPath, body, ct).ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
             var doc = await resp.Content.ReadFromJsonAsync<OllamaEmbeddingsResponse>(cancellationToken: ct).ConfigureAwait(false)
                       ?? throw new InvalidOperationException("Empty response from Ollama.");
@@ -93,7 +93,7 @@ internal sealed class OllamaAdapter : IAiAdapter
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
     {
-        using var resp = await _http.GetAsync("/api/tags", ct).ConfigureAwait(false);
+    using var resp = await _http.GetAsync(Infrastructure.Constants.Discovery.TagsPath, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         var doc = await resp.Content.ReadFromJsonAsync<OllamaTagsResponse>(cancellationToken: ct).ConfigureAwait(false);
         var models = new List<AiModelDescriptor>();

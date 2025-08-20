@@ -1,4 +1,5 @@
 using System;
+using System.Data.Common;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
@@ -53,7 +54,8 @@ public static class PostgresRegistration
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
-        services.AddSingleton<IDataAdapterFactory, PostgresAdapterFactory>();
+    services.AddSingleton<IDataAdapterFactory, PostgresAdapterFactory>();
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, PostgresConnectionFactory>());
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(PostgresNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         return services;
@@ -123,6 +125,17 @@ internal sealed class PostgresHealthContributor(IOptions<PostgresOptions> option
             return new HealthReport(Name, HealthState.Unhealthy, ex.Message, ex);
         }
     }
+}
+
+internal sealed class PostgresConnectionFactory : Sora.Data.Core.Configuration.IDataProviderConnectionFactory
+{
+    public bool CanHandle(string provider)
+        => provider.Equals("postgres", StringComparison.OrdinalIgnoreCase)
+           || provider.Equals("postgresql", StringComparison.OrdinalIgnoreCase)
+           || provider.Equals("npgsql", StringComparison.OrdinalIgnoreCase);
+
+    public DbConnection Create(string connectionString)
+        => new NpgsqlConnection(connectionString);
 }
 
 [Sora.Data.Abstractions.ProviderPriority(14)]
