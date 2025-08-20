@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Ollama provider for Sora AI (chat, streaming, embeddings) with Dev auto-discovery.</Description>
+    <PackageTags>$(CommonPackageTags);ai;ollama;provider</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
+    <ProjectReference Include="..\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
+  </ItemGroup>
+</Project>
