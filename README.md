@@ -104,11 +104,19 @@ That's it. You now have:
 - `GET /api/todos/{id}` - Get specific todo
 - `PUT /api/todos/{id}` - Update todo
 - `DELETE /api/todos/{id}` - Delete todo
-- `GET /api/todos/graphql` - GraphQL endpoint (auto-generated)
 - Automatic health checks at `/health`
-- Interactive OpenAPI docs at `/swagger`
 
 **That's it.** Real data, clean routing, and production patterns—all working.
+
+## And now, what if I want to see my API specs?
+
+Add interactive API documentation with one package:
+
+```bash
+dotnet add package Sora.Web.Swagger
+```
+
+Now visit `/swagger` to explore and test your endpoints interactively. No additional configuration needed; Swagger auto-discovers your controllers and generates beautiful, interactive docs.
 
 ## Need more? Just add it
 
