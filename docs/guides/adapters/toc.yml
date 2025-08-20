@@ -8,5 +8,7 @@
   href: postgres-adapter.md
 - name: Redis adapter
   href: redis-adapter.md
+- name: Vector Search contracts
+  href: vector-search.md
 - name: Authoring adapters
   href: adapter-authoring-guide.md

@@ -66,6 +66,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - CDC (D2): Debezium/Kafka → EntityChange stream; replicators to Postgres/Mongo with idempotency.
   - AI-aware indexer (D3): embed-on-change with Redis vector; embedding versioning and invalidation.
   - Vector & RAG (V1/R1): Redis vector + cache; `/ai/chat` (SSE), `/ai/embed`, `/ai/rag/query`; ai-probe.ps1.
+  - Vector contracts (planned): Sora.Data.Vector (IVectorSearchRepository, options, instructions) and first adapter Sora.Data.Weaviate; see ADR DATA-0054 and guides/adapters/vector-search.md.
 
 - Foundations
   - API schemas & SSE format; gRPC draft; tokenization/cost plan; secrets provider; Redis guardrails; pgvector fast-follow plan.
