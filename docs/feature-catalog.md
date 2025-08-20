@@ -1,102 +1,134 @@
-# Sora Feature Catalog (Value-centered)
+# Sora Framework
 
-A modular .NET framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
+**Building backend services should feel like playing with Legos, not assembling puzzles with missing pieces.**
 
-## Pillars → outcomes
+Sora is designed to feel natural—like having a conversation with your code rather than wrestling with it. Start with a three-file API, add vector search when you need it, scale to enterprise patterns when you're ready.
 
-- Core
-  - Predictable apps by default (health/readiness, env flags, secure headers, boot reports, OpenTelemetry).
-- Data
-  - Adapter-agnostic persistence with capability discovery, pushdown-first performance, safe Direct escape hatch.
-- Web
-  - Controller-driven APIs (REST/GraphQL) with guardrails, content negotiation, consistent paging/filtering.
-- Messaging
-  - Capability-aware, cross-broker semantics (aliases, DLQ/retry, idempotency) with simple handler wiring.
-- AI
-  - Turnkey inference (streaming chat, embeddings) with minimal config; Redis-first vector + cache; RAG defaults; observability and budgets; optional sidecar/central proxy; one-call AddSoraAI() and auto-boot discovery.
-- Services & DX
-  - Fast onboarding (Tiny\* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
+## What makes Sora different?
 
-## Scenarios and benefits
+**Start simple, grow smart** — Your first API can be three files. When you need CQRS, messaging, AI, or vector search, they're there—but they don't get in your way until you're ready.
 
-- Greenfield APIs/services: ship quickly on JSON/SQLite; swap to Postgres/SQL Server/Mongo without API churn.
-- Enterprise data services: enforceable governance (DDL policy, naming, projection), measurable performance (pushdown), and traceability (db.\* tags).
-- CQRS/event-driven: inbox/idempotency, batch semantics, provider-neutral retries/DLQ.
-- Ops/reporting: Direct API for audited, parameterized ad-hoc access; neutral rows; limits and policy gates.
-- Modern UI backends: REST + GraphQL from the same model with consistent naming and filter semantics.
-- AI assist & RAG: `/ai/chat` with SSE, `/ai/embed`, and `/ai/rag/query` with citations; Redis vector and cache by default; pgvector fast-follow.
-- Data bridge: snapshot export/import (JSONL/CSV/Parquet), CDC via Debezium/Kafka, virtualization (composed reads), scheduled materialization.
+**Familiar, but better** — Controllers work like you expect. Configuration follows .NET conventions. No magic, no surprises—just the good parts of what you already know, refined.
 
-## Strategic opportunities
+**Batteries included, assembly optional** — Health checks, OpenAPI docs, flexible data access, message handling, and AI integration all work out of the box. Use what you need, ignore the rest.
 
-- Platform standardization: common naming, controllers-only HTTP, centralized constants, ADR taxonomy.
-- Progressive hardening: start permissive in dev; tighten paging caps, CSP, DDL policy, discovery gating.
-- Polyglot without chaos: capability flags make differences explicit; shared policy (naming, projection, pushdown).
-- Observability-first: spans/metrics + boot reports enable SLOs and faster incident response.
-- On-ramp path: adapters → transfer/replication → AI-aware indexing → RAG—value compounds with low switching cost.
-- Protocol interop: optional adapters for gRPC (internal), OpenAI-compatible shim, MCP (Model Context Protocol), and AI-RPC to meet teams where they are.
+```csharp
+// This is a complete, working API with persistence
+using Sora.Web;
 
-## Risks and guardrails
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSora();
 
-- Accidental DDL/unsafe ops in prod → magic gating, DDL policy (NoDdl), prod-off discovery, redacted boot report.
-- Hidden in-memory fallbacks → pushdown MUST; `Sora-InMemory-Paging` header signals fallback.
-- Adapter drift → centralized instruction constants, capability flags, relational toolkit + LINQ translator.
-- AI cost/leakage → token/time budgets, prompt hashing, redaction-by-default, model allow-lists.
-- Vector posture → Redis guardrails (memory/persistence/HA); pgvector parity tests; migration utilities.
+var app = builder.Build();
+app.UseSora();
+app.Run();
+```
 
-## Coming soon (on-ramp and near-term)
+## Why choose Sora?
 
-- Cognitive coalescence (AI North Star)
+🚀 **Zero to API in minutes** — Real CRUD endpoints with just `EntityController<T>`  
+🔧 **Escape hatches everywhere** — Drop to raw SQL, custom controllers, or provider-specific features  
+📦 **Modular by design** — Add SQLite, MongoDB, Redis, RabbitMQ, AI providers, or vector search as you grow  
+🤖 **AI-ready** — Built-in streaming chat, embeddings, vector search, and RAG patterns  
+✅ **Production ready** — Health checks, OpenAPI docs, observability, and message reliability built-in  
+🎯 **Predictable** — Convention over configuration, but configuration always wins
 
-  - Auto-boot orchestrator: probes providers (Ollama/OpenAI), vectors (Redis/pgvector), secrets, budgets, and protocols; single boot report with redacted status and action hints.
-  - One-call DI: AddSoraAI() wires providers, tokenization/cost, budgets/moderation, SSE, telemetry, headers, and /ai/\* controllers.
-  - AI profiles: SORA_AI_PROFILE = DevLocal | HostedKeyed | ProxyClient | TestHarness; sensible defaults for model, streaming, budgets, vector, cache TTLs.
-  - Convention endpoints: /ai/chat, /ai/embed, /ai/rag/query, /ai/models auto-enable when Ready; OpenAI-shim and gRPC via single flags.
-  - Zero-scaffold RAG quickstart: first run indexes docs/ with defaults; Redis-first vector + cache; background index job; safe projection/redaction.
-  - Vector autodiscovery: Redis HNSW index bootstrap with sane metrics; pgvector fast-follow with auto-migrate if permitted.
-  - Secrets layering: prefer secrets provider (KV/Secrets Manager) with env fallback; never log values; redacted boot entries.
-  - Policy presets: DevPermissive | StagingBalanced | ProdConservative for token/time budgets, moderation, model allow-lists.
-  - Capabilities surface: Sora-AI-\* headers and GET /ai/capabilities expose provider/vector flags, budgets, protocol availability.
-  - Probes & health: ai-probe.ps1 mirrors /health/ready details; precise remediation messages.
-  - Record/replay harness: SORA_AI_TEST_RECORD to capture; replay in CI; cassettes sanitized by default.
-  - DX: TinyAI template and AI transformer recipes (summarize/classify) for Web/MQ.
+## Core philosophy
 
-- On-ramp
+- **Start simple, grow smart** — Begin with basics, add complexity only when needed
+- **Familiarity first** — Uses patterns you already know (Controllers, DI, EF-style entities)
+- **Developer experience** — Clear error messages, helpful defaults, minimal friction
+- **Everything is optional** — Data providers, messaging, AI, vector search—add what you need, when you need it
 
-  - Platform ramp-up: Redis core cache/session; MySQL relational adapter; optional CouchDB.
-  - Data Bridge (D1): snapshot export/import (JSONL/CSV; FS/S3/Blob) with manifests and parity checks.
-  - CDC (D2): Debezium/Kafka → EntityChange stream; replicators to Postgres/Mongo with idempotency.
-  - AI-aware indexer (D3): embed-on-change with Redis vector; embedding versioning and invalidation.
-  - Vector & RAG (V1/R1): Redis vector + cache; `/ai/chat` (SSE), `/ai/embed`, `/ai/rag/query`; ai-probe.ps1.
-  - Vector contracts (planned): Sora.Data.Vector (IVectorSearchRepository, options, instructions) and first adapter Sora.Data.Weaviate; see ADR DATA-0054 and guides/adapters/vector-search.md.
+## Real-World Example
 
-- Foundations
-  - API schemas & SSE format; gRPC draft; tokenization/cost plan; secrets provider; Redis guardrails; pgvector fast-follow plan.
-  - Formats & grounding: Parquet materialization; JSON-LD manifests and Schema.org guidance on Entity exports.
-  - Protocol interop: KServe/KFServing interop guide; GGUF probe notes for local models.
+```csharp
+// Define your model
+public class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = string.Empty;
+    public bool IsDone { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
 
-## Future steps
+// Get a full REST API
+[Route("api/[controller]")]
+public class TodosController : EntityController<Todo> { }
 
-- AI growth
+// Use it naturally
+var todo = await new Todo { Title = "Learn Sora" }.Save();
+var todos = await Todo.Where(t => !t.IsDone);
+```
 
-  - Proxy/connector: sidecar (P1) and central (T1) with quotas, per-tenant secrets, admin APIs; OpenAI shim/gRPC GA.
-  - Multi-model routing: cost/latency/quality policies; safe tool registry audited function calling at scale.
-  - Evaluation: golden tests expansion and optional eval harness integration.
+That's it. You now have:
 
-- Vector & knowledge
+- `GET /api/todos` — List all todos
+- `POST /api/todos` — Create new todo
+- `GET /api/todos/{id}` — Get specific todo
+- `PUT /api/todos/{id}` — Update todo
+- `DELETE /api/todos/{id}` — Delete todo
+- `GET /api/todos/graphql` — GraphQL endpoint (auto-generated)
+- Automatic health checks at `/health`
+- Interactive OpenAPI docs at `/swagger`
 
-  - Weaviate adapter + Redis↔Weaviate migration utility; pgvector parity hardening.
-  - Knowledge & servers: SPARQL/RDF export guide; FAISS/HNSWlib local adapter option; vLLM/TGI optional adapters; MMEPs tracking.
+**That's it.** Real data, clean routing, and production patterns—all working.
 
-- Data & replication
+## Need more? Just add it
 
-  - Virtualization & materialization: composed reads (D4) and scheduled Parquet exports (D5) with manifests.
-  - Diff & reconcile (D6): drift detection and targeted replays; connector interop guides (D8).
+**Want AI chat and embeddings?**
 
-- Protocol interop
-  - Optional adapters: MCP server role and AI-RPC mapping; compatibility matrix and CI checks.
-- Protocol adapters: MCP server role (tools/resources) and AI-RPC mapping layer for chat/embeddings.
+```bash
+dotnet add package Sora.AI
+dotnet add package Sora.Ai.Provider.Ollama
+```
+
+Now you have `/ai/chat` with streaming and `/ai/embed` endpoints working with local models.
+
+**Need vector search?**
+
+```bash
+dotnet add package Sora.Data.Weaviate
+```
+
+Your entities can now be embedded and searched semantically.
+
+**Want reliable messaging?**
+
+```bash
+dotnet add package Sora.Messaging.RabbitMq
+```
+
+Send messages, handle failures, and process with inbox patterns.
+
+**GraphQL from your REST models?**
+
+```bash
+dotnet add package Sora.Web.GraphQl
+```
+
+Your `EntityController<T>` now serves both REST and GraphQL automatically.
+
+## Getting started
+
+1. **Quick Start** — [3-minute tutorial](docs/api/quickstart/) from zero to working API
+2. **Documentation** — [Complete guides](docs/api/) for all features
+3. **Examples** — Real applications in the `samples/` directory
+
+## Built for
+
+- **Rapid prototyping** — Get ideas into code fast, add AI features with a single line
+- **Microservices** — Lightweight, focused services with built-in messaging and observability
+- **Modern APIs** — REST + GraphQL from the same models, with vector search when you need it
+- **Enterprise applications** — Scales to complex patterns (CQRS, Event Sourcing, AI workflows)
+
+## Community & support
+
+- **GitHub Issues** — Bug reports and feature requests
+- **Discussions** — Questions and community help
+- **Contributing** — See our [guidelines](CONTRIBUTING.md)
+
+Built with ❤️ for .NET developers who want to focus on solving problems, not fighting frameworks.
 
 ---
 
-See also: `docs/decisions/index.md` for architectural decisions and `docs/guides/*` for topic guides.
+**License:** Apache 2.0 | **Requirements:** .NET 9 SDK | **Current:** v0.2.18
