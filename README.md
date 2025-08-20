@@ -63,6 +63,22 @@ app.Run();
 
 ## Real-World Example
 
+First, install the essential packages:
+
+```bash
+dotnet add package Sora.Core
+```
+
+```bash
+dotnet add package Sora.Web
+```
+
+```bash
+dotnet add package Sora.Data.Sqlite  # or your preferred data adapter
+```
+
+Then write your code:
+
 ```csharp
 // Define your model
 public class Todo : Entity<Todo>
