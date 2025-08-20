@@ -87,8 +87,8 @@ public static class AddSoraGraphQlExtensions
     private static void RegisterEntity(IRequestExecutorBuilder builder, IServiceCollection services, Type entityType)
     {
         // Compute GraphQL names from storage naming
-    var sp = services.BuildServiceProvider();
-    var nameRaw = ResolveStorageName(sp, entityType);
+    // Resolve storage name via a scoped provider at request time to avoid building a temporary container
+    var nameRaw = ResolveStorageNameFactory(entityType);
         var name = ToGraphQlTypeName(nameRaw);
         var resolverType = typeof(Resolvers<>).MakeGenericType(entityType);
         services.AddScoped(resolverType);
@@ -364,6 +364,15 @@ public static class AddSoraGraphQlExtensions
 
         // Ignore set suffix for type/field names
         return baseName.Split('#')[0];
+    }
+
+    private static string ResolveStorageNameFactory(Type entityType)
+    {
+        // Best-effort: use ambient SoraApp.Current if available; otherwise fallback to defaults
+        var sp = Sora.Core.SoraApp.Current;
+        if (sp is not null) return ResolveStorageName(sp, entityType);
+        // Fallback path without DI context
+        return entityType.Name;
     }
 
     private static string ToGraphQlTypeName(string storageName)

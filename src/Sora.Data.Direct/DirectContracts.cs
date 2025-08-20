@@ -29,8 +29,9 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
     private readonly IConfiguration _cfg = cfg;
     private string _source = sourceOrAdapter;
     private string? _connectionString;
-    private TimeSpan _timeout = TimeSpan.FromSeconds(30);
-    private int _maxRows = 10_000;
+    private TimeSpan _timeout = TimeSpan.FromSeconds(
+        (sp.GetService<Microsoft.Extensions.Options.IOptions<Sora.Data.Core.Options.DirectOptions>>()?.Value?.TimeoutSeconds) ?? 30);
+    private int _maxRows = sp.GetService<Microsoft.Extensions.Options.IOptions<Sora.Data.Core.Options.DirectOptions>>()?.Value?.MaxRows ?? 10_000;
 
     public Sora.Data.Core.Direct.IDirectSession WithConnectionString(string value)
     {
