@@ -163,25 +163,113 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private string BuildWhereClause(object? filter)
     {
         if (filter is null) return string.Empty;
-        // Expect a simple dictionary<string, object> of equals comparisons
-        if (filter is IEnumerable<KeyValuePair<string, object?>> kvs)
-        {
-            var parts = kvs.ToList();
-            if (parts.Count == 0) return string.Empty;
-            if (parts.Count == 1)
-            {
-                var (k, v) = parts[0];
-                return $"{{ path: [\"{k}\"], operator: Equal, valueText: \"{EscapeGraphQl(v)}\" }}";
-            }
-            var opers = string.Join(",", parts.Select(p => $"{{ path: [\"{p.Key}\"], operator: Equal, valueText: \"{EscapeGraphQl(p.Value)}\" }}"));
-            return $"{{ operator: And, operands: [ {opers} ] }}";
-        }
-        // Unknown shape: ignore rather than doing client-side filtering
-        return string.Empty;
+        JsonElement el;
+        try { el = JsonSerializer.SerializeToElement(filter); }
+        catch { return string.Empty; }
+        var result = BuildWhereClauseFromJson(el);
+        return result ?? string.Empty;
     }
 
-    private static string EscapeGraphQl(object? value)
-        => (value?.ToString() ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+    private string? BuildWhereClauseFromJson(JsonElement el)
+    {
+        if (el.ValueKind == JsonValueKind.Object)
+        {
+            if (el.TryGetProperty("operator", out var opEl))
+            {
+                var op = opEl.GetString() ?? string.Empty;
+                if (string.Equals(op, "And", StringComparison.OrdinalIgnoreCase) || string.Equals(op, "Or", StringComparison.OrdinalIgnoreCase) || string.Equals(op, "Not", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (el.TryGetProperty("operands", out var opsEl) && opsEl.ValueKind == JsonValueKind.Array)
+                    {
+                        var items = new List<string>();
+                        foreach (var child in opsEl.EnumerateArray())
+                        {
+                            var c = BuildWhereClauseFromJson(child);
+                            if (!string.IsNullOrEmpty(c)) items.Add(c!);
+                        }
+                        if (items.Count == 0) return null;
+                        var oper = char.ToUpperInvariant(op[0]) + op.Substring(1).ToLowerInvariant();
+                        return oper == "Not"
+                            ? $"{{ operator: Not, operands: [ {items[0]} ] }}"
+                            : $"{{ operator: {oper}, operands: [ {string.Join(",", items)} ] }}";
+                    }
+                    return null;
+                }
+                // leaf comparison
+                var path = el.TryGetProperty("path", out var pathEl) ? pathEl : default;
+                var value = el.TryGetProperty("value", out var valEl) ? valEl : default;
+                var pathArr = PathToGraphQl(path);
+                var operName = NormalizeOperator(op);
+                var valueField = ValueFieldAndLiteral(value, out var literal);
+                if (pathArr is null || valueField is null) return null;
+                return $"{{ path: {pathArr}, operator: {operName}, {valueField}: {literal} }}";
+            }
+            // Equality map shorthand
+            var kvs = new List<string>();
+            foreach (var prop in el.EnumerateObject())
+            {
+                var pathArr = $"[\"{EscapeGraphQl(prop.Name)}\"]";
+                var vf = ValueFieldAndLiteral(prop.Value, out var lit);
+                if (vf is null) continue;
+                kvs.Add($"{{ path: {pathArr}, operator: Equal, {vf}: {lit} }}");
+            }
+            if (kvs.Count == 0) return null;
+            if (kvs.Count == 1) return kvs[0];
+            return $"{{ operator: And, operands: [ {string.Join(",", kvs)} ] }}";
+        }
+        return null;
+    }
+
+    private static string? PathToGraphQl(JsonElement pathEl)
+    {
+        if (pathEl.ValueKind == JsonValueKind.String)
+            return $"[\"{EscapeGraphQl(pathEl.GetString())}\"]";
+        if (pathEl.ValueKind == JsonValueKind.Array)
+        {
+            var parts = pathEl.EnumerateArray().Select(p => $"\"{EscapeGraphQl(p.GetString())}\"");
+            return $"[{string.Join(",", parts)}]";
+        }
+        return null;
+    }
+
+    private static string NormalizeOperator(string op)
+    {
+        return op switch
+        {
+            var s when s.Equals("eq", StringComparison.OrdinalIgnoreCase) || s.Equals("equal", StringComparison.OrdinalIgnoreCase) => "Equal",
+            var s when s.Equals("ne", StringComparison.OrdinalIgnoreCase) || s.Equals("notequal", StringComparison.OrdinalIgnoreCase) => "NotEqual",
+            var s when s.Equals("gt", StringComparison.OrdinalIgnoreCase) || s.Equals("greaterthan", StringComparison.OrdinalIgnoreCase) => "GreaterThan",
+            var s when s.Equals("gte", StringComparison.OrdinalIgnoreCase) || s.Equals("ge", StringComparison.OrdinalIgnoreCase) || s.Equals("greaterthanequal", StringComparison.OrdinalIgnoreCase) => "GreaterThanEqual",
+            var s when s.Equals("lt", StringComparison.OrdinalIgnoreCase) || s.Equals("lessthan", StringComparison.OrdinalIgnoreCase) => "LessThan",
+            var s when s.Equals("lte", StringComparison.OrdinalIgnoreCase) || s.Equals("le", StringComparison.OrdinalIgnoreCase) || s.Equals("lessthanequal", StringComparison.OrdinalIgnoreCase) => "LessThanEqual",
+            var s when s.Equals("like", StringComparison.OrdinalIgnoreCase) => "Like",
+            var s when s.Equals("contains", StringComparison.OrdinalIgnoreCase) => "ContainsAny",
+            _ => op
+        };
+    }
+
+    private static string? ValueFieldAndLiteral(JsonElement value, out string literal)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.String:
+                literal = $"\"{EscapeGraphQl(value.GetString())}\""; return "valueText";
+            case JsonValueKind.True:
+            case JsonValueKind.False:
+                literal = value.GetBoolean() ? "true" : "false"; return "valueBoolean";
+            case JsonValueKind.Number:
+                if (value.TryGetInt64(out var i)) { literal = i.ToString(System.Globalization.CultureInfo.InvariantCulture); return "valueInt"; }
+                if (value.TryGetDouble(out var d)) { literal = d.ToString(System.Globalization.CultureInfo.InvariantCulture); return "valueNumber"; }
+                literal = "0"; return "valueNumber";
+            case JsonValueKind.Null:
+                literal = "null"; return "valueText";
+            default:
+                literal = "\"\""; return null;
+        }
+    }
+
+    private static string EscapeGraphQl(string? value)
+        => (value ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     private void ValidateEmbedding(float[] embedding)
     {
@@ -210,7 +298,10 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                         throw new InvalidOperationException($"Weaviate stats failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
                     }
                     var txt = await resp.Content.ReadAsStringAsync(ct);
-                    object result = new { count = ParseAggregateCount(txt) };
+                    var count = ParseAggregateCount(txt);
+                    if (typeof(TResult) == typeof(int))
+                        return (TResult)(object)count;
+                    object result = new { count };
                     return (TResult)result;
                 }
             case Sora.Data.Vector.VectorInstructions.IndexClear:
