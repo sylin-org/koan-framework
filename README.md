@@ -1,6 +1,6 @@
 # Sora Framework
 
-**Building backend services shouldn't feel like assembling a puzzle with missing pieces.**
+**Building backend services should feel like playing with Legos, not assembling puzzles with missing pieces.**
 
 Sora is designed to feel natural—like having a conversation with your code rather than wrestling with it. Start with a three-file API, add vector search when you need it, scale to enterprise patterns when you're ready.
 
