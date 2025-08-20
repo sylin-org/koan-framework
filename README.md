@@ -6,11 +6,14 @@ Sora is designed to feel natural—like having a conversation with your code rat
 
 ## What makes Sora different?
 
-**Start simple, grow smart** - Your first API can be three files. When you need CQRS, messaging, AI, or vector search, they're there—but they don't get in your way until you're ready.
+**Start simple, grow smart**  
+   Your first API can be three files. When you need CQRS, messaging, AI, or vector search, they're there—but they don't get in your way until you're ready.
 
-**Familiar, but better** - Controllers work like you expect. Configuration follows .NET conventions. No magic, no surprises—just the good parts of what you already know, refined.
+**Familiar, but better**  
+   Controllers work like you expect. Configuration follows .NET conventions. No magic, no surprises—just the good parts of what you already know, refined.
 
-**Batteries included, assembly optional** - Health checks, OpenAPI docs, flexible data access, message handling, and AI integration all work out of the box. Use what you need, ignore the rest.
+**Batteries included, assembly optional**  
+   Health checks, OpenAPI docs, flexible data access, message handling, and AI integration all work out of the box. Use what you need, ignore the rest.
 
 ```csharp
 // This is a complete, working API with persistence
