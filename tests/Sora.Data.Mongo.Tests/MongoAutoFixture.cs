@@ -1,5 +1,9 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Sora.Data.Core;
+using Sora.Data.Mongo;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Testcontainers.MongoDb;
@@ -19,6 +23,7 @@ public sealed class MongoAutoFixture : IAsyncLifetime
     private MongoDbContainer? _mongo;
     public string? ConnectionString { get; private set; }
     public bool IsAvailable => !string.IsNullOrWhiteSpace(ConnectionString);
+    public IServiceProvider? Services { get; private set; }
 
     public async Task InitializeAsync()
     {
@@ -27,12 +32,12 @@ public sealed class MongoAutoFixture : IAsyncLifetime
                   ?? Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING");
         if (!string.IsNullOrWhiteSpace(env))
         {
-            if (await CanPingAsync(env)) { ConnectionString = env; return; }
+            if (await CanPingAsync(env)) { ConnectionString = env; BuildServices(); return; }
         }
 
         // 2) Localhost
         var local = "mongodb://localhost:27017";
-        if (await CanPingAsync(local)) { ConnectionString = local; return; }
+        if (await CanPingAsync(local)) { ConnectionString = local; BuildServices(); return; }
 
         // 3) Docker
         try
@@ -43,6 +48,7 @@ public sealed class MongoAutoFixture : IAsyncLifetime
                 .Build();
             await _mongo.StartAsync();
             ConnectionString = _mongo.GetConnectionString();
+            BuildServices();
         }
         catch
         {
@@ -71,5 +77,25 @@ public sealed class MongoAutoFixture : IAsyncLifetime
         {
             return false;
         }
+    }
+
+    private void BuildServices()
+    {
+        if (!IsAvailable) return;
+        var dbName = "sora-test-" + Guid.NewGuid().ToString("n");
+        var cfg = new ConfigurationBuilder()
+            .AddInMemoryCollection(new[]
+            {
+                new KeyValuePair<string,string?>("Sora:Data:Mongo:ConnectionString", ConnectionString),
+                new KeyValuePair<string,string?>("Sora:Data:Mongo:Database", dbName)
+            })
+            .Build();
+        var sc = new ServiceCollection();
+        sc.AddSingleton<IConfiguration>(cfg);
+        sc.AddSoraDataCore();
+        sc.AddMongoAdapter();
+        // Provide naming resolver for StorageNameRegistry
+        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        Services = sc.BuildServiceProvider();
     }
 }
