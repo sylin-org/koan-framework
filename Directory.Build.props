@@ -14,7 +14,7 @@
   <!-- Common NuGet package metadata -->
   <Authors>Sylin Labs</Authors>
   <Company>Sylin Labs</Company>
-  <PackageProjectUrl>https://github.com/sylin-labs/sora-framework/issues</PackageProjectUrl>
+  <PackageProjectUrl>https://github.com/sylin-labs/sora-framework</PackageProjectUrl>
   <RepositoryUrl>https://github.com/sylin-labs/sora-framework.git</RepositoryUrl>
   <RepositoryType>git</RepositoryType>
   <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>

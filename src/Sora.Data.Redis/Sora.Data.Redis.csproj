@@ -4,6 +4,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <Description>Redis-backed key/value repository adapter for Sora: simple CRUD, paging guardrails, and options binding.</Description>
+  <PackageTags>$(CommonPackageTags);data;redis;keyvalue;repository</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
@@ -11,6 +13,6 @@
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="StackExchange.Redis" Version="2.7.33" />
+  <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
   </ItemGroup>
 </Project>

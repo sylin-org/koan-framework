@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Sora.Data.Postgres</AssemblyName>
     <RootNamespace>Sora.Data.Postgres</RootNamespace>
+  <Description>PostgreSQL provider for Sora relational data: Dapper-based SQL integration with guardrails and governance.</Description>
+  <PackageTags>$(CommonPackageTags);data;postgres;relational;sql;dapper</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.35" />
