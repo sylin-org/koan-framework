@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Sora.Data.Abstractions;
 using Sora.Data.Json;
 using Sora.Data.Core;
+using Sora.Data.Abstractions.Instructions;
 using Xunit;
 
 namespace Sora.Data.Json.Tests;
@@ -23,7 +24,7 @@ public class RepositoryTests
     sc.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(cfg);
     // Provide naming resolver needed by StorageNameRegistry for set-aware physical names
     sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
-    sc.AddJsonData<Todo, string>(o => o.DirectoryPath = dir);
+    sc.AddJsonData<Todo, string>(o => { o.DirectoryPath = dir; o.DefaultPageSize = 2; o.MaxPageSize = 3; });
     sc.AddSoraDataCore();
         return sc.BuildServiceProvider();
     }
@@ -126,11 +127,11 @@ public class RepositoryTests
             await repo.UpsertAsync(new Todo { Id = sharedId, Title = "backup-shared" });
         }
 
-        // Verify counts
-        (await repo.QueryAsync((object?)null)).Count.Should().Be(rootCount + 1);
+    // Verify totals via CountAsync (QueryAsync applies default paging guardrail)
+    (await repo.CountAsync((object?)null)).Should().Be(rootCount + 1);
     using (DataSetContext.With("backup"))
         {
-            (await repo.QueryAsync((object?)null)).Count.Should().Be(backupCount + 1);
+            (await repo.CountAsync((object?)null)).Should().Be(backupCount + 1);
         }
 
         // Update shared in root only
@@ -143,17 +144,76 @@ public class RepositoryTests
             backupItems.Should().ContainSingle(x => x.Title == "backup-shared");
         }
 
-        // Clear backup set
-    using (DataSetContext.With("backup"))
+        // Clear backup set using adapter fast-path DeleteAllAsync
+        using (DataSetContext.With("backup"))
         {
-            var b = await repo.QueryAsync((object?)null);
-            await repo.DeleteManyAsync(b.Select(i => i.Id));
-            (await repo.QueryAsync((object?)null)).Should().BeEmpty();
+            await repo.DeleteAllAsync();
+            (await repo.CountAsync((object?)null)).Should().Be(0);
         }
 
-        // Root still intact and updated
-        (await repo.QueryAsync((object?)null)).Count.Should().Be(rootCount + 1);
+    // Root still intact and updated
+    (await repo.CountAsync((object?)null)).Should().Be(rootCount + 1);
         var again = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
         again.Should().ContainSingle(x => x.Title == "root-shared-updated");
+    }
+
+    [Fact]
+    public async Task Paging_Defaults_And_MaxPageSize_Are_Enforced()
+    {
+        var dir = TempDir();
+        var sp = BuildServices(dir);
+        var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
+
+        // DefaultPageSize set to 2 in BuildServices; insert 10 items
+        for (int i = 0; i < 10; i++)
+            await repo.UpsertAsync(new Todo { Id = $"i{i}", Title = $"t{i}" });
+
+        // Without options, results are capped at DefaultPageSize=2
+        var def = await repo.QueryAsync((object?)null);
+        def.Count.Should().Be(2);
+        (await repo.CountAsync((object?)null)).Should().Be(10);
+
+    // Validate options-based paging using the decorated repository (facade implements IDataRepositoryWithOptions)
+    var withOptsRepo = Assert.IsAssignableFrom<IDataRepositoryWithOptions<Todo, string>>(repo);
+    var withOpts = await withOptsRepo.QueryAsync((object?)null, new DataQueryOptions(Page: 2, PageSize: 3));
+    withOpts.Count.Should().Be(3);
+    var capped = await withOptsRepo.QueryAsync((object?)null, new DataQueryOptions(Page: 1, PageSize: 999));
+    capped.Count.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Instruction_EnsureCreated_Succeeds()
+    {
+        var dir = TempDir();
+        var sp = BuildServices(dir);
+        var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
+        var exec = Assert.IsAssignableFrom<IInstructionExecutor<Todo>>(repo);
+        var ok = await exec.ExecuteAsync<bool>(new Instruction(DataInstructions.EnsureCreated));
+        ok.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Cancellation_Is_Observed_In_UpsertMany()
+    {
+        var dir = TempDir();
+        var sp = BuildServices(dir);
+        var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var many = Enumerable.Range(0, 1000).Select(i => new Todo { Id = $"i{i}", Title = "x" });
+    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repo.UpsertManyAsync(many, cts.Token));
+    }
+
+    [Fact]
+    public async Task Health_Is_Healthy_When_Directory_Exists()
+    {
+        var dir = TempDir();
+        var sp = BuildServices(dir);
+
+        var hc = sp.GetServices<Sora.Core.IHealthContributor>().FirstOrDefault(h => h.Name == "data:json");
+        hc.Should().NotBeNull();
+        var report = await hc!.CheckAsync();
+        report.State.Should().Be(Sora.Core.HealthState.Healthy);
     }
 }

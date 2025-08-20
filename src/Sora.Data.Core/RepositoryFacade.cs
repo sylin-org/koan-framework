@@ -17,6 +17,7 @@ namespace Sora.Data.Core;
 ///</summary>
 internal sealed class RepositoryFacade<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
+    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
