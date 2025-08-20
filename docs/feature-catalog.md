@@ -1,4 +1,4 @@
-# Sora Feature Catalog (Value-centered)
+# Sora Feature Catalog (Value-centered) - v0.2.18
 
 A modular .NET framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
 
@@ -8,12 +8,23 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - Predictable apps by default (health/readiness, env flags, secure headers, boot reports, OpenTelemetry).
 - Data
   - Adapter-agnostic persistence with capability discovery, pushdown-first performance, safe Direct escape hatch.
+  - Production-ready adapters: Postgres, SQL Server, SQLite, MongoDB, Redis, and JSON file storage.
+  - Vector search capabilities with Weaviate adapter supporting schema management and KNN queries.
+  - CQRS patterns with outbox support for MongoDB and event-driven architectures.
 - Web
   - Controller-driven APIs (REST/GraphQL) with guardrails, content negotiation, consistent paging/filtering.
+  - Built-in Swagger/OpenAPI integration with idempotent registration and friendly defaults.
+  - HTTP payload transformers for flexible request/response shaping with auto-discovery.
+  - GraphQL endpoints auto-generated from IEntity<> types with HotChocolate integration.
 - Messaging
   - Capability-aware, cross-broker semantics (aliases, DLQ/retry, idempotency) with simple handler wiring.
+  - RabbitMQ transport with resilient connection management and config-first options.
+  - Redis-based inbox service for message processing and deduplication.
+  - HTTP and in-memory inbox implementations for testing and lightweight scenarios.
 - AI
   - Turnkey inference (streaming chat, embeddings) with minimal config; Redis-first vector + cache; RAG defaults; observability and budgets; optional sidecar/central proxy; one-call AddSoraAI() and auto-boot discovery.
+  - Ollama provider integration for local AI models with streaming support and health monitoring.
+  - Weaviate vector database adapter with GraphQL query translation and KNN search capabilities.
 - Services & DX
   - Fast onboarding (Tiny\* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
 
@@ -24,7 +35,8 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - CQRS/event-driven: inbox/idempotency, batch semantics, provider-neutral retries/DLQ.
 - Ops/reporting: Direct API for audited, parameterized ad-hoc access; neutral rows; limits and policy gates.
 - Modern UI backends: REST + GraphQL from the same model with consistent naming and filter semantics.
-- AI assist & RAG: `/ai/chat` with SSE, `/ai/embed`, and `/ai/rag/query` with citations; Redis vector and cache by default; pgvector fast-follow.
+- AI assist & RAG: `/ai/chat` with SSE, `/ai/embed`, and `/ai/rag/query` with citations; Redis vector and cache by default; Weaviate and pgvector support.
+- Vector operations: Multi-provider vector search (Redis HNSW, Weaviate GraphQL, planned pgvector) with unified query interface.
 - Data bridge: snapshot export/import (JSONL/CSV/Parquet), CDC via Debezium/Kafka, virtualization (composed reads), scheduled materialization.
 
 ## Strategic opportunities
@@ -68,7 +80,8 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - CDC (D2): Debezium/Kafka → EntityChange stream; replicators to Postgres/Mongo with idempotency.
   - AI-aware indexer (D3): embed-on-change with Redis vector; embedding versioning and invalidation.
   - Vector & RAG (V1/R1): Redis vector + cache; `/ai/chat` (SSE), `/ai/embed`, `/ai/rag/query`; ai-probe.ps1.
-  - Vector contracts (planned): Sora.Data.Vector (IVectorSearchRepository, options, instructions) and first adapter Sora.Data.Weaviate; see ADR DATA-0054 and guides/adapters/vector-search.md.
+  - Vector contracts (implemented): Sora.Data.Vector (IVectorSearchRepository, options, instructions) with Weaviate adapter; see ADR DATA-0054 and guides/adapters/vector-search.md.
+  - AI provider ecosystem: Ollama integration for local models with streaming and health checks; OpenAI-compatible patterns.
 
 - Foundations
   - API schemas & SSE format; gRPC draft; tokenization/cost plan; secrets provider; Redis guardrails; pgvector fast-follow plan.
@@ -85,7 +98,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 
 - Vector & knowledge
 
-  - Weaviate adapter + Redis↔Weaviate migration utility; pgvector parity hardening.
+  - Weaviate adapter implemented with Redis↔Weaviate migration utility planning; pgvector parity hardening in progress.
   - Knowledge & servers: SPARQL/RDF export guide; FAISS/HNSWlib local adapter option; vLLM/TGI optional adapters; MMEPs tracking.
 
 - Data & replication
