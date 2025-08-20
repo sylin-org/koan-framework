@@ -6,4 +6,10 @@ internal static class Constants
     {
         public const string ServicesRoot = "Sora:Ai:Services:Ollama";
     }
+
+    public static class Discovery
+    {
+        public const int DefaultPort = 11434;
+        public const string TagsPath = "/api/tags";
+    }
 }

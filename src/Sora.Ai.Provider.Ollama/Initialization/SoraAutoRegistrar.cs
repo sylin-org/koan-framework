@@ -13,8 +13,9 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Initialize(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
     {
         // Enable config-based registration via initializer; discovery initializer can be added later.
-        services.AddOllamaFromConfig();
-        services.TryAddEnumerable(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<Sora.Core.ISoraInitializer>(new OllamaConfigInitializer()));
+    services.AddOllamaFromConfig();
+    services.TryAddEnumerable(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<Sora.Core.ISoraInitializer>(new OllamaConfigInitializer()));
+    services.TryAddEnumerable(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<Sora.Core.ISoraInitializer>(new OllamaDiscoveryInitializer()));
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
