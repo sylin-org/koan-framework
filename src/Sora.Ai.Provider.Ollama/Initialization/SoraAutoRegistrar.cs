@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
 
@@ -11,8 +12,9 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
     {
-        // Enable config-based registration; discovery will be added later.
+        // Enable config-based registration via initializer; discovery initializer can be added later.
         services.AddOllamaFromConfig();
+        services.TryAddEnumerable(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<Sora.Core.ISoraInitializer>(new OllamaConfigInitializer()));
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
