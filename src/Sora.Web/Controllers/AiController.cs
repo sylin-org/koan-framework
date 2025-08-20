@@ -28,6 +28,34 @@ public sealed class AiController : ControllerBase
     public IActionResult Adapters()
         => Ok(_registry.All.Select(a => new { a.Id, a.Name, a.Type }));
 
+    [HttpGet(AiConstants.Routes.Models)]
+    public async Task<IActionResult> Models(CancellationToken ct)
+    {
+        var results = new List<AiModelDescriptor>();
+        foreach (var a in _registry.All)
+        {
+            try
+            {
+                var list = await a.ListModelsAsync(ct).ConfigureAwait(false);
+                results.AddRange(list);
+            }
+            catch { /* ignore unavailable adapter */ }
+        }
+        return Ok(results);
+    }
+
+    [HttpGet(AiConstants.Routes.Capabilities)]
+    public async Task<IActionResult> Capabilities(CancellationToken ct)
+    {
+        var caps = new List<AiCapabilities>();
+        foreach (var a in _registry.All)
+        {
+            try { caps.Add(await a.GetCapabilitiesAsync(ct).ConfigureAwait(false)); }
+            catch { /* ignore unavailable adapter */ }
+        }
+        return Ok(caps);
+    }
+
     [HttpPost(AiConstants.Routes.Chat)]
     public async Task<ActionResult<AiChatResponse>> Chat([FromBody] AiChatRequest request, CancellationToken ct)
     {

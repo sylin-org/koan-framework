@@ -91,6 +91,35 @@ internal sealed class OllamaAdapter : IAiAdapter
         return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = vectors.FirstOrDefault()?.Length };
     }
 
+    public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("/api/tags", ct).ConfigureAwait(false);
+        resp.EnsureSuccessStatusCode();
+        var doc = await resp.Content.ReadFromJsonAsync<OllamaTagsResponse>(cancellationToken: ct).ConfigureAwait(false);
+        var models = new List<AiModelDescriptor>();
+        foreach (var m in doc?.models ?? Enumerable.Empty<OllamaTag>())
+        {
+            models.Add(new AiModelDescriptor
+            {
+                Name = m.name ?? string.Empty,
+                Family = m.model,
+                AdapterId = Id,
+                AdapterType = Type
+            });
+        }
+        return models;
+    }
+
+    public Task<AiCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
+        => Task.FromResult(new AiCapabilities
+        {
+            AdapterId = Id,
+            AdapterType = Type,
+            SupportsChat = true,
+            SupportsStreaming = true,
+            SupportsEmbeddings = true
+        });
+
     private static string BuildPrompt(AiChatRequest req)
     {
         if (req.Messages.Count == 1 && string.Equals(req.Messages[0].Role, "user", StringComparison.OrdinalIgnoreCase))
@@ -143,5 +172,15 @@ internal sealed class OllamaAdapter : IAiAdapter
     private sealed class OllamaEmbeddingsResponse
     {
         public float[]? embedding { get; set; }
+    }
+
+    private sealed class OllamaTagsResponse
+    {
+        public List<OllamaTag> models { get; set; } = new();
+    }
+    private sealed class OllamaTag
+    {
+        public string? name { get; set; }
+        public string? model { get; set; }
     }
 }

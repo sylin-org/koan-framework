@@ -60,3 +60,23 @@ public record AiEmbeddingsResponse
     public string? Model { get; init; }
     public int? Dimension { get; init; }
 }
+
+public record AiModelDescriptor
+{
+    public string Name { get; init; } = string.Empty;
+    public string? Family { get; init; }
+    public int? ContextWindow { get; init; }
+    public int? EmbeddingDim { get; init; }
+    public string AdapterId { get; init; } = string.Empty;
+    public string AdapterType { get; init; } = string.Empty;
+}
+
+public record AiCapabilities
+{
+    public string AdapterId { get; init; } = string.Empty;
+    public string AdapterType { get; init; } = string.Empty;
+    public string? Version { get; init; }
+    public bool SupportsChat { get; init; }
+    public bool SupportsStreaming { get; init; }
+    public bool SupportsEmbeddings { get; init; }
+}

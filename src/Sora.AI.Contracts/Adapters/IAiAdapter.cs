@@ -24,4 +24,8 @@ public interface IAiAdapter
     Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default);
     IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, CancellationToken ct = default);
     Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default);
+
+    // Metadata
+    Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default);
+    Task<AiCapabilities> GetCapabilitiesAsync(CancellationToken ct = default);
 }
