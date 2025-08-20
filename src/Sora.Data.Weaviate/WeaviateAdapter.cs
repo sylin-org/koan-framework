@@ -1,10 +1,13 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Net.Http;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Instructions;
 
 namespace Sora.Data.Weaviate;
 
@@ -16,17 +19,23 @@ public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
     public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => new WeaviateVectorRepository<TEntity, TKey>(sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<IOptions<WeaviateOptions>>(), sp);
+    {
+        var httpFactory = (IHttpClientFactory?)sp.GetService(typeof(IHttpClientFactory))
+            ?? throw new InvalidOperationException("IHttpClientFactory not registered; call services.AddHttpClient().");
+        var options = (IOptions<WeaviateOptions>?)sp.GetService(typeof(IOptions<WeaviateOptions>))
+            ?? throw new InvalidOperationException("WeaviateOptions not configured; bind Sora:Data:Weaviate.");
+        return new WeaviateVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+    }
 }
 
-internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IVectorCapabilities
+internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>, IVectorCapabilities, IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
     private readonly HttpClient _http;
     private readonly WeaviateOptions _options;
     private readonly IServiceProvider _sp;
-    private readonly ILogger<WeaviateVectorRepository<TEntity, TKey>>? _logger;
+    private readonly Microsoft.Extensions.Logging.ILogger<WeaviateVectorRepository<TEntity, TKey>>? _logger;
     private volatile bool _schemaEnsured;
 
     public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete;
@@ -36,7 +45,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         _http = httpFactory.CreateClient("weaviate");
         _options = options.Value;
         _sp = sp;
-        _logger = sp.GetService<ILogger<WeaviateVectorRepository<TEntity, TKey>>>();
+        _logger = (Microsoft.Extensions.Logging.ILogger<WeaviateVectorRepository<TEntity, TKey>>?)sp.GetService(typeof(Microsoft.Extensions.Logging.ILogger<WeaviateVectorRepository<TEntity, TKey>>));
         _http.BaseAddress = new Uri(_options.Endpoint);
         if (_http.Timeout == default)
             _http.Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.DefaultTimeoutSeconds));
@@ -77,6 +86,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.upsert");
     await EnsureSchemaAsync(ct);
+    ValidateEmbedding(embedding);
         var obj = new
         {
             class_ = ClassName,
@@ -124,13 +134,19 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.search");
     await EnsureSchemaAsync(ct);
+        ValidateEmbedding(options.Query);
         var topK = options.TopK ?? _options.DefaultTopK;
         if (topK > _options.MaxTopK) topK = _options.MaxTopK;
 
-        // Weaviate GraphQL nearVector query
+        // Build optional filters (simple equality map)
+        string whereClause = BuildWhereClause(options.Filter);
+        var nearVector = $"nearVector: {{ vector: [{string.Join(",", options.Query.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture)))}] }}";
+        var args = string.IsNullOrEmpty(whereClause)
+            ? $"({nearVector}, limit: {topK})"
+            : $"({nearVector}, limit: {topK}, where: {whereClause})";
         var gql = new
         {
-            query = $"query {{ Get {{ {ClassName} (nearVector: {{ vector: [{string.Join(",", options.Query.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture)))}] }}, limit: {topK}) {{ _additional {{ id distance }} }} }} }}"
+            query = $"query {{ Get {{ {ClassName} {args} {{ _additional {{ id distance }} }} }} }}"
         };
         var req = JsonContent.Create(gql);
         var resp = await _http.PostAsync("/v1/graphql", req, ct);
@@ -142,6 +158,102 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         var json = await resp.Content.ReadAsStringAsync(ct);
         var matches = ParseGraphQlIds(json);
         return new VectorQueryResult<TKey>(matches, ContinuationToken: null);
+    }
+
+    private string BuildWhereClause(object? filter)
+    {
+        if (filter is null) return string.Empty;
+        // Expect a simple dictionary<string, object> of equals comparisons
+        if (filter is IEnumerable<KeyValuePair<string, object?>> kvs)
+        {
+            var parts = kvs.ToList();
+            if (parts.Count == 0) return string.Empty;
+            if (parts.Count == 1)
+            {
+                var (k, v) = parts[0];
+                return $"{{ path: [\"{k}\"], operator: Equal, valueText: \"{EscapeGraphQl(v)}\" }}";
+            }
+            var opers = string.Join(",", parts.Select(p => $"{{ path: [\"{p.Key}\"], operator: Equal, valueText: \"{EscapeGraphQl(p.Value)}\" }}"));
+            return $"{{ operator: And, operands: [ {opers} ] }}";
+        }
+        // Unknown shape: ignore rather than doing client-side filtering
+        return string.Empty;
+    }
+
+    private static string EscapeGraphQl(object? value)
+        => (value?.ToString() ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+    private void ValidateEmbedding(float[] embedding)
+    {
+        if (_options.Dimension > 0 && embedding.Length != _options.Dimension)
+            throw new ArgumentException($"Embedding dimension {embedding.Length} does not match configured {_options.Dimension}.");
+    }
+
+    // Instruction execution: ensureCreated, stats, clear (destructive guard)
+    public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
+    {
+        switch (instruction.Name)
+        {
+            case Sora.Data.Vector.VectorInstructions.IndexEnsureCreated:
+                await EnsureSchemaAsync(ct);
+                return (TResult)(object)true;
+            case Sora.Data.Vector.VectorInstructions.IndexStats:
+                {
+                    await EnsureSchemaAsync(ct);
+                    var cls = ClassName;
+                    var gql = new { query = $"query {{ Aggregate {{ {cls} {{ meta {{ count }} }} }} }}" };
+                    var req = JsonContent.Create(gql);
+                    var resp = await _http.PostAsync("/v1/graphql", req, ct);
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        var body = await resp.Content.ReadAsStringAsync(ct);
+                        throw new InvalidOperationException($"Weaviate stats failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+                    }
+                    var txt = await resp.Content.ReadAsStringAsync(ct);
+                    object result = new { count = ParseAggregateCount(txt) };
+                    return (TResult)result;
+                }
+            case Sora.Data.Vector.VectorInstructions.IndexClear:
+                {
+                    var allow = instruction.Options != null && instruction.Options.TryGetValue("AllowDestructive", out var v) && v is bool b && b;
+                    if (!allow) throw new NotSupportedException("Destructive clear requires Options.AllowDestructive=true.");
+                    await EnsureSchemaAsync(ct);
+                    var body = new
+                    {
+                        @class = ClassName,
+                        where = new { @operator = "IsNotNull", path = new[] { "id" } }
+                    };
+                    var req = JsonContent.Create(body);
+                    var resp = await _http.PostAsync("/v1/batch/objects/delete", req, ct);
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        var txt = await resp.Content.ReadAsStringAsync(ct);
+                        throw new InvalidOperationException($"Weaviate clear failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {txt}");
+                    }
+                    // Return approximate deleted count if provided; else 0
+                    object ok = 0;
+                    return (TResult)ok;
+                }
+            default:
+                throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Weaviate vector adapter.");
+        }
+    }
+
+    private static int ParseAggregateCount(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var data = doc.RootElement.GetProperty("data").GetProperty("Aggregate");
+        foreach (var cls in data.EnumerateObject())
+        {
+            var arr = cls.Value.EnumerateArray();
+            if (arr.MoveNext())
+            {
+                var meta = arr.Current.GetProperty("meta");
+                if (meta.TryGetProperty("count", out var countEl))
+                    return countEl.GetInt32();
+            }
+        }
+        return 0;
     }
 
     private static IReadOnlyList<VectorMatch<TKey>> ParseGraphQlIds(string json)
