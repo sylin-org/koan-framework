@@ -10,11 +10,7 @@ We want a pluggable AI adapter abstraction so Sora can connect to different yet 
 
 ## Decision
 
-- Define a narrow, provider-agnostic adapter contract in Sora.AI.Abstractions.
-- Provide a default registry in Sora.AI.Core to manage one or many adapters and to aggregate capabilities.
-- First-party adapters: Sora.AI.Adapter.Ollama (first), Sora.AI.Adapter.OpenAI (subset). Others can be community.
-- Keep controllers as the HTTP surface; adapters are pure services behind controllers.
-
+ First-party adapters: Sora.Ai.Provider.Ollama (first), Sora.AI.Adapter.OpenAI (subset). Others can be community.
 ### Adapter identity and capabilities (contract)
 
 1) Identity
