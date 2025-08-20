@@ -20,6 +20,8 @@
       href: DATA-0051-direct-routing-via-instruction-executors.md
     - name: Dapper boundary; Direct uses ADO.NET
       href: DATA-0052-relational-dapper-boundary-and-direct-ado.md
+  - name: DATA-0054 — vector search capability and contracts
+    href: DATA-0054-vector-search-capability-and-contracts.md
     - name: SQLite DDL policy
       href: DATA-0046-sqlite-schema-governance-ddl-policy.md
     - name: Paging guardrails and tracing

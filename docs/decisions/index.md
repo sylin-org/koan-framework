@@ -41,6 +41,7 @@ Canonical ADRs live in this folder. They’re grouped by domain below for quick 
 - 0050 — Instruction name constants and scoping — DATA-0050-instruction-name-constants-and-scoping.md
 - 0051 — Direct routing via instruction executors — DATA-0051-direct-routing-via-instruction-executors.md
 - 0052 — Relational Dapper boundary; Direct uses ADO.NET — DATA-0052-relational-dapper-boundary-and-direct-ado.md
+- 0054 — Vector search capability and contracts — DATA-0054-vector-search-capability-and-contracts.md
 
 ## Web (WEB)
 
