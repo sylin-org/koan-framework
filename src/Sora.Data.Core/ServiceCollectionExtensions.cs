@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
     // Provide a default storage name resolver so naming works even without adapter-specific registration (e.g., JSON adapter)
     services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
     services.AddOptions<Sora.Data.Core.Options.DirectOptions>().BindConfiguration("Sora:Data:Direct");
+    services.AddOptions<Sora.Data.Core.Options.VectorDefaultsOptions>().BindConfiguration("Sora:Data:VectorDefaults");
     services.AddOptions<DataRuntimeOptions>();
     services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
         services.AddSingleton<IDataService, DataService>();

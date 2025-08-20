@@ -27,6 +27,11 @@ public interface IDataService
     /// Returns a session for running ad-hoc queries/commands with optional connection override.
     /// </summary>
     Sora.Data.Core.Direct.IDirectSession Direct(string sourceOrAdapter);
+
+    // Vector repository accessor (optional adapter). Returns null if no vector adapter is configured for the entity.
+    IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull;
 }
 
 /// <summary>
@@ -36,6 +41,7 @@ public interface IDataService
 public sealed class DataService(IServiceProvider sp) : IDataService
 {
     private readonly ConcurrentDictionary<(Type, Type), object> _cache = new();
+    private readonly ConcurrentDictionary<(Type, Type), object> _vecCache = new();
 
     /// <inheritdoc />
     public IDataRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
@@ -57,6 +63,27 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var svc = sp.GetService<Sora.Data.Core.Direct.IDirectDataService>()
             ?? throw new InvalidOperationException("IDirectDataService not registered. AddSoraDataDirect() required.");
         return svc.Direct(sourceOrAdapter);
+    }
+    
+    public IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        var key = (typeof(TEntity), typeof(TKey));
+        if (_vecCache.TryGetValue(key, out var existing)) return (IVectorSearchRepository<TEntity, TKey>?)existing;
+
+        // Resolve from adapter factories that can provide a vector repo; prefer the entity's provider if possible.
+        var provider = Configuration.AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
+        var vectorFactories = sp.GetServices<IVectorAdapterFactory>().ToList();
+        IVectorSearchRepository<TEntity, TKey>? repo = null;
+        var factory = vectorFactories.FirstOrDefault(f => f.CanHandle(provider))
+            ?? vectorFactories.FirstOrDefault();
+        if (factory is not null)
+            repo = factory.Create<TEntity, TKey>(sp);
+
+        if (repo is not null)
+            _vecCache[key] = repo;
+        return repo;
     }
     // Provider resolution is now handled by TypeConfigs
 }
