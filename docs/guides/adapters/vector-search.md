@@ -5,11 +5,13 @@ Status: Planned (see ADR DATA-0054)
 This guide defines Sora’s vector datasource signature and accessory elements. It complements, but does not replace, classic query surfaces (LINQ/string). Vector search is a parallel capability focused on kNN/top‑K similarity.
 
 See also:
+
 - Support: Vector Adapter Acceptance Criteria (docs/support/09-vector-adapter-acceptance-criteria.md)
 
 ## Contracts (proposed)
 
 - Capability flags (reported by adapters)
+
   - VectorSearch, FilterPushdown, ContinuationTokens, Rerank, AccurateCount (vector)
 
 - Repository interface
@@ -50,6 +52,7 @@ public enum VectorCapabilities { None = 0, VectorSearch = 1, FilterPushdown = 2,
 ```
 
 - Index instructions (via IInstructionExecutor)
+
   - vector.index.ensureCreated
   - vector.index.rebuild
   - vector.index.stats
@@ -69,6 +72,7 @@ public sealed class VectorEmbeddingAttribute : Attribute
 ```
 
 Notes:
+
 - These definitions are specification-only here; implementation will live in Sora.Data.Vector.
 
 ## Usage patterns
@@ -141,6 +145,7 @@ var stats = await exec.ExecuteAsync<Dictionary<string, object?>>(Instruction.Cre
 For vector-enabled adapters, implement the minimal entity surface below. Keep semantics honest; don’t fake unsupported features.
 
 - Must
+
   - IVectorSearchRepository<TEntity, TKey>.SearchAsync(options)
   - IDataRepository<TEntity, TKey> lifecycle: UpsertAsync, UpsertManyAsync, DeleteAsync, DeleteManyAsync, DeleteAllAsync
   - IBatchSet<TEntity, TKey>: best-effort only; throw on RequireAtomic = true
@@ -148,6 +153,7 @@ For vector-enabled adapters, implement the minimal entity surface below. Keep se
   - IQueryCapabilities/IWriteCapabilities: advertise VectorSearch; omit LINQ/String if not supported; Writes = no native bulk unless truly supported
 
 - Optional
+
   - GetAsync(id): return full entity if the vector store keeps payloads; otherwise support only when paired with a primary repo for hydration
   - QueryAsync(object?) / LINQ: only if the engine offers a viable pushdown; avoid in-memory fallbacks for large sets
 
@@ -158,6 +164,7 @@ For vector-enabled adapters, implement the minimal entity surface below. Keep se
   - Cancellation: observe CancellationToken on all async paths; throw on cancellation promptly
 
 Notes
+
 - Count across vector results is not guaranteed; don’t expose AccurateCount unless cheap and correct
 - Prefer explicit capability checks in callers instead of bridging vector search to LINQ
 

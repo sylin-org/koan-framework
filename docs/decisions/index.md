@@ -85,6 +85,6 @@ Template: see 0000-template.md
 - 0005 — Protocol surfaces (gRPC, OpenAI shim, MCP, AI-RPC) — AI-0005-protocol-surfaces.md
 - 0006 — Data formats and grounding (Parquet, JSON-LD, Schema.org) — AI-0006-data-formats-and-grounding.md
 - 0007 — Inference servers interop (KServe, vLLM, TGI) — AI-0007-inference-servers-interop.md
- - 0010 — Prompt entrypoint and augmentation pipeline — AI-0010-entrypoint-and-augmentations.md
+- 0010 — Prompt entrypoint and augmentation pipeline — AI-0010-entrypoint-and-augmentations.md
 - 0008 — AI adapters and registry — AI-0008-adapters-and-registry.md
 - 0009 — Multi-service routing, load balancing, and policies — AI-0009-multi-service-routing-and-policies.md

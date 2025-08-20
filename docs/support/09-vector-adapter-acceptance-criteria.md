@@ -7,6 +7,7 @@ Scope: Adapters that expose vector similarity search over entities (IEntity<TKey
 Audience: Adapter authors and maintainers; reviewers; test writers.
 
 References:
+
 - Vector Search contracts and usage: ../guides/adapters/vector-search.md
 - ADR DATA-0054: ../decisions/DATA-0054-vector-search-capability-and-contracts.md
 
@@ -100,7 +101,8 @@ References:
 ## 12) Acceptance tests (minimum)
 
 Adapters MUST include tests that verify the following:
-- Capabilities: vector capability flags accurately reflect native support (Knn, Filters, Hybrid, PaginationToken, Bulk*, AtomicBatch, etc.).
+
+- Capabilities: vector capability flags accurately reflect native support (Knn, Filters, Hybrid, PaginationToken, Bulk\*, AtomicBatch, etc.).
 - Index: `vector.index.ensureCreated` is idempotent; `vector.index.stats`/`clear` where applicable.
 - Upsert/Delete: single and bulk upsert/delete; metadata round-trip limits; dimension validation.
 - Search: KNN returns correct identifiers ordered by score; the self-vector ranks highest for its own embedding; score monotonicity matches the metric.

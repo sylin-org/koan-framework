@@ -15,12 +15,12 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - AI
   - Turnkey inference (streaming chat, embeddings) with minimal config; Redis-first vector + cache; RAG defaults; observability and budgets; optional sidecar/central proxy; one-call AddSoraAI() and auto-boot discovery.
 - Services & DX
-  - Fast onboarding (Tiny* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
+  - Fast onboarding (Tiny\* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
 
 ## Scenarios and benefits
 
 - Greenfield APIs/services: ship quickly on JSON/SQLite; swap to Postgres/SQL Server/Mongo without API churn.
-- Enterprise data services: enforceable governance (DDL policy, naming, projection), measurable performance (pushdown), and traceability (db.* tags).
+- Enterprise data services: enforceable governance (DDL policy, naming, projection), measurable performance (pushdown), and traceability (db.\* tags).
 - CQRS/event-driven: inbox/idempotency, batch semantics, provider-neutral retries/DLQ.
 - Ops/reporting: Direct API for audited, parameterized ad-hoc access; neutral rows; limits and policy gates.
 - Modern UI backends: REST + GraphQL from the same model with consistent naming and filter semantics.
@@ -47,20 +47,22 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 ## Coming soon (on-ramp and near-term)
 
 - Cognitive coalescence (AI North Star)
+
   - Auto-boot orchestrator: probes providers (Ollama/OpenAI), vectors (Redis/pgvector), secrets, budgets, and protocols; single boot report with redacted status and action hints.
-  - One-call DI: AddSoraAI() wires providers, tokenization/cost, budgets/moderation, SSE, telemetry, headers, and /ai/* controllers.
+  - One-call DI: AddSoraAI() wires providers, tokenization/cost, budgets/moderation, SSE, telemetry, headers, and /ai/\* controllers.
   - AI profiles: SORA_AI_PROFILE = DevLocal | HostedKeyed | ProxyClient | TestHarness; sensible defaults for model, streaming, budgets, vector, cache TTLs.
   - Convention endpoints: /ai/chat, /ai/embed, /ai/rag/query, /ai/models auto-enable when Ready; OpenAI-shim and gRPC via single flags.
   - Zero-scaffold RAG quickstart: first run indexes docs/ with defaults; Redis-first vector + cache; background index job; safe projection/redaction.
   - Vector autodiscovery: Redis HNSW index bootstrap with sane metrics; pgvector fast-follow with auto-migrate if permitted.
   - Secrets layering: prefer secrets provider (KV/Secrets Manager) with env fallback; never log values; redacted boot entries.
   - Policy presets: DevPermissive | StagingBalanced | ProdConservative for token/time budgets, moderation, model allow-lists.
-  - Capabilities surface: Sora-AI-* headers and GET /ai/capabilities expose provider/vector flags, budgets, protocol availability.
+  - Capabilities surface: Sora-AI-\* headers and GET /ai/capabilities expose provider/vector flags, budgets, protocol availability.
   - Probes & health: ai-probe.ps1 mirrors /health/ready details; precise remediation messages.
   - Record/replay harness: SORA_AI_TEST_RECORD to capture; replay in CI; cassettes sanitized by default.
   - DX: TinyAI template and AI transformer recipes (summarize/classify) for Web/MQ.
 
 - On-ramp
+
   - Platform ramp-up: Redis core cache/session; MySQL relational adapter; optional CouchDB.
   - Data Bridge (D1): snapshot export/import (JSONL/CSV; FS/S3/Blob) with manifests and parity checks.
   - CDC (D2): Debezium/Kafka → EntityChange stream; replicators to Postgres/Mongo with idempotency.
@@ -76,15 +78,18 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 ## Future steps
 
 - AI growth
+
   - Proxy/connector: sidecar (P1) and central (T1) with quotas, per-tenant secrets, admin APIs; OpenAI shim/gRPC GA.
   - Multi-model routing: cost/latency/quality policies; safe tool registry audited function calling at scale.
   - Evaluation: golden tests expansion and optional eval harness integration.
 
 - Vector & knowledge
+
   - Weaviate adapter + Redis↔Weaviate migration utility; pgvector parity hardening.
   - Knowledge & servers: SPARQL/RDF export guide; FAISS/HNSWlib local adapter option; vLLM/TGI optional adapters; MMEPs tracking.
 
 - Data & replication
+
   - Virtualization & materialization: composed reads (D4) and scheduled Parquet exports (D5) with manifests.
   - Diff & reconcile (D6): drift detection and targeted replays; connector interop guides (D8).
 

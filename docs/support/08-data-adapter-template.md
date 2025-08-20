@@ -5,6 +5,7 @@ Purpose: Provide a minimal, idiomatic starting point for a Sora data adapter (re
 Use this as a reference or copy-and-paste template into a new adapter project.
 
 Notes
+
 - Replace placeholders YourData, YOUR_PROVIDER, connection/config paths.
 - Keep capability flags honest; avoid advertising unsupported LINQ/string features.
 - Prefer server-side pushdown for paging and filters; fall back safely only when acceptable and bounded.

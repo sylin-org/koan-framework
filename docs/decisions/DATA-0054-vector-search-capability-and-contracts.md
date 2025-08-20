@@ -39,10 +39,10 @@ Sora’s data model centers on aggregates (`IEntity<TKey>`) and adapter-specific
 
 ## Adoption plan
 
-1) Add `Sora.Data.Vector.Abstractions` package with interfaces, options, and instruction constants.
-2) Extend the capabilities reporting to include Vector flags (without breaking existing enum values).
-3) Document a capability matrix and dual‑store pattern (vector index + primary repo).
-4) Implement a pgvector adapter prototype, then Qdrant/Milvus.
+1. Add `Sora.Data.Vector.Abstractions` package with interfaces, options, and instruction constants.
+2. Extend the capabilities reporting to include Vector flags (without breaking existing enum values).
+3. Document a capability matrix and dual‑store pattern (vector index + primary repo).
+4. Implement a pgvector adapter prototype, then Qdrant/Milvus.
 
 ## Alternatives considered
 

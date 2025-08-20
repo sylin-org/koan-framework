@@ -10,6 +10,7 @@ Open focused subsets of the solution with .slnf files:
 In VS Code: File > Open... and select the .slnf. In Visual Studio: File > Open > Project/Solution and pick the .slnf.
 
 Configurations (use from CLI with -c):
+
 - Debug (default)
 - Release
 

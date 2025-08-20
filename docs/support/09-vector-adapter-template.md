@@ -5,6 +5,7 @@ Purpose: Provide a minimal, idiomatic starting point for a Sora vector adapter. 
 Use this as a reference or copy-and-paste template into a new adapter project.
 
 Notes
+
 - Replace all placeholders YourVector, YOUR_PROVIDER, and configuration paths as needed.
 - Keep capability flags and guardrails honest—don’t advertise features you don’t implement.
 
