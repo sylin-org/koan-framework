@@ -6,11 +6,11 @@ Sora is designed to feel natural—like having a conversation with your code rat
 
 ## What makes Sora different?
 
-**Start simple, grow smart** — Your first API can be three files. When you need CQRS, messaging, AI, or vector search, they're there—but they don't get in your way until you're ready.
+**Start simple, grow smart** - Your first API can be three files. When you need CQRS, messaging, AI, or vector search, they're there—but they don't get in your way until you're ready.
 
-**Familiar, but better** — Controllers work like you expect. Configuration follows .NET conventions. No magic, no surprises—just the good parts of what you already know, refined.
+**Familiar, but better** - Controllers work like you expect. Configuration follows .NET conventions. No magic, no surprises—just the good parts of what you already know, refined.
 
-**Batteries included, assembly optional** — Health checks, OpenAPI docs, flexible data access, message handling, and AI integration all work out of the box. Use what you need, ignore the rest.
+**Batteries included, assembly optional** - Health checks, OpenAPI docs, flexible data access, message handling, and AI integration all work out of the box. Use what you need, ignore the rest.
 
 ```csharp
 // This is a complete, working API with persistence
@@ -26,19 +26,19 @@ app.Run();
 
 ## Why choose Sora?
 
-🚀 **Zero to API in minutes** — Real CRUD endpoints with just `EntityController<T>`  
-🔧 **Escape hatches everywhere** — Drop to raw SQL, custom controllers, or provider-specific features  
-📦 **Modular by design** — Add SQLite, MongoDB, Redis, RabbitMQ, AI providers, or vector search as you grow  
-🤖 **AI-ready** — Built-in streaming chat, embeddings, vector search, and RAG patterns  
-✅ **Production ready** — Health checks, OpenAPI docs, observability, and message reliability built-in  
-🎯 **Predictable** — Convention over configuration, but configuration always wins
+**Zero to API in minutes** - Real CRUD endpoints with just `EntityController<T>`  
+**Escape hatches everywhere** - Drop to raw SQL, custom controllers, or provider-specific features  
+**Modular by design** - Add SQLite, MongoDB, Redis, RabbitMQ, AI providers, or vector search as you grow  
+**AI-ready** - Built-in streaming chat, embeddings, vector search, and RAG patterns  
+**Production ready** - Health checks, OpenAPI docs, observability, and message reliability built-in  
+**Predictable** - Convention over configuration, but configuration always wins
 
 ## Core philosophy
 
-- **Start simple, grow smart** — Begin with basics, add complexity only when needed
-- **Familiarity first** — Uses patterns you already know (Controllers, DI, EF-style entities)
-- **Developer experience** — Clear error messages, helpful defaults, minimal friction
-- **Everything is optional** — Data providers, messaging, AI, vector search—add what you need, when you need it
+- **Start simple, grow smart** - Begin with basics, add complexity only when needed
+- **Familiarity first** - Uses patterns you already know (Controllers, DI, EF-style entities)
+- **Developer experience** - Clear error messages, helpful defaults, minimal friction
+- **Everything is optional** - Data providers, messaging, AI, vector search—add what you need, when you need it
 
 ## Real-World Example
 
@@ -62,12 +62,12 @@ var todos = await Todo.Where(t => !t.IsDone);
 
 That's it. You now have:
 
-- `GET /api/todos` — List all todos
-- `POST /api/todos` — Create new todo
-- `GET /api/todos/{id}` — Get specific todo
-- `PUT /api/todos/{id}` — Update todo
-- `DELETE /api/todos/{id}` — Delete todo
-- `GET /api/todos/graphql` — GraphQL endpoint (auto-generated)
+- `GET /api/todos` - List all todos
+- `POST /api/todos` - Create new todo
+- `GET /api/todos/{id}` - Get specific todo
+- `PUT /api/todos/{id}` - Update todo
+- `DELETE /api/todos/{id}` - Delete todo
+- `GET /api/todos/graphql` - GraphQL endpoint (auto-generated)
 - Automatic health checks at `/health`
 - Interactive OpenAPI docs at `/swagger`
 
@@ -110,22 +110,22 @@ Your `EntityController<T>` now serves both REST and GraphQL automatically.
 
 ## Getting started
 
-1. **Quick Start** — [3-minute tutorial](docs/api/quickstart/) from zero to working API
-2. **Documentation** — [Complete guides](docs/api/) for all features
-3. **Examples** — Real applications in the `samples/` directory
+1. **Quick Start** - [3-minute tutorial](docs/api/quickstart/) from zero to working API
+2. **Documentation** - [Complete guides](docs/api/) for all features
+3. **Examples** - Real applications in the `samples/` directory
 
 ## Built for
 
-- **Rapid prototyping** — Get ideas into code fast, add AI features with a single line
-- **Microservices** — Lightweight, focused services with built-in messaging and observability
-- **Modern APIs** — REST + GraphQL from the same models, with vector search when you need it
-- **Enterprise applications** — Scales to complex patterns (CQRS, Event Sourcing, AI workflows)
+- **Rapid prototyping** - Get ideas into code fast, add AI features with a single line
+- **Microservices** - Lightweight, focused services with built-in messaging and observability
+- **Modern APIs** - REST + GraphQL from the same models, with vector search when you need it
+- **Enterprise applications** - Scales to complex patterns (CQRS, Event Sourcing, AI workflows)
 
 ## Community & support
 
-- **GitHub Issues** — Bug reports and feature requests
-- **Discussions** — Questions and community help
-- **Contributing** — See our [guidelines](CONTRIBUTING.md)
+- **GitHub Issues** - Bug reports and feature requests
+- **Discussions** - Questions and community help
+- **Contributing** - See our [guidelines](CONTRIBUTING.md)
 
 Built with ❤️ for .NET developers who want to focus on solving problems, not fighting frameworks.
 
