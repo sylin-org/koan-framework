@@ -29,19 +29,36 @@ app.Run();
 
 ## Why choose Sora?
 
-**Zero to API in minutes** - Real CRUD endpoints with just `EntityController<T>`  
-**Escape hatches everywhere** - Drop to raw SQL, custom controllers, or provider-specific features  
-**Modular by design** - Add SQLite, MongoDB, Redis, RabbitMQ, AI providers, or vector search as you grow  
-**AI-ready** - Built-in streaming chat, embeddings, vector search, and RAG patterns  
-**Production ready** - Health checks, OpenAPI docs, observability, and message reliability built-in  
-**Predictable** - Convention over configuration, but configuration always wins
+- **Zero to API in minutes**
+  Real CRUD endpoints with just `EntityController<T>`
+- **Escape hatches everywhere**
+  Drop to raw SQL, custom controllers, or provider-specific features
+
+- **Modular by design**
+  Add SQLite, MongoDB, Redis, RabbitMQ, AI providers, or vector search as you grow
+
+- **AI-ready**
+  Built-in streaming chat, embeddings, vector search, and RAG patterns
+
+- **Production ready**
+  Health checks, OpenAPI docs, observability, and message reliability built-in
+
+- **Predictable**
+  Convention over configuration, but configuration always wins
 
 ## Core philosophy
 
-- **Start simple, grow smart** - Begin with basics, add complexity only when needed
-- **Familiarity first** - Uses patterns you already know (Controllers, DI, EF-style entities)
-- **Developer experience** - Clear error messages, helpful defaults, minimal friction
-- **Everything is optional** - Data providers, messaging, AI, vector search—add what you need, when you need it
+- **Start simple, grow smart**
+  Begin with basics, add complexity only when needed
+
+- **Familiarity first**
+  Uses patterns you already know (Controllers, DI, EF-style entities)
+
+- **Developer experience**
+  Clear error messages, helpful defaults, minimal friction
+
+- **Everything is optional**
+  Data providers, messaging, AI, vector search—add what you need, when you need it
 
 ## Real-World Example
 
