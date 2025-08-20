@@ -17,9 +17,9 @@ public sealed class SoraHeadersOperationFilter : IOperationFilter
         foreach (var resp in operation.Responses.Values)
         {
             resp.Headers ??= new Dictionary<string, OpenApiHeader>(StringComparer.OrdinalIgnoreCase);
-                if (!resp.Headers.ContainsKey(Sora.Web.Infrastructure.SoraWebConstants.Headers.SoraTraceId))
+            if (!resp.Headers.ContainsKey(Sora.Web.Infrastructure.SoraWebConstants.Headers.SoraTraceId))
             {
-                    resp.Headers.Add(Sora.Web.Infrastructure.SoraWebConstants.Headers.SoraTraceId, new OpenApiHeader
+                resp.Headers.Add(Sora.Web.Infrastructure.SoraWebConstants.Headers.SoraTraceId, new OpenApiHeader
                 {
                     Description = "Trace correlation id for this response.",
                     Schema = new OpenApiSchema { Type = "string" }

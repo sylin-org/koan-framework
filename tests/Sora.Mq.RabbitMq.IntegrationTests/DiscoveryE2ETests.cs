@@ -10,10 +10,10 @@ using Sora.Core;
 using Sora.Data.Core;
 using Sora.Messaging;
 using Sora.Messaging.Inbox.Http;
+using Sora.Testing;
 using System.Text;
 using System.Text.Json;
 using Xunit;
-using Sora.Testing;
 
 public class DiscoveryE2ETests : IAsyncLifetime
 {
@@ -83,14 +83,14 @@ public class DiscoveryE2ETests : IAsyncLifetime
             channel.BasicAck(ea.DeliveryTag, false);
             await Task.CompletedTask;
         };
-    channel.BasicConsume(queue: q, autoAck: false, consumer: consumer);
-    // Give the consumer a tick to attach before publishing test messages
-    await Task.Delay(10);
+        channel.BasicConsume(queue: q, autoAck: false, consumer: consumer);
+        // Give the consumer a tick to attach before publishing test messages
+        await Task.Delay(10);
 
         // Now build a Sora app configured for discovery
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:DefaultGroup"] = group,

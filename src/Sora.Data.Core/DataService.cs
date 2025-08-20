@@ -1,10 +1,10 @@
+using Microsoft.Extensions.DependencyInjection;
+using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Core.Configuration;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Abstractions;
-using Sora.Data.Core.Configuration;
-using Sora.Data.Abstractions.Annotations;
 
 namespace Sora.Data.Core;
 
@@ -51,7 +51,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var key = (typeof(TEntity), typeof(TKey));
         if (_cache.TryGetValue(key, out var existing)) return (IDataRepository<TEntity, TKey>)existing;
 
-    var cfg = AggregateConfigs.Get<TEntity, TKey>(sp);
+        var cfg = AggregateConfigs.Get<TEntity, TKey>(sp);
         var repo = cfg.Repository;
         _cache[key] = repo;
         return repo;
@@ -64,7 +64,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
             ?? throw new InvalidOperationException("IDirectDataService not registered. AddSoraDataDirect() required.");
         return svc.Direct(sourceOrAdapter);
     }
-    
+
     public IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
         where TEntity : class, IEntity<TKey>
         where TKey : notnull

@@ -28,8 +28,8 @@ public sealed class RedisCrudAndQueryTests : IClassFixture<RedisAutoFixture>
             });
         }
         var cfg = cfgBuilder.AddEnvironmentVariables().Build();
-    sc.AddSingleton<IConfiguration>(cfg);
-    sc.AddSora();
+        sc.AddSingleton<IConfiguration>(cfg);
+        sc.AddSora();
 
         return sc.BuildServiceProvider();
     }
@@ -44,10 +44,10 @@ public sealed class RedisCrudAndQueryTests : IClassFixture<RedisAutoFixture>
     [Fact]
     public async Task Upsert_get_query_count_and_delete_should_work()
     {
-    if (string.IsNullOrWhiteSpace(_fx.ConnectionString)) return; // no Docker/env: skip
+        if (string.IsNullOrWhiteSpace(_fx.ConnectionString)) return; // no Docker/env: skip
         using var sp = CreateProvider();
-    var data = sp.GetRequiredService<IDataService>();
-    var repo = data.GetRepository<Person, string>();
+        var data = sp.GetRequiredService<IDataService>();
+        var repo = data.GetRepository<Person, string>();
 
         await repo.DeleteAllAsync();
 
@@ -74,10 +74,10 @@ public sealed class RedisCrudAndQueryTests : IClassFixture<RedisAutoFixture>
     [Fact]
     public async Task Paging_guardrails_should_apply()
     {
-    if (string.IsNullOrWhiteSpace(_fx.ConnectionString)) return; // no Docker/env: skip
+        if (string.IsNullOrWhiteSpace(_fx.ConnectionString)) return; // no Docker/env: skip
         using var sp = CreateProvider();
-    var data = sp.GetRequiredService<IDataService>();
-    var repo = data.GetRepository<Person, string>();
+        var data = sp.GetRequiredService<IDataService>();
+        var repo = data.GetRepository<Person, string>();
         await repo.DeleteAllAsync();
 
         // create 5

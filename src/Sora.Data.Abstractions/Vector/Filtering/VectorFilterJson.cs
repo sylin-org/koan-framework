@@ -81,7 +81,7 @@ public static class VectorFilterJson
     private static string WriteLeaf(VectorFilterCompare cmp)
     {
         var op = cmp.Operator.ToString();
-    var path = "[" + string.Join(',', cmp.Path.Select(p => "\"" + Escape(p) + "\"")) + "]";
+        var path = "[" + string.Join(',', cmp.Path.Select(p => "\"" + Escape(p) + "\"")) + "]";
         var (field, lit) = ValueFieldAndLiteral(cmp.Value);
         return $"{{ \"path\": {path}, \"operator\": \"{op}\", {field}: {lit} }}";
     }

@@ -1,12 +1,12 @@
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Mongo.Tests;
@@ -40,8 +40,8 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
     [Fact]
     public async Task RequireAtomic_true_on_standalone_should_throw_NotSupported()
     {
-    var sp = BuildServices();
-    if (sp == null) return; // skip
+        var sp = BuildServices();
+        if (sp == null) return; // skip
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
@@ -50,18 +50,18 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
             .Add(new Todo(Guid.NewGuid().ToString("n"), "b"));
 
         // Standalone container (no replica set) does not support transactions
-    await Assert.ThrowsAsync<NotSupportedException>(async () =>
-        {
-            await batch.SaveAsync(new BatchOptions(RequireAtomic: true));
-        });
+        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+            {
+                await batch.SaveAsync(new BatchOptions(RequireAtomic: true));
+            });
         await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 
     [Fact]
     public async Task Batch_deleted_count_is_reported_correctly()
     {
-    var sp = BuildServices();
-    if (sp == null) return; // skip
+        var sp = BuildServices();
+        if (sp == null) return; // skip
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
         var a = await repo.UpsertAsync(new Todo(Guid.NewGuid().ToString("n"), "keep"));
@@ -80,13 +80,13 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
     [Fact]
     public async Task Batch_cancellation_is_observed()
     {
-    var sp = BuildServices();
-    if (sp == null) return; // skip
+        var sp = BuildServices();
+        if (sp == null) return; // skip
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
-    var batch = repo.CreateBatch();
-    for (int i = 0; i < 2000; i++) batch.Add(new Todo(Guid.NewGuid().ToString("n"), "t-" + i));
+        var batch = repo.CreateBatch();
+        for (int i = 0; i < 2000; i++) batch.Add(new Todo(Guid.NewGuid().ToString("n"), "t-" + i));
 
         using var cts = new CancellationTokenSource();
         cts.Cancel(); // cancel immediately to ensure the token is observed

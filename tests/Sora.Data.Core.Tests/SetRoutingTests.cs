@@ -1,9 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +5,12 @@ using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.Json;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Core.Tests;
@@ -28,12 +28,12 @@ public class SetRoutingTests
     {
         var sc = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[] { new KeyValuePair<string,string?>("Sora:Data:Json:DirectoryPath", dir) })
+            .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("Sora:Data:Json:DirectoryPath", dir) })
             .Build();
         sc.AddSingleton<IConfiguration>(cfg);
-    sc.AddSora();
-    // Provide naming resolver defaults to satisfy registry
-    sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        sc.AddSora();
+        // Provide naming resolver defaults to satisfy registry
+        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
         sc.AddJsonAdapter(o => o.DirectoryPath = dir);
         var sp = sc.BuildServiceProvider();
         sp.UseSora();

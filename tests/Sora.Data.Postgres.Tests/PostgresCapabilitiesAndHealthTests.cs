@@ -1,7 +1,7 @@
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Sdk;
 
@@ -19,13 +19,13 @@ public class PostgresCapabilitiesAndHealthTests : IClassFixture<PostgresAutoFixt
     [Fact]
     public async Task Capabilities_and_health_are_reported()
     {
-            if (_fx.SkipTests) return; // environment lacks Docker; treat as skipped
-    var hs = _fx.ServiceProvider.GetRequiredService<Sora.Core.IHealthService>();
+        if (_fx.SkipTests) return; // environment lacks Docker; treat as skipped
+        var hs = _fx.ServiceProvider.GetRequiredService<Sora.Core.IHealthService>();
         var health = await hs.CheckAllAsync(default);
         health.Overall.Should().Be(Sora.Core.HealthState.Healthy);
 
         var data = _fx.Data;
-    var repo = data.GetRepository<TestEntity, string>();
+        var repo = data.GetRepository<TestEntity, string>();
 
         var qc = (repo as IQueryCapabilities)!;
         qc.Capabilities.Should().HaveFlag(QueryCapabilities.String);

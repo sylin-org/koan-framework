@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Configuration;
 using Sora.Core;
 
 namespace Sora.Web.Transformers;
@@ -131,7 +131,7 @@ internal sealed class TransformerRegistry : ITransformerRegistry
 
     public TransformerMatch<TEntity>? ResolveForInput<TEntity>(string contentType)
     {
-    EnsureInitialized();
+        EnsureInitialized();
         if (!_map.TryGetValue(typeof(TEntity), out var list)) return null;
         var ct = contentType.Split(';')[0].Trim();
         var match = list
@@ -155,19 +155,19 @@ public static class TransformerServiceCollectionExtensions
     public static IServiceCollection AddEntityTransformer<TEntity, TShape, TTransformer>(this IServiceCollection services, params string[] contentTypes)
         where TTransformer : class, IEntityTransformer<TEntity, TShape>
     {
-    services.TryAddSingleton<ITransformerRegistry, TransformerRegistry>();
-    services.AddSingleton<IEntityTransformer<TEntity, TShape>, TTransformer>();
-    // Store a deferred binding that will be executed by the registry on first use
-    services.AddOptions<TransformerBindings>();
-    services.PostConfigure<TransformerBindings>(b =>
-        {
-            b.Bindings.Add((sp) =>
+        services.TryAddSingleton<ITransformerRegistry, TransformerRegistry>();
+        services.AddSingleton<IEntityTransformer<TEntity, TShape>, TTransformer>();
+        // Store a deferred binding that will be executed by the registry on first use
+        services.AddOptions<TransformerBindings>();
+        services.PostConfigure<TransformerBindings>(b =>
             {
-                var reg = sp.GetRequiredService<ITransformerRegistry>();
-                var tr = sp.GetRequiredService<IEntityTransformer<TEntity, TShape>>();
-        reg.Register(tr, contentTypes, (int)TransformerPriority.Explicit);
+                b.Bindings.Add((sp) =>
+                {
+                    var reg = sp.GetRequiredService<ITransformerRegistry>();
+                    var tr = sp.GetRequiredService<IEntityTransformer<TEntity, TShape>>();
+                    reg.Register(tr, contentTypes, (int)TransformerPriority.Explicit);
+                });
             });
-        });
         return services;
     }
 
@@ -227,6 +227,6 @@ public static class TransformerServiceCollectionExtensions
             });
         }
 
-    private sealed class AutoDiscoveryOptions { }
+        private sealed class AutoDiscoveryOptions { }
     }
 }

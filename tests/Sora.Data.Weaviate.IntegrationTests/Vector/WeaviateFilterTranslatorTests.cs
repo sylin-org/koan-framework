@@ -1,5 +1,5 @@
-using Sora.Data.Weaviate;
 using Sora.Data.Abstractions;
+using Sora.Data.Weaviate;
 using Xunit;
 
 namespace Sora.Data.Weaviate.IntegrationTests.Vector;
@@ -24,7 +24,7 @@ public class WeaviateFilterTranslatorTests
     }
 
     [Theory]
-    [InlineData("type", "doc", "Equal", "valueText")] 
+    [InlineData("type", "doc", "Equal", "valueText")]
     [InlineData("active", true, "Equal", "valueBoolean")]
     [InlineData("age", 42, "Equal", "valueInt")]
     [InlineData("ratio", 0.75, "Equal", "valueNumber")]

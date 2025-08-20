@@ -1,9 +1,9 @@
-using System.Collections.Generic;
 using FluentAssertions;
-using HotChocolate.Execution;
 using HotChocolate;
+using HotChocolate.Execution;
 using Microsoft.AspNetCore.Http;
 using Sora.Web.GraphQl.Infrastructure;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Sora.Web.GraphQl.Tests;

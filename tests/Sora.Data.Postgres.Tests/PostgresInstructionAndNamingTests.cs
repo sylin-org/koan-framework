@@ -1,11 +1,11 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Abstractions.Naming;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Sdk;
 
@@ -19,8 +19,8 @@ public class PostgresInstructionAndNamingTests : IClassFixture<PostgresAutoFixtu
     [Fact]
     public async Task Instructions_and_naming_basics()
     {
-    if (_fx.SkipTests) return; // environment lacks Docker; treat as skipped
-    var repo = _fx.Data.GetRepository<Doc, string>();
+        if (_fx.SkipTests) return; // environment lacks Docker; treat as skipped
+        var repo = _fx.Data.GetRepository<Doc, string>();
 
         var nsr = _fx.ServiceProvider.GetRequiredService<IStorageNameResolver>();
         var conv = new StorageNameResolver.Convention(StorageNamingStyle.FullNamespace, ".", NameCasing.AsIs);
@@ -38,10 +38,10 @@ public class PostgresInstructionAndNamingTests : IClassFixture<PostgresAutoFixtu
             new Doc("a") { Title = "A" }, new Doc("b") { Title = "B" }
         }, default);
 
-        var all = await repo.QueryAsync((object?)null, default);
+        var all = await repo.QueryAsync(null, default);
         all.Count.Should().Be(2);
 
-    var echoed = await exec.ExecuteAsync<int>(new Instruction("relational.sql.scalar", null, new Dictionary<string, object?>{ ["Sql"] = $"SELECT COUNT(*) FROM Doc" }), default);
+        var echoed = await exec.ExecuteAsync<int>(new Instruction("relational.sql.scalar", null, new Dictionary<string, object?> { ["Sql"] = $"SELECT COUNT(*) FROM Doc" }), default);
         echoed.Should().Be(2);
     }
 

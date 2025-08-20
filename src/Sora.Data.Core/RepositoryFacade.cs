@@ -1,10 +1,10 @@
+using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Instructions;
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Instructions;
 
 namespace Sora.Data.Core;
 
@@ -146,7 +146,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             catch (NotSupportedException) { /* fall back */ }
         }
         // Fallback: enumerate ids then delete
-        var all = await _inner.QueryAsync((object?)null, ct);
+        var all = await _inner.QueryAsync(null, ct);
         var ids = all.Select(e => e.Id);
         return await _inner.DeleteManyAsync(ids, ct);
     }
@@ -171,8 +171,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         private readonly RepositoryFacade<TEntity, TKey> _outer;
         private readonly List<TEntity> _adds = new();
         private readonly List<TEntity> _updates = new();
-    private readonly List<TKey> _deletes = new();
-	private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
+        private readonly List<TKey> _deletes = new();
+        private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
 
         public BatchFacade(RepositoryFacade<TEntity, TKey> outer) => _outer = outer;
 
@@ -182,8 +182,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
         public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
 
-    /// <inheritdoc />
-    public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
+        /// <inheritdoc />
+        public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
             foreach (var e in _adds)

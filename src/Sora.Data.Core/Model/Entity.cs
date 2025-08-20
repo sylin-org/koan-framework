@@ -1,9 +1,9 @@
+using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Abstractions.Instructions;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Instructions;
-using Sora.Data.Abstractions.Annotations;
 
 namespace Sora.Domain;
 
@@ -44,9 +44,9 @@ public abstract class Entity<TEntity, TKey> : IEntity<TKey>
 
     public static async Task<int> Remove(string query, CancellationToken ct = default)
     {
-    var items = await Sora.Data.Core.Data<TEntity, TKey>.Query(query, ct);
-    var ids = System.Linq.Enumerable.Select(items, e => ((IEntity<TKey>)e).Id);
-    return await Sora.Data.Core.Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
+        var items = await Sora.Data.Core.Data<TEntity, TKey>.Query(query, ct);
+        var ids = System.Linq.Enumerable.Select(items, e => e.Id);
+        return await Sora.Data.Core.Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
     }
 
     public static Task<int> RemoveAll(CancellationToken ct = default)

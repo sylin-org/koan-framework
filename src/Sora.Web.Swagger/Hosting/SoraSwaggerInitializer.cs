@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
-using Swashbuckle.AspNetCore.Swagger;
 using Sora.Web.Swagger.Infrastructure;
+using Swashbuckle.AspNetCore.Swagger;
 
 namespace Sora.Web.Swagger.Hosting;
 

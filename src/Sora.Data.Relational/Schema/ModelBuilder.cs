@@ -1,12 +1,12 @@
+using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Abstractions.Naming;
+using Sora.Data.Core;
+using Sora.Data.Core.Metadata;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Data.Core;
-using Sora.Data.Core.Metadata;
-using Sora.Data.Abstractions.Naming;
 
 namespace Sora.Data.Relational.Schema;
 
@@ -21,7 +21,7 @@ public static class RelationalModelBuilder
     public static IRelationalSchemaModel FromEntity(Type entityType)
     {
         var storage = entityType.GetCustomAttribute<StorageAttribute>();
-    var tableName = !string.IsNullOrWhiteSpace(storage?.Name) ? storage!.Name! : ResolveDefaultName(entityType);
+        var tableName = !string.IsNullOrWhiteSpace(storage?.Name) ? storage!.Name! : ResolveDefaultName(entityType);
         var ns = storage?.Namespace;
 
         var idSpec = AggregateMetadata.GetIdSpec(entityType)?.Prop ?? throw new InvalidOperationException($"No Identifier/Id on {entityType.Name}");
@@ -34,7 +34,7 @@ public static class RelationalModelBuilder
 
         var indexes = new List<RelationalIndex>();
         // Implicit PK index represented separately
-    var pkIndex = new RelationalIndex(null, new[] { idCol }, true, true);
+        var pkIndex = new RelationalIndex(null, new[] { idCol }, true, true);
         indexes.Add(pkIndex);
 
         // Declared secondary indexes

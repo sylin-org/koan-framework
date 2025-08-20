@@ -1,8 +1,8 @@
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Sdk;
 
@@ -16,8 +16,8 @@ public class PostgresCrudAndQueryTests : IClassFixture<PostgresAutoFixture>
     [Fact]
     public async Task Upsert_read_query_count_and_paging()
     {
-    if (_fx.SkipTests) return; // environment lacks Docker; treat as skipped
-    var repo = _fx.Data.GetRepository<Person, string>();
+        if (_fx.SkipTests) return; // environment lacks Docker; treat as skipped
+        var repo = _fx.Data.GetRepository<Person, string>();
 
         var people = Enumerable.Range(1, 25).Select(i => new Person(i.ToString())
         {
@@ -27,7 +27,7 @@ public class PostgresCrudAndQueryTests : IClassFixture<PostgresAutoFixture>
 
         await repo.UpsertManyAsync(people, default);
 
-        var all = await repo.QueryAsync((object?)null, default);
+        var all = await repo.QueryAsync(null, default);
         all.Count.Should().Be(25);
 
         var lrepo = (ILinqQueryRepository<Person, string>)repo;

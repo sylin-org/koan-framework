@@ -1,12 +1,12 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
-using Sora.Testing;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Core;
 using Sora.Core;
+using Sora.Data.Core;
 using Sora.Messaging;
+using Sora.Testing;
 using System.Text.Json;
 using Xunit;
 
@@ -57,12 +57,12 @@ public class BasicRabbitMqTests : IAsyncLifetime
     [Fact]
     public async Task Send_and_handle_message_via_DI_handler()
     {
-    if (!_available) return; // Skip when Docker/Testcontainers not available.
-    var conn = $"amqp://guest:guest@localhost:{_hostPort}";
+        if (!_available) return; // Skip when Docker/Testcontainers not available.
+        var conn = $"amqp://guest:guest@localhost:{_hostPort}";
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -98,7 +98,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -150,7 +150,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -198,7 +198,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -248,7 +248,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:DefaultGroup"] = "workers",
@@ -280,7 +280,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -351,7 +351,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = "rabbit",
                 ["Sora:Messaging:Buses:rabbit:Provider"] = "RabbitMq",
@@ -365,7 +365,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
         services.AddSingleton<IConfiguration>(cfg);
 
         var handler = new InboxedHandler();
-    services.AddSora();
+        services.AddSora();
         services.AddSingleton<IMessageHandler<InboxSample>>(handler);
 
         var sp = services.BuildServiceProvider();

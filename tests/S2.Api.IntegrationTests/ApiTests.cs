@@ -1,9 +1,9 @@
-using System.Net.Http.Json;
-using System.Collections.Generic;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using System.Collections.Generic;
+using System.Net.Http.Json;
 using Xunit;
 
 public class ApiTests : IClassFixture<MongoFixture>

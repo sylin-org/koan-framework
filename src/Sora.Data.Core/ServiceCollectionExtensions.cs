@@ -1,9 +1,9 @@
-using Microsoft.Extensions.DependencyInjection;
-using Sora.Core;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Sora.Data.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Sora.Core;
+using Sora.Data.Abstractions;
 
 namespace Sora.Data.Core;
 
@@ -29,17 +29,17 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddSoraDataCore(this IServiceCollection services)
     {
-    // Initialize modules (adapters, etc.) that opt-in via ISoraInitializer
-    SoraInitialization.InitializeModules(services);
-    services.TryAddSingleton<Sora.Data.Core.Configuration.IDataConnectionResolver, Sora.Data.Core.Configuration.DefaultDataConnectionResolver>();
-    // Provide a default storage name resolver so naming works even without adapter-specific registration (e.g., JSON adapter)
-    services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
-    services.AddOptions<Sora.Data.Core.Options.DirectOptions>().BindConfiguration("Sora:Data:Direct");
-    services.AddOptions<Sora.Data.Core.Options.VectorDefaultsOptions>().BindConfiguration("Sora:Data:VectorDefaults");
-    services.AddOptions<DataRuntimeOptions>();
-    services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
+        // Initialize modules (adapters, etc.) that opt-in via ISoraInitializer
+        SoraInitialization.InitializeModules(services);
+        services.TryAddSingleton<Sora.Data.Core.Configuration.IDataConnectionResolver, Sora.Data.Core.Configuration.DefaultDataConnectionResolver>();
+        // Provide a default storage name resolver so naming works even without adapter-specific registration (e.g., JSON adapter)
+        services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        services.AddOptions<Sora.Data.Core.Options.DirectOptions>().BindConfiguration("Sora:Data:Direct");
+        services.AddOptions<Sora.Data.Core.Options.VectorDefaultsOptions>().BindConfiguration("Sora:Data:VectorDefaults");
+        services.AddOptions<DataRuntimeOptions>();
+        services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
         services.AddSingleton<IDataService, DataService>();
-    services.AddSingleton<IDataDiagnostics, DataDiagnostics>();
+        services.AddSingleton<IDataDiagnostics, DataDiagnostics>();
         services.AddSingleton<ISoraRuntime, SoraRuntime>();
         // Decorate repositories registered as IDataRepository<,>
         services.TryDecorate(typeof(IDataRepository<,>), typeof(RepositoryFacade<,>));
@@ -63,7 +63,7 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IConfiguration>(cfg);
         }
         var sp = services.BuildServiceProvider();
-    Sora.Core.SoraApp.Current = sp;
+        Sora.Core.SoraApp.Current = sp;
         sp.UseSora();
         sp.StartSora();
         return sp;
@@ -82,9 +82,9 @@ internal sealed class SoraRuntime : ISoraRuntime
         _ = _sp.GetService<IDataService>();
 
         // Warn in production if discovery is running (explicit registration still wins)
-    var env = Sora.Core.SoraEnv.EnvironmentName
-          ?? Sora.Core.Configuration.ReadFirst(null, Sora.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment)
-          ?? string.Empty;
+        var env = Sora.Core.SoraEnv.EnvironmentName
+              ?? Sora.Core.Configuration.ReadFirst(null, Sora.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment)
+              ?? string.Empty;
         if (Sora.Core.SoraEnv.IsProduction)
         {
             // In isolated/containerized environments, downgrade the noise level.
@@ -135,7 +135,8 @@ internal sealed class SoraRuntime : ISoraRuntime
             // Enumerate known IEntity<> types from loaded assemblies.
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             var entityTypes = assemblies
-                .SelectMany(a => {
+                .SelectMany(a =>
+                {
                     try { return a.GetTypes(); } catch { return Array.Empty<Type>(); }
                 })
                 .Where(t => t.IsClass && !t.IsAbstract)
@@ -162,7 +163,7 @@ internal sealed class SoraRuntime : ISoraRuntime
                         if (execIface is not null)
                         {
                             var instrType = typeof(Sora.Data.Abstractions.Instructions.Instruction);
-                            var instruction = Activator.CreateInstance(instrType, (object)global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated, null, null, null);
+                            var instruction = Activator.CreateInstance(instrType, Relational.RelationalInstructions.SchemaEnsureCreated, null, null, null);
                             var method = execIface.GetMethod("ExecuteAsync");
                             var task = (System.Threading.Tasks.Task)method!.Invoke(repo, new object?[] { instruction!, default(System.Threading.CancellationToken) })!;
                             task.GetAwaiter().GetResult();

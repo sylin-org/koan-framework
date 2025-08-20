@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Testcontainers.MongoDb;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +6,9 @@ using MongoDB.Driver;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.Mongo;
+using System;
+using System.Threading.Tasks;
+using Testcontainers.MongoDb;
 using Xunit;
 
 namespace Sora.Data.Mongo.Tests;
@@ -24,13 +24,13 @@ public class MongoContainerSmokeTests : IAsyncLifetime
             .WithImage("mongo:7")
             .WithPortBinding(0, 27017)
             .Build();
-    await _mongo.StartAsync();
-    _connString = _mongo.GetConnectionString();
+        await _mongo.StartAsync();
+        _connString = _mongo.GetConnectionString();
     }
 
     public async Task DisposeAsync()
     {
-    if (_mongo is not null) await _mongo.DisposeAsync();
+        if (_mongo is not null) await _mongo.DisposeAsync();
     }
 
     private IServiceProvider BuildServices()
@@ -84,9 +84,9 @@ public class MongoContainerSmokeTests : IAsyncLifetime
         var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MongoOptions>>().Value;
         var client = new MongoClient(opts.ConnectionString);
         var db = client.GetDatabase(opts.Database);
-    var ping = await db.RunCommandAsync((Command<BsonDocument>)new BsonDocument("ping", 1));
+        var ping = await db.RunCommandAsync((Command<BsonDocument>)new BsonDocument("ping", 1));
         ping.Should().NotBeNull();
 
-    await TestMongoTeardown.DropDatabaseAsync(sp);
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }

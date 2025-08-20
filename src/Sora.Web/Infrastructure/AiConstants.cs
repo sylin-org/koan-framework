@@ -10,7 +10,7 @@ internal static class AiConstants
         public const string ChatStream = "chat/stream";
         public const string Embeddings = "embeddings";
         public const string Adapters = "adapters";
-    public const string Models = "models";
-    public const string Capabilities = "capabilities";
+        public const string Models = "models";
+        public const string Capabilities = "capabilities";
     }
 }

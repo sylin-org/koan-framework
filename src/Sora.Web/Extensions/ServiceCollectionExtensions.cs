@@ -1,12 +1,12 @@
-using System;
-using System.Linq;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
+using System;
+using System.Linq;
 
 namespace Sora.Web;
 
@@ -54,8 +54,8 @@ public static class ServiceCollectionExtensions
             j.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
 
         });
-    // Add input formatter via DI-aware options configurator (no early ServiceProvider build)
-    services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, OptionalTransformerInputFormatterConfigurator>());
+        // Add input formatter via DI-aware options configurator (no early ServiceProvider build)
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, OptionalTransformerInputFormatterConfigurator>());
         services.AddOptions<WebPipelineOptions>();
 
         // Observability is wired in Sora.Core's AddSoraObservability; Sora.Web only ensures core web services are present.

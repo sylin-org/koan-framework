@@ -1,5 +1,5 @@
-using Sora.Core;
 using Microsoft.Extensions.Options;
+using Sora.Core;
 
 namespace Sora.Data.Weaviate;
 

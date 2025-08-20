@@ -1,10 +1,10 @@
+using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Core.Metadata;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Data.Core.Metadata;
 
 namespace Sora.Data.Core;
 

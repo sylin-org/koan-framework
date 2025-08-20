@@ -26,7 +26,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var endpoint = Sora.Core.Configuration.Read(cfg, "Sora:Data:Weaviate:Endpoint", (string?)null) ?? "http://localhost:8085";
+        var endpoint = Sora.Core.Configuration.Read(cfg, "Sora:Data:Weaviate:Endpoint", null) ?? "http://localhost:8085";
         report.AddSetting("Weaviate:Endpoint", endpoint, isSecret: false);
     }
 }

@@ -1,9 +1,9 @@
-using System.Net.Http.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sora.Core;
 using Sora.Messaging;
+using System.Net.Http.Json;
 
 namespace Sora.Messaging.Inbox.Http;
 
@@ -31,7 +31,7 @@ public sealed class HttpInboxStore : IInboxStore
 
     public async Task MarkProcessedAsync(string key, CancellationToken ct)
     {
-    var resp = await _http.PostAsJsonAsync(Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Routes.MarkProcessed, new { key }, ct).ConfigureAwait(false);
+        var resp = await _http.PostAsJsonAsync(Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Routes.MarkProcessed, new { key }, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
     }
 

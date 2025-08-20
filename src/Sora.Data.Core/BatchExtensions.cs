@@ -1,6 +1,6 @@
+using Sora.Data.Abstractions;
 using System.Threading;
 using System.Threading.Tasks;
-using Sora.Data.Abstractions;
 
 namespace Sora.Data.Core;
 

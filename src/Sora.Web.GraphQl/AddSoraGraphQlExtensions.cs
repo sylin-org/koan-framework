@@ -1,24 +1,24 @@
-using System.Reflection;
 using HotChocolate;
-using HotChocolate.Execution.Options;
+using HotChocolate.Execution;
 using HotChocolate.Execution.Configuration;
-using HotChocolate.Resolvers;
+using HotChocolate.Execution.Options;
 using HotChocolate.Language;
+using HotChocolate.Resolvers;
 using HotChocolate.Types;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
+using Sora.Data.Core.Configuration;
 using Sora.Web.Filtering;
 using Sora.Web.Hooks;
 using Sora.Web.Infrastructure;
-using Sora.Data.Core.Configuration;
-using Sora.Data.Abstractions.Naming;
-using HotChocolate.Execution;
 using System.Diagnostics;
-using Sora.Data.Abstractions.Annotations;
+using System.Reflection;
 
 namespace Sora.Web.GraphQl;
 
@@ -32,7 +32,7 @@ public static class AddSoraGraphQlExtensions
         _registered = true;
 
         services.AddHttpContextAccessor();
-    services.AddSingleton<Execution.IGraphQlExecutor, Execution.GraphQlExecutor>();
+        services.AddSingleton<Execution.IGraphQlExecutor, Execution.GraphQlExecutor>();
 
         var entityTypes = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic)
@@ -87,72 +87,72 @@ public static class AddSoraGraphQlExtensions
     private static void RegisterEntity(IRequestExecutorBuilder builder, IServiceCollection services, Type entityType)
     {
         // Compute GraphQL names from storage naming
-    // Resolve storage name via a scoped provider at request time to avoid building a temporary container
-    var nameRaw = ResolveStorageNameFactory(entityType);
+        // Resolve storage name via a scoped provider at request time to avoid building a temporary container
+        var nameRaw = ResolveStorageNameFactory(entityType);
         var name = ToGraphQlTypeName(nameRaw);
         var resolverType = typeof(Resolvers<>).MakeGenericType(entityType);
         services.AddScoped(resolverType);
 
-    // Register entity GraphQL type with explicit field resolvers so no implicit binding is required
-    builder.AddType(new ObjectType(descriptor =>
-    {
-        descriptor.Name(name);
-        foreach (var p in entityType.GetProperties(BindingFlags.Instance | BindingFlags.Public))
+        // Register entity GraphQL type with explicit field resolvers so no implicit binding is required
+        builder.AddType(new ObjectType(descriptor =>
         {
-            if (!p.CanRead) continue;
-            var fieldName = ToCamelCase(p.Name);
-            // Map simple primitives as strings for now; we primarily need id/name
-            descriptor.Field(fieldName)
-                .Type<StringType>()
-                .Resolve(ctx =>
-                {
-                    var parent = ctx.Parent<object?>();
-                    if (parent is null) return null;
-                    var val = p.GetValue(parent);
-                    if (val is null) return null;
-                    return val is string s ? s : val.ToString();
-                });
-        }
-    }));
-
-    builder.AddTypeExtension(new ObjectTypeExtension(d =>
-        {
-            d.Name(name);
-            d.Field("display").Type<StringType>().Resolve(ctx =>
+            descriptor.Name(name);
+            foreach (var p in entityType.GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
-                var o = ctx.Parent<object>();
-                var t = o?.GetType();
-                if (t is null) return string.Empty;
-                string? pick(params string[] names)
-                    => names.Select(n => t.GetProperty(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)?.GetValue(o) as string)
-                            .FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
-                return pick("Display", "Name", "Title", "Label") ?? o!.ToString() ?? string.Empty;
-            });
+                if (!p.CanRead) continue;
+                var fieldName = ToCamelCase(p.Name);
+                // Map simple primitives as strings for now; we primarily need id/name
+                descriptor.Field(fieldName)
+                    .Type<StringType>()
+                    .Resolve(ctx =>
+                    {
+                        var parent = ctx.Parent<object?>();
+                        if (parent is null) return null;
+                        var val = p.GetValue(parent);
+                        if (val is null) return null;
+                        return val is string s ? s : val.ToString();
+                    });
+            }
         }));
 
-    // Concrete payload type per-entity to avoid generic name collisions
-    var collectionPayloadName = $"{name}CollectionPayload";
-                var payloadClr = typeof(CollectionPayload<>).MakeGenericType(entityType);
-                var itemsProp = payloadClr.GetProperty("Items")!;
-                var totalProp = payloadClr.GetProperty("TotalCount")!;
-                builder.AddType(new ObjectType(od =>
+        builder.AddTypeExtension(new ObjectTypeExtension(d =>
+            {
+                d.Name(name);
+                d.Field("display").Type<StringType>().Resolve(ctx =>
                 {
-                        od.Name(collectionPayloadName);
-                        od.Field("items")
-                            .Type(new ListTypeNode(new NamedTypeNode(name)))
-                            .Resolve(ctx =>
-                            {
-                                    var parent = ctx.Parent<object?>();
-                                    return parent is null ? null : itemsProp.GetValue(parent);
-                            });
-                        od.Field("totalCount")
-                            .Type<IntType>()
-                            .Resolve(ctx =>
-                            {
-                                    var parent = ctx.Parent<object?>();
-                                    return parent is null ? 0 : (int)(totalProp.GetValue(parent) ?? 0);
-                            });
-                }));
+                    var o = ctx.Parent<object>();
+                    var t = o?.GetType();
+                    if (t is null) return string.Empty;
+                    string? pick(params string[] names)
+                        => names.Select(n => t.GetProperty(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase)?.GetValue(o) as string)
+                                .FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+                    return pick("Display", "Name", "Title", "Label") ?? o!.ToString() ?? string.Empty;
+                });
+            }));
+
+        // Concrete payload type per-entity to avoid generic name collisions
+        var collectionPayloadName = $"{name}CollectionPayload";
+        var payloadClr = typeof(CollectionPayload<>).MakeGenericType(entityType);
+        var itemsProp = payloadClr.GetProperty("Items")!;
+        var totalProp = payloadClr.GetProperty("TotalCount")!;
+        builder.AddType(new ObjectType(od =>
+        {
+            od.Name(collectionPayloadName);
+            od.Field("items")
+                        .Type(new ListTypeNode(new NamedTypeNode(name)))
+                        .Resolve(ctx =>
+                        {
+                        var parent = ctx.Parent<object?>();
+                        return parent is null ? null : itemsProp.GetValue(parent);
+                    });
+            od.Field("totalCount")
+                        .Type<IntType>()
+                        .Resolve(ctx =>
+                        {
+                        var parent = ctx.Parent<object?>();
+                        return parent is null ? 0 : (int)(totalProp.GetValue(parent) ?? 0);
+                    });
+        }));
 
         builder.AddTypeExtension(new ObjectTypeExtension(d =>
         {
@@ -178,15 +178,15 @@ public static class AddSoraGraphQlExtensions
                     return await res.GetItemsAsync(ctx, q, filter, ignore, page, size);
                 });
 
-                d.Field(ToGraphQlFieldName(nameRaw))
-                .Argument("id", a => a.Type<NonNullType<StringType>>())
-                .Type(new NamedTypeNode(name))
-                .Resolve(async ctx =>
-                {
-                    var res = (dynamic)ctx.Service(resolverType);
-                    var id = ctx.ArgumentValue<string>("id");
-                    return await res.GetByIdAsync(ctx, id);
-                });
+            d.Field(ToGraphQlFieldName(nameRaw))
+            .Argument("id", a => a.Type<NonNullType<StringType>>())
+            .Type(new NamedTypeNode(name))
+            .Resolve(async ctx =>
+            {
+                var res = (dynamic)ctx.Service(resolverType);
+                var id = ctx.ArgumentValue<string>("id");
+                return await res.GetByIdAsync(ctx, id);
+            });
         }));
 
         // CLR-name-based alias fields for compatibility (e.g., item/items)
@@ -239,34 +239,34 @@ public static class AddSoraGraphQlExtensions
             }));
         }
 
-    var inputName = name + "Input";
-    builder.AddType(new InputObjectType(d =>
-        {
-            d.Name(inputName);
-            foreach (var p in entityType.GetProperties(BindingFlags.Instance | BindingFlags.Public))
-            {
-                if (!p.CanWrite) continue;
-                if (string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase)) continue;
-                if (p.PropertyType.IsClass && p.PropertyType != typeof(string)) continue;
-                d.Field(ToCamelCase(p.Name)).Type<StringType>();
-            }
-        }));
-
-        // Alias input type for CLR name (e.g., ItemInput)
-        var altInputName = altTypeName + "Input";
-        if (!string.Equals(altInputName, inputName, StringComparison.Ordinal))
-        {
+        var inputName = name + "Input";
         builder.AddType(new InputObjectType(d =>
             {
-                d.Name(altInputName);
+                d.Name(inputName);
                 foreach (var p in entityType.GetProperties(BindingFlags.Instance | BindingFlags.Public))
                 {
                     if (!p.CanWrite) continue;
                     if (string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase)) continue;
                     if (p.PropertyType.IsClass && p.PropertyType != typeof(string)) continue;
-            d.Field(ToCamelCase(p.Name)).Type<StringType>();
+                    d.Field(ToCamelCase(p.Name)).Type<StringType>();
                 }
             }));
+
+        // Alias input type for CLR name (e.g., ItemInput)
+        var altInputName = altTypeName + "Input";
+        if (!string.Equals(altInputName, inputName, StringComparison.Ordinal))
+        {
+            builder.AddType(new InputObjectType(d =>
+                {
+                    d.Name(altInputName);
+                    foreach (var p in entityType.GetProperties(BindingFlags.Instance | BindingFlags.Public))
+                    {
+                        if (!p.CanWrite) continue;
+                        if (string.Equals(p.Name, "Id", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (p.PropertyType.IsClass && p.PropertyType != typeof(string)) continue;
+                        d.Field(ToCamelCase(p.Name)).Type<StringType>();
+                    }
+                }));
         }
 
         builder.AddTypeExtension(new ObjectTypeExtension(d =>
@@ -507,7 +507,7 @@ public static class AddSoraGraphQlExtensions
                 IReadOnlyList<TEntity> items;
                 int total = 0;
 
-                using (var _set = DataSetContext.With(null as string))
+                using (var _set = DataSetContext.With(null))
                 {
                     if (!string.IsNullOrWhiteSpace(filterJson) && repo is ILinqQueryRepository<TEntity, string> lrepo)
                     {
@@ -524,7 +524,7 @@ public static class AddSoraGraphQlExtensions
                     else
                     {
                         items = await repo.QueryAsync(null, ctx.RequestAborted);
-                        try { total = await repo.CountAsync((object?)null, ctx.RequestAborted); } catch { total = items.Count; }
+                        try { total = await repo.CountAsync(null, ctx.RequestAborted); } catch { total = items.Count; }
                     }
                 }
 

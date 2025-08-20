@@ -1,8 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
 using System.Linq;
 using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Sora.Core;
 
@@ -92,6 +92,6 @@ public static class SoraInitialization
             }
         }
 
-    // Warning is logged at runtime in ISoraRuntime.Discover() to avoid building a temporary provider here.
+        // Warning is logged at runtime in ISoraRuntime.Discover() to avoid building a temporary provider here.
     }
 }

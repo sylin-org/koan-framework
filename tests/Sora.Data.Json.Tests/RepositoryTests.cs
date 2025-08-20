@@ -1,14 +1,14 @@
+using FluentAssertions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Instructions;
+using Sora.Data.Core;
+using Sora.Data.Json;
 using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using Sora.Data.Abstractions;
-using Sora.Data.Json;
-using Sora.Data.Core;
-using Sora.Data.Abstractions.Instructions;
 using Xunit;
 
 namespace Sora.Data.Json.Tests;
@@ -19,13 +19,13 @@ public class RepositoryTests
     {
         var sc = new ServiceCollection();
         var cfg = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
-            .AddInMemoryCollection(new[] { new KeyValuePair<string,string?>("JsonDataOptions:DirectoryPath", dir) })
+            .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("JsonDataOptions:DirectoryPath", dir) })
             .Build();
-    sc.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(cfg);
-    // Provide naming resolver needed by StorageNameRegistry for set-aware physical names
-    sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
-    sc.AddJsonData<Todo, string>(o => { o.DirectoryPath = dir; o.DefaultPageSize = 2; o.MaxPageSize = 3; });
-    sc.AddSoraDataCore();
+        sc.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(cfg);
+        // Provide naming resolver needed by StorageNameRegistry for set-aware physical names
+        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        sc.AddJsonData<Todo, string>(o => { o.DirectoryPath = dir; o.DefaultPageSize = 2; o.MaxPageSize = 3; });
+        sc.AddSoraDataCore();
         return sc.BuildServiceProvider();
     }
 
@@ -122,20 +122,20 @@ public class RepositoryTests
         var sp = BuildServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
-    var todo = new Todo { Title = "one" };
-    (todo.Id).Should().BeNullOrEmpty();
-    await repo.UpsertAsync(todo);
-    todo.Id.Should().NotBeNullOrWhiteSpace();
-    (await repo.GetAsync(todo.Id)).Should().NotBeNull();
+        var todo = new Todo { Title = "one" };
+        (todo.Id).Should().BeNullOrEmpty();
+        await repo.UpsertAsync(todo);
+        todo.Id.Should().NotBeNullOrWhiteSpace();
+        (await repo.GetAsync(todo.Id)).Should().NotBeNull();
 
-    await repo.UpsertAsync(new Todo { Id = todo.Id, Title = "two" });
-    (await repo.GetAsync(todo.Id))!.Title.Should().Be("two");
+        await repo.UpsertAsync(new Todo { Id = todo.Id, Title = "two" });
+        (await repo.GetAsync(todo.Id))!.Title.Should().Be("two");
 
         var all = await repo.QueryAsync(null);
         all.Count.Should().Be(1);
 
-    (await repo.DeleteAsync(todo.Id)).Should().BeTrue();
-    (await repo.GetAsync(todo.Id)).Should().BeNull();
+        (await repo.DeleteAsync(todo.Id)).Should().BeTrue();
+        (await repo.GetAsync(todo.Id)).Should().BeNull();
     }
 
     [Fact]
@@ -178,15 +178,15 @@ public class RepositoryTests
     {
         var dir = TempDir();
         var sp = BuildServices(dir);
-    // Set SoraApp.Current so JSON repo can resolve set-aware physical names
-    Sora.Core.SoraApp.Current = sp;
+        // Set SoraApp.Current so JSON repo can resolve set-aware physical names
+        Sora.Core.SoraApp.Current = sp;
 
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
         // Seed different counts per set
         int rootCount = 2, backupCount = 4;
         for (int i = 0; i < rootCount; i++) await repo.UpsertAsync(new Todo { Title = $"root-{i}" });
-    using (DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             for (int i = 0; i < backupCount; i++) await repo.UpsertAsync(new Todo { Title = $"backup-{i}" });
         }
@@ -194,23 +194,23 @@ public class RepositoryTests
         // Insert a shared-id record into both sets
         var sharedId = "shared-json";
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared" });
-    using (DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             await repo.UpsertAsync(new Todo { Id = sharedId, Title = "backup-shared" });
         }
 
     // Verify totals via CountAsync (QueryAsync applies default paging guardrail)
-    (await repo.CountAsync((object?)null)).Should().Be(rootCount + 1);
-    using (DataSetContext.With("backup"))
+    (await repo.CountAsync(null)).Should().Be(rootCount + 1);
+        using (DataSetContext.With("backup"))
         {
-            (await repo.CountAsync((object?)null)).Should().Be(backupCount + 1);
+            (await repo.CountAsync(null)).Should().Be(backupCount + 1);
         }
 
         // Update shared in root only
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared-updated" });
         var rootItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
         rootItems.Should().ContainSingle(x => x.Title == "root-shared-updated");
-    using (DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             var backupItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
             backupItems.Should().ContainSingle(x => x.Title == "backup-shared");
@@ -220,11 +220,11 @@ public class RepositoryTests
         using (DataSetContext.With("backup"))
         {
             await repo.DeleteAllAsync();
-            (await repo.CountAsync((object?)null)).Should().Be(0);
+            (await repo.CountAsync(null)).Should().Be(0);
         }
 
     // Root still intact and updated
-    (await repo.CountAsync((object?)null)).Should().Be(rootCount + 1);
+    (await repo.CountAsync(null)).Should().Be(rootCount + 1);
         var again = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
         again.Should().ContainSingle(x => x.Title == "root-shared-updated");
     }
@@ -241,16 +241,16 @@ public class RepositoryTests
             await repo.UpsertAsync(new Todo { Id = $"i{i}", Title = $"t{i}" });
 
         // Without options, results are capped at DefaultPageSize=2
-        var def = await repo.QueryAsync((object?)null);
+        var def = await repo.QueryAsync(null);
         def.Count.Should().Be(2);
-        (await repo.CountAsync((object?)null)).Should().Be(10);
+        (await repo.CountAsync(null)).Should().Be(10);
 
-    // Validate options-based paging using the decorated repository (facade implements IDataRepositoryWithOptions)
-    var withOptsRepo = Assert.IsAssignableFrom<IDataRepositoryWithOptions<Todo, string>>(repo);
-    var withOpts = await withOptsRepo.QueryAsync((object?)null, new DataQueryOptions(Page: 2, PageSize: 3));
-    withOpts.Count.Should().Be(3);
-    var capped = await withOptsRepo.QueryAsync((object?)null, new DataQueryOptions(Page: 1, PageSize: 999));
-    capped.Count.Should().Be(3);
+        // Validate options-based paging using the decorated repository (facade implements IDataRepositoryWithOptions)
+        var withOptsRepo = Assert.IsAssignableFrom<IDataRepositoryWithOptions<Todo, string>>(repo);
+        var withOpts = await withOptsRepo.QueryAsync(null, new DataQueryOptions(Page: 2, PageSize: 3));
+        withOpts.Count.Should().Be(3);
+        var capped = await withOptsRepo.QueryAsync(null, new DataQueryOptions(Page: 1, PageSize: 999));
+        capped.Count.Should().Be(3);
     }
 
     [Fact]
@@ -274,7 +274,7 @@ public class RepositoryTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         var many = Enumerable.Range(0, 1000).Select(i => new Todo { Id = $"i{i}", Title = "x" });
-    await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repo.UpsertManyAsync(many, cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repo.UpsertManyAsync(many, cts.Token));
     }
 
     [Fact]

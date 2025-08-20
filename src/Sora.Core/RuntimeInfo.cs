@@ -45,19 +45,19 @@ public static class SoraEnv
         bool isDev = env?.IsDevelopment() ?? string.Equals(envName, "Development", StringComparison.OrdinalIgnoreCase);
         bool isProd = env?.IsProduction() ?? string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase);
         bool isStg = env?.IsStaging() ?? string.Equals(envName, "Staging", StringComparison.OrdinalIgnoreCase);
-    bool inContainer = Sora.Core.Configuration.Read(
-                cfg,
-                Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetRunningInContainer,
-                false)
-            || !string.IsNullOrEmpty(Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Env.KubernetesServiceHost, null));
-    bool isCi = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Env.Ci, false)
-                 || !string.IsNullOrEmpty(Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Env.TfBuild, null));
+        bool inContainer = Sora.Core.Configuration.Read(
+                    cfg,
+                    Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetRunningInContainer,
+                    false)
+                || !string.IsNullOrEmpty(Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Env.KubernetesServiceHost, null));
+        bool isCi = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Env.Ci, false)
+                     || !string.IsNullOrEmpty(Sora.Core.Configuration.Read<string?>(cfg, Sora.Core.Infrastructure.Constants.Configuration.Env.TfBuild, null));
         // Read flag with precedence (env var overrides config) via SoraConfig
-    bool magic = Sora.Core.Configuration.Read(
-            cfg,
-            Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction,
-            false
-        );
+        bool magic = Sora.Core.Configuration.Read(
+                cfg,
+                Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction,
+                false
+            );
         return new Snapshot(envName, isDev, isProd, isStg, inContainer, isCi, magic, DateTimeOffset.UtcNow);
     }
 

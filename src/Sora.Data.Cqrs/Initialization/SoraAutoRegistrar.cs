@@ -28,9 +28,9 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-    var defaultProfile = Sora.Core.Configuration.Read<string?>(cfg, Sora.Data.Cqrs.Infrastructure.Constants.Configuration.Keys.DefaultProfile, null);
-    report.AddSetting("DefaultProfile", defaultProfile);
-    var profiles = cfg.GetSection(Sora.Data.Cqrs.Infrastructure.Constants.Configuration.Profiles.Section).GetChildren().Select(c => c.Key).ToArray();
-    report.AddSetting("Profiles", string.Join(",", profiles));
+        var defaultProfile = Sora.Core.Configuration.Read<string?>(cfg, Sora.Data.Cqrs.Infrastructure.Constants.Configuration.Keys.DefaultProfile, null);
+        report.AddSetting("DefaultProfile", defaultProfile);
+        var profiles = cfg.GetSection(Sora.Data.Cqrs.Infrastructure.Constants.Configuration.Profiles.Section).GetChildren().Select(c => c.Key).ToArray();
+        report.AddSetting("Profiles", string.Join(",", profiles));
     }
 }

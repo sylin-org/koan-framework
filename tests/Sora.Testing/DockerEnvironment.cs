@@ -1,7 +1,7 @@
+using Docker.DotNet;
 using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Docker.DotNet;
 
 namespace Sora.Testing;
 

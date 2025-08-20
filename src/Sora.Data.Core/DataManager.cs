@@ -1,12 +1,12 @@
+using Sora.Core.Primitives;
+using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Core.Metadata;
 using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Sora.Core.Primitives;
-using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Data.Core.Metadata;
 
 namespace Sora.Data.Core;
 
@@ -21,7 +21,7 @@ public sealed class AggregateIdentityManager : IAggregateIdentityManager
 {
     private static (PropertyInfo? Prop, bool IsString, bool IsGuid) GetIdProp<TEntity>()
     {
-    var spec = AggregateMetadata.GetIdSpec(typeof(TEntity));
+        var spec = AggregateMetadata.GetIdSpec(typeof(TEntity));
         return (spec?.Prop, spec?.IsString == true, spec?.IsGuid == true);
     }
 
@@ -29,7 +29,7 @@ public sealed class AggregateIdentityManager : IAggregateIdentityManager
     where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-    if (entity is null) return ValueTask.CompletedTask;
+        if (entity is null) return ValueTask.CompletedTask;
         var (prop, isString, isGuid) = GetIdProp<TEntity>();
         if (prop is null) return ValueTask.CompletedTask;
 

@@ -1,5 +1,5 @@
-using System.Data;
 using Sora.Data.Relational.Schema;
+using System.Data;
 
 namespace Sora.Data.Relational.Schema;
 

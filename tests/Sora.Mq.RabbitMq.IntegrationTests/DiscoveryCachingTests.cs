@@ -3,14 +3,14 @@ using DotNet.Testcontainers.Containers;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Core;
-using Sora.Data.Core;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using Sora.Core;
+using Sora.Data.Core;
 using Sora.Messaging;
+using Sora.Testing;
 using System.Text.Json;
 using Xunit;
-using Sora.Testing;
 
 public class DiscoveryCachingTests : IAsyncLifetime
 {
@@ -82,7 +82,7 @@ public class DiscoveryCachingTests : IAsyncLifetime
         // App configured with short timeout and longer cache
         var services = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string,string?>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Sora:Messaging:DefaultBus"] = busCode,
                 ["Sora:Messaging:DefaultGroup"] = group,

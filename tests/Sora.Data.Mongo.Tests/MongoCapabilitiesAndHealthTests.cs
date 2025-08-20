@@ -1,12 +1,12 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
-using Sora.Core;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Mongo.Tests;
@@ -40,7 +40,7 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
     public async Task Capabilities_flags_are_set_correctly()
     {
         if (!_fx.IsAvailable) return; // skip
-    var sp = BuildServices();
+        var sp = BuildServices();
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
         var caps = (IQueryCapabilities)repo;
@@ -56,7 +56,7 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
     public async Task Health_contributor_reports_healthy_when_reachable()
     {
         if (!_fx.IsAvailable) return; // skip
-    var sp = BuildServices();
+        var sp = BuildServices();
         var hc = sp.GetRequiredService<IEnumerable<IHealthContributor>>();
         hc.Should().ContainSingle(h => h.Name == "data:mongo");
         var mongo = hc.Single(h => h.Name == "data:mongo");

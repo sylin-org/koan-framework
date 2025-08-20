@@ -7,8 +7,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core;
-using System.Diagnostics;
 using Sora.Web.Infrastructure;
+using System.Diagnostics;
 
 namespace Sora.Web.Hosting;
 

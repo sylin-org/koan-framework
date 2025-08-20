@@ -1,10 +1,10 @@
-using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using System;
 
 namespace Sora.Core.Observability;
 
@@ -12,12 +12,12 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddSoraObservability(this IServiceCollection services, Action<ObservabilityOptions>? configure = null)
     {
-    services.AddOptions<ObservabilityOptions>().BindConfiguration(Sora.Core.Infrastructure.Constants.Configuration.Observability.Section);
+        services.AddOptions<ObservabilityOptions>().BindConfiguration(Sora.Core.Infrastructure.Constants.Configuration.Observability.Section);
         if (configure is not null) services.Configure(configure);
 
         using var tmp = services.BuildServiceProvider();
         var cfg = tmp.GetService<IConfiguration>();
-    var env = tmp.GetService<IHostEnvironment>();
+        var env = tmp.GetService<IHostEnvironment>();
         var opts = tmp.GetService<Microsoft.Extensions.Options.IOptions<ObservabilityOptions>>()?.Value ?? new ObservabilityOptions();
 
         var enabled = opts.Enabled;

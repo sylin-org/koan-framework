@@ -1,7 +1,7 @@
+using Sora.Data.Abstractions.Annotations;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Sora.Data.Abstractions.Annotations;
 
 namespace Sora.Data.Relational.Schema;
 

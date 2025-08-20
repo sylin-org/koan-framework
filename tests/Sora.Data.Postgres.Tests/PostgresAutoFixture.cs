@@ -1,9 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using Sora.Testing;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Microsoft.Extensions.Configuration;
@@ -11,6 +5,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
+using Sora.Testing;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Postgres.Tests;
@@ -26,11 +26,11 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
 
     public async Task InitializeAsync()
     {
-    // Disable Testcontainers' resource reaper to avoid Docker hijack issues on some Windows setups
-    Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
+        // Disable Testcontainers' resource reaper to avoid Docker hijack issues on some Windows setups
+        Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
 
-    // Probe Docker daemon robustly and derive a stable endpoint string for Testcontainers
-    var probe = await DockerEnvironment.ProbeAsync();
+        // Probe Docker daemon robustly and derive a stable endpoint string for Testcontainers
+        var probe = await DockerEnvironment.ProbeAsync();
 
         var envCxn = Environment.GetEnvironmentVariable("SORA_POSTGRES__CONNECTION_STRING")
             ?? Environment.GetEnvironmentVariable("ConnectionStrings__Postgres");
@@ -74,13 +74,13 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
             })
             .Build();
 
-    var services = new ServiceCollection();
-    services.AddSingleton<IConfiguration>(cfg);
-    services.AddSoraCore();
-    services.AddSoraDataCore();
-    services.AddPostgresAdapter();
-    ServiceProvider = services.BuildServiceProvider();
-    Data = ServiceProvider.GetRequiredService<IDataService>();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(cfg);
+        services.AddSoraCore();
+        services.AddSoraDataCore();
+        services.AddPostgresAdapter();
+        ServiceProvider = services.BuildServiceProvider();
+        Data = ServiceProvider.GetRequiredService<IDataService>();
     }
 
     // Docker probing moved to Sora.Testing.DockerEnvironment

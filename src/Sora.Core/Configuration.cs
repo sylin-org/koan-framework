@@ -1,5 +1,5 @@
-using System.Globalization;
 using Microsoft.Extensions.Configuration;
+using System.Globalization;
 
 namespace Sora.Core;
 
@@ -77,7 +77,7 @@ public static class Configuration
                 var sp = Sora.Core.SoraApp.Current;
                 if (sp is not null)
                 {
-                    cfg = (sp as IServiceProvider)?.GetService(typeof(IConfiguration)) as IConfiguration;
+                    cfg = sp?.GetService(typeof(IConfiguration)) as IConfiguration;
                 }
             }
             catch { /* ignore */ }
@@ -88,7 +88,7 @@ public static class Configuration
             key = key.Replace('_', ':');
         }
         // 1) Environment variables (probe multiple shapes for resilience)
-    foreach (var envKey in EnumerateEnvKeys(key))
+        foreach (var envKey in EnumerateEnvKeys(key))
         {
             var envVal = Environment.GetEnvironmentVariable(envKey);
             if (!string.IsNullOrWhiteSpace(envVal) && TryConvert(envVal!, out T parsed))

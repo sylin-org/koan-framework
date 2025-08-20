@@ -1,11 +1,11 @@
+using Sora.AI.Contracts.Adapters;
+using Sora.AI.Contracts.Models;
 using System.Buffers;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
-using Sora.AI.Contracts.Adapters;
-using Sora.AI.Contracts.Models;
 
 namespace Sora.Ai.Provider.Ollama;
 
@@ -39,7 +39,7 @@ internal sealed class OllamaAdapter : IAiAdapter
             stream = false,
             options = MapOptions(request.Options)
         };
-    using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.GeneratePath, body, ct).ConfigureAwait(false);
+        using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.GeneratePath, body, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         var doc = await resp.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken: ct).ConfigureAwait(false)
                   ?? throw new InvalidOperationException("Empty response from Ollama.");
@@ -58,7 +58,7 @@ internal sealed class OllamaAdapter : IAiAdapter
             throw new InvalidOperationException("Ollama adapter requires a model name.");
         var prompt = BuildPrompt(request);
         var body = JsonSerializer.Serialize(new { model, prompt, stream = true, options = MapOptions(request.Options) });
-    using var httpReq = new HttpRequestMessage(HttpMethod.Post, Infrastructure.Constants.Api.GeneratePath)
+        using var httpReq = new HttpRequestMessage(HttpMethod.Post, Infrastructure.Constants.Api.GeneratePath)
         { Content = new StringContent(body, Encoding.UTF8, "application/json") };
         using var resp = await _http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
@@ -93,7 +93,7 @@ internal sealed class OllamaAdapter : IAiAdapter
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
     {
-    using var resp = await _http.GetAsync(Infrastructure.Constants.Discovery.TagsPath, ct).ConfigureAwait(false);
+        using var resp = await _http.GetAsync(Infrastructure.Constants.Discovery.TagsPath, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         var doc = await resp.Content.ReadFromJsonAsync<OllamaTagsResponse>(cancellationToken: ct).ConfigureAwait(false);
         var models = new List<AiModelDescriptor>();

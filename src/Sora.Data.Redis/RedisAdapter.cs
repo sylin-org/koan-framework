@@ -1,11 +1,11 @@
-using System.Linq;
-using System.Linq.Expressions;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using StackExchange.Redis;
+using System.Linq;
+using System.Linq.Expressions;
 
 namespace Sora.Data.Redis;
 
@@ -60,9 +60,9 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-    var opts = sp.GetRequiredService<IOptions<RedisOptions>>();
-    var muxer = sp.GetRequiredService<IConnectionMultiplexer>();
-    return new RedisRepository<TEntity, TKey>(opts, muxer, sp.GetService<ILoggerFactory>());
+        var opts = sp.GetRequiredService<IOptions<RedisOptions>>();
+        var muxer = sp.GetRequiredService<IConnectionMultiplexer>();
+        return new RedisRepository<TEntity, TKey>(opts, muxer, sp.GetService<ILoggerFactory>());
     }
 }
 

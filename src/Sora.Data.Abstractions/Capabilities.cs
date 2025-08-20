@@ -5,9 +5,9 @@ namespace Sora.Data.Abstractions;
 [Flags]
 public enum QueryCapabilities
 {
-    None  = 0,
+    None = 0,
     String = 1 << 0,
-    Linq   = 1 << 1,
+    Linq = 1 << 1,
 }
 
 public interface IQueryCapabilities
@@ -19,9 +19,9 @@ public interface IQueryCapabilities
 [Flags]
 public enum WriteCapabilities
 {
-    None        = 0,
-    BulkUpsert  = 1 << 0,
-    BulkDelete  = 1 << 1,
+    None = 0,
+    BulkUpsert = 1 << 0,
+    BulkDelete = 1 << 1,
     AtomicBatch = 1 << 2,
 }
 

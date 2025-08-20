@@ -1,7 +1,3 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +5,10 @@ using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
 using Sora.Data.Sqlite;
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
@@ -56,21 +56,21 @@ public class SqliteSetRoutingTests
         // root set (no suffix)
         var rootItem = new Todo { Title = "root-1" };
         await repo.UpsertAsync(rootItem);
-        (await repo.QueryAsync((object?)null)).Should().ContainSingle(x => x.Title == "root-1");
+        (await repo.QueryAsync(null)).Should().ContainSingle(x => x.Title == "root-1");
 
         // backup set insert
         using (Sora.Data.Core.DataSetContext.With("backup"))
         {
             await repo.UpsertAsync(new Todo { Title = "backup-1" });
-            var inBackup = await ((ILinqQueryRepository<Todo,string>)repo).QueryAsync(x => x.Title.StartsWith("backup"));
+            var inBackup = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Title.StartsWith("backup"));
             inBackup.Should().ContainSingle(x => x.Title == "backup-1");
         }
 
         // Validate isolation
-        (await repo.QueryAsync((object?)null)).Should().OnlyContain(x => x.Title == "root-1");
+        (await repo.QueryAsync(null)).Should().OnlyContain(x => x.Title == "root-1");
         using (Sora.Data.Core.DataSetContext.With("backup"))
         {
-            (await repo.QueryAsync((object?)null)).Should().OnlyContain(x => x.Title == "backup-1");
+            (await repo.QueryAsync(null)).Should().OnlyContain(x => x.Title == "backup-1");
         }
 
         // Delete by predicate within backup
@@ -80,11 +80,11 @@ public class SqliteSetRoutingTests
             var items = await lrepo.QueryAsync(x => x.Title.StartsWith("backup"));
             var deleted = await repo.DeleteManyAsync(items.Select(i => i.Id));
             deleted.Should().Be(items.Count);
-            (await repo.QueryAsync((object?)null)).Should().BeEmpty();
+            (await repo.QueryAsync(null)).Should().BeEmpty();
         }
 
         // Root remains
-        (await repo.QueryAsync((object?)null)).Should().ContainSingle(x => x.Title == "root-1");
+        (await repo.QueryAsync(null)).Should().ContainSingle(x => x.Title == "root-1");
     }
 }
 
@@ -145,10 +145,10 @@ public class SqliteSetRoutingCountsAndUpdatesTests
         }
 
         // Verify counts
-        (await repo.QueryAsync((object?)null)).Count.Should().Be(rootCount + 1);
+        (await repo.QueryAsync(null)).Count.Should().Be(rootCount + 1);
         using (Sora.Data.Core.DataSetContext.With("backup"))
         {
-            (await repo.QueryAsync((object?)null)).Count.Should().Be(backupCount + 1);
+            (await repo.QueryAsync(null)).Count.Should().Be(backupCount + 1);
         }
 
         // Update shared record only in root
@@ -166,13 +166,13 @@ public class SqliteSetRoutingCountsAndUpdatesTests
         // Clear backup set
         using (Sora.Data.Core.DataSetContext.With("backup"))
         {
-            var allBackup = await repo.QueryAsync((object?)null);
+            var allBackup = await repo.QueryAsync(null);
             await repo.DeleteManyAsync(allBackup.Select(i => i.Id));
-            (await repo.QueryAsync((object?)null)).Should().BeEmpty();
+            (await repo.QueryAsync(null)).Should().BeEmpty();
         }
 
         // Root remains populated with expected count
-        (await repo.QueryAsync((object?)null)).Count.Should().Be(rootCount + 1);
+        (await repo.QueryAsync(null)).Count.Should().Be(rootCount + 1);
         // And the shared updated record still reflects the update in root
         var again = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
         again.Should().ContainSingle(x => x.Title == "root-shared-updated");

@@ -1,8 +1,8 @@
-using System.Diagnostics;
-using System.Net.Http.Headers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
+using System.Diagnostics;
+using System.Net.Http.Headers;
 
 namespace Sora.Data.Weaviate;
 

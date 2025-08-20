@@ -1,12 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
+using Sora.AI.Contracts;
+using Sora.AI.Contracts.Models;
+using Sora.Core;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Sora.AI.Contracts;
-using Sora.AI.Contracts.Models;
-using Sora.Core;
 
 namespace Sora.AI;
 
@@ -35,7 +35,7 @@ public static class Ai
     private static IAi Resolve()
     {
         if (_override.Value is IAi o) return o;
-    var sp = SoraApp.Current ?? throw new InvalidOperationException("AI not configured; call services.AddSora() or AddAi() and ensure provider.UseSora().");
+        var sp = SoraApp.Current ?? throw new InvalidOperationException("AI not configured; call services.AddSora() or AddAi() and ensure provider.UseSora().");
         _resolver ??= CreateResolver(sp);
         return _resolver(sp);
     }

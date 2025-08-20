@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +6,11 @@ using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
 using Sora.Data.Sqlite;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
@@ -56,11 +56,11 @@ public class SqliteSchemaGovernanceTests
         return Path.Combine(dir, Guid.NewGuid().ToString("n") + ".db");
     }
 
-    private static IServiceProvider BuildServices(string file, Action<SqliteOptions>? configure = null, IEnumerable<KeyValuePair<string,string?>>? extraConfig = null)
+    private static IServiceProvider BuildServices(string file, Action<SqliteOptions>? configure = null, IEnumerable<KeyValuePair<string, string?>>? extraConfig = null)
     {
         var cs = $"Data Source={file}";
         var sc = new ServiceCollection();
-        var baseConfig = new List<KeyValuePair<string,string?>>
+        var baseConfig = new List<KeyValuePair<string, string?>>
         {
             new("Sora:Data:Sqlite:ConnectionString", cs),
             new("SORA_DATA_PROVIDER","sqlite"),
@@ -92,15 +92,15 @@ public class SqliteSchemaGovernanceTests
         // Trigger table + generated columns creation
         await repo.UpsertAsync(new Todo { Title = "x" });
 
-    var rep = await data.Execute<Todo, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
-    rep.Should().NotBeNull();
-    var tableExists = rep!["TableExists"] as bool? ?? false;
-    tableExists.Should().BeTrue();
-    // Title should be projected and present
-    var missing = rep["MissingColumns"] as System.Collections.Generic.IEnumerable<string> ?? Array.Empty<string>();
-    missing.Should().BeEmpty();
-    var state = rep["State"] as string ?? string.Empty;
-    state.Should().Be("Healthy");
+        var rep = await data.Execute<Todo, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
+        rep.Should().NotBeNull();
+        var tableExists = rep!["TableExists"] as bool? ?? false;
+        tableExists.Should().BeTrue();
+        // Title should be projected and present
+        var missing = rep["MissingColumns"] as System.Collections.Generic.IEnumerable<string> ?? Array.Empty<string>();
+        missing.Should().BeEmpty();
+        var state = rep["State"] as string ?? string.Empty;
+        state.Should().Be("Healthy");
     }
 
     [Fact]
@@ -110,11 +110,11 @@ public class SqliteSchemaGovernanceTests
         var sp = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.NoDdl; });
         var data = sp.GetRequiredService<IDataService>();
 
-    var rep = await data.Execute<Todo, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
-    rep.Should().NotBeNull();
-    (rep!["TableExists"] as bool? ?? false).Should().BeFalse();
-    (rep["State"] as string ?? string.Empty).Should().BeOneOf("Degraded", "Unhealthy");
-    (rep["DdlAllowed"] as bool? ?? false).Should().BeFalse();
+        var rep = await data.Execute<Todo, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
+        rep.Should().NotBeNull();
+        (rep!["TableExists"] as bool? ?? false).Should().BeFalse();
+        (rep["State"] as string ?? string.Empty).Should().BeOneOf("Degraded", "Unhealthy");
+        (rep["DdlAllowed"] as bool? ?? false).Should().BeFalse();
     }
 
     [Fact]
@@ -128,32 +128,32 @@ public class SqliteSchemaGovernanceTests
         var ok = await data.Execute<ReadOnlyTodo, bool>(new Instruction("data.ensureCreated"));
         ok.Should().BeTrue(); // call returns true, but table should not be created
 
-    var rep = await data.Execute<ReadOnlyTodo, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
-    rep.Should().NotBeNull();
-    (rep!["TableExists"] as bool? ?? false).Should().BeFalse();
-    (rep["State"] as string ?? string.Empty).Should().Be("Degraded");
-    (rep["DdlAllowed"] as bool? ?? false).Should().BeFalse();
+        var rep = await data.Execute<ReadOnlyTodo, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
+        rep.Should().NotBeNull();
+        (rep!["TableExists"] as bool? ?? false).Should().BeFalse();
+        (rep["State"] as string ?? string.Empty).Should().Be("Degraded");
+        (rep["DdlAllowed"] as bool? ?? false).Should().BeFalse();
     }
 
     [Fact]
     public async Task Validate_Strict_Mode_Is_Unhealthy_When_Table_Missing()
     {
-    var file = TempFile();
-    // Ensure environment override also signals Strict for code paths that read from env
-    Environment.SetEnvironmentVariable("Sora__Data__Sqlite__SchemaMatchingMode", "Strict");
+        var file = TempFile();
+        // Ensure environment override also signals Strict for code paths that read from env
+        Environment.SetEnvironmentVariable("Sora__Data__Sqlite__SchemaMatchingMode", "Strict");
         var sp = BuildServices(file,
             o => { o.DdlPolicy = SchemaDdlPolicy.NoDdl; o.SchemaMatching = SchemaMatchingMode.Strict; },
-            new[] { new KeyValuePair<string,string?>("Sora:Data:Sqlite:SchemaMatchingMode", "Strict") });
+            new[] { new KeyValuePair<string, string?>("Sora:Data:Sqlite:SchemaMatchingMode", "Strict") });
         var data = sp.GetRequiredService<IDataService>();
 
-    var rep = await data.Execute<Todo, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
-    rep.Should().NotBeNull();
-    (rep!["MatchingMode"] as string ?? string.Empty).Should().Be("Strict");
-    ((rep["TableExists"] as bool?) ?? false).Should().BeFalse();
-    var st = rep["State"] as string ?? string.Empty;
-    st.Should().BeOneOf("Unhealthy", "Degraded");
-    // Cleanup env var to avoid side effects on other tests
-    Environment.SetEnvironmentVariable("Sora__Data__Sqlite__SchemaMatchingMode", null);
+        var rep = await data.Execute<Todo, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
+        rep.Should().NotBeNull();
+        (rep!["MatchingMode"] as string ?? string.Empty).Should().Be("Strict");
+        ((rep["TableExists"] as bool?) ?? false).Should().BeFalse();
+        var st = rep["State"] as string ?? string.Empty;
+        st.Should().BeOneOf("Unhealthy", "Degraded");
+        // Cleanup env var to avoid side effects on other tests
+        Environment.SetEnvironmentVariable("Sora__Data__Sqlite__SchemaMatchingMode", null);
     }
 
     [Fact]
@@ -171,11 +171,11 @@ public class SqliteSchemaGovernanceTests
         var sp2 = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.Validate; });
         var data2 = sp2.GetRequiredService<IDataService>();
 
-    var rep = await data2.Execute<SharedTodoV2, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
-    rep.Should().NotBeNull();
-    (rep!["TableExists"] as bool? ?? false).Should().BeTrue();
-    var missing2 = rep["MissingColumns"] as System.Collections.Generic.IEnumerable<string> ?? Array.Empty<string>();
-    missing2.Should().Contain(new[] { "Priority" });
-    (rep["State"] as string ?? string.Empty).Should().Be("Degraded");
+        var rep = await data2.Execute<SharedTodoV2, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
+        rep.Should().NotBeNull();
+        (rep!["TableExists"] as bool? ?? false).Should().BeTrue();
+        var missing2 = rep["MissingColumns"] as System.Collections.Generic.IEnumerable<string> ?? Array.Empty<string>();
+        missing2.Should().Contain(new[] { "Priority" });
+        (rep["State"] as string ?? string.Empty).Should().Be("Degraded");
     }
 }

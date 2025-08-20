@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Core;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using Swashbuckle.AspNetCore.Swagger;
+using Sora.Core;
 using Sora.Web.Swagger.Infrastructure;
+using Swashbuckle.AspNetCore.Swagger;
 
 namespace Sora.Web.Swagger;
 
@@ -49,7 +49,7 @@ public static class AddSoraSwaggerExtensions
 
     public static WebApplication UseSoraSwagger(this WebApplication app)
     {
-    var env = app.Environment;
+        var env = app.Environment;
         var cfg = app.Configuration;
         var opts = GetOptions(cfg);
 
@@ -72,7 +72,7 @@ public static class AddSoraSwaggerExtensions
         if (!enabled) return app; // off in non-dev unless explicitly enabled via env or magic flag
 
         // Ensure services were registered; if not, skip to avoid runtime 500s
-    var provider = app.Services.GetService<ISwaggerProvider>();
+        var provider = app.Services.GetService<ISwaggerProvider>();
         if (provider is null)
         {
             app.Logger.LogWarning("Sora.Web.Swagger: Swagger services not found. Did you call services.AddSoraSwagger()? Skipping UI middleware.");
@@ -87,7 +87,7 @@ public static class AddSoraSwaggerExtensions
         });
 
         // Optionally protect UI outside Development
-    if (!Sora.Core.SoraEnv.IsDevelopment && opts.RequireAuthOutsideDevelopment)
+        if (!Sora.Core.SoraEnv.IsDevelopment && opts.RequireAuthOutsideDevelopment)
         {
             app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments($"/{opts.RoutePrefix}"), b =>
             {
@@ -101,16 +101,16 @@ public static class AddSoraSwaggerExtensions
 
     private static SoraWebSwaggerOptions GetOptions(IConfiguration cfg)
     {
-    var o = new SoraWebSwaggerOptions();
-    // ADR-0040: read explicit keys instead of binding
-    o.Enabled = cfg.Read<bool?>(Constants.Configuration.Enabled);
-    o.RoutePrefix = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RoutePrefix}", o.RoutePrefix)!;
-    o.IncludeXmlComments = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.IncludeXmlComments}", o.IncludeXmlComments);
-    o.RequireAuthOutsideDevelopment = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RequireAuthOutsideDevelopment}", o.RequireAuthOutsideDevelopment);
-    // magic flag unified across Sora
-    var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
-    if (magic == true) o.Enabled = true;
-    return o;
+        var o = new SoraWebSwaggerOptions();
+        // ADR-0040: read explicit keys instead of binding
+        o.Enabled = cfg.Read<bool?>(Constants.Configuration.Enabled);
+        o.RoutePrefix = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RoutePrefix}", o.RoutePrefix)!;
+        o.IncludeXmlComments = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.IncludeXmlComments}", o.IncludeXmlComments);
+        o.RequireAuthOutsideDevelopment = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RequireAuthOutsideDevelopment}", o.RequireAuthOutsideDevelopment);
+        // magic flag unified across Sora
+        var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
+        if (magic == true) o.Enabled = true;
+        return o;
     }
 
     private static IEnumerable<string> GetXmlDocFiles()

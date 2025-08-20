@@ -1,9 +1,9 @@
+using Sora.Data.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Sora.Data.Abstractions;
 using Xunit;
 
 namespace Sora.Testing.Vector;
@@ -122,7 +122,7 @@ public abstract class VectorAcceptanceTests<TEntity, TKey>
         // Equality map shorthand
         var f1 = new Dictionary<string, object?> { ["color"] = "red" };
         // Operator JSON DSL
-    var f2 = new { @operator = "And", operands = new object[] { new { path = new[] { "color" }, @operator = "Eq", value = "red" } } };
+        var f2 = new { @operator = "And", operands = new object[] { new { path = new[] { "color" }, @operator = "Eq", value = "red" } } };
         // Typed AST
         var f3 = VectorFilter.Eq("color", "red");
 

@@ -1,8 +1,8 @@
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Sdk;
 
@@ -16,8 +16,8 @@ public class PostgresBatchAndBulkTests : IClassFixture<PostgresAutoFixture>
     [Fact]
     public async Task Bulk_upsert_and_delete_and_batch()
     {
-            if (_fx.SkipTests) return; // environment lacks Docker; treat as skipped
-    var repo = _fx.Data.GetRepository<Item, string>();
+        if (_fx.SkipTests) return; // environment lacks Docker; treat as skipped
+        var repo = _fx.Data.GetRepository<Item, string>();
 
         var items = Enumerable.Range(1, 10).Select(i => new Item(i.ToString()) { Name = $"I-{i}" }).ToArray();
         await repo.UpsertManyAsync(items, default);
@@ -26,7 +26,7 @@ public class PostgresBatchAndBulkTests : IClassFixture<PostgresAutoFixture>
             (await repo.GetAsync(it.Id, default)).Should().NotBeNull();
 
         await repo.DeleteManyAsync(items.Take(3).Select(i => i.Id).ToArray(), default);
-        var remaining = await repo.QueryAsync((object?)null, default);
+        var remaining = await repo.QueryAsync(null, default);
         remaining.Count.Should().Be(7);
 
         var batch = repo.CreateBatch();

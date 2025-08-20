@@ -1,7 +1,7 @@
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 using Sora.Data.Abstractions;
+using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Postgres.Tests;

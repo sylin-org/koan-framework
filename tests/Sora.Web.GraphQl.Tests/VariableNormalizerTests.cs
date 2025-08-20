@@ -1,6 +1,6 @@
-using System.Text.Json;
 using FluentAssertions;
 using Sora.Web.GraphQl.Infrastructure;
+using System.Text.Json;
 using Xunit;
 
 namespace Sora.Web.GraphQl.Tests;

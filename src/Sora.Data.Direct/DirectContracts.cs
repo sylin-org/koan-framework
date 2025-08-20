@@ -1,19 +1,18 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-
-using System.Data.Common;
-using System.Linq;
-using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
-using Sora.Data.Core.Configuration;
-using Sora.Data.Core.Direct;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
+using Sora.Data.Core.Configuration;
+using Sora.Data.Core.Direct;
+using System;
+using System.Collections.Generic;
+using System.Data.Common;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sora.Data.Direct;
 
@@ -48,8 +47,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public Sora.Data.Core.Direct.IDirectTransaction Begin(CancellationToken ct = default)
     {
-    var (provider, connStr) = Resolve();
-    var conn = CreateConnection(_sp, provider, connStr);
+        var (provider, connStr) = Resolve();
+        var conn = CreateConnection(_sp, provider, connStr);
         conn.Open();
         var tx = conn.BeginTransaction();
         return new DirectTransaction(conn, tx, _timeout, _maxRows);
@@ -146,7 +145,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         var assemblies = AppDomain.CurrentDomain.GetAssemblies();
         entityType = assemblies
             .OrderBy(a => a.GetName().Name?.StartsWith("Sora.") == true ? 0 : 1)
-            .SelectMany(a => {
+            .SelectMany(a =>
+            {
                 try { return a.GetTypes(); } catch { return Array.Empty<Type>(); }
             })
             .FirstOrDefault(t => string.Equals(t.FullName, token, StringComparison.OrdinalIgnoreCase) || string.Equals(t.Name, token, StringComparison.Ordinal));
@@ -171,8 +171,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     private async Task<ConnCtx> OpenAsync(CancellationToken ct)
     {
-    var (provider, connStr) = Resolve();
-    var conn = CreateConnection(_sp, provider, connStr);
+        var (provider, connStr) = Resolve();
+        var conn = CreateConnection(_sp, provider, connStr);
         await conn.OpenAsync(ct);
         return new ConnCtx(conn);
     }
@@ -215,7 +215,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             return (_source, value);
         }
 
-    var byName = resolver?.Resolve(_source, _source);
+        var byName = resolver?.Resolve(_source, _source);
         if (!string.IsNullOrWhiteSpace(byName))
         {
             return (_source, byName!);
@@ -397,7 +397,7 @@ public static class DirectRegistration
 {
     public static IServiceCollection AddSoraDataDirect(this IServiceCollection services)
     {
-    services.AddSingleton<Sora.Data.Core.Direct.IDirectDataService, DirectDataService>();
+        services.AddSingleton<Sora.Data.Core.Direct.IDirectDataService, DirectDataService>();
         return services;
     }
 }

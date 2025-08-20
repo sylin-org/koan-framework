@@ -1,20 +1,20 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Sora.Core;
+using Sora.Data.Abstractions;
+using Sora.Data.Json.Infrastructure;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Configuration;
-using Sora.Data.Abstractions;
-using Sora.Core;
-using System.ComponentModel.DataAnnotations;
-using Sora.Data.Json.Infrastructure;
 
 namespace Sora.Data.Json;
 
@@ -68,7 +68,7 @@ public static class JsonAdapterRegistration
     /// </summary>
     public static IServiceCollection AddJsonAdapter(this IServiceCollection services, Action<JsonDataOptions>? configure = null)
     {
-    services.AddOptions<JsonDataOptions>();
+        services.AddOptions<JsonDataOptions>();
         if (configure is not null) services.Configure(configure);
         services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
         return services;
@@ -279,24 +279,24 @@ internal sealed class JsonRepository<TEntity, TKey> :
         switch (instruction.Name)
         {
             case global::Sora.Data.DataInstructions.EnsureCreated:
-            {
-                Directory.CreateDirectory(_baseDir);
-                // Touch the set file to ensure presence
-                var name = ComputePhysicalName();
-                var path = _files.GetOrAdd(name, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
-                if (!File.Exists(path)) File.WriteAllText(path, "[]");
-                object result = true;
-                return Task.FromResult((TResult)result);
-            }
+                {
+                    Directory.CreateDirectory(_baseDir);
+                    // Touch the set file to ensure presence
+                    var name = ComputePhysicalName();
+                    var path = _files.GetOrAdd(name, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
+                    if (!File.Exists(path)) File.WriteAllText(path, "[]");
+                    object result = true;
+                    return Task.FromResult((TResult)result);
+                }
             case global::Sora.Data.DataInstructions.Clear:
-            {
-                var (name, store) = ResolveNameAndStore();
-                var deleted = store.Count;
-                store.Clear();
-                Persist(name, store);
-                object result = deleted;
-                return Task.FromResult((TResult)result);
-            }
+                {
+                    var (name, store) = ResolveNameAndStore();
+                    var deleted = store.Count;
+                    store.Clear();
+                    Persist(name, store);
+                    object result = deleted;
+                    return Task.FromResult((TResult)result);
+                }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by JSON adapter for {typeof(TEntity).Name}.");
         }
@@ -360,9 +360,9 @@ internal sealed class JsonRepository<TEntity, TKey> :
     {
         private readonly JsonRepository<TEntity, TKey> _repo;
         private readonly List<TEntity> _adds = new();
-    private readonly List<TEntity> _updates = new();
+        private readonly List<TEntity> _updates = new();
         private readonly List<TKey> _deletes = new();
-	private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
+        private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
 
         public JsonBatch(JsonRepository<TEntity, TKey> repo) => _repo = repo;
 

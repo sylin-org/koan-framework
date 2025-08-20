@@ -80,8 +80,8 @@ public static class JsonFilterBuilder
 
     private static Expression BuildObject<TEntity>(JsonElement obj, ParameterExpression param, BuildOptions opts)
     {
-    // Merge any local $options with parent options
-    opts = MergeOptions(obj, opts);
+        // Merge any local $options with parent options
+        opts = MergeOptions(obj, opts);
 
         // Logical operators take precedence
         if (obj.TryGetProperty("$and", out var andNode) && andNode.ValueKind == JsonValueKind.Array)
@@ -89,7 +89,7 @@ public static class JsonFilterBuilder
             Expression? acc = null;
             foreach (var child in andNode.EnumerateArray())
             {
-        var e = BuildObject<TEntity>(child, param, opts);
+                var e = BuildObject<TEntity>(child, param, opts);
                 acc = acc == null ? e : Expression.AndAlso(acc, e);
             }
             return acc ?? Expression.Constant(true);
@@ -99,14 +99,14 @@ public static class JsonFilterBuilder
             Expression? acc = null;
             foreach (var child in orNode.EnumerateArray())
             {
-        var e = BuildObject<TEntity>(child, param, opts);
+                var e = BuildObject<TEntity>(child, param, opts);
                 acc = acc == null ? e : Expression.OrElse(acc, e);
             }
             return acc ?? Expression.Constant(false);
         }
         if (obj.TryGetProperty("$not", out var notNode) && notNode.ValueKind is JsonValueKind.Object)
         {
-        var inner = BuildObject<TEntity>(notNode, param, opts);
+            var inner = BuildObject<TEntity>(notNode, param, opts);
             return Expression.Not(inner);
         }
 
@@ -114,7 +114,7 @@ public static class JsonFilterBuilder
         Expression? result = null;
         foreach (var prop in obj.EnumerateObject())
         {
-        if (prop.Name.StartsWith("$")) continue; // skip operators incl. $options
+            if (prop.Name.StartsWith("$")) continue; // skip operators incl. $options
             var member = Expression.PropertyOrField(param, prop.Name);
             var expr = BuildComparison(member, prop.Value, opts);
             result = result == null ? expr : Expression.AndAlso(result, expr);

@@ -1,5 +1,5 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Sora.AI.Contracts;
 using Sora.AI.Contracts.Models;
 using Sora.AI.Contracts.Routing;
@@ -67,11 +67,11 @@ public sealed class AiController : ControllerBase
     public async Task Stream([FromBody] AiChatRequest request, CancellationToken ct)
     {
         Response.StatusCode = 200;
-    Response.ContentType = "text/event-stream";
-    Response.Headers.CacheControl = "no-cache";
-    Response.Headers.Pragma = "no-cache";
-    Response.Headers.Connection = "keep-alive";
-    Response.Headers["X-Accel-Buffering"] = "no"; // nginx
+        Response.ContentType = "text/event-stream";
+        Response.Headers.CacheControl = "no-cache";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Connection = "keep-alive";
+        Response.Headers["X-Accel-Buffering"] = "no"; // nginx
         await foreach (var chunk in _ai.StreamAsync(request, ct))
         {
             var payload = chunk.DeltaText ?? string.Empty;

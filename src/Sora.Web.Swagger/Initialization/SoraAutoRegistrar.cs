@@ -3,8 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
-using Swashbuckle.AspNetCore.Swagger;
 using Sora.Web.Swagger.Infrastructure;
+using Swashbuckle.AspNetCore.Swagger;
 
 namespace Sora.Web.Swagger.Initialization;
 
@@ -25,18 +25,18 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
-    report.AddModule(ModuleName, ModuleVersion);
-    // ADR-0040: read settings via helper and constants
-    var enabled = cfg.Read(Constants.Configuration.Enabled, Sora.Core.SoraEnv.IsProduction ? false : true);
-    var routePrefix = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RoutePrefix}", "swagger");
-    var requireAuth = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RequireAuthOutsideDevelopment}", true);
-    var xml = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.IncludeXmlComments}", true);
-    // Magic flag can force-enable in production
-    var magic = cfg.Read(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
-    if (magic) enabled = true;
-    report.AddSetting("Enabled", enabled.ToString());
-    report.AddSetting("RoutePrefix", routePrefix);
-    report.AddSetting("RequireAuthOutsideDevelopment", requireAuth.ToString());
-    report.AddSetting("IncludeXmlComments", xml.ToString());
+        report.AddModule(ModuleName, ModuleVersion);
+        // ADR-0040: read settings via helper and constants
+        var enabled = cfg.Read(Constants.Configuration.Enabled, Sora.Core.SoraEnv.IsProduction ? false : true);
+        var routePrefix = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RoutePrefix}", "swagger");
+        var requireAuth = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RequireAuthOutsideDevelopment}", true);
+        var xml = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.IncludeXmlComments}", true);
+        // Magic flag can force-enable in production
+        var magic = cfg.Read(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+        if (magic) enabled = true;
+        report.AddSetting("Enabled", enabled.ToString());
+        report.AddSetting("RoutePrefix", routePrefix);
+        report.AddSetting("RequireAuthOutsideDevelopment", requireAuth.ToString());
+        report.AddSetting("IncludeXmlComments", xml.ToString());
     }
 }

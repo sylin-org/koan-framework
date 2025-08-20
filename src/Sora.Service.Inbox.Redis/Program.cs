@@ -1,6 +1,6 @@
-using StackExchange.Redis;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using StackExchange.Redis;
 using System.Text;
 using System.Text.Json;
 

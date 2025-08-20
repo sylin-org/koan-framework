@@ -1,8 +1,8 @@
+using Sora.Data.Abstractions.Annotations;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Reflection;
-using Sora.Data.Abstractions.Annotations;
 
 namespace Sora.Data.Core.Metadata;
 

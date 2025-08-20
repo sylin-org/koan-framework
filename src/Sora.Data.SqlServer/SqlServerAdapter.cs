@@ -1,12 +1,3 @@
-using System;
-using System.Data.Common;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Data;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
@@ -22,6 +13,15 @@ using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
+using System.Data.Common;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sora.Data.SqlServer;
 
@@ -55,8 +55,8 @@ public static class SqlServerRegistration
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
-    services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqlServerConnectionFactory>());
+        services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqlServerConnectionFactory>());
         return services;
     }
 }
@@ -624,42 +624,42 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         switch (instruction.Name)
         {
             case global::Sora.Data.Relational.RelationalInstructions.SchemaValidate:
-            {
-                var report = ValidateSchema(conn);
-                return (TResult)(object)report;
-            }
+                {
+                    var report = ValidateSchema(conn);
+                    return (TResult)report;
+                }
             case global::Sora.Data.DataInstructions.EnsureCreated:
             case global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated:
                 EnsureTable(conn);
                 object ok = true; return (TResult)ok;
             case global::Sora.Data.DataInstructions.Clear:
-            {
-                EnsureTable(conn);
-                var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
-                object res = del; return (TResult)res;
-            }
+                {
+                    EnsureTable(conn);
+                    var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
+                    object res = del; return (TResult)res;
+                }
             case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var result = await conn.ExecuteScalarAsync(sql, p);
-                return CastScalar<TResult>(result);
-            }
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var result = await conn.ExecuteScalarAsync(sql, p);
+                    return CastScalar<TResult>(result);
+                }
             case global::Sora.Data.Relational.RelationalInstructions.SqlNonQuery:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var affected = await conn.ExecuteAsync(sql, p);
-                object res = affected; return (TResult)res;
-            }
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var affected = await conn.ExecuteAsync(sql, p);
+                    object res = affected; return (TResult)res;
+                }
             case global::Sora.Data.Relational.RelationalInstructions.SqlQuery:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var rows = await conn.QueryAsync(sql, p);
-                var list = MapDynamicRows(rows);
-                return (TResult)(object)list;
-            }
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var rows = await conn.QueryAsync(sql, p);
+                    var list = MapDynamicRows(rows);
+                    return (TResult)(object)list;
+                }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by SQL Server adapter for {typeof(TEntity).Name}.");
         }
@@ -777,8 +777,25 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                 var token = m.Groups[1].Value;
                 switch (token.ToUpperInvariant())
                 {
-                    case "AND": case "OR": case "NOT": case "NULL": case "LIKE": case "IN": case "IS": case "BETWEEN": case "EXISTS":
-                    case "SELECT": case "FROM": case "WHERE": case "GROUP": case "BY": case "ORDER": case "OFFSET": case "FETCH": case "ASC": case "DESC":
+                    case "AND":
+                    case "OR":
+                    case "NOT":
+                    case "NULL":
+                    case "LIKE":
+                    case "IN":
+                    case "IS":
+                    case "BETWEEN":
+                    case "EXISTS":
+                    case "SELECT":
+                    case "FROM":
+                    case "WHERE":
+                    case "GROUP":
+                    case "BY":
+                    case "ORDER":
+                    case "OFFSET":
+                    case "FETCH":
+                    case "ASC":
+                    case "DESC":
                         return token;
                 }
                 if (map.ContainsKey(token)) return map[token];

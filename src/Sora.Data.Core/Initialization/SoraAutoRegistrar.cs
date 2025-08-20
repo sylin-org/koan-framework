@@ -19,7 +19,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-    var ensure = cfg.Read(Sora.Data.Core.Infrastructure.Constants.Configuration.Runtime.EnsureSchemaOnStart, true);
-    report.AddSetting("EnsureSchemaOnStart", ensure.ToString());
+        var ensure = cfg.Read(Sora.Data.Core.Infrastructure.Constants.Configuration.Runtime.EnsureSchemaOnStart, true);
+        report.AddSetting("EnsureSchemaOnStart", ensure.ToString());
     }
 }

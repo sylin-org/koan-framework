@@ -13,10 +13,10 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
     {
-    // Enable options and hosted services for config registration and discovery
-    services.AddOllamaFromConfig();
-    services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService, OllamaConfigRegistrationService>();
-    services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService, OllamaDiscoveryService>();
+        // Enable options and hosted services for config registration and discovery
+        services.AddOllamaFromConfig();
+        services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService, OllamaConfigRegistrationService>();
+        services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService, OllamaDiscoveryService>();
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)

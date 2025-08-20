@@ -1,13 +1,13 @@
-using System.Diagnostics;
-using System.Net.Http.Json;
-using System.Text.Json;
-using System.Net.Http;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
+using System.Diagnostics;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Sora.Data.Weaviate;
 
@@ -85,8 +85,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     public async Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.upsert");
-    await EnsureSchemaAsync(ct);
-    ValidateEmbedding(embedding);
+        await EnsureSchemaAsync(ct);
+        ValidateEmbedding(embedding);
         var obj = new
         {
             class_ = ClassName,
@@ -133,13 +133,13 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     public async Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.search");
-    await EnsureSchemaAsync(ct);
+        await EnsureSchemaAsync(ct);
         ValidateEmbedding(options.Query);
         var topK = options.TopK ?? _options.DefaultTopK;
         if (topK > _options.MaxTopK) topK = _options.MaxTopK;
 
-    // Build optional filters using shared AST + dedicated translator
-    string whereClause = WeaviateFilterTranslator.TranslateWhereClause(options.Filter);
+        // Build optional filters using shared AST + dedicated translator
+        string whereClause = WeaviateFilterTranslator.TranslateWhereClause(options.Filter);
         var nearVector = $"nearVector: {{ vector: [{string.Join(",", options.Query.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture)))}] }}";
         var args = string.IsNullOrEmpty(whereClause)
             ? $"({nearVector}, limit: {topK})"

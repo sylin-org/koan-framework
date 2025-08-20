@@ -23,7 +23,7 @@ public sealed class ItemsController : EntityController<Item>
     [HttpDelete("clear")]
     public async Task<IActionResult> Clear(CancellationToken ct)
     {
-    var deleted = await Item.RemoveAll(ct);
+        var deleted = await Item.RemoveAll(ct);
         return Ok(new { deleted });
     }
 }

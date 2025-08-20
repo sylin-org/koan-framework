@@ -1,16 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using Sora.Data.Cqrs;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sora.Data.Cqrs.Outbox.Mongo;
 
@@ -33,7 +33,7 @@ internal sealed class MongoOutboxRecord
     public string Operation { get; set; } = string.Empty;
     public string EntityId { get; set; } = string.Empty;
     public string PayloadJson { get; set; } = string.Empty;
-    public Dictionary<string,string>? Headers { get; set; }
+    public Dictionary<string, string>? Headers { get; set; }
     public string? PartitionKey { get; set; }
     public string? DedupKey { get; set; }
     public int Attempt { get; set; }
@@ -53,8 +53,8 @@ public sealed class MongoOutboxStore : IOutboxStore
     public MongoOutboxStore(ILogger<MongoOutboxStore> logger, IOptions<MongoOutboxOptions> options, IConfiguration cfg)
     {
         _logger = logger; _opts = options.Value;
-    var name = string.IsNullOrWhiteSpace(_opts.ConnectionStringName) ? "mongo" : _opts.ConnectionStringName!;
-    var cs = OutboxConfig.ResolveConnectionString(cfg, provider: "mongo", inline: _opts.ConnectionString, name: name, defaultName: "mongo");
+        var name = string.IsNullOrWhiteSpace(_opts.ConnectionStringName) ? "mongo" : _opts.ConnectionStringName!;
+        var cs = OutboxConfig.ResolveConnectionString(cfg, provider: "mongo", inline: _opts.ConnectionString, name: name, defaultName: "mongo");
         if (string.IsNullOrWhiteSpace(cs)) throw new InvalidOperationException("Mongo outbox requires a ConnectionString or ConnectionStringName.");
         var client = new MongoClient(cs);
         var db = client.GetDatabase(_opts.Database);
@@ -153,8 +153,8 @@ public static class MongoOutboxRegistration
 {
     public static IServiceCollection AddMongoOutbox(this IServiceCollection services, Action<MongoOutboxOptions>? configure = null)
     {
-    services.BindOutboxOptions<MongoOutboxOptions>("Mongo");
-    if (configure is not null) services.PostConfigure(configure);
+        services.BindOutboxOptions<MongoOutboxOptions>("Mongo");
+        if (configure is not null) services.PostConfigure(configure);
         services.AddSingleton<IOutboxStore, MongoOutboxStore>();
         services.AddSingleton<IOutboxStoreFactory, MongoOutboxFactory>();
         return services;
