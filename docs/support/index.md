@@ -8,3 +8,6 @@ Operational docs, environment setup, and troubleshooting.
   - Common failures and fixes: troubleshooting/index.md
 - CI/CD
   - Build, test, docs, versioning (see repo scripts and version.json)
+- Acceptance Criteria
+  - Data Adapters: 08-data-adapter-acceptance-criteria.md
+  - Vector Adapters: 09-vector-adapter-acceptance-criteria.md
