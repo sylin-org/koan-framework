@@ -29,6 +29,78 @@ public class RepositoryTests
         return sc.BuildServiceProvider();
     }
 
+    [Fact]
+    public async Task Linq_Filtering_Works()
+    {
+        var dir = TempDir();
+        var sp = BuildServices(dir);
+        var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
+
+        // Seed
+        for (int i = 0; i < 5; i++)
+            await repo.UpsertAsync(new Todo { Id = $"id-{i}", Title = i % 2 == 0 ? "even" : "odd" });
+
+        var linq = Assert.IsAssignableFrom<ILinqQueryRepository<Todo, string>>(repo);
+        var evens = await linq.QueryAsync(x => x.Title == "even");
+        evens.Should().NotBeEmpty();
+        evens.All(x => x.Title == "even").Should().BeTrue();
+
+        var ones = await linq.QueryAsync(x => x.Id == "id-1");
+        ones.Should().ContainSingle(x => x.Id == "id-1");
+    }
+
+    [Fact]
+    public async Task Linq_Count_Is_Accurate()
+    {
+        var dir = TempDir();
+        var sp = BuildServices(dir);
+        var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
+
+        // Seed 8 items, 5 match
+        var titles = new[] { "x", "y", "x", "y", "x", "x", "z", "x" };
+        for (int i = 0; i < titles.Length; i++)
+            await repo.UpsertAsync(new Todo { Id = $"i{i}", Title = titles[i] });
+
+        var linq = Assert.IsAssignableFrom<ILinqQueryRepository<Todo, string>>(repo);
+        var count = await linq.CountAsync(x => x.Title == "x");
+        count.Should().Be(titles.Count(t => t == "x"));
+    }
+
+    [Fact]
+    public async Task Linq_Paging_With_Options_Is_Enforced()
+    {
+        var dir = TempDir();
+        var sp = BuildServices(dir);
+        var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
+
+        // Seed 10 matching items so multiple pages exist
+        for (int i = 0; i < 10; i++)
+            await repo.UpsertAsync(new Todo { Id = $"i{i}", Title = "page" });
+
+        var linqWithOpts = Assert.IsAssignableFrom<ILinqQueryRepositoryWithOptions<Todo, string>>(repo);
+        // BuildServices() uses DefaultPageSize=2, MaxPageSize=3; request PageSize=3 capped by MaxPageSize
+        var p1 = await linqWithOpts.QueryAsync(x => x.Title == "page", new DataQueryOptions(Page: 1, PageSize: 3));
+        p1.Count.Should().Be(3);
+        var p2 = await linqWithOpts.QueryAsync(x => x.Title == "page", new DataQueryOptions(Page: 2, PageSize: 3));
+        p2.Count.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Linq_Cancellation_Is_Observed()
+    {
+        var dir = TempDir();
+        var sp = BuildServices(dir);
+        var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
+        var linq = Assert.IsAssignableFrom<ILinqQueryRepository<Todo, string>>(repo);
+
+        // Seed a few
+        for (int i = 0; i < 5; i++)
+            await repo.UpsertAsync(new Todo { Id = $"i{i}", Title = "cxl" });
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => linq.QueryAsync(x => x.Title == "cxl", cts.Token));
+    }
     private static string TempDir()
     {
         var d = Path.Combine(Path.GetTempPath(), "sora-json-tests", Guid.NewGuid().ToString("n"));
