@@ -128,6 +128,31 @@ var stats = await exec.ExecuteAsync<Dictionary<string, object?>>(Instruction.Cre
 - Nice
   - Rerank and AccurateCount where feasible; vector.index.stats.
 
+## Entity<TEntity> surface to implement (sparse, meaningful)
+
+For vector-enabled adapters, implement the minimal entity surface below. Keep semantics honest; don’t fake unsupported features.
+
+- Must
+  - IVectorSearchRepository<TEntity, TKey>.SearchAsync(options)
+  - IDataRepository<TEntity, TKey> lifecycle: UpsertAsync, UpsertManyAsync, DeleteAsync, DeleteManyAsync, DeleteAllAsync
+  - IBatchSet<TEntity, TKey>: best-effort only; throw on RequireAtomic = true
+  - IInstructionExecutor<TEntity>: vector.index.ensureCreated, data.clear (optional: vector.index.stats, vector.index.rebuild)
+  - IQueryCapabilities/IWriteCapabilities: advertise VectorSearch; omit LINQ/String if not supported; Writes = no native bulk unless truly supported
+
+- Optional
+  - GetAsync(id): return full entity if the vector store keeps payloads; otherwise support only when paired with a primary repo for hydration
+  - QueryAsync(object?) / LINQ: only if the engine offers a viable pushdown; avoid in-memory fallbacks for large sets
+
+- Operational
+  - Health: lightweight readiness check (ping/info)
+  - Options: Endpoint, ApiKey/Secret, DefaultTopK, DefaultMetric, Dimensions (if fixed), timeout; guardrails on TopK and timeouts
+  - Naming: resolve set/class/index via StorageNameRegistry
+  - Cancellation: observe CancellationToken on all async paths; throw on cancellation promptly
+
+Notes
+- Count across vector results is not guaranteed; don’t expose AccurateCount unless cheap and correct
+- Prefer explicit capability checks in callers instead of bridging vector search to LINQ
+
 ## Naming and options
 
 - Use StorageNameRegistry to derive collection/class names per entity set.
