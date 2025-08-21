@@ -45,7 +45,7 @@ internal sealed class RecsService : IRecsService
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     // Derive simple embedding using AI core for the query; avoid blocking on seed
-                    var ai = (IAi?)_sp.GetService(typeof(IAi));
+                    var ai = Sora.AI.Ai.TryResolve();
                     if (ai is not null)
                     {
                         var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { text! } }, ct);
@@ -65,7 +65,7 @@ internal sealed class RecsService : IRecsService
                             anchor = new AnimeDoc { Id = aDemo.Id, Title = aDemo.Title, Genres = aDemo.Genres, Episodes = aDemo.Episodes, Synopsis = aDemo.Synopsis, Popularity = aDemo.Popularity };
                     }
                     var textAnchor = anchor is null ? null : $"{anchor.Title}\n\n{anchor.Synopsis}\nTags: {string.Join(", ", anchor.Genres ?? Array.Empty<string>())}";
-                    var ai = (IAi?)_sp.GetService(typeof(IAi));
+                    var ai = Sora.AI.Ai.TryResolve();
                     AiEmbeddingsResponse? emb = textAnchor is not null && ai is not null
                         ? await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { textAnchor } }, ct)
                         : null;
@@ -186,7 +186,7 @@ internal sealed class RecsService : IRecsService
         // Update preference vector via EWMA if embedding is available
         try
         {
-            var ai = (IAi?)_sp.GetService(typeof(IAi));
+            var ai = Sora.AI.Ai.TryResolve();
             if (ai is not null)
             {
                 var text = BuildEmbeddingText(new Anime { Id = a.Id, Title = a.Title, Genres = a.Genres ?? Array.Empty<string>(), Episodes = a.Episodes, Synopsis = a.Synopsis, Popularity = a.Popularity });

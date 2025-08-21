@@ -10,6 +10,7 @@ See the epic for a full roadmap and interconnected deliverables:
 
 - Native AI Sora — Epic (this guide series): native-ai-sora-epic.md
  - Adapters and multi-service routing: adapters-and-multi-service.md
+ - Engine facade (terse AI access): engine-facade.md
 
 Related:
 - Feature Catalog: ../..//feature-catalog.md

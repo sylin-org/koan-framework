@@ -162,7 +162,7 @@ internal sealed class SeedService : ISeedService
     {
         try
         {
-            var ai = (IAi?)_sp.GetService(typeof(IAi));
+            var ai = Sora.AI.Ai.TryResolve();
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             // Use the facade; degrade gracefully if no vector adapter is configured
