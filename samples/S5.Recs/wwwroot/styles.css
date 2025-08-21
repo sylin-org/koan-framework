@@ -1,0 +1,7 @@
+body{margin:0;padding:0;background:#0b0e14;color:#e6e6e6}
+.container{max-width:980px;margin:0 auto;padding:1rem}
+input,select,button{margin:.25rem;padding:.35rem .5rem;background:#101520;color:#e6e6e6;border:1px solid #2a2f3a;border-radius:4px}
+button{cursor:pointer}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+article{border:1px solid #2a2f3a;border-radius:6px;padding:.75rem;margin:.5rem 0}
+.note{opacity:.8;margin-top:1rem}

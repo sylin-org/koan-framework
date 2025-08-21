@@ -1,0 +1,45 @@
+version: '3.9'
+services:
+  api:
+    build:
+      context: ../../..
+      dockerfile: samples/S5.Recs/Dockerfile
+    image: sora-s5-recs:dev
+    ports:
+      - "5084:5084"
+    environment:
+      - ASPNETCORE_URLS=http://+:5084
+      - "Sora:Data:Mongo:ConnectionString=mongodb://mongo:27017"
+      - "Sora:Data:Mongo:Database=sora"
+      - "Sora:Data:Weaviate:Endpoint=http://weaviate:8080"
+      - "Sora:Ai:AutoDiscoveryEnabled=true"
+      - "SORA_AI_OLLAMA_URLS=http://host.docker.internal:11434,http://ollama:11434"
+    volumes:
+      - ../data:/app/data
+    depends_on:
+      - mongo
+      - weaviate
+  mongo:
+    image: mongo:7
+    volumes:
+      - ../data/mongo:/data/db
+    ports:
+      - "5081:27017" # host:container for external tools (Mongo Compass)
+  weaviate:
+    image: semitechnologies/weaviate:1.25.6
+    environment:
+      - QUERY_DEFAULTS_LIMIT=25
+      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
+      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
+      - DEFAULT_VECTORIZER_MODULE=none
+    volumes:
+      - ../data/weaviate:/var/lib/weaviate
+    ports:
+      - "5082:8080" # host:container for external access to Weaviate HTTP
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ../data/ollama-models:/root/.ollama
+    ports:
+      - "5083:11434" # host:container for external access to Ollama
+volumes: {}

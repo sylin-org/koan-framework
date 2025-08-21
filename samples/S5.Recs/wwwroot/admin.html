@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>S5.Recs — Admin</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="container" x-data="adminApp()">
+    <header>
+      <h1>Admin</h1>
+      <nav><a href="/">Browse</a></nav>
+    </header>
+    <section>
+      <h2>Seed</h2>
+      <div>
+        <label>Source
+          <select x-model="source">
+            <template x-for="p in providers" :key="p.code">
+              <option :value="p.code" x-text="p.name + ' (' + p.code + ')' "></option>
+            </template>
+          </select>
+        </label>
+        <label>Limit <input type="number" x-model.number="limit" min="1" /></label>
+        <label><input type="checkbox" x-model="overwrite" /> Overwrite</label>
+        <button @click="start()">Start seed</button>
+      </div>
+      <div x-show="jobId">
+        <p>Job: <code x-text="jobId"></code></p>
+        <p><span x-show="live">Live</span><span x-show="!live">Idle</span></p>
+        <pre x-text="JSON.stringify(status, null, 2)"></pre>
+      </div>
+    </section>
+    <section>
+      <h2>Stats</h2>
+      <pre x-text="JSON.stringify(stats, null, 2)"></pre>
+    </section>
+  </main>
+
+  <script>
+  function adminApp(){
+      return {
+        source:'local', limit:1000, overwrite:false, jobId:null, status:null, stats:null, es:null, live:false, providers:[],
+        async start(){
+          const r = await fetch('/admin/seed/start', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source:this.source, limit:this.limit, overwrite:this.overwrite })});
+          const d = await r.json(); this.jobId = d.jobId; this.connectSse();
+        },
+        connectSse(){
+          if(!this.jobId) return;
+          try{
+            if(this.es) { this.es.close(); this.es = null; }
+            this.es = new EventSource(`/admin/seed/sse/${this.jobId}`);
+            this.live = true;
+            this.es.onmessage = (e)=>{
+              try{ this.status = JSON.parse(e.data); }catch{}
+              const st = this.status?.state;
+              if(st && st !== 'running') { this.live = false; this.es?.close(); this.es = null; this.loadStats(); }
+            };
+            this.es.onerror = ()=>{
+              this.live = false; this.es?.close(); this.es = null;
+              // fallback to one-shot poll to keep UI updated
+              this.pollOnce();
+              // simple retry while still running
+              if(this.status?.state === 'running') setTimeout(()=>this.connectSse(), 1500);
+            };
+          }catch{ this.pollOnce(); }
+        },
+        async pollOnce(){ if(!this.jobId) return; const r = await fetch(`/admin/seed/status/${this.jobId}`); this.status = await r.json(); },
+  async loadStats(){ const r = await fetch('/admin/stats'); this.stats = await r.json(); },
+  async loadProviders(){ const r = await fetch('/admin/providers'); this.providers = await r.json(); if(this.providers?.length && !this.providers.find(p=>p.code===this.source)){ this.source = this.providers[0].code; } },
+  init(){ this.loadStats(); this.loadProviders(); },
+        beforeDestroy(){ if(this.es) { this.es.close(); this.es=null; } }
+      }
+    }
+  </script>
+</body>
+</html>

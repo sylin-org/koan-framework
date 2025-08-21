@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>S5.Recs — Browse</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="font-sans">
+  <main class="container" x-data="recsApp()">
+    <header>
+      <h1>What to watch next?</h1>
+      <nav><a href="/admin.html">Admin</a></nav>
+    </header>
+    <section class="query">
+      <input x-model="text" placeholder="like Haikyuu!! but cozier and slice-of-life, under 24 eps" />
+  <label>User <input x-model="userId" placeholder="demo" /></label>
+      <label>Episodes ≤ <input type="number" x-model.number="episodesMax" min="1" /></label>
+      <label><input type="checkbox" x-model="spoilerSafe" /> Spoiler‑safe</label>
+  <label>Genres (csv) <input x-model="genresCsv" placeholder="Slice of Life, Sports" /></label>
+      <button @click="search()">Search</button>
+    </section>
+    <section class="results">
+      <template x-for="item in results" :key="item.anime.id">
+        <article>
+          <h3 x-text="item.anime.title"></h3>
+          <small>Score <span x-text="item.score.toFixed(2)"></span></small>
+          <div class="reasons" x-text="item.reasons.join(', ')"></div>
+          <div class="rating">
+            <template x-for="n in 5">
+              <button @click="rate(item.anime.id, n)" x-text="n"></button>
+            </template>
+          </div>
+        </article>
+      </template>
+      <div x-show="degraded" class="note">Semantic features are not enabled yet.</div>
+    </section>
+  </main>
+  <script>
+    function recsApp(){
+      return {
+        text: '', userId: 'demo', episodesMax: 24, spoilerSafe: true, genresCsv: '', results: [], degraded: false,
+        async search(){
+          const genres = (this.genresCsv||'').split(',').map(s=>s.trim()).filter(Boolean);
+          const body = { text: this.text, userId: this.userId, filters: { genres, episodesMax: this.episodesMax, spoilerSafe: this.spoilerSafe } };
+          const r = await fetch('/api/recs/query', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+          const data = await r.json();
+          this.results = data.items ?? []; this.degraded = !!data.degraded;
+        },
+        async rate(animeId, rating){
+          await fetch('/api/recs/rate', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId: this.userId||'demo', animeId, rating })});
+          this.search();
+        }
+      }
+    }
+  </script>
+</body>
+</html>
