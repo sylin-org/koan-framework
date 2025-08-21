@@ -10,6 +10,10 @@
       href: ARCH-0039-soraenv-static-runtime.md
 - name: Data (DATA)
   items:
+    - name: Adapter role attributes and entity mapping
+      href: DATA-0058-adapter-role-attributes-and-entity-store-mapping.md
+    - name: Entity-first facade and Save semantics
+      href: DATA-0059-entity-first-facade-and-save-semantics.md
     - name: Postgres adapter
       href: DATA-0047-postgres-adapter.md
     - name: Instruction constants
@@ -20,8 +24,8 @@
       href: DATA-0051-direct-routing-via-instruction-executors.md
     - name: Dapper boundary; Direct uses ADO.NET
       href: DATA-0052-relational-dapper-boundary-and-direct-ado.md
-  - name: DATA-0054 — vector search capability and contracts
-    href: DATA-0054-vector-search-capability-and-contracts.md
+    - name: DATA-0054 — vector search capability and contracts
+      href: DATA-0054-vector-search-capability-and-contracts.md
     - name: SQLite DDL policy
       href: DATA-0046-sqlite-schema-governance-ddl-policy.md
     - name: Paging guardrails and tracing
@@ -96,6 +100,7 @@
       href: OPS-0014-samples-port-allocation.md
     - name: Default configuration fallback
       href: OPS-0015-default-configuration-fallback.md
+- name: Developer Experience (DX)
   items:
     - name: Tiny templates family
       href: DX-0037-tiny-templates-family.md

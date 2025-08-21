@@ -6,3 +6,5 @@
   href: entity-filtering-and-query.md
 - name: Executing provider instructions
   href: execute-instructions.md
+- name: Entity-first facade and adapter roles
+  href: entity-facade-and-adapter-roles.md
