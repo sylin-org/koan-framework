@@ -8,3 +8,5 @@
   href: execute-instructions.md
 - name: Entity-first facade and adapter roles
   href: entity-facade-and-adapter-roles.md
+- name: Vector provider resolution
+  href: ../vector-provider-resolution.md
