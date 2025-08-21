@@ -34,7 +34,11 @@ public class SqliteRepositoryTests
             })
             .Build();
         sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={file}");
+        sc.AddSqliteAdapter(o => {
+            o.ConnectionString = $"Data Source={file}";
+            o.DdlPolicy = Sora.Data.Sqlite.SchemaDdlPolicy.AutoCreate;
+            o.AllowProductionDdl = true;
+        });
         sc.AddSoraDataCore();
         sc.AddSingleton<IDataService, DataService>();
         return sc.BuildServiceProvider();

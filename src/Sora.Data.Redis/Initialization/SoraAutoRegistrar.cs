@@ -19,8 +19,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddOptions<RedisOptions>().ValidateDataAnnotations();
         services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
         services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
-    services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, RedisHealthContributor>());
+        services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, RedisHealthContributor>());
         // Connection multiplexer singleton
         services.AddSingleton<IConnectionMultiplexer>(sp =>
         {

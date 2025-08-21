@@ -12,6 +12,7 @@ using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
+using Sora.Data.Relational.Orchestration;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -21,6 +22,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Sora.Core.Infrastructure;
 
 namespace Sora.Data.Postgres;
 
@@ -58,6 +60,7 @@ public static class PostgresRegistration
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, PostgresConnectionFactory>());
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(PostgresNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
+        services.AddRelationalOrchestration();
         return services;
     }
 }
@@ -200,6 +203,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     private readonly int _defaultPageSize;
     private readonly int _maxPageSize;
     private readonly ILogger _logger;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
     public PostgresRepository(IServiceProvider sp, PostgresOptions options, IStorageNameResolver resolver)
     {
@@ -223,8 +227,35 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     {
         var conn = new NpgsqlConnection(_options.ConnectionString);
         conn.Open();
-        EnsureTable(conn);
+        EnsureOrchestrated(conn);
         return conn;
+    }
+
+    private void EnsureOrchestrated(NpgsqlConnection conn)
+    {
+        var table = TableName;
+    var key = $"{conn.Host}/{conn.Database}::{table}";
+        try
+        {
+            if (_healthyCache.TryGetValue(key, out var healthy) && healthy) return;
+            Singleflight.RunAsync(key, async ct =>
+            {
+                if (_healthyCache.TryGetValue(key, out var healthy2) && healthy2) return;
+                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                var ddl = new PgDdlExecutor(conn, _options.SearchPath);
+                var feats = new PostgresStoreFeatures();
+                var vReport = (System.Collections.Generic.IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                var ddlAllowed = vReport.TryGetValue("DdlAllowed", out var da) && da is bool db && db;
+                var tableExists = vReport.TryGetValue("TableExists", out var te) && te is bool tb && tb;
+                if (ddlAllowed)
+                {
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
+                    _healthyCache[key] = true; return;
+                }
+                if (tableExists) { _healthyCache[key] = true; }
+            }).GetAwaiter().GetResult();
+        }
+        catch { }
     }
 
     private void EnsureTable(NpgsqlConnection conn)
@@ -616,18 +647,32 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         {
             case global::Sora.Data.Relational.RelationalInstructions.SchemaValidate:
                 {
-                    var report = ValidateSchema(conn);
+                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                    var ddl = new PgDdlExecutor(conn, _options.SearchPath);
+                    var feats = new PostgresStoreFeatures();
+                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
                     return (TResult)report;
                 }
             case global::Sora.Data.DataInstructions.EnsureCreated:
             case global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated:
-                EnsureTable(conn);
-                object ok = true; return (TResult)ok;
+                {
+                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                    var ddl = new PgDdlExecutor(conn, _options.SearchPath);
+                    var feats = new PostgresStoreFeatures();
+                    var key = $"{conn.Host}/{conn.Database}::{TableName}";
+                    await Singleflight.RunAsync(key, async kct =>
+                    {
+                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
+                        _healthyCache[key] = true;
+                    }, ct);
+                    object ok = true; return (TResult)ok;
+                }
             case global::Sora.Data.Relational.RelationalInstructions.SchemaClear:
             case global::Sora.Data.DataInstructions.Clear:
                 {
                     EnsureTable(conn);
                     var del = await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}");
+                    try { var key = $"{conn.Host}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
                     object res = del; return (TResult)res;
                 }
             case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
@@ -697,6 +742,119 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         if (string.IsNullOrWhiteSpace(sql)) return false;
         var s = sql.TrimStart();
         return s.StartsWith("select ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Relational orchestration primitives for Postgres
+    private sealed class PgDdlExecutor(NpgsqlConnection conn, string? searchPath) : IRelationalDdlExecutor
+    {
+        private string Qual(string ident) => ident.Replace("\"", "\"\"");
+        public bool TableExists(string schema, string table)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_schema = @s AND table_name = @t";
+            cmd.Parameters.AddWithValue("@s", schema ?? (searchPath ?? "public"));
+            cmd.Parameters.AddWithValue("@t", table);
+            return cmd.ExecuteScalar() is not null;
+        }
+        public bool ColumnExists(string schema, string table, string column)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM information_schema.columns WHERE table_schema = @s AND table_name = @t AND column_name = @c";
+            cmd.Parameters.AddWithValue("@s", schema ?? (searchPath ?? "public"));
+            cmd.Parameters.AddWithValue("@t", table);
+            cmd.Parameters.AddWithValue("@c", column);
+            return cmd.ExecuteScalar() is not null;
+        }
+        public void CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json")
+        {
+            var sch = schema ?? (searchPath ?? "public");
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(idColumn)}\" text PRIMARY KEY, \"{Qual(jsonColumn)}\" jsonb NOT NULL)";
+            cmd.ExecuteNonQuery();
+        }
+        public void CreateTableWithColumns(string schema, string table, System.Collections.Generic.List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+        {
+            var sch = schema ?? (searchPath ?? "public");
+            using var cmd = conn.CreateCommand();
+            var defs = new System.Text.StringBuilder();
+            for (int i = 0; i < columns.Count; i++)
+            {
+                var col = columns[i];
+                if (i > 0) defs.Append(", ");
+                if (string.Equals(col.Name, "Id", StringComparison.OrdinalIgnoreCase))
+                {
+                    defs.Append($"\"{Qual(col.Name)}\" text PRIMARY KEY");
+                    continue;
+                }
+                if (string.Equals(col.Name, "Json", StringComparison.OrdinalIgnoreCase))
+                {
+                    defs.Append($"\"{Qual(col.Name)}\" jsonb NOT NULL");
+                    continue;
+                }
+                if (col.IsComputed && !string.IsNullOrEmpty(col.JsonPath))
+                {
+                    // jsonPath like $.Prop -> extract Prop
+                    var prop = col.JsonPath.StartsWith("$.") ? col.JsonPath.Substring(2) : col.JsonPath.TrimStart('$', '.');
+                    defs.Append($"\"{Qual(col.Name)}\" text GENERATED ALWAYS AS ((\"Json\"->>'{prop}')) STORED");
+                }
+                else
+                {
+                    var pgType = col.ClrType == typeof(int) ? "integer" : col.ClrType == typeof(long) ? "bigint" : col.ClrType == typeof(bool) ? "boolean" : col.ClrType == typeof(DateTime) ? "timestamp with time zone" : "text";
+                    var nullSql = col.Nullable ? string.Empty : " NOT NULL";
+                    defs.Append($"\"{Qual(col.Name)}\" {pgType}{nullSql}");
+                }
+            }
+
+            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" ({defs});";
+            try { cmd.ExecuteNonQuery(); } catch { }
+
+            // Create indexes for indexed columns
+            for (int i = 0; i < columns.Count; i++)
+            {
+                var c = columns[i];
+                if (c.IsIndexed)
+                {
+                    var ix = $"IX_{table}_{c.Name}";
+                    using var cmd2 = conn.CreateCommand();
+                    cmd2.CommandText = $"CREATE INDEX IF NOT EXISTS \"{Qual(ix)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(c.Name)}\");";
+                    try { cmd2.ExecuteNonQuery(); } catch { }
+                }
+            }
+        }
+        public void AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted)
+        {
+            // Postgres uses generated columns from jsonb extraction
+            var sch = schema ?? (searchPath ?? "public");
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"ALTER TABLE \"{Qual(sch)}\".\"{Qual(table)}\" ADD COLUMN IF NOT EXISTS \"{Qual(column)}\" text GENERATED ALWAYS AS ((\"Json\"->>substring(@p from 3))) STORED";
+            // @p like $.Prop -> use substring to strip '$.'; simple helper for tests
+            var p = conn.CreateCommand();
+            cmd.Parameters.AddWithValue("@p", jsonPath);
+            cmd.ExecuteNonQuery();
+        }
+        public void AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable)
+        {
+            var sch = schema ?? (searchPath ?? "public");
+            string pgType = clrType == typeof(int) ? "integer" : clrType == typeof(long) ? "bigint" : clrType == typeof(bool) ? "boolean" : clrType == typeof(DateTime) ? "timestamp with time zone" : "text";
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"ALTER TABLE \"{Qual(sch)}\".\"{Qual(table)}\" ADD COLUMN IF NOT EXISTS \"{Qual(column)}\" {pgType} {(nullable ? "" : "NOT NULL")}";
+            cmd.ExecuteNonQuery();
+        }
+        public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique)
+        {
+            var sch = schema ?? (searchPath ?? "public");
+            var cols = string.Join(", ", columns.Select(c => "\"" + Qual(c) + "\""));
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS \"{Qual(indexName)}\" ON \"{Qual(sch)}\".\"{Qual(table)}\" ({cols})";
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    private sealed class PostgresStoreFeatures : IRelationalStoreFeatures
+    {
+        public bool SupportsJsonFunctions => true;
+        public bool SupportsPersistedComputedColumns => true; // generated columns are stored
+        public bool SupportsIndexesOnComputedColumns => true;
     }
 
     private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)

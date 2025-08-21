@@ -62,13 +62,13 @@ Bind from `Sora:Health:Aggregator:*`:
         "Scheduler": {
           "EnableTtlScheduling": true,
           "QuantizationWindow": "00:00:02",
-          "JitterPercent": 0.10,
+          "JitterPercent": 0.1,
           "JitterAbsoluteMin": "00:00:00.100",
           "MinComponentGap": "00:00:01",
           "MaxComponentsPerBucket": 256,
           "MinInterBucketGap": "00:00:00.100",
           "BroadcastThreshold": 2,
-          "RefreshLeadPercent": 0.10,
+          "RefreshLeadPercent": 0.1,
           "RefreshLeadAbsoluteMin": "00:00:00.100"
         },
         "Ttl": {
@@ -78,8 +78,8 @@ Bind from `Sora:Health:Aggregator:*`:
         "Policy": {
           "SnapshotStalenessWindow": "00:00:30",
           "TreatUnknownAsDegradedForRequired": true,
-          "RequiredComponents": [ "core", "data", "mq" ],
-          "OptionalComponents": [ "ai", "cache" ],
+          "RequiredComponents": ["core", "data", "mq"],
+          "OptionalComponents": ["ai", "cache"],
           "DegradedComponentsThreshold": 1
         },
         "Limits": {
@@ -94,6 +94,7 @@ Bind from `Sora:Health:Aggregator:*`:
 ```
 
 Notes
+
 - All timespans use `hh:mm:ss.fff` format.
 - Per-component TTL is applied only when provided in `Push`.
 - The aggregator never awaits event handlers; handlers must be safe and fast.

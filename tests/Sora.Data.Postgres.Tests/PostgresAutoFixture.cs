@@ -12,14 +12,18 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Xunit;
+using Npgsql;
+using System.Net.Sockets;
+using System.Linq;
+using Sora.Data.Relational.Tests;
 
 namespace Sora.Data.Postgres.Tests;
 
-public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
+public sealed class PostgresAutoFixture : IRelationalTestFixture<PostgresSchemaGovernanceSharedTests.Todo, string>, IAsyncLifetime, IDisposable
 {
     private TestcontainersContainer? _container;
     public string ConnectionString { get; private set; } = string.Empty;
-    public ServiceProvider ServiceProvider { get; private set; } = default!;
+    public IServiceProvider ServiceProvider { get; private set; } = default!;
     public IDataService Data { get; private set; } = default!;
     public bool SkipTests { get; private set; }
     public string? SkipReason { get; private set; }
@@ -32,17 +36,31 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
         // Probe Docker daemon robustly and derive a stable endpoint string for Testcontainers
         var probe = await DockerEnvironment.ProbeAsync();
 
+        // 1) Explicit env var wins
         var envCxn = Environment.GetEnvironmentVariable("SORA_POSTGRES__CONNECTION_STRING")
             ?? Environment.GetEnvironmentVariable("ConnectionStrings__Postgres");
 
-        if (!string.IsNullOrWhiteSpace(envCxn))
+        if (TryNormalize(envCxn, out var normalized))
         {
-            ConnectionString = envCxn!;
+            ConnectionString = normalized!;
+        }
+        else if (await TryDetectLocalAsync() is string localCxn)
+        {
+            // 2) Local instance discovered
+            ConnectionString = localCxn;
         }
         else
         {
+            // 3) Fallback to Testcontainers if Docker is available
             try
             {
+                if (!probe.Available)
+                {
+                    SkipTests = true;
+                    SkipReason = probe.Message ?? "Docker not available";
+                    return;
+                }
+
                 var password = "postgres";
                 var builder = new TestcontainersBuilder<TestcontainersContainer>()
                     .WithDockerEndpoint(probe.Endpoint!)
@@ -50,16 +68,16 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
                     .WithEnvironment("POSTGRES_PASSWORD", password)
                     .WithEnvironment("POSTGRES_DB", "sora")
                     .WithPortBinding(54329, 5432)
-                    .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
-                    ;
+                    .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432));
+
                 _container = builder.Build();
                 await _container.StartAsync();
-                ConnectionString = $"Host=localhost;Port=54329;Database=sora;Username=postgres;Password={password}";
+                ConnectionString = $"Host=localhost;Port=54329;Database=sora;Username=postgres;Password={password};Timeout=3";
             }
             catch (Exception ex)
             {
                 SkipTests = true;
-                SkipReason = $"Docker not available: {ex.GetType().Name}: {ex.Message}";
+                SkipReason = $"Docker start failed: {ex.GetType().Name}: {ex.Message}";
                 return;
             }
         }
@@ -78,7 +96,11 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
         services.AddSingleton<IConfiguration>(cfg);
         services.AddSoraCore();
         services.AddSoraDataCore();
-        services.AddPostgresAdapter();
+        services.AddPostgresAdapter(o => {
+            o.ConnectionString = ConnectionString;
+            o.DdlPolicy = Sora.Data.Postgres.SchemaDdlPolicy.AutoCreate;
+            o.AllowProductionDdl = true;
+        });
         ServiceProvider = services.BuildServiceProvider();
         Data = ServiceProvider.GetRequiredService<IDataService>();
     }
@@ -87,10 +109,10 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
 
     public async Task DisposeAsync()
     {
-        if (ServiceProvider is not null)
+        if (ServiceProvider is IDisposable disp)
         {
             await Task.Yield();
-            ServiceProvider.Dispose();
+            disp.Dispose();
         }
         if (_container is not null)
         {
@@ -99,4 +121,134 @@ public sealed class PostgresAutoFixture : IAsyncLifetime, IDisposable
     }
 
     public void Dispose() { }
+
+    private static bool TryNormalize(string? cxn, out string? normalized)
+    {
+        if (!string.IsNullOrWhiteSpace(cxn))
+        {
+            // Ensure short timeout so failures are fast in CI
+            var builder = new NpgsqlConnectionStringBuilder(cxn!)
+            {
+                Timeout = 3,
+                KeepAlive = 0
+            };
+            normalized = builder.ConnectionString;
+            return true;
+        }
+        normalized = null;
+        return false;
+    }
+
+    private static async Task<bool> CanTcpConnectAsync(string host, int port, int timeoutMs = 250)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            var connectTask = client.ConnectAsync(host, port);
+            var completed = await Task.WhenAny(connectTask, Task.Delay(timeoutMs));
+            return completed == connectTask && client.Connected;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static async Task<bool> CanOpenAsync(string connectionString)
+    {
+        try
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            await conn.CloseAsync();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string? BuildFromPgEnv()
+    {
+        var host = Environment.GetEnvironmentVariable("PGHOST");
+        var port = Environment.GetEnvironmentVariable("PGPORT");
+        var db = Environment.GetEnvironmentVariable("PGDATABASE");
+        var user = Environment.GetEnvironmentVariable("PGUSER");
+        var pwd = Environment.GetEnvironmentVariable("PGPASSWORD");
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(user)) return null;
+        var b = new NpgsqlConnectionStringBuilder
+        {
+            Host = host,
+            Port = int.TryParse(port, out var p) ? p : 5432,
+            Database = string.IsNullOrWhiteSpace(db) ? "postgres" : db,
+            Username = user,
+            Timeout = 3,
+        };
+        if (!string.IsNullOrWhiteSpace(pwd)) b.Password = pwd;
+        return b.ConnectionString;
+    }
+
+    private static async Task<string?> TryDetectLocalAsync()
+    {
+        // PG* environment variables first
+        var envCxn = BuildFromPgEnv();
+        if (envCxn is not null && await CanOpenAsync(envCxn)) return envCxn;
+
+        // Probe common localhost ports quickly
+        var ports = new[] { 5432, 5433, 5434 };
+        var host = "localhost";
+        var anyOpen = false;
+        foreach (var port in ports)
+        {
+            if (await CanTcpConnectAsync(host, port)) { anyOpen = true; break; }
+        }
+        if (!anyOpen) return null;
+
+        // Try a few common credential combos
+        var users = new[]
+        {
+            Environment.GetEnvironmentVariable("PGUSER"),
+            "postgres",
+            Environment.UserName
+        }.Where(s => !string.IsNullOrWhiteSpace(s))!.Distinct().ToArray();
+        var dbs = new[]
+        {
+            Environment.GetEnvironmentVariable("PGDATABASE"),
+            "sora",
+            "postgres"
+        }.Where(s => !string.IsNullOrWhiteSpace(s))!.Distinct().ToArray();
+        var pwds = new[]
+        {
+            Environment.GetEnvironmentVariable("PGPASSWORD"),
+            "postgres",
+            string.Empty
+        };
+
+        foreach (var port in ports)
+        {
+            foreach (var user in users)
+            {
+                foreach (var db in dbs)
+                {
+                    foreach (var pwd in pwds)
+                    {
+                        var b = new NpgsqlConnectionStringBuilder
+                        {
+                            Host = host,
+                            Port = port,
+                            Database = db,
+                            Username = user!,
+                            Timeout = 3,
+                        };
+                        if (pwd is not null) b.Password = pwd;
+                        var cs = b.ConnectionString;
+                        if (await CanOpenAsync(cs)) return cs;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
 }

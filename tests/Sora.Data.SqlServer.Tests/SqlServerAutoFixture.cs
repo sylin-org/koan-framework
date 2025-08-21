@@ -9,6 +9,8 @@ using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.SqlServer;
+using Sora.Testing;
+using Sora.Data.Relational.Tests;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
@@ -19,13 +21,15 @@ using Xunit;
 
 namespace Sora.Data.SqlServer.Tests;
 
-public sealed class SqlServerAutoFixture : IAsyncLifetime, IDisposable
+public sealed class SqlServerAutoFixture : IRelationalTestFixture<SqlServerSchemaGovernanceTests.Doc, string>, IAsyncLifetime, IDisposable
 {
     private TestcontainersContainer? _container;
     private string? _localDbName;
     public string ConnectionString { get; private set; } = string.Empty;
-    public ServiceProvider ServiceProvider { get; private set; } = default!;
+    public IServiceProvider ServiceProvider { get; private set; } = default!;
     public IDataService Data { get; private set; } = default!;
+    public bool SkipTests { get; private set; }
+    public string? SkipReason { get; private set; }
 
     public async Task InitializeAsync()
     {
@@ -43,17 +47,24 @@ public sealed class SqlServerAutoFixture : IAsyncLifetime, IDisposable
             if (OperatingSystem.IsWindows())
             {
                 if (await TryUseLocalDbAsync()) { /* done */ }
-                else if (await TryUseSqlExpressAsync()) { /* done */ }
             }
 
             if (string.IsNullOrWhiteSpace(ConnectionString))
             {
-                // Start a SQL Server container only if explicitly enabled
-                var useDocker = (Environment.GetEnvironmentVariable("SORA_SQLSERVER__USE_DOCKER") ?? string.Empty).Trim();
-                if (string.Equals(useDocker, "1", StringComparison.OrdinalIgnoreCase) || string.Equals(useDocker, "true", StringComparison.OrdinalIgnoreCase))
+                // Fallback to Docker if available; otherwise skip
+                try
                 {
+                    Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
+                    var probe = await DockerEnvironment.ProbeAsync();
+                    if (!probe.Available)
+                    {
+                        SkipTests = true;
+                        SkipReason = probe.Message ?? "Docker not available";
+                        return;
+                    }
                     var password = "yourStrong(!)Password";
                     _container = new TestcontainersBuilder<TestcontainersContainer>()
+                        .WithDockerEndpoint(probe.Endpoint!)
                         .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
                         .WithEnvironment("ACCEPT_EULA", "Y")
                         .WithEnvironment("MSSQL_SA_PASSWORD", password)
@@ -61,11 +72,13 @@ public sealed class SqlServerAutoFixture : IAsyncLifetime, IDisposable
                         .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(1433))
                         .Build();
                     await _container.StartAsync();
-                    ConnectionString = $"Server=localhost,14333;User Id=sa;Password={password};TrustServerCertificate=True;Encrypt=False";
+                    ConnectionString = $"Server=localhost,14333;User Id=sa;Password={password};TrustServerCertificate=True;Encrypt=False;Connect Timeout=5";
                 }
-                else
+                catch (Exception ex)
                 {
-                    throw new InvalidOperationException("No SQL Server available. Options: set SORA_SQLSERVER__CONNECTION_STRING, install LocalDB or SQL Express, or set SORA_SQLSERVER__USE_DOCKER=1 with Docker running.");
+                    SkipTests = true;
+                    SkipReason = $"Docker start failed: {ex.Message}";
+                    return;
                 }
             }
         }
@@ -88,11 +101,14 @@ public sealed class SqlServerAutoFixture : IAsyncLifetime, IDisposable
         ServiceProvider = services.BuildServiceProvider();
         Data = ServiceProvider.GetRequiredService<IDataService>();
 
-        // Smoke probe
-    await using var smokeConn = new SqlConnection(ConnectionString);
-    await smokeConn.OpenAsync();
-    await using var smokeCmd = new SqlCommand("SELECT 1", smokeConn);
-    await smokeCmd.ExecuteScalarAsync();
+        if (!SkipTests)
+        {
+            // Smoke probe
+            await using var smokeConn = new SqlConnection(ConnectionString);
+            await smokeConn.OpenAsync();
+            await using var smokeCmd = new SqlCommand("SELECT 1", smokeConn);
+            await smokeCmd.ExecuteScalarAsync();
+        }
     }
 
     public async Task DisposeAsync()
@@ -100,7 +116,7 @@ public sealed class SqlServerAutoFixture : IAsyncLifetime, IDisposable
         if (ServiceProvider is not null)
         {
             await Task.Yield();
-            ServiceProvider.Dispose();
+            try { (ServiceProvider as IDisposable)?.Dispose(); } catch { }
         }
         if (_localDbName is not null)
         {
@@ -160,21 +176,5 @@ public sealed class SqlServerAutoFixture : IAsyncLifetime, IDisposable
         catch { return false; }
     }
 
-    private async Task<bool> TryUseSqlExpressAsync()
-    {
-        try
-        {
-            var master = "Server=.\\SQLEXPRESS;Integrated Security=True;TrustServerCertificate=True;Connection Timeout=5;";
-            await using var masterConn = new SqlConnection(master);
-            await masterConn.OpenAsync();
-            _localDbName = "sora_test_" + Guid.NewGuid().ToString("N");
-            await using (var masterCmd = new SqlCommand($"CREATE DATABASE [{_localDbName}];", masterConn))
-            {
-                await masterCmd.ExecuteNonQueryAsync();
-            }
-            ConnectionString = $"Server=.\\SQLEXPRESS;Database={_localDbName};Integrated Security=True;TrustServerCertificate=True;";
-            return true;
-        }
-        catch { return false; }
-    }
+    // SQL Express probe removed: prefer LocalDB (Windows) and container fallback for CI reproducibility.
 }

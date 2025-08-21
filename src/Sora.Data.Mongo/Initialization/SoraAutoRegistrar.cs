@@ -19,8 +19,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddSingleton<IConfigureOptions<MongoOptions>, MongoOptionsConfigurator>();
         services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(Sora.Data.Abstractions.Naming.INamingDefaultsProvider), typeof(MongoNamingDefaultsProvider), ServiceLifetime.Singleton));
-    services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
+        services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)

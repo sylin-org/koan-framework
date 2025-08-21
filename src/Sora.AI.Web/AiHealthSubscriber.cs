@@ -50,7 +50,7 @@ internal sealed class AiHealthSubscriber : IHostedService
                 status: HealthStatus.Healthy,
                 message: "ok",
                 ttl: TimeSpan.FromSeconds(30),
-                facts: new Dictionary<string,string>
+                facts: new Dictionary<string, string>
                 {
                     ["adapters"] = all.Count.ToString(),
                     ["adaptersReady"] = ready.ToString(),

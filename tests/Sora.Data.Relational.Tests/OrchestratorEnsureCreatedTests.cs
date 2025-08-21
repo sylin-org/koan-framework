@@ -26,9 +26,9 @@ public class OrchestratorEnsureCreatedTests
 
     private static (IRelationalSchemaOrchestrator orch, IServiceProvider sp) CreateSut(RelationalMaterializationOptions? opts = null)
     {
-    var services = new ServiceCollection();
-    var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
-    services.AddSingleton<IConfiguration>(cfg);
+        var services = new ServiceCollection();
+        var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
+        services.AddSingleton<IConfiguration>(cfg);
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.AddRelationalOrchestration();
         if (opts is not null)
@@ -130,6 +130,20 @@ public class OrchestratorEnsureCreatedTests
             set.Add(idColumn);
             set.Add(jsonColumn);
             _columns[(schema, table)] = set;
+        }
+
+        public void CreateTableWithColumns(string schema, string table, System.Collections.Generic.List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+        {
+            _tables.Add((schema, table));
+            var set = _columns.GetValueOrDefault((schema, table)) ?? new HashSet<string>(StringComparer.Ordinal);
+            foreach (var c in columns) set.Add(c.Name);
+            _columns[(schema, table)] = set;
+            // record indexes
+            for (int i = 0; i < columns.Count; i++)
+            {
+                var c = columns[i];
+                if (c.IsIndexed) Indexes.Add((schema, table, $"IX_{table}_{c.Name}", new List<string> { c.Name }, false));
+            }
         }
 
         public void AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted)

@@ -13,11 +13,14 @@ This page shows minimal, copy-pasteable usage for the Health Aggregator.
         "Scheduler": {
           "EnableTtlScheduling": true,
           "QuantizationWindow": "00:00:02",
-          "JitterPercent": 0.10,
+          "JitterPercent": 0.1,
           "JitterAbsoluteMin": "00:00:00.100"
         },
         "Ttl": { "MinTtl": "00:00:01", "MaxTtl": "01:00:00" },
-        "Policy": { "SnapshotStalenessWindow": "00:00:30", "RequiredComponents": ["core","data","mq"] }
+        "Policy": {
+          "SnapshotStalenessWindow": "00:00:30",
+          "RequiredComponents": ["core", "data", "mq"]
+        }
       }
     }
   }
@@ -86,7 +89,7 @@ app.Services.GetRequiredService<IHealthAggregator>()
     .RequestProbe(ProbeReason.Startup);
 
 // On demand (e.g., admin controller) — broadcast
-[HttpPost("/ops/health/probe")] 
+[HttpPost("/ops/health/probe")]
 public IActionResult Probe([FromServices] IHealthAggregator agg)
 {
     agg.RequestProbe(ProbeReason.Manual);
@@ -119,6 +122,7 @@ public class HealthController : ControllerBase
 ```
 
 Notes
+
 - The aggregator keeps reads cheap and out-of-band. Handlers should be fast; offload slow work.
 - TTLs apply only when supplied by the component in `Push`.
 - With the scheduler running, TTL-driven components will be re-invited near expiry.

@@ -6,6 +6,7 @@ using Sora.Data.Abstractions;
 using Sora.Data.Redis;
 using Sora.Testing;
 using Xunit;
+using System.Net.Sockets;
 
 namespace Sora.Data.Redis.IntegrationTests;
 
@@ -25,6 +26,13 @@ public sealed class RedisAutoFixture : IAsyncLifetime
         if (!string.IsNullOrWhiteSpace(explicitCs))
         {
             ConnectionString = explicitCs;
+            return;
+        }
+
+        // Try local Redis on default port quickly
+        if (await CanTcpConnectAsync("localhost", 6379))
+        {
+            ConnectionString = "localhost:6379";
             return;
         }
 
@@ -55,5 +63,17 @@ public sealed class RedisAutoFixture : IAsyncLifetime
             try { await _container.StopAsync(); } catch { }
             try { await _container.DisposeAsync(); } catch { }
         }
+    }
+
+    private static async Task<bool> CanTcpConnectAsync(string host, int port, int timeoutMs = 250)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            var connectTask = client.ConnectAsync(host, port);
+            var completed = await Task.WhenAny(connectTask, Task.Delay(timeoutMs));
+            return completed == connectTask && client.Connected;
+        }
+        catch { return false; }
     }
 }

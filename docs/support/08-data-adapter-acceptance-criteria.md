@@ -1,3 +1,51 @@
+## Testing and Compliance
+
+This document defines testable acceptance criteria that all Sora Data adapters must meet. It complements the authoring checklist and testing guide with normative MUST/SHOULD/MAY language, and ties behavior to provider capabilities.
+
+## Integration tests: local-first, container-fallback (gold standard)
+
+To make integration tests reliable on both developer machines and CI, all data adapters should follow this policy:
+
+- Try a local instance first (fast feedback, no infra requirement).
+- If no local instance is reachable, spin a disposable container using Testcontainers.
+- If neither is possible, mark the fixture as unavailable and let tests return early (treated as skipped).
+
+Adapters and fixtures implement this consistently:
+
+- PostgreSQL
+
+  - Local detection order:
+    - Use an explicit connection string if provided: `SORA_POSTGRES__CONNECTION_STRING` or `ConnectionStrings__Postgres`.
+    - Otherwise use standard PG env vars: `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`.
+    - Otherwise probe `localhost` ports 5432/5433/5434 and attempt common credentials (`postgres`, current OS user) across DBs (`sora`, `postgres`). Short timeouts (≈3s) ensure fast failures.
+  - Container fallback:
+    - Image: `postgres:16-alpine`, bound to host port 54329.
+    - Environment: `POSTGRES_PASSWORD=postgres`, `POSTGRES_DB=sora`.
+    - Uses `DotNet.Testcontainers` and Sora.Testing `DockerEnvironment` to locate a working Docker endpoint; sets `TESTCONTAINERS_RYUK_DISABLED=true` to avoid reaper issues on Windows.
+
+- SQL Server
+- SQL Server
+
+  - Local detection order:
+    - Use an explicit connection string if provided: `SORA_SQLSERVER__CONNECTION_STRING` or `ConnectionStrings__SqlServer`.
+    - On Windows, a LocalDB instance (`(localdb)\\MSSQLLocalDB`) may be probed by creating a temporary database for fast local feedback. Do not rely on pre-installed SQL Express instances in CI — prefer containerized SQL Server for reproducible tests.
+  - Container fallback (recommended for CI and when LocalDB is unavailable):
+    - Image: `mcr.microsoft.com/mssql/server:2022-latest`, bound to host port 14333 (or dynamically mapped where preferred).
+    - Environment: `ACCEPT_EULA=Y`, `MSSQL_SA_PASSWORD=yourStrong(!)Password` (use a secure secret in CI).
+    - Connection string should include `TrustServerCertificate=True` and a short connect timeout for fast failure.
+    - Uses `DotNet.Testcontainers` and Sora.Testing `DockerEnvironment` to start the container; set `TESTCONTAINERS_RYUK_DISABLED=true` on Windows CI runners when needed.
+
+- Redis
+  - Local detection: use `SORA_REDIS__CONNECTION_STRING`, `REDIS_URL`, or `REDIS_CONNECTION_STRING` if provided.
+  - Container fallback: `redis:7-alpine` with a dynamically mapped host port; `TESTCONTAINERS_RYUK_DISABLED=true` applied.
+
+Notes and tips
+
+- Docker endpoint probing: Sora.Testing `DockerEnvironment` checks common endpoints per OS (Windows named pipe, Unix socket, localhost:2375) and honors `DOCKER_HOST` when set.
+- Skips: When no local service and no Docker are available, fixtures set `SkipTests = true`; tests early-return so CI can still run without hard failures in restricted environments.
+- Override behavior: Prefer explicit connection strings via the env vars above to force tests to use a specific instance.
+- Cleanup: Containers are disposed by the fixtures. LocalDB test databases are dropped on teardown; other local instances are left untouched.
+
 # Data Adapter Acceptance Criteria
 
 This document defines testable acceptance criteria that all Sora Data adapters must meet. It complements the authoring checklist and testing guide with normative MUST/SHOULD/MAY language, and ties behavior to provider capabilities.
@@ -30,11 +78,13 @@ Audience: Adapter authors and maintainers; reviewers; test writers.
 ## 3) Bulk operations
 
 If the backing database exposes native bulk operations:
+
 - MUST implement native bulk upsert and delete.
 - MUST set `WriteCapabilities.BulkUpsert` and/or `WriteCapabilities.BulkDelete` true and implement the corresponding marker interfaces.
 - SHOULD stream or chunk for large sets where the database benefits from it.
 
 If the backing database does not expose native bulk operations:
+
 - MUST still honor `UpsertManyAsync/DeleteManyAsync` semantics by falling back to efficient single-row operations, batching network round-trips when feasible.
 - MUST leave `WriteCapabilities.Bulk*` flags false and NOT implement the bulk marker interfaces.
 
@@ -85,12 +135,13 @@ If the backing database does not expose native bulk operations:
 - If an instruction is unsupported or disallowed by configuration/policy, MUST return a clear NotSupported result/exception with actionable guidance.
 
 Relational-specific:
+
 - MUST route `relational.schema.validate`, `relational.schema.ensureCreated`, and related schema/migration instructions to the `Sora.Data.Relational` orchestrator. The orchestrator determines the concrete shape (JSON-first vs. materialized) and uses provider primitives to apply it.
 
 ## 9) Diagnostics, health, and observability
 
 - Logging: SHOULD log at Debug/Information for key lifecycle events and at Warning/Error for failures using consistent categories.
-- Tracing/Metrics: MUST participate in OpenTelemetry if present (activity scopes around query/batch/command paths), without introducing a hard dependency. Use `ActivitySource` and standard db.* attributes; avoid sensitive data in spans.
+- Tracing/Metrics: MUST participate in OpenTelemetry if present (activity scopes around query/batch/command paths), without introducing a hard dependency. Use `ActivitySource` and standard db.\* attributes; avoid sensitive data in spans.
 - Health: MUST provide an `IHealthContributor` that performs a lightweight readiness probe (e.g., directory probe for JSON; trivial command/PRAGMA for SQLite) and register it by default in the adapter’s initializer.
 
 ## 10) Options, configuration, and defaults
@@ -98,11 +149,12 @@ Relational-specific:
 - MUST bind options from configuration sections named consistently (`Sora:Data:<Adapter>` or provider-specific sections) using provided helpers.
 - MUST provide sane dev defaults (e.g., SQLite file path; Mongo default host per decision 0043), and respect environment overrides.
 - MUST fail fast with actionable messages when critical configuration is missing.
- - MUST provide paging guardrails:
-   - `DefaultPageSize` (applied when the caller does not specify paging) and `MaxPageSize` (an upper bound), with clear documentation of their defaults.
-   - A production safety policy to disable or strictly limit in-memory filtering/paging (fallbacks). Respect the platform-level `Sora:AllowMagicInProduction` if applicable; adapters MAY also expose a provider-specific override.
+- MUST provide paging guardrails:
+  - `DefaultPageSize` (applied when the caller does not specify paging) and `MaxPageSize` (an upper bound), with clear documentation of their defaults.
+  - A production safety policy to disable or strictly limit in-memory filtering/paging (fallbacks). Respect the platform-level `Sora:AllowMagicInProduction` if applicable; adapters MAY also expose a provider-specific override.
 
 Relational materialization options and overrides (centralized in `Sora.Data.Relational`):
+
 - MUST support a `MaterializationPolicy` option with values:
   - `None` (default): new tables are created as `Id + Json` only; no computed/physical projection columns unless explicitly requested.
   - `ComputedProjections`: add computed columns (e.g., via `JSON_VALUE`) for projected properties; index columns with `IsIndexed` where supported.
@@ -110,7 +162,7 @@ Relational materialization options and overrides (centralized in `Sora.Data.Rela
 - MUST support `ProbeOnStartup` (default: true in non-production, false in production) to enable schema probing and state caching.
 - MUST support `FailOnMismatch` (default: true when `MaterializationPolicy != None`) to control whether a detected mismatch causes hard failure or degraded fallback.
 - MUST honor existing `DdlPolicy`, `SchemaMatching`, and production safety flags (`AllowMagicInProduction`).
- - MUST honor entity-level override via `[RelationalStorage(Shape=...)]` attribute; precedence is: entity attribute > orchestrator options > default. The orchestrator exposes `EnsureCreatedAsync<TEntity,TKey>()` to apply this decision.
+- MUST honor entity-level override via `[RelationalStorage(Shape=...)]` attribute; precedence is: entity attribute > orchestrator options > default. The orchestrator exposes `EnsureCreatedAsync<TEntity,TKey>()` to apply this decision.
 
 ## 11) Error semantics and safety
 
@@ -121,6 +173,7 @@ Relational materialization options and overrides (centralized in `Sora.Data.Rela
 ## 12) Acceptance tests (minimum)
 
 Adapters MUST include tests that verify the following:
+
 - Capabilities: `IWriteCapabilities`, `IQueryCapabilities`, bulk markers, and (if present) concurrency support.
 - CRUD: round-trip with complex property hydration; identifier uniqueness; delete by id.
 - Bulk: upsert/delete many happy path; large set behavior; flags reflect true native vs fallback coverage.
@@ -133,6 +186,7 @@ Adapters MUST include tests that verify the following:
 - Health: health contributor passes under normal conditions and fails with clear diagnostics when broken.
 
 Relational materialization (additional tests):
+
 - Schema orchestration is delegated: adapter routes `relational.schema.*` instructions to the shared orchestrator.
 - Materialization policy:
   - `None`: ensure-created produces `Id + Json`; validation is Healthy when table matches; queries operate via `JSON_VALUE` fallback when no projection columns exist.
@@ -140,7 +194,7 @@ Relational materialization (additional tests):
   - `PhysicalColumns`: ensure-created/validate creates or verifies native columns and ensures write mirroring to `Json`.
 - Probing and caching respect `ProbeOnStartup` and environment gates; failures in production default to safe degraded behavior unless `FailOnMismatch` is set.
 - Failure path: when mismatch and `FailOnMismatch = true`, CRUD/query paths throw a clear `SchemaMismatchException`; health state reports Unhealthy with actionable details.
- - The orchestrator’s `ValidateAsync` MUST surface `MissingColumns` and policy in its report; providers SHOULD wire repository operations to consult this state and throw `SchemaMismatchException` when `FailOnMismatch` is enabled.
+- The orchestrator’s `ValidateAsync` MUST surface `MissingColumns` and policy in its report; providers SHOULD wire repository operations to consult this state and throw `SchemaMismatchException` when `FailOnMismatch` is enabled.
 
 ## 13) Delivery checklist (PR gate)
 
@@ -162,6 +216,7 @@ Use this checklist in PRs for new or updated adapters. All MUST items are requir
 - [ ] Docs updated (adapter README/notes if applicable)
 
 Relational-only (materialization & orchestration):
+
 - [ ] Adapter delegates schema/materialization to `Sora.Data.Relational` orchestrator (no inline ensure/validate logic)
 - [ ] Provider implements required primitives (DDL executor, feature flags) consumed by the orchestrator
 - [ ] Materialization options bound (`MaterializationPolicy`, `ProbeOnStartup`, `FailOnMismatch`) and respected alongside `DdlPolicy`/`SchemaMatching`
@@ -172,23 +227,28 @@ Relational-only (materialization & orchestration):
 This section formalizes relational schema/materialization behavior managed by `Sora.Data.Relational`.
 
 - Central orchestration:
+
   - MUST: Relational adapters delegate schema validation/creation and materialization to the shared orchestrator. Adapters SHOULD remain thin and dialect-focused.
   - MUST: Provider packages expose primitives for DDL and feature discovery used by the orchestrator.
 
 - Supported shapes:
+
   - JSON-first (default): Table with `[Id]` as primary key and `[Json]` as the document column. No computed/physical projection columns unless requested by policy.
   - Computed projections: Computed columns per projection backed by `JSON_VALUE([Json], '$.Prop')`; persist the computed column if supported; index columns marked `IsIndexed` when the database supports indexes on computed columns.
   - Physical columns: Native typed columns for simple primitives plus `[Json]`; writes MUST mirror values into `Json` to preserve fidelity; reserved for advanced scenarios.
 
 - Probing and state:
+
   - MUST: Orchestrator can probe schema at startup when `ProbeOnStartup` is enabled (default on non-production); otherwise probe lazily on first access.
   - MUST: Cache per-entity schema state (Healthy/Degraded/Failure) to avoid repeated probing.
 
 - Mismatch and failure semantics:
+
   - MUST: If `FailOnMismatch = true` and the existing table does not match the required shape, mark Failure and throw a `SchemaMismatchException` on CRUD/query calls; health contributor reports Unhealthy with details (policy, missing/extra columns, `DdlAllowed`, `MatchingMode`).
   - SHOULD: If `FailOnMismatch = false`, operate in Degraded mode using safe `JSON_VALUE` fallbacks; log actionable guidance and expose Degraded in health.
 
 - Instructions and routing:
+
   - MUST: `relational.schema.validate` returns a detailed report describing shape, policy, DDL allowance, and state.
   - MUST: `relational.schema.ensureCreated` applies the shape per attribute/options precedence (`EnsureCreatedAsync`) and `DdlPolicy`, idempotently.
   - MAY: `relational.schema.clear` delete-all convenience; MUST be parameterized and safe.

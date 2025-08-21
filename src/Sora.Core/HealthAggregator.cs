@@ -14,7 +14,7 @@ public sealed record HealthSample(
     string? Message,
     DateTimeOffset TimestampUtc,
     TimeSpan? Ttl,
-    IReadOnlyDictionary<string,string>? Facts
+    IReadOnlyDictionary<string, string>? Facts
 );
 
 public sealed record HealthSnapshot(
@@ -55,7 +55,7 @@ public interface IHealthAggregator
 
     void RequestProbe(ProbeReason reason = ProbeReason.Manual, string? component = null, CancellationToken ct = default);
 
-    void Push(string component, HealthStatus status, string? message = null, TimeSpan? ttl = null, IReadOnlyDictionary<string,string>? facts = null);
+    void Push(string component, HealthStatus status, string? message = null, TimeSpan? ttl = null, IReadOnlyDictionary<string, string>? facts = null);
 
     HealthSnapshot GetSnapshot();
 }
@@ -146,7 +146,7 @@ internal sealed class HealthAggregator : IHealthAggregator
             if (approxBytes > _options.Limits.MaxFactsBytesPerComponent)
             {
                 // Trim until under budget
-                var trimmed = new Dictionary<string,string>();
+                var trimmed = new Dictionary<string, string>();
                 foreach (var kv in facts)
                 {
                     if ((trimmed.Sum(x => x.Key.Length + x.Value.Length) + kv.Key.Length + kv.Value.Length) > _options.Limits.MaxFactsBytesPerComponent)

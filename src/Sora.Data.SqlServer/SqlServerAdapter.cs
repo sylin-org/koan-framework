@@ -25,6 +25,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Sora.Core.Infrastructure;
 
 namespace Sora.Data.SqlServer;
 
@@ -62,10 +63,36 @@ public static class SqlServerRegistration
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
     services.AddRelationalOrchestration();
+    // Bridge SQL Server provider options into the relational materialization pipeline
+    services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqlServerToRelationalBridgeConfigurator>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqlServerConnectionFactory>());
         return services;
+    }
+
+    // Bridge SQL Server adapter options into the global RelationalMaterializationOptions used by orchestrator
+    internal sealed class SqlServerToRelationalBridgeConfigurator(IOptions<SqlServerOptions> sqlOpts, IConfiguration cfg) : IConfigureOptions<RelationalMaterializationOptions>
+    {
+        public void Configure(RelationalMaterializationOptions options)
+        {
+            var so = sqlOpts.Value;
+            // Map DDL policy
+            options.DdlPolicy = so.DdlPolicy switch
+            {
+                SchemaDdlPolicy.NoDdl => RelationalDdlPolicy.NoDdl,
+                SchemaDdlPolicy.Validate => RelationalDdlPolicy.Validate,
+                SchemaDdlPolicy.AutoCreate => RelationalDdlPolicy.AutoCreate,
+                _ => options.DdlPolicy
+            };
+            // Use computed projections by default for SQL Server (supports JSON_VALUE)
+            options.Materialization = RelationalMaterializationPolicy.ComputedProjections;
+            // Map matching mode
+            options.SchemaMatching = so.SchemaMatching == SchemaMatchingMode.Strict ? RelationalSchemaMatchingMode.Strict : RelationalSchemaMatchingMode.Relaxed;
+            // Allow production DDL only when explicitly allowed or when provider option permits
+            var allowMagic = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+            options.AllowProductionDdl = so.AllowProductionDdl || allowMagic;
+        }
     }
 }
 
@@ -201,6 +228,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private readonly int _maxPageSize;
     private readonly ILogger _logger;
     private readonly JsonSerializerOptions _json;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
     public SqlServerRepository(IServiceProvider sp, SqlServerOptions options, IStorageNameResolver resolver)
     {
@@ -213,7 +241,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                 ? lf.CreateLogger($"Sora.Data.SqlServer[{typeof(TEntity).FullName}]")
                 : NullLogger.Instance);
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
-    _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
+        _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
         _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
         _json = new JsonSerializerOptions
         {
@@ -231,9 +259,43 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private SqlConnection Open()
     {
         var conn = new SqlConnection(_options.ConnectionString);
-        conn.Open();
-        EnsureTable(conn);
+    conn.Open();
+    // IMPORTANT: Do not create or ensure schema here.
+    // Schema lifecycle (validation/creation) must be managed by the shared orchestrator
+    // via instructions (relational.schema.ensurecreated / data.ensureCreated).
+        EnsureOrchestrated(conn);
         return conn;
+    }
+
+    private void EnsureOrchestrated(SqlConnection conn)
+    {
+        var table = TableName;
+    var key = $"{conn.DataSource}/{conn.Database}::{table}";
+        // Use the shared relational orchestrator to validate and, if allowed, create schema.
+        try
+        {
+            if (_healthyCache.TryGetValue(key, out var healthy) && healthy) return;
+            Singleflight.RunAsync(key, async ct =>
+            {
+                if (_healthyCache.TryGetValue(key, out var healthy2) && healthy2) return;
+                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                var ddl = new MsSqlDdlExecutor(conn);
+                var feats = new MsSqlStoreFeatures();
+                var vReport = (System.Collections.Generic.IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                var ddlAllowed = vReport.TryGetValue("DdlAllowed", out var da) && da is bool db && db;
+                var tableExists = vReport.TryGetValue("TableExists", out var te) && te is bool tb && tb;
+                if (ddlAllowed)
+                {
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
+                    _healthyCache[key] = true; return;
+                }
+                if (tableExists) { _healthyCache[key] = true; }
+            }).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // best effort: do not fail repository open if orchestration isn't available; let operations surface errors
+        }
     }
 
     private void EnsureTable(SqlConnection conn)
@@ -246,9 +308,9 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             return;
         }
 
-    using var cmd = conn.CreateCommand();
-    var safe = MakeSafeIdentifier(TableName);
-    cmd.CommandText = $@"IF OBJECT_ID(N'[dbo].[{TableName}]', N'U') IS NULL
+        using var cmd = conn.CreateCommand();
+        var safe = MakeSafeIdentifier(TableName);
+        cmd.CommandText = $@"IF OBJECT_ID(N'[dbo].[{TableName}]', N'U') IS NULL
 BEGIN
     CREATE TABLE [dbo].[{TableName}] (
     [Id] NVARCHAR(128) NOT NULL CONSTRAINT [PK_{safe}_Id] PRIMARY KEY,
@@ -343,8 +405,8 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         using var act = SqlServerTelemetry.Activity.StartActivity("mssql.query:all");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
-    // When no query/options are provided, return all rows (not paginated)
-    var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause}");
+        // When no query/options are provided, return all rows (not paginated)
+        var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause}");
         return rows.Select(FromRow).ToList();
     }
 
@@ -355,7 +417,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         act?.SetTag("entity", typeof(TEntity).FullName);
         var (offset, limit) = ComputeSkipTake(options);
         await using var conn = Open();
-    var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY";
+        var sql = $"SELECT [Id], [Json] FROM [dbo].[{TableName}] {OrderByIdClause} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY";
         var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
         return rows.Select(FromRow).ToList();
     }
@@ -677,20 +739,29 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     var ddl = new MsSqlDdlExecutor(conn);
                     var feats = new MsSqlStoreFeatures();
                     // Decide based on attribute > options precedence handled by orchestrator
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
+                    var key = $"{conn.DataSource}/{conn.Database}::{TableName}";
+                    await Singleflight.RunAsync(key, async kct =>
+                    {
+                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
+                        _healthyCache[key] = true;
+                    }, ct);
                     object ok = true; return (TResult)ok;
                 }
             case global::Sora.Data.DataInstructions.Clear:
                 {
-                    EnsureTable(conn);
+                    // Do not create the table when clearing; only delete if it exists so we honor DDL policy.
+                    if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
                     var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
                     object res = del; return (TResult)res;
                 }
             case global::Sora.Data.Relational.RelationalInstructions.SchemaClear:
                 {
-                    EnsureTable(conn);
-                    var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
-                    object res = del; return (TResult)res;
+                    // Schema clear should remove the table when present, but must not create it.
+                    if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
+                    var drop = $"IF OBJECT_ID(N'[dbo].[{TableName}]', N'U') IS NOT NULL DROP TABLE [dbo].[{TableName}];";
+                    var affected = await conn.ExecuteAsync(drop);
+                    try { var key = $"{conn.DataSource}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
+                    object res = affected; return (TResult)res;
                 }
             case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
                 {
@@ -802,10 +873,10 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
     {
         var token = typeof(TEntity).Name;
         var physical = TableName;
-    // If SQL already contains a schema-qualified bracketed identifier, don't rewrite
-    if (System.Text.RegularExpressions.Regex.IsMatch(sql, "\\[[^\\]]+\\]\\.\\[[^\\]]+\\]")) return sql;
-    var pattern = $"\\b{System.Text.RegularExpressions.Regex.Escape(token)}\\b";
-    return System.Text.RegularExpressions.Regex.Replace(sql, pattern, $"[dbo].[{physical}]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        // If SQL already contains a schema-qualified bracketed identifier, don't rewrite
+        if (System.Text.RegularExpressions.Regex.IsMatch(sql, "\\[[^\\]]+\\]\\.\\[[^\\]]+\\]")) return sql;
+        var pattern = $"\\b{System.Text.RegularExpressions.Regex.Escape(token)}\\b";
+        return System.Text.RegularExpressions.Regex.Replace(sql, pattern, $"[dbo].[{physical}]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
     private string RewriteWhereForProjection(string whereSql)
@@ -998,6 +1069,59 @@ BEGIN
     );
 END";
         cmd.ExecuteNonQuery();
+    }
+
+    // Create table with provided columns (Id, Json already included in columns list expected by orchestrator)
+    public void CreateTableWithColumns(string schema, string table, System.Collections.Generic.List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+    {
+        using var cmd = _conn.CreateCommand();
+        var safe = System.Text.RegularExpressions.Regex.Replace(table, "[^A-Za-z0-9_]+", "_");
+        // Build column definitions. Expect Id and Json to be present as first two columns.
+        var defs = new System.Text.StringBuilder();
+        foreach (var col in columns)
+        {
+            if (defs.Length > 0) defs.AppendLine(",");
+            if (string.Equals(col.Name, "Id", StringComparison.OrdinalIgnoreCase))
+            {
+                defs.Append($"[{col.Name}] NVARCHAR(128) NOT NULL CONSTRAINT [PK_{safe}_{col.Name}] PRIMARY KEY");
+                continue;
+            }
+            if (string.Equals(col.Name, "Json", StringComparison.OrdinalIgnoreCase))
+            {
+                defs.Append($"[{col.Name}] NVARCHAR(MAX) NOT NULL");
+                continue;
+            }
+            if (col.IsComputed && !string.IsNullOrEmpty(col.JsonPath))
+            {
+                // Use PERSISTED since SQL Server supports persisted computed columns
+                defs.Append($"[{col.Name}] AS JSON_VALUE([Json], '{col.JsonPath}') PERSISTED");
+            }
+            else
+            {
+                var sqlType = MapType(col.ClrType);
+                var nullSql = col.Nullable ? " NULL" : " NOT NULL";
+                defs.Append($"[{col.Name}] {sqlType}{nullSql}");
+            }
+        }
+
+        cmd.CommandText = $@"IF OBJECT_ID(N'[{schema}].[{table}]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [{schema}].[{table}] (
+{defs}
+    );
+END";
+        try { cmd.ExecuteNonQuery(); } catch { }
+
+        // Create indexes for any indexed columns
+        for (int i = 0; i < columns.Count; i++)
+        {
+            var c = columns[i];
+            if (c.IsIndexed)
+            {
+                var ixName = $"IX_{table}_{c.Name}";
+                CreateIndex(schema, table, ixName, new[] { c.Name }, unique: false);
+            }
+        }
     }
 
     public void AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted)
