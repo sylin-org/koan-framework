@@ -12,6 +12,7 @@ Introduce a dedicated module/package Sora.Data.Vector and move all vector-facing
 
 - In Sora.Data.Vector.Abstractions (new): IVectorSearchRepository, IVectorAdapterFactory, VectorCapabilities, VectorQueryOptions/Result/Match, VectorEmbeddingAttribute, [VectorAdapter].
 - In Sora.Data.Vector (new): IVectorService (resolution and caching), AddSoraDataVector(IServiceCollection) with options binding, VectorDefaultsOptions, facades VectorData<TEntity,TKey>/VectorData<TEntity> (Upsert/Delete/Search + SaveWithVector/SaveManyWithVector), extensions for IServiceProvider and health.
+	- Developer-facing facade: Vector<TEntity> provides terse ergonomics without touching Core. Methods: Save((id, vector, metadata)), Save(IEnumerable<...>), Search(options). Example: await Vector<MyDoc>.Save(items, ct).
 - In Sora.Data.Core (remove): Data<TEntity,TKey>.Vector nested facade, SaveWithVector helpers in AggregateExtensions, IDataService vector helpers (TryGetVectorRepository/GetRequiredVectorRepository), VectorDefaultsOptions.
 - Resolution precedence: [VectorAdapter] attribute → VectorDefaultsOptions.DefaultProvider → Source provider (from [SourceAdapter]/[DataAdapter]) → first available IVectorAdapterFactory → fail fast.
 
@@ -36,7 +37,7 @@ Providers depend on Sora.Data.Vector.Abstractions (not on Sora.Data.Vector). Cor
 - Add projects Sora.Data.Vector and Sora.Data.Vector.Abstractions; wire AddSoraDataVector().
 - Move contracts from Sora.Data.Abstractions → Sora.Data.Vector.Abstractions.
 - Move implementation code listed above from Core to Vector module; update namespaces.
-- Update S5.Recs to reference Sora.Data.Vector and use VectorData<TEntity> facade (or IVectorService) for vector operations.
+- Update S5.Recs to reference Sora.Data.Vector and use Vector<TEntity> (or VectorData<TEntity>) facade for vector operations.
 - Update docs and guides to reference the new module.
 
 ## Alternatives considered

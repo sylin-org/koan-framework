@@ -4,7 +4,7 @@ using Sora.Data.Abstractions.Annotations;
 namespace Sora.Domain;
 
 // Domain-centric CRTP base with static conveniences, independent of data namespace
-public abstract class Entity<TEntity, TKey> : IEntity<TKey>
+public abstract partial class Entity<TEntity, TKey> : IEntity<TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -51,9 +51,10 @@ public abstract class Entity<TEntity, TKey> : IEntity<TKey>
     // Instance self-remove
     public Task<bool> Remove(CancellationToken ct = default)
         => Sora.Data.Core.Data<TEntity, TKey>.DeleteAsync(Id, ct);
+
 }
 
 // Convenience for string-keyed entities
-public abstract class Entity<TEntity> : Entity<TEntity, string>
+public abstract partial class Entity<TEntity> : Entity<TEntity, string>
     where TEntity : class, IEntity<string>
 { }

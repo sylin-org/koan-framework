@@ -6,6 +6,7 @@ using Sora.AI.Contracts.Models;
 using S5.Recs.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Sora.Data.Vector.Abstractions;
+using Sora.Data.Vector;
 
 namespace S5.Recs.Services;
 
@@ -38,12 +39,7 @@ internal sealed class RecsService : IRecsService
             text, anchorAnimeId, genres is null ? string.Empty : string.Join(',', genres), episodesMax, spoilerSafe, topK, userId);
         try
         {
-            var data = (IDataService?)_sp.GetService(typeof(IDataService));
-            var repo = data?.TryGetVectorRepository<AnimeDoc, string>();
-            var dataRepo = data?.GetRepository<AnimeDoc, string>();
-            var ratingsRepo = data?.GetRepository<RatingDoc, string>();
-            var profileRepo = data?.GetRepository<UserProfileDoc, string>();
-            if (repo is not null && dataRepo is not null)
+            if (!string.IsNullOrWhiteSpace(text) || !string.IsNullOrWhiteSpace(anchorAnimeId))
             {
                 float[] query;
                 if (!string.IsNullOrWhiteSpace(text))
@@ -60,7 +56,7 @@ internal sealed class RecsService : IRecsService
                 else if (!string.IsNullOrWhiteSpace(anchorAnimeId))
                 {
                     // For now, approximate by embedding the anchor's synopsis+title
-                    var anchorDoc = await dataRepo.GetAsync(anchorAnimeId!, ct);
+                    var anchorDoc = await AnimeDoc.Get(anchorAnimeId!, ct);
                     AnimeDoc? anchor = anchorDoc;
                     if (anchor is null)
                     {
@@ -77,12 +73,12 @@ internal sealed class RecsService : IRecsService
                 }
                 else query = Array.Empty<float>();
 
-                if (query.Length > 0)
+                if (query.Length > 0 && Vector<AnimeDoc>.IsAvailable)
                 {
                     // If user profile vector exists, blend with query vector for personalization
-            if (!string.IsNullOrWhiteSpace(userId) && profileRepo is not null)
+                    if (!string.IsNullOrWhiteSpace(userId))
                     {
-                        var prof = await profileRepo.GetAsync(userId, ct);
+                        var prof = await UserProfileDoc.Get(userId, ct);
                         if (prof?.PrefVector is { Length: > 0 } pv && pv.Length == query.Length)
                         {
                 _logger?.LogDebug("Query: blending profile vector for user {UserId}", userId);
@@ -94,12 +90,12 @@ internal sealed class RecsService : IRecsService
                             query = blended;
                         }
                     }
-                    var res = await repo.SearchAsync(new Sora.Data.Vector.Abstractions.VectorQueryOptions(query, TopK: topK), ct);
+                    var res = await Vector<AnimeDoc>.Search(new Sora.Data.Vector.Abstractions.VectorQueryOptions(query, TopK: topK), ct);
                     var idToScore = res.Matches.ToDictionary(m => m.Id, m => m.Score);
                     var docs = new List<AnimeDoc>();
                     foreach (var id in idToScore.Keys)
                     {
-                        var d = await dataRepo.GetAsync(id, ct);
+                        var d = await AnimeDoc.Get(id, ct);
                         if (d is not null) docs.Add(d);
                     }
                     IEnumerable<AnimeDoc> q = docs;
@@ -107,9 +103,9 @@ internal sealed class RecsService : IRecsService
                     if (episodesMax is int emax) q = q.Where(a => a.Episodes is null || a.Episodes <= emax);
                     // Personalization: fetch profile if present
                     UserProfileDoc? profile = null;
-                    if (!string.IsNullOrWhiteSpace(userId) && profileRepo is not null)
+                    if (!string.IsNullOrWhiteSpace(userId))
                     {
-                        profile = await profileRepo.GetAsync(userId, ct);
+                        profile = await UserProfileDoc.Get(userId, ct);
                     }
 
             var mapped = q
@@ -165,23 +161,20 @@ internal sealed class RecsService : IRecsService
     _logger?.LogInformation("Rating: user={UserId} anime={AnimeId} rating={Rating}", userId, animeId, rating);
     var data = (IDataService?)_sp.GetService(typeof(IDataService));
         if (data is null) return;
-        // Upsert rating
-        var rRepo = data.GetRepository<RatingDoc, string>();
-        await rRepo.UpsertAsync(new RatingDoc
+    // Upsert rating
+    await RatingDoc.UpsertMany(new[]{ new RatingDoc
         {
             Id = $"{userId}:{animeId}",
             UserId = userId,
             AnimeId = animeId,
             Rating = Math.Max(0, Math.Min(5, rating)),
             UpdatedAt = DateTimeOffset.UtcNow
-        }, ct);
+    } }, ct);
 
         // Update profile genre weights using simple EWMA
-        var aRepo = data.GetRepository<AnimeDoc, string>();
-        var pRepo = data.GetRepository<UserProfileDoc, string>();
-        var a = await aRepo.GetAsync(animeId, ct);
+    var a = await AnimeDoc.Get(animeId, ct);
         if (a is null) return;
-        var profile = await pRepo.GetAsync(userId, ct) ?? new UserProfileDoc { Id = userId };
+    var profile = await UserProfileDoc.Get(userId, ct) ?? new UserProfileDoc { Id = userId };
         const double alpha = 0.3; // smoothing factor
         foreach (var g in a.Genres ?? Array.Empty<string>())
         {
@@ -217,7 +210,7 @@ internal sealed class RecsService : IRecsService
         }
         catch { /* optional */ }
         profile.UpdatedAt = DateTimeOffset.UtcNow;
-    await pRepo.UpsertAsync(profile, ct);
+    await UserProfileDoc.UpsertMany(new[]{ profile }, ct);
     _logger?.LogDebug("Rating: updated profile for user {UserId} (genres={Count}, vec={VecLen})", userId, profile.GenreWeights.Count, profile.PrefVector?.Length ?? 0);
     }
 

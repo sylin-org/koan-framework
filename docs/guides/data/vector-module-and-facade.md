@@ -9,7 +9,7 @@ This guide explains the new vector module split and how to use vector features v
   - AddSoraDataVector(IServiceCollection)
   - IVectorService (resolution/caching)
   - VectorDefaultsOptions (Sora:Data:VectorDefaults:DefaultProvider)
-  - Facades: VectorData<TEntity, TKey> and VectorData<TEntity>
+  - Facades: Vector<TEntity> (preferred) and VectorData<TEntity, TKey>/VectorData<TEntity>
   - Orchestration: SaveWithVector and SaveManyWithVector with VectorEntity<TEntity>
 
 ## Configuration
@@ -20,10 +20,14 @@ Bind default vector provider:
 
 ## Usage
 
-- Resolve the facade:
-  - VectorData<MyDoc>.UpsertManyAsync(items)
-  - VectorData<MyDoc>.SearchAsync(options)
-- Or orchestrate document + vector save:
+- Preferred, terse facade:
+  - await Vector<MyDoc>.Save((id, vec, meta), ct);
+  - await Vector<MyDoc>.Save(items, ct);
+  - var res = await Vector<MyDoc>.Search(new VectorQueryOptions(query, TopK: 10), ct);
+  - if (Vector<MyDoc>.IsAvailable) { var caps = Vector<MyDoc>.GetCapabilities(); }
+  - Optional maintenance (provider-dependent): await Vector<MyDoc>.EnsureCreated(); await Vector<MyDoc>.Clear(); await Vector<MyDoc>.Rebuild(); var n = await Vector<MyDoc>.Stats();
+
+- Orchestrate document + vector save:
   - var ve = new VectorEntity<MyDoc>(doc, vector);
   - await VectorData<MyDoc>.SaveManyWithVector(new[]{ ve });
 

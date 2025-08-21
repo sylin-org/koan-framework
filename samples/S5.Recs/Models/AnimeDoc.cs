@@ -1,6 +1,7 @@
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Vector.Abstractions;
+using Sora.Domain;
 
 namespace S5.Recs.Models;
 
@@ -8,9 +9,8 @@ namespace S5.Recs.Models;
 [DataAdapter("mongo")]
 [Sora.Data.Vector.Abstractions.VectorAdapter("weaviate")]
 [Storage(Name = "Anime")]
-public sealed class AnimeDoc : IEntity<string>
+public sealed class AnimeDoc : Entity<AnimeDoc>
 {
-    public string Id { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string[] Genres { get; set; } = Array.Empty<string>();
     public int? Episodes { get; set; }

@@ -10,7 +10,9 @@ using Sora.Data.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using Sora.Data.Vector;
 using S5.Recs.Providers;
+using Sora.Data.Vector;
 
 namespace S5.Recs.Services;
 
@@ -78,21 +80,43 @@ internal sealed class SeedService : ISeedService
 
     public async Task<(int anime, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct)
     {
+        var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
+        if (dataSvc is null) { _logger?.LogWarning("Stats: IDataService unavailable"); return (0, 0, 0); }
+
+        int animeCount = 0;
+        int vectorCount = 0;
+
+        // Count documents (best-effort)
         try
         {
-            var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
-            if (dataSvc is null) return (0, 0, 0);
-            var repo = dataSvc.GetRepository<AnimeDoc, string>();
-            var animeCount = await repo.CountAsync(query: null, ct);
-            var vecRepo = dataSvc.TryGetVectorRepository<AnimeDoc, string>();
-            int vectorCount = 0;
-            if (vecRepo is Sora.Data.Abstractions.Instructions.IInstructionExecutor<AnimeDoc> exec)
+            using (Sora.Data.Core.DataSetContext.With(null))
             {
-                vectorCount = await exec.ExecuteAsync<int>(new Sora.Data.Abstractions.Instructions.Instruction(Sora.Data.Vector.VectorInstructions.IndexStats), ct);
+                var repo = dataSvc.GetRepository<AnimeDoc, string>();
+                animeCount = await repo.CountAsync(query: null, ct);
             }
-            return (animeCount, animeCount, vectorCount);
         }
-        catch { return (0, 0, 0); }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Stats: failed to count AnimeDoc");
+        }
+
+        // Count vectors if provider supports instructions (best-effort)
+        try
+        {
+            using (Sora.Data.Core.DataSetContext.With(null))
+            {
+                if (Vector<AnimeDoc>.IsAvailable)
+                {
+                    vectorCount = await Vector<AnimeDoc>.Stats(ct);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "Stats: vector instruction not supported or failed");
+        }
+
+        return (animeCount, animeCount, vectorCount);
     }
 
     private Task<List<Anime>> FetchFromProviderAsync(string source, int limit, CancellationToken ct)
@@ -117,7 +141,6 @@ internal sealed class SeedService : ISeedService
         {
             var dataSvc = (Sora.Data.Core.IDataService?)_sp.GetService(typeof(Sora.Data.Core.IDataService));
             if (dataSvc is null) return 0;
-            var repo = dataSvc.GetRepository<S5.Recs.Models.AnimeDoc, string>();
             var docs = items.Select(a => new S5.Recs.Models.AnimeDoc
             {
                 Id = a.Id,
@@ -127,7 +150,7 @@ internal sealed class SeedService : ISeedService
                 Synopsis = a.Synopsis,
                 Popularity = a.Popularity
             });
-            return await repo.UpsertManyAsync(docs, ct);
+            return await S5.Recs.Models.AnimeDoc.UpsertMany(docs, ct);
         }
         catch
         {
@@ -164,7 +187,7 @@ internal sealed class SeedService : ISeedService
                 int up;
                 try
                 {
-                    up = await Sora.Data.Vector.VectorData<AnimeDoc>.UpsertManyAsync(tuples, ct);
+                    up = await Vector<AnimeDoc>.Save(tuples, ct);
                 }
                 catch (InvalidOperationException)
                 {
