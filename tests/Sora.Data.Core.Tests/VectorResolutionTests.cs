@@ -44,9 +44,10 @@ public class VectorResolutionTests
         if (cfg != null) sc.AddSingleton<IConfiguration>(cfg);
         sc.AddSoraDataCore();
         sc.AddSingleton<IDataService, DataService>();
-        // Register two vector factories: foo and bar
+    // Register vector factories: foo, bar, and json
         sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
         sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
+    sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
         return sc.BuildServiceProvider();
     }
 

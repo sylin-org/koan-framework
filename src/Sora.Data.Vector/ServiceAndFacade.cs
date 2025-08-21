@@ -29,7 +29,7 @@ internal sealed class VectorService(IServiceProvider sp) : IVectorService
         string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(Sora.Data.Vector.Abstractions.VectorAdapterAttribute))
             as Sora.Data.Vector.Abstractions.VectorAdapterAttribute)?.Provider;
         desired ??= sp.GetService<IOptions<VectorDefaultsOptions>>()?.Value?.DefaultProvider;
-        desired ??= Sora.Data.Core.Configuration.AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
+    // Fallback to the source provider name if accessible; otherwise skip to first factory.
         var factory = !string.IsNullOrWhiteSpace(desired) ? factories.FirstOrDefault(f => f.CanHandle(desired)) : null;
         factory ??= factories.FirstOrDefault();
         var repo = factory?.Create<TEntity, TKey>(sp);

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Sora.Data.Abstractions;
 using Sora.Data.Vector.Abstractions;
 using Sora.Data.Core.Configuration;
@@ -95,6 +96,14 @@ public sealed class DataService(IServiceProvider sp) : IDataService
                 }
             }
             catch { /* optional */ }
+
+            // Fallback: read straight from IConfiguration if options aren't bound
+            if (string.IsNullOrWhiteSpace(desired))
+            {
+                var cfg = sp.GetService<IConfiguration>();
+                var viaCfg = cfg?["Sora:Data:VectorDefaults:DefaultProvider"];
+                if (!string.IsNullOrWhiteSpace(viaCfg)) desired = viaCfg;
+            }
         }
 
         // 3) Fallback: entity data provider (useful when provider names align, e.g., "weaviate")
