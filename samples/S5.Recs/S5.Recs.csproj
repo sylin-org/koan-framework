@@ -11,6 +11,8 @@
     <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
     <ProjectReference Include="..\..\src\Sora.Web.Swagger\Sora.Web.Swagger.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Data.Vector.Abstractions\Sora.Data.Vector.Abstractions.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Data.Vector\Sora.Data.Vector.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Weaviate\Sora.Data.Weaviate.csproj" />
     <ProjectReference Include="..\..\src\Sora.AI\Sora.AI.csproj" />

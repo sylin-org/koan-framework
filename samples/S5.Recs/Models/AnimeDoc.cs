@@ -1,11 +1,12 @@
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Vector.Abstractions;
 
 namespace S5.Recs.Models;
 
 // Canonical metadata document stored in Mongo
 [DataAdapter("mongo")]
-[VectorAdapter("weaviate")]
+[Sora.Data.Vector.Abstractions.VectorAdapter("weaviate")]
 [Storage(Name = "Anime")]
 public sealed class AnimeDoc : IEntity<string>
 {

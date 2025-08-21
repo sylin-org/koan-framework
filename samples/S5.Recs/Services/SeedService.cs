@@ -24,7 +24,6 @@ public interface ISeedService
 internal sealed class SeedService : ISeedService
 {
     private readonly string _cacheDir = Constants.Paths.SeedCache;
-    private readonly string _offlinePath = Constants.Paths.OfflineData;
     private readonly Dictionary<string, (int Fetched, int Normalized, int Embedded, int Imported, bool Completed, string? Error)> _progress = new();
     private readonly IServiceProvider _sp;
     private readonly ILogger<SeedService>? _logger;
@@ -143,7 +142,7 @@ internal sealed class SeedService : ISeedService
             var ai = (IAi?)_sp.GetService(typeof(IAi));
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
-            // Use the new facade; degrade gracefully if no vector adapter is configured
+            // Use the facade; degrade gracefully if no vector adapter is configured
 
             var opts = (IOptions<OllamaOptions>?)_sp.GetService(typeof(IOptions<OllamaOptions>));
             var model = opts?.Value?.Model ?? "all-minilm";
@@ -165,7 +164,7 @@ internal sealed class SeedService : ISeedService
                 int up;
                 try
                 {
-                    up = await Data<AnimeDoc>.Vector.UpsertManyAsync(tuples, ct);
+                    up = await Sora.Data.Vector.VectorData<AnimeDoc>.UpsertManyAsync(tuples, ct);
                 }
                 catch (InvalidOperationException)
                 {

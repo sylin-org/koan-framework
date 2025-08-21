@@ -5,6 +5,7 @@ using Sora.AI.Contracts;
 using Sora.AI.Contracts.Models;
 using S5.Recs.Infrastructure;
 using Microsoft.Extensions.Logging;
+using Sora.Data.Vector.Abstractions;
 
 namespace S5.Recs.Services;
 
@@ -63,13 +64,15 @@ internal sealed class RecsService : IRecsService
                     AnimeDoc? anchor = anchorDoc;
                     if (anchor is null)
                     {
-                        var aDemo = _demo.FirstOrDefault(d => d.Id == anchorAnimeId);
+                        Anime? aDemo = _demo.FirstOrDefault(d => d.Id == anchorAnimeId);
                         if (aDemo is not null)
                             anchor = new AnimeDoc { Id = aDemo.Id, Title = aDemo.Title, Genres = aDemo.Genres, Episodes = aDemo.Episodes, Synopsis = aDemo.Synopsis, Popularity = aDemo.Popularity };
                     }
                     var textAnchor = anchor is null ? null : $"{anchor.Title}\n\n{anchor.Synopsis}\nTags: {string.Join(", ", anchor.Genres ?? Array.Empty<string>())}";
                     var ai = (IAi?)_sp.GetService(typeof(IAi));
-                    var emb = textAnchor is not null && ai is not null ? await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { textAnchor } }, ct) : null;
+                    AiEmbeddingsResponse? emb = textAnchor is not null && ai is not null
+                        ? await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { textAnchor } }, ct)
+                        : null;
                     query = emb?.Vectors.FirstOrDefault() ?? Array.Empty<float>();
                 }
                 else query = Array.Empty<float>();
@@ -91,7 +94,7 @@ internal sealed class RecsService : IRecsService
                             query = blended;
                         }
                     }
-                    var res = await repo.SearchAsync(new VectorQueryOptions(query, TopK: topK), ct);
+                    var res = await repo.SearchAsync(new Sora.Data.Vector.Abstractions.VectorQueryOptions(query, TopK: topK), ct);
                     var idToScore = res.Matches.ToDictionary(m => m.Id, m => m.Score);
                     var docs = new List<AnimeDoc>();
                     foreach (var id in idToScore.Keys)
@@ -193,10 +196,10 @@ internal sealed class RecsService : IRecsService
             var ai = (IAi?)_sp.GetService(typeof(IAi));
             if (ai is not null)
             {
-                var text = BuildEmbeddingText(new Anime { Id = a.Id, Title = a.Title, Genres = a.Genres, Episodes = a.Episodes, Synopsis = a.Synopsis, Popularity = a.Popularity });
+                var text = BuildEmbeddingText(new Anime { Id = a.Id, Title = a.Title, Genres = a.Genres ?? Array.Empty<string>(), Episodes = a.Episodes, Synopsis = a.Synopsis, Popularity = a.Popularity });
                 var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { text } }, ct);
-                var vec = emb.Vectors.FirstOrDefault();
-                if (vec is not null && vec.Length > 0)
+                var vec = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+                if (vec.Length > 0)
                 {
                     var target = (float)(rating / 5.0);
                     if (profile.PrefVector is null || profile.PrefVector.Length != vec.Length)

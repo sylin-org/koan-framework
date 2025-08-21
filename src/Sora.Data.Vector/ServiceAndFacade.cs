@@ -81,7 +81,7 @@ public static class VectorData<TEntity>
         => (Sora.Core.SoraApp.Current?.GetService<IVectorService>()?.TryGetRepository<TEntity, string>())
             ?? throw new InvalidOperationException("No vector adapter configured for this entity.");
 
-    public static Task UpsertManyAsync(IEnumerable<(string Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
+    public static Task<int> UpsertManyAsync(IEnumerable<(string Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
         => Repo.UpsertManyAsync(items, ct);
 
     public static Task<VectorQueryResult<string>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)

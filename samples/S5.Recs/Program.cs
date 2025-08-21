@@ -6,6 +6,7 @@ using Sora.Web.Swagger;
 using Sora.AI;
 using Sora.Ai.Provider.Ollama;
 using Sora.Data.Weaviate;
+using Sora.Data.Vector;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,7 @@ builder.Services.AddSora()
 builder.Services.AddSoraObservability();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+builder.Services.AddSoraDataVector();
 
 // AI core + Ollama provider (auto-discovers endpoints in Dev; configurable via Sora:Ai)
 builder.Services.AddAi(builder.Configuration);
