@@ -9,6 +9,7 @@ public sealed class WeaviateAutoFixture : IAsyncLifetime
 {
     public bool Available { get; private set; }
     private TestcontainersContainer? _container;
+    private string? _dockerEndpoint;
 
     public async Task InitializeAsync()
     {
@@ -19,11 +20,14 @@ public sealed class WeaviateAutoFixture : IAsyncLifetime
             Available = false;
             return;
         }
+        _dockerEndpoint = probe.Endpoint;
 
         var builder = new TestcontainersBuilder<TestcontainersContainer>()
+            .WithDockerEndpoint(_dockerEndpoint!)
             .WithImage("semitechnologies/weaviate:1.24.12")
             .WithName("sora-weaviate-test")
             .WithPortBinding(8085, 8080)
+            .WithCleanUp(false)
             .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
             .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(8080));
 

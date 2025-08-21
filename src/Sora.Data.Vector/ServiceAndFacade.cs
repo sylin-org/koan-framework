@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Vector.Abstractions;
 
 namespace Sora.Data.Vector;
@@ -26,10 +27,45 @@ internal sealed class VectorService(IServiceProvider sp) : IVectorService
         if (_cache.TryGetValue(key, out var existing)) return (IVectorSearchRepository<TEntity, TKey>?)existing;
         var factories = sp.GetServices<IVectorAdapterFactory>().ToList();
         if (factories.Count == 0) return null;
+        // 1) Entity-level vector role
         string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(Sora.Data.Vector.Abstractions.VectorAdapterAttribute))
             as Sora.Data.Vector.Abstractions.VectorAdapterAttribute)?.Provider;
+        // 2) App defaults
         desired ??= sp.GetService<IOptions<VectorDefaultsOptions>>()?.Value?.DefaultProvider;
-    // Fallback to the source provider name if accessible; otherwise skip to first factory.
+        // 3) Entity source provider (role-based)
+        if (string.IsNullOrWhiteSpace(desired))
+        {
+            var src = (SourceAdapterAttribute?)Attribute.GetCustomAttribute(typeof(TEntity), typeof(SourceAdapterAttribute));
+            if (src is not null && !string.IsNullOrWhiteSpace(src.Provider)) desired = src.Provider;
+            else
+            {
+                var data = (DataAdapterAttribute?)Attribute.GetCustomAttribute(typeof(TEntity), typeof(DataAdapterAttribute));
+                if (data is not null && !string.IsNullOrWhiteSpace(data.Provider)) desired = data.Provider;
+            }
+        }
+        // 4) Default to highest-priority data provider name when none specified
+        if (string.IsNullOrWhiteSpace(desired))
+        {
+            var dataFactories = sp.GetServices<IDataAdapterFactory>().ToList();
+            if (dataFactories.Count > 0)
+            {
+                var ranked = dataFactories
+                    .Select(f => new
+                    {
+                        Factory = f,
+                        Priority = (f.GetType().GetCustomAttributes(typeof(Sora.Data.Abstractions.ProviderPriorityAttribute), inherit: false).FirstOrDefault() as Sora.Data.Abstractions.ProviderPriorityAttribute)?.Priority ?? 0,
+                        Name = f.GetType().Name
+                    })
+                    .OrderByDescending(x => x.Priority)
+                    .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var chosen = ranked.First().Factory.GetType().Name;
+                const string suffix = "AdapterFactory";
+                if (chosen.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) chosen = chosen[..^suffix.Length];
+                desired = chosen.ToLowerInvariant();
+            }
+        }
+        // Resolve vector factory
         var factory = !string.IsNullOrWhiteSpace(desired) ? factories.FirstOrDefault(f => f.CanHandle(desired)) : null;
         factory ??= factories.FirstOrDefault();
         var repo = factory?.Create<TEntity, TKey>(sp);
