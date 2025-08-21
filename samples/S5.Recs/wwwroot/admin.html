@@ -17,15 +17,16 @@
       <h2>Seed</h2>
       <div>
         <label>Source
-          <select x-model="source">
+          <select name="source" x-model="source" @change="source = $event.target.value">
+            <option value="" disabled x-show="!providers.length">Loading…</option>
             <template x-for="p in providers" :key="p.code">
-              <option :value="p.code" x-text="p.name + ' (' + p.code + ')' "></option>
+              <option x-bind:value="p.code" x-text="p.name + ' (' + p.code + ')' "></option>
             </template>
           </select>
         </label>
         <label>Limit <input type="number" x-model.number="limit" min="1" /></label>
         <label><input type="checkbox" x-model="overwrite" /> Overwrite</label>
-        <button @click="start()">Start seed</button>
+        <button :disabled="!providers.length || !source" @click="start()">Start seed</button>
       </div>
       <div x-show="jobId">
         <p>Job: <code x-text="jobId"></code></p>
@@ -42,9 +43,10 @@
   <script>
   function adminApp(){
       return {
-        source:'local', limit:1000, overwrite:false, jobId:null, status:null, stats:null, es:null, live:false, providers:[],
+        source:'', limit:1000, overwrite:false, jobId:null, status:null, stats:null, es:null, live:false, providers:[],
         async start(){
-          const r = await fetch('/admin/seed/start', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source:this.source, limit:this.limit, overwrite:this.overwrite })});
+          if(!this.source){ await this.loadProviders(); if(!this.source){ alert('No providers available'); return; } }
+          const r = await fetch('/admin/seed/start', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ Source:this.source, Limit:this.limit, Overwrite:this.overwrite })});
           const d = await r.json(); this.jobId = d.jobId; this.connectSse();
         },
         connectSse(){
@@ -69,7 +71,16 @@
         },
         async pollOnce(){ if(!this.jobId) return; const r = await fetch(`/admin/seed/status/${this.jobId}`); this.status = await r.json(); },
   async loadStats(){ const r = await fetch('/admin/stats'); this.stats = await r.json(); },
-  async loadProviders(){ const r = await fetch('/admin/providers'); this.providers = await r.json(); if(this.providers?.length && !this.providers.find(p=>p.code===this.source)){ this.source = this.providers[0].code; } },
+  async loadProviders(){
+    const r = await fetch('/admin/providers');
+    this.providers = await r.json();
+    // Set default only if source is blank or not present in the list; do not override a user selection
+    if(this.providers?.length){
+      if(!this.source || !this.providers.find(p=>p.code===this.source)){
+        this.source = this.providers[0].code;
+      }
+    }
+  },
   init(){ this.loadStats(); this.loadProviders(); },
         beforeDestroy(){ if(this.es) { this.es.close(); this.es=null; } }
       }
