@@ -1,0 +1,50 @@
+# DATA-0060 — Vector module split and clean separation (Sora.Data.Vector)
+
+Status: Accepted
+
+## Context
+
+Vector features (search repos, defaults, and facades) currently live partly in Sora.Data.Core. Non-vector apps see vector types and helpers despite not using them. We want strict separation so vector functionality is opt-in by package reference.
+
+## Decision
+
+Introduce a dedicated module/package Sora.Data.Vector and move all vector-facing implementations there. Also introduce a slim contracts-only package Sora.Data.Vector.Abstractions and relocate vector contracts there (providers depend only on abstractions).
+
+- In Sora.Data.Vector.Abstractions (new): IVectorSearchRepository, IVectorAdapterFactory, VectorCapabilities, VectorQueryOptions/Result/Match, VectorEmbeddingAttribute, [VectorAdapter].
+- In Sora.Data.Vector (new): IVectorService (resolution and caching), AddSoraDataVector(IServiceCollection) with options binding, VectorDefaultsOptions, facades VectorData<TEntity,TKey>/VectorData<TEntity> (Upsert/Delete/Search + SaveWithVector/SaveManyWithVector), extensions for IServiceProvider and health.
+- In Sora.Data.Core (remove): Data<TEntity,TKey>.Vector nested facade, SaveWithVector helpers in AggregateExtensions, IDataService vector helpers (TryGetVectorRepository/GetRequiredVectorRepository), VectorDefaultsOptions.
+- Resolution precedence: [VectorAdapter] attribute → VectorDefaultsOptions.DefaultProvider → Source provider (from [SourceAdapter]/[DataAdapter]) → first available IVectorAdapterFactory → fail fast.
+
+This is a greenfield split; no shims or deprecations required.
+
+## Packages and dependencies
+
+One-way dependency flow:
+
+Sora.Data.Vector → Sora.Data.Vector.Abstractions → (no further deps)
+
+Providers depend on Sora.Data.Vector.Abstractions (not on Sora.Data.Vector). Core and non-vector apps remain free of vector dependencies by default.
+
+## Consequences
+
+- Non-vector apps do not reference Sora.Data.Vector and won’t see vector APIs or options.
+- Samples/tests that use vector features must reference Sora.Data.Vector and update using statements.
+- Providers (e.g., Weaviate) register IVectorAdapterFactory from Sora.Data.Vector.Abstractions; Sora.Data.Vector discovers them via DI.
+
+## Migration (repo-wide)
+
+- Add projects Sora.Data.Vector and Sora.Data.Vector.Abstractions; wire AddSoraDataVector().
+- Move contracts from Sora.Data.Abstractions → Sora.Data.Vector.Abstractions.
+- Move implementation code listed above from Core to Vector module; update namespaces.
+- Update S5.Recs to reference Sora.Data.Vector and use VectorData<TEntity> facade (or IVectorService) for vector operations.
+- Update docs and guides to reference the new module.
+
+## Alternatives considered
+
+- Keep vector helpers in Core with conditional DI: rejected; still exposes APIs to non-vector apps and couples Core to vector defaults.
+- Partial static extensions across assemblies: not feasible in C#; would fragment UX.
+
+## Notes
+
+- Follow Sora’s core engineering concerns: centralize constants, avoid stubs, and keep module-level boundaries crisp.
+- Keep provider packages depending on abstractions only to avoid implementation coupling and ease versioning.

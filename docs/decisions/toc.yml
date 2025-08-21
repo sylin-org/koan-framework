@@ -10,6 +10,8 @@
       href: ARCH-0039-soraenv-static-runtime.md
 - name: Data (DATA)
   items:
+    - name: Vector module split and clean separation
+      href: DATA-0060-vector-module-split-and-clean-separation.md
     - name: Adapter role attributes and entity mapping
       href: DATA-0058-adapter-role-attributes-and-entity-store-mapping.md
     - name: Entity-first facade and Save semantics

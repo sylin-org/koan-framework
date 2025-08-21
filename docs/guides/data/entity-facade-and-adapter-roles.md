@@ -2,7 +2,7 @@
 
 Updated: 2025-08-21
 
-This spec supports DATA-0058 and DATA-0059.
+This spec supports DATA-0058 and DATA-0059. See DATA-0060 for the vector module split.
 
 ## Goals
 
@@ -67,6 +67,7 @@ public partial class DataService : IDataService
 ## Entity facade (sketch)
 
 ```csharp
+// Note: vector helpers moved to Sora.Data.Vector (see DATA-0060)
 public static class Entity<T>
 {
     public static class Doc

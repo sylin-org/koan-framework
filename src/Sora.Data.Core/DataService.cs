@@ -69,12 +69,34 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var key = (typeof(TEntity), typeof(TKey));
         if (_vecCache.TryGetValue(key, out var existing)) return (IVectorSearchRepository<TEntity, TKey>?)existing;
 
-        // Resolve from adapter factories that can provide a vector repo; prefer the entity's provider if possible.
-        var provider = Configuration.AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
+        // Resolve from adapter factories honoring role attributes and defaults.
         var vectorFactories = sp.GetServices<IVectorAdapterFactory>().ToList();
+        if (vectorFactories.Count == 0) return null;
+
+        // 1) Role attribute: [VectorAdapter("...")]
+        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(Sora.Data.Abstractions.Annotations.VectorAdapterAttribute))
+            as Sora.Data.Abstractions.Annotations.VectorAdapterAttribute)?.Provider;
+
+        // 2) App default: Sora:Data:VectorDefaults:DefaultProvider
+        if (string.IsNullOrWhiteSpace(desired))
+        {
+            var opts = sp.GetService<Microsoft.Extensions.Options.IOptions<Sora.Data.Core.Options.VectorDefaultsOptions>>();
+            desired = opts?.Value?.DefaultProvider;
+        }
+
+        // 3) Fallback: entity data provider (useful when provider names align, e.g., "weaviate")
+        if (string.IsNullOrWhiteSpace(desired))
+        {
+            desired = Configuration.AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
+        }
+
         IVectorSearchRepository<TEntity, TKey>? repo = null;
-        var factory = vectorFactories.FirstOrDefault(f => f.CanHandle(provider))
-            ?? vectorFactories.FirstOrDefault();
+        IVectorAdapterFactory? factory = null;
+        if (!string.IsNullOrWhiteSpace(desired))
+        {
+            factory = vectorFactories.FirstOrDefault(f => f.CanHandle(desired!));
+        }
+        factory ??= vectorFactories.FirstOrDefault();
         if (factory is not null)
             repo = factory.Create<TEntity, TKey>(sp);
 

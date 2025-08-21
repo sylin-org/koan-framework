@@ -4,3 +4,4 @@
 - Entity filtering and query: entity-filtering-and-query.md
 - Executing provider instructions: execute-instructions.md
 - Adapter authoring guide: ../adapters/adapter-authoring-guide.md
+- Vector module and facade: vector-module-and-facade.md

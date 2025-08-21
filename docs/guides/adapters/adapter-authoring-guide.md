@@ -3,6 +3,7 @@
 - Families: Relational, Document, Vector (v1); optional: Search, Graph, Time-series, Event store, Columnar.
 - Redis: included as a Document adapter for v1.
 - Implement IDataRepository and IBatchSet; support repo pipeline hooks.
+	- For Vector adapters: depend on Sora.Data.Vector.Abstractions only; implement IVectorAdapterFactory and provide an IVectorSearchRepository. Do not depend on Sora.Data.Vector to avoid implementation coupling.
 	- If the adapter supports native bulk upsert/delete, implement `IWriteCapabilities` and set `Writes` flags; optionally implement `IBulkUpsert<TKey>` / `IBulkDelete<TKey>`.
 	- Ensure `UpsertManyAsync` / `DeleteManyAsync` use native bulk operations when available; otherwise provide efficient fallbacks.
 	- Query capabilities: implement `IStringQueryRepository<TEntity,TKey>` for parameterized SQL or query strings; implement `ILinqQueryRepository<TEntity,TKey>` and `IQueryCapabilities` if you support LINQ predicates. For relational providers, it’s acceptable to start with in-memory filtering for LINQ (materialize then `.Where(predicate)`), but document performance trade-offs and prefer string queries for large datasets.

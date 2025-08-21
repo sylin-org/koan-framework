@@ -143,8 +143,7 @@ internal sealed class SeedService : ISeedService
             var ai = (IAi?)_sp.GetService(typeof(IAi));
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
-            var vec = dataSvc.TryGetVectorRepository<AnimeDoc, string>();
-            if (vec is null) { _logger?.LogWarning("Vector repository unavailable. Skipping vector upsert."); return 0; }
+            // Use the new facade; degrade gracefully if no vector adapter is configured
 
             var opts = (IOptions<OllamaOptions>?)_sp.GetService(typeof(IOptions<OllamaOptions>));
             var model = opts?.Value?.Model ?? "all-minilm";
@@ -163,7 +162,16 @@ internal sealed class SeedService : ISeedService
                     var a = batch[j];
                     tuples.Add((a.Id, emb.Vectors[j], new { title = a.Title, genres = a.Genres, popularity = a.Popularity }));
                 }
-                var up = await vec.UpsertManyAsync(tuples, ct);
+                int up;
+                try
+                {
+                    up = await Data<AnimeDoc>.Vector.UpsertManyAsync(tuples, ct);
+                }
+                catch (InvalidOperationException)
+                {
+                    _logger?.LogWarning("Vector repository unavailable. Skipping vector upsert.");
+                    return 0;
+                }
                 total += up;
                 _logger?.LogInformation("Vector upsert: batch {BatchStart}-{BatchEnd} size={Size} upserted={Upserted}", i + 1, Math.Min(i + batch.Count, items.Count), batch.Count, up);
             }

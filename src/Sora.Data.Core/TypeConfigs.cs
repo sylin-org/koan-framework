@@ -29,8 +29,11 @@ internal static class AggregateConfigs
 
     private static string? ResolveProvider(Type aggregateType)
     {
-        var attr = (DataAdapterAttribute?)Attribute.GetCustomAttribute(aggregateType, typeof(DataAdapterAttribute));
-        return attr?.Provider;
+        // Prefer explicit SourceAdapter if present, then fall back to legacy DataAdapter
+        var src = (SourceAdapterAttribute?)Attribute.GetCustomAttribute(aggregateType, typeof(SourceAdapterAttribute));
+        if (src is not null && !string.IsNullOrWhiteSpace(src.Provider)) return src.Provider;
+        var data = (DataAdapterAttribute?)Attribute.GetCustomAttribute(aggregateType, typeof(DataAdapterAttribute));
+        return data?.Provider;
     }
 
     private static string DefaultProvider(IServiceProvider sp)
