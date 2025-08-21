@@ -3,9 +3,7 @@ using HotChocolate;
 using HotChocolate.Execution;
 using Microsoft.AspNetCore.Http;
 using Sora.Web.GraphQl.Infrastructure;
-using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace S4.Web.IntegrationTests;

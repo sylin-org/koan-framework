@@ -7,7 +7,6 @@ using Sora.Core;
 using Sora.Data.Core;
 using Sora.Messaging;
 using Sora.Testing;
-using System.Text.Json;
 using Xunit;
 
 public class BasicRabbitMqTests : IAsyncLifetime

@@ -5,7 +5,6 @@ using Newtonsoft.Json.Converters;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
 using Sora.Data.Core.Configuration;
-using Sora.Data.Core.Direct;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;

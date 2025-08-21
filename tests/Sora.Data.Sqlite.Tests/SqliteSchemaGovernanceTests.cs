@@ -5,12 +5,6 @@ using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
-using Sora.Data.Sqlite;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
@@ -72,7 +66,8 @@ public class SqliteSchemaGovernanceTests
             .Build();
         sc.AddSingleton<IConfiguration>(cfg);
         // Always set DdlPolicy=AutoCreate and AllowProductionDdl=true unless explicitly overridden
-        sc.AddSqliteAdapter(o => {
+        sc.AddSqliteAdapter(o =>
+        {
             o.ConnectionString = cs;
             o.DdlPolicy = SchemaDdlPolicy.AutoCreate;
             o.AllowProductionDdl = true;
@@ -87,7 +82,7 @@ public class SqliteSchemaGovernanceTests
     public async Task Validate_Healthy_When_AutoCreate_And_Projected_Columns_Exist()
     {
         var file = TempFile();
-    var sp = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.AutoCreate; o.AllowProductionDdl = true; });
+        var sp = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.AutoCreate; o.AllowProductionDdl = true; });
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
@@ -153,7 +148,7 @@ public class SqliteSchemaGovernanceTests
     public async Task Validate_Degraded_When_NoDdl_And_Table_Missing()
     {
         var file = TempFile();
-    var sp = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.NoDdl; o.AllowProductionDdl = true; });
+        var sp = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.NoDdl; o.AllowProductionDdl = true; });
         var data = sp.GetRequiredService<IDataService>();
 
         var rep = await data.Execute<Todo, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;
@@ -167,7 +162,7 @@ public class SqliteSchemaGovernanceTests
     public async Task EnsureCreated_NoOp_For_ReadOnly_Entity()
     {
         var file = TempFile();
-    var sp = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.AutoCreate; o.AllowProductionDdl = true; });
+        var sp = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.AutoCreate; o.AllowProductionDdl = true; });
         var data = sp.GetRequiredService<IDataService>();
 
         // Attempt to ensure created on a read-only aggregate (should not create)
@@ -206,7 +201,7 @@ public class SqliteSchemaGovernanceTests
     public async Task Validate_Detects_Missing_Projected_Columns()
     {
         var file = TempFile();
-    var sp1 = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.AutoCreate; o.AllowProductionDdl = true; });
+        var sp1 = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.AutoCreate; o.AllowProductionDdl = true; });
         var data1 = sp1.GetRequiredService<IDataService>();
         var repo1 = data1.GetRepository<SharedTodoV1, string>();
 
@@ -214,7 +209,7 @@ public class SqliteSchemaGovernanceTests
         await repo1.UpsertAsync(new SharedTodoV1 { Title = "x" });
 
         // Now validate with V2 (expects Priority column) but do not allow DDL
-    var sp2 = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.Validate; o.AllowProductionDdl = true; });
+        var sp2 = BuildServices(file, o => { o.DdlPolicy = SchemaDdlPolicy.Validate; o.AllowProductionDdl = true; });
         var data2 = sp2.GetRequiredService<IDataService>();
 
         var rep = await data2.Execute<SharedTodoV2, object>(new Instruction("relational.schema.validate")) as System.Collections.Generic.IDictionary<string, object?>;

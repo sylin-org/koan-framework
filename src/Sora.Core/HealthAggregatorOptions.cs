@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Sora.Core;
 
 /// Options for the Health Aggregator. Bind from configuration path: "Sora:Health:Aggregator".

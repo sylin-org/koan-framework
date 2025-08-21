@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Testing.Vector;

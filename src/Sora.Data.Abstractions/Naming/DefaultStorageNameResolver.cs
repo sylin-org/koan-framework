@@ -1,5 +1,3 @@
-using System;
-
 namespace Sora.Data.Abstractions.Naming;
 
 /// <summary>

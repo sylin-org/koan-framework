@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
-using Sora.Data.Redis;
 using Xunit;
 
 namespace Sora.Data.Redis.IntegrationTests;

@@ -1,5 +1,3 @@
-using System;
-
 namespace Sora.Data.Relational.Orchestration;
 
 public sealed class SchemaMismatchException : InvalidOperationException

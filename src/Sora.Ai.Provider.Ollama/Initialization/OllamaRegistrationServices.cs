@@ -3,11 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sora.Ai.Provider.Ollama.Options;
 using Sora.AI.Contracts.Routing;
-using System;
-using System.Linq;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sora.Ai.Provider.Ollama.Initialization;
 

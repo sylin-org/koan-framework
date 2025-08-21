@@ -1,5 +1,4 @@
 using Sora.Data.Relational.Tests;
-using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
 

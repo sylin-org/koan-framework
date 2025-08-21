@@ -1,14 +1,10 @@
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Relational.Orchestration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Xunit;
 
 namespace Sora.Data.Relational.Tests;

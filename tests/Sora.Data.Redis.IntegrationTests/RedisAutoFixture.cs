@@ -1,12 +1,8 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Abstractions;
-using Sora.Data.Redis;
 using Sora.Testing;
-using Xunit;
 using System.Net.Sockets;
+using Xunit;
 
 namespace Sora.Data.Redis.IntegrationTests;
 

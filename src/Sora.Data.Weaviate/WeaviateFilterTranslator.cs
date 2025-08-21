@@ -1,6 +1,4 @@
 using Sora.Data.Abstractions;
-using System;
-using System.Linq;
 
 namespace Sora.Data.Weaviate;
 

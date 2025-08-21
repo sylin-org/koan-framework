@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sora.Core;
-using Sora.Messaging;
 using System.Net.Http.Json;
 
 namespace Sora.Messaging.Inbox.Http;

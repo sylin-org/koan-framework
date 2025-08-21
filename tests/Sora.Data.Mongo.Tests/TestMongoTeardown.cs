@@ -1,8 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
-using System;
-using System.Threading.Tasks;
 
 namespace Sora.Data.Mongo.Tests;
 

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Sora.Data.Abstractions.Annotations;
+﻿namespace Sora.Data.Abstractions.Annotations;
 
 // Back-compat shim for older code; prefer ReadOnlyAttribute
 // Kept to avoid breaking existing consumers. This attribute has the same intent

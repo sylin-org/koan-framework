@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Sora.Messaging.Core.Infrastructure;
 using System.Collections.Concurrent;
-using System.Reflection;
 
 namespace Sora.Messaging;
 

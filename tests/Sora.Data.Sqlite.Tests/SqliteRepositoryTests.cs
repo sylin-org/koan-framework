@@ -4,10 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
-using Sora.Data.Sqlite;
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;
@@ -34,7 +30,8 @@ public class SqliteRepositoryTests
             })
             .Build();
         sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddSqliteAdapter(o => {
+        sc.AddSqliteAdapter(o =>
+        {
             o.ConnectionString = $"Data Source={file}";
             o.DdlPolicy = Sora.Data.Sqlite.SchemaDdlPolicy.AutoCreate;
             o.AllowProductionDdl = true;

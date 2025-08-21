@@ -2,7 +2,6 @@ using Sora.Core.Observability;
 using Sora.Data.Core;
 using Sora.Web;
 using Sora.Web.Swagger;
-using Sora.Web.Transformers;
 
 var builder = WebApplication.CreateBuilder(args);
 

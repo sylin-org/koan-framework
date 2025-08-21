@@ -1,11 +1,8 @@
 using Sora.AI.Contracts.Adapters;
 using Sora.AI.Contracts.Models;
-using System.Buffers;
-using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
 
 namespace Sora.Ai.Provider.Ollama;
 

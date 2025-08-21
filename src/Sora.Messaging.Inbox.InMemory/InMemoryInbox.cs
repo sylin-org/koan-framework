@@ -1,7 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Sora.Core;
-using Sora.Messaging;
 using System.Collections.Concurrent;
 
 namespace Sora.Messaging.Inbox;

@@ -1,13 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Abstractions;
-using Sora.Data.Relational.Tests;
-using Xunit;
 using Sora.Data.Core;
+using Sora.Data.Relational.Tests;
 
 namespace Sora.Data.Sqlite.Tests;
 
@@ -33,7 +27,8 @@ public class SqliteAutoFixture : IRelationalTestFixture<SqliteSchemaGovernanceSh
             .Build();
         var sc = new ServiceCollection();
         sc.AddSingleton<IConfiguration>(config);
-        sc.AddSqliteAdapter(o => {
+        sc.AddSqliteAdapter(o =>
+        {
             o.ConnectionString = cs;
             o.DdlPolicy = Sora.Data.Sqlite.SchemaDdlPolicy.AutoCreate;
             o.AllowProductionDdl = true;
@@ -42,7 +37,7 @@ public class SqliteAutoFixture : IRelationalTestFixture<SqliteSchemaGovernanceSh
         sc.AddSingleton<IDataService, Sora.Data.Core.DataService>();
         ServiceProvider = sc.BuildServiceProvider();
         Data = ServiceProvider.GetRequiredService<IDataService>();
-    // rely on adapter DDL policy (AutoCreate) to create the schema during tests
+        // rely on adapter DDL policy (AutoCreate) to create the schema during tests
         await Task.CompletedTask;
     }
 

@@ -1,12 +1,8 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
-using Sora.Data.Json;
-using System;
-using System.Threading.Tasks;
 using Xunit;
 
 public class DataServiceTests

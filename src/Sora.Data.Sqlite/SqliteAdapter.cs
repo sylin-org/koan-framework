@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Infrastructure;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Instructions;
@@ -14,17 +15,11 @@ using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
 using Sora.Data.Relational.Orchestration;
-using Sora.Core.Infrastructure;
 using System.Collections.Concurrent;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Data.Common;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sora.Data.Sqlite;
 
@@ -79,19 +74,19 @@ public static class SqliteRegistration
 {
     public static IServiceCollection AddSqliteAdapter(this IServiceCollection services, Action<SqliteOptions>? configure = null)
     {
-    services.AddOptions<SqliteOptions>().ValidateDataAnnotations();
-    services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>());
-    if (configure is not null) services.Configure(configure);
-    services.AddRelationalOrchestration();
-    // Register bridge AFTER orchestrator so options pipeline is complete and test delegates win
-    services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqliteToRelationalBridgeConfigurator>());
-    // Ensure health contributor is available even outside Sora bootstrap
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
-    services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqliteConnectionFactory>());
-    // Provide naming defaults so relational naming resolves to provider's convention
-    services.TryAddEnumerable(new ServiceDescriptor(typeof(Sora.Data.Abstractions.Naming.INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
-    return services;
+        services.AddOptions<SqliteOptions>().ValidateDataAnnotations();
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>());
+        if (configure is not null) services.Configure(configure);
+        services.AddRelationalOrchestration();
+        // Register bridge AFTER orchestrator so options pipeline is complete and test delegates win
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqliteToRelationalBridgeConfigurator>());
+        // Ensure health contributor is available even outside Sora bootstrap
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
+        services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqliteConnectionFactory>());
+        // Provide naming defaults so relational naming resolves to provider's convention
+        services.TryAddEnumerable(new ServiceDescriptor(typeof(Sora.Data.Abstractions.Naming.INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
+        return services;
     }
 }
 
@@ -162,8 +157,8 @@ internal sealed class SqliteToRelationalBridgeConfigurator(IOptions<SqliteOption
         };
         // Map matching
         options.SchemaMatching = so.SchemaMatching == SchemaMatchingMode.Strict ? RelationalSchemaMatchingMode.Strict : RelationalSchemaMatchingMode.Relaxed;
-    // Favor materialized projections for SQLite so projected columns are created and validated
-    options.Materialization = RelationalMaterializationPolicy.PhysicalColumns;
+        // Favor materialized projections for SQLite so projected columns are created and validated
+        options.Materialization = RelationalMaterializationPolicy.PhysicalColumns;
         // Production guardrail: for SQLite, default to allowing DDL when AutoCreate is selected to favor local/test usability
         var magic = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         options.AllowProductionDdl = so.AllowProductionDdl || magic || options.DdlPolicy == RelationalDdlPolicy.AutoCreate;
@@ -282,7 +277,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private void EnsureOrchestrated(SqliteConnection conn)
     {
         var table = TableName;
-    var cacheKey = ($"{conn.DataSource}/{conn.Database}::{table}");
+        var cacheKey = ($"{conn.DataSource}/{conn.Database}::{table}");
         _logger.LogDebug($"[EnsureOrchestrated] Called for table: {table} (ds={conn.DataSource})");
         if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy) return;
         // Singleflight: dedupe in-flight ensure per DataSource::Table
@@ -1155,7 +1150,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 }
             }
             catch { }
-    }
+        }
         public bool TableExists(string schema, string table)
         {
             using var cmd = conn.CreateCommand();

@@ -4,9 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Mongo.Tests;

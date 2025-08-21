@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Infrastructure;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Instructions;
@@ -14,18 +15,12 @@ using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
 using Sora.Data.Relational.Orchestration;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Data.Common;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Sora.Core.Infrastructure;
 
 namespace Sora.Data.SqlServer;
 
@@ -62,9 +57,9 @@ public static class SqlServerRegistration
         services.AddOptions<SqlServerOptions>().ValidateDataAnnotations();
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
-    services.AddRelationalOrchestration();
-    // Bridge SQL Server provider options into the relational materialization pipeline
-    services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqlServerToRelationalBridgeConfigurator>());
+        services.AddRelationalOrchestration();
+        // Bridge SQL Server provider options into the relational materialization pipeline
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqlServerToRelationalBridgeConfigurator>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqlServerConnectionFactory>());
@@ -259,10 +254,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private SqlConnection Open()
     {
         var conn = new SqlConnection(_options.ConnectionString);
-    conn.Open();
-    // IMPORTANT: Do not create or ensure schema here.
-    // Schema lifecycle (validation/creation) must be managed by the shared orchestrator
-    // via instructions (relational.schema.ensurecreated / data.ensureCreated).
+        conn.Open();
+        // IMPORTANT: Do not create or ensure schema here.
+        // Schema lifecycle (validation/creation) must be managed by the shared orchestrator
+        // via instructions (relational.schema.ensurecreated / data.ensureCreated).
         EnsureOrchestrated(conn);
         return conn;
     }
@@ -270,7 +265,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private void EnsureOrchestrated(SqlConnection conn)
     {
         var table = TableName;
-    var key = $"{conn.DataSource}/{conn.Database}::{table}";
+        var key = $"{conn.DataSource}/{conn.Database}::{table}";
         // Use the shared relational orchestrator to validate and, if allowed, create schema.
         try
         {

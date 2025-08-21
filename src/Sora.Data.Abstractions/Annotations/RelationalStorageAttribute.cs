@@ -1,5 +1,3 @@
-using System;
-
 namespace Sora.Data.Abstractions.Annotations;
 
 public enum RelationalStorageShape

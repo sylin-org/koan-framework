@@ -1,6 +1,5 @@
 using Sora.Data.Relational.Tests;
 using System;
-using Xunit;
 
 namespace Sora.Data.Postgres.Tests;
 

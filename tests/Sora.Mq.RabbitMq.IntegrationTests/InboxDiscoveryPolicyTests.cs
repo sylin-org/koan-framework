@@ -1,9 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Messaging;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Sora.Messaging.RabbitMq.IntegrationTests;

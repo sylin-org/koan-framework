@@ -1,5 +1,4 @@
 using Sora.Data.Relational.Tests;
-using Xunit;
 
 namespace Sora.Data.SqlServer.Tests;
 
@@ -10,7 +9,7 @@ public class SqlServerSchemaGovernanceTests : RelationalSchemaGovernanceSharedTe
     public class Doc : Sora.Data.Abstractions.IEntity<string>
     {
         public Doc() { }
-    public string Id { get; set; } = string.Empty;
+        public string Id { get; set; } = string.Empty;
         public string? Title { get; set; }
     }
 }

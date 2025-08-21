@@ -5,11 +5,8 @@ using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Core.Observability;
 using Sora.Data.Abstractions;
-using Sora.Data.Core;
 using Sora.Web.Infrastructure;
-using System;
 using System.Diagnostics;
-using System.Linq;
 
 namespace Sora.Web.Controllers;
 

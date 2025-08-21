@@ -3,11 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Xunit;
-using Xunit.Sdk;
 
 namespace Sora.Data.Mongo.Tests;
 

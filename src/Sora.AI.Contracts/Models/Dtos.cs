@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Sora.AI.Contracts.Models;
 
 public record AiMessage(string Role, string Content);

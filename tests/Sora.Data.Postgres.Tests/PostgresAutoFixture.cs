@@ -2,20 +2,17 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Sora.Core;
-using Sora.Data.Abstractions;
 using Sora.Data.Core;
+using Sora.Data.Relational.Tests;
 using Sora.Testing;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Runtime.InteropServices;
+using System.Linq;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using Xunit;
-using Npgsql;
-using System.Net.Sockets;
-using System.Linq;
-using Sora.Data.Relational.Tests;
 
 namespace Sora.Data.Postgres.Tests;
 
@@ -96,7 +93,8 @@ public sealed class PostgresAutoFixture : IRelationalTestFixture<PostgresSchemaG
         services.AddSingleton<IConfiguration>(cfg);
         services.AddSoraCore();
         services.AddSoraDataCore();
-        services.AddPostgresAdapter(o => {
+        services.AddPostgresAdapter(o =>
+        {
             o.ConnectionString = ConnectionString;
             o.DdlPolicy = Sora.Data.Postgres.SchemaDdlPolicy.AutoCreate;
             o.AllowProductionDdl = true;

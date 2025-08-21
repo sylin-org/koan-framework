@@ -1,5 +1,3 @@
-using HotChocolate;
-using HotChocolate.Execution;
 using System.Diagnostics;
 
 namespace Sora.Web.GraphQl.Errors;

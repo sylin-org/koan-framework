@@ -7,22 +7,17 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Sora.Core;
+using Sora.Core.Infrastructure;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
 using Sora.Data.Relational.Orchestration;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Data.Common;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
-using Sora.Core.Infrastructure;
 
 namespace Sora.Data.Postgres;
 
@@ -234,7 +229,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     private void EnsureOrchestrated(NpgsqlConnection conn)
     {
         var table = TableName;
-    var key = $"{conn.Host}/{conn.Database}::{table}";
+        var key = $"{conn.Host}/{conn.Database}::{table}";
         try
         {
             if (_healthyCache.TryGetValue(key, out var healthy) && healthy) return;

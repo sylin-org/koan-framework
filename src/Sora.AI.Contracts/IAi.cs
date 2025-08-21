@@ -1,7 +1,4 @@
 using Sora.AI.Contracts.Models;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sora.AI.Contracts;
 
