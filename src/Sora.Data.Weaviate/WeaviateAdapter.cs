@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
+using Sora.Data.Vector.Abstractions;
 using System.Net.Http.Json;
 using System.Text.Json;
 

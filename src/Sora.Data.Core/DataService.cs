@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
+using Sora.Data.Vector.Abstractions;
 using Sora.Data.Core.Configuration;
 using System.Collections.Concurrent;
 
@@ -26,7 +27,7 @@ public interface IDataService
     Sora.Data.Core.Direct.IDirectSession Direct(string sourceOrAdapter);
 
     // Vector repository accessor (optional adapter). Returns null if no vector adapter is configured for the entity.
-    IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
+    Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
         where TEntity : class, IEntity<TKey>
         where TKey : notnull;
 }
@@ -62,26 +63,38 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         return svc.Direct(sourceOrAdapter);
     }
 
-    public IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
+    public Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
         var key = (typeof(TEntity), typeof(TKey));
-        if (_vecCache.TryGetValue(key, out var existing)) return (IVectorSearchRepository<TEntity, TKey>?)existing;
+        if (_vecCache.TryGetValue(key, out var existing)) return (Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>?)existing;
 
         // Resolve from adapter factories honoring role attributes and defaults.
-        var vectorFactories = sp.GetServices<IVectorAdapterFactory>().ToList();
+    var vectorFactories = sp.GetServices<Sora.Data.Vector.Abstractions.IVectorAdapterFactory>().ToList();
         if (vectorFactories.Count == 0) return null;
 
         // 1) Role attribute: [VectorAdapter("...")]
-        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(Sora.Data.Abstractions.Annotations.VectorAdapterAttribute))
-            as Sora.Data.Abstractions.Annotations.VectorAdapterAttribute)?.Provider;
+        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(Sora.Data.Vector.Abstractions.VectorAdapterAttribute))
+            as Sora.Data.Vector.Abstractions.VectorAdapterAttribute)?.Provider;
 
         // 2) App default: Sora:Data:VectorDefaults:DefaultProvider
         if (string.IsNullOrWhiteSpace(desired))
         {
-            var opts = sp.GetService<Microsoft.Extensions.Options.IOptions<Sora.Data.Core.Options.VectorDefaultsOptions>>();
-            desired = opts?.Value?.DefaultProvider;
+            // If vector module is referenced, resolve defaults from there. Optional.
+            try
+            {
+                var optType = typeof(Microsoft.Extensions.Options.IOptions<>).MakeGenericType(Type.GetType("Sora.Data.Vector.VectorDefaultsOptions, Sora.Data.Vector")!);
+                var opts = sp.GetService(optType);
+                if (opts is not null)
+                {
+                    var valProp = optType.GetProperty("Value");
+                    var val = valProp?.GetValue(opts);
+                    var prop = val?.GetType().GetProperty("DefaultProvider");
+                    desired = (string?)prop?.GetValue(val);
+                }
+            }
+            catch { /* optional */ }
         }
 
         // 3) Fallback: entity data provider (useful when provider names align, e.g., "weaviate")
@@ -90,8 +103,8 @@ public sealed class DataService(IServiceProvider sp) : IDataService
             desired = Configuration.AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
         }
 
-        IVectorSearchRepository<TEntity, TKey>? repo = null;
-        IVectorAdapterFactory? factory = null;
+    Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? repo = null;
+    Sora.Data.Vector.Abstractions.IVectorAdapterFactory? factory = null;
         if (!string.IsNullOrWhiteSpace(desired))
         {
             factory = vectorFactories.FirstOrDefault(f => f.CanHandle(desired!));
@@ -102,7 +115,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
 
         if (repo is not null)
             _vecCache[key] = repo;
-        return repo;
+    return repo;
     }
     // Provider resolution is now handled by TypeConfigs
 }

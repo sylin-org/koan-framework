@@ -324,23 +324,23 @@ public static class Data<TEntity, TKey>
     // Vector role facade (minimal surface for now)
     public static class Vector
     {
-        private static IVectorSearchRepository<TEntity, TKey> Repo
+    private static Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey> Repo
             => SoraApp.Current?.GetService<IDataService>()?.GetRequiredVectorRepository<TEntity, TKey>()
                 ?? throw new System.InvalidOperationException("No vector repository available for this entity.");
 
-        public static Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
+    public static Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
             => Repo.UpsertAsync(id, embedding, metadata, ct);
 
-        public static Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
+    public static Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
             => Repo.UpsertManyAsync(items, ct);
 
-        public static Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    public static Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
             => Repo.DeleteAsync(id, ct);
 
-        public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
             => Repo.DeleteManyAsync(ids, ct);
 
-        public static Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
+        public static Task<Sora.Data.Vector.Abstractions.VectorQueryResult<TKey>> SearchAsync(Sora.Data.Vector.Abstractions.VectorQueryOptions options, CancellationToken ct = default)
             => Repo.SearchAsync(options, ct);
     }
 

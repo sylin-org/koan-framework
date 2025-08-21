@@ -5,6 +5,10 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "01-Core", "01-Core", "{F0E1D2C3-0001-4A5B-8C9D-010203040501}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Data.Vector.Abstractions", "src\Sora.Data.Vector.Abstractions\Sora.Data.Vector.Abstractions.csproj", "{E0E2B3D7-7C2A-4B51-8B91-4C3D5E5E2A10}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Data.Vector", "src\Sora.Data.Vector\Sora.Data.Vector.csproj", "{A3E4B245-5C66-4F6F-A1B9-07B58A2D1C6A}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Data.Weaviate", "src\Sora.Data.Weaviate\Sora.Data.Weaviate.csproj", "{B3D5CFF3-2D8B-4C55-A2D8-0D9D5E3F7C0A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Data.Weaviate.IntegrationTests", "tests\Sora.Data.Weaviate.IntegrationTests\Sora.Data.Weaviate.IntegrationTests.csproj", "{3F11A49F-8D41-4D47-9A99-29F8E33B9E56}"

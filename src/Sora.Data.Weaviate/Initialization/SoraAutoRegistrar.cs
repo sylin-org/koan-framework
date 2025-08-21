@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using Sora.Data.Abstractions;
+using Sora.Data.Vector.Abstractions;
 
 namespace Sora.Data.Weaviate.Initialization;
 
@@ -17,7 +18,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddOptions<WeaviateOptions>().BindConfiguration("Sora:Data:Weaviate").ValidateDataAnnotations();
         services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(Sora.Data.Abstractions.Naming.INamingDefaultsProvider), typeof(WeaviateNamingDefaultsProvider), ServiceLifetime.Singleton));
-        services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
+    services.AddSingleton<Sora.Data.Vector.Abstractions.IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, WeaviateHealthContributor>());
         services.AddHttpClient("weaviate");
     }

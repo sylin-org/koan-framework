@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
+using Sora.Data.Vector.Abstractions;
 using Sora.Data.Core;
 using Sora.Testing.Vector;
 using Xunit;
@@ -15,7 +16,7 @@ public sealed class TestEntity : IEntity<string>
 public sealed class WeaviateVectorTests : VectorAcceptanceTests<TestEntity, string>, IClassFixture<WeaviateAutoFixture>
 {
     private readonly WeaviateAutoFixture _fx;
-    private IVectorSearchRepository<TestEntity, string>? _repo;
+    private Sora.Data.Vector.Abstractions.IVectorSearchRepository<TestEntity, string>? _repo;
 
     public WeaviateVectorTests(WeaviateAutoFixture fx)
     {
@@ -23,7 +24,8 @@ public sealed class WeaviateVectorTests : VectorAcceptanceTests<TestEntity, stri
         if (!IsAvailable) return;
 
         var services = new ServiceCollection();
-        services.AddSora();
+    services.AddSora();
+    services.AddSoraDataVector();
         // Configure Weaviate
         services.Configure<Sora.Data.Weaviate.WeaviateOptions>(o =>
         {
@@ -41,7 +43,7 @@ public sealed class WeaviateVectorTests : VectorAcceptanceTests<TestEntity, stri
     protected override bool IsAvailable => _fx.Available;
     protected override string SetName => "test";
 
-    protected override IVectorSearchRepository<TestEntity, string> GetVectorRepo()
+    protected override Sora.Data.Vector.Abstractions.IVectorSearchRepository<TestEntity, string> GetVectorRepo()
         => _repo ?? throw new SkipException("Weaviate not available");
 
     protected override IDataRepository<TestEntity, string>? GetPrimaryRepoOrNull() => null;

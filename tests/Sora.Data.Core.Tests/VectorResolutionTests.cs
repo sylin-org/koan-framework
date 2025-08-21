@@ -3,13 +3,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Vector.Abstractions;
 using Sora.Data.Core;
 using Xunit;
 
 public class VectorResolutionTests
 {
     // Fake vector repo and factory used to assert selection
-    private sealed class FakeVectorRepo<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>
+    private sealed class FakeVectorRepo<TEntity, TKey> : Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>
         where TEntity : class, IEntity<TKey> where TKey : notnull
     {
         public string ProviderName { get; }
@@ -18,22 +19,22 @@ public class VectorResolutionTests
         public Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default) => Task.FromResult(0);
         public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default) => Task.FromResult(true);
         public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Task.FromResult(0);
-        public Task<Sora.Data.Abstractions.VectorQueryResult<TKey>> SearchAsync(Sora.Data.Abstractions.VectorQueryOptions options, CancellationToken ct = default)
-            => Task.FromResult(new Sora.Data.Abstractions.VectorQueryResult<TKey>(Array.Empty<Sora.Data.Abstractions.VectorMatch<TKey>>(), null));
+        public Task<Sora.Data.Vector.Abstractions.VectorQueryResult<TKey>> SearchAsync(Sora.Data.Vector.Abstractions.VectorQueryOptions options, CancellationToken ct = default)
+            => Task.FromResult(new Sora.Data.Vector.Abstractions.VectorQueryResult<TKey>(Array.Empty<Sora.Data.Vector.Abstractions.VectorMatch<TKey>>(), null));
     }
 
-    private sealed class FakeVectorFactory(string provider) : IVectorAdapterFactory
+    private sealed class FakeVectorFactory(string provider) : Sora.Data.Vector.Abstractions.IVectorAdapterFactory
     {
-        public string Provider { get; } = provider;
         public bool CanHandle(string provider) => string.Equals(provider, Provider, StringComparison.OrdinalIgnoreCase);
-        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp) where TEntity : class, IEntity<TKey> where TKey : notnull
+        public Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp) where TEntity : class, IEntity<TKey> where TKey : notnull
             => new FakeVectorRepo<TEntity, TKey>(Provider);
+        public string Provider { get; } = provider;
     }
 
     [SourceAdapter("json")]
     private sealed class A : IEntity<string> { [Identifier] public string Id { get; set; } = string.Empty; }
 
-    [VectorAdapter("foo")]
+    [Sora.Data.Vector.Abstractions.VectorAdapter("foo")]
     [SourceAdapter("json")]
     private sealed class B : IEntity<string> { [Identifier] public string Id { get; set; } = string.Empty; }
 

@@ -10,7 +10,8 @@
   <PackageTags>$(CommonPackageTags);data;vector;weaviate;graphql;knn</PackageTags>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
+  <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
+  <ProjectReference Include="..\Sora.Data.Vector.Abstractions\Sora.Data.Vector.Abstractions.csproj" />
     <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
   <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
     <PackageReference Include="System.Net.Http.Json" Version="9.0.0" />

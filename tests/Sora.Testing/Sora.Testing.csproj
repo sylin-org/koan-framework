@@ -13,5 +13,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Data.Vector.Abstractions\Sora.Data.Vector.Abstractions.csproj" />
   </ItemGroup>
 </Project>

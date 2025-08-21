@@ -10,6 +10,7 @@
     <ProjectReference Include="..\Sora.Testing\Sora.Testing.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Data.Vector\Sora.Data.Vector.csproj" />
   </ItemGroup>
   <ItemGroup>
   <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
