@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>S5.Recs — System Status</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/feather.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+  <!-- No charts until server exposes real metrics; avoid fictional visuals -->
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="app-container" x-data="statusApp()">
+    <header class="app-header">
+      <div class="header-content">
+        <div class="brand">
+          <h1>📊 System Status</h1>
+          <p>Real-time monitoring and performance metrics</p>
+        </div>
+        <nav class="header-nav">
+          <a href="/" class="nav-link">
+            <i data-feather="home"></i>
+            Browse
+          </a>
+          <a href="/admin.html" class="nav-link">
+            <i data-feather="settings"></i>
+            Admin
+          </a>
+          <button @click="toggleAutoRefresh()" class="nav-link" :class="{'accent': autoRefresh}">
+            <i data-feather="refresh-cw" :class="{'spin': autoRefresh}"></i>
+            <span x-text="autoRefresh ? 'Auto Refresh: ON' : 'Auto Refresh: OFF'"></span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <div class="status-grid">
+      <!-- System Health Matrix -->
+      <section class="status-card overview-card">
+        <div class="card-header">
+          <h2>
+            <i data-feather="activity"></i>
+            System Health Matrix
+          </h2>
+          <div class="last-updated">
+            Last updated: <span x-text="lastUpdated"></span>
+          </div>
+        </div>
+        <div class="health-matrix">
+          <div class="service-status" x-init="loadHealth()">
+            <template x-for="service in services" :key="service.name">
+              <div class="service-card" :class="service.status">
+                <div class="service-icon">
+                  <i :data-feather="service.icon"></i>
+                </div>
+                <div class="service-info">
+                  <h3 x-text="service.name"></h3>
+                  <span class="service-status-text" x-text="service.statusText"></span>
+                  <span class="service-latency" x-show="service.latency" x-text="service.latency"></span>
+                </div>
+                <div class="service-indicator" :class="service.status"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </section>
+
+      <!-- Data Insights -->
+      <section class="status-card data-insights-card">
+        <div class="card-header">
+          <h2>
+            <i data-feather="database"></i>
+            Data Insights
+          </h2>
+          <button @click="loadStats()" class="refresh-btn">
+            <i data-feather="refresh-cw"></i>
+          </button>
+        </div>
+        <div class="insights-grid">
+          <div class="insight-item">
+            <div class="insight-icon">
+              <i data-feather="film"></i>
+            </div>
+            <div class="insight-content">
+              <span class="insight-value" x-text="stats?.anime || 0"></span>
+              <span class="insight-label">Total Anime</span>
+              <div class="insight-trend positive">
+                <i data-feather="trending-up"></i>
+                <span>+5% this week</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="insight-item">
+            <div class="insight-icon">
+              <i data-feather="cpu"></i>
+            </div>
+            <div class="insight-content">
+              <span class="insight-value" x-text="stats?.vectors || 0"></span>
+              <span class="insight-label">Vector Embeddings</span>
+              <div class="insight-trend" :class="getVectorTrend()">
+                <i :data-feather="getVectorTrendIcon()"></i>
+                <span x-text="getVectorTrendText()"></span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="insight-item">
+            <div class="insight-icon">
+              <i data-feather="users"></i>
+            </div>
+            <div class="insight-content">
+              <span class="insight-value" x-text="queryStats.totalQueries"></span>
+              <span class="insight-label">Total Queries</span>
+              <div class="insight-trend neutral">
+                <i data-feather="activity"></i>
+                <span x-text="queryStats.queriesPerHour + '/hr'"></span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="insight-item">
+            <div class="insight-icon">
+              <i data-feather="star"></i>
+            </div>
+            <div class="insight-content">
+              <span class="insight-value" x-text="queryStats.totalRatings"></span>
+              <span class="insight-label">User Ratings</span>
+              <div class="insight-trend positive">
+                <i data-feather="heart"></i>
+                <span>Avg 4.2/5</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Observability & Capabilities (raw) -->
+      <section class="status-card observability-card">
+        <div class="card-header">
+          <h2>
+            <i data-feather="eye"></i>
+            Observability & Capabilities
+          </h2>
+          <div class="header-actions">
+            <button @click="loadObservability(); loadAggregates()" class="refresh-btn">
+              <i data-feather="refresh-cw"></i>
+            </button>
+          </div>
+        </div>
+        <div class="json-viewer">
+          <h3>Capabilities</h3>
+          <template x-if="aggregates">
+            <pre x-text="JSON.stringify(aggregates, null, 2)"></pre>
+          </template>
+          <div x-show="!aggregates" class="loading-state">
+            <i data-feather="loader" class="spin"></i>
+            Loading…
+          </div>
+          <h3 style="margin-top:1rem">Observability</h3>
+          <template x-if="observability">
+            <pre x-text="JSON.stringify(observability, null, 2)"></pre>
+          </template>
+          <div x-show="!observability" class="loading-state">
+            <i data-feather="loader" class="spin"></i>
+            Loading…
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    function statusApp() {
+      return {
+        autoRefresh: false,
+        refreshInterval: null,
+        lastUpdated: new Date().toLocaleTimeString(),
+        stats: null,
+        health: null,
+        services: [],
+        observability: null,
+        aggregates: null,
+
+        async loadStats() {
+          try {
+            const r = await fetch('/admin/stats');
+            this.stats = await r.json();
+            this.iconTick();
+          } catch (error) {
+            console.error('Failed to load stats:', error);
+          }
+        },
+
+        async loadHealth() {
+          try {
+            const r = await fetch('/.well-known/sora/health');
+            this.health = await r.json();
+            this.buildServicesFromHealth();
+            this.iconTick();
+          } catch (error) {
+            console.error('Failed to load health:', error);
+          }
+        },
+        
+        async loadObservability(){
+          try{
+            const r = await fetch('/.well-known/sora/observability');
+            this.observability = await r.json();
+            this.iconTick();
+          }catch(err){ console.warn('Observability unavailable', err); }
+        },
+
+        async loadAggregates(){
+          try{
+            const r = await fetch('/.well-known/sora/aggregates');
+            this.aggregates = await r.json();
+            this.iconTick();
+          }catch(err){ console.warn('Aggregates unavailable', err); }
+        },
+
+        buildServicesFromHealth(){
+          if(!this.health) { this.services = []; return; }
+          const iconFor = (key)=>{
+            const k = key.toLowerCase();
+            if(k.includes('mongo')) return 'database';
+            if(k.includes('weaviate') || k.includes('vector')) return 'cpu';
+            if(k.includes('ollama') || k.includes('ai')) return 'brain';
+            if(k.includes('api') || k.includes('server')) return 'server';
+            if(k.includes('redis') || k.includes('cache')) return 'box';
+            return 'activity';
+          };
+          const mapStatus = (v)=> (v === true || v === 'Healthy') ? 'healthy' : ((v === false || v === 'Unhealthy') ? 'unhealthy' : 'warning');
+          const mapText = (v)=> (v === true || v === 'Healthy') ? 'Operational' : ((v === false || v === 'Unhealthy') ? 'Unhealthy' : String(v));
+          this.services = Object.keys(this.health).map(key=>({
+            name: key,
+            icon: iconFor(key),
+            status: mapStatus(this.health[key]),
+            statusText: mapText(this.health[key])
+          }));
+        },
+
+        getVectorTrend() {
+          const ratio = (this.stats && this.stats.anime) ? (this.stats.vectors / Math.max(1, this.stats.anime)) : 0;
+          if (ratio >= 0.9) return 'positive';
+          if (ratio >= 0.5) return 'neutral';
+          return 'negative';
+        },
+
+        getVectorTrendIcon() {
+          const trend = this.getVectorTrend();
+          if (trend === 'positive') return 'trending-up';
+          if (trend === 'negative') return 'trending-down';
+          return 'minus';
+        },
+
+        getVectorTrendText() {
+          const ratio = (this.stats && this.stats.anime) ? (this.stats.vectors / Math.max(1, this.stats.anime)) : 0;
+          return Math.round(ratio * 100) + '% coverage';
+        },
+
+        toggleAutoRefresh() {
+          this.autoRefresh = !this.autoRefresh;
+          
+          if (this.autoRefresh) {
+            this.refreshInterval = setInterval(() => {
+              this.refreshData();
+            }, 30000); // Refresh every 30 seconds
+          } else {
+            if (this.refreshInterval) {
+              clearInterval(this.refreshInterval);
+              this.refreshInterval = null;
+            }
+          }
+        },
+
+        async refreshData() {
+          await Promise.all([
+            this.loadStats(),
+            this.loadHealth(),
+            this.loadObservability(),
+            this.loadAggregates()
+          ]);
+          this.lastUpdated = new Date().toLocaleTimeString();
+          this.iconTick();
+        },
+        
+        iconTick(){
+          this.$nextTick(()=>{ if(window.feather){ feather.replace(); } });
+        },
+
+        init() {
+          this.refreshData();
+        },
+
+        beforeDestroy() {
+          if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html>

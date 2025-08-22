@@ -3,120 +3,446 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>S5.Recs — Admin</title>
+  <title>S5.Recs — Administration</title>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/feather.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <main class="container" x-data="adminApp()">
-    <header>
-      <h1>Admin</h1>
-      <nav><a href="/">Browse</a></nav>
+  <main class="app-container" x-data="adminApp()">
+    <header class="app-header">
+      <div class="header-content">
+        <div class="brand">
+          <h1>🛠️ Admin Dashboard</h1>
+          <p>System management and data operations</p>
+        </div>
+        <nav class="header-nav">
+          <a href="/" class="nav-link">
+            <i data-feather="home"></i>
+            Browse
+          </a>
+          <a href="/status.html" class="nav-link">
+            <i data-feather="activity"></i>
+            Status
+          </a>
+        </nav>
+      </div>
     </header>
-  <section id="seed">
-      <h2>Seed</h2>
-      <div>
-        <label>Source
-          <select name="source" x-model="source" @change="source = $event.target.value">
-            <option value="" disabled x-show="!providers.length">Loading…</option>
-            <template x-for="p in providers" :key="p.code">
-              <option x-bind:value="p.code" x-text="p.name + ' (' + p.code + ')' "></option>
-            </template>
-          </select>
-        </label>
-        <label>Limit <input type="number" x-model.number="limit" min="1" /></label>
-        <label><input type="checkbox" x-model="overwrite" /> Overwrite</label>
-        <button :disabled="!providers.length || !source" @click="start()">Start seed</button>
-  <button @click="startVectors()" title="Embed + upsert vectors only for existing docs">Upsert vectors only</button>
-      </div>
-      <div x-show="jobId">
-        <p>Job: <code x-text="jobId"></code></p>
-        <p><span x-show="live">Live</span><span x-show="!live">Idle</span></p>
-        <pre x-text="JSON.stringify(status, null, 2)"></pre>
-      </div>
-    </section>
-    <section>
-      <h2>Stats</h2>
-      <pre x-text="JSON.stringify(stats, null, 2)"></pre>
-    </section>
+    <div class="dashboard-grid">
+      <!-- System Overview -->
+      <section class="dashboard-card overview-card">
+        <div class="card-header">
+          <h2>
+            <i data-feather="monitor"></i>
+            System Overview
+          </h2>
+          <button @click="loadStats(); loadHealth()" class="refresh-btn">
+            <i data-feather="refresh-cw"></i>
+          </button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <i data-feather="film" class="stat-icon"></i>
+            <div class="stat-content">
+              <span class="stat-value" x-text="stats?.anime || 0"></span>
+              <span class="stat-label">Anime Records</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <i data-feather="file-text" class="stat-icon"></i>
+            <div class="stat-content">
+              <span class="stat-value" x-text="stats?.contentPieces || 0"></span>
+              <span class="stat-label">Content Pieces</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <i data-feather="cpu" class="stat-icon"></i>
+            <div class="stat-content">
+              <span class="stat-value" x-text="stats?.vectors || 0"></span>
+              <span class="stat-label">Vector Embeddings</span>
+            </div>
+          </div>
+          <div class="stat-item">
+            <i data-feather="activity" class="stat-icon"></i>
+            <div class="stat-content">
+              <span class="stat-value status-indicator" :class="getHealthStatus()"></span>
+              <span class="stat-label">System Health</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section>
-      <h2>Health</h2>
-      <button @click="loadHealth">Refresh</button>
-      <pre x-text="JSON.stringify(health, null, 2)"></pre>
-    </section>
-    <section>
-      <h2>Capabilities</h2>
-      <button @click="loadCapabilities">Refresh</button>
-      <pre x-text="JSON.stringify(capabilities, null, 2)"></pre>
-    </section>
-    <section>
-      <h2>Observability</h2>
-      <button @click="loadObservability">Refresh</button>
-      <pre x-text="JSON.stringify(observability, null, 2)"></pre>
-    </section>
+      <!-- Data Management -->
+      <section id="seed" class="dashboard-card seed-card">
+        <div class="card-header">
+          <h2>
+            <i data-feather="download"></i>
+            Data Pipeline
+          </h2>
+        </div>
+        
+        <div class="seed-controls">
+          <div class="alert alert-warning" x-show="health && !isVectorHealthy()">
+            <i data-feather="alert-triangle"></i>
+            <div>
+              <strong>Vector backend unavailable.</strong> Semantic features are disabled; you can still import metadata, but vector-only operations are unavailable.
+            </div>
+          </div>
+
+          <div class="provider-selection">
+            <h3>Data Source</h3>
+            <div class="provider-grid">
+              <template x-for="p in providers" :key="p.code">
+                <label class="provider-card" :class="{'selected': source === p.code}">
+                  <input type="radio" x-model="source" :value="p.code" class="sr-only">
+                  <div class="provider-icon">
+                    <i :data-feather="p.code === 'local' ? 'hard-drive' : 'globe'"></i>
+                  </div>
+                  <div class="provider-info">
+                    <span class="provider-name" x-text="p.name"></span>
+                    <span class="provider-code" x-text="p.code"></span>
+                  </div>
+                </label>
+              </template>
+            </div>
+          </div>
+          
+          <div class="pipeline-settings">
+            <div class="setting-group">
+              <label class="setting-label">
+                <i data-feather="hash"></i>
+                Import Limit
+              </label>
+              <input type="number" x-model.number="limit" min="1" max="10000" class="setting-input">
+            </div>
+            
+            <div class="setting-group checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" x-model="overwrite" class="checkbox">
+                <span class="checkmark"></span>
+                Overwrite existing data
+              </label>
+            </div>
+          </div>
+          
+          <div class="pipeline-actions">
+            <button :disabled="!providers.length || !source || isRunning()" @click="start()" class="action-btn primary" :title="isRunning() ? 'Job in progress' : ''">
+              <i data-feather="play"></i>
+              Start Full Pipeline
+            </button>
+            <button @click="startVectors()" class="action-btn secondary" :disabled="!isVectorHealthy() || isRunning()" :title="!isVectorHealthy() ? 'Vector backend unavailable' : (isRunning() ? 'Job in progress' : 'Embed + upsert vectors only for existing docs')">
+              <i data-feather="cpu"></i>
+              Rebuild Vectors Only
+            </button>
+          </div>
+        </div>
+        
+        <div x-show="jobId" class="pipeline-status">
+          <div class="status-header">
+            <h3>Pipeline Progress</h3>
+            <div class="status-indicators">
+              <span class="job-id">Job: <code x-text="jobId"></code></span>
+              <span class="connection-status" :class="{'live': live, 'idle': !live}">
+                <i :data-feather="live ? 'wifi' : 'wifi-off'"></i>
+                <span x-text="live ? 'Live' : 'Idle'"></span>
+              </span>
+            </div>
+          </div>
+          
+          <div class="pipeline-stages" x-show="status">
+            <div class="stage-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{width: getProgressPercentage() + '%'}"></div>
+              </div>
+              <span class="progress-text" x-text="getProgressText()"></span>
+            </div>
+            
+            <div class="status-details">
+              <pre class="status-json" x-text="JSON.stringify(status, null, 2)"></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- System Health -->
+      <section class="dashboard-card health-card">
+        <div class="card-header">
+          <h2>
+            <i data-feather="heart"></i>
+            System Health
+          </h2>
+          <button @click="loadHealth()" class="refresh-btn">
+            <i data-feather="refresh-cw"></i>
+          </button>
+        </div>
+        <div class="health-content">
+          <template x-if="health">
+            <div class="health-grid">
+              <template x-for="(value, key) in health" :key="key">
+                <div class="health-item">
+                  <span class="health-service" x-text="key"></span>
+                  <span class="health-status" :class="getServiceStatus(value)" x-text="getStatusText(value)"></span>
+                </div>
+              </template>
+            </div>
+          </template>
+          <div x-show="!health" class="loading-state">
+            <i data-feather="loader" class="spin"></i>
+            Loading health data...
+          </div>
+        </div>
+      </section>
+
+      <!-- Capabilities -->
+      <section class="dashboard-card capabilities-card">
+        <div class="card-header">
+          <h2>
+            <i data-feather="zap"></i>
+            System Capabilities
+          </h2>
+          <button @click="loadCapabilities()" class="refresh-btn">
+            <i data-feather="refresh-cw"></i>
+          </button>
+        </div>
+        <div class="capabilities-content">
+          <template x-if="capabilities">
+            <div class="json-viewer">
+              <pre x-text="JSON.stringify(capabilities, null, 2)"></pre>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <!-- Observability -->
+      <section class="dashboard-card observability-card">
+        <div class="card-header">
+          <h2>
+            <i data-feather="eye"></i>
+            Observability
+          </h2>
+          <button @click="loadObservability()" class="refresh-btn">
+            <i data-feather="refresh-cw"></i>
+          </button>
+        </div>
+        <div class="observability-content">
+          <template x-if="observability">
+            <div class="json-viewer">
+              <pre x-text="JSON.stringify(observability, null, 2)"></pre>
+            </div>
+          </template>
+        </div>
+      </section>
+    </div>
   </main>
 
   <script>
   function adminApp(){
     return {
       source:'', limit:1000, overwrite:false, jobId:null, status:null, stats:null, es:null, live:false, providers:[],
-      health:null, capabilities:null, observability:null,
+      health:null, capabilities:null, observability:null, statsInterval:null,
+      
       async start(){
         if(!this.source){ await this.loadProviders(); if(!this.source){ alert('No providers available'); return; } }
-        const r = await fetch('/admin/seed/start', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ Source:this.source, Limit:this.limit, Overwrite:this.overwrite })});
-        const d = await r.json(); this.jobId = d.jobId; this.connectSse();
+        try {
+          const r = await fetch('/admin/seed/start', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ Source:this.source, Limit:this.limit, Overwrite:this.overwrite })});
+          const d = await r.json(); 
+          this.jobId = d.jobId; 
+          try{ sessionStorage.setItem('s5recs_jobId', this.jobId); }catch{}
+          this.connectSse();
+        } catch (error) {
+          console.error('Failed to start seed:', error);
+        }
       },
+      
       async startVectors(){
-        const r = await fetch('/admin/seed/vectors', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ Limit:this.limit }) });
-        const d = await r.json(); this.jobId = d.jobId; this.connectSse();
+        try {
+          const r = await fetch('/admin/seed/vectors', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ Limit:this.limit }) });
+          const d = await r.json(); 
+          this.jobId = d.jobId; 
+          try{ sessionStorage.setItem('s5recs_jobId', this.jobId); }catch{}
+          this.connectSse();
+        } catch (error) {
+          console.error('Failed to start vector rebuild:', error);
+        }
       },
+      
       connectSse(){
         if(!this.jobId) return;
         try{
           if(this.es) { this.es.close(); this.es = null; }
           this.es = new EventSource(`/admin/seed/sse/${this.jobId}`);
           this.live = true;
+          this.startStatsTick();
           this.es.onmessage = (e)=>{
             try{ this.status = JSON.parse(e.data); }catch{}
             const st = this.status?.state;
-            if(st && st !== 'running') { this.live = false; this.es?.close(); this.es = null; this.loadStats(); }
+            if(st && st !== 'running') { 
+              this.live = false; 
+              this.es?.close(); 
+              this.es = null; 
+              this.loadStats(); 
+              this.stopStatsTick();
+              try{ sessionStorage.removeItem('s5recs_jobId'); }catch{}
+            }
           };
           this.es.onerror = ()=>{
             this.live = false; this.es?.close(); this.es = null;
-            // fallback to one-shot poll to keep UI updated
             this.pollOnce();
-            // simple retry while still running
             if(this.status?.state === 'running') setTimeout(()=>this.connectSse(), 1500);
           };
         }catch{ this.pollOnce(); }
       },
-      async pollOnce(){ if(!this.jobId) return; const r = await fetch(`/admin/seed/status/${this.jobId}`); this.status = await r.json(); },
-      async loadStats(){ const r = await fetch('/admin/stats'); this.stats = await r.json(); },
-      async loadProviders(){
-        const r = await fetch('/admin/providers');
-        this.providers = await r.json();
-        // Set default only if source is blank or not present in the list; do not override a user selection
-        if(this.providers?.length){
-          if(!this.source || !this.providers.find(p=>p.code===this.source)){
-            this.source = this.providers[0].code;
+      
+      async pollOnce(){ 
+        if(!this.jobId) return; 
+        try {
+          const r = await fetch(`/admin/seed/status/${this.jobId}`); 
+          this.status = await r.json(); 
+          if(this.status?.state !== 'running') {
+            this.live = false;
+            this.stopStatsTick();
+            try{ sessionStorage.removeItem('s5recs_jobId'); }catch{}
           }
+        } catch (error) {
+          console.error('Failed to poll status:', error);
         }
       },
+      
+      async loadStats(){ 
+        try {
+          const r = await fetch('/admin/stats'); 
+          this.stats = await r.json(); 
+          this.iconTick();
+        } catch (error) {
+          console.error('Failed to load stats:', error);
+        }
+      },
+      
+      async loadProviders(){
+        try {
+          const r = await fetch('/admin/providers');
+          this.providers = await r.json();
+          if(this.providers?.length){
+            if(!this.source || !this.providers.find(p=>p.code===this.source)){
+              this.source = this.providers[0].code;
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load providers:', error);
+        }
+      },
+      
       async loadHealth(){
-        const r = await fetch('/.well-known/sora/health');
-        this.health = await r.json();
+        try {
+          const r = await fetch('/.well-known/sora/health');
+          this.health = await r.json();
+          this.iconTick();
+        } catch (error) {
+          console.error('Failed to load health:', error);
+        }
       },
+      
       async loadCapabilities(){
-        const r = await fetch('/.well-known/sora/aggregates');
-        this.capabilities = await r.json();
+        try {
+          const r = await fetch('/.well-known/sora/aggregates');
+          this.capabilities = await r.json();
+        } catch (error) {
+          console.error('Failed to load capabilities:', error);
+        }
       },
+      
       async loadObservability(){
-        const r = await fetch('/.well-known/sora/observability');
-        this.observability = await r.json();
+        try {
+          const r = await fetch('/.well-known/sora/observability');
+          this.observability = await r.json();
+        } catch (error) {
+          console.error('Failed to load observability:', error);
+        }
       },
-      init(){ this.loadStats(); this.loadProviders(); this.loadHealth(); this.loadCapabilities(); this.loadObservability(); },
-      beforeDestroy(){ if(this.es) { this.es.close(); this.es=null; } }
+      
+      getHealthStatus() {
+        if (!this.health) return 'unknown';
+        const values = Object.values(this.health);
+        if (values.every(v => v === true || v === 'Healthy')) return 'healthy';
+        if (values.some(v => v === false || v === 'Unhealthy')) return 'unhealthy';
+        return 'warning';
+      },
+      
+      isVectorHealthy(){
+        if(!this.health) return false;
+        const entries = Object.entries(this.health);
+        const vectorEntry = entries.find(([k,v])=> k.toLowerCase().includes('weaviate') || k.toLowerCase().includes('vector'));
+        if(!vectorEntry) return false;
+        const v = vectorEntry[1];
+        return (v === true || v === 'Healthy');
+      },
+      
+      isRunning(){
+        const st = this.status?.state;
+        return this.live || st === 'running';
+      },
+      
+      startStatsTick(){
+        this.stopStatsTick();
+        this.statsInterval = setInterval(()=>{ this.loadStats(); this.loadHealth(); }, 10000);
+      },
+      
+      stopStatsTick(){
+        if(this.statsInterval){ clearInterval(this.statsInterval); this.statsInterval = null; }
+      },
+      
+      getServiceStatus(value) {
+        if (value === true || value === 'Healthy') return 'healthy';
+        if (value === false || value === 'Unhealthy') return 'unhealthy';
+        return 'warning';
+      },
+      
+      getStatusText(value) {
+        if (value === true || value === 'Healthy') return 'Healthy';
+        if (value === false || value === 'Unhealthy') return 'Unhealthy';
+        return 'Unknown';
+      },
+      
+      getProgressPercentage() {
+        if (!this.status) return 0;
+        const state = this.status.state;
+        if (state === 'completed') return 100;
+        if (state === 'running') return 60;
+        if (state === 'failed') return 100;
+        return 20;
+      },
+      
+      getProgressText() {
+        if (!this.status) return 'Waiting...';
+        return this.status.state || 'Unknown';
+      },
+      
+      init(){ 
+        this.loadStats(); 
+        this.loadProviders(); 
+        this.loadHealth(); 
+        this.loadCapabilities(); 
+        this.loadObservability();
+        
+        // Resume last job if present
+        try{ 
+          const saved = sessionStorage.getItem('s5recs_jobId');
+          if(saved){ this.jobId = saved; this.connectSse(); this.pollOnce(); }
+        }catch{}
+        
+        this.iconTick();
+      },
+      
+      beforeDestroy(){ 
+        if(this.es) { 
+          this.es.close(); 
+          this.es=null; 
+        }
+        this.stopStatsTick();
+      }
+      ,
+      iconTick(){ this.$nextTick(()=>{ if(window.feather){ feather.replace(); } }); }
     }
   }
   </script>
