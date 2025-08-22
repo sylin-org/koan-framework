@@ -20,11 +20,9 @@ public static class DataServiceExecuteExtensions
 
         // Non-query path: support TResult of int (affected) or bool (affected > 0)
         var nonQuery = InstructionSql.NonQuery(sql, parameters);
-        if (typeof(TResult) == typeof(bool))
-        {
-            var affected = await data.Execute<TEntity, int>(nonQuery, ct);
-            return (TResult)(object)(affected > 0);
-        }
-        return await data.Execute<TEntity, TResult>(nonQuery, ct);
+        if (typeof(TResult) != typeof(bool)) return await data.Execute<TEntity, TResult>(nonQuery, ct);
+
+        var affected = await data.Execute<TEntity, int>(nonQuery, ct);
+        return (TResult)(object)(affected > 0);
     }
 }
