@@ -7,10 +7,7 @@ Note: This page contains historical planning materials. For day-to-day developme
 This documentation set tracks the design and implementation plan for the Sora Framework.
 
 Start here:
-- 11-getting-started.md — Hands-on guide for installing, running samples, and basic data APIs
-
-- 13-messaging-getting-started.md — Messaging quickstart and capability-aware behavior
- - 14-messaging-how-to.md — Developer how-to: from tiny examples to production patterns
+// Removed tutorial and quickstart links; prefer Engineering and Reference sections.
 
 - 01-proposal.md — New framework proposal (moved from Zen docs), updated for Sora
 - 02-composition-and-profiles.md — Composition model and profile presets explained
@@ -23,8 +20,7 @@ Start here:
 
 Additional guides:
 - 10-execute-instructions.md — Executing provider instructions and SQL sugar
- - 11-getting-started.md — Beginner’s Getting Started guide (also linked above)
- - 12-cqrs-for-humans.md — A gentle introduction to CQRS in Sora (where it plugs in, how to implement, how to use)
+// Removed beginner and gentle tutorial pages
  - 15-entity-filtering-and-query.md — Filtering via JSON filters and query endpoints with examples
  - 16-working-with-entity-data.md — Developer guide to reading, filtering, sets, and migrations
 - 17-sqlite-logging-and-governance.md — SQLite adapter logging, tracing, and DDL governance

@@ -221,6 +221,6 @@ All APIs shown accept an optional CancellationToken as the last parameter (e.g.,
 
 ## Where to go next
 
-- 11-getting-started.md for setup and running samples
+See Engineering front door and Reference/Data Access for setup.
 - 15-entity-filtering-and-query.md for full filter language details
 - docs/decisions for ADRs 0029 (filter language), 0030 (sets), 0031 (ignoreCase)

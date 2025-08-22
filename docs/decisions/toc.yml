@@ -8,6 +8,8 @@
       href: ARCH-0034-ddd-documentation-and-glossary.md
     - name: SoraEnv static runtime
       href: ARCH-0039-soraenv-static-runtime.md
+    - name: Docs posture — instructions over tutorials
+      href: ARCH-0041-docs-posture-instructions-over-tutorials.md
 - name: Data (DATA)
   items:
     - name: Data access semantics (All/Query; streaming; pager)

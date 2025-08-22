@@ -15,7 +15,7 @@ Contents
 - 08-cross-cutting-and-observability.md — Tracing/metrics, headers, policies
 
 Related
-- ../12-cqrs-for-humans.md — Intro to CQRS in Sora
+// removed tutorial link
 - ../03-core-contracts.md, ../04-adapter-authoring-guide.md — Core contracts and adapters
 - ../decisions/DATA-0032-paging-pushdown-and-in-memory-fallback.md
 - ../decisions/ARCH-0033-opentelemetry-integration.md

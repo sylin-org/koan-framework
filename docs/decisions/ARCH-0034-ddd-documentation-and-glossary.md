@@ -33,7 +33,7 @@ Developers using Sora asked for a practical DDD perspective with a beginner-frie
 - Documentation maintenance: future features should reference and, when necessary, extend the DDD section.
 
 ## References
-- 12-cqrs-for-humans.md
+// tutorial removed
 - 03-core-contracts.md
 - 04-adapter-authoring-guide.md
 - 0032-paging-pushdown-and-in-memory-fallback.md
