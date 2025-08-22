@@ -30,5 +30,9 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             report.AddNote("No explicit Ollama services configured (Dev auto-discovery may register).");
         else
             report.AddNote($"Configured Ollama services: {string.Join(", ", nodes.Select(n => n["Id"]))}");
+    // Discovery visibility
+    report.AddSetting("Discovery:EnvBaseUrl", Sora.Ai.Provider.Ollama.Infrastructure.Constants.Discovery.EnvBaseUrl, isSecret: false);
+    report.AddSetting("Discovery:EnvList", Sora.Ai.Provider.Ollama.Infrastructure.Constants.Discovery.EnvList, isSecret: false);
+    report.AddSetting("Discovery:DefaultPort", Sora.Ai.Provider.Ollama.Infrastructure.Constants.Discovery.DefaultPort.ToString(), isSecret: false);
     }
 }

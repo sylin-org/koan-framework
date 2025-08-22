@@ -65,5 +65,9 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
         report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.DefaultPageSize, defSize.ToString());
         report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.MaxPageSize, maxSize.ToString());
+    // Discovery visibility
+    report.AddSetting("Discovery:EnvList", Sora.Data.Mongo.Infrastructure.Constants.Discovery.EnvList, isSecret: false);
+    report.AddSetting("Discovery:DefaultLocal", MongoConstants.DefaultLocalUri, isSecret: false);
+    report.AddSetting("Discovery:DefaultCompose", MongoConstants.DefaultComposeUri, isSecret: false);
     }
 }

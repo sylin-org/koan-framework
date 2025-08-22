@@ -44,6 +44,10 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         report.AddModule(ModuleName, ModuleVersion);
         var endpoint = Sora.Core.Configuration.Read(cfg, "Sora:Data:Weaviate:Endpoint", null) ?? "http://localhost:8085";
         report.AddSetting("Weaviate:Endpoint", endpoint, isSecret: false);
+    // Discovery visibility
+    report.AddSetting("Discovery:EnvList", Sora.Data.Weaviate.Infrastructure.Constants.Discovery.EnvList, isSecret: false);
+    report.AddSetting("Discovery:DefaultLocal", $"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
+    report.AddSetting("Discovery:DefaultCompose", $"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.WellKnownServiceName}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
     }
 
     private static bool IsDefault(string endpoint)
