@@ -1,14 +1,10 @@
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
-using Sora.Data.Abstractions.Instructions;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sora.Domain;
 
 // Domain-centric CRTP base with static conveniences, independent of data namespace
-public abstract class Entity<TEntity, TKey> : IEntity<TKey>
+public abstract partial class Entity<TEntity, TKey> : IEntity<TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -23,6 +19,18 @@ public abstract class Entity<TEntity, TKey> : IEntity<TKey>
         => Sora.Data.Core.Data<TEntity, TKey>.All(ct);
     public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
         => Sora.Data.Core.Data<TEntity, TKey>.Query(query, ct);
+
+    // Streaming (IAsyncEnumerable)
+    public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
+        => Sora.Data.Core.Data<TEntity, TKey>.AllStream(batchSize, ct);
+    public static IAsyncEnumerable<TEntity> QueryStream(string query, int? batchSize = null, CancellationToken ct = default)
+        => Sora.Data.Core.Data<TEntity, TKey>.QueryStream(query, batchSize, ct);
+
+    // Basic paging helpers (materialized)
+    public static Task<IReadOnlyList<TEntity>> FirstPage(int size, CancellationToken ct = default)
+        => Sora.Data.Core.Data<TEntity, TKey>.FirstPage(size, ct);
+    public static Task<IReadOnlyList<TEntity>> Page(int page, int size, CancellationToken ct = default)
+        => Sora.Data.Core.Data<TEntity, TKey>.Page(page, size, ct);
 
     // Counts
     public static Task<int> Count(CancellationToken ct = default)
@@ -55,9 +63,10 @@ public abstract class Entity<TEntity, TKey> : IEntity<TKey>
     // Instance self-remove
     public Task<bool> Remove(CancellationToken ct = default)
         => Sora.Data.Core.Data<TEntity, TKey>.DeleteAsync(Id, ct);
+
 }
 
 // Convenience for string-keyed entities
-public abstract class Entity<TEntity> : Entity<TEntity, string>
+public abstract partial class Entity<TEntity> : Entity<TEntity, string>
     where TEntity : class, IEntity<string>
 { }

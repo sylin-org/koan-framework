@@ -1,10 +1,7 @@
 using FluentAssertions;
-using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Relational.Schema;
-using System;
-using System.Linq;
 using Xunit;
 
 namespace Sora.Data.Relational.Tests;

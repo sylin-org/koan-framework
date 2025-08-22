@@ -5,12 +5,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
-using Sora.Data.Mongo;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Xunit;
-using Xunit.Sdk;
 
 namespace Sora.Data.Mongo.Tests;
 

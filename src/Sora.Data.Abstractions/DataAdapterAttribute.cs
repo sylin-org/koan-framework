@@ -1,5 +1,3 @@
-using System;
-
 namespace Sora.Data.Abstractions.Annotations;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]

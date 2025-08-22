@@ -2,11 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Sora.AI.Contracts;
 using Sora.AI.Contracts.Models;
 using Sora.Core;
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sora.AI;
 
@@ -30,6 +26,36 @@ public static class Ai
 
     public static Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
         => Resolve().EmbedAsync(req, ct);
+
+    // Discovery helpers for optional usage
+    public static bool IsAvailable
+    {
+        get
+        {
+            if (_override.Value is IAi) return true;
+            var sp = SoraApp.Current;
+            if (sp is null) return false;
+            var ia = sp.GetService<IAi>();
+            if (ia is not null) return true;
+            var scopeFactory = sp.GetService<IServiceScopeFactory>();
+            if (scopeFactory is null) return false;
+            using var scope = scopeFactory.CreateScope();
+            return scope.ServiceProvider.GetService<IAi>() is not null;
+        }
+    }
+
+    public static IAi? TryResolve()
+    {
+        if (_override.Value is IAi o) return o;
+        var sp = SoraApp.Current;
+        if (sp is null) return null;
+        var ia = sp.GetService<IAi>();
+        if (ia is not null) return ia;
+        var scopeFactory = sp.GetService<IServiceScopeFactory>();
+        if (scopeFactory is null) return null;
+        using var scope = scopeFactory.CreateScope();
+        return scope.ServiceProvider.GetService<IAi>();
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static IAi Resolve()

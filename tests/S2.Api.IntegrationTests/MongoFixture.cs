@@ -1,6 +1,5 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
-using Xunit;
 
 public sealed class MongoFixture : Xunit.IAsyncLifetime
 {

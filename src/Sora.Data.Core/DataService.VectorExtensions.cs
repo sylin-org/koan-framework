@@ -1,5 +1,5 @@
 using Sora.Data.Abstractions;
-using System;
+using Sora.Data.Vector.Abstractions;
 
 namespace Sora.Data.Core;
 
@@ -8,7 +8,7 @@ public static class DataServiceVectorExtensions
     /// <summary>
     /// Get a vector repository for the specified aggregate and key type, or throw with a helpful message if none is configured.
     /// </summary>
-    public static IVectorSearchRepository<TEntity, TKey> GetRequiredVectorRepository<TEntity, TKey>(this IDataService data)
+    public static Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey> GetRequiredVectorRepository<TEntity, TKey>(this IDataService data)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {

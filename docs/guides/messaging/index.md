@@ -1,5 +1,6 @@
 # Messaging guides
 
-- Messaging quickstart: messaging-getting-started.md
-- How-to: from zero to production: messaging-how-to.md
+See Reference/Messaging for canonical APIs and patterns, and the Decisions index for architecture choices.
+
+- Reference: /docs/reference/messaging.md
 - Decisions (capabilities, provisioning): ../decisions/index.md#messaging

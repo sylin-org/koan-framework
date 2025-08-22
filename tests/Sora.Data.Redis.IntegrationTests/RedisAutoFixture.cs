@@ -1,10 +1,7 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Abstractions;
-using Sora.Data.Redis;
 using Sora.Testing;
+using System.Net.Sockets;
 using Xunit;
 
 namespace Sora.Data.Redis.IntegrationTests;
@@ -28,6 +25,13 @@ public sealed class RedisAutoFixture : IAsyncLifetime
             return;
         }
 
+        // Try local Redis on default port quickly
+        if (await CanTcpConnectAsync("localhost", 6379))
+        {
+            ConnectionString = "localhost:6379";
+            return;
+        }
+
         Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
         var probe = await DockerEnvironment.ProbeAsync();
         if (!probe.Available) { _available = false; return; }
@@ -42,10 +46,18 @@ public sealed class RedisAutoFixture : IAsyncLifetime
             .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(6379))
             .Build();
 
-        await _container.StartAsync();
-
-        var hostPort = _container.GetMappedPublicPort(6379);
-        ConnectionString = $"localhost:{hostPort}";
+        try
+        {
+            await _container.StartAsync();
+            var hostPort = _container.GetMappedPublicPort(6379);
+            ConnectionString = $"localhost:{hostPort}";
+        }
+        catch
+        {
+            // On some Windows/Docker setups, attaching/hijacking can fail. Mark unavailable to skip tests.
+            ConnectionString = null;
+            _available = false;
+        }
     }
 
     public async Task DisposeAsync()
@@ -55,5 +67,17 @@ public sealed class RedisAutoFixture : IAsyncLifetime
             try { await _container.StopAsync(); } catch { }
             try { await _container.DisposeAsync(); } catch { }
         }
+    }
+
+    private static async Task<bool> CanTcpConnectAsync(string host, int port, int timeoutMs = 250)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            var connectTask = client.ConnectAsync(host, port);
+            var completed = await Task.WhenAny(connectTask, Task.Delay(timeoutMs));
+            return completed == connectTask && client.Connected;
+        }
+        catch { return false; }
     }
 }

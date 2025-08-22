@@ -1,11 +1,9 @@
 using Sora.AI.Contracts.Adapters;
 using Sora.AI.Contracts.Models;
-using System.Buffers;
-using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Sora.Ai.Provider.Ollama;
 
@@ -13,12 +11,13 @@ internal sealed class OllamaAdapter : IAiAdapter
 {
     private readonly HttpClient _http;
     private readonly string _defaultModel;
+    private readonly Microsoft.Extensions.Logging.ILogger<OllamaAdapter>? _logger;
     public string Id { get; }
     public string Name { get; }
     public string Type => Infrastructure.Constants.Adapter.Type;
 
-    public OllamaAdapter(string id, string name, HttpClient http, string? defaultModel)
-    { Id = id; Name = name; _http = http; _defaultModel = defaultModel ?? string.Empty; }
+    public OllamaAdapter(string id, string name, HttpClient http, string? defaultModel, Microsoft.Extensions.Logging.ILogger<OllamaAdapter>? logger = null)
+    { Id = id; Name = name; _http = http; _defaultModel = defaultModel ?? string.Empty; _logger = logger; }
 
     public bool CanServe(AiChatRequest request)
     {
@@ -39,7 +38,13 @@ internal sealed class OllamaAdapter : IAiAdapter
             stream = false,
             options = MapOptions(request.Options)
         };
+        _logger?.LogDebug("Ollama: POST {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);
         using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.GeneratePath, body, ct).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            _logger?.LogWarning("Ollama: generate failed ({Status}) body={Body}", (int)resp.StatusCode, text);
+        }
         resp.EnsureSuccessStatusCode();
         var doc = await resp.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken: ct).ConfigureAwait(false)
                   ?? throw new InvalidOperationException("Empty response from Ollama.");
@@ -60,6 +65,7 @@ internal sealed class OllamaAdapter : IAiAdapter
         var body = JsonSerializer.Serialize(new { model, prompt, stream = true, options = MapOptions(request.Options) });
         using var httpReq = new HttpRequestMessage(HttpMethod.Post, Infrastructure.Constants.Api.GeneratePath)
         { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+        _logger?.LogDebug("Ollama: STREAM {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);
         using var resp = await _http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         await foreach (var part in ReadJsonLinesAsync<OllamaGenerateResponse>(resp, ct))
@@ -81,14 +87,23 @@ internal sealed class OllamaAdapter : IAiAdapter
         var vectors = new List<float[]>();
         foreach (var input in request.Input)
         {
-            var body = new { model, input };
+            // Ollama embeddings API expects 'prompt' as the input field
+            var body = new { model, prompt = input };
+            _logger?.LogDebug("Ollama: POST {Path} model={Model} input.len={Len}", Infrastructure.Constants.Api.EmbeddingsPath, model, input?.Length ?? 0);
             using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.EmbeddingsPath, body, ct).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                _logger?.LogWarning("Ollama: embeddings failed ({Status}) body={Body}", (int)resp.StatusCode, text);
+            }
             resp.EnsureSuccessStatusCode();
             var doc = await resp.Content.ReadFromJsonAsync<OllamaEmbeddingsResponse>(cancellationToken: ct).ConfigureAwait(false)
                       ?? throw new InvalidOperationException("Empty response from Ollama.");
             vectors.Add(doc.embedding ?? Array.Empty<float>());
         }
-        return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = vectors.FirstOrDefault()?.Length };
+        var dim = vectors.FirstOrDefault()?.Length ?? 0;
+        _logger?.LogDebug("Ollama: embeddings ok model={Model} dim={Dim} count={Count}", model, dim, vectors.Count);
+        return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = dim };
     }
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)

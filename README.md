@@ -2,7 +2,7 @@
 
 **Building backend services should feel like playing with Legos, not assembling puzzles with missing pieces.**
 
-Sora is designed to feel natural—like having a conversation with your code rather than wrestling with it. Start with a three-file API, add vector search when you need it, scale to enterprise patterns when you're ready.
+Sora is designed to having a conversation with your code rather than wrestling with it. Start with a three-file API, add vector search when you need it, scale to enterprise patterns when you're ready.
 
 ## What makes Sora different?
 
@@ -155,9 +155,9 @@ Your `EntityController<T>` now serves both REST and GraphQL automatically.
 
 ## Getting started
 
-1. **Quick Start** - [3-minute tutorial](docs/api/quickstart/) from zero to working API
-2. **Documentation** - [Complete guides](docs/api/) for all features
-3. **Examples** - Real applications in the `samples/` directory
+1. **Documentation** - Read the engineering front door and reference pages
+2. **Examples** - Explore real applications in the `samples/` directory
+3. **Docs style** - See `docs/engineering/docs-style-and-checklist.md` for contribution rules
 
 ## Built for
 
@@ -177,3 +177,7 @@ Built with ❤️ for .NET developers who want to focus on solving problems, not
 ---
 
 **License:** Apache 2.0 | **Requirements:** .NET 9 SDK | **Current:** v0.2.18
+
+Quick links
+- Engineering front door: `/docs/engineering/index.md`
+- Architecture principles: `/docs/architecture/principles.md`

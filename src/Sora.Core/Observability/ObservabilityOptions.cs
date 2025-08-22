@@ -1,5 +1,3 @@
-using System;
-
 namespace Sora.Core.Observability;
 
 public sealed class ObservabilityOptions

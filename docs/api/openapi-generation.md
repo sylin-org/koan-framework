@@ -27,6 +27,6 @@ Documenting Sora-specific conventions
 - For query endpoints that accept JSON filters, describe the filter scheme or link to docs/15-entity-filtering-and-query.md.
 
 References
-- docs/11-getting-started.md
+// removed tutorial reference
 - docs/15-entity-filtering-and-query.md
 - docs/ddd/04-cqrs-and-eventing-in-sora.md

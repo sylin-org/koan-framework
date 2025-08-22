@@ -1,10 +1,7 @@
-using HotChocolate;
-using HotChocolate.Execution;
 using HotChocolate.Execution.Configuration;
 using HotChocolate.Execution.Options;
 using HotChocolate.Language;
 using HotChocolate.Resolvers;
-using HotChocolate.Types;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -13,7 +10,6 @@ using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
-using Sora.Data.Core.Configuration;
 using Sora.Web.Filtering;
 using Sora.Web.Hooks;
 using Sora.Web.Infrastructure;
@@ -142,16 +138,16 @@ public static class AddSoraGraphQlExtensions
                         .Type(new ListTypeNode(new NamedTypeNode(name)))
                         .Resolve(ctx =>
                         {
-                        var parent = ctx.Parent<object?>();
-                        return parent is null ? null : itemsProp.GetValue(parent);
-                    });
+                            var parent = ctx.Parent<object?>();
+                            return parent is null ? null : itemsProp.GetValue(parent);
+                        });
             od.Field("totalCount")
                         .Type<IntType>()
                         .Resolve(ctx =>
                         {
-                        var parent = ctx.Parent<object?>();
-                        return parent is null ? 0 : (int)(totalProp.GetValue(parent) ?? 0);
-                    });
+                            var parent = ctx.Parent<object?>();
+                            return parent is null ? 0 : (int)(totalProp.GetValue(parent) ?? 0);
+                        });
         }));
 
         builder.AddTypeExtension(new ObjectTypeExtension(d =>

@@ -4,11 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
-using Sora.Data.Sqlite;
-using System;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;

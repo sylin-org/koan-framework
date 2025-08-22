@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
-using Sora.Data.Mongo;
 using Xunit;
 
 namespace Sora.Data.Mongo.Tests;

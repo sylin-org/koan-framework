@@ -1,10 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Vector.Abstractions;
 using Sora.Data.Core.Configuration;
-using System;
 using System.Collections.Concurrent;
-using System.Linq;
 
 namespace Sora.Data.Core;
 
@@ -29,7 +28,7 @@ public interface IDataService
     Sora.Data.Core.Direct.IDirectSession Direct(string sourceOrAdapter);
 
     // Vector repository accessor (optional adapter). Returns null if no vector adapter is configured for the entity.
-    IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
+    Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
         where TEntity : class, IEntity<TKey>
         where TKey : notnull;
 }
@@ -65,25 +64,67 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         return svc.Direct(sourceOrAdapter);
     }
 
-    public IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
+    public Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
         var key = (typeof(TEntity), typeof(TKey));
-        if (_vecCache.TryGetValue(key, out var existing)) return (IVectorSearchRepository<TEntity, TKey>?)existing;
+        if (_vecCache.TryGetValue(key, out var existing)) return (Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>?)existing;
 
-        // Resolve from adapter factories that can provide a vector repo; prefer the entity's provider if possible.
-        var provider = Configuration.AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
-        var vectorFactories = sp.GetServices<IVectorAdapterFactory>().ToList();
-        IVectorSearchRepository<TEntity, TKey>? repo = null;
-        var factory = vectorFactories.FirstOrDefault(f => f.CanHandle(provider))
-            ?? vectorFactories.FirstOrDefault();
+        // Resolve from adapter factories honoring role attributes and defaults.
+    var vectorFactories = sp.GetServices<Sora.Data.Vector.Abstractions.IVectorAdapterFactory>().ToList();
+        if (vectorFactories.Count == 0) return null;
+
+        // 1) Role attribute: [VectorAdapter("...")]
+        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(Sora.Data.Vector.Abstractions.VectorAdapterAttribute))
+            as Sora.Data.Vector.Abstractions.VectorAdapterAttribute)?.Provider;
+
+        // 2) App default: Sora:Data:VectorDefaults:DefaultProvider
+        if (string.IsNullOrWhiteSpace(desired))
+        {
+            // If vector module is referenced, resolve defaults from there. Optional.
+            try
+            {
+                var optType = typeof(Microsoft.Extensions.Options.IOptions<>).MakeGenericType(Type.GetType("Sora.Data.Vector.VectorDefaultsOptions, Sora.Data.Vector")!);
+                var opts = sp.GetService(optType);
+                if (opts is not null)
+                {
+                    var valProp = optType.GetProperty("Value");
+                    var val = valProp?.GetValue(opts);
+                    var prop = val?.GetType().GetProperty("DefaultProvider");
+                    desired = (string?)prop?.GetValue(val);
+                }
+            }
+            catch { /* optional */ }
+
+            // Fallback: read straight from IConfiguration if options aren't bound
+            if (string.IsNullOrWhiteSpace(desired))
+            {
+                var cfg = sp.GetService<IConfiguration>();
+                var viaCfg = cfg?["Sora:Data:VectorDefaults:DefaultProvider"];
+                if (!string.IsNullOrWhiteSpace(viaCfg)) desired = viaCfg;
+            }
+        }
+
+        // 3) Fallback: entity data provider (useful when provider names align, e.g., "weaviate")
+        if (string.IsNullOrWhiteSpace(desired))
+        {
+            desired = Configuration.AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
+        }
+
+    Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? repo = null;
+    Sora.Data.Vector.Abstractions.IVectorAdapterFactory? factory = null;
+        if (!string.IsNullOrWhiteSpace(desired))
+        {
+            factory = vectorFactories.FirstOrDefault(f => f.CanHandle(desired!));
+        }
+        factory ??= vectorFactories.FirstOrDefault();
         if (factory is not null)
             repo = factory.Create<TEntity, TKey>(sp);
 
         if (repo is not null)
             _vecCache[key] = repo;
-        return repo;
+    return repo;
     }
     // Provider resolution is now handled by TypeConfigs
 }

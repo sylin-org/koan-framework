@@ -1,5 +1,4 @@
 using Sora.Data.Abstractions.Annotations;
-using System;
 using System.Reflection;
 
 namespace Sora.Data.Abstractions.Naming;

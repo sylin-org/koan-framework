@@ -45,4 +45,4 @@ We introduced a projection-by-default storage model for SQLite: base table `[Id,
 ## Follow-ups
 
 - Extend the SQLite health contributor to detect missing tables/columns and report Degraded vs Unhealthy based on `SchemaMatchingMode` and policy.
-- Document configuration keys in `/docs/11-getting-started.md` and adapter reference.
+- Document configuration keys in the adapter reference and engineering guardrails.

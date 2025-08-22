@@ -19,7 +19,6 @@
     <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
     <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
-  <ProjectReference Include="..\Sora.AI\Sora.AI.csproj" />
-  <ProjectReference Include="..\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
+  <ProjectReference Include="..\Sora.Scheduling\Sora.Scheduling.csproj" />
   </ItemGroup>
 </Project>

@@ -20,7 +20,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(Sora.Data.Abstractions.Naming.INamingDefaultsProvider), typeof(MongoNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
-        services.AddHealthContributor<MongoHealthContributor>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
@@ -65,5 +65,9 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
         report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.DefaultPageSize, defSize.ToString());
         report.AddSetting(Sora.Data.Mongo.Infrastructure.Constants.Bootstrap.MaxPageSize, maxSize.ToString());
+        // Discovery visibility
+        report.AddSetting("Discovery:EnvList", Sora.Data.Mongo.Infrastructure.Constants.Discovery.EnvList, isSecret: false);
+        report.AddSetting("Discovery:DefaultLocal", MongoConstants.DefaultLocalUri, isSecret: false);
+        report.AddSetting("Discovery:DefaultCompose", MongoConstants.DefaultComposeUri, isSecret: false);
     }
 }

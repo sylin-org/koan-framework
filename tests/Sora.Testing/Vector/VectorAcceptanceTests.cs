@@ -1,4 +1,5 @@
 using Sora.Data.Abstractions;
+using Sora.Data.Vector.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;

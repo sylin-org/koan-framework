@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using Sora.Data.Abstractions;
-using System.Linq;
 
 namespace Sora.Data.Cqrs.Initialization;
 

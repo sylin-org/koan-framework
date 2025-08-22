@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using StackExchange.Redis;
-using System.Linq;
 using System.Linq.Expressions;
 
 namespace Sora.Data.Redis;
@@ -30,6 +29,20 @@ internal sealed class RedisOptionsConfigurator : IConfigureOptions<RedisOptions>
             $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Data}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.ConnectionString}",
             $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Sources_Default}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.ConnectionString}");
         if (!string.IsNullOrWhiteSpace(cs)) o.ConnectionString = cs;
+        else
+        {
+            // Multi-endpoint env list; pick the first that responds to a short ping
+            var list = Environment.GetEnvironmentVariable(Sora.Data.Redis.Infrastructure.Constants.Discovery.EnvRedisList);
+            if (!string.IsNullOrWhiteSpace(list))
+            {
+                foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var candidate = part.Trim();
+                    if (string.IsNullOrWhiteSpace(candidate)) continue;
+                    if (TryRedisPing(candidate, TimeSpan.FromMilliseconds(250))) { o.ConnectionString = candidate; break; }
+                }
+            }
+        }
         var db = Sora.Core.Configuration.ReadFirst(_cfg, o.Database,
             $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Data}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.Database}",
             $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Sources_Default}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.Database}");
@@ -44,11 +57,24 @@ internal sealed class RedisOptionsConfigurator : IConfigureOptions<RedisOptions>
         if (max > 0) o.MaxPageSize = max;
         if (o.DefaultPageSize > o.MaxPageSize) o.DefaultPageSize = o.MaxPageSize;
 
-        if (string.IsNullOrWhiteSpace(o.ConnectionString))
+        if (string.IsNullOrWhiteSpace(o.ConnectionString) || string.Equals(o.ConnectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
         {
             // host/docker discovery pattern
             o.ConnectionString = Sora.Core.SoraEnv.InContainer ? Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultCompose : Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultLocal;
         }
+    }
+
+    private static bool TryRedisPing(string configuration, TimeSpan timeout)
+    {
+        try
+        {
+            var options = ConfigurationOptions.Parse(configuration);
+            options.ConnectTimeout = (int)timeout.TotalMilliseconds;
+            options.SyncTimeout = (int)timeout.TotalMilliseconds;
+            using var muxer = ConnectionMultiplexer.Connect(options);
+            return muxer.IsConnected;
+        }
+        catch { return false; }
     }
 }
 

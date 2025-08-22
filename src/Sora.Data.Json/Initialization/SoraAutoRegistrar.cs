@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Json.Infrastructure;
@@ -20,7 +19,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddOptions<JsonDataOptions>().ValidateDataAnnotations();
         services.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>, JsonDataOptionsConfigurator>();
         services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
-        services.AddHealthContributor<JsonHealthContributor>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, JsonHealthContributor>());
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)

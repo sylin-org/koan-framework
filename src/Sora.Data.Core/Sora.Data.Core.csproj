@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
+  <ProjectReference Include="..\Sora.Data.Vector.Abstractions\Sora.Data.Vector.Abstractions.csproj" />
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
   </ItemGroup>
 

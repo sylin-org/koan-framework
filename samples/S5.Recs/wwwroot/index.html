@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>S5.Recs — Discover Anime</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/feather.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="app-container" x-data="recsApp()">
+    <header class="app-header">
+      <div class="header-content">
+        <div class="brand">
+          <h1>🎌 AnimeRecs</h1>
+          <p>Discover your next favorite anime</p>
+        </div>
+        <nav class="header-nav">
+          <a href="/admin.html" class="nav-link">
+            <i data-feather="settings"></i>
+            Admin
+          </a>
+          <a href="/status.html" class="nav-link">
+            <i data-feather="activity"></i>
+            Status
+          </a>
+          <a href="/admin.html#seed" class="nav-link accent" title="Seed vectors to enable semantic search">
+            <i data-feather="download"></i>
+            Seed Data
+          </a>
+        </nav>
+      </div>
+    </header>
+    <section class="search-section">
+      <div class="search-container">
+        <div class="query-input-group">
+          <div class="search-input-wrapper">
+            <i data-feather="search" class="search-icon"></i>
+            <input 
+              x-model="text" 
+              placeholder="like Haikyuu!! but cozier and slice-of-life, under 24 eps"
+              class="search-input"
+              @keyup.enter="search()"
+            />
+          </div>
+          <button @click="search()" class="search-btn" :disabled="searching">
+            <span x-show="!searching">Search</span>
+            <span x-show="searching" class="loading">Searching...</span>
+          </button>
+        </div>
+        
+        <div class="filters-panel" x-show="showFilters">
+          <div class="filter-group">
+            <label class="filter-label">
+              <i data-feather="user"></i>
+              User Profile
+            </label>
+            <input x-model="userId" placeholder="demo" class="filter-input" />
+          </div>
+          
+          <div class="filter-group">
+            <label class="filter-label">
+              <i data-feather="tv"></i>
+              Max Episodes
+            </label>
+            <input type="number" x-model.number="episodesMax" min="1" max="500" class="filter-input" />
+          </div>
+          
+          <div class="filter-group">
+            <label class="filter-label">
+              <i data-feather="tag"></i>
+              Genres
+            </label>
+            <input x-model="genresCsv" placeholder="Slice of Life, Sports" class="filter-input" />
+          </div>
+          
+          <div class="filter-group">
+            <label class="filter-label">
+              <i data-feather="list"></i>
+              Results
+            </label>
+            <input type="number" x-model.number="topK" min="1" max="50" class="filter-input" />
+          </div>
+          
+          <div class="filter-group checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" x-model="spoilerSafe" class="checkbox" />
+              <span class="checkmark"></span>
+              Spoiler-safe mode
+            </label>
+          </div>
+        </div>
+        
+        <button @click="showFilters = !showFilters" class="filters-toggle">
+          <i data-feather="sliders"></i>
+          <span x-text="showFilters ? 'Hide Filters' : 'Show Filters'"></span>
+        </button>
+      </div>
+    </section>
+    <section class="results-section">
+      <div x-show="degraded" class="alert alert-warning">
+        <i data-feather="alert-triangle"></i>
+        <div>
+          <strong>Limited Mode:</strong> Semantic features are not enabled yet. 
+          <a href="/admin.html#seed" class="alert-link">Seed data now</a> for full AI-powered recommendations.
+        </div>
+      </div>
+      
+      <div x-show="results.length > 0" class="results-header">
+        <h2>
+          <i data-feather="star"></i>
+          Recommendations for you
+        </h2>
+        <p class="results-count" x-text="`Found ${results.length} anime matching your preferences`"></p>
+      </div>
+      
+      <div class="anime-grid">
+        <template x-for="item in results" :key="item.anime.id">
+          <article class="anime-card">
+            <div class="card-header" @click="selectedAnime = selectedAnime === item.anime.id ? null : item.anime.id">
+              <div class="anime-poster">
+                <div class="poster-placeholder">
+                  <i data-feather="film"></i>
+                </div>
+                <div class="score-badge" x-text="item.score.toFixed(2)"></div>
+              </div>
+              <div class="anime-info">
+                <h3 class="anime-title" x-text="item.anime.title"></h3>
+                <div class="anime-meta">
+                  <span class="episode-count" x-show="item.anime.episodes">
+                    <i data-feather="tv"></i>
+                    <span x-text="item.anime.episodes"></span> eps
+                  </span>
+                  <span class="popularity">
+                    <i data-feather="trending-up"></i>
+                    <span x-text="Math.round(item.anime.popularity * 100)"></span>%
+                  </span>
+                </div>
+                <div class="genres-list">
+                  <template x-for="genre in item.anime.genres" :key="genre">
+                    <span class="genre-tag" x-text="genre"></span>
+                  </template>
+                </div>
+              </div>
+            </div>
+            
+            <div class="card-content" x-show="selectedAnime === item.anime.id" x-transition>
+              <div class="synopsis" x-show="item.anime.synopsis">
+                <h4>Synopsis</h4>
+                <p x-text="item.anime.synopsis"></p>
+              </div>
+              
+              <div class="reasons" x-show="item.reasons.length > 0">
+                <h4>Why recommended?</h4>
+                <div class="reason-chips">
+                  <template x-for="reason in item.reasons" :key="reason">
+                    <span class="reason-chip" x-text="reason"></span>
+                  </template>
+                </div>
+              </div>
+            </div>
+            
+            <div class="card-actions">
+              <div class="rating-section">
+                <span class="rating-label">Rate this anime:</span>
+                <div class="star-rating">
+                  <template x-for="n in 5" :key="n">
+                    <button 
+                      @click.stop="rate(item.anime.id, n)" 
+                      class="star-btn"
+                      :class="{'active': userRatings[item.anime.id] >= n, 'hover': hoverRating === n}"
+                      @mouseenter="hoverRating = n"
+                      @mouseleave="hoverRating = 0"
+                    >
+                      <i data-feather="star"></i>
+                    </button>
+                  </template>
+                </div>
+                <span x-show="userRatings[item.anime.id]" class="current-rating">
+                  Your rating: <span x-text="userRatings[item.anime.id]"></span>/5
+                </span>
+              </div>
+            </div>
+          </article>
+        </template>
+      </div>
+      
+      <div x-show="!searching && results.length === 0 && hasSearched" class="empty-state">
+        <i data-feather="search"></i>
+        <h3>No recommendations found</h3>
+        <p>Try adjusting your search query or filters to discover new anime.</p>
+      </div>
+    </section>
+  </main>
+  <script>
+    function recsApp(){
+      return {
+        text: '', 
+        userId: 'demo', 
+        episodesMax: 24, 
+        spoilerSafe: true, 
+        genresCsv: '', 
+        topK: 10, 
+        results: [], 
+        degraded: false,
+        searching: false,
+        hasSearched: false,
+        showFilters: false,
+        selectedAnime: null,
+        hoverRating: 0,
+        userRatings: {},
+        
+        async search(){
+          this.searching = true;
+          this.hasSearched = true;
+          try {
+            const genres = (this.genresCsv||'').split(',').map(s=>s.trim()).filter(Boolean);
+            const body = { 
+              text: this.text, 
+              userId: this.userId, 
+              topK: this.topK, 
+              filters: { 
+                genres, 
+                episodesMax: this.episodesMax, 
+                spoilerSafe: this.spoilerSafe 
+              } 
+            };
+            const r = await fetch('/api/recs/query', {
+              method:'POST', 
+              headers:{'Content-Type':'application/json'}, 
+              body: JSON.stringify(body)
+            });
+            const data = await r.json();
+            this.results = data.items ?? []; 
+            this.degraded = !!data.degraded;
+            
+            // Re-initialize feather icons for new content
+            this.$nextTick(() => {
+              if (window.feather) {
+                feather.replace();
+              }
+            });
+          } catch (error) {
+            console.error('Search failed:', error);
+            this.results = [];
+          } finally {
+            this.searching = false;
+          }
+        },
+        
+        async rate(animeId, rating){
+          try {
+            await fetch('/api/recs/rate', {
+              method:'POST', 
+              headers:{'Content-Type':'application/json'}, 
+              body: JSON.stringify({ 
+                userId: this.userId||'demo', 
+                animeId, 
+                rating 
+              })
+            });
+            this.userRatings[animeId] = rating;
+            // Refresh recommendations after rating
+            if (this.hasSearched) {
+              this.search();
+            }
+          } catch (error) {
+            console.error('Rating failed:', error);
+          }
+        },
+        
+        init() {
+          // Initialize feather icons after DOM is ready
+          this.$nextTick(() => {
+            if (window.feather) {
+              feather.replace();
+            }
+          });
+        }
+      }
+    }
+  </script>
+</body>
+</html>

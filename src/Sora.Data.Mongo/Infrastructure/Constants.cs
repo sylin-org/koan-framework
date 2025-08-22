@@ -2,6 +2,12 @@ namespace Sora.Data.Mongo.Infrastructure;
 
 public static class Constants
 {
+    public static class Discovery
+    {
+        public const string EnvList = "SORA_DATA_MONGO_URLS"; // comma/semicolon-separated list of URIs
+        public const string WellKnownServiceName = "mongodb";
+        public const int DefaultPort = 27017;
+    }
     public static class Configuration
     {
         public static class Keys

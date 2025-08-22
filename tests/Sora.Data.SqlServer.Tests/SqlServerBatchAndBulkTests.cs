@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;

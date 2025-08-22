@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Sora.Data.Abstractions;
 
 // Typed, provider-agnostic vector filter AST root with terse builders.

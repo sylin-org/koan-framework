@@ -3,9 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Sora.Data.Core;
-using Sora.Data.Mongo;
-using System;
-using System.Threading.Tasks;
 using Testcontainers.MongoDb;
 using Xunit;
 

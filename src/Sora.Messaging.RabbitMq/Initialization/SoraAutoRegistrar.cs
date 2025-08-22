@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
-using Sora.Messaging.Inbox.Http;
 
 namespace Sora.Messaging.RabbitMq.Initialization;
 

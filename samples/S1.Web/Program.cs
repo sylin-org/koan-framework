@@ -1,7 +1,3 @@
-using Microsoft.AspNetCore.RateLimiting;
-using S1.Web;
-using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
 using Sora.Web;
 using System.Threading.RateLimiting;
@@ -49,6 +45,12 @@ builder.Services.AddRateLimiter(options =>
 var app = builder.Build();
 
 // Platform auto-ensures schema at startup when supported
+if (app.Environment.IsDevelopment())
+{
+    // Ensure local data folder exists for providers that default to ./data
+    var dataPath = Path.Combine(app.Environment.ContentRootPath, "data");
+    try { Directory.CreateDirectory(dataPath); } catch { /* best effort */ }
+}
 
 app.Run();
 

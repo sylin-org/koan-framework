@@ -1,7 +1,6 @@
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using StackExchange.Redis;
-using System.Text;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);

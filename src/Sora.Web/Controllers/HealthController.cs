@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using Sora.Web.Infrastructure;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Sora.Web.Controllers;
 
@@ -12,7 +10,7 @@ namespace Sora.Web.Controllers;
 [Produces("application/json")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 [Route(SoraWebConstants.Routes.HealthBase)]
-public sealed class HealthController(IHealthService health, IHostEnvironment env) : ControllerBase
+public sealed class HealthController(IHostEnvironment env, IHealthAggregator aggregator) : ControllerBase
 {
     // Human-friendly info endpoint; simple up check (no dependencies)
     [HttpGet]
@@ -27,28 +25,34 @@ public sealed class HealthController(IHealthService health, IHostEnvironment env
     [Produces("application/health+json", "application/json")]
     public async Task<IActionResult> Ready()
     {
-        var (overall, reports) = await health.CheckAllAsync(HttpContext.RequestAborted);
+        await Task.Yield(); // keep signature async-friendly
+                            // Invite contributors to refresh status synchronously via bridge
+        aggregator.RequestProbe(ProbeReason.PolicyRefresh, component: null);
+        var snap = aggregator.GetSnapshot();
 
         object payload = env.IsDevelopment()
             ? new
             {
-                status = overall.ToString().ToLowerInvariant(),
-                details = reports.Select(r => new
-                {
-                    name = r.Name,
-                    state = r.State.ToString().ToLowerInvariant(),
-                    description = r.Description,
-                    data = r.Data
-                })
+                status = snap.Overall.ToString().ToLowerInvariant(),
+                components = snap.Components
+                    .Select(c => new
+                    {
+                        name = c.Component,
+                        state = c.Status.ToString().ToLowerInvariant(),
+                        message = c.Message,
+                        ttl = c.Ttl?.ToString(),
+                        facts = c.Facts
+                    })
             }
-            : new { status = overall.ToString().ToLowerInvariant() };
-
-        if (overall == HealthState.Unhealthy)
-        {
-            Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-        }
+            : new { status = snap.Overall.ToString().ToLowerInvariant() };
 
         Response.Headers["Cache-Control"] = SoraWebConstants.Policies.NoStore;
+        if (snap.Overall == HealthStatus.Unhealthy)
+        {
+            // Important: return an ObjectResult with 503, not Ok(payload) which would override the status code.
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, payload);
+        }
+
         return Ok(payload);
     }
 }

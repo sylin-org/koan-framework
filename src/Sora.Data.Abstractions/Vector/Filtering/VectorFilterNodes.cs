@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Sora.Data.Abstractions;
 
 public enum VectorFilterOperator { Eq, Ne, Gt, Gte, Lt, Lte, Like, Contains, In, Between }

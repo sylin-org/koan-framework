@@ -2,6 +2,10 @@
 
 Sora exposes well-known routes for capability discovery and safe observability snapshots.
 
+## Matrix (quick)
+- Path: `/.well-known/sora/capabilities` — Method: GET — Purpose: advertised capabilities and links — Auth: typically anonymous in Dev, gated in Prod.
+- Path: `/.well-known/sora/observability` — Method: GET — Purpose: safe observability snapshot — Auth: gated (never expose sensitive data).
+
 Capabilities
 - Route: `/.well-known/sora/capabilities`
 - Purpose: advertise supported capabilities and helpful links.

@@ -2,12 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
-using Sora.Data.Abstractions;
 using Sora.Data.Core;
-using Sora.Data.Sqlite;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Sora.Data.Sqlite.Tests;

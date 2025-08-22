@@ -2,10 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core.Metadata;
-using System;
 using System.Collections.Concurrent;
-using System.Linq;
-using System.Threading;
 
 namespace Sora.Data.Core.Configuration;
 
@@ -32,8 +29,11 @@ internal static class AggregateConfigs
 
     private static string? ResolveProvider(Type aggregateType)
     {
-        var attr = (DataAdapterAttribute?)Attribute.GetCustomAttribute(aggregateType, typeof(DataAdapterAttribute));
-        return attr?.Provider;
+        // Prefer explicit SourceAdapter if present, then fall back to legacy DataAdapter
+        var src = (SourceAdapterAttribute?)Attribute.GetCustomAttribute(aggregateType, typeof(SourceAdapterAttribute));
+        if (src is not null && !string.IsNullOrWhiteSpace(src.Provider)) return src.Provider;
+        var data = (DataAdapterAttribute?)Attribute.GetCustomAttribute(aggregateType, typeof(DataAdapterAttribute));
+        return data?.Provider;
     }
 
     private static string DefaultProvider(IServiceProvider sp)

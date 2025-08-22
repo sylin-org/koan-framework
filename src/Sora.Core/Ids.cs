@@ -1,5 +1,3 @@
-using System;
-
 namespace Sora.Core.Primitives;
 
 /// <summary>

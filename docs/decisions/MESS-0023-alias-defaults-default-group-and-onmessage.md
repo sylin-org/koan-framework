@@ -33,8 +33,8 @@ Consequences
 - Auto-subscribe is guarded by ProvisionOnStart, and only when Subscriptions are omitted, to avoid surprising production topologies.
 
 References
-- docs/13-messaging-getting-started.md updated with defaults and OnMessage.
-- src changes:
+- See Reference/Messaging for defaults and OnMessage usage.
+ - src changes:
   - Sora.Messaging.Core: MessagingOptions.DefaultGroup
     - Sora.Messaging.Core: MessagingExtensions.OnMessage
   - Sora.Mq.RabbitMq: auto-subscription when Subscriptions omitted

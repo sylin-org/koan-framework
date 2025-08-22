@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.Vector;
+using Sora.Data.Vector.Abstractions;
 using Xunit;
 
 namespace Sora.Data.Weaviate.IntegrationTests;
@@ -17,9 +18,10 @@ public sealed class WeaviateFilterAndStatsTests : IClassFixture<WeaviateAutoFixt
         if (!_available) return;
 
         var services = new ServiceCollection().AddSora();
+        services.AddSoraDataVector();
         services.Configure<Sora.Data.Weaviate.WeaviateOptions>(o =>
         {
-            o.Endpoint = "http://localhost:8085";
+            o.Endpoint = fx.BaseUrl ?? "http://localhost:8085";
             o.DefaultTopK = 5;
             o.MaxTopK = 50;
             o.Dimension = 3;

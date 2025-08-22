@@ -4,7 +4,6 @@ using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using System;
 
 namespace Sora.Core.Observability;
 

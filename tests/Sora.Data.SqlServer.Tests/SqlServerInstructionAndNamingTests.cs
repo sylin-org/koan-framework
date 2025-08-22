@@ -1,10 +1,8 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Abstractions.Naming;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 

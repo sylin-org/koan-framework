@@ -1,11 +1,39 @@
 - name: Overview
   href: README.md
+- name: Engineering
+  items:
+    - name: Front door
+      href: engineering/index.md
+    - name: Contributor workflow
+      href: engineering/contributor-workflow.md
+    - name: Developer guidelines
+      href: engineering/developer-guidelines.md
+    - name: Docs engagement plan
+      href: engineering/docs-engagement-plan.md
+- name: Architecture Principles
+  href: architecture/principles.md
+- name: Reference
+  items:
+    - name: Data Access
+      href: reference/data-access.md
+    - name: Web
+      href: reference/web.md
+    - name: Messaging
+      href: reference/messaging.md
+    - name: AI
+      href: reference/ai.md
+    - name: Config & Constants
+      href: reference/config-and-constants.md
+    - name: Adapter Matrix
+      href: reference/adapter-matrix.md
 - name: Feature Catalog
   href: feature-catalog.md
 - name: Guides
   items:
     - name: Core
       href: guides/core/index.md
+    - name: Scheduling and Bootstrap
+      href: guides/scheduling-and-bootstrap.md
     - name: Data
       href: guides/data/index.md
     - name: Web
@@ -14,6 +42,10 @@
       href: guides/messaging/index.md
     - name: Adapters
       href: guides/adapters/index.md
+    - name: Building Data Adapters
+      href: guides/adapters/building-data-adapters.md
+    - name: Building Messaging Adapters
+      href: guides/adapters/building-messaging-adapters.md
     - name: AI
       items:
         - name: Overview

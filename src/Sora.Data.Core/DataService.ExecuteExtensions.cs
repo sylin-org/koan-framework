@@ -1,9 +1,5 @@
-using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core.Metadata;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sora.Data.Core;
 
@@ -20,11 +16,31 @@ public static class DataServiceExecuteExtensions
         // Determine the key type via AggregateMetadata and call GetRepository<TEntity,TKey>() reflectively
         var id = AggregateMetadata.GetIdSpec(typeof(TEntity)) ?? throw new InvalidOperationException($"No Identifier on {typeof(TEntity).Name}");
         var keyType = id.Prop.PropertyType;
-        var mi = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository));
+        // Prefer resolving the generic method on the concrete instance to avoid interface invocation quirks
+        var targetType = data.GetType();
+        var mi = targetType.GetMethod("GetRepository");
+        if (mi is null)
+        {
+            mi = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository));
+        }
         if (mi is null) throw new InvalidOperationException("IDataService.GetRepository method not found.");
         var gm = mi.MakeGenericMethod(typeof(TEntity), keyType);
-        // Invoke the generic method on the instance 'data' (target must be the instance for non-static methods)
-        var repo = gm.Invoke(data, Array.Empty<object>())!;
+        var repo = gm.Invoke(data, null)!;
+        if (repo is IInstructionExecutor<TEntity> exec)
+        {
+            return await exec.ExecuteAsync<TResult>(instruction, ct);
+        }
+        throw new NotSupportedException($"Repository for {typeof(TEntity).Name} does not support instruction '{instruction.Name}'.");
+    }
+
+    /// <summary>
+    /// Execute an instruction when the key type is already known, avoiding reflection.
+    /// </summary>
+    public static async Task<TResult> Execute<TEntity, TKey, TResult>(this IDataService data, Instruction instruction, CancellationToken ct = default)
+        where TEntity : class, Sora.Data.Abstractions.IEntity<TKey>
+        where TKey : notnull
+    {
+        var repo = data.GetRepository<TEntity, TKey>();
         if (repo is IInstructionExecutor<TEntity> exec)
         {
             return await exec.ExecuteAsync<TResult>(instruction, ct);

@@ -26,6 +26,5 @@ Well-known endpoints
 - See well-known-endpoints.md for `/.well-known/sora/*` routes.
 
 References
-- docs/15-entity-filtering-and-query.md
-- docs/12-cqrs-for-humans.md
-- docs/decisions/DATA-0032-paging-pushdown-and-in-memory-fallback.md
+- Filtering and query: see Reference/Data Access and WEB-0035 transformer guidance
+- ADR: DATA-0032 paging pushdown and in-memory fallback

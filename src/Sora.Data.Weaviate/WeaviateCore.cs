@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sora.Data.Abstractions;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 
@@ -33,13 +32,25 @@ internal sealed class WeaviateClient
         try
         {
             using var _ = WeaviateTelemetry.Activity.StartActivity("weaviate.ping");
-            var resp = await _http.GetAsync("/.well-known/ready", ct);
+            var path = "/.well-known/ready";
+            var url = new Uri(_http.BaseAddress!, path).AbsoluteUri;
+            _logger?.LogDebug("Weaviate ping: GET {Url}", url);
+            var resp = await _http.GetAsync(path, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var fallback = "/v1/.well-known/ready";
+                var fallbackUrl = new Uri(_http.BaseAddress!, fallback).AbsoluteUri;
+                _logger?.LogDebug("Weaviate ping: fallback GET {Url} (prior {Status})", fallbackUrl, (int)resp.StatusCode);
+                resp = await _http.GetAsync(fallback, ct);
+            }
             if (resp.IsSuccessStatusCode)
             {
                 // Optional version header
                 resp.Headers.TryGetValues("weaviate-version", out var values);
+                _logger?.LogDebug("Weaviate ping: ready ({Status})", (int)resp.StatusCode);
                 return (true, values?.FirstOrDefault());
             }
+            _logger?.LogDebug("Weaviate ping: not ready ({Status})", (int)resp.StatusCode);
             return (false, null);
         }
         catch (Exception ex)

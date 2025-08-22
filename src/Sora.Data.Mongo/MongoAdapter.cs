@@ -7,18 +7,12 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Sora.Core;
 using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
-using Sora.Data.Core;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sora.Data.Mongo;
+
 internal static class MongoTelemetry
 {
     public static readonly System.Diagnostics.ActivitySource Activity = new("Sora.Data.Mongo");
@@ -47,6 +41,7 @@ internal static class MongoConstants
 {
     public const string DefaultLocalUri = "mongodb://localhost:27017";
     public const string DefaultComposeUri = "mongodb://mongodb:27017";
+    public const string EnvList = Sora.Data.Mongo.Infrastructure.Constants.Discovery.EnvList; // comma/semicolon-separated list
 }
 
 public static class MongoRegistration
@@ -101,6 +96,26 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
             Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
+        // If an env list is provided, use the first reachable entry
+        try
+        {
+            var list = Environment.GetEnvironmentVariable(MongoConstants.EnvList);
+            if (!string.IsNullOrWhiteSpace(list))
+            {
+                foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var candidate = part.Trim();
+                    if (string.IsNullOrWhiteSpace(candidate)) continue;
+                    // Normalize scheme if missing
+                    var normalized = candidate.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) || candidate.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase)
+                        ? candidate
+                        : ("mongodb://" + candidate);
+                    if (TryMongoPing(normalized, TimeSpan.FromMilliseconds(250))) { options.ConnectionString = normalized; break; }
+                }
+            }
+        }
+        catch { /* best-effort */ }
+
         // Resolve from ConnectionStrings:Default when present. Override placeholder/empty.
         var cs = Sora.Core.Configuration.Read(config, Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, null);
         if (!string.IsNullOrWhiteSpace(cs))
@@ -110,8 +125,8 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
                 options.ConnectionString = cs!;
             }
         }
-        // Final safety default if still unset: prefer docker compose host when containerized
-        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+        // Final safety default if still unset or sentinel 'auto': prefer docker compose host when containerized
+        if (string.IsNullOrWhiteSpace(options.ConnectionString) || string.Equals(options.ConnectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
         {
             var inContainer = Sora.Core.SoraEnv.InContainer;
             options.ConnectionString = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
@@ -127,6 +142,20 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
                 options.ConnectionString = "mongodb://" + v;
             }
         }
+    }
+
+    private static bool TryMongoPing(string connectionString, TimeSpan timeout)
+    {
+        try
+        {
+            var settings = MongoClientSettings.FromConnectionString(connectionString);
+            settings.ServerSelectionTimeout = timeout;
+            var client = new MongoClient(settings);
+            // ping admin
+            client.GetDatabase("admin").RunCommand<BsonDocument>(new BsonDocument("ping", 1));
+            return true;
+        }
+        catch { return false; }
     }
 
     // Container detection uses SoraEnv static runtime snapshot per ADR-0039
@@ -266,9 +295,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
         act?.SetTag("entity", typeof(TEntity).FullName);
         // Guardrails: enforce server-side paging if possible to avoid unbounded materialization.
         var col = GetCollection();
-        var find = col.Find(Builders<TEntity>.Filter.Empty);
-        find = find.Limit(_defaultPageSize);
-        return await find.ToListAsync(ct);
+        // DATA-0061: no-options should return the complete set (no implicit limit)
+        return await col.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct);
     }
 
     public async Task<int> CountAsync(object? query, CancellationToken ct = default)
@@ -284,8 +312,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
         using var act = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
         act?.SetTag("entity", typeof(TEntity).FullName);
         var col = GetCollection();
-        var find = col.Find(predicate).Limit(_defaultPageSize);
-        return await find.ToListAsync(ct);
+        // DATA-0061: no-options should return the complete set for this predicate
+        return await col.Find(predicate).ToListAsync(ct);
     }
 
     public async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)

@@ -2,7 +2,13 @@
 
 This is the documentation root. Navigation is organized by domain pillars for clarity and growth:
 
-- Guides (concepts + how-to)
+- Engineering (front door)
+  - High-signal rules and quick links — see engineering/index.md
+  - Docs style and checklist — see engineering/docs-style-and-checklist.md
+- Architecture Principles
+  - Curated ADR digest — see architecture/principles.md
+
+- Guides (concepts)
   - Core: hosting, options, composition — see guides/core/
   - Data: repositories, filters, instructions, sets — see guides/data/
   - Web: controllers, transformers, health — see guides/web/

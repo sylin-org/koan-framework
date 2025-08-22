@@ -1,5 +1,3 @@
-using System;
-
 namespace Sora.Data.Cqrs;
 
 /// <summary>

@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
 using Sora.Domain;
