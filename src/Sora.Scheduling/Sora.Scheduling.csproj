@@ -6,6 +6,8 @@
     <RootNamespace>Sora.Scheduling</RootNamespace>
     <AssemblyName>Sora.Scheduling</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <Description>Scheduling primitives for Sora: orchestration helpers, coordination, and background job utilities.</Description>
+  <PackageTags>$(CommonPackageTags);scheduling;orchestrator;jobs;background</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />

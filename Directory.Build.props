@@ -21,7 +21,9 @@
   <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   <IncludeSymbols>true</IncludeSymbols>
   <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <PackageReadmeFile Condition="Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
+  <!-- Prefer a README.md in the project folder; fall back to repo root README.md -->
+  <PackageReadmeFile Condition="Exists('$(MSBuildProjectDirectory)\README.md')">README.md</PackageReadmeFile>
+  <PackageReadmeFile Condition="'$(PackageReadmeFile)' == '' and Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
     <PackageReleaseNotes>See release notes: https://github.com/sylin-labs/sora-framework/releases</PackageReleaseNotes>
     <!-- Common tags; projects can append by using $(CommonPackageTags) in their PackageTags -->
     <CommonPackageTags>sora;framework;modular;dotnet;aspnetcore;cqrs;ddd;messaging;data;opentelemetry</CommonPackageTags>
@@ -33,8 +35,9 @@
   <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Pack the repo README into each package root when present -->
-    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)README.md')" />
+  <!-- Pack project-level README if present; otherwise include repo README -->
+  <None Include="$(MSBuildProjectDirectory)\README.md" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildProjectDirectory)\README.md')" />
+  <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Condition="!Exists('$(MSBuildProjectDirectory)\README.md') and Exists('$(MSBuildThisFileDirectory)README.md')" />
     <!-- If you provide an icon.png at repo root, it will be packed and used automatically -->
     <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
   <None Include="$(MSBuildThisFileDirectory)resources\image\0_2.jpg" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)resources\image\0_2.jpg')" />
