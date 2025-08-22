@@ -40,6 +40,7 @@ internal static class MongoConstants
 {
     public const string DefaultLocalUri = "mongodb://localhost:27017";
     public const string DefaultComposeUri = "mongodb://mongodb:27017";
+    public const string EnvList = "SORA_DATA_MONGO_URLS"; // comma/semicolon-separated list of URIs
 }
 
 public static class MongoRegistration
@@ -94,6 +95,26 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
             Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
+        // If an env list is provided, use the first reachable entry
+        try
+        {
+            var list = Environment.GetEnvironmentVariable(MongoConstants.EnvList);
+            if (!string.IsNullOrWhiteSpace(list))
+            {
+                foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var candidate = part.Trim();
+                    if (string.IsNullOrWhiteSpace(candidate)) continue;
+                    // Normalize scheme if missing
+                    var normalized = candidate.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) || candidate.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase)
+                        ? candidate
+                        : ("mongodb://" + candidate);
+                    if (TryMongoPing(normalized, TimeSpan.FromMilliseconds(250))) { options.ConnectionString = normalized; break; }
+                }
+            }
+        }
+        catch { /* best-effort */ }
+
         // Resolve from ConnectionStrings:Default when present. Override placeholder/empty.
         var cs = Sora.Core.Configuration.Read(config, Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, null);
         if (!string.IsNullOrWhiteSpace(cs))
@@ -103,8 +124,8 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
                 options.ConnectionString = cs!;
             }
         }
-        // Final safety default if still unset: prefer docker compose host when containerized
-        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+        // Final safety default if still unset or sentinel 'auto': prefer docker compose host when containerized
+        if (string.IsNullOrWhiteSpace(options.ConnectionString) || string.Equals(options.ConnectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
         {
             var inContainer = Sora.Core.SoraEnv.InContainer;
             options.ConnectionString = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
@@ -120,6 +141,20 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
                 options.ConnectionString = "mongodb://" + v;
             }
         }
+    }
+
+    private static bool TryMongoPing(string connectionString, TimeSpan timeout)
+    {
+        try
+        {
+            var settings = MongoClientSettings.FromConnectionString(connectionString);
+            settings.ServerSelectionTimeout = timeout;
+            var client = new MongoClient(settings);
+            // ping admin
+            client.GetDatabase("admin").RunCommand<BsonDocument>(new BsonDocument("ping", 1));
+            return true;
+        }
+        catch { return false; }
     }
 
     // Container detection uses SoraEnv static runtime snapshot per ADR-0039

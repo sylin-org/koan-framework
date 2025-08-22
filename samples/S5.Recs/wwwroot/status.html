@@ -231,6 +231,7 @@
             if(k.includes('redis') || k.includes('cache')) return 'box';
             return 'activity';
           };
+          
           const mapStatus = (v)=> (v === true || v === 'Healthy') ? 'healthy' : ((v === false || v === 'Unhealthy') ? 'unhealthy' : 'warning');
           const mapText = (v)=> (v === true || v === 'Healthy') ? 'Operational' : ((v === false || v === 'Unhealthy') ? 'Unhealthy' : String(v));
           this.services = Object.keys(this.health).map(key=>({

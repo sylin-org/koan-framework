@@ -28,5 +28,6 @@ public static class Constants
         public const string DefaultCompose = "redis:6379";
         public const string EnvRedisUrl = "REDIS_URL";
         public const string EnvRedisConnectionString = "REDIS_CONNECTION_STRING";
+    public const string EnvRedisList = "SORA_DATA_REDIS_URLS"; // comma/semicolon-separated list of endpoints
     }
 }

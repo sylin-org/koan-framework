@@ -21,7 +21,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(opts.Endpoint) || IsDefault(opts.Endpoint))
+                // If Endpoint is not explicitly provided, left at default, or set to 'auto', try to self-configure
+                if (string.IsNullOrWhiteSpace(opts.Endpoint) || IsDefault(opts.Endpoint) || IsAuto(opts.Endpoint))
                 {
                     foreach (var url in CollectCandidateUrls())
                     {
@@ -51,24 +52,34 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     // Host-first discovery similar to Ollama
     private static IEnumerable<string> CollectCandidateUrls()
     {
-        // Ordered, de-duplicated list
+        // Ordered, de-duplicated list (env-list first, then host-first defaults)
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        string[] candidates = new[]
+        var ordered = new List<string>();
+        void Add(string? url)
         {
-            // Host machine mapped ports (dev compose)
-            "http://host.docker.internal:8080",
-            "http://localhost:8080",
-            // In-container default compose network name
-            "http://weaviate:8080",
-            // Conventional local default
-            "http://localhost:8085"
-        };
-        foreach (var c in candidates)
-        {
-            var u = c.TrimEnd('/');
-            if (seen.Add(u)) yield return u;
+            if (string.IsNullOrWhiteSpace(url)) return;
+            var u = url.Trim().TrimEnd('/');
+            if (seen.Add(u)) ordered.Add(u);
         }
+
+        // Read environment-driven list (comma/semicolon separated) for parity with Ollama
+        var list = Environment.GetEnvironmentVariable("SORA_DATA_WEAVIATE_URLS");
+        if (!string.IsNullOrWhiteSpace(list))
+        {
+            foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) Add(part);
+        }
+
+        // Well-known defaults in strict host-first order
+        Add("http://host.docker.internal:8080");
+        Add("http://localhost:8080");
+        Add("http://weaviate:8080");
+        Add("http://localhost:8085");
+
+        foreach (var u in ordered) yield return u;
     }
+
+    private static bool IsAuto(string endpoint)
+        => string.Equals(endpoint?.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
 
     private static bool Probe(string baseUrl, TimeSpan timeout)
     {
