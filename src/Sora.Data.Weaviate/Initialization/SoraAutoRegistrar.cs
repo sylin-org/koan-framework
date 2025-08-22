@@ -15,7 +15,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddOptions<WeaviateOptions>().BindConfiguration("Sora:Data:Weaviate").ValidateDataAnnotations();
+    services.AddOptions<WeaviateOptions>().BindConfiguration(Sora.Data.Weaviate.Infrastructure.Constants.Configuration.Section).ValidateDataAnnotations();
         // Post-configure: if Endpoint is not explicitly provided (or left at default), try to self-configure
         services.PostConfigure<WeaviateOptions>(opts =>
         {
@@ -63,17 +63,17 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         }
 
         // Read environment-driven list (comma/semicolon separated) for parity with Ollama
-        var list = Environment.GetEnvironmentVariable("SORA_DATA_WEAVIATE_URLS");
+    var list = Environment.GetEnvironmentVariable(Sora.Data.Weaviate.Infrastructure.Constants.Discovery.EnvList);
         if (!string.IsNullOrWhiteSpace(list))
         {
             foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) Add(part);
         }
 
         // Well-known defaults in strict host-first order
-        Add("http://host.docker.internal:8080");
-        Add("http://localhost:8080");
-        Add("http://weaviate:8080");
-        Add("http://localhost:8085");
+    Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.HostDocker}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
+    Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
+    Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.WellKnownServiceName}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
+    Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.LocalFallbackPort}");
 
         foreach (var u in ordered) yield return u;
     }

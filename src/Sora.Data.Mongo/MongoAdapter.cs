@@ -40,7 +40,7 @@ internal static class MongoConstants
 {
     public const string DefaultLocalUri = "mongodb://localhost:27017";
     public const string DefaultComposeUri = "mongodb://mongodb:27017";
-    public const string EnvList = "SORA_DATA_MONGO_URLS"; // comma/semicolon-separated list of URIs
+    public const string EnvList = Sora.Data.Mongo.Infrastructure.Constants.Discovery.EnvList; // comma/semicolon-separated list
 }
 
 public static class MongoRegistration
