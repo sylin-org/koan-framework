@@ -6,16 +6,26 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 
 - Core
   - Predictable apps by default (health/readiness, env flags, secure headers, boot reports, OpenTelemetry).
+  - Auto-registration pipeline (ISoraAutoRegistrar) with a unified bootstrap report (redacted in prod) and module Describe() coverage.
+  - Unified runtime/config helpers: SoraEnv snapshot + Sora.Core.Configuration.Read/ReadFirst for consistent, overridable settings.
 - Data
   - Adapter-agnostic persistence with capability discovery, pushdown-first performance, safe Direct escape hatch.
   - Production-ready adapters: Postgres, SQL Server, SQLite, MongoDB, Redis, and JSON file storage.
-  - Vector search capabilities with Weaviate adapter supporting schema management and KNN queries.
+  - Vector module split: Sora.Data.Vector (+ Abstractions) with auto-registration; default provider resolver precedence (attribute > vector defaults > source role > highest-priority data provider).
+  - Vector facade on Entity<T> and Vector<TEntity> helpers (Save/Delete/Search) for a simpler usage model.
+  - Weaviate adapter with schema management, KNN queries, and filter pushdown via GraphQL translator.
   - CQRS patterns with outbox support for MongoDB and event-driven architectures.
+  - Relational orchestration: [RelationalStorage] attribute + EnsureCreated orchestration with attribute > options precedence.
+  - Singleflight dedupe for in-flight operations across core and relational adapters.
 - Web
   - Controller-driven APIs (REST/GraphQL) with guardrails, content negotiation, consistent paging/filtering.
-  - Built-in Swagger/OpenAPI integration with idempotent registration and friendly defaults.
+  - Startup filter auto-wires the pipeline: UseDefaultFiles/UseStaticFiles (opt-in), routing, and MapControllers; well-known health endpoints (/health, /health/live, /health/ready).
+  - Built-in Swagger/OpenAPI auto-registered (dev-on by default; prod opt-in). Idempotent Add wiring; no explicit Add/Use calls required when the module is referenced.
   - HTTP payload transformers for flexible request/response shaping with auto-discovery.
   - GraphQL endpoints auto-generated from IEntity<> types with HotChocolate integration.
+- Scheduling
+  - Background job orchestrator with OnStartup tasks, per-task timeouts, health facts, and readiness gating. Auto-registered; tasks discovered via DI — no bespoke reflection.
+  - Sample: S5 bootstrap task seeds local data and optional vectors on first run without gating readiness by default.
 - Messaging
   - Capability-aware, cross-broker semantics (aliases, DLQ/retry, idempotency) with simple handler wiring.
   - RabbitMQ transport with resilient connection management and config-first options.
@@ -27,6 +37,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - Weaviate vector database adapter with GraphQL query translation and KNN search capabilities.
 - Services & DX
   - Fast onboarding (Tiny\* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
+  - Auto-registration across modules reduces boilerplate; templates and samples rely on controllers-only routing (no inline endpoints).
 
 ## Scenarios and benefits
 
@@ -38,6 +49,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - AI assist & RAG: `/ai/chat` with SSE, `/ai/embed`, and `/ai/rag/query` with citations; Redis vector and cache by default; Weaviate and pgvector support.
 - Vector operations: Multi-provider vector search (Redis HNSW, Weaviate GraphQL, planned pgvector) with unified query interface.
 - Data bridge: snapshot export/import (JSONL/CSV/Parquet), CDC via Debezium/Kafka, virtualization (composed reads), scheduled materialization.
+- First-run bootstrap: schedule startup tasks to seed local data and vectors, with readiness gating disabled by default (opt-in when needed).
 
 ## Strategic opportunities
 
@@ -45,6 +57,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Progressive hardening: start permissive in dev; tighten paging caps, CSP, DDL policy, discovery gating.
 - Polyglot without chaos: capability flags make differences explicit; shared policy (naming, projection, pushdown).
 - Observability-first: spans/metrics + boot reports enable SLOs and faster incident response.
+  - Explicit opt-in for OpenTelemetry via AddSoraObservability() to avoid surprise telemetry and double-pipeline conflicts; configurable via Sora:Observability.
 - On-ramp path: adapters → transfer/replication → AI-aware indexing → RAG—value compounds with low switching cost.
 - Protocol interop: optional adapters for gRPC (internal), OpenAI-compatible shim, MCP (Model Context Protocol), and AI-RPC to meet teams where they are.
 
@@ -80,7 +93,6 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - CDC (D2): Debezium/Kafka → EntityChange stream; replicators to Postgres/Mongo with idempotency.
   - AI-aware indexer (D3): embed-on-change with Redis vector; embedding versioning and invalidation.
   - Vector & RAG (V1/R1): Redis vector + cache; `/ai/chat` (SSE), `/ai/embed`, `/ai/rag/query`; ai-probe.ps1.
-  - Vector contracts (implemented): Sora.Data.Vector (IVectorSearchRepository, options, instructions) with Weaviate adapter; see ADR DATA-0054 and guides/adapters/vector-search.md.
   - AI provider ecosystem: Ollama integration for local models with streaming and health checks; OpenAI-compatible patterns.
 
 - Foundations

@@ -4,6 +4,10 @@
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(SORA_ENABLE_S4_TESTS)' != '1'">
+    <!-- Prevent test discovery/execution locally unless explicitly enabled -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
     <PackageReference Include="FluentAssertions" Version="6.12.0" />

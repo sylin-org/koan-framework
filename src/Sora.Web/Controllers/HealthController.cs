@@ -26,6 +26,8 @@ public sealed class HealthController(IHostEnvironment env, IHealthAggregator agg
     public async Task<IActionResult> Ready()
     {
         await Task.Yield(); // keep signature async-friendly
+                            // Invite contributors to refresh status synchronously via bridge
+        aggregator.RequestProbe(ProbeReason.PolicyRefresh, component: null);
         var snap = aggregator.GetSnapshot();
 
         object payload = env.IsDevelopment()
@@ -44,12 +46,13 @@ public sealed class HealthController(IHostEnvironment env, IHealthAggregator agg
             }
             : new { status = snap.Overall.ToString().ToLowerInvariant() };
 
+        Response.Headers["Cache-Control"] = SoraWebConstants.Policies.NoStore;
         if (snap.Overall == HealthStatus.Unhealthy)
         {
-            Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            // Important: return an ObjectResult with 503, not Ok(payload) which would override the status code.
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, payload);
         }
 
-        Response.Headers["Cache-Control"] = SoraWebConstants.Policies.NoStore;
         return Ok(payload);
     }
 }

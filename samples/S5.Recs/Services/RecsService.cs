@@ -34,6 +34,9 @@ internal sealed class RecsService : IRecsService
 
     public async Task<(IReadOnlyList<Recommendation> items, bool degraded)> QueryAsync(string? text, string? anchorAnimeId, string[]? genres, int? episodesMax, bool spoilerSafe, int topK, string? userId, CancellationToken ct)
     {
+        // Guardrails: sensible defaults and caps for K
+        if (topK <= 0) topK = 10; // avoid empty results when a caller sends 0
+        if (topK > 50) topK = 50; // keep requests light for the sample
         // Try vector-first if text or anchor provided
         _logger?.LogInformation("Query: text='{Text}' anchor='{Anchor}' genres=[{Genres}] episodesMax={EpisodesMax} spoilerSafe={SpoilerSafe} topK={TopK} user={UserId}",
             text, anchorAnimeId, genres is null ? string.Empty : string.Join(',', genres), episodesMax, spoilerSafe, topK, userId);
@@ -46,10 +49,13 @@ internal sealed class RecsService : IRecsService
                 {
                     // Derive simple embedding using AI core for the query; avoid blocking on seed
                     var ai = Sora.AI.Ai.TryResolve();
+                    _logger?.LogDebug("AI resolve: {Resolved}", ai is null ? "null" : ai.GetType().Name);
                     if (ai is not null)
                     {
+                        _logger?.LogDebug("Embedding query text len={Len}", text!.Length);
                         var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { text! } }, ct);
                         query = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+                        _logger?.LogDebug("Embedding result: dim={Dim}", query.Length);
                     }
                     else query = Array.Empty<float>();
                 }
@@ -69,6 +75,7 @@ internal sealed class RecsService : IRecsService
                     AiEmbeddingsResponse? emb = textAnchor is not null && ai is not null
                         ? await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { textAnchor } }, ct)
                         : null;
+                    _logger?.LogDebug("Anchor embedding: text?={HasText} dim={Dim}", textAnchor is not null, emb?.Vectors.FirstOrDefault()?.Length ?? 0);
                     query = emb?.Vectors.FirstOrDefault() ?? Array.Empty<float>();
                 }
                 else query = Array.Empty<float>();
@@ -81,7 +88,7 @@ internal sealed class RecsService : IRecsService
                         var prof = await UserProfileDoc.Get(userId, ct);
                         if (prof?.PrefVector is { Length: > 0 } pv && pv.Length == query.Length)
                         {
-                _logger?.LogDebug("Query: blending profile vector for user {UserId}", userId);
+                            _logger?.LogDebug("Query: blending profile vector for user {UserId}", userId);
                             var blended = new float[query.Length];
                             for (int i = 0; i < query.Length; i++)
                             {
@@ -108,38 +115,38 @@ internal sealed class RecsService : IRecsService
                         profile = await UserProfileDoc.Get(userId, ct);
                     }
 
-            var mapped = q
-                        .Select(a =>
-                        {
-                            var vs = idToScore.TryGetValue(a.Id, out var s) ? s : 0d;
-                            var pop = a.Popularity;
-                            var genreBoost = 0d;
-                            if (profile?.GenreWeights is { Count: > 0 } && a.Genres is { Length: > 0 })
-                            {
-                                foreach (var g in a.Genres)
+                    var mapped = q
+                                .Select(a =>
                                 {
-                                    if (profile.GenreWeights.TryGetValue(g, out var w)) genreBoost += w;
-                                }
-                                genreBoost /= Math.Max(1, a.Genres.Length);
-                            }
-                            var hasSpoiler = spoilerSafe && Constants.Spoilers.Keywords.Any(k => a.Synopsis?.Contains(k, StringComparison.OrdinalIgnoreCase) == true);
-                var spoilerPenalty = hasSpoiler ? Constants.Scoring.SpoilerPenalty : 0.0;
-                var hybrid = Constants.Scoring.VectorWeight * vs + Constants.Scoring.PopularityWeight * pop + Constants.Scoring.GenreWeight * genreBoost;
-                            hybrid *= (1.0 - spoilerPenalty);
-                            var reasons = new List<string> { "vector" };
-                            if (genreBoost > 0) reasons.Add("genre");
-                if (pop > Constants.Scoring.PopularityHotThreshold) reasons.Add("popular");
-                            if (spoilerPenalty > 0) reasons.Add("spoiler-safe");
-                            return new Recommendation
-                            {
-                                Anime = new Anime { Id = a.Id, Title = a.Title, Genres = a.Genres, Episodes = a.Episodes, Synopsis = a.Synopsis, Popularity = a.Popularity },
-                                Score = hybrid,
-                                Reasons = reasons.ToArray()
-                            };
-                        })
-                        .OrderByDescending(r => r.Score)
-                        .Take(topK)
-                        .ToList();
+                                    var vs = idToScore.TryGetValue(a.Id, out var s) ? s : 0d;
+                                    var pop = a.Popularity;
+                                    var genreBoost = 0d;
+                                    if (profile?.GenreWeights is { Count: > 0 } && a.Genres is { Length: > 0 })
+                                    {
+                                        foreach (var g in a.Genres)
+                                        {
+                                            if (profile.GenreWeights.TryGetValue(g, out var w)) genreBoost += w;
+                                        }
+                                        genreBoost /= Math.Max(1, a.Genres.Length);
+                                    }
+                                    var hasSpoiler = spoilerSafe && Constants.Spoilers.Keywords.Any(k => a.Synopsis?.Contains(k, StringComparison.OrdinalIgnoreCase) == true);
+                                    var spoilerPenalty = hasSpoiler ? Constants.Scoring.SpoilerPenalty : 0.0;
+                                    var hybrid = Constants.Scoring.VectorWeight * vs + Constants.Scoring.PopularityWeight * pop + Constants.Scoring.GenreWeight * genreBoost;
+                                    hybrid *= (1.0 - spoilerPenalty);
+                                    var reasons = new List<string> { "vector" };
+                                    if (genreBoost > 0) reasons.Add("genre");
+                                    if (pop > Constants.Scoring.PopularityHotThreshold) reasons.Add("popular");
+                                    if (spoilerPenalty > 0) reasons.Add("spoiler-safe");
+                                    return new Recommendation
+                                    {
+                                        Anime = new Anime { Id = a.Id, Title = a.Title, Genres = a.Genres, Episodes = a.Episodes, Synopsis = a.Synopsis, Popularity = a.Popularity },
+                                        Score = hybrid,
+                                        Reasons = reasons.ToArray()
+                                    };
+                                })
+                                .OrderByDescending(r => r.Score)
+                                .Take(topK)
+                                .ToList();
                     _logger?.LogInformation("Query: vector path returned {Count} items (degraded=false)", mapped.Count);
                     return (mapped, false);
                 }
@@ -151,18 +158,18 @@ internal sealed class RecsService : IRecsService
         IEnumerable<Anime> f = _demo;
         if (genres is { Length: > 0 }) f = f.Where(a => a.Genres.Intersect(genres).Any());
         if (episodesMax is int em) f = f.Where(a => a.Episodes is null || a.Episodes <= em);
-    var items = f.Select(a => new Recommendation { Anime = a, Score = a.Popularity, Reasons = new[]{"demo","popularity"} }).Take(topK).ToList();
-    _logger?.LogInformation("Query: demo fallback returned {Count} items (degraded=true)", items.Count);
+        var items = f.Select(a => new Recommendation { Anime = a, Score = a.Popularity, Reasons = new[] { "demo", "popularity" } }).Take(topK).ToList();
+        _logger?.LogInformation("Query: demo fallback returned {Count} items (degraded=true)", items.Count);
         return (items, true);
     }
 
     public async Task RateAsync(string userId, string animeId, int rating, CancellationToken ct)
     {
-    _logger?.LogInformation("Rating: user={UserId} anime={AnimeId} rating={Rating}", userId, animeId, rating);
-    var data = (IDataService?)_sp.GetService(typeof(IDataService));
+        _logger?.LogInformation("Rating: user={UserId} anime={AnimeId} rating={Rating}", userId, animeId, rating);
+        var data = (IDataService?)_sp.GetService(typeof(IDataService));
         if (data is null) return;
-    // Upsert rating
-    await RatingDoc.UpsertMany(new[]{ new RatingDoc
+        // Upsert rating
+        await RatingDoc.UpsertMany(new[]{ new RatingDoc
         {
             Id = $"{userId}:{animeId}",
             UserId = userId,
@@ -172,9 +179,9 @@ internal sealed class RecsService : IRecsService
     } }, ct);
 
         // Update profile genre weights using simple EWMA
-    var a = await AnimeDoc.Get(animeId, ct);
+        var a = await AnimeDoc.Get(animeId, ct);
         if (a is null) return;
-    var profile = await UserProfileDoc.Get(userId, ct) ?? new UserProfileDoc { Id = userId };
+        var profile = await UserProfileDoc.Get(userId, ct) ?? new UserProfileDoc { Id = userId };
         const double alpha = 0.3; // smoothing factor
         foreach (var g in a.Genres ?? Array.Empty<string>())
         {
@@ -210,8 +217,8 @@ internal sealed class RecsService : IRecsService
         }
         catch { /* optional */ }
         profile.UpdatedAt = DateTimeOffset.UtcNow;
-    await UserProfileDoc.UpsertMany(new[]{ profile }, ct);
-    _logger?.LogDebug("Rating: updated profile for user {UserId} (genres={Count}, vec={VecLen})", userId, profile.GenreWeights.Count, profile.PrefVector?.Length ?? 0);
+        await UserProfileDoc.UpsertMany(new[] { profile }, ct);
+        _logger?.LogDebug("Rating: updated profile for user {UserId} (genres={Count}, vec={VecLen})", userId, profile.GenreWeights.Count, profile.PrefVector?.Length ?? 0);
     }
 
     private static string BuildEmbeddingText(Anime a)

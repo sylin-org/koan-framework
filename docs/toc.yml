@@ -6,6 +6,8 @@
   items:
     - name: Core
       href: guides/core/index.md
+    - name: Scheduling and Bootstrap
+      href: guides/scheduling-and-bootstrap.md
     - name: Data
       href: guides/data/index.md
     - name: Web

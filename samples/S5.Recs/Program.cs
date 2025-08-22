@@ -1,11 +1,7 @@
 using Sora.Core.Observability;
 using Sora.Data.Core;
-using Sora.Data.Mongo;
 using Sora.Web;
 using Sora.Web.Swagger;
-using Sora.AI;
-using Sora.Ai.Provider.Ollama;
-using Sora.Data.Weaviate;
 using Sora.Data.Vector;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,28 +12,25 @@ builder.Services.AddSora()
     .WithRateLimit();
 
 builder.Services.AddSoraObservability();
-builder.Services.AddControllers();
-builder.Services.AddHttpClient();
-builder.Services.AddSoraDataVector();
+// Ensure local data folders exist for offline/bootstrap flows
+Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.OfflineData))!);
+Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.SeedCache));
 
-// AI core + Ollama provider (auto-discovers endpoints in Dev; configurable via Sora:Ai)
-builder.Services.AddAi(builder.Configuration);
-builder.Services.AddOllamaFromConfig();
-builder.Services.AddOptions<WeaviateOptions>()
-    .BindConfiguration("Sora:Data:Weaviate")
-    .PostConfigure(opts =>
-    {
-        if (string.IsNullOrWhiteSpace(opts.Endpoint))
-        {
-            var inContainer = string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase);
-            // Prefer container DNS when inside compose; otherwise host-exposed port per OPS-0014
-            opts.Endpoint = inContainer ? "http://weaviate:8080" : "http://localhost:5082";
-        }
-    });
+// AI, Ollama, and Weaviate are auto-registered by their modules via Sora.Core discovery
 
 // Local services
 builder.Services.AddSingleton<S5.Recs.Services.ISeedService, S5.Recs.Services.SeedService>();
 builder.Services.AddSingleton<S5.Recs.Services.IRecsService, S5.Recs.Services.RecsService>();
+// Scheduling: tasks are auto-discovered and registered by Sora.Scheduling's auto-registrar
+// Scheduling defaults for S5: don't gate readiness; ensure bootstrap runs on startup
+builder.Services.AddOptions<Sora.Scheduling.SchedulingOptions>()
+    .Bind(builder.Configuration.GetSection("Sora:Scheduling"))
+    .PostConfigure(opts =>
+    {
+        opts.ReadinessGate = false;
+        if (!opts.Jobs.ContainsKey("s5:bootstrap"))
+            opts.Jobs["s5:bootstrap"] = new Sora.Scheduling.SchedulingOptions.JobOptions { OnStartup = true };
+    });
 
 // Discover and register all IAnimeProvider implementations in this assembly
 var providerInterface = typeof(S5.Recs.Providers.IAnimeProvider);
@@ -48,17 +41,11 @@ foreach (var t in providerTypes)
     builder.Services.AddSingleton(providerInterface, t);
 }
 
-// Optional Mongo for document storage; reads defaults from env/config
-builder.Services.AddMongoAdapter();
+// Mongo adapter is auto-registered by its module via Sora.Core discovery
 
 var app = builder.Build();
 
-app.UseDefaultFiles();
-app.UseStaticFiles();
-
-app.UseSoraSwagger();
-
-app.MapControllers();
+// Sora.Web startup filter auto-wires static files, controller routing, and Swagger
 
 app.Run();
 

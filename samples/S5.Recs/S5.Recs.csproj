@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\Sora.AI\Sora.AI.csproj" />
     <ProjectReference Include="..\..\src\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Sora.Ai.Provider.Ollama\Sora.Ai.Provider.Ollama.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Scheduling\Sora.Scheduling.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>

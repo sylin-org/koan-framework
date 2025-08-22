@@ -36,6 +36,8 @@ public sealed class HealthAggregatorOptions
         public bool TreatUnknownAsDegradedForRequired { get; set; } = true;
         public List<string> RequiredComponents { get; set; } = new();
         public List<string> OptionalComponents { get; set; } = new();
+        // When true, overall readiness only considers components marked as critical by contributors.
+        public bool ConsiderOnlyCriticalForOverall { get; set; } = true;
         public int DegradedComponentsThreshold { get; set; } = 1;
     }
 

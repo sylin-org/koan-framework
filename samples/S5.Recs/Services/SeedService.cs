@@ -10,7 +10,6 @@ using Sora.Data.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using Sora.Data.Vector;
 using S5.Recs.Providers;
 using Sora.Data.Vector;
 
@@ -19,6 +18,7 @@ namespace S5.Recs.Services;
 public interface ISeedService
 {
     Task<string> StartAsync(string source, int limit, bool overwrite, CancellationToken ct);
+    Task<string> StartVectorUpsertAsync(IEnumerable<S5.Recs.Models.AnimeDoc> items, CancellationToken ct);
     Task<object> GetStatusAsync(string jobId, CancellationToken ct);
     Task<(int anime, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct);
 }
@@ -42,29 +42,57 @@ internal sealed class SeedService : ISeedService
 
     public Task<string> StartAsync(string source, int limit, bool overwrite, CancellationToken ct)
     {
-    Directory.CreateDirectory(_cacheDir);
+        Directory.CreateDirectory(_cacheDir);
         var jobId = Guid.NewGuid().ToString("n");
-    _progress[jobId] = (0,0,0,0,false,null);
-    _logger?.LogInformation("Seeding job {JobId} started. source={Source} limit={Limit} overwrite={Overwrite}", jobId, source, limit, overwrite);
+        _progress[jobId] = (0, 0, 0, 0, false, null);
+        _logger?.LogInformation("Seeding job {JobId} started. source={Source} limit={Limit} overwrite={Overwrite}", jobId, source, limit, overwrite);
         _ = Task.Run(async () =>
         {
             try
             {
                 var data = await FetchFromProviderAsync(source, limit, ct);
-        _progress[jobId] = (data.Count, data.Count, 0, 0,false,null);
-        _logger?.LogInformation("Seeding job {JobId}: fetched and normalized {Count} items", jobId, data.Count);
+                _progress[jobId] = (data.Count, data.Count, 0, 0, false, null);
+                _logger?.LogInformation("Seeding job {JobId}: fetched and normalized {Count} items", jobId, data.Count);
                 var embedded = await EmbedAndIndexAsync(data, ct);
-        _logger?.LogInformation("Seeding job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
+                _logger?.LogInformation("Seeding job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
                 var imported = await ImportMongoAsync(data, ct);
-        _progress[jobId] = (data.Count, data.Count, embedded, imported,true,null);
-        _logger?.LogInformation("Seeding job {JobId}: imported {Imported} docs into Mongo", jobId, imported);
+                _progress[jobId] = (data.Count, data.Count, embedded, imported, true, null);
+                _logger?.LogInformation("Seeding job {JobId}: imported {Imported} docs into Mongo", jobId, imported);
                 await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest.json"), JsonSerializer.Serialize(new { jobId, count = data.Count, at = DateTimeOffset.UtcNow }), ct);
-        _logger?.LogInformation("Seeding job {JobId} completed. Manifest written.", jobId);
+                _logger?.LogInformation("Seeding job {JobId} completed. Manifest written.", jobId);
             }
             catch (Exception ex)
             {
-        _progress[jobId] = (_progress[jobId].Fetched, _progress[jobId].Normalized, _progress[jobId].Embedded, _progress[jobId].Imported, true, ex.Message);
-        _logger?.LogError(ex, "Seeding job {JobId} failed: {Error}", jobId, ex.Message);
+                _progress[jobId] = (_progress[jobId].Fetched, _progress[jobId].Normalized, _progress[jobId].Embedded, _progress[jobId].Imported, true, ex.Message);
+                _logger?.LogError(ex, "Seeding job {JobId} failed: {Error}", jobId, ex.Message);
+            }
+        }, ct);
+        return Task.FromResult(jobId);
+    }
+
+    // Overload: Start a vector-only job from a provided list of AnimeDoc entities
+    public Task<string> StartVectorUpsertAsync(IEnumerable<S5.Recs.Models.AnimeDoc> itemss, CancellationToken ct)
+    {
+        var items = itemss.ToList();
+
+        Directory.CreateDirectory(_cacheDir);
+        var jobId = Guid.NewGuid().ToString("n");
+        var count = items?.Count ?? 0;
+        _progress[jobId] = (count, count, 0, 0, false, null);
+        _logger?.LogInformation("Vector-only upsert job {JobId} started from provided items. count={Count}", jobId, count);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var embedded = await UpsertVectorsAsync(items ?? [], ct);
+                _progress[jobId] = (count, count, embedded, 0, true, null);
+                _logger?.LogInformation("Vector-only job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
+                await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest-vectors.json"), JsonSerializer.Serialize(new { jobId, count = count, at = DateTimeOffset.UtcNow }), ct);
+            }
+            catch (Exception ex)
+            {
+                _progress[jobId] = (_progress[jobId].Fetched, _progress[jobId].Normalized, _progress[jobId].Embedded, _progress[jobId].Imported, true, ex.Message);
+                _logger?.LogError(ex, "Vector-only job {JobId} failed: {Error}", jobId, ex.Message);
             }
         }, ct);
         return Task.FromResult(jobId);
@@ -72,10 +100,10 @@ internal sealed class SeedService : ISeedService
 
     public Task<object> GetStatusAsync(string jobId, CancellationToken ct)
     {
-    var p = _progress.TryGetValue(jobId, out var prog) ? prog : (Fetched:0, Normalized:0, Embedded:0, Imported:0, Completed:false, Error:(string?)null);
-    _logger?.LogDebug("Seeding job {JobId} status requested: state={State} fetched={Fetched} normalized={Normalized} embedded={Embedded} imported={Imported}", jobId, p.Completed ? (p.Error is null ? "completed" : "failed") : "running", p.Fetched, p.Normalized, p.Embedded, p.Imported);
-    var state = p.Completed ? (p.Error is null ? "completed" : "failed") : "running";
-    return Task.FromResult<object>(new { jobId, state, error = p.Error, progress = new { fetched = p.Fetched, normalized = p.Normalized, embedded = p.Embedded, imported = p.Imported } });
+        var p = _progress.TryGetValue(jobId, out var prog) ? prog : (Fetched: 0, Normalized: 0, Embedded: 0, Imported: 0, Completed: false, Error: (string?)null);
+        //_logger?.LogDebug("Seeding job {JobId} status requested: state={State} fetched={Fetched} normalized={Normalized} embedded={Embedded} imported={Imported}", jobId, p.Completed ? (p.Error is null ? "completed" : "failed") : "running", p.Fetched, p.Normalized, p.Embedded, p.Imported);
+        var state = p.Completed ? (p.Error is null ? "completed" : "failed") : "running";
+        return Task.FromResult<object>(new { jobId, state, error = p.Error, progress = new { fetched = p.Fetched, normalized = p.Normalized, embedded = p.Embedded, imported = p.Imported } });
     }
 
     public async Task<(int anime, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct)
@@ -158,6 +186,8 @@ internal sealed class SeedService : ISeedService
         }
     }
 
+    // (Removed) Mongo fetch helpers replaced by direct use of AnimeDoc.All(ct) for small collections
+
     private async Task<int> EmbedAndIndexAsync(List<Anime> items, CancellationToken ct)
     {
         try
@@ -165,6 +195,11 @@ internal sealed class SeedService : ISeedService
             var ai = Sora.AI.Ai.TryResolve();
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
+            if (!Vector<AnimeDoc>.IsAvailable)
+            {
+                _logger?.LogWarning("Vector repository unavailable. Configure a vector engine (e.g., Weaviate) and set Sora:Data:Weaviate:Endpoint. In Docker compose, ensure service 'weaviate' is running and reachable.");
+                return 0;
+            }
             // Use the facade; degrade gracefully if no vector adapter is configured
 
             var opts = (IOptions<OllamaOptions>?)_sp.GetService(typeof(IOptions<OllamaOptions>));
@@ -189,13 +224,67 @@ internal sealed class SeedService : ISeedService
                 {
                     up = await Vector<AnimeDoc>.Save(tuples, ct);
                 }
-                catch (InvalidOperationException)
+                catch (InvalidOperationException ex)
                 {
-                    _logger?.LogWarning("Vector repository unavailable. Skipping vector upsert.");
+                    _logger?.LogWarning(ex, "Vector repository unavailable or rejected upsert. Skipping vector upsert. Ensure Sora:Data:Weaviate:Endpoint is configured and reachable. Details: {Message}", ex.Message);
                     return 0;
                 }
                 total += up;
                 _logger?.LogInformation("Vector upsert: batch {BatchStart}-{BatchEnd} size={Size} upserted={Upserted}", i + 1, Math.Min(i + batch.Count, items.Count), batch.Count, up);
+            }
+            return total;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    // New: Upsert vectors for an existing set of AnimeDoc entities in one go
+    private async Task<int> UpsertVectorsAsync(List<S5.Recs.Models.AnimeDoc> docss, CancellationToken ct)
+    {
+        try
+        {
+
+            var docs = docss.ToList();
+
+            var ai = Sora.AI.Ai.TryResolve();
+            var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
+            if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
+            if (!Vector<AnimeDoc>.IsAvailable)
+            {
+                _logger?.LogWarning("Vector repository unavailable. Configure a vector engine (e.g., Weaviate) and set Sora:Data:Weaviate:Endpoint. In Docker compose, ensure service 'weaviate' is running and reachable.");
+                return 0;
+            }
+
+            var opts = (IOptions<OllamaOptions>?)_sp.GetService(typeof(IOptions<OllamaOptions>));
+            var model = opts?.Value?.Model ?? "all-minilm";
+
+            const int batchSize = 32;
+            int total = 0;
+            for (int i = 0; i < docs.Count; i += batchSize)
+            {
+                var batch = docs.Skip(i).Take(batchSize).ToList();
+                var inputs = batch.Select(d => ($"{d.Title}\n\n{d.Synopsis}\n\nTags: {string.Join(", ", d.Genres ?? Array.Empty<string>())}").Trim()).ToList();
+                var emb = await ai.EmbedAsync(new Sora.AI.Contracts.Models.AiEmbeddingsRequest { Input = inputs, Model = model }, ct);
+                var tuples = new List<(string Id, float[] Embedding, object? Metadata)>(batch.Count);
+                for (int j = 0; j < batch.Count && j < emb.Vectors.Count; j++)
+                {
+                    var d = batch[j];
+                    tuples.Add((d.Id!, emb.Vectors[j], new { title = d.Title, genres = d.Genres, popularity = d.Popularity }));
+                }
+                int up;
+                try
+                {
+                    up = await Vector<AnimeDoc>.Save(tuples, ct);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger?.LogWarning(ex, "Vector repository unavailable or rejected upsert. Skipping vector upsert. Ensure Sora:Data:Weaviate:Endpoint is configured and reachable. Details: {Message}", ex.Message);
+                    return total;
+                }
+                total += up;
+                _logger?.LogInformation("Vector upsert (docs): batch {BatchStart}-{BatchEnd} size={Size} upserted={Upserted}", i + 1, Math.Min(i + batch.Count, docs.Count), batch.Count, up);
             }
             return total;
         }

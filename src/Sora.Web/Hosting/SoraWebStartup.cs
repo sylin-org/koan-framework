@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
 using Sora.Core;
@@ -56,6 +57,21 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                             return Task.CompletedTask;
                         });
                         return next();
+                    });
+                }
+                // Lightweight health alias: if configured, respond to GET {HealthPath} with { status: "ok" }
+                if (!string.IsNullOrWhiteSpace(opts.HealthPath))
+                {
+                    app.Use(async (ctx, next) =>
+                    {
+                        if (HttpMethods.IsGet(ctx.Request.Method)
+                            && string.Equals(ctx.Request.Path.Value, opts.HealthPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            ctx.Response.Headers[SoraWebConstants.Headers.XContentTypeOptions] = SoraWebConstants.Policies.NoSniff;
+                            await ctx.Response.WriteAsJsonAsync(new { status = "ok" });
+                            return;
+                        }
+                        await next();
                     });
                 }
                 if (opts.AutoMapControllers)

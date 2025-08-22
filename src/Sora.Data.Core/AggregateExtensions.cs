@@ -300,13 +300,79 @@ public static class Data<TEntity, TKey>
         => Repo as IWriteCapabilities ?? new WriteCapsImpl(WriteCapabilities.None);
 
     public static Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default) => Repo.GetAsync(id, ct);
-    public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default) => Repo.QueryAsync(null, ct);
-    public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => (Repo as ILinqQueryRepository<TEntity, TKey>)?.QueryAsync(predicate, ct)
-           ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
-    public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
-        => (Repo as IStringQueryRepository<TEntity, TKey>)?.QueryAsync(query, ct)
-           ?? throw new System.NotSupportedException("String queries are not supported by this repository.");
+
+    // Materialize entire set even if adapter enforces a default page size; we page internally using options where available
+    public static async Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
+    {
+        // If the repository supports options, loop pages to avoid silent truncation
+        if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
+        {
+            var acc = new List<TEntity>(capacity: Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
+            int page = 1;
+            int fetched;
+            do
+            {
+                ct.ThrowIfCancellationRequested();
+                var opts = new DataQueryOptions(page, Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
+                var batch = await repoOpts.QueryAsync(null, opts, ct).ConfigureAwait(false);
+                fetched = batch.Count;
+                if (fetched == 0) break;
+                acc.AddRange(batch);
+                page++;
+            } while (fetched == Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
+            return acc;
+        }
+        // Fall back to direct call when adapter does not cap by default
+        return await Repo.QueryAsync(null, ct).ConfigureAwait(false);
+    }
+
+    public static async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    {
+        if (Repo is ILinqQueryRepositoryWithOptions<TEntity, TKey> lrepoOpts)
+        {
+            var acc = new List<TEntity>(capacity: Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
+            int page = 1;
+            int fetched;
+            do
+            {
+                ct.ThrowIfCancellationRequested();
+                var opts = new DataQueryOptions(page, Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
+                var batch = await lrepoOpts.QueryAsync(predicate, opts, ct).ConfigureAwait(false);
+                fetched = batch.Count;
+                if (fetched == 0) break;
+                acc.AddRange(batch);
+                page++;
+            } while (fetched == Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
+            return acc;
+        }
+        if (Repo is ILinqQueryRepository<TEntity, TKey> lrepo)
+            return await lrepo.QueryAsync(predicate, ct).ConfigureAwait(false);
+        throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
+    }
+
+    public static async Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
+    {
+        if (Repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
+        {
+            var acc = new List<TEntity>(capacity: Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
+            int page = 1;
+            int fetched;
+            do
+            {
+                ct.ThrowIfCancellationRequested();
+                var opts = new DataQueryOptions(page, Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
+                var batch = await srepoOpts.QueryAsync(query, opts, ct).ConfigureAwait(false);
+                fetched = batch.Count;
+                if (fetched == 0) break;
+                acc.AddRange(batch);
+                page++;
+            } while (fetched == Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
+            return acc;
+        }
+        if (Repo is IStringQueryRepository<TEntity, TKey> srepo)
+            return await srepo.QueryAsync(query, ct).ConfigureAwait(false);
+        throw new System.NotSupportedException("String queries are not supported by this repository.");
+    }
     public static Task<int> CountAllAsync(CancellationToken ct = default)
         => Repo.CountAsync(null, ct);
     public static Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -320,6 +386,81 @@ public static class Data<TEntity, TKey>
     public static Task<int> DeleteAllAsync(CancellationToken ct = default) => Repo.DeleteAllAsync(ct);
     public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertManyAsync(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
+
+    // Streaming helpers (IAsyncEnumerable), stable iteration using options page loops
+    public static async IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var size = batchSize is int bs && bs > 0 ? bs : Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize;
+        if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
+        {
+            int page = 1;
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+                var opts = new DataQueryOptions(page, size);
+                var batch = await repoOpts.QueryAsync(null, opts, ct).ConfigureAwait(false);
+                if (batch.Count == 0) yield break;
+                foreach (var item in batch) yield return item;
+                if (batch.Count < size) yield break;
+                page++;
+            }
+        }
+        else
+        {
+            var all = await Repo.QueryAsync(null, ct).ConfigureAwait(false);
+            foreach (var item in all) yield return item;
+        }
+    }
+
+    public static async IAsyncEnumerable<TEntity> QueryStream(string query, int? batchSize = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var size = batchSize is int bs && bs > 0 ? bs : Sora.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize;
+        if (Repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
+        {
+            int page = 1;
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+                var opts = new DataQueryOptions(page, size);
+                var batch = await srepoOpts.QueryAsync(query, opts, ct).ConfigureAwait(false);
+                if (batch.Count == 0) yield break;
+                foreach (var item in batch) yield return item;
+                if (batch.Count < size) yield break;
+                page++;
+            }
+        }
+        else if (Repo is IStringQueryRepository<TEntity, TKey> srepo)
+        {
+            var all = await srepo.QueryAsync(query, ct).ConfigureAwait(false);
+            foreach (var item in all) yield return item;
+        }
+        else
+        {
+            throw new System.NotSupportedException("String queries are not supported by this repository.");
+        }
+    }
+
+    // Materialized paging helpers
+    public static async Task<IReadOnlyList<TEntity>> FirstPage(int size, CancellationToken ct = default)
+    {
+        if (size <= 0) throw new System.ArgumentOutOfRangeException(nameof(size));
+        if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
+            return await repoOpts.QueryAsync(null, new DataQueryOptions(1, size), ct).ConfigureAwait(false);
+        // Fallback: materialize and take
+        var all = await Repo.QueryAsync(null, ct).ConfigureAwait(false);
+        return all.Take(size).ToList();
+    }
+
+    public static async Task<IReadOnlyList<TEntity>> Page(int page, int size, CancellationToken ct = default)
+    {
+        if (page <= 0) throw new System.ArgumentOutOfRangeException(nameof(page));
+        if (size <= 0) throw new System.ArgumentOutOfRangeException(nameof(size));
+        if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
+            return await repoOpts.QueryAsync(null, new DataQueryOptions(page, size), ct).ConfigureAwait(false);
+        // Fallback: materialize and page in-memory
+        var all = await Repo.QueryAsync(null, ct).ConfigureAwait(false);
+        return all.Skip((page - 1) * size).Take(size).ToList();
+    }
 
     // Vector role facade (minimal surface for now)
     public static class Vector

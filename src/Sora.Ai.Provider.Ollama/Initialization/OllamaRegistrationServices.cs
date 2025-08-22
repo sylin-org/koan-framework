@@ -24,7 +24,8 @@ internal sealed class OllamaConfigRegistrationService : IHostedService
                 try
                 {
                     var http = new HttpClient { BaseAddress = new Uri(opt.BaseUrl), Timeout = TimeSpan.FromSeconds(60) };
-                    var adapter = new OllamaAdapter(opt.Id, $"Ollama ({http.BaseAddress})", http, opt.DefaultModel);
+                    var logger = _sp.GetService<Microsoft.Extensions.Logging.ILogger<OllamaAdapter>>();
+                    var adapter = new OllamaAdapter(opt.Id, $"Ollama ({http.BaseAddress})", http, opt.DefaultModel, logger);
                     _registry.Add(adapter);
                 }
                 catch { /* ignore invalid entries */ }
@@ -56,6 +57,20 @@ internal sealed class OllamaDiscoveryService : IHostedService
             if (!autoDiscovery) return Task.CompletedTask;
             if (!envIsDev && !allowNonDev) return Task.CompletedTask;
 
+            // If explicit Ollama services are configured, do not auto-discover
+            try
+            {
+                var configured = _cfg.GetSection(Infrastructure.Constants.Configuration.ServicesRoot)
+                    .Get<OllamaServiceOptions[]>() ?? Array.Empty<OllamaServiceOptions>();
+                if (configured.Any(s => s.Enabled))
+                    return Task.CompletedTask;
+            }
+            catch { /* ignore and proceed with discovery */ }
+
+            // If the app requires specific models, use the first as the default for discovered adapters
+            string? defaultModel = null;
+            try { defaultModel = _cfg.GetSection("Sora:Ai:Ollama:RequiredModels").Get<string[]>()?.FirstOrDefault(); } catch { }
+
             foreach (var u in CollectCandidateUrls(_cfg))
             {
                 try
@@ -64,9 +79,24 @@ internal sealed class OllamaDiscoveryService : IHostedService
                     using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(450));
                     var resp = http.GetAsync(Infrastructure.Constants.Discovery.TagsPath, cts.Token).GetAwaiter().GetResult();
                     if (!resp.IsSuccessStatusCode) continue;
+
+                    // If a required model is specified, ensure the endpoint has it before registering
+                    if (!string.IsNullOrWhiteSpace(defaultModel))
+                    {
+                        try
+                        {
+                            var payload = resp.Content.ReadAsStringAsync(cts.Token).GetAwaiter().GetResult();
+                            if (!EndpointHasModel(payload, defaultModel))
+                                continue; // try next candidate
+                        }
+                        catch { /* best-effort filter */ }
+                    }
                     var client = new HttpClient { BaseAddress = u, Timeout = TimeSpan.FromSeconds(60) };
                     var id = $"ollama@{u.Host}:{u.Port}";
-                    _registry.Add(new OllamaAdapter(id, $"Ollama ({u})", client, defaultModel: null));
+                    var logger = _sp.GetService<Microsoft.Extensions.Logging.ILogger<OllamaAdapter>>();
+                    _registry.Add(new OllamaAdapter(id, $"Ollama ({u})", client, defaultModel: defaultModel, logger));
+                    // Register only the first viable endpoint (host-first policy)
+                    break;
                 }
                 catch { /* ignore */ }
             }
@@ -79,22 +109,53 @@ internal sealed class OllamaDiscoveryService : IHostedService
 
     private static IEnumerable<Uri> CollectCandidateUrls(IConfiguration? cfg)
     {
-        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        void Add(string url) { if (!string.IsNullOrWhiteSpace(url)) set.Add(url.Trim()); }
+        // Preserve insertion order while de-duplicating
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ordered = new List<string>();
+        void Add(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return;
+            var u = url.Trim();
+            if (seen.Add(u)) ordered.Add(u);
+        }
+        // Highest precedence: explicit single var
         var fromEnv = Environment.GetEnvironmentVariable("OLLAMA_BASE_URL");
         Add(fromEnv ?? string.Empty);
+        // Next: multi-endpoint env list, keep given order
         var multi = Environment.GetEnvironmentVariable("SORA_AI_OLLAMA_URLS");
         if (!string.IsNullOrWhiteSpace(multi))
         {
             foreach (var part in multi.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) Add(part);
         }
+        // Finally: sensible defaults in strict host-first order
         Add($"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}");
         Add($"http://127.0.0.1:{Infrastructure.Constants.Discovery.DefaultPort}");
         Add($"http://host.docker.internal:{Infrastructure.Constants.Discovery.DefaultPort}");
         Add($"http://ollama:{Infrastructure.Constants.Discovery.DefaultPort}");
-        foreach (var s in set)
+        foreach (var s in ordered)
         {
             if (Uri.TryCreate(s, UriKind.Absolute, out var uri)) yield return uri;
         }
+    }
+
+    private static bool EndpointHasModel(string json, string required)
+    {
+        // Accept either exact name or prefix before ':' tag (e.g., "all-minilm" matches "all-minilm:latest")
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("models", out var models)) return false;
+            foreach (var m in models.EnumerateArray())
+            {
+                var name = m.TryGetProperty("name", out var n) ? n.GetString() : null;
+                if (string.IsNullOrEmpty(name)) continue;
+                var baseName = name.Split(':')[0];
+                if (string.Equals(name, required, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(baseName, required, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        catch { }
+        return false;
     }
 }

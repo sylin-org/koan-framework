@@ -183,6 +183,11 @@ internal sealed class HealthAggregator : IHealthAggregator
         HealthStatus overall = HealthStatus.Healthy;
         foreach (var s in list)
         {
+            if (_options.Policy.ConsiderOnlyCriticalForOverall)
+            {
+                var critical = s.Facts?.TryGetValue("critical", out var v) == true && string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
+                if (!critical) continue;
+            }
             var status = s.Status;
             if (status == HealthStatus.Unknown)
             {

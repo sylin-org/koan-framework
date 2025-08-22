@@ -7,13 +7,14 @@ namespace S5.Recs.Controllers;
 
 [ApiController]
 [Route(Constants.Routes.Admin)] // Sora guideline: controllers define routes
-public class AdminController(ISeedService seeder, IEnumerable<S5.Recs.Providers.IAnimeProvider> providers) : ControllerBase
+public class AdminController(ISeedService seeder, ILogger<AdminController> _logger, IEnumerable<S5.Recs.Providers.IAnimeProvider> providers) : ControllerBase
 {
+
     [HttpPost("seed/start")]
     public IActionResult StartSeed([FromBody] SeedRequest req)
     {
-    var id = seeder.StartAsync(req.Source, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
-    return Ok(new { jobId = id });
+        var id = seeder.StartAsync(req.Source, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
+        return Ok(new { jobId = id });
     }
 
     [HttpGet("seed/status/{jobId}")]
@@ -36,6 +37,18 @@ public class AdminController(ISeedService seeder, IEnumerable<S5.Recs.Providers.
         return Ok(providers.Select(p => new { code = p.Code, name = p.Name }));
     }
 
+    [HttpPost("seed/vectors")] // vector-only upsert from existing docs
+    public IActionResult StartVectorOnly([FromBody] VectorOnlyRequest req)
+    {
+        // Responsibility: AdminController builds the list; SeedService just upserts vectors for the provided items.
+        var all = Models.AnimeDoc.All(HttpContext.RequestAborted).Result.ToList();
+
+        _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})", all.Count, req.Limit);
+
+        var id = seeder.StartVectorUpsertAsync(all, HttpContext.RequestAborted).Result;
+        return Ok(new { jobId = id, count = all.Count });
+    }
+
     // Minimal SSE for progress (poll-ish server push). Browsers: fetch('/admin/seed/sse/{jobId}').
     [HttpGet("seed/sse/{jobId}")]
     public async Task SeedSse([FromRoute] string jobId)
@@ -55,3 +68,4 @@ public class AdminController(ISeedService seeder, IEnumerable<S5.Recs.Providers.
 }
 
 public record SeedRequest(string Source = "local", int Limit = 50, bool Overwrite = false);
+public record VectorOnlyRequest(int Limit = 1000);

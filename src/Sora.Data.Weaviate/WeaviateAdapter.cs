@@ -1,9 +1,12 @@
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Vector.Abstractions;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Net;
 
 namespace Sora.Data.Weaviate;
 
@@ -54,8 +57,10 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         if (_schemaEnsured) return;
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.index.ensureCreated");
         var cls = ClassName;
+        _logger?.LogDebug("Weaviate: ensure schema base={Base} class={Class}", _http.BaseAddress, cls);
         // Probe class
         var probe = await _http.GetAsync($"/v1/schema/{Uri.EscapeDataString(cls)}", ct);
+        _logger?.LogDebug("Weaviate: GET /v1/schema/{Class} -> {Status}", cls, (int)probe.StatusCode);
         if (probe.IsSuccessStatusCode)
         {
             _schemaEnsured = true; return;
@@ -66,13 +71,34 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             @class = cls,
             vectorizer = "none",
             vectorIndexConfig = new { distance = _options.Metric },
-            properties = Array.Empty<object>()
+            // Minimal schema: store original document id for reverse mapping
+            properties = new object[]
+            {
+                new { name = "docId", dataType = new[] { "text" } }
+            }
         };
+        _logger?.LogDebug("Weaviate: POST /v1/schema/classes for class {Class}", cls);
         var create = await _http.PostAsJsonAsync("/v1/schema/classes", body, ct);
         if (!create.IsSuccessStatusCode)
         {
-            var txt = await create.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Weaviate ensure schema failed: {(int)create.StatusCode} {create.ReasonPhrase} {txt}");
+            // Fallback for older Weaviate versions that require POST /v1/schema
+            if (create.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed)
+            {
+                _logger?.LogDebug("Weaviate: POST /v1/schema/classes returned 405; retrying legacy endpoint /v1/schema for class {Class}", cls);
+                var legacy = await _http.PostAsJsonAsync("/v1/schema", body, ct);
+                if (!legacy.IsSuccessStatusCode)
+                {
+                    var ltxt = await legacy.Content.ReadAsStringAsync(ct);
+                    _logger?.LogDebug("Weaviate: legacy schema POST failed ({Status}) {Body}", (int)legacy.StatusCode, ltxt);
+                    throw new InvalidOperationException($"Weaviate ensure schema failed (legacy): {(int)legacy.StatusCode} {legacy.ReasonPhrase} {ltxt}");
+                }
+            }
+            else
+            {
+                var txt = await create.Content.ReadAsStringAsync(ct);
+                _logger?.LogDebug("Weaviate: schema POST failed ({Status}) {Body}", (int)create.StatusCode, txt);
+                throw new InvalidOperationException($"Weaviate ensure schema failed: {(int)create.StatusCode} {create.ReasonPhrase} {txt}");
+            }
         }
         _schemaEnsured = true;
     }
@@ -83,17 +109,53 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.upsert");
         await EnsureSchemaAsync(ct);
         ValidateEmbedding(embedding);
-        var obj = new
+        // Weaviate requires UUID ids; derive a deterministic UUID from the entity id (namespaced by class) for stable mapping
+        var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
+        // Persist minimal properties including original doc id for reverse lookup
+        var obj = new Dictionary<string, object?>
         {
-            class_ = ClassName,
-            id = id!.ToString(),
-            properties = metadata ?? new { },
-            vector = embedding,
+            ["class"] = ClassName,
+            ["id"] = uuid.ToString(),
+            ["properties"] = new { docId = id!.ToString() },
+            ["vector"] = embedding,
         };
-        var resp = await _http.PostAsJsonAsync("/v1/objects", obj, ct);
+        var putUrl = $"/v1/objects/{Uri.EscapeDataString(uuid.ToString())}";
+        _logger?.LogDebug("Weaviate: PUT {Url} class={Class} id={Id} uuid={Uuid} vecDim={Dim}", putUrl, ClassName, id, uuid, embedding.Length);
+        var resp = await _http.PutAsJsonAsync(putUrl, obj, ct);
         if (!resp.IsSuccessStatusCode)
         {
             var body = await resp.Content.ReadAsStringAsync(ct);
+            // Some deployments return 404/405 for create-via-PUT; some buggy builds return 500 "no object with id ..."
+            var missingOnPut = resp.StatusCode == HttpStatusCode.NotFound
+                || resp.StatusCode == HttpStatusCode.MethodNotAllowed
+                || (resp.StatusCode == HttpStatusCode.InternalServerError && body.Contains("no object with id", StringComparison.OrdinalIgnoreCase));
+            if (missingOnPut)
+            {
+                _logger?.LogDebug("Weaviate: PUT failed ({Status}); retrying POST /v1/objects", (int)resp.StatusCode);
+                var post = await _http.PostAsJsonAsync("/v1/objects", obj, ct);
+                if (!post.IsSuccessStatusCode)
+                {
+                    var ptxt = await post.Content.ReadAsStringAsync(ct);
+                    // If POST says already exists, attempt a final PUT update (race or concurrent create)
+                    if ((int)post.StatusCode == 422 && ptxt.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger?.LogDebug("Weaviate: POST reported existing object; retrying final PUT to update {Url}", putUrl);
+                        var put2 = await _http.PutAsJsonAsync(putUrl, obj, ct);
+                        if (!put2.IsSuccessStatusCode)
+                        {
+                            var p2txt = await put2.Content.ReadAsStringAsync(ct);
+                            _logger?.LogDebug("Weaviate: upsert (final PUT) failed ({Status}) {Body}", (int)put2.StatusCode, p2txt);
+                            throw new InvalidOperationException($"Weaviate upsert failed: {(int)put2.StatusCode} {put2.ReasonPhrase} {p2txt}");
+                        }
+                        return;
+                    }
+                    _logger?.LogDebug("Weaviate: upsert (POST fallback) failed ({Status}) {Body}", (int)post.StatusCode, ptxt);
+                    throw new InvalidOperationException($"Weaviate upsert failed: {(int)post.StatusCode} {post.ReasonPhrase} {ptxt}");
+                }
+                return;
+            }
+            // If a POST was previously created and PUT still reports an error, surface the body for triage
+            _logger?.LogDebug("Weaviate: upsert (PUT) failed ({Status}) {Body}", (int)resp.StatusCode, body);
             throw new InvalidOperationException($"Weaviate upsert failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
         }
     }
@@ -112,7 +174,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.delete");
-        var resp = await _http.DeleteAsync($"/v1/objects/{Uri.EscapeDataString(id!.ToString()!)}", ct);
+        var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
+        var resp = await _http.DeleteAsync($"/v1/objects/{Uri.EscapeDataString(uuid.ToString())}", ct);
         return resp.IsSuccessStatusCode;
     }
 
@@ -142,7 +205,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             : $"({nearVector}, limit: {topK}, where: {whereClause})";
         var gql = new
         {
-            query = $"query {{ Get {{ {ClassName} {args} {{ _additional {{ id distance }} }} }} }}"
+            // Request docId alongside _additional so we can map back to original ids
+            query = $"query {{ Get {{ {ClassName} {args} {{ docId _additional {{ id distance }} }} }} }}"
         };
         var req = JsonContent.Create(gql);
         var resp = await _http.PostAsync("/v1/graphql", req, ct);
@@ -244,7 +308,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             foreach (var item in prop.Value.EnumerateArray())
             {
                 var add = item.GetProperty("_additional");
-                var idStr = add.GetProperty("id").GetString();
+                var idStr = item.TryGetProperty("docId", out var docIdEl) && docIdEl.ValueKind == JsonValueKind.String
+                    ? docIdEl.GetString()
+                    : add.GetProperty("id").GetString();
                 var distance = add.TryGetProperty("distance", out var distEl) ? distEl.GetDouble() : 0.0;
                 if (idStr is null) continue;
                 TKey id = (TKey)Convert.ChangeType(idStr, typeof(TKey));
@@ -254,5 +320,23 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             }
         }
         return list;
+    }
+
+    // Deterministic UUID (v5-like) from class namespace + id using SHA-1
+    private static Guid DeterministicGuidFromString(string @namespace, string input)
+    {
+        using var sha1 = System.Security.Cryptography.SHA1.Create();
+        var nsBytes = System.Text.Encoding.UTF8.GetBytes(@namespace + ":");
+        var nameBytes = System.Text.Encoding.UTF8.GetBytes(input);
+        var all = new byte[nsBytes.Length + nameBytes.Length];
+        Buffer.BlockCopy(nsBytes, 0, all, 0, nsBytes.Length);
+        Buffer.BlockCopy(nameBytes, 0, all, nsBytes.Length, nameBytes.Length);
+        var hash = sha1.ComputeHash(all);
+        // take first 16 bytes
+        Array.Resize(ref hash, 16);
+        // Set version to 5 (name-based, SHA-1) and variant RFC 4122
+        hash[6] = (byte)((hash[6] & 0x0F) | (5 << 4));
+        hash[8] = (byte)((hash[8] & 0x3F) | 0x80);
+        return new Guid(hash);
     }
 }

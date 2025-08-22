@@ -25,12 +25,12 @@ public sealed class WeaviateVectorTests : VectorAcceptanceTests<TestEntity, stri
         if (!IsAvailable) return;
 
         var services = new ServiceCollection();
-    services.AddSora();
-    services.AddSoraDataVector();
+        services.AddSora();
+        services.AddSoraDataVector();
         // Configure Weaviate
         services.Configure<Sora.Data.Weaviate.WeaviateOptions>(o =>
         {
-            o.Endpoint = "http://localhost:8085";
+            o.Endpoint = fx.BaseUrl ?? "http://localhost:8085";
             o.DefaultTopK = 5;
             o.MaxTopK = 50;
             o.Dimension = 5; // small dimension for tests

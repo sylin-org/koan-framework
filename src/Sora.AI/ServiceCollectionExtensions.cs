@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Sora.AI.Contracts;
 using Sora.AI.Contracts.Options;
 using Sora.AI.Contracts.Routing;
@@ -60,8 +61,10 @@ internal sealed class InMemoryAdapterRegistry : IAiAdapterRegistry
 internal sealed class DefaultAiRouter : IAiRouter
 {
     private readonly IAiAdapterRegistry _registry;
+    private readonly Microsoft.Extensions.Logging.ILogger<DefaultAiRouter>? _logger;
     private int _rr;
-    public DefaultAiRouter(IAiAdapterRegistry registry) => _registry = registry;
+    public DefaultAiRouter(IAiAdapterRegistry registry, Microsoft.Extensions.Logging.ILogger<DefaultAiRouter>? logger = null)
+    { _registry = registry; _logger = logger; }
 
     public async Task<Sora.AI.Contracts.Models.AiChatResponse> PromptAsync(Sora.AI.Contracts.Models.AiChatRequest request, CancellationToken ct = default)
     {
@@ -80,9 +83,11 @@ internal sealed class DefaultAiRouter : IAiRouter
     public async Task<Sora.AI.Contracts.Models.AiEmbeddingsResponse> EmbedAsync(Sora.AI.Contracts.Models.AiEmbeddingsRequest request, CancellationToken ct = default)
     {
         var rr = Interlocked.Increment(ref _rr);
-        var adapter = _registry.All.Skip(rr % Math.Max(1, _registry.All.Count)).FirstOrDefault();
+        var list = _registry.All;
+        var adapter = list.Skip(rr % Math.Max(1, list.Count)).FirstOrDefault();
         if (adapter is null)
             throw new InvalidOperationException("No AI providers available. Add an adapter (e.g., Ollama) or enable Dev auto-discovery.");
+        _logger?.LogDebug("AI Router: Embeddings via adapter {AdapterId} ({AdapterType}), model={Model}", adapter.Id, adapter.Type, request.Model ?? "<default>");
         return await adapter.EmbedAsync(request, ct).ConfigureAwait(false);
     }
 
@@ -91,7 +96,11 @@ internal sealed class DefaultAiRouter : IAiRouter
         // Policy: prefer explicit AdapterId; else round-robin among CanServe()
         var routeId = request.Route?.AdapterId;
         if (!string.IsNullOrEmpty(routeId))
-            return _registry.Get(routeId!);
+        {
+            var picked = _registry.Get(routeId!);
+            _logger?.LogDebug("AI Router: Route requested adapter {AdapterId} -> {Picked}", routeId, picked?.Id ?? "<none>");
+            return picked;
+        }
         var list = _registry.All;
         if (list.Count == 0) return null;
         var start = Interlocked.Increment(ref _rr);
@@ -102,6 +111,8 @@ internal sealed class DefaultAiRouter : IAiRouter
             if (a.CanServe(request)) return a;
         }
         // Fallback: any adapter
-        return list[(start) % list.Count];
+        var any = list[(start) % list.Count];
+        _logger?.LogDebug("AI Router: Fallback picked adapter {AdapterId}", any.Id);
+        return any;
     }
 }

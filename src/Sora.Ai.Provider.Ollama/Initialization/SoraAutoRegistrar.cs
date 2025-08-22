@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Ai.Provider.Ollama.Health;
 
 namespace Sora.Ai.Provider.Ollama.Initialization;
 
@@ -16,6 +18,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddOllamaFromConfig();
         services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService, OllamaConfigRegistrationService>();
         services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService, OllamaDiscoveryService>();
+        // Health reporter so readiness can reflect Ollama availability and models
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Core.IHealthContributor, OllamaHealthContributor>());
     }
 
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)

@@ -20,6 +20,18 @@ public abstract partial class Entity<TEntity, TKey> : IEntity<TKey>
     public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
         => Sora.Data.Core.Data<TEntity, TKey>.Query(query, ct);
 
+    // Streaming (IAsyncEnumerable)
+    public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
+        => Sora.Data.Core.Data<TEntity, TKey>.AllStream(batchSize, ct);
+    public static IAsyncEnumerable<TEntity> QueryStream(string query, int? batchSize = null, CancellationToken ct = default)
+        => Sora.Data.Core.Data<TEntity, TKey>.QueryStream(query, batchSize, ct);
+
+    // Basic paging helpers (materialized)
+    public static Task<IReadOnlyList<TEntity>> FirstPage(int size, CancellationToken ct = default)
+        => Sora.Data.Core.Data<TEntity, TKey>.FirstPage(size, ct);
+    public static Task<IReadOnlyList<TEntity>> Page(int page, int size, CancellationToken ct = default)
+        => Sora.Data.Core.Data<TEntity, TKey>.Page(page, size, ct);
+
     // Counts
     public static Task<int> Count(CancellationToken ct = default)
         => Sora.Data.Core.Data<TEntity, TKey>.CountAllAsync(ct);

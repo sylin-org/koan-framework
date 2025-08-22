@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 services:
   api:
     build:
@@ -8,12 +8,23 @@ services:
     ports:
       - "5084:5084"
     environment:
-      - ASPNETCORE_URLS=http://+:5084
-      - "Sora:Data:Mongo:ConnectionString=mongodb://mongo:27017"
-      - "Sora:Data:Mongo:Database=sora"
-      - "Sora:Data:Weaviate:Endpoint=http://weaviate:8080"
-      - "Sora:Ai:AutoDiscoveryEnabled=true"
-      - "SORA_AI_OLLAMA_URLS=http://host.docker.internal:11434,http://ollama:11434"
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5084"
+      Sora__Web__ExposeObservabilitySnapshot: "true"
+      Sora__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
+      Sora__Data__Mongo__Database: "sora"
+      Sora__Data__Weaviate__Endpoint: "http://weaviate:8080"
+      Sora__Ai__AutoDiscoveryEnabled: "true"
+      Sora__Ai__AllowDiscoveryInNonDev: "true"
+      SORA_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
+      # Explicit Ollama service registration (Production-safe)
+      Sora__Ai__Services__Ollama__0__Id: "ollama"
+      Sora__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Sora__Ai__Services__Ollama__0__DefaultModel: "all-minilm"
+  # Disable explicit registration in dev so discovery picks a single best endpoint (host-first)
+      Sora__Ai__Services__Ollama__0__Enabled: "false"
+      # Readiness: require the embedding model to be present
+      Sora__Ai__Ollama__RequiredModels__0: "all-minilm"
     volumes:
       - ../data:/app/data
     depends_on:
@@ -24,22 +35,25 @@ services:
     volumes:
       - ../data/mongo:/data/db
     ports:
-      - "5081:27017" # host:container for external tools (Mongo Compass)
+      - "5081:27017"
   weaviate:
     image: semitechnologies/weaviate:1.25.6
     environment:
-      - QUERY_DEFAULTS_LIMIT=25
-      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
-      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
-      - DEFAULT_VECTORIZER_MODULE=none
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      # Stable single-node clustering to avoid RAFT bootstrap loops
+      CLUSTER_HOSTNAME: "node1"
+      RAFT_BOOTSTRAP_EXPECT: "1"
     volumes:
       - ../data/weaviate:/var/lib/weaviate
     ports:
-      - "5082:8080" # host:container for external access to Weaviate HTTP
+      - "5082:8080"
   ollama:
     image: ollama/ollama:latest
     volumes:
       - ../data/ollama-models:/root/.ollama
     ports:
-      - "5083:11434" # host:container for external access to Ollama
+      - "5083:11434"
 volumes: {}

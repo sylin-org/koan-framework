@@ -7,11 +7,13 @@ internal static class DebugToggle
 {
     public static bool IsEnabled(HttpContext http)
     {
-        return IsEnabled(http, http.RequestServices.GetService(typeof(IConfiguration)) as IConfiguration);
+        var cfg = http?.RequestServices?.GetService(typeof(IConfiguration)) as IConfiguration;
+        return IsEnabled(http!, cfg);
     }
 
     public static bool IsEnabled(HttpContext http, IConfiguration? cfg)
     {
+        if (http is null) return false;
         if (http.Request.Headers.TryGetValue(GraphQlConstants.DebugHeader, out var hv))
         {
             var s = hv.ToString();

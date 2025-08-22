@@ -8,6 +8,7 @@ namespace Sora.Data.Weaviate.IntegrationTests;
 public sealed class WeaviateAutoFixture : IAsyncLifetime
 {
     public bool Available { get; private set; }
+    public string? BaseUrl { get; private set; }
     private TestcontainersContainer? _container;
     private string? _dockerEndpoint;
 
@@ -25,15 +26,24 @@ public sealed class WeaviateAutoFixture : IAsyncLifetime
         var builder = new TestcontainersBuilder<TestcontainersContainer>()
             .WithDockerEndpoint(_dockerEndpoint!)
             .WithImage("semitechnologies/weaviate:1.24.12")
-            .WithName("sora-weaviate-test")
-            .WithPortBinding(8085, 8080)
-            .WithCleanUp(false)
+            .WithName($"sora-weaviate-test-{Guid.NewGuid():N}")
+            .WithPortBinding(8080, true) // dynamic host port
+            .WithCleanUp(true)
             .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
             .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(8080));
 
         _container = builder.Build();
-        await _container.StartAsync();
-        Available = true;
+        try
+        {
+            await _container.StartAsync();
+            var hostPort = _container.GetMappedPublicPort(8080);
+            BaseUrl = $"http://localhost:{hostPort}";
+            Available = true;
+        }
+        catch
+        {
+            Available = false;
+        }
     }
 
     public async Task DisposeAsync()

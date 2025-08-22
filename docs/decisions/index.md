@@ -42,6 +42,7 @@ Canonical ADRs live in this folder. They’re grouped by domain below for quick 
 - 0051 — Direct routing via instruction executors — DATA-0051-direct-routing-via-instruction-executors.md
 - 0052 — Relational Dapper boundary; Direct uses ADO.NET — DATA-0052-relational-dapper-boundary-and-direct-ado.md
 - 0054 — Vector search capability and contracts — DATA-0054-vector-search-capability-and-contracts.md
+- 0061 — Data access semantics (All/Query; streaming; pager) — DATA-0061-data-access-pagination-and-streaming.md
 
 ## Web (WEB)
 
@@ -66,6 +67,7 @@ Canonical ADRs live in this folder. They’re grouped by domain below for quick 
 - 0015 — Default configuration fallback — OPS-0015-default-configuration-fallback.md
 - 0043 — Mongo container default host — OPS-0043-mongo-container-default-host.md
 - 0048 — Standardize Docker probing for tests — OPS-0048-standardize-docker-probing-for-tests.md
+- 0050 — Scheduling core and Bootstrap unification — OPS-0050-scheduling-and-bootstrap-unification.md
 
 ## Developer Experience (DX)
 

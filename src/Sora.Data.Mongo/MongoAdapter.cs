@@ -259,9 +259,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
         act?.SetTag("entity", typeof(TEntity).FullName);
         // Guardrails: enforce server-side paging if possible to avoid unbounded materialization.
         var col = GetCollection();
-        var find = col.Find(Builders<TEntity>.Filter.Empty);
-        find = find.Limit(_defaultPageSize);
-        return await find.ToListAsync(ct);
+    // DATA-0061: no-options should return the complete set (no implicit limit)
+    return await col.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct);
     }
 
     public async Task<int> CountAsync(object? query, CancellationToken ct = default)
@@ -277,8 +276,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
         using var act = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
         act?.SetTag("entity", typeof(TEntity).FullName);
         var col = GetCollection();
-        var find = col.Find(predicate).Limit(_defaultPageSize);
-        return await find.ToListAsync(ct);
+    // DATA-0061: no-options should return the complete set for this predicate
+    return await col.Find(predicate).ToListAsync(ct);
     }
 
     public async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)

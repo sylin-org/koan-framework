@@ -11,7 +11,11 @@
   <main class="container" x-data="recsApp()">
     <header>
       <h1>What to watch next?</h1>
-      <nav><a href="/admin.html">Admin</a></nav>
+      <nav>
+        <a href="/admin.html">Admin</a>
+        <span aria-hidden="true"> · </span>
+        <a href="/admin.html#seed" title="Seed vectors to enable semantic search">Seed</a>
+      </nav>
     </header>
     <section class="query">
       <input x-model="text" placeholder="like Haikyuu!! but cozier and slice-of-life, under 24 eps" />
@@ -19,6 +23,7 @@
       <label>Episodes ≤ <input type="number" x-model.number="episodesMax" min="1" /></label>
       <label><input type="checkbox" x-model="spoilerSafe" /> Spoiler‑safe</label>
   <label>Genres (csv) <input x-model="genresCsv" placeholder="Slice of Life, Sports" /></label>
+      <label>Top K <input type="number" x-model.number="topK" min="1" max="50" /></label>
       <button @click="search()">Search</button>
     </section>
     <section class="results">
@@ -34,16 +39,16 @@
           </div>
         </article>
       </template>
-      <div x-show="degraded" class="note">Semantic features are not enabled yet.</div>
+  <div x-show="degraded" class="note">Semantic features are not enabled yet. <a href="/admin.html#seed">Seed now</a>.</div>
     </section>
   </main>
   <script>
     function recsApp(){
       return {
-        text: '', userId: 'demo', episodesMax: 24, spoilerSafe: true, genresCsv: '', results: [], degraded: false,
+        text: '', userId: 'demo', episodesMax: 24, spoilerSafe: true, genresCsv: '', topK: 10, results: [], degraded: false,
         async search(){
           const genres = (this.genresCsv||'').split(',').map(s=>s.trim()).filter(Boolean);
-          const body = { text: this.text, userId: this.userId, filters: { genres, episodesMax: this.episodesMax, spoilerSafe: this.spoilerSafe } };
+          const body = { text: this.text, userId: this.userId, topK: this.topK, filters: { genres, episodesMax: this.episodesMax, spoilerSafe: this.spoilerSafe } };
           const r = await fetch('/api/recs/query', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
           const data = await r.json();
           this.results = data.items ?? []; this.degraded = !!data.degraded;

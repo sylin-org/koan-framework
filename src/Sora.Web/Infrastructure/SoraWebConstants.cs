@@ -35,6 +35,7 @@ public static class SoraWebConstants
         public const string WellKnownBase = ".well-known/sora";
         public const string WellKnownObservability = "observability"; // relative to WellKnownBase
         public const string WellKnownAggregates = "aggregates";       // relative to WellKnownBase
+        public const string WellKnownScheduling = "scheduling";       // relative to WellKnownBase
     }
 
     public static class Defaults

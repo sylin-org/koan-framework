@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Sora.Core;
 using Sora.Web.Swagger.Infrastructure;
 using Swashbuckle.AspNetCore.Swagger;
@@ -26,6 +27,7 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
                 // Determine if Swagger should be enabled
                 var env = app.ApplicationServices.GetService<IHostEnvironment>();
                 var cfg = app.ApplicationServices.GetService<IConfiguration>();
+                var logger = app.ApplicationServices.GetService<ILogger<SoraSwaggerStartupFilter>>();
                 var opts = GetOptions(cfg);
 
                 bool enabled;
@@ -33,7 +35,7 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
                 {
                     enabled = opts.Enabled.Value;
                 }
-                else if (env?.IsProduction() == true)
+                else if (Sora.Core.SoraEnv.IsProduction)
                 {
                     enabled = cfg.Read(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
                   || cfg.Read(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
@@ -58,6 +60,8 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
                             ui.SwaggerEndpoint("/swagger/v1/swagger.json", "Sora API v1");
                         });
 
+                        logger?.LogInformation("Sora.Web.Swagger enabled at '/{RoutePrefix}' (env={Env})", opts.RoutePrefix, env?.EnvironmentName);
+
                         // Optionally require auth outside Development
                         if (env?.IsDevelopment() != true && opts.RequireAuthOutsideDevelopment)
                         {
@@ -68,6 +72,14 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
                             });
                         }
                     }
+                    else
+                    {
+                        logger?.LogWarning("Sora.Web.Swagger requested but services were not registered. Call services.AddSoraSwagger() earlier or keep the auto-registrar.");
+                    }
+                }
+                else
+                {
+                    logger?.LogInformation("Sora.Web.Swagger disabled (env={Env}). Set 'Sora:Web:Swagger:Enabled=true' or 'Sora:AllowMagicInProduction=true' to enable.", env?.EnvironmentName);
                 }
             }
 

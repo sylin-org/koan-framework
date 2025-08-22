@@ -18,9 +18,10 @@ public sealed class WeaviateFilterAndStatsTests : IClassFixture<WeaviateAutoFixt
         if (!_available) return;
 
         var services = new ServiceCollection().AddSora();
+        services.AddSoraDataVector();
         services.Configure<Sora.Data.Weaviate.WeaviateOptions>(o =>
         {
-            o.Endpoint = "http://localhost:8085";
+            o.Endpoint = fx.BaseUrl ?? "http://localhost:8085";
             o.DefaultTopK = 5;
             o.MaxTopK = 50;
             o.Dimension = 3;
@@ -66,12 +67,12 @@ public sealed class WeaviateFilterAndStatsTests : IClassFixture<WeaviateAutoFixt
         Assert.True(before.Matches.Count >= 1);
 
         // Stats should be >= 1
-    var exec = (Sora.Data.Abstractions.Instructions.IInstructionExecutor<TestEntity>)repo;
-    var count = await exec.ExecuteAsync<int>(new Sora.Data.Abstractions.Instructions.Instruction(VectorInstructions.IndexStats));
+        var exec = (Sora.Data.Abstractions.Instructions.IInstructionExecutor<TestEntity>)repo;
+        var count = await exec.ExecuteAsync<int>(new Sora.Data.Abstractions.Instructions.Instruction(VectorInstructions.IndexStats));
         Assert.True(count >= 1);
 
         // Clear (destructive) with explicit opt-in
-    await exec.ExecuteAsync<object>(new Sora.Data.Abstractions.Instructions.Instruction(VectorInstructions.IndexClear, Options: new Dictionary<string, object?> { ["AllowDestructive"] = true }));
+        await exec.ExecuteAsync<object>(new Sora.Data.Abstractions.Instructions.Instruction(VectorInstructions.IndexClear, Options: new Dictionary<string, object?> { ["AllowDestructive"] = true }));
         var after = await repo.SearchAsync(new VectorQueryOptions(new float[] { 0.2f, 0.1f, 0.0f }, TopK: 5));
         Assert.True(after.Matches.Count == 0);
     }

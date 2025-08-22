@@ -1,6 +1,4 @@
-using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
-using Sora.Data.Vector.Abstractions;
 using Sora.Domain;
 
 namespace S5.Recs.Models;

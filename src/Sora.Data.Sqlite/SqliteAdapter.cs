@@ -247,6 +247,20 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private IDbConnection Open()
     {
         var cs = _options.ConnectionString;
+        try
+        {
+            // Best-effort: create directory for file-based connection strings
+            var builder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(cs);
+            var dataSource = builder.DataSource;
+            if (!string.IsNullOrWhiteSpace(dataSource))
+            {
+                var fullPath = dataSource;
+                try { fullPath = System.IO.Path.GetFullPath(dataSource); } catch { }
+                var dir = System.IO.Path.GetDirectoryName(fullPath);
+                if (!string.IsNullOrWhiteSpace(dir)) System.IO.Directory.CreateDirectory(dir);
+            }
+        }
+        catch { /* non-fatal */ }
         var conn = new SqliteConnection(cs);
         conn.Open();
         EnsureOrchestrated(conn);
@@ -394,7 +408,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:all");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-        var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] LIMIT {_defaultPageSize}");
+    // DATA-0061: no-options should return full set
+    var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] ORDER BY Id");
         return rows.Select(FromRow).ToList();
     }
 
@@ -432,7 +447,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             // Replace property references with projected column or JSON extraction when needed
             whereSql = RewriteWhereForProjection(whereSql);
             using var conn = Open();
-            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} LIMIT {_defaultPageSize}";
+            // DATA-0061: no-options should return full set for predicate
+            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql} ORDER BY Id";
             var dyn = new DynamicParameters();
             for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
             try

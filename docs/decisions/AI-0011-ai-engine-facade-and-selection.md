@@ -20,6 +20,7 @@ Introduce `Sora.AI.Engine` as the preferred facade for AI operations:
 - Backward compatibility: keep `Sora.AI.Ai` and delegate under the hood.
 
 Resolution precedence mirrors vector:
+
 - Explicit selector overrides
 - App defaults
 - Router/provider priority

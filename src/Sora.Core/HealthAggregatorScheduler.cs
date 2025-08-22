@@ -12,12 +12,13 @@ internal sealed class HealthAggregatorScheduler : BackgroundService
     private readonly IHealthAggregator _agg;
     private readonly HealthAggregatorOptions _opt;
     private readonly ILogger<HealthAggregatorScheduler> _log;
+    private readonly IHostApplicationLifetime _lifetime;
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastInvited = new(StringComparer.OrdinalIgnoreCase);
     private readonly Random _rng = new();
     private static readonly DateTimeOffset Epoch = DateTimeOffset.UnixEpoch;
 
-    public HealthAggregatorScheduler(IHealthAggregator agg, HealthAggregatorOptions opt, ILogger<HealthAggregatorScheduler> log)
-    { _agg = agg; _opt = opt; _log = log; }
+    public HealthAggregatorScheduler(IHealthAggregator agg, HealthAggregatorOptions opt, ILogger<HealthAggregatorScheduler> log, IHostApplicationLifetime lifetime)
+    { _agg = agg; _opt = opt; _log = log; _lifetime = lifetime; }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -25,6 +26,19 @@ internal sealed class HealthAggregatorScheduler : BackgroundService
         {
             _log.LogInformation("Health aggregator disabled; scheduler not running.");
             return;
+        }
+
+        // Defer scheduler start until the application has signaled ApplicationStarted
+        if (!_lifetime.ApplicationStarted.IsCancellationRequested)
+        {
+            _log.LogDebug("Health aggregator scheduler waiting for application start...");
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, _lifetime.ApplicationStarted);
+                await Task.Delay(Timeout.InfiniteTimeSpan, cts.Token);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
+            catch (OperationCanceledException) { /* started */ }
         }
 
         var win = _opt.Scheduler.QuantizationWindow;

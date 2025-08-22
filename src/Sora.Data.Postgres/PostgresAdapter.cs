@@ -336,7 +336,8 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         using var act = PgTelemetry.Activity.StartActivity("pg.query:all");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
-        var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY \"Id\" LIMIT {_defaultPageSize} OFFSET 0");
+    // DATA-0061: no-options should return full set
+    var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY \"Id\"");
         return rows.Select(FromRow).ToList();
     }
 
@@ -372,7 +373,8 @@ internal sealed class PostgresRepository<TEntity, TKey> :
             var (whereSql, parameters) = translator.Translate(predicate);
             whereSql = RewriteWhereForProjection(whereSql);
             await using var conn = Open();
-            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY \"Id\" LIMIT {_defaultPageSize} OFFSET 0";
+            // DATA-0061: no-options should return full set for predicate
+            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY \"Id\"";
             var dyn = new DynamicParameters();
             for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);

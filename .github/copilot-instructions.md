@@ -5,6 +5,13 @@
 - **Documentation First**
   Refer to `/docs` when looking for implementation guidance. Keep documentation updated with new decisions to ensure accuracy and consistency.
 
+## Data access (priority guidance)
+
+- Prefer first-class, static model methods for all top-level data access in samples, docs, and code suggestions:
+  - Examples: `MyModel.All(ct)`, `MyModel.Query(...)`, `MyModel.AllStream(...)`, `MyModel.QueryStream(...)`, `MyModel.FirstPage(...)`, `MyModel.Page(...)`.
+- Treat generic facades like `Data<TEntity, TKey>` as second-class helpers; only use them when a first-class model static is not available for the scenario.
+- All/Query without paging must materialize the complete result set. Use streaming (`AllStream`/`QueryStream`) or explicit paging (`FirstPage`/`Page`) for large sets.
+
 ## Core engineering concerns (mandatory)
 
 These are default assumptions for all code. Follow them unless a documented ADR explicitly allows an exception.
@@ -70,5 +77,5 @@ Clarity & design
 - Replace literals with constants or options; if constant, add to a central Constants class for the project.
 - If a project grows beyond 4 classes, move .cs files into folders; keep only the .csproj at the root.
 - Keep one public class per file; nest satellites; co-locate interfaces/attributes only when they share a single concern and name the file accordingly.
-
-If an exception is needed, add a short ADR or decision note in /docs/decisions with rationale and scope.
+- If an exception is needed, add a short ADR or decision note in /docs/decisions with rationale and scope.
+- Do not implement bespoke methods if a similar one is already present in a core library (Sora.Core, Sora.Dat.Core, etc.)
