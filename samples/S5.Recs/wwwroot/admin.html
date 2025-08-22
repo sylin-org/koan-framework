@@ -9,214 +9,202 @@
   <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
-  <main class="app-container" x-data="adminApp()">
-    <header class="app-header">
-      <div class="header-content">
-        <div class="brand">
-          <h1>🛠️ Admin Dashboard</h1>
-          <p>System management and data operations</p>
-        </div>
-        <nav class="header-nav">
-          <a href="/" class="nav-link">
-            <i data-feather="home"></i>
-            Browse
-          </a>
-          <a href="/status.html" class="nav-link">
-            <i data-feather="activity"></i>
-            Status
-          </a>
-        </nav>
-      </div>
-    </header>
-    <div class="dashboard-grid">
-      <!-- System Overview -->
-      <section class="dashboard-card overview-card">
-        <div class="card-header">
-          <h2>
-            <i data-feather="monitor"></i>
-            System Overview
-          </h2>
-          <button @click="loadStats(); loadHealth()" class="refresh-btn">
-            <i data-feather="refresh-cw"></i>
-          </button>
-        </div>
-        <div class="stats-grid">
-          <div class="stat-item">
-            <i data-feather="film" class="stat-icon"></i>
-            <div class="stat-content">
-              <span class="stat-value" x-text="stats?.anime || 0"></span>
-              <span class="stat-label">Anime Records</span>
+<!-- Adopt Proposal 3 admin UI with live endpoints -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Sora Recs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = { theme: { extend: { colors: { slate: { 950: '#020617' } } } } };
+  </script>
+</head>
+<body class="bg-slate-950 text-white font-sans">
+  <nav class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
+              <i class="fas fa-shield-alt text-white text-sm"></i>
             </div>
+            <h1 class="text-xl font-bold bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent">Admin Dashboard</h1>
           </div>
-          <div class="stat-item">
-            <i data-feather="file-text" class="stat-icon"></i>
-            <div class="stat-content">
-              <span class="stat-value" x-text="stats?.contentPieces || 0"></span>
-              <span class="stat-label">Content Pieces</span>
-            </div>
-          </div>
-          <div class="stat-item">
-            <i data-feather="cpu" class="stat-icon"></i>
-            <div class="stat-content">
-              <span class="stat-value" x-text="stats?.vectors || 0"></span>
-              <span class="stat-label">Vector Embeddings</span>
-            </div>
-          </div>
-          <div class="stat-item">
-            <i data-feather="activity" class="stat-icon"></i>
-            <div class="stat-content">
-              <span class="stat-value status-indicator" :class="getHealthStatus()"></span>
-              <span class="stat-label">System Health</span>
-            </div>
+          <div class="hidden md:flex items-center space-x-8 ml-8">
+            <a href="#" class="text-white border-b-2 border-red-500 pb-1 px-1" onclick="setActiveTab('overview')">
+              <i class="fas fa-chart-pie mr-2"></i>Overview
+            </a>
+            <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('data')">
+              <i class="fas fa-database mr-2"></i>Data Management
+            </a>
+            <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('users')">
+              <i class="fas fa-users mr-2"></i>User Analytics
+            </a>
+            <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('system')">
+              <i class="fas fa-cog mr-2"></i>System Config
+            </a>
           </div>
         </div>
-      </section>
-
-      <!-- Data Management -->
-      <section id="seed" class="dashboard-card seed-card">
-        <div class="card-header">
-          <h2>
-            <i data-feather="download"></i>
-            Data Pipeline
-          </h2>
-        </div>
-        
-        <div class="seed-controls">
-          <div class="alert alert-warning" x-show="health && !isVectorHealthy()">
-            <i data-feather="alert-triangle"></i>
-            <div>
-              <strong>Vector backend unavailable.</strong> Semantic features are disabled; you can still import metadata, but vector-only operations are unavailable.
-            </div>
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-2 text-sm">
+            <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span class="text-gray-400">System Online</span>
           </div>
-
-          <div class="provider-selection">
-            <h3>Data Source</h3>
-            <div class="provider-grid">
-              <template x-for="p in providers" :key="p.code">
-                <label class="provider-card" :class="{'selected': source === p.code}">
-                  <input type="radio" x-model="source" :value="p.code" class="sr-only">
-                  <div class="provider-icon">
-                    <i :data-feather="p.code === 'local' ? 'hard-drive' : 'globe'"></i>
-                  </div>
-                  <div class="provider-info">
-                    <span class="provider-name" x-text="p.name"></span>
-                    <span class="provider-code" x-text="p.code"></span>
-                  </div>
-                </label>
-              </template>
-            </div>
-          </div>
-          
-          <div class="pipeline-settings">
-            <div class="setting-group">
-              <label class="setting-label">
-                <i data-feather="hash"></i>
-                Import Limit
-              </label>
-              <input type="number" x-model.number="limit" min="1" max="10000" class="setting-input">
-            </div>
-            
-            <div class="setting-group checkbox-group">
-              <label class="checkbox-label">
-                <input type="checkbox" x-model="overwrite" class="checkbox">
-                <span class="checkmark"></span>
-                Overwrite existing data
-              </label>
-            </div>
-          </div>
-          
-          <div class="pipeline-actions">
-            <button :disabled="!providers.length || !source || isRunning()" @click="start()" class="action-btn primary" :title="isRunning() ? 'Job in progress' : ''">
-              <i data-feather="play"></i>
-              Start Full Pipeline
+          <div class="relative">
+            <button onclick="toggleQuickActions()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors">
+              <i class="fas fa-bolt mr-2"></i>Quick Actions<i class="fas fa-chevron-down ml-2 text-xs"></i>
             </button>
-            <button @click="startVectors()" class="action-btn secondary" :disabled="!isVectorHealthy() || isRunning()" :title="!isVectorHealthy() ? 'Vector backend unavailable' : (isRunning() ? 'Job in progress' : 'Embed + upsert vectors only for existing docs')">
-              <i data-feather="cpu"></i>
-              Rebuild Vectors Only
-            </button>
-          </div>
-        </div>
-        
-        <div x-show="jobId" class="pipeline-status">
-          <div class="status-header">
-            <h3>Pipeline Progress</h3>
-            <div class="status-indicators">
-              <span class="job-id">Job: <code x-text="jobId"></code></span>
-              <span class="connection-status" :class="{'live': live, 'idle': !live}">
-                <i :data-feather="live ? 'wifi' : 'wifi-off'"></i>
-                <span x-text="live ? 'Live' : 'Idle'"></span>
-              </span>
-            </div>
-          </div>
-          
-          <div class="pipeline-stages" x-show="status">
-            <div class="stage-progress">
-              <div class="progress-bar">
-                <div class="progress-fill" :style="{width: getProgressPercentage() + '%'}"></div>
+            <div id="quickActionsMenu" class="absolute right-0 mt-2 w-64 bg-slate-800 rounded-lg shadow-xl border border-slate-700 hidden z-50">
+              <div class="p-2">
+                <button onclick="seedData()" class="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors"><i class="fas fa-seedling mr-2 text-green-500"></i>Seed Sample Data</button>
+                <button onclick="vectorUpsert()" class="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors"><i class="fas fa-brain mr-2 text-purple-400"></i>Seed Vectors Only</button>
+                <div class="border-t border-slate-700 my-2"></div>
+                <a href="status.html" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors"><i class="fas fa-chart-line mr-2 text-purple-500"></i>System Status</a>
+                <a href="index.html" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors"><i class="fas fa-arrow-left mr-2 text-gray-500"></i>Back to Browse</a>
               </div>
-              <span class="progress-text" x-text="getProgressText()"></span>
-            </div>
-            
-            <div class="status-details">
-              <pre class="status-json" x-text="JSON.stringify(status, null, 2)"></pre>
             </div>
           </div>
         </div>
-      </section>
+      </div>
+    </div>
+  </nav>
 
-      <!-- System Health -->
-      <section class="dashboard-card health-card">
-        <div class="card-header">
-          <h2>
-            <i data-feather="heart"></i>
-            System Health
-          </h2>
-          <button @click="loadHealth()" class="refresh-btn">
-            <i data-feather="refresh-cw"></i>
-          </button>
-        </div>
-        <div class="health-content">
-          <template x-if="health">
-            <div class="health-grid">
-              <template x-for="(value, key) in health" :key="key">
-                <div class="health-item">
-                  <span class="health-service" x-text="key"></span>
-                  <span class="health-status" :class="getServiceStatus(value)" x-text="getStatusText(value)"></span>
-                </div>
-              </template>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div id="overview-tab" class="space-y-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-gray-400 text-sm font-medium">Total Anime</p>
+              <p class="text-3xl font-bold text-white mt-2" id="totalAnime">0</p>
             </div>
-          </template>
-          <div x-show="!health" class="loading-state">
-            <i data-feather="loader" class="spin"></i>
-            Loading health data...
+            <div class="bg-blue-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-film text-blue-500 text-xl"></i></div>
           </div>
         </div>
-      </section>
-
-      <!-- Capabilities -->
-      <section class="dashboard-card capabilities-card">
-        <div class="card-header">
-          <h2>
-            <i data-feather="zap"></i>
-            System Capabilities
-          </h2>
-          <button @click="loadCapabilities()" class="refresh-btn">
-            <i data-feather="refresh-cw"></i>
-          </button>
-        </div>
-        <div class="capabilities-content">
-          <template x-if="capabilities">
-            <div class="json-viewer">
-              <pre x-text="JSON.stringify(capabilities, null, 2)"></pre>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-gray-400 text-sm font-medium">Vector Embeddings</p>
+              <p class="text-3xl font-bold text-white mt-2" id="totalVectors">0</p>
             </div>
-          </template>
+            <div class="bg-yellow-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-brain text-yellow-500 text-xl"></i></div>
+          </div>
         </div>
-      </section>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-gray-400 text-sm font-medium">User Ratings</p>
+              <p class="text-3xl font-bold text-white mt-2" id="totalRatings">0</p>
+            </div>
+            <div class="bg-green-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-star text-green-500 text-xl"></i></div>
+          </div>
+        </div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-gray-400 text-sm font-medium">Daily Searches</p>
+              <p class="text-3xl font-bold text-white mt-2" id="dailySearches">0</p>
+            </div>
+            <div class="bg-purple-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-search text-purple-500 text-xl"></i></div>
+          </div>
+        </div>
+      </div>
 
-      <!-- Observability -->
-      <section class="dashboard-card observability-card">
-        <div class="card-header">
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-semibold text-white">Recent System Activity</h3>
+          <button onclick="refreshActivity()" class="text-gray-400 hover:text-white transition-colors"><i class="fas fa-sync"></i></button>
+        </div>
+        <div class="space-y-4" id="activityFeed"></div>
+      </div>
+    </div>
+
+    <div id="data-tab" class="space-y-8 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+          <h3 class="text-lg font-semibold text-white mb-6">Database Operations</h3>
+          <div class="space-y-4">
+            <button onclick="seedData()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center"><i class="fas fa-seedling mr-2"></i>Seed Sample Data</button>
+            <button onclick="vectorUpsert()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center"><i class="fas fa-brain mr-2"></i>Seed Vectors Only</button>
+          </div>
+        </div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+          <h3 class="text-lg font-semibold text-white mb-6">Database Statistics</h3>
+          <div class="space-y-4">
+            <div class="flex justify-between items-center p-4 bg-slate-800 rounded-lg"><span class="text-gray-300">Total Records</span><span class="text-white font-semibold" id="dbTotalRecords">0</span></div>
+            <div class="flex justify-between items-center p-4 bg-slate-800 rounded-lg"><span class="text-gray-300">Vectors</span><span class="text-white font-semibold" id="dbVectors">0</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="successToast" class="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg hidden transform translate-y-full transition-transform">
+    <div class="flex items-center"><i class="fas fa-check-circle mr-2"></i><span id="toastMessage">OK</span></div>
+  </div>
+
+  <script>
+    let currentTab = 'overview';
+    document.addEventListener('DOMContentLoaded', function(){
+      loadDashboardData();
+      document.addEventListener('click', (e)=>{ if(!e.target.closest('[onclick*="toggleQuickActions"]')) document.getElementById('quickActionsMenu').classList.add('hidden'); });
+    });
+
+    function setActiveTab(tab){
+      document.querySelectorAll('[id$="-tab"]').forEach(el=>el.classList.add('hidden'));
+      document.getElementById(tab+'-tab').classList.remove('hidden');
+      document.querySelectorAll('nav a').forEach(link=>{ link.className = link.className.replace('text-white border-b-2 border-red-500','text-gray-400 border-b-2 border-transparent hover:border-gray-600'); });
+      event.target.className = 'text-white border-b-2 border-red-500 pb-1 px-1';
+      currentTab = tab;
+    }
+
+    function toggleQuickActions(){ document.getElementById('quickActionsMenu').classList.toggle('hidden'); }
+
+    async function loadDashboardData(){
+      try{
+        const r = await fetch('/admin/stats');
+        if(r.ok){ const s = await r.json();
+          document.getElementById('totalAnime').textContent = (s.anime||0).toLocaleString();
+          document.getElementById('totalVectors').textContent = (s.vectors||0).toLocaleString();
+          document.getElementById('dbTotalRecords').textContent = (s.anime||0).toLocaleString();
+          document.getElementById('dbVectors').textContent = (s.vectors||0).toLocaleString();
+        }
+      }catch(err){ console.warn('Stats failed', err); }
+    }
+
+    async function seedData(){
+      try{ showToast('Seeding data...');
+        const r = await fetch('/admin/seed/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source:'anilist', limit:50, overwrite:false }) });
+        if(r.ok){ showToast('Seed started'); setTimeout(loadDashboardData, 1500); } else { showToast('Failed to seed', 'error'); }
+      }catch(err){ showToast('Error seeding', 'error'); }
+      document.getElementById('quickActionsMenu').classList.add('hidden');
+    }
+
+    async function vectorUpsert(){
+      try{ showToast('Starting vector upsert...');
+        const r = await fetch('/admin/seed/vectors', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ limit: 1000 }) });
+        if(r.ok){ showToast('Vector upsert started'); setTimeout(loadDashboardData, 1500); } else { showToast('Failed to start vector upsert', 'error'); }
+      }catch(err){ showToast('Error starting vector upsert', 'error'); }
+      document.getElementById('quickActionsMenu').classList.add('hidden');
+    }
+
+    function refreshActivity(){ showToast('Refreshed'); }
+
+    function showToast(message, type='success'){
+      const toast = document.getElementById('successToast');
+      const msg = document.getElementById('toastMessage');
+      msg.textContent = message;
+      toast.className = 'fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg transform transition-transform ' + (type==='error'?'bg-red-600':'bg-green-600');
+      toast.classList.remove('translate-y-full','hidden');
+      setTimeout(()=>{ toast.classList.add('translate-y-full'); setTimeout(()=>toast.classList.add('hidden'), 300); }, 2500);
+    }
+  </script>
+</body>
+</html>
           <h2>
             <i data-feather="eye"></i>
             Observability

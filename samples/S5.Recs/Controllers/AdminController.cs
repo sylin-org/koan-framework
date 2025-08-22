@@ -66,6 +66,3 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         }
     }
 }
-
-public record SeedRequest(string Source = "local", int Limit = 50, bool Overwrite = false);
-public record VectorOnlyRequest(int Limit = 1000);

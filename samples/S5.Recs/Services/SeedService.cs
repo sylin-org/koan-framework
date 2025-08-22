@@ -15,14 +15,6 @@ using Sora.Data.Vector;
 
 namespace S5.Recs.Services;
 
-public interface ISeedService
-{
-    Task<string> StartAsync(string source, int limit, bool overwrite, CancellationToken ct);
-    Task<string> StartVectorUpsertAsync(IEnumerable<AnimeDoc> items, CancellationToken ct);
-    Task<object> GetStatusAsync(string jobId, CancellationToken ct);
-    Task<(int anime, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct);
-}
-
 internal sealed class SeedService : ISeedService
 {
     private readonly string _cacheDir = Constants.Paths.SeedCache;
@@ -173,10 +165,18 @@ internal sealed class SeedService : ISeedService
             {
                 Id = a.Id,
                 Title = a.Title,
+                TitleEnglish = a.TitleEnglish,
+                TitleRomaji = a.TitleRomaji,
+                TitleNative = a.TitleNative,
+                Synonyms = a.Synonyms,
                 Genres = a.Genres,
+                Tags = a.Tags,
                 Episodes = a.Episodes,
                 Synopsis = a.Synopsis,
-                Popularity = a.Popularity
+                Popularity = a.Popularity,
+                CoverUrl = a.CoverUrl,
+                BannerUrl = a.BannerUrl,
+                CoverColorHex = a.CoverColorHex
             });
             return await AnimeDoc.UpsertMany(docs, ct);
         }
@@ -265,7 +265,22 @@ internal sealed class SeedService : ISeedService
             for (int i = 0; i < docs.Count; i += batchSize)
             {
                 var batch = docs.Skip(i).Take(batchSize).ToList();
-                var inputs = batch.Select(d => ($"{d.Title}\n\n{d.Synopsis}\n\nTags: {string.Join(", ", d.Genres ?? Array.Empty<string>())}").Trim()).ToList();
+                // Build enriched embedding text (titles + synonyms + genres + tags)
+                var inputs = batch.Select(d =>
+                {
+                    var titles = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(d.Title)) titles.Add(d.Title!);
+                    if (!string.IsNullOrWhiteSpace(d.TitleEnglish) && d.TitleEnglish != d.Title) titles.Add(d.TitleEnglish!);
+                    if (!string.IsNullOrWhiteSpace(d.TitleRomaji) && d.TitleRomaji != d.Title) titles.Add(d.TitleRomaji!);
+                    if (!string.IsNullOrWhiteSpace(d.TitleNative) && d.TitleNative != d.Title) titles.Add(d.TitleNative!);
+                    if (d.Synonyms is { Length: > 0 }) titles.AddRange(d.Synonyms);
+
+                    var tags = new List<string>();
+                    if (d.Genres is { Length: > 0 }) tags.AddRange(d.Genres);
+                    if (d.Tags is { Length: > 0 }) tags.AddRange(d.Tags);
+
+                    return ($"{string.Join(" / ", titles.Distinct())}\n\n{d.Synopsis}\n\nTags: {string.Join(", ", tags.Distinct())}").Trim();
+                }).ToList();
                 var emb = await ai.EmbedAsync(new Sora.AI.Contracts.Models.AiEmbeddingsRequest { Input = inputs, Model = model }, ct);
                 var tuples = new List<(string Id, float[] Embedding, object? Metadata)>(batch.Count);
                 for (int j = 0; j < batch.Count && j < emb.Vectors.Count; j++)
@@ -295,5 +310,17 @@ internal sealed class SeedService : ISeedService
     }
 
     private static string BuildEmbeddingText(Anime a)
-        => ($"{a.Title}\n\n{a.Synopsis}\n\nTags: {string.Join(", ", a.Genres ?? Array.Empty<string>())}").Trim();
+    {
+        var titles = new List<string>();
+        if (!string.IsNullOrWhiteSpace(a.Title)) titles.Add(a.Title);
+        if (!string.IsNullOrWhiteSpace(a.TitleEnglish) && a.TitleEnglish != a.Title) titles.Add(a.TitleEnglish!);
+        if (!string.IsNullOrWhiteSpace(a.TitleRomaji) && a.TitleRomaji != a.Title) titles.Add(a.TitleRomaji!);
+        if (!string.IsNullOrWhiteSpace(a.TitleNative) && a.TitleNative != a.Title) titles.Add(a.TitleNative!);
+        if (a.Synonyms is { Length: > 0 }) titles.AddRange(a.Synonyms);
+        var tags = new List<string>();
+        if (a.Genres is { Length: > 0 }) tags.AddRange(a.Genres);
+        if (a.Tags is { Length: > 0 }) tags.AddRange(a.Tags);
+        var text = $"{string.Join(" / ", titles.Distinct())}\n\n{a.Synopsis}\n\nTags: {string.Join(", ", tags.Distinct())}";
+        return text.Trim();
+    }
 }

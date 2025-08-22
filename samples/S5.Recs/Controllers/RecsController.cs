@@ -23,7 +23,3 @@ public class RecsController(IRecsService recs) : ControllerBase
         return Ok(new { ok = true });
     }
 }
-
-public record RecsQuery(string? Text, string? AnchorAnimeId, Filters? Filters, int TopK = 20, string? UserId = null);
-public record Filters(string[]? Genres, int? EpisodesMax, bool SpoilerSafe = true);
-public record RateRequest(string UserId, string AnimeId, int Rating);

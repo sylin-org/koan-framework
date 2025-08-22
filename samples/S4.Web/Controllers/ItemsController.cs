@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Sora.Data.Abstractions;
 using Sora.Data.Core;
-using Sora.Data.Core.Model;
 using Sora.Web.Attributes;
 using Sora.Web.Controllers;
 
@@ -29,9 +27,3 @@ public sealed class ItemsController : EntityController<Item>
 }
 
 // GraphQL endpoint is provided by Sora.Web.GraphQl's centralized controller (/graphql).
-
-[DataAdapter("mongo")]
-public sealed class Item : Entity<Item>
-{
-    public string Name { get; set; } = string.Empty;
-}

@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Sora Recs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#020617'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-white font-sans">
+    <!-- Top Navigation -->
+    <nav class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo and Brand -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-shield-alt text-white text-sm"></i>
+                        </div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent">
+                            Admin Dashboard
+                        </h1>
+                    </div>
+                    
+                    <!-- Admin Navigation -->
+                    <div class="hidden md:flex items-center space-x-8 ml-8">
+                        <a href="#" class="text-white border-b-2 border-red-500 pb-1 px-1" onclick="setActiveTab('overview')">
+                            <i class="fas fa-chart-pie mr-2"></i>
+                            Overview
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('data')">
+                            <i class="fas fa-database mr-2"></i>
+                            Data Management
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('users')">
+                            <i class="fas fa-users mr-2"></i>
+                            User Analytics
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('system')">
+                            <i class="fas fa-cog mr-2"></i>
+                            System Config
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Right Side Actions -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2 text-sm">
+                        <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span class="text-gray-400">System Online</span>
+                    </div>
+                    
+                    <div class="relative">
+                        <button onclick="toggleQuickActions()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-bolt mr-2"></i>
+                            Quick Actions
+                            <i class="fas fa-chevron-down ml-2 text-xs"></i>
+                        </button>
+                        
+                        <!-- Quick Actions Dropdown -->
+                        <div id="quickActionsMenu" class="absolute right-0 mt-2 w-64 bg-slate-800 rounded-lg shadow-xl border border-slate-700 hidden z-50">
+                            <div class="p-2">
+                                <button onclick="seedData()" class="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                                    <i class="fas fa-seedling mr-2 text-green-500"></i>
+                                    Seed Sample Data
+                                </button>
+                                <button onclick="clearData()" class="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                                    <i class="fas fa-trash mr-2 text-red-500"></i>
+                                    Clear All Data
+                                </button>
+                                <button onclick="backupData()" class="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                                    <i class="fas fa-download mr-2 text-blue-500"></i>
+                                    Create Backup
+                                </button>
+                                <div class="border-t border-slate-700 my-2"></div>
+                                <a href="status.html" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                                    <i class="fas fa-chart-line mr-2 text-purple-500"></i>
+                                    System Status
+                                </a>
+                                <a href="index.html" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                                    <i class="fas fa-arrow-left mr-2 text-gray-500"></i>
+                                    Back to Browse
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="space-y-8">
+            <!-- Statistics Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm font-medium">Total Anime</p>
+                            <p class="text-3xl font-bold text-white mt-2" id="totalAnime">1,247</p>
+                            <div class="flex items-center mt-2">
+                                <span class="text-green-500 text-sm">+12</span>
+                                <span class="text-gray-400 text-sm ml-1">this week</span>
+                            </div>
+                        </div>
+                        <div class="bg-blue-500 bg-opacity-20 p-3 rounded-lg">
+                            <i class="fas fa-film text-blue-500 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm font-medium">User Ratings</p>
+                            <p class="text-3xl font-bold text-white mt-2" id="totalRatings">3,892</p>
+                            <div class="flex items-center mt-2">
+                                <span class="text-green-500 text-sm">+234</span>
+                                <span class="text-gray-400 text-sm ml-1">this week</span>
+                            </div>
+                        </div>
+                        <div class="bg-yellow-500 bg-opacity-20 p-3 rounded-lg">
+                            <i class="fas fa-star text-yellow-500 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm font-medium">Active Users</p>
+                            <p class="text-3xl font-bold text-white mt-2" id="activeUsers">156</p>
+                            <div class="flex items-center mt-2">
+                                <span class="text-green-500 text-sm">+8%</span>
+                                <span class="text-gray-400 text-sm ml-1">vs last week</span>
+                            </div>
+                        </div>
+                        <div class="bg-green-500 bg-opacity-20 p-3 rounded-lg">
+                            <i class="fas fa-users text-green-500 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm font-medium">Search Queries</p>
+                            <p class="text-3xl font-bold text-white mt-2" id="dailySearches">542</p>
+                            <div class="flex items-center mt-2">
+                                <span class="text-red-500 text-sm">-5%</span>
+                                <span class="text-gray-400 text-sm ml-1">vs yesterday</span>
+                            </div>
+                        </div>
+                        <div class="bg-purple-500 bg-opacity-20 p-3 rounded-lg">
+                            <i class="fas fa-search text-purple-500 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <h3 class="text-lg font-semibold text-white mb-4">User Activity (Last 7 Days)</h3>
+                    <canvas id="activityChart" height="300"></canvas>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <h3 class="text-lg font-semibold text-white mb-4">Popular Genres</h3>
+                    <canvas id="genreChart" height="300"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Activity Feed -->
+            <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-semibold text-white">Recent System Activity</h3>
+                    <button onclick="refreshActivity()" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4" id="activityFeed">
+                    <div class="flex items-center space-x-4 p-4 bg-slate-800 rounded-lg">
+                        <div class="w-10 h-10 bg-green-500 bg-opacity-20 rounded-full flex items-center justify-center">
+                            <i class="fas fa-check text-green-500"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-white">Database backup completed successfully</p>
+                            <p class="text-gray-400 text-sm">Backup size: 2.3GB • 15 minutes ago</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4 p-4 bg-slate-800 rounded-lg">
+                        <div class="w-10 h-10 bg-blue-500 bg-opacity-20 rounded-full flex items-center justify-center">
+                            <i class="fas fa-upload text-blue-500"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-white">New anime data imported</p>
+                            <p class="text-gray-400 text-sm">15 new entries added • 2 hours ago</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4 p-4 bg-slate-800 rounded-lg">
+                        <div class="w-10 h-10 bg-yellow-500 bg-opacity-20 rounded-full flex items-center justify-center">
+                            <i class="fas fa-exclamation-triangle text-yellow-500"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-white">High API usage detected</p>
+                            <p class="text-gray-400 text-sm">Rate limit: 80% • 4 hours ago</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Management Tab -->
+        <div id="data-tab" class="space-y-8 hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Database Operations -->
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <h3 class="text-lg font-semibold text-white mb-6">Database Operations</h3>
+                    
+                    <div class="space-y-4">
+                        <button onclick="seedData()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                            <i class="fas fa-seedling mr-2"></i>
+                            Seed Sample Data
+                        </button>
+                        
+                        <button onclick="clearData()" class="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                            <i class="fas fa-trash mr-2"></i>
+                            Clear All Data
+                        </button>
+                        
+                        <button onclick="optimizeDatabase()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                            <i class="fas fa-rocket mr-2"></i>
+                            Optimize Database
+                        </button>
+                        
+                        <button onclick="backupData()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                            <i class="fas fa-download mr-2"></i>
+                            Create Backup
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Database Statistics -->
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <h3 class="text-lg font-semibold text-white mb-6">Database Statistics</h3>
+                    
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center p-4 bg-slate-800 rounded-lg">
+                            <span class="text-gray-300">Total Records</span>
+                            <span class="text-white font-semibold" id="dbTotalRecords">15,673</span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center p-4 bg-slate-800 rounded-lg">
+                            <span class="text-gray-300">Database Size</span>
+                            <span class="text-white font-semibold" id="dbSize">2.3 GB</span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center p-4 bg-slate-800 rounded-lg">
+                            <span class="text-gray-300">Last Backup</span>
+                            <span class="text-white font-semibold" id="lastBackup">15 minutes ago</span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center p-4 bg-slate-800 rounded-lg">
+                            <span class="text-gray-300">Index Health</span>
+                            <span class="text-green-400 font-semibold" id="indexHealth">Optimal</span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center p-4 bg-slate-800 rounded-lg">
+                            <span class="text-gray-300">Query Performance</span>
+                            <span class="text-white font-semibold" id="queryPerf">45ms avg</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Import/Export -->
+            <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                <h3 class="text-lg font-semibold text-white mb-6">Data Import/Export</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="text-white font-medium mb-4">Import Data</h4>
+                        <div class="border-2 border-dashed border-slate-700 rounded-lg p-6 text-center hover:border-slate-600 transition-colors">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
+                            <p class="text-gray-300 mb-2">Drop files here or click to browse</p>
+                            <p class="text-gray-500 text-sm">Supports JSON, CSV formats</p>
+                            <input type="file" class="hidden" accept=".json,.csv">
+                            <button class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                                Select Files
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-white font-medium mb-4">Export Data</h4>
+                        <div class="space-y-3">
+                            <button class="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 px-4 rounded-lg transition-colors text-left">
+                                <i class="fas fa-file-code mr-2 text-blue-400"></i>
+                                Export as JSON
+                            </button>
+                            <button class="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 px-4 rounded-lg transition-colors text-left">
+                                <i class="fas fa-file-excel mr-2 text-green-400"></i>
+                                Export as CSV
+                            </button>
+                            <button class="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 px-4 rounded-lg transition-colors text-left">
+                                <i class="fas fa-database mr-2 text-purple-400"></i>
+                                Full Database Dump
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Analytics Tab -->
+        <div id="users-tab" class="space-y-8 hidden">
+            <div class="text-center py-20">
+                <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-users text-4xl text-gray-600"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-white mb-2">User Analytics</h3>
+                <p class="text-gray-400">Detailed user analytics dashboard coming soon</p>
+            </div>
+        </div>
+
+        <!-- System Config Tab -->
+        <div id="system-tab" class="space-y-8 hidden">
+            <div class="text-center py-20">
+                <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-cog text-4xl text-gray-600"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-white mb-2">System Configuration</h3>
+                <p class="text-gray-400">System configuration panel coming soon</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Success Toast -->
+    <div id="successToast" class="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg hidden transform translate-y-full transition-transform">
+        <div class="flex items-center">
+            <i class="fas fa-check-circle mr-2"></i>
+            <span id="toastMessage">Operation completed successfully</span>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'overview';
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            loadDashboardData();
+            
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('[onclick*="toggleQuickActions"]')) {
+                    document.getElementById('quickActionsMenu').classList.add('hidden');
+                }
+            });
+        });
+
+        // Tab navigation
+        function setActiveTab(tab) {
+            // Hide all tabs
+            document.querySelectorAll('[id$="-tab"]').forEach(el => el.classList.add('hidden'));
+            
+            // Show selected tab
+            document.getElementById(tab + '-tab').classList.remove('hidden');
+            
+            // Update navigation active states
+            document.querySelectorAll('nav a').forEach(link => {
+                link.className = link.className.replace('text-white border-b-2 border-red-500', 'text-gray-400 border-b-2 border-transparent hover:border-gray-600');
+            });
+            
+            event.target.className = 'text-white border-b-2 border-red-500 pb-1 px-1';
+            
+            currentTab = tab;
+        }
+
+        // Quick actions dropdown
+        function toggleQuickActions() {
+            const menu = document.getElementById('quickActionsMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Initialize charts
+        function initializeCharts() {
+            // Activity Chart
+            const activityCtx = document.getElementById('activityChart').getContext('2d');
+            new Chart(activityCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Searches',
+                        data: [320, 456, 589, 612, 445, 380, 542],
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Ratings',
+                        data: [180, 210, 345, 289, 267, 189, 234],
+                        borderColor: '#06d6a0',
+                        backgroundColor: 'rgba(6, 214, 160, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#94a3b8' }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        },
+                        x: { 
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        }
+                    }
+                }
+            });
+
+            // Genre Chart
+            const genreCtx = document.getElementById('genreChart').getContext('2d');
+            new Chart(genreCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Action', 'Romance', 'Comedy', 'Drama', 'Fantasy', 'Sci-Fi'],
+                    datasets: [{
+                        data: [28, 22, 18, 15, 10, 7],
+                        backgroundColor: [
+                            '#ef4444', '#ec4899', '#eab308', 
+                            '#3b82f6', '#8b5cf6', '#06d6a0'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { 
+                                color: '#94a3b8',
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                if (response.ok) {
+                    const stats = await response.json();
+                    updateDashboardStats(stats);
+                }
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                // Keep mock data as fallback
+            }
+        }
+
+        function updateDashboardStats(stats) {
+            if (stats.totalAnime) {
+                document.getElementById('totalAnime').textContent = stats.totalAnime.toLocaleString();
+            }
+            if (stats.totalRatings) {
+                document.getElementById('totalRatings').textContent = stats.totalRatings.toLocaleString();
+            }
+            if (stats.activeUsers) {
+                document.getElementById('activeUsers').textContent = stats.activeUsers.toLocaleString();
+            }
+            if (stats.dailySearches) {
+                document.getElementById('dailySearches').textContent = stats.dailySearches.toLocaleString();
+            }
+        }
+
+        // Database operations
+        async function seedData() {
+            try {
+                showToast('Seeding data...', 'info');
+                const response = await fetch('/api/admin/seed', { method: 'POST' });
+                if (response.ok) {
+                    showToast('Sample data seeded successfully!');
+                    setTimeout(loadDashboardData, 1000);
+                } else {
+                    showToast('Failed to seed data', 'error');
+                }
+            } catch (error) {
+                console.error('Error seeding data:', error);
+                showToast('Error seeding data', 'error');
+            }
+            
+            document.getElementById('quickActionsMenu').classList.add('hidden');
+        }
+
+        async function clearData() {
+            if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
+                try {
+                    showToast('Clearing data...', 'info');
+                    const response = await fetch('/api/admin/clear', { method: 'DELETE' });
+                    if (response.ok) {
+                        showToast('All data cleared successfully!');
+                        setTimeout(loadDashboardData, 1000);
+                    } else {
+                        showToast('Failed to clear data', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error clearing data:', error);
+                    showToast('Error clearing data', 'error');
+                }
+            }
+            
+            document.getElementById('quickActionsMenu').classList.add('hidden');
+        }
+
+        async function optimizeDatabase() {
+            try {
+                showToast('Optimizing database...', 'info');
+                // Simulate API call
+                setTimeout(() => {
+                    showToast('Database optimized successfully!');
+                    loadDashboardData();
+                }, 2000);
+            } catch (error) {
+                console.error('Error optimizing database:', error);
+                showToast('Error optimizing database', 'error');
+            }
+        }
+
+        async function backupData() {
+            try {
+                showToast('Creating backup...', 'info');
+                // Simulate API call
+                setTimeout(() => {
+                    showToast('Backup created successfully!');
+                    document.getElementById('lastBackup').textContent = 'Just now';
+                }, 3000);
+            } catch (error) {
+                console.error('Error creating backup:', error);
+                showToast('Error creating backup', 'error');
+            }
+            
+            document.getElementById('quickActionsMenu').classList.add('hidden');
+        }
+
+        function refreshActivity() {
+            showToast('Activity feed refreshed');
+        }
+
+        // Toast notifications
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('successToast');
+            const messageEl = document.getElementById('toastMessage');
+            
+            messageEl.textContent = message;
+            
+            // Update toast color based on type
+            toast.className = 'fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg transform transition-transform';
+            
+            if (type === 'success') {
+                toast.classList.add('bg-green-600');
+            } else if (type === 'error') {
+                toast.classList.add('bg-red-600');
+            } else {
+                toast.classList.add('bg-blue-600');
+            }
+            
+            // Show toast
+            toast.classList.remove('translate-y-full', 'hidden');
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-y-full');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anime Recommendations - Sora Recs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#020617'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-white font-sans">
+    <!-- Top Navigation -->
+    <nav class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo and Brand -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-film text-white text-sm"></i>
+                        </div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                            Sora Recs
+                        </h1>
+                    </div>
+                    
+                    <!-- Main Navigation -->
+                    <div class="hidden md:flex items-center space-x-8 ml-8">
+                        <a href="#" class="text-white border-b-2 border-purple-500 pb-1 px-1" onclick="setActiveTab('discover')">
+                            <i class="fas fa-compass mr-2"></i>
+                            Discover
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('trending')">
+                            <i class="fas fa-fire mr-2"></i>
+                            Trending
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('top-rated')">
+                            <i class="fas fa-star mr-2"></i>
+                            Top Rated
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('watchlist')">
+                            <i class="fas fa-bookmark mr-2"></i>
+                            Watchlist
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Search and User -->
+                <div class="flex items-center space-x-4">
+                    <!-- Search Bar -->
+                    <div class="relative hidden md:block">
+                        <input 
+                            type="text" 
+                            id="globalSearch"
+                            placeholder="Search anime, genres..."
+                            class="bg-slate-800 text-white placeholder-gray-400 rounded-lg px-4 py-2 pl-10 w-80 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-slate-700 transition-colors"
+                        >
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
+                    </div>
+                    
+                    <!-- User Profile Selector -->
+                    <div class="relative">
+                        <button id="profileButton" onclick="toggleProfileMenu()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 rounded-lg px-3 py-2 transition-colors">
+                            <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center" id="currentProfileAvatar">
+                                <span class="text-white font-bold text-sm" id="currentProfileInitial">C</span>
+                            </div>
+                            <span class="text-white text-sm" id="currentProfileName">Casual Viewer</span>
+                            <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+                        </button>
+                        
+                        <!-- Profile Dropdown -->
+                        <div id="profileMenu" class="absolute right-0 mt-2 w-64 bg-slate-800 rounded-lg shadow-xl border border-slate-700 hidden z-50">
+                            <div class="p-4 border-b border-slate-700">
+                                <h3 class="text-white font-semibold mb-2">Switch Profile</h3>
+                                <p class="text-gray-400 text-sm">Choose your viewing style for personalized recommendations</p>
+                            </div>
+                            <div class="p-2">
+                                <div class="profile-option flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors" onclick="selectProfile('casual')">
+                                    <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                                        <span class="text-white font-bold">C</span>
+                                    </div>
+                                    <div>
+                                        <div class="text-white font-medium">Casual Viewer</div>
+                                        <div class="text-gray-400 text-sm">Light entertainment, comedy</div>
+                                    </div>
+                                </div>
+                                <div class="profile-option flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors" onclick="selectProfile('serious')">
+                                    <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
+                                        <span class="text-white font-bold">S</span>
+                                    </div>
+                                    <div>
+                                        <div class="text-white font-medium">Serious Critic</div>
+                                        <div class="text-gray-400 text-sm">Complex narratives, depth</div>
+                                    </div>
+                                </div>
+                                <div class="profile-option flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors" onclick="selectProfile('otaku')">
+                                    <div class="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
+                                        <span class="text-white font-bold">O</span>
+                                    </div>
+                                    <div>
+                                        <div class="text-white font-medium">Dedicated Otaku</div>
+                                        <div class="text-gray-400 text-sm">All genres, deep culture</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-2 border-t border-slate-700">
+                                <button onclick="createNewProfile()" class="w-full text-left p-3 hover:bg-slate-700 rounded-lg transition-colors text-purple-400 hover:text-purple-300">
+                                    <i class="fas fa-plus mr-2"></i>
+                                    Create New Profile
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Admin Menu -->
+                    <div class="relative">
+                        <button onclick="toggleAdminMenu()" class="p-2 text-gray-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        
+                        <!-- Admin Dropdown -->
+                        <div id="adminMenu" class="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 hidden z-50">
+                            <div class="p-2">
+                                <a href="admin.html" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                                    <i class="fas fa-shield-alt mr-2"></i>
+                                    Admin Panel
+                                </a>
+                                <a href="status.html" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                                    <i class="fas fa-chart-line mr-2"></i>
+                                    System Status
+                                </a>
+                                <div class="border-t border-slate-700 my-2"></div>
+                                <a href="#" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                                    <i class="fas fa-user-cog mr-2"></i>
+                                    Settings
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Profile Banner -->
+        <div class="bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-xl p-6 mb-8 border border-purple-500/20" id="profileBanner">
+            <div class="flex items-center space-x-4">
+                <div class="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center" id="bannerProfileAvatar">
+                    <span class="text-white font-bold text-xl" id="bannerProfileInitial">C</span>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-bold text-white" id="bannerProfileName">Welcome back, Casual Viewer!</h2>
+                    <p class="text-purple-200" id="bannerProfileDescription">Here are some light-hearted anime recommendations perfect for relaxation</p>
+                    <div class="flex items-center space-x-4 mt-2">
+                        <span class="text-sm text-purple-300">
+                            <i class="fas fa-heart mr-1"></i>
+                            <span id="profileStats">127 favorites</span>
+                        </span>
+                        <span class="text-sm text-purple-300">
+                            <i class="fas fa-clock mr-1"></i>
+                            Last active 2 hours ago
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters and Sort -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 space-y-4 lg:space-y-0">
+            <div class="flex flex-wrap items-center space-x-4">
+                <h3 class="text-xl font-semibold text-white" id="contentTitle">Discover Anime</h3>
+                <div class="flex items-center space-x-2">
+                    <button class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm transition-colors" onclick="toggleFilters()">
+                        <i class="fas fa-filter mr-2"></i>
+                        Filters
+                    </button>
+                    <span class="text-gray-400 text-sm" id="resultCount">Showing 24 results</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <!-- Sort Dropdown -->
+                <select id="sortBy" class="bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="relevance">Most Relevant</option>
+                    <option value="rating">Highest Rated</option>
+                    <option value="recent">Most Recent</option>
+                    <option value="popular">Most Popular</option>
+                </select>
+                
+                <!-- View Toggle -->
+                <div class="flex bg-slate-800 rounded-lg p-1">
+                    <button id="gridViewBtn" class="px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors">
+                        <i class="fas fa-th"></i>
+                    </button>
+                    <button id="listViewBtn" class="px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors">
+                        <i class="fas fa-list"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters Panel -->
+        <div id="filtersPanel" class="bg-slate-900 rounded-lg p-6 mb-8 border border-slate-800 hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Genre</label>
+                    <select id="genreFilter" class="w-full bg-slate-800 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">All Genres</option>
+                        <option value="Action">Action</option>
+                        <option value="Romance">Romance</option>
+                        <option value="Comedy">Comedy</option>
+                        <option value="Drama">Drama</option>
+                        <option value="Fantasy">Fantasy</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Rating</label>
+                    <select id="ratingFilter" class="w-full bg-slate-800 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">Any Rating</option>
+                        <option value="9">9+ Stars</option>
+                        <option value="8">8+ Stars</option>
+                        <option value="7">7+ Stars</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Year</label>
+                    <select id="yearFilter" class="w-full bg-slate-800 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">Any Year</option>
+                        <option value="2024">2024</option>
+                        <option value="2023">2023</option>
+                        <option value="2022">2022</option>
+                        <option value="2021">2021</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Episodes</label>
+                    <select id="episodeFilter" class="w-full bg-slate-800 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">Any Length</option>
+                        <option value="short">Short (1-12 eps)</option>
+                        <option value="medium">Medium (13-25 eps)</option>
+                        <option value="long">Long (26+ eps)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="clearFilters()" class="px-4 py-2 text-gray-400 hover:text-white transition-colors">
+                    Clear All
+                </button>
+                <button onclick="applyFilters()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+
+        <!-- Content Grid -->
+        <div id="animeGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+            <!-- Anime cards will be populated here -->
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+            <p class="text-gray-400 mt-4">Loading amazing anime recommendations...</p>
+        </div>
+        
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-20 hidden">
+            <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-search text-4xl text-gray-600"></i>
+            </div>
+            <h3 class="text-xl font-semibold text-white mb-2">No anime found</h3>
+            <p class="text-gray-400">Try adjusting your filters or search terms</p>
+        </div>
+    </main>
+
+    <!-- Anime Detail Modal -->
+    <div id="animeModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden overflow-y-auto">
+        <div class="bg-slate-900 rounded-xl max-w-5xl w-full mx-4 my-8 max-h-[90vh] overflow-y-auto">
+            <div class="relative">
+                <!-- Modal Header with Background -->
+                <div class="relative h-64 bg-gradient-to-t from-slate-900 to-transparent overflow-hidden rounded-t-xl">
+                    <img id="modalBackdrop" src="" alt="" class="w-full h-full object-cover opacity-30">
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent"></div>
+                    <div class="absolute top-4 right-4">
+                        <button onclick="closeAnimeModal()" class="w-10 h-10 bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded-full flex items-center justify-center transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="absolute bottom-4 left-6">
+                        <h2 id="modalTitle" class="text-3xl font-bold text-white mb-2"></h2>
+                        <div class="flex items-center space-x-4">
+                            <div id="modalRating" class="flex items-center space-x-1"></div>
+                            <span id="modalYear" class="text-purple-300"></span>
+                            <span id="modalType" class="text-purple-300"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal Content -->
+                <div class="p-6">
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div>
+                            <img id="modalPoster" src="" alt="" class="w-full rounded-lg shadow-lg">
+                            <div class="mt-4 space-y-3">
+                                <button onclick="addToWatchlist()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                                    <i class="fas fa-bookmark mr-2"></i>
+                                    Add to Watchlist
+                                </button>
+                                <button onclick="openRatingModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                                    <i class="fas fa-star mr-2"></i>
+                                    Rate This Anime
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-white mb-2">Synopsis</h3>
+                                <p id="modalSynopsis" class="text-gray-300 leading-relaxed"></p>
+                            </div>
+                            
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-white mb-3">Details</h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <span class="text-gray-400">Episodes:</span>
+                                        <span id="modalEpisodes" class="text-white ml-2"></span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-400">Status:</span>
+                                        <span id="modalStatus" class="text-white ml-2"></span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-400">Studio:</span>
+                                        <span id="modalStudio" class="text-white ml-2"></span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-400">Source:</span>
+                                        <span id="modalSource" class="text-white ml-2"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h3 class="text-lg font-semibold text-white mb-3">Genres</h3>
+                                <div id="modalGenres" class="flex flex-wrap gap-2">
+                                    <!-- Genre tags will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentProfile = 'casual';
+        let currentTab = 'discover';
+        let animeData = [];
+        let filteredData = [];
+        let currentFilters = {};
+
+        // Profile configurations
+        const profiles = {
+            casual: {
+                name: 'Casual Viewer',
+                initial: 'C',
+                gradient: 'from-purple-500 to-pink-500',
+                description: 'Here are some light-hearted anime recommendations perfect for relaxation',
+                stats: '127 favorites',
+                preferences: ['Comedy', 'Romance', 'Slice of Life', 'Music']
+            },
+            serious: {
+                name: 'Serious Critic',
+                initial: 'S',
+                gradient: 'from-blue-500 to-cyan-500',
+                description: 'Complex narratives and deep character development await you',
+                stats: '89 analyzed',
+                preferences: ['Drama', 'Psychological', 'Thriller', 'Historical']
+            },
+            otaku: {
+                name: 'Dedicated Otaku',
+                initial: 'O',
+                gradient: 'from-orange-500 to-red-500',
+                description: 'Dive deep into the world of anime culture and storytelling',
+                stats: '342 completed',
+                preferences: ['Action', 'Fantasy', 'Mecha', 'Adventure']
+            }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            selectProfile('casual');
+            loadAnimeData();
+            setupEventListeners();
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('globalSearch').addEventListener('input', handleGlobalSearch);
+            document.getElementById('sortBy').addEventListener('change', applySortAndFilters);
+            document.getElementById('gridViewBtn').addEventListener('click', () => setViewMode('grid'));
+            document.getElementById('listViewBtn').addEventListener('click', () => setViewMode('list'));
+            
+            // Filter event listeners
+            ['genreFilter', 'ratingFilter', 'yearFilter', 'episodeFilter'].forEach(id => {
+                document.getElementById(id).addEventListener('change', applyFilters);
+            });
+            
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#profileButton')) {
+                    document.getElementById('profileMenu').classList.add('hidden');
+                }
+                if (!e.target.closest('[onclick*="toggleAdminMenu"]')) {
+                    document.getElementById('adminMenu').classList.add('hidden');
+                }
+            });
+        }
+
+        // Profile management
+        function selectProfile(profileId) {
+            currentProfile = profileId;
+            const profile = profiles[profileId];
+            
+            if (profile) {
+                updateProfileUI(profile);
+                filterByProfile();
+            }
+            
+            // Close profile menu
+            document.getElementById('profileMenu').classList.add('hidden');
+        }
+
+        function updateProfileUI(profile) {
+            // Update top navigation profile display
+            document.getElementById('currentProfileInitial').textContent = profile.initial;
+            document.getElementById('currentProfileName').textContent = profile.name;
+            
+            // Update banner
+            document.getElementById('bannerProfileInitial').textContent = profile.initial;
+            document.getElementById('bannerProfileName').textContent = `Welcome back, ${profile.name}!`;
+            document.getElementById('bannerProfileDescription').textContent = profile.description;
+            document.getElementById('profileStats').textContent = profile.stats;
+            
+            // Update avatar gradients
+            const avatars = [
+                document.getElementById('currentProfileAvatar'),
+                document.getElementById('bannerProfileAvatar')
+            ];
+            
+            avatars.forEach(avatar => {
+                avatar.className = `w-16 h-16 bg-gradient-to-r ${profile.gradient} rounded-xl flex items-center justify-center`;
+            });
+            
+            // Update banner gradient
+            document.getElementById('profileBanner').className = `bg-gradient-to-r ${profile.gradient.replace('500', '900/50')} rounded-xl p-6 mb-8 border border-purple-500/20`;
+        }
+
+        function toggleProfileMenu() {
+            const menu = document.getElementById('profileMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        function toggleAdminMenu() {
+            const menu = document.getElementById('adminMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        function createNewProfile() {
+            alert('Profile creation feature coming soon!');
+            document.getElementById('profileMenu').classList.add('hidden');
+        }
+
+        // Navigation
+        function setActiveTab(tab) {
+            currentTab = tab;
+            
+            // Update navigation active states
+            document.querySelectorAll('nav a').forEach(link => {
+                link.className = link.className.replace('text-white border-b-2 border-purple-500', 'text-gray-400 border-b-2 border-transparent hover:border-gray-600');
+            });
+            
+            event.target.className = 'text-white border-b-2 border-purple-500 pb-1 px-1';
+            
+            // Update content title
+            const titles = {
+                discover: 'Discover Anime',
+                trending: 'Trending Now',
+                'top-rated': 'Top Rated Anime',
+                watchlist: 'My Watchlist'
+            };
+            
+            document.getElementById('contentTitle').textContent = titles[tab] || 'Browse Anime';
+            
+            // Load content for tab
+            loadContentForTab(tab);
+        }
+
+        // Data loading
+        async function loadAnimeData() {
+            try {
+                const recs = await fetchRecommendations({ text: '', topK: 24 });
+                animeData = recs;
+                filteredData = [...animeData];
+                displayAnime(filteredData);
+            } catch (error) {
+                console.error('Error loading anime data:', error);
+                animeData = generateSampleData();
+                filteredData = [...animeData];
+                displayAnime(filteredData);
+            }
+        }
+
+        async function fetchRecommendations({ text, topK = 24 }) {
+            const profile = profiles[currentProfile] || null;
+            const genre = document.getElementById('genreFilter')?.value || '';
+            const episodeSel = document.getElementById('episodeFilter')?.value || '';
+            const episodesMax = episodeSel === 'short' ? 12 : (episodeSel === 'medium' ? 25 : (episodeSel === 'long' ? 9999 : null));
+            const genres = [];
+            if (genre) genres.push(genre);
+            if (!genre && profile?.preferences?.length) {
+                // Lightly bias with profile preferences when no explicit genre selected
+                genres.push(...profile.preferences.slice(0, 3));
+            }
+
+            const body = {
+                text: text || '',
+                topK,
+                filters: {
+                    genres: genres,
+                    episodesMax: episodesMax,
+                    spoilerSafe: true
+                },
+                userId: currentProfile // map profile id to userId for personalization if available
+            };
+            const r = await fetch('/api/recs/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const data = await r.json();
+            const items = Array.isArray(data.items) ? data.items : [];
+            // Map API results to UI-friendly list
+            return items.map(it => mapItemToAnime(it));
+        }
+
+        function mapItemToAnime(item) {
+            const a = item.anime || item; // tolerate raw anime shape
+            const score = typeof item.score === 'number' ? item.score : (typeof a.popularity === 'number' ? a.popularity : 0.7);
+            const computedRating = Math.max(1, Math.min(5, Math.round(score * 5 * 10) / 10));
+            return {
+                id: a.id,
+                title: a.titleEnglish || a.title || a.titleRomaji || a.titleNative || 'Untitled',
+                englishTitle: a.titleEnglish || '',
+                coverUrl: a.coverUrl || '',
+                backdrop: a.bannerUrl || a.coverUrl || '',
+                rating: computedRating,
+                episodes: a.episodes || 0,
+                type: a.type || 'TV',
+                year: a.year || '',
+                status: a.status || '',
+                studio: a.studio || '',
+                source: a.source || '',
+                synopsis: a.synopsis || '',
+                genres: Array.isArray(a.genres) ? a.genres : (Array.isArray(a.tags) ? a.tags : [])
+            };
+        }
+
+        function generateSampleData() {
+            return [
+                {
+                    id: 1,
+                    title: "Attack on Titan",
+                    englishTitle: "Shingeki no Kyojin",
+                    poster: "https://via.placeholder.com/300x400/1a1a1a/ffffff?text=Attack+on+Titan",
+                    backdrop: "https://via.placeholder.com/1200x400/2a2a2a/ffffff?text=Attack+on+Titan",
+                    rating: 9.0,
+                    episodes: 25,
+                    type: "TV",
+                    year: 2013,
+                    status: "Completed",
+                    studio: "Mappa",
+                    source: "Manga",
+                    synopsis: "Humanity fights for survival against giant humanoid Titans that have brought humanity to the brink of extinction.",
+                    genres: ["Action", "Drama", "Fantasy", "Military"]
+                },
+                {
+                    id: 2,
+                    title: "Your Name",
+                    englishTitle: "Kimi no Na wa",
+                    poster: "https://via.placeholder.com/300x400/1a1a1a/ffffff?text=Your+Name",
+                    backdrop: "https://via.placeholder.com/1200x400/2a2a2a/ffffff?text=Your+Name",
+                    rating: 8.4,
+                    episodes: 1,
+                    type: "Movie",
+                    year: 2016,
+                    status: "Completed",
+                    studio: "CoMix Wave Films",
+                    source: "Original",
+                    synopsis: "Two teenagers share a profound, magical connection upon discovering they are swapping bodies.",
+                    genres: ["Romance", "Supernatural", "Drama"]
+                }
+                // Add more sample data as needed
+            ];
+        }
+
+        function filterByProfile() {
+            const profile = profiles[currentProfile];
+            if (!profile) return;
+            
+            // Filter anime based on profile preferences
+            const profileFiltered = animeData.filter(anime => 
+                anime.genres.some(genre => profile.preferences.includes(genre))
+            );
+            
+            filteredData = profileFiltered.length > 0 ? profileFiltered : animeData.slice(0, 12);
+            displayAnime(filteredData);
+        }
+
+        function loadContentForTab(tab) {
+            switch(tab) {
+                case 'trending':
+                    filteredData = animeData.sort((a, b) => (b.popularity || 0) - (a.popularity || 0)).slice(0, 24);
+                    break;
+                case 'top-rated':
+                    filteredData = animeData.sort((a, b) => b.rating - a.rating).slice(0, 24);
+                    break;
+                case 'watchlist':
+                    // Load user's watchlist
+                    filteredData = []; // Empty for demo
+                    break;
+                default:
+                    filterByProfile();
+                    return;
+            }
+            
+            displayAnime(filteredData);
+        }
+
+        // Display functions
+        function displayAnime(animeList) {
+            const grid = document.getElementById('animeGrid');
+            const loading = document.getElementById('loadingState');
+            const empty = document.getElementById('emptyState');
+            
+            loading.style.display = 'none';
+            
+            if (!animeList || animeList.length === 0) {
+                grid.classList.add('hidden');
+                empty.classList.remove('hidden');
+                document.getElementById('resultCount').textContent = 'No results';
+                return;
+            }
+            
+            grid.classList.remove('hidden');
+            empty.classList.add('hidden');
+            document.getElementById('resultCount').textContent = `Showing ${animeList.length} results`;
+            
+            grid.innerHTML = animeList.map(anime => createAnimeCard(anime)).join('');
+        }
+
+        function createAnimeCard(anime) {
+            return `
+                <div class="bg-slate-900 rounded-xl overflow-hidden hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer group" onclick="openAnimeModal(${anime.id})">
+                    <div class="aspect-[3/4] relative overflow-hidden">
+                        <img src="${anime.coverUrl || '/images/missing-cover.svg'}" alt="${anime.title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" onerror="this.onerror=null;this.src='/images/missing-cover.svg'">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        <div class="absolute top-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded-full">
+                            ★ ${anime.rating.toFixed(1)}
+                        </div>
+                        <div class="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <div class="text-white text-sm font-medium mb-1">${anime.title}</div>
+                            <div class="text-gray-300 text-xs">${anime.episodes} eps • ${anime.year}</div>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-semibold text-white text-sm mb-2 line-clamp-2 group-hover:text-purple-300 transition-colors">${anime.title}</h3>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            ${anime.genres.slice(0, 2).map(genre => 
+                                `<span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">${genre}</span>`
+                            ).join('')}
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-gray-400">
+                            <span>${anime.type}</span>
+                            <span>${anime.year}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Search and filtering
+        async function handleGlobalSearch(event) {
+            const query = event.target.value;
+            if (!query || query.trim().length === 0) {
+                loadContentForTab(currentTab);
+                return;
+            }
+            try {
+                const recs = await fetchRecommendations({ text: query, topK: 24 });
+                animeData = recs;
+                filteredData = [...animeData];
+                displayAnime(filteredData);
+            } catch (e) {
+                console.error('Search failed', e);
+            }
+        }
+
+        function toggleFilters() {
+            const panel = document.getElementById('filtersPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function applyFilters() {
+            const genre = document.getElementById('genreFilter').value;
+            const rating = document.getElementById('ratingFilter').value;
+            const year = document.getElementById('yearFilter').value;
+            const episode = document.getElementById('episodeFilter').value;
+            
+            let filtered = [...animeData];
+            
+            if (genre) {
+                filtered = filtered.filter(anime => anime.genres.includes(genre));
+            }
+            
+            if (rating) {
+                filtered = filtered.filter(anime => anime.rating >= parseFloat(rating));
+            }
+            
+            if (year) {
+                filtered = filtered.filter(anime => anime.year.toString() === year);
+            }
+            
+            if (episode) {
+                const episodeRanges = {
+                    short: [1, 12],
+                    medium: [13, 25],
+                    long: [26, Infinity]
+                };
+                
+                const [min, max] = episodeRanges[episode] || [0, Infinity];
+                filtered = filtered.filter(anime => anime.episodes >= min && anime.episodes <= max);
+            }
+            
+            filteredData = filtered;
+            applySortAndFilters();
+        }
+
+        function applySortAndFilters() {
+            const sortBy = document.getElementById('sortBy').value;
+            
+            let sorted = [...filteredData];
+            
+            switch(sortBy) {
+                case 'rating':
+                    sorted.sort((a, b) => b.rating - a.rating);
+                    break;
+                case 'recent':
+                    sorted.sort((a, b) => b.year - a.year);
+                    break;
+                case 'popular':
+                    sorted.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+                    break;
+                default:
+                    // Keep current order for relevance
+                    break;
+            }
+            
+            displayAnime(sorted);
+        }
+
+        function clearFilters() {
+            document.getElementById('genreFilter').value = '';
+            document.getElementById('ratingFilter').value = '';
+            document.getElementById('yearFilter').value = '';
+            document.getElementById('episodeFilter').value = '';
+            
+            applyFilters();
+        }
+
+        function setViewMode(mode) {
+            const gridBtn = document.getElementById('gridViewBtn');
+            const listBtn = document.getElementById('listViewBtn');
+            
+            if (mode === 'grid') {
+                gridBtn.className = 'px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors';
+                listBtn.className = 'px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors';
+            } else {
+                listBtn.className = 'px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors';
+                gridBtn.className = 'px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors';
+            }
+            
+            // TODO: Implement list view layout
+        }
+
+        // Modal functions
+        function openAnimeModal(animeId) {
+            const anime = animeData.find(a => a.id === animeId);
+            if (!anime) return;
+            
+            // Populate modal content
+            document.getElementById('modalTitle').textContent = anime.title;
+            document.getElementById('modalPoster').src = anime.coverUrl || '/images/missing-cover.svg';
+            document.getElementById('modalBackdrop').src = anime.backdrop || anime.coverUrl || '/images/missing-cover.svg';
+            document.getElementById('modalYear').textContent = anime.year;
+            document.getElementById('modalType').textContent = anime.type;
+            document.getElementById('modalEpisodes').textContent = anime.episodes;
+            document.getElementById('modalStatus').textContent = anime.status;
+            document.getElementById('modalStudio').textContent = anime.studio;
+            document.getElementById('modalSource').textContent = anime.source;
+            document.getElementById('modalSynopsis').textContent = anime.synopsis;
+            
+            // Rating stars
+            const ratingEl = document.getElementById('modalRating');
+            ratingEl.innerHTML = `
+                <span class="text-yellow-400">${'★'.repeat(Math.floor(anime.rating))}</span>
+                <span class="text-gray-500">${'☆'.repeat(5 - Math.floor(anime.rating))}</span>
+                <span class="ml-2 text-white font-semibold">${anime.rating.toFixed(1)}</span>
+            `;
+            
+            // Genres
+            const genresEl = document.getElementById('modalGenres');
+            genresEl.innerHTML = anime.genres.map(genre => 
+                `<span class="bg-purple-600 text-white px-3 py-1 rounded-full text-sm">${genre}</span>`
+            ).join('');
+            
+            document.getElementById('animeModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeAnimeModal() {
+            document.getElementById('animeModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        function addToWatchlist() {
+            alert('Added to watchlist! (Feature coming soon)');
+        }
+
+        function openRatingModal() {
+            alert('Rating feature coming soon!');
+        }
+
+        // Close modal on backdrop click
+        document.getElementById('animeModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAnimeModal();
+            }
+        });
+    </script>
+</body>
+</html>

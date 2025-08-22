@@ -5,7 +5,6 @@ using S5.Recs.Services;
 using Sora.Data.Vector;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Scheduling;
-using Sora.Core;
 
 namespace S5.Recs.Tasks;
 
@@ -83,10 +82,3 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
 }
 
 // Self-registration via Sora.Core discovery
-internal sealed class S5BootstrapTaskRegistration : ISoraInitializer
-{
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddSingleton<IScheduledTask, S5BootstrapTask>();
-    }
-}

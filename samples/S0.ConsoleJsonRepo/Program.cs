@@ -3,7 +3,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using S0.ConsoleJsonRepo;
 using Sora.Data.Core;
-using Sora.Data.Core.Model;
 using Sora.Data.Json;
 
 var services = new ServiceCollection();
@@ -29,11 +28,3 @@ Console.WriteLine($"Batch: +{result.Added} ~{result.Updated} -{result.Deleted}")
 
 var all = await Todo.All();
 Console.WriteLine($"Total items: {all.Count}");
-
-namespace S0.ConsoleJsonRepo
-{
-    public class Todo : Entity<Todo>
-    {
-        public string Title { get; set; } = string.Empty;
-    }
-}

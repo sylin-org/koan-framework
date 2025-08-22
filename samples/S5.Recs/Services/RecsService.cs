@@ -10,12 +10,6 @@ using Sora.Data.Vector;
 
 namespace S5.Recs.Services;
 
-public interface IRecsService
-{
-    Task<(IReadOnlyList<Recommendation> items, bool degraded)> QueryAsync(string? text, string? anchorAnimeId, string[]? genres, int? episodesMax, bool spoilerSafe, int topK, string? userId, CancellationToken ct);
-    Task RateAsync(string userId, string animeId, int rating, CancellationToken ct);
-}
-
 internal sealed class RecsService : IRecsService
 {
     private readonly IServiceProvider _sp;
@@ -139,7 +133,22 @@ internal sealed class RecsService : IRecsService
                                     if (spoilerPenalty > 0) reasons.Add("spoiler-safe");
                                     return new Recommendation
                                     {
-                                        Anime = new Anime { Id = a.Id, Title = a.Title, Genres = a.Genres, Episodes = a.Episodes, Synopsis = a.Synopsis, Popularity = a.Popularity },
+                                        Anime = new Anime {
+                                            Id = a.Id,
+                                            Title = a.Title,
+                                            TitleEnglish = a.TitleEnglish,
+                                            TitleRomaji = a.TitleRomaji,
+                                            TitleNative = a.TitleNative,
+                                            Synonyms = a.Synonyms ?? Array.Empty<string>(),
+                                            Genres = a.Genres ?? Array.Empty<string>(),
+                                            Tags = a.Tags ?? Array.Empty<string>(),
+                                            Episodes = a.Episodes,
+                                            Synopsis = a.Synopsis,
+                                            Popularity = a.Popularity,
+                                            CoverUrl = a.CoverUrl,
+                                            BannerUrl = a.BannerUrl,
+                                            CoverColorHex = a.CoverColorHex
+                                        },
                                         Score = hybrid,
                                         Reasons = reasons.ToArray()
                                     };
@@ -222,5 +231,17 @@ internal sealed class RecsService : IRecsService
     }
 
     private static string BuildEmbeddingText(Anime a)
-        => ($"{a.Title}\n\n{a.Synopsis}\n\nTags: {string.Join(", ", a.Genres ?? Array.Empty<string>())}").Trim();
+    {
+        var titles = new List<string>();
+        if (!string.IsNullOrWhiteSpace(a.Title)) titles.Add(a.Title);
+        if (!string.IsNullOrWhiteSpace(a.TitleEnglish) && a.TitleEnglish != a.Title) titles.Add(a.TitleEnglish!);
+        if (!string.IsNullOrWhiteSpace(a.TitleRomaji) && a.TitleRomaji != a.Title) titles.Add(a.TitleRomaji!);
+        if (!string.IsNullOrWhiteSpace(a.TitleNative) && a.TitleNative != a.Title) titles.Add(a.TitleNative!);
+        if (a.Synonyms is { Length: > 0 }) titles.AddRange(a.Synonyms);
+        var tags = new List<string>();
+        if (a.Genres is { Length: > 0 }) tags.AddRange(a.Genres);
+        if (a.Tags is { Length: > 0 }) tags.AddRange(a.Tags);
+        var text = $"{string.Join(" / ", titles.Distinct())}\n\n{a.Synopsis}\n\nTags: {string.Join(", ", tags.Distinct())}";
+        return text.Trim();
+    }
 }

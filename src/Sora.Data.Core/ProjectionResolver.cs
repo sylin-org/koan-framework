@@ -3,13 +3,6 @@ using System.Reflection;
 
 namespace Sora.Data.Core;
 
-public sealed record ProjectedProperty(
-    PropertyInfo Property,
-    string ColumnName,
-    bool IsEnum,
-    bool IsIndexed
-);
-
 public static class ProjectionResolver
 {
     private static readonly HashSet<Type> ScalarTypes = new(

@@ -20,7 +20,7 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
         using var client = http.CreateClient();
         var list = new List<Anime>(capacity: Math.Max(100, Math.Min(2000, limit)));
 
-        var query = @"query ($page:Int,$perPage:Int){ Page(page:$page,perPage:$perPage){ pageInfo{ hasNextPage currentPage lastPage perPage total } media(type:ANIME,isAdult:false,sort:POPULARITY_DESC){ id title{romaji english native} episodes genres description(asHtml:false) averageScore popularity } } }";
+    var query = @"query ($page:Int,$perPage:Int){ Page(page:$page,perPage:$perPage){ pageInfo{ hasNextPage currentPage lastPage perPage total } media(type:ANIME,isAdult:false,sort:POPULARITY_DESC){ id siteUrl title{romaji english native} synonyms episodes genres tags{name rank} description(asHtml:false) averageScore popularity coverImage{extraLarge large medium color} bannerImage } } }";
         int pageNum = 1;
         bool hasNext = true;
         int perPage = Math.Clamp(limit >= 50 ? 50 : limit, 1, 50);
@@ -98,6 +98,26 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
                         var desc = m.TryGetProperty("description", out var d) ? d.GetString() : null;
                         var synopsis = string.IsNullOrWhiteSpace(desc) ? null : Regex.Replace(desc!, "<.*?>", string.Empty).Replace("\n", " ").Trim();
 
+                        // Optional titles and synonyms
+                        string? tEn = null, tRo = null, tNa = null;
+                        try { var te = m.GetProperty("title"); tEn = te.GetProperty("english").GetString(); tRo = te.GetProperty("romaji").GetString(); tNa = te.GetProperty("native").GetString(); } catch { }
+                        var synonyms = m.TryGetProperty("synonyms", out var syn) && syn.ValueKind == JsonValueKind.Array
+                            ? syn.EnumerateArray().Select(x => x.GetString() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+                            : Array.Empty<string>();
+                        // Tags
+                        var tags = m.TryGetProperty("tags", out var tg) && tg.ValueKind == JsonValueKind.Array
+                            ? tg.EnumerateArray().Select(x => x.TryGetProperty("name", out var nm) ? nm.GetString() ?? string.Empty : string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+                            : Array.Empty<string>();
+
+                        // Images
+                        string? cover = null, banner = null, color = null;
+                        if (m.TryGetProperty("coverImage", out var ci) && ci.ValueKind == JsonValueKind.Object)
+                        {
+                            cover = ci.TryGetProperty("large", out var l) ? l.GetString() : (ci.TryGetProperty("extraLarge", out var xl) ? xl.GetString() : (ci.TryGetProperty("medium", out var md) ? md.GetString() : null));
+                            color = ci.TryGetProperty("color", out var cc) ? cc.GetString() : null;
+                        }
+                        banner = m.TryGetProperty("bannerImage", out var bi) ? bi.GetString() : null;
+
                         double popularity = 0.0;
                         if (m.TryGetProperty("averageScore", out var avg) && avg.ValueKind == JsonValueKind.Number)
                         {
@@ -109,7 +129,22 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
                             popularity = Math.Clamp(Math.Log10(Math.Max(1, p)) / 5.0, 0.0, 1.0);
                         }
 
-                        list.Add(new Anime { Id = $"anilist:{id}", Title = title!, Episodes = episodes, Genres = genres, Synopsis = synopsis, Popularity = popularity });
+                        list.Add(new Anime {
+                            Id = $"anilist:{id}",
+                            Title = title!,
+                            TitleEnglish = tEn,
+                            TitleRomaji = tRo,
+                            TitleNative = tNa,
+                            Synonyms = synonyms,
+                            Episodes = episodes,
+                            Genres = genres,
+                            Tags = tags,
+                            Synopsis = synopsis,
+                            Popularity = popularity,
+                            CoverUrl = cover,
+                            BannerUrl = banner,
+                            CoverColorHex = color
+                        });
 
                         if (list.Count >= limit) break;
                     }

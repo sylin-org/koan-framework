@@ -68,13 +68,5 @@ await Task.Delay(-1);
 
 namespace S3.Mq.Sample
 {
-    public sealed class Hello { public string Name { get; init; } = string.Empty; }
-
-    public sealed class UserRegistered
-    {
-        public string UserId { get; init; } = string.Empty;
-        public string Email { get; init; } = string.Empty;
-    }
-
-// ...existing code...
+    // ...existing code...
 }

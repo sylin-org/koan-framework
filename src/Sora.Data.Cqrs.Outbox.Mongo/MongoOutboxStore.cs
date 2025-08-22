@@ -1,41 +1,9 @@
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
 namespace Sora.Data.Cqrs.Outbox.Mongo;
-
-public sealed class MongoOutboxOptions
-{
-    public string? ConnectionString { get; set; }
-    public string? ConnectionStringName { get; set; } = "mongo";
-    public string Database { get; set; } = "sora";
-    public string Collection { get; set; } = "Outbox";
-    public int MaxAttempts { get; set; } = 10;
-    public int LeaseSeconds { get; set; } = 30;
-}
-
-internal sealed class MongoOutboxRecord
-{
-    [BsonId]
-    public string Id { get; set; } = default!;
-    public DateTimeOffset OccurredAt { get; set; }
-    public string EntityType { get; set; } = string.Empty;
-    public string Operation { get; set; } = string.Empty;
-    public string EntityId { get; set; } = string.Empty;
-    public string PayloadJson { get; set; } = string.Empty;
-    public Dictionary<string, string>? Headers { get; set; }
-    public string? PartitionKey { get; set; }
-    public string? DedupKey { get; set; }
-    public int Attempt { get; set; }
-    public DateTimeOffset VisibleAt { get; set; }
-    public string? LeaseId { get; set; }
-    public DateTimeOffset? LeaseUntil { get; set; }
-    public string Status { get; set; } = "Pending"; // Pending, Done, Dead
-    public string? DeadReason { get; set; }
-}
 
 public sealed class MongoOutboxStore : IOutboxStore
 {
@@ -142,24 +110,5 @@ public sealed class MongoOutboxStore : IOutboxStore
     );
 }
 
-public static class MongoOutboxRegistration
-{
-    public static IServiceCollection AddMongoOutbox(this IServiceCollection services, Action<MongoOutboxOptions>? configure = null)
-    {
-        services.BindOutboxOptions<MongoOutboxOptions>("Mongo");
-        if (configure is not null) services.PostConfigure(configure);
-        services.AddSingleton<IOutboxStore, MongoOutboxStore>();
-        services.AddSingleton<IOutboxStoreFactory, MongoOutboxFactory>();
-        return services;
-    }
-}
-
 // Auto-registration for discovery
 // legacy initializer removed in favor of standardized auto-registrar
-
-[Abstractions.ProviderPriority(20)]
-public sealed class MongoOutboxFactory : IOutboxStoreFactory
-{
-    public string Provider => "mongo";
-    public IOutboxStore Create(IServiceProvider sp) => sp.GetRequiredService<MongoOutboxStore>();
-}

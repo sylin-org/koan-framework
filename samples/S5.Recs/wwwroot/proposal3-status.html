@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Status - Sora Recs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#020617'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-white font-sans">
+    <!-- Top Navigation -->
+    <nav class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo and Brand -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-heartbeat text-white text-sm"></i>
+                        </div>
+                        <h1 class="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                            System Status
+                        </h1>
+                    </div>
+                    
+                    <!-- Status Navigation -->
+                    <div class="hidden md:flex items-center space-x-8 ml-8">
+                        <a href="#" class="text-white border-b-2 border-green-500 pb-1 px-1" onclick="setActiveView('overview')">
+                            <i class="fas fa-tachometer-alt mr-2"></i>
+                            Overview
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveView('services')">
+                            <i class="fas fa-server mr-2"></i>
+                            Services
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveView('performance')">
+                            <i class="fas fa-chart-line mr-2"></i>
+                            Performance
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveView('incidents')">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Incidents
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Status and Actions -->
+                <div class="flex items-center space-x-4">
+                    <!-- Overall Status -->
+                    <div class="flex items-center space-x-2 bg-slate-800 rounded-lg px-4 py-2">
+                        <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse" id="overallStatusDot"></div>
+                        <span class="text-sm text-gray-300" id="overallStatusText">All Systems Operational</span>
+                    </div>
+                    
+                    <!-- Last Updated -->
+                    <div class="text-sm text-gray-400">
+                        Updated: <span id="lastUpdated">Never</span>
+                    </div>
+                    
+                    <!-- Refresh Button -->
+                    <button onclick="refreshStatus()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-sync mr-2"></i>
+                        Refresh
+                    </button>
+                    
+                    <!-- Back to Admin -->
+                    <a href="admin.html" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Back to Admin
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Overview View -->
+        <div id="overview-view" class="space-y-8">
+            <!-- Service Status Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- API Service -->
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-blue-500 bg-opacity-20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-blue-500"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-white">API Service</h3>
+                        </div>
+                        <div class="w-3 h-3 bg-green-500 rounded-full" id="apiStatusDot"></div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Status:</span>
+                            <span class="text-green-400 font-medium" id="apiStatus">Operational</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Response Time:</span>
+                            <span class="text-white" id="apiResponseTime">125ms</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Uptime:</span>
+                            <span class="text-white" id="apiUptime">99.9%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Requests/min:</span>
+                            <span class="text-white" id="apiRequestRate">847</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Database -->
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-purple-500 bg-opacity-20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-database text-purple-500"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-white">Database</h3>
+                        </div>
+                        <div class="w-3 h-3 bg-green-500 rounded-full" id="dbStatusDot"></div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Status:</span>
+                            <span class="text-green-400 font-medium" id="dbStatus">Connected</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Query Time:</span>
+                            <span class="text-white" id="dbQueryTime">45ms</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Pool Usage:</span>
+                            <span class="text-white" id="dbPoolUsage">8/20</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Active Queries:</span>
+                            <span class="text-white" id="dbActiveQueries">12</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vector Search -->
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-yellow-500 bg-opacity-20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-search text-yellow-500"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-white">Vector Search</h3>
+                        </div>
+                        <div class="w-3 h-3 bg-green-500 rounded-full" id="vectorStatusDot"></div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Status:</span>
+                            <span class="text-green-400 font-medium" id="vectorStatus">Active</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Search Time:</span>
+                            <span class="text-white" id="vectorSearchTime">89ms</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Index Size:</span>
+                            <span class="text-white" id="vectorIndexSize">1.2GB</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Searches/min:</span>
+                            <span class="text-white" id="vectorSearchRate">234</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cache -->
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-orange-500 bg-opacity-20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-layer-group text-orange-500"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-white">Cache</h3>
+                        </div>
+                        <div class="w-3 h-3 bg-green-500 rounded-full" id="cacheStatusDot"></div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Status:</span>
+                            <span class="text-green-400 font-medium" id="cacheStatus">Ready</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Hit Rate:</span>
+                            <span class="text-white" id="cacheHitRate">85%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Memory Used:</span>
+                            <span class="text-white" id="cacheMemoryUsed">245MB</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Keys Stored:</span>
+                            <span class="text-white" id="cacheKeysStored">1,247</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Response Times Chart -->
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <h3 class="text-lg font-semibold text-white mb-4">Response Times (24h)</h3>
+                    <canvas id="responseTimeChart" height="200"></canvas>
+                </div>
+
+                <!-- Error Rate Chart -->
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <h3 class="text-lg font-semibold text-white mb-4">Error Rate (24h)</h3>
+                    <canvas id="errorRateChart" height="200"></canvas>
+                </div>
+
+                <!-- System Resources -->
+                <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                    <h3 class="text-lg font-semibold text-white mb-4">System Resources</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-400">CPU Usage</span>
+                                <span class="text-white font-medium" id="cpuUsage">34%</span>
+                            </div>
+                            <div class="w-full bg-slate-700 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 34%" id="cpuBar"></div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-400">Memory Usage</span>
+                                <span class="text-white font-medium" id="memoryUsage">67%</span>
+                            </div>
+                            <div class="w-full bg-slate-700 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 67%" id="memoryBar"></div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-400">Disk Usage</span>
+                                <span class="text-white font-medium" id="diskUsage">23%</span>
+                            </div>
+                            <div class="w-full bg-slate-700 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 23%" id="diskBar"></div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-400">Network I/O</span>
+                                <span class="text-white font-medium" id="networkIO">12 Mbps</span>
+                            </div>
+                            <div class="w-full bg-slate-700 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: 45%" id="networkBar"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Events -->
+            <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-semibold text-white">Recent System Events</h3>
+                    <div class="flex items-center space-x-3">
+                        <select class="bg-slate-800 text-white text-sm rounded-lg px-3 py-1 border border-slate-700">
+                            <option>All Events</option>
+                            <option>Errors Only</option>
+                            <option>Warnings Only</option>
+                            <option>Info Only</option>
+                        </select>
+                        <button onclick="refreshEvents()" class="text-gray-400 hover:text-white transition-colors">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="space-y-3" id="systemEvents">
+                    <div class="flex items-center space-x-4 p-4 bg-slate-800 rounded-lg">
+                        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-white">System health check completed</span>
+                                <span class="text-gray-400 text-sm">30 seconds ago</span>
+                            </div>
+                            <p class="text-gray-400 text-sm">All services responding normally</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4 p-4 bg-slate-800 rounded-lg">
+                        <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-white">Database connection pool optimized</span>
+                                <span class="text-gray-400 text-sm">2 minutes ago</span>
+                            </div>
+                            <p class="text-gray-400 text-sm">Pool size adjusted to handle increased load</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4 p-4 bg-slate-800 rounded-lg">
+                        <div class="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-white">High memory usage detected</span>
+                                <span class="text-gray-400 text-sm">5 minutes ago</span>
+                            </div>
+                            <p class="text-gray-400 text-sm">Memory usage reached 67% - monitoring closely</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4 p-4 bg-slate-800 rounded-lg">
+                        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-white">Vector search index updated</span>
+                                <span class="text-gray-400 text-sm">15 minutes ago</span>
+                            </div>
+                            <p class="text-gray-400 text-sm">Added 127 new entries to search index</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 text-center">
+                    <button class="text-gray-400 hover:text-white transition-colors">
+                        Load More Events
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services View -->
+        <div id="services-view" class="space-y-8 hidden">
+            <div class="text-center py-20">
+                <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-server text-4xl text-gray-600"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-white mb-2">Detailed Service Status</h3>
+                <p class="text-gray-400">Service monitoring dashboard coming soon</p>
+            </div>
+        </div>
+
+        <!-- Performance View -->
+        <div id="performance-view" class="space-y-8 hidden">
+            <div class="text-center py-20">
+                <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-chart-line text-4xl text-gray-600"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-white mb-2">Performance Analytics</h3>
+                <p class="text-gray-400">Detailed performance metrics coming soon</p>
+            </div>
+        </div>
+
+        <!-- Incidents View -->
+        <div id="incidents-view" class="space-y-8 hidden">
+            <div class="text-center py-20">
+                <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-exclamation-triangle text-4xl text-gray-600"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-white mb-2">Incident Management</h3>
+                <p class="text-gray-400">Incident tracking and management coming soon</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentView = 'overview';
+        let refreshInterval;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            loadSystemStatus();
+            startAutoRefresh();
+        });
+
+        // View navigation
+        function setActiveView(view) {
+            // Hide all views
+            document.querySelectorAll('[id$="-view"]').forEach(el => el.classList.add('hidden'));
+            
+            // Show selected view
+            document.getElementById(view + '-view').classList.remove('hidden');
+            
+            // Update navigation active states
+            document.querySelectorAll('nav a').forEach(link => {
+                link.className = link.className.replace('text-white border-b-2 border-green-500', 'text-gray-400 border-b-2 border-transparent hover:border-gray-600');
+            });
+            
+            event.target.className = 'text-white border-b-2 border-green-500 pb-1 px-1';
+            
+            currentView = view;
+        }
+
+        // Initialize charts
+        function initializeCharts() {
+            // Response Time Chart
+            const responseCtx = document.getElementById('responseTimeChart').getContext('2d');
+            new Chart(responseCtx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'Response Time (ms)',
+                        data: Array.from({length: 24}, () => Math.floor(Math.random() * 100) + 80),
+                        borderColor: '#06d6a0',
+                        backgroundColor: 'rgba(6, 214, 160, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        },
+                        x: { 
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        }
+                    }
+                }
+            });
+
+            // Error Rate Chart
+            const errorCtx = document.getElementById('errorRateChart').getContext('2d');
+            new Chart(errorCtx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'Error Rate (%)',
+                        data: Array.from({length: 24}, () => Math.random() * 2),
+                        backgroundColor: '#ef4444',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        },
+                        x: { 
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load system status
+        async function loadSystemStatus() {
+            try {
+                const response = await fetch('/api/health');
+                const healthData = response.ok ? await response.json() : null;
+                
+                updateSystemStatus(healthData);
+                updateResourceMetrics();
+                
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Error loading system status:', error);
+                updateSystemStatus(null);
+            }
+        }
+
+        function updateSystemStatus(healthData) {
+            // Simulate healthy status for demo
+            const isHealthy = true;
+            
+            // Update overall status
+            const statusDot = document.getElementById('overallStatusDot');
+            const statusText = document.getElementById('overallStatusText');
+            
+            if (isHealthy) {
+                statusDot.className = 'w-2 h-2 bg-green-500 rounded-full animate-pulse';
+                statusText.textContent = 'All Systems Operational';
+            } else {
+                statusDot.className = 'w-2 h-2 bg-red-500 rounded-full animate-pulse';
+                statusText.textContent = 'System Issues Detected';
+            }
+            
+            // Update individual services
+            updateServiceStatus('api', true, '125ms', '99.9%', '847', 'Operational');
+            updateServiceStatus('db', true, '45ms', '8/20', '12', 'Connected');
+            updateServiceStatus('vector', true, '89ms', '1.2GB', '234', 'Active');
+            updateServiceStatus('cache', true, '85%', '245MB', '1,247', 'Ready');
+        }
+
+        function updateServiceStatus(service, isHealthy, metric1, metric2, metric3, statusText) {
+            const statusDot = document.getElementById(`${service}StatusDot`);
+            const status = document.getElementById(`${service}Status`);
+            
+            if (isHealthy) {
+                statusDot.className = 'w-3 h-3 bg-green-500 rounded-full';
+                status.className = 'text-green-400 font-medium';
+                status.textContent = statusText;
+            } else {
+                statusDot.className = 'w-3 h-3 bg-red-500 rounded-full';
+                status.className = 'text-red-400 font-medium';
+                status.textContent = 'Error';
+            }
+            
+            // Update specific metrics based on service
+            if (service === 'api') {
+                document.getElementById('apiResponseTime').textContent = metric1;
+                document.getElementById('apiUptime').textContent = metric2;
+                document.getElementById('apiRequestRate').textContent = metric3;
+            } else if (service === 'db') {
+                document.getElementById('dbQueryTime').textContent = metric1;
+                document.getElementById('dbPoolUsage').textContent = metric2;
+                document.getElementById('dbActiveQueries').textContent = metric3;
+            } else if (service === 'vector') {
+                document.getElementById('vectorSearchTime').textContent = metric1;
+                document.getElementById('vectorIndexSize').textContent = metric2;
+                document.getElementById('vectorSearchRate').textContent = metric3;
+            } else if (service === 'cache') {
+                document.getElementById('cacheHitRate').textContent = metric1;
+                document.getElementById('cacheMemoryUsed').textContent = metric2;
+                document.getElementById('cacheKeysStored').textContent = metric3;
+            }
+        }
+
+        function updateResourceMetrics() {
+            // Simulate resource usage
+            const cpu = Math.floor(Math.random() * 40) + 20;
+            const memory = Math.floor(Math.random() * 30) + 50;
+            const disk = Math.floor(Math.random() * 20) + 15;
+            const network = Math.floor(Math.random() * 20) + 5;
+            
+            document.getElementById('cpuUsage').textContent = `${cpu}%`;
+            document.getElementById('memoryUsage').textContent = `${memory}%`;
+            document.getElementById('diskUsage').textContent = `${disk}%`;
+            document.getElementById('networkIO').textContent = `${network} Mbps`;
+            
+            updateProgressBar('cpuBar', cpu);
+            updateProgressBar('memoryBar', memory);
+            updateProgressBar('diskBar', disk);
+            updateProgressBar('networkBar', network * 2); // Scale for visual
+        }
+
+        function updateProgressBar(barId, percentage) {
+            const bar = document.getElementById(barId);
+            bar.style.width = `${percentage}%`;
+            
+            // Update color based on percentage
+            if (percentage > 80) {
+                bar.className = 'bg-red-500 h-2 rounded-full';
+            } else if (percentage > 60) {
+                bar.className = 'bg-yellow-500 h-2 rounded-full';
+            } else {
+                bar.className = 'bg-green-500 h-2 rounded-full';
+            }
+        }
+
+        function refreshStatus() {
+            loadSystemStatus();
+        }
+
+        function refreshEvents() {
+            // Simulate refreshing events
+            console.log('Refreshing events...');
+        }
+
+        function startAutoRefresh() {
+            refreshInterval = setInterval(loadSystemStatus, 30000); // Refresh every 30 seconds
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>
