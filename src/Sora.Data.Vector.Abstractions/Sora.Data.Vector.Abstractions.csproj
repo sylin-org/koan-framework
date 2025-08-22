@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Sora vector contracts (providers depend on this package only)</Description>
-    <PackageId>Sora.Data.Vector.Abstractions</PackageId>
+  <PackageTags>$(CommonPackageTags);data;vector;abstractions;contracts</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />

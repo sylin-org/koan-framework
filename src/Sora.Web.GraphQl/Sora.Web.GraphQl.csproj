@@ -3,11 +3,10 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PackageId>Sora.Web.GraphQl</PackageId>
     <AssemblyName>Sora.Web.GraphQl</AssemblyName>
     <RootNamespace>Sora.Web.GraphQl</RootNamespace>
     <Description>Sora GraphQL module providing a controller-hosted GraphQL endpoint and schema for IEntity&lt;&gt; types.</Description>
-    <PackageTags>sora;framework;web;graphql;hotchocolate;controllers</PackageTags>
+  <PackageTags>$(CommonPackageTags);web;graphql;hotchocolate;controllers</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

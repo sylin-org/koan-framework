@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Sora vector module (facades, DI, defaults)</Description>
-    <PackageId>Sora.Data.Vector</PackageId>
+  <PackageTags>$(CommonPackageTags);data;vector;di;facade</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
