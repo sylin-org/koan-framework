@@ -94,3 +94,53 @@ Clarity & design
 See also:
 - Engineering: `/docs/engineering/index.md`
 - Architecture: `/docs/architecture/principles.md`
+
+## Doc requests: translate “document …” into concrete edits
+
+When a user asks to “document X”, choose the right target(s) and produce instruction-first content (no tutorials). Use this routing guide and checklist.
+
+Routing map (what to create/edit)
+- Architecture decision (ADR): when the ask is a policy, tradeoff, or framework-wide behavior.
+  - Create `docs/decisions/<ID>-<slug>.md` with front-matter (id, slug, domain, status, date, title).
+  - Sections: Context → Decision → Scope → Consequences → Implementation notes → Follow-ups → References.
+  - Add to `docs/decisions/toc.yml` in the proper domain group.
+- Engineering guidance: rules and guardrails for developers.
+  - Edit `docs/engineering/index.md` or add a focused page under `docs/engineering/` and link it from the index.
+- Reference (canonical how-to + API-centric): default for features, modules, adapters.
+  - Data/Web/Messaging/Vector: prefer updating/creating under `docs/reference/` (e.g., `reference/messaging.md`, `reference/data-access.md`).
+  - Web HTTP conventions: `docs/api/web-http-api.md`, `docs/api/openapi-generation.md`, `docs/api/well-known-endpoints.md`.
+  - Adapters: update capabilities/guardrails in `docs/reference/_data/adapters.yml` (single source). The matrix is generated to `docs/reference/_generated/adapter-matrix.md` at build time—don’t hand edit generated files.
+- Guides (concise, instructional, API-anchored): place under `docs/guides/<area>/` only when it maps 1:1 to stable APIs (no narratives/quickstarts).
+  - Update the local `toc.yml`.
+
+Always include developer samples (when applicable)
+- Add an Examples section with minimal, runnable snippets:
+  - C# first-class model statics for data access: `Item.All(ct)`, `Item.Query(...)`, `Item.FirstPage(...)`.
+  - HTTP examples for controllers/headers with realistic payloads.
+  - Link to sample apps in `samples/` when deeper context helps (keep links minimal and stable), e.g., `samples/S2.Api/`.
+- Keep examples short and production-safe (headers, paging, error handling cues). No multi-part tutorials.
+
+Content patterns to apply
+- Lead with a short “contract” block: Inputs/Outputs, options, error modes, success criteria.
+- List 3–5 edge cases (null/empty, large/slow, auth/permission, concurrency/timeouts).
+- Hoist literals into constants/options and link relevant ADRs.
+- Cross-link canonical pages (Engineering front door, Architecture principles, Decisions).
+
+Process checklist (green-before-done)
+1) Pick targets using the Routing map; create/edit files accordingly.
+2) If adding an ADR, register it in `docs/decisions/toc.yml` under the correct domain.
+3) If touching adapters, update `docs/reference/_data/adapters.yml`; let the build generate the matrix.
+4) Update any affected TOCs (`docs/toc.yml`, per-folder `toc.yml`).
+5) Run strict docs build (Task: docs:build (clean)) and fix broken links.
+6) Commit with a conventional message, e.g., `docs(ref): web pagination headers with examples` or `docs(adr): ARCH-00xx <title>`.
+
+Posture guardrails (enforced)
+- No tutorials, quickstarts, or course-style flows. Keep docs instructional and reference-focused as per ADR ARCH-0041.
+- Prefer first-class model statics over generic facades in samples.
+- Don’t hand-edit `docs/reference/_generated/**`.
+
+Handy anchors
+- Data access patterns: `/docs/guides/data/all-query-streaming-and-pager.md`, `/docs/guides/data/working-with-entity-data.md`, `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`.
+- Web API conventions: `/docs/api/web-http-api.md`, `/docs/api/openapi-generation.md`, `/docs/decisions/WEB-0035-entitycontroller-transformers.md`.
+- Messaging basics: `docs/reference/messaging.md` (create if missing) and decisions under `docs/decisions/MESS-*.md`.
+- Adapter matrix source: `docs/reference/_data/adapters.yml` → generated matrix include at `docs/reference/adapter-matrix.md`.
