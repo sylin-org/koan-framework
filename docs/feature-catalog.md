@@ -38,6 +38,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Services & DX
   - Fast onboarding (Tiny\* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
   - Auto-registration across modules reduces boilerplate; templates and samples rely on controllers-only routing (no inline endpoints).
+  - Container-smart defaults and discovery lists for adapters and AI providers; see Guides → "Container-smart defaults" and ADR OPS-0051.
 
 ## Scenarios and benefits
 

@@ -120,19 +120,19 @@ internal sealed class OllamaDiscoveryService : IHostedService
             if (seen.Add(u)) ordered.Add(u);
         }
         // Highest precedence: explicit single var
-        var fromEnv = Environment.GetEnvironmentVariable("OLLAMA_BASE_URL");
+    var fromEnv = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.EnvBaseUrl);
         Add(fromEnv ?? string.Empty);
         // Next: multi-endpoint env list, keep given order
-        var multi = Environment.GetEnvironmentVariable("SORA_AI_OLLAMA_URLS");
+    var multi = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.EnvList);
         if (!string.IsNullOrWhiteSpace(multi))
         {
             foreach (var part in multi.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) Add(part);
         }
         // Finally: sensible defaults in strict host-first order
-        Add($"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}");
-        Add($"http://127.0.0.1:{Infrastructure.Constants.Discovery.DefaultPort}");
-        Add($"http://host.docker.internal:{Infrastructure.Constants.Discovery.DefaultPort}");
-        Add($"http://ollama:{Infrastructure.Constants.Discovery.DefaultPort}");
+    Add($"http://{Infrastructure.Constants.Discovery.Localhost}:{Infrastructure.Constants.Discovery.DefaultPort}");
+    Add($"http://{Infrastructure.Constants.Discovery.Loopback}:{Infrastructure.Constants.Discovery.DefaultPort}");
+    Add($"http://{Infrastructure.Constants.Discovery.HostDocker}:{Infrastructure.Constants.Discovery.DefaultPort}");
+    Add($"http://{Infrastructure.Constants.Discovery.WellKnownServiceName}:{Infrastructure.Constants.Discovery.DefaultPort}");
         foreach (var s in ordered)
         {
             if (Uri.TryCreate(s, UriKind.Absolute, out var uri)) yield return uri;
