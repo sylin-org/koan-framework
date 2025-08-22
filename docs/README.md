@@ -4,6 +4,7 @@ This is the documentation root. Navigation is organized by domain pillars for cl
 
 - Engineering (front door)
   - High-signal rules and quick links — see engineering/index.md
+  - Docs style and checklist — see engineering/docs-style-and-checklist.md
 - Architecture Principles
   - Curated ADR digest — see architecture/principles.md
 

@@ -155,9 +155,9 @@ Your `EntityController<T>` now serves both REST and GraphQL automatically.
 
 ## Getting started
 
-1. **Quick Start** - [3-minute tutorial](docs/api/quickstart/) from zero to working API
-2. **Documentation** - [Complete guides](docs/api/) for all features
-3. **Examples** - Real applications in the `samples/` directory
+1. **Documentation** - Read the engineering front door and reference pages
+2. **Examples** - Explore real applications in the `samples/` directory
+3. **Docs style** - See `docs/engineering/docs-style-and-checklist.md` for contribution rules
 
 ## Built for
 
