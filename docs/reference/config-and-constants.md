@@ -16,4 +16,17 @@
 
 ## References
 - decisions/ARCH-0040-config-and-constants-naming.md
-- engineering guardrails
+ - engineering/developer-guidelines.md
+
+### Snippet
+```csharp
+// Constants class per assembly
+namespace MyApp.Web;
+internal static class Constants
+{
+	public const string RoutePrefix = "/api";
+}
+
+// Reading configuration (first-win)
+var prefix = SoraConfig.ReadFirst("Sora:Web:RoutePrefix") ?? Constants.RoutePrefix;
+```

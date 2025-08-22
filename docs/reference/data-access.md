@@ -4,9 +4,9 @@ Canonical APIs and semantics for Sora data access. Newer ADRs supersede older on
 
 ## Contract
 - First-class static model methods only for top-level access:
-  - All(ct), Query(..., ct)
-  - AllStream(batchSize, ct), QueryStream(predicate|filter, batchSize, ct)
-  - FirstPage(size, ct), Page(page, size, ct)
+  - `All(ct)`, `Query(..., ct)`
+  - `AllStream(batchSize, ct)`, `QueryStream(predicate|filter, batchSize, ct)`
+  - `FirstPage(size, ct)`, `Page(page, size, ct)`
 - All/Query without paging must fully materialize the result set.
 - Prefer streaming (AllStream/QueryStream) or Pager/EntityCursor for large sets.
 - Stable iteration order is by Id ascending across adapters.
@@ -23,8 +23,11 @@ Canonical APIs and semantics for Sora data access. Newer ADRs supersede older on
 // Full collection
 var all = await MyModel.All(ct);
 
-// Filtered subset
+// Filtered subset (LINQ predicate)
 var drama = await MyModel.Query(m => m.Genres.Contains("Drama"), ct);
+
+// Filter DSL (string)
+var recent = await MyModel.Query("Year:>=2020 AND Rating:>=8", ct);
 
 // Streaming in batches
 await foreach (var item in MyModel.QueryStream(m => m.Score >= 80, batchSize: 500, ct))
@@ -42,9 +45,17 @@ while (!pager.End)
 }
 ```
 
+HTTP pagination and filters:
+
+```
+GET /api/movies?filter={"Genres":"*Drama*"}&page=1&size=20
+// Headers: X-Total-Count, X-Page, X-Page-Size, X-Total-Pages
+```
+
 ## Filters and pushdown
-- JSON filter language and endpoints (DATA-0029); $options.ignoreCase (DATA-0031).
+- JSON filter language and endpoints (DATA-0029); `$options.ignoreCase` (DATA-0031).
 - Paging pushdown with in-memory fallback (DATA-0032); guardrails (DATA-0044).
+- See Adapter Matrix for provider support nuances.
 
 ## References
 - guides/data/all-query-streaming-and-pager.md
@@ -53,3 +64,4 @@ while (!pager.End)
 - decisions/DATA-0031-filter-ignore-case-option.md
 - decisions/DATA-0032-paging-pushdown-and-in-memory-fallback.md
 - decisions/DATA-0044-paging-guardrails-and-tracing-must.md
+- reference/adapter-matrix.md

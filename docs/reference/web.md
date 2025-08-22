@@ -2,9 +2,31 @@
 
 Policies and patterns for HTTP endpoints in Sora.
 
-## Controllers only
-- Attribute-routed MVC controllers are required.
-- Do not declare endpoints inline (no MapGet/MapPost/etc.).
+## Contract
+- Attribute-routed MVC controllers only; no inline endpoints in startup.
+- Transformers shape payloads consistently for EntityController.
+- Emit headers: `Sora-Trace-Id`; `Sora-InMemory-Paging: true` when fallback pagination happened.
+
+## Example
+
+```http
+POST /api/movies/query HTTP/1.1
+Content-Type: application/json
+
+{
+	"filter": { "Genres": "*Drama*" },
+	"page": 1,
+	"size": 20
+}
+
+// Response headers
+Sora-Trace-Id: 7e9226b2...
+Sora-InMemory-Paging: true
+X-Total-Count: 125
+X-Page: 1
+X-Page-Size: 20
+X-Total-Pages: 7
+```
 
 ## Transformers and payload shaping
 - Use transformers with EntityController for consistent shapes.
@@ -20,12 +42,4 @@ Policies and patterns for HTTP endpoints in Sora.
 - Naming and discovery rules.
 - References: decisions/WEB-0041-graphql-module-and-controller.md, decisions/WEB-0042-graphql-naming-and-discovery.md
 
-## Skeletons
-
-```csharp
-[ApiController]
-[Route("api/[controller]")]
-public class MoviesController : EntityController<Movie>
-{
-}
-```
+See also: `api/well-known-endpoints.md` for `/.well-known/sora/*` routes.
