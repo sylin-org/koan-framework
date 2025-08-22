@@ -6,3 +6,7 @@
 - Authoring adapters: adapter-authoring-guide.md
 - Redis adapter: redis-adapter.md
 - Vector Search contracts: vector-search.md
+ 
+Build your own
+- Building Data Adapters: building-data-adapters.md
+- Building Messaging Adapters: building-messaging-adapters.md

@@ -15,7 +15,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-    services.AddOptions<WeaviateOptions>().BindConfiguration(Sora.Data.Weaviate.Infrastructure.Constants.Configuration.Section).ValidateDataAnnotations();
+        services.AddOptions<WeaviateOptions>().BindConfiguration(Sora.Data.Weaviate.Infrastructure.Constants.Configuration.Section).ValidateDataAnnotations();
         // Post-configure: if Endpoint is not explicitly provided (or left at default), try to self-configure
         services.PostConfigure<WeaviateOptions>(opts =>
         {
@@ -44,10 +44,10 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         report.AddModule(ModuleName, ModuleVersion);
         var endpoint = Sora.Core.Configuration.Read(cfg, "Sora:Data:Weaviate:Endpoint", null) ?? "http://localhost:8085";
         report.AddSetting("Weaviate:Endpoint", endpoint, isSecret: false);
-    // Discovery visibility
-    report.AddSetting("Discovery:EnvList", Sora.Data.Weaviate.Infrastructure.Constants.Discovery.EnvList, isSecret: false);
-    report.AddSetting("Discovery:DefaultLocal", $"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
-    report.AddSetting("Discovery:DefaultCompose", $"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.WellKnownServiceName}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
+        // Discovery visibility
+        report.AddSetting("Discovery:EnvList", Sora.Data.Weaviate.Infrastructure.Constants.Discovery.EnvList, isSecret: false);
+        report.AddSetting("Discovery:DefaultLocal", $"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
+        report.AddSetting("Discovery:DefaultCompose", $"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.WellKnownServiceName}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
     }
 
     private static bool IsDefault(string endpoint)
@@ -67,17 +67,17 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         }
 
         // Read environment-driven list (comma/semicolon separated) for parity with Ollama
-    var list = Environment.GetEnvironmentVariable(Sora.Data.Weaviate.Infrastructure.Constants.Discovery.EnvList);
+        var list = Environment.GetEnvironmentVariable(Sora.Data.Weaviate.Infrastructure.Constants.Discovery.EnvList);
         if (!string.IsNullOrWhiteSpace(list))
         {
             foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) Add(part);
         }
 
         // Well-known defaults in strict host-first order
-    Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.HostDocker}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
-    Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
-    Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.WellKnownServiceName}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
-    Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.LocalFallbackPort}");
+        Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.HostDocker}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
+        Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
+        Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.WellKnownServiceName}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
+        Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.LocalFallbackPort}");
 
         foreach (var u in ordered) yield return u;
     }

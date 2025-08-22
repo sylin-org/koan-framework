@@ -177,3 +177,7 @@ Built with ❤️ for .NET developers who want to focus on solving problems, not
 ---
 
 **License:** Apache 2.0 | **Requirements:** .NET 9 SDK | **Current:** v0.2.18
+
+Quick links
+- Engineering front door: `/docs/engineering/index.md`
+- Architecture principles: `/docs/architecture/principles.md`

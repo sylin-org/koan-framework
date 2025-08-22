@@ -24,13 +24,13 @@ public static class Constants
 
     public static class Discovery
     {
-    public const string DefaultLocal = "localhost:6379";
-    public const string DefaultCompose = "redis:6379";
-    public const string EnvRedisUrl = "REDIS_URL";
-    public const string EnvRedisConnectionString = "REDIS_CONNECTION_STRING";
-    public const string EnvRedisList = "SORA_DATA_REDIS_URLS"; // comma/semicolon-separated list
-    public const string WellKnownServiceName = "redis";
-    public const string HostDocker = "host.docker.internal";
-    public const string Localhost = "localhost";
+        public const string DefaultLocal = "localhost:6379";
+        public const string DefaultCompose = "redis:6379";
+        public const string EnvRedisUrl = "REDIS_URL";
+        public const string EnvRedisConnectionString = "REDIS_CONNECTION_STRING";
+        public const string EnvRedisList = "SORA_DATA_REDIS_URLS"; // comma/semicolon-separated list
+        public const string WellKnownServiceName = "redis";
+        public const string HostDocker = "host.docker.internal";
+        public const string Localhost = "localhost";
     }
 }

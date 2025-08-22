@@ -1,5 +1,9 @@
 # Sora Docs Index
 
+Note: This page contains historical planning materials. For day-to-day development, start with:
+- Engineering front door: engineering/index.md
+- Architecture principles: architecture/principles.md
+
 This documentation set tracks the design and implementation plan for the Sora Framework.
 
 Start here:

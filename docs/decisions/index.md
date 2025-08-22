@@ -2,6 +2,12 @@
 
 Canonical ADRs live in this folder. They’re grouped by domain below for quick navigation; files keep their historical numeric IDs. New ADRs should prefer PREFIX-####-short-title.md for filenames while remaining in this folder.
 
+High-signal ADRs (start here):
+- DATA-0061 — Data access semantics (All/Query; streaming; pager)
+- WEB-0035 — EntityController transformers
+- ARCH-0040 — Config and constants naming
+- ARCH-0011 — Logging (Core) and secure headers (Web) layering
+
 ## Architecture (ARCH)
 
 - 0001 — Rename generic TAggregate → TEntity — ARCH-0001-rename-generic-to-tentity.md

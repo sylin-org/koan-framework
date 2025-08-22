@@ -44,9 +44,9 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         report.AddSetting(Sora.Data.Redis.Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
         report.AddSetting(Sora.Data.Redis.Infrastructure.Constants.Bootstrap.DefaultPageSize, o.DefaultPageSize.ToString());
         report.AddSetting(Sora.Data.Redis.Infrastructure.Constants.Bootstrap.MaxPageSize, o.MaxPageSize.ToString());
-    // Discovery visibility
-    report.AddSetting("Discovery:EnvList", Sora.Data.Redis.Infrastructure.Constants.Discovery.EnvRedisList, isSecret: false);
-    report.AddSetting("Discovery:DefaultLocal", Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultLocal, isSecret: false);
-    report.AddSetting("Discovery:DefaultCompose", Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultCompose, isSecret: false);
+        // Discovery visibility
+        report.AddSetting("Discovery:EnvList", Sora.Data.Redis.Infrastructure.Constants.Discovery.EnvRedisList, isSecret: false);
+        report.AddSetting("Discovery:DefaultLocal", Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultLocal, isSecret: false);
+        report.AddSetting("Discovery:DefaultCompose", Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultCompose, isSecret: false);
     }
 }

@@ -11,12 +11,12 @@ internal static class Constants
     {
         public const int DefaultPort = 11434;
         public const string TagsPath = "/api/tags";
-    public const string EnvBaseUrl = "OLLAMA_BASE_URL";
-    public const string EnvList = "SORA_AI_OLLAMA_URLS"; // comma/semicolon-separated list
-    public const string HostDocker = "host.docker.internal";
-    public const string Localhost = "localhost";
-    public const string Loopback = "127.0.0.1";
-    public const string WellKnownServiceName = "ollama";
+        public const string EnvBaseUrl = "OLLAMA_BASE_URL";
+        public const string EnvList = "SORA_AI_OLLAMA_URLS"; // comma/semicolon-separated list
+        public const string HostDocker = "host.docker.internal";
+        public const string Localhost = "localhost";
+        public const string Loopback = "127.0.0.1";
+        public const string WellKnownServiceName = "ollama";
     }
 
     public static class Api

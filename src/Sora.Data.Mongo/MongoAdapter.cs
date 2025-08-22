@@ -12,6 +12,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq.Expressions;
 
 namespace Sora.Data.Mongo;
+
 internal static class MongoTelemetry
 {
     public static readonly System.Diagnostics.ActivitySource Activity = new("Sora.Data.Mongo");
@@ -294,8 +295,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
         act?.SetTag("entity", typeof(TEntity).FullName);
         // Guardrails: enforce server-side paging if possible to avoid unbounded materialization.
         var col = GetCollection();
-    // DATA-0061: no-options should return the complete set (no implicit limit)
-    return await col.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct);
+        // DATA-0061: no-options should return the complete set (no implicit limit)
+        return await col.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct);
     }
 
     public async Task<int> CountAsync(object? query, CancellationToken ct = default)
@@ -311,8 +312,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
         using var act = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
         act?.SetTag("entity", typeof(TEntity).FullName);
         var col = GetCollection();
-    // DATA-0061: no-options should return the complete set for this predicate
-    return await col.Find(predicate).ToListAsync(ct);
+        // DATA-0061: no-options should return the complete set for this predicate
+        return await col.Find(predicate).ToListAsync(ct);
     }
 
     public async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)

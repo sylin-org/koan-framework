@@ -1,9 +1,12 @@
 ﻿You are contributing to **Sora**, a greenfield framework for building modern, modular applications. Sora emphasizes **simplicity** and **flexibility**, drawing inspiration from the legacy Zen framework.
 
-#### Guidelines
+#### Entry points for agents and developers
 
-- **Documentation First**
-  Refer to `/docs` when looking for implementation guidance. Keep documentation updated with new decisions to ensure accuracy and consistency.
+- Engineering front door: `/docs/engineering/index.md` (high-signal rules and quick links)
+- Architecture principles: `/docs/architecture/principles.md` (curated ADR digest)
+- Full docs root: `/docs` and `/docs/toc.yml`
+
+Keep documentation updated with new decisions to ensure accuracy and consistency.
 
 ## Data access (priority guidance)
 
@@ -11,6 +14,10 @@
   - Examples: `MyModel.All(ct)`, `MyModel.Query(...)`, `MyModel.AllStream(...)`, `MyModel.QueryStream(...)`, `MyModel.FirstPage(...)`, `MyModel.Page(...)`.
 - Treat generic facades like `Data<TEntity, TKey>` as second-class helpers; only use them when a first-class model static is not available for the scenario.
 - All/Query without paging must materialize the complete result set. Use streaming (`AllStream`/`QueryStream`) or explicit paging (`FirstPage`/`Page`) for large sets.
+
+References:
+- `/docs/guides/data/all-query-streaming-and-pager.md`
+- `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
 
 ## Core engineering concerns (mandatory)
 
@@ -25,6 +32,8 @@ Avoid repetition; if all methods are async, names should be shorter and concise;
 - Do: expose HTTP routes via MVC controllers (attribute-routed). Keep routing in controllers for discoverability and testability.
 - Don’t: declare endpoints inline (no MapGet/MapPost/etc. in startup or module initialization).
 
+Reference: `/docs/decisions/WEB-0035-entitycontroller-transformers.md` for payload shaping.
+
 2. No stubs or empty artifacts
 
 - Do: remove empty classes, placeholder files, and commented-out scaffolds.
@@ -35,6 +44,8 @@ Avoid repetition; if all methods are async, names should be shorter and concise;
 - Do: hoist magic strings/numbers into a project-scoped Constants class (for example, Infrastructure/Constants or Infrastructure/<Area>Constants).
 - Prefer typed Options for tunables; use constants for stable names (headers, routes, keys, defaults) and policy literals.
 - Don’t: scatter literals (headers, routes, paging sizes, media types) across the codebase.
+
+Reference: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`.
 
 4. Project root hygiene
 
@@ -79,3 +90,7 @@ Clarity & design
 - Keep one public class per file; nest satellites; co-locate interfaces/attributes only when they share a single concern and name the file accordingly.
 - If an exception is needed, add a short ADR or decision note in /docs/decisions with rationale and scope.
 - Do not implement bespoke methods if a similar one is already present in a core library (Sora.Core, Sora.Dat.Core, etc.)
+
+See also:
+- Engineering: `/docs/engineering/index.md`
+- Architecture: `/docs/architecture/principles.md`
