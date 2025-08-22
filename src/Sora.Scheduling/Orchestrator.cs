@@ -21,7 +21,7 @@ internal sealed class SchedulingOrchestrator(
         var opts = options.CurrentValue;
         if (!opts.Enabled)
         {
-            logger.LogInformation("Scheduling disabled");
+            logger.LogInformation("Scheduling disabled (env: {Env})", env.EnvironmentName);
             return;
         }
 
@@ -75,24 +75,22 @@ internal sealed class SchedulingOrchestrator(
 
         int maxConc = jobOpts?.MaxConcurrency ?? attr?.MaxConcurrency ?? (task is IHasMaxConcurrency mc ? mc.MaxConcurrency : 1);
 
-        return new Runner(task, health, logger, id, onStartup, fixedDelay, critical, timeout, maxConc, env, opts.ReadinessGate);
+    return new Runner(task, health, id, onStartup, fixedDelay, critical, timeout, maxConc);
     }
 
     private sealed class Runner(
         IScheduledTask task,
         IHealthAggregator health,
-        ILogger logger,
         string id,
         bool onStartup,
         TimeSpan? fixedDelay,
         bool critical,
         TimeSpan? timeout,
-        int maxConcurrency,
-        IHostEnvironment env,
-        bool readinessGate
+        int maxConcurrency
     )
     {
-        private readonly SemaphoreSlim _gate = new(1, 1);
+        // Limit concurrent task executions according to maxConcurrency (default 1)
+        private readonly SemaphoreSlim _gate = new(maxConcurrency <= 0 ? 1 : maxConcurrency, maxConcurrency <= 0 ? 1 : maxConcurrency);
         public bool OnStartup { get; } = onStartup;
         public DateTimeOffset? NextRunUtc { get; private set; } = fixedDelay is null ? null : DateTimeOffset.UtcNow + fixedDelay;
         private int _running;
@@ -143,7 +141,7 @@ internal sealed class SchedulingOrchestrator(
             }
         }
 
-        private IReadOnlyDictionary<string, string> Facts(string state)
+    private IReadOnlyDictionary<string, string> Facts(string state)
         {
             var dict = new Dictionary<string, string>
             {

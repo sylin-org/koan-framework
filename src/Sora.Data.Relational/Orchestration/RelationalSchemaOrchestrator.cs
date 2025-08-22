@@ -147,7 +147,8 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                     if (col.IsComputed && features.SupportsJsonFunctions)
                     {
                         System.Diagnostics.Debug.WriteLine($"[ORCH] Adding computed column from JSON: {col.Name}, path={col.JsonPath}");
-                        ddl.AddComputedColumnFromJson(schema, table, col.Name, col.JsonPath, features.SupportsPersistedComputedColumns);
+                        // JsonPath is defined when IsComputed=true; assert non-null to satisfy nullable analysis
+                        ddl.AddComputedColumnFromJson(schema, table, col.Name, col.JsonPath!, features.SupportsPersistedComputedColumns);
                     }
                     else
                     {
