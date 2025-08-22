@@ -63,3 +63,6 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 - Constants centralized; options validated on start.
 - Data access uses model statics; large sets use streaming or explicit paging.
 - Logs/metrics present for important operations; no secrets/PII in logs.
+
+## Docs style & checklist
+- See: ./docs-style-and-checklist.md

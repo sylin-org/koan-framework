@@ -212,7 +212,7 @@ Note: Controllers must strictly follow Story A0 schemas; SSE event framing must 
     - Capability flags (attachments, partitioning, mango query support if enabled).
     - Consistent telemetry tags (db.system=couchdb) and error normalization.
 - Docs
-  - Quickstarts for Redis/MySQL/CouchDB including docker-compose snippets and env examples.
+  - Examples for Redis/MySQL/CouchDB including docker-compose snippets and env configuration.
   - Capability matrices and known differences vs. existing adapters (e.g., Postgres/Mongo).
   - DDL/governance policy notes for MySQL; data model guidance for CouchDB.
 - Tests
@@ -284,7 +284,7 @@ Note: Add Redis guardrails: memory cap guidance, persistence (RDB/AOF) recommend
   - Background job for incremental indexing; session memory in Redis with TTL.
   - `scripts/ai-probe.ps1`: checks provider connectivity, lists models, pings Redis, validates index and prints boot-style JSON.
 - Docs
-  - Step-by-step quickstart; troubleshooting matrix; performance tips.
+  - Concise examples; troubleshooting matrix; performance tips.
 - Tests
   - Smoke test that a known query returns expected doc ids; probe script exit codes for CI.
 

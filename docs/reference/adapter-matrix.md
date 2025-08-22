@@ -2,6 +2,10 @@
 
 Authoritative capabilities by adapter (Relational, Document, Vector). See adapters.yml for the raw data source.
 
+Contributor note
+- Edit source at `docs/reference/_data/adapters.yml`.
+- Do not edit files under `docs/reference/_generated/**` — they’re produced by the docs build.
+
 Columns
 - Storage type, Transactions, Batching, Paging pushdown, Filter pushdown
 - Schema tools, Instruction API, Vector support/filters/cursor

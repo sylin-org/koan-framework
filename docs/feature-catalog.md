@@ -78,7 +78,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - One-call DI: AddSoraAI() wires providers, tokenization/cost, budgets/moderation, SSE, telemetry, headers, and /ai/\* controllers.
   - AI profiles: SORA_AI_PROFILE = DevLocal | HostedKeyed | ProxyClient | TestHarness; sensible defaults for model, streaming, budgets, vector, cache TTLs.
   - Convention endpoints: /ai/chat, /ai/embed, /ai/rag/query, /ai/models auto-enable when Ready; OpenAI-shim and gRPC via single flags.
-  - Zero-scaffold RAG quickstart: first run indexes docs/ with defaults; Redis-first vector + cache; background index job; safe projection/redaction.
+  - Zero-scaffold RAG example: first run indexes docs/ with defaults; Redis-first vector + cache; background index job; safe projection/redaction.
   - Vector autodiscovery: Redis HNSW index bootstrap with sane metrics; pgvector fast-follow with auto-migrate if permitted.
   - Secrets layering: prefer secrets provider (KV/Secrets Manager) with env fallback; never log values; redacted boot entries.
   - Policy presets: DevPermissive | StagingBalanced | ProdConservative for token/time budgets, moderation, model allow-lists.

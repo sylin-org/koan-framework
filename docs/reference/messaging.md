@@ -52,6 +52,13 @@ Sora__Messaging__ProvisionOnStart=true
 - Explicit Subscriptions disable auto-subscribe.
 - Use aliases to interop across languages when you can’t share type names.
 
+## Edge cases
+- Missing alias: defaults to full type name; set `[Message(Alias=...)]` for cross-language consumers.
+- Handler exceptions: use retries/DLQ policy; keep handlers idempotent.
+- At-least-once delivery: design handlers to be idempotent and safe on duplicates.
+- Oversized batches: providers may cap batch size; the abstraction sends in chunks.
+- Provisioning failures: when `ProvisionOnStart` is true and the broker is unavailable, fail fast with actionable logs.
+
 ## References
 - decisions/MESS-0021-messaging-capabilities-and-negotiation.md
 - decisions/MESS-0022-mq-provisioning-aliases-and-dispatcher.md

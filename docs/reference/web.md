@@ -43,3 +43,12 @@ X-Total-Pages: 7
 - References: decisions/WEB-0041-graphql-module-and-controller.md, decisions/WEB-0042-graphql-naming-and-discovery.md
 
 See also: `api/well-known-endpoints.md` for `/.well-known/sora/*` routes.
+
+## Edge cases
+- Invalid filters/payloads: prefer ProblemDetails with validation details; never return 200 on invalid inputs.
+- Large queries/timeouts: enforce paging caps and timeouts; set `Sora-InMemory-Paging` when fallback occurs; document limits.
+- Auth/permissions: apply auth scopes before filters; avoid leaking fields across tenants.
+- Transformer errors: map exceptions to ProblemDetails and include correlation via `Sora-Trace-Id`.
+- Inline endpoints: disallowed; routes must live in MVC controllers for discoverability and tests.
+
+Note: Well-known header names and route prefixes are documented in `docs/api/web-http-api.md`. Prefer linking to that page over repeating literals.

@@ -52,6 +52,13 @@ GET /api/movies?filter={"Genres":"*Drama*"}&page=1&size=20
 // Headers: X-Total-Count, X-Page, X-Page-Size, X-Total-Pages
 ```
 
+## Edge cases
+- Empty/null filter: treat as All; ensure auth/tenant scopes still apply.
+- Large result sets: prefer QueryStream/AllStream or Pager to avoid OOM/timeouts.
+- In-memory fallback: when pushdown isn’t possible, emit `Sora-InMemory-Paging: true` and consider tighter page caps.
+- Concurrency during paging: stable Id-ascending order avoids skips/dupes when new items are inserted.
+- Authorization: filters must be applied after auth scoping; do not leak cross-tenant data.
+
 ## Filters and pushdown
 - JSON filter language and endpoints (DATA-0029); `$options.ignoreCase` (DATA-0031).
 - Paging pushdown with in-memory fallback (DATA-0032); guardrails (DATA-0044).
