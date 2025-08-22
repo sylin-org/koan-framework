@@ -15,7 +15,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
     { _optionsMonitor = optionsMonitor; _sp = sp; }
 
     public Task<object> ValidateAsync<TEntity, TKey>(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, CancellationToken ct = default)
-        where TEntity : class, Sora.Data.Abstractions.IEntity<TKey>
+        where TEntity : class, Abstractions.IEntity<TKey>
         where TKey : notnull
     {
         ct.ThrowIfCancellationRequested();
@@ -42,7 +42,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
     }
 
     public Task EnsureCreatedJsonAsync<TEntity, TKey>(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, CancellationToken ct = default)
-        where TEntity : class, Sora.Data.Abstractions.IEntity<TKey>
+        where TEntity : class, Abstractions.IEntity<TKey>
         where TKey : notnull
     {
         ct.ThrowIfCancellationRequested();
@@ -57,24 +57,24 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
     }
 
     public async Task EnsureCreatedAsync<TEntity, TKey>(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, CancellationToken ct = default)
-        where TEntity : class, Sora.Data.Abstractions.IEntity<TKey>
+        where TEntity : class, Abstractions.IEntity<TKey>
         where TKey : notnull
     {
         ct.ThrowIfCancellationRequested();
         // Precedence: [RelationalStorage(Shape=...)] > options.Materialization
         var entity = typeof(TEntity);
-        var attr = entity.GetCustomAttribute<Sora.Data.Abstractions.Annotations.RelationalStorageAttribute>(inherit: false);
+        var attr = entity.GetCustomAttribute<Abstractions.Annotations.RelationalStorageAttribute>(inherit: false);
         var options = _optionsMonitor.CurrentValue;
         System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedAsync: Entity={entity.Name}, Materialization={options.Materialization}, DdlPolicy={options.DdlPolicy}, AllowProductionDdl={options.AllowProductionDdl}");
         if (attr is not null)
         {
             switch (attr.Shape)
             {
-                case Sora.Data.Abstractions.Annotations.RelationalStorageShape.Json:
+                case Abstractions.Annotations.RelationalStorageShape.Json:
                     System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedAsync: Shape=Json, calling EnsureCreatedJsonAsync");
                     await EnsureCreatedJsonAsync<TEntity, TKey>(ddl, features, ct); return;
-                case Sora.Data.Abstractions.Annotations.RelationalStorageShape.ComputedProjections:
-                case Sora.Data.Abstractions.Annotations.RelationalStorageShape.PhysicalColumns:
+                case Abstractions.Annotations.RelationalStorageShape.ComputedProjections:
+                case Abstractions.Annotations.RelationalStorageShape.PhysicalColumns:
                     System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedAsync: Shape=Projections/Physical, calling EnsureCreatedMaterializedAsync");
                     await EnsureCreatedMaterializedAsync<TEntity, TKey>(ddl, features, ct); return;
             }
@@ -93,7 +93,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
     }
 
     public Task EnsureCreatedMaterializedAsync<TEntity, TKey>(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, CancellationToken ct = default)
-        where TEntity : class, Sora.Data.Abstractions.IEntity<TKey>
+        where TEntity : class, Abstractions.IEntity<TKey>
         where TKey : notnull
     {
         ct.ThrowIfCancellationRequested();
@@ -175,7 +175,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
     {
         // Resolve via StorageNameResolver defaults for relational: dbo schema + registered physical name
         var schema = "dbo";
-        var method = typeof(Sora.Data.Core.Configuration.StorageNameRegistry).GetMethods()
+        var method = typeof(Core.Configuration.StorageNameRegistry).GetMethods()
             .First(m => m.Name == "GetOrCompute" && m.GetGenericArguments().Length == 2);
         // Fallback: try to use string key if reflection fails (shouldn't in our codebase)
         var table = (string)method.MakeGenericMethod(entity, typeof(string)).Invoke(null, new object?[] { _sp })!;

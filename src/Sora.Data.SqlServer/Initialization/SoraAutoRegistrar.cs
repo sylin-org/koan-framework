@@ -29,17 +29,17 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         report.AddModule(ModuleName, ModuleVersion);
         var o = new SqlServerOptions
         {
-            ConnectionString = Sora.Core.Configuration.ReadFirst(cfg, "Server=localhost;Database=sora;User Id=sa;Password=Your_password123;TrustServerCertificate=True",
-                Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.ConnectionString,
-                Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-                Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlServer,
-                Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
-            DefaultPageSize = Sora.Core.Configuration.ReadFirst(cfg, 50,
-                Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-                Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize),
-            MaxPageSize = Sora.Core.Configuration.ReadFirst(cfg, 200,
-                Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-                Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize)
+            ConnectionString = Configuration.ReadFirst(cfg, "Server=localhost;Database=sora;User Id=sa;Password=Your_password123;TrustServerCertificate=True",
+                Infrastructure.Constants.Configuration.Keys.ConnectionString,
+                Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+                Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlServer,
+                Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
+            DefaultPageSize = Configuration.ReadFirst(cfg, 50,
+                Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+                Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize),
+            MaxPageSize = Configuration.ReadFirst(cfg, 200,
+                Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+                Infrastructure.Constants.Configuration.Keys.AltMaxPageSize)
         };
         report.AddSetting("ConnectionString", o.ConnectionString, isSecret: true);
         report.AddSetting("NamingStyle", o.NamingStyle.ToString());

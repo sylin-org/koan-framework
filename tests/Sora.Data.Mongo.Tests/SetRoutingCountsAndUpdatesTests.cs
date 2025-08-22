@@ -31,7 +31,7 @@ public class SetRoutingCountsAndUpdatesTests
         sc.AddSoraDataCore();
         sc.AddMongoAdapter();
         // Provide naming resolver for StorageNameRegistry
-        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         return sc.BuildServiceProvider();
     }
 
@@ -62,20 +62,20 @@ public class SetRoutingCountsAndUpdatesTests
 
         int rootCount = 2, backupCount = 3;
         for (int i = 0; i < rootCount; i++) await repo.UpsertAsync(new Todo { Title = $"root-{i}" });
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             for (int i = 0; i < backupCount; i++) await repo.UpsertAsync(new Todo { Title = $"backup-{i}" });
         }
 
         var sharedId = "shared-mongo";
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared" });
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             await repo.UpsertAsync(new Todo { Id = sharedId, Title = "backup-shared" });
         }
 
         (await repo.QueryAsync(null)).Count.Should().Be(rootCount + 1);
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             (await repo.QueryAsync(null)).Count.Should().Be(backupCount + 1);
         }
@@ -83,13 +83,13 @@ public class SetRoutingCountsAndUpdatesTests
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared-updated" });
         var rootItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
         rootItems.Should().ContainSingle(x => x.Title == "root-shared-updated");
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             var backupItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
             backupItems.Should().ContainSingle(x => x.Title == "backup-shared");
         }
 
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             var all = await repo.QueryAsync(null);
             await repo.DeleteManyAsync(all.Select(i => i.Id));

@@ -11,7 +11,7 @@ namespace Sora.Data.Core.Configuration;
 public static class StorageNameRegistry
 {
     private static string BagKey(string provider, string? set)
-        => set is null || set.Length == 0 || string.Equals(set, "root", System.StringComparison.OrdinalIgnoreCase)
+        => set is null || set.Length == 0 || string.Equals(set, "root", StringComparison.OrdinalIgnoreCase)
             ? $"name:{provider}:root"
             : $"name:{provider}:{set}";
 
@@ -21,7 +21,7 @@ public static class StorageNameRegistry
     {
         var cfg = AggregateConfigs.Get<TEntity, TKey>(sp);
         var provider = cfg.Provider;
-        var set = Sora.Data.Core.DataSetContext.Current;
+        var set = DataSetContext.Current;
         var key = BagKey(provider, set);
         return AggregateBags.GetOrAdd<TEntity, TKey, string>(sp, key, () =>
         {
@@ -34,7 +34,7 @@ public static class StorageNameRegistry
                 // No registered defaults provider; fall back to the DI resolver with built-in defaults
                 var diFallback = sp.GetRequiredService<IStorageNameResolver>();
                 // Prefer global fallback options if configured
-                var fallback = sp.GetService<IOptions<Sora.Data.Core.Naming.NamingFallbackOptions>>()?.Value;
+                var fallback = sp.GetService<IOptions<Naming.NamingFallbackOptions>>()?.Value;
                 var convFallback = fallback is not null
                     ? new StorageNameResolver.Convention(fallback.Style, fallback.Separator, fallback.Casing)
                     : new StorageNameResolver.Convention(StorageNamingStyle.EntityType, ".", NameCasing.AsIs);
@@ -51,7 +51,7 @@ public static class StorageNameRegistry
 
     private static string AppendSet(string baseName, string? set)
     {
-        if (string.IsNullOrWhiteSpace(set) || string.Equals(set, "root", System.StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(set) || string.Equals(set, "root", StringComparison.OrdinalIgnoreCase))
             return baseName;
         return baseName + "#" + set;
     }

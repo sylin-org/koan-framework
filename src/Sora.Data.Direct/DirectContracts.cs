@@ -28,8 +28,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
     private string _source = sourceOrAdapter;
     private string? _connectionString;
     private TimeSpan _timeout = TimeSpan.FromSeconds(
-        (sp.GetService<Microsoft.Extensions.Options.IOptions<Sora.Data.Core.Options.DirectOptions>>()?.Value?.TimeoutSeconds) ?? 30);
-    private int _maxRows = sp.GetService<Microsoft.Extensions.Options.IOptions<Sora.Data.Core.Options.DirectOptions>>()?.Value?.MaxRows ?? 10_000;
+        (sp.GetService<Microsoft.Extensions.Options.IOptions<Core.Options.DirectOptions>>()?.Value?.TimeoutSeconds) ?? 30);
+    private int _maxRows = sp.GetService<Microsoft.Extensions.Options.IOptions<Core.Options.DirectOptions>>()?.Value?.MaxRows ?? 10_000;
 
     public Sora.Data.Core.Direct.IDirectSession WithConnectionString(string value)
     {
@@ -231,8 +231,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     private static DbConnection CreateConnection(IServiceProvider sp, string provider, string connectionString)
     {
-        var factories = sp.GetServices<Sora.Data.Core.Configuration.IDataProviderConnectionFactory>()
-            ?? Enumerable.Empty<Sora.Data.Core.Configuration.IDataProviderConnectionFactory>();
+        var factories = sp.GetServices<IDataProviderConnectionFactory>()
+            ?? Enumerable.Empty<IDataProviderConnectionFactory>();
         var factory = factories.FirstOrDefault(f => f.CanHandle(provider));
         if (factory is null)
         {

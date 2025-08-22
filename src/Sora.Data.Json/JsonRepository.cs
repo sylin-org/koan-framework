@@ -38,7 +38,7 @@ public static class JsonDataServiceCollectionExtensions
     }
 }
 
-[Sora.Data.Abstractions.ProviderPriority(0)]
+[ProviderPriority(0)]
 public sealed class JsonAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider) => string.Equals(provider, "json", StringComparison.OrdinalIgnoreCase);
@@ -72,7 +72,7 @@ public static class JsonAdapterRegistration
 /// </summary>
 // legacy initializer removed in favor of standardized auto-registrar
 
-internal sealed class JsonDataOptionsConfigurator : Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>
+internal sealed class JsonDataOptionsConfigurator : IConfigureOptions<JsonDataOptions>
 {
     private readonly IConfiguration? _config;
     // Prefer IConfiguration when available; do not fail if it's missing (non-host apps)
@@ -119,7 +119,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
-    Sora.Data.Abstractions.Instructions.IInstructionExecutor<TEntity>
+    Abstractions.Instructions.IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -265,11 +265,11 @@ internal sealed class JsonRepository<TEntity, TKey> :
     public IBatchSet<TEntity, TKey> CreateBatch() => new JsonBatch(this);
 
     // Instruction execution for fast-path operations (e.g., clear all)
-    public Task<TResult> ExecuteAsync<TResult>(Sora.Data.Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
+    public Task<TResult> ExecuteAsync<TResult>(Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
     {
         switch (instruction.Name)
         {
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
+            case Abstractions.Instructions.DataInstructions.EnsureCreated:
                 {
                     Directory.CreateDirectory(_baseDir);
                     // Touch the set file to ensure presence
@@ -279,7 +279,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
                     object result = true;
                     return Task.FromResult((TResult)result);
                 }
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
+            case Abstractions.Instructions.DataInstructions.Clear:
                 {
                     var (name, store) = ResolveNameAndStore();
                     var deleted = store.Count;
@@ -342,7 +342,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         if (sp is not null)
         {
             // Delegate to central naming registry which is set-aware
-            return Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
+            return Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
         }
         return typeof(TEntity).Name;
     }

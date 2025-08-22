@@ -51,9 +51,9 @@ public static class NamingUtils
         return string.Join(sep, parts);
     }
 
-    private static System.Collections.Generic.List<string> SplitWords(string input)
+    private static List<string> SplitWords(string input)
     {
-        var list = new System.Collections.Generic.List<string>();
+        var list = new List<string>();
         var sb = new System.Text.StringBuilder();
         foreach (var ch in input)
         {

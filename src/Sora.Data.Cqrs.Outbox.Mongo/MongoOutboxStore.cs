@@ -157,7 +157,7 @@ public static class MongoOutboxRegistration
 // Auto-registration for discovery
 // legacy initializer removed in favor of standardized auto-registrar
 
-[Sora.Data.Abstractions.ProviderPriority(20)]
+[Abstractions.ProviderPriority(20)]
 public sealed class MongoOutboxFactory : IOutboxStoreFactory
 {
     public string Provider => "mongo";

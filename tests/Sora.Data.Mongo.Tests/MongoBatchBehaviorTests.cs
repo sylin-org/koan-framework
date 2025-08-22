@@ -27,7 +27,7 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
         sc.AddSingleton<IConfiguration>(cfg);
         sc.AddSoraDataCore();
         sc.AddMongoAdapter();
-        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         return sc.BuildServiceProvider();
     }
 

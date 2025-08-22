@@ -35,7 +35,7 @@ public class SqlServerBatchAndBulkTests : IClassFixture<SqlServerAutoFixture>
         (await repo.GetAsync("5", default)).Should().BeNull();
     }
 
-    public sealed record Item(string Id) : Sora.Data.Abstractions.IEntity<string>
+    public sealed record Item(string Id) : IEntity<string>
     {
         public string? Name { get; init; }
     }

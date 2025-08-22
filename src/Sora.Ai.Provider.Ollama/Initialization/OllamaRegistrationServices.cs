@@ -50,7 +50,7 @@ internal sealed class OllamaDiscoveryService : IHostedService
     {
         try
         {
-            var envIsDev = Sora.Core.SoraEnv.IsDevelopment;
+            var envIsDev = Core.SoraEnv.IsDevelopment;
             var aiOpts = _sp.GetService<Microsoft.Extensions.Options.IOptions<Sora.AI.Contracts.Options.AiOptions>>()?.Value;
             var autoDiscovery = aiOpts?.AutoDiscoveryEnabled ?? envIsDev;
             // Provider-scoped default: allow discovery in non-dev unless explicitly disabled via AiOptions

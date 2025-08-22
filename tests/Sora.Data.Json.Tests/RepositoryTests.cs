@@ -13,12 +13,12 @@ public class RepositoryTests
     private static IServiceProvider BuildServices(string dir)
     {
         var sc = new ServiceCollection();
-        var cfg = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+        var cfg = new ConfigurationBuilder()
             .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("JsonDataOptions:DirectoryPath", dir) })
             .Build();
-        sc.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(cfg);
+        sc.AddSingleton<IConfiguration>(cfg);
         // Provide naming resolver needed by StorageNameRegistry for set-aware physical names
-        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         sc.AddJsonData<Todo, string>(o => { o.DirectoryPath = dir; o.DefaultPageSize = 2; o.MaxPageSize = 3; });
         sc.AddSoraDataCore();
         return sc.BuildServiceProvider();
@@ -103,7 +103,7 @@ public class RepositoryTests
         return d;
     }
 
-    public class Todo : Sora.Data.Abstractions.IEntity<string>
+    public class Todo : IEntity<string>
     {
         [Identifier]
         public string Id { get; set; } = default!;

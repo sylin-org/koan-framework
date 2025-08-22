@@ -18,7 +18,7 @@ namespace S5.Recs.Services;
 public interface ISeedService
 {
     Task<string> StartAsync(string source, int limit, bool overwrite, CancellationToken ct);
-    Task<string> StartVectorUpsertAsync(IEnumerable<S5.Recs.Models.AnimeDoc> items, CancellationToken ct);
+    Task<string> StartVectorUpsertAsync(IEnumerable<AnimeDoc> items, CancellationToken ct);
     Task<object> GetStatusAsync(string jobId, CancellationToken ct);
     Task<(int anime, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct);
 }
@@ -71,7 +71,7 @@ internal sealed class SeedService : ISeedService
     }
 
     // Overload: Start a vector-only job from a provided list of AnimeDoc entities
-    public Task<string> StartVectorUpsertAsync(IEnumerable<S5.Recs.Models.AnimeDoc> itemss, CancellationToken ct)
+    public Task<string> StartVectorUpsertAsync(IEnumerable<AnimeDoc> itemss, CancellationToken ct)
     {
         var items = itemss.ToList();
 
@@ -117,7 +117,7 @@ internal sealed class SeedService : ISeedService
         // Count documents (best-effort)
         try
         {
-            using (Sora.Data.Core.DataSetContext.With(null))
+            using (DataSetContext.With(null))
             {
                 var repo = dataSvc.GetRepository<AnimeDoc, string>();
                 animeCount = await repo.CountAsync(query: null, ct);
@@ -131,7 +131,7 @@ internal sealed class SeedService : ISeedService
         // Count vectors if provider supports instructions (best-effort)
         try
         {
-            using (Sora.Data.Core.DataSetContext.With(null))
+            using (DataSetContext.With(null))
             {
                 if (Vector<AnimeDoc>.IsAvailable)
                 {
@@ -167,9 +167,9 @@ internal sealed class SeedService : ISeedService
     {
         try
         {
-            var dataSvc = (Sora.Data.Core.IDataService?)_sp.GetService(typeof(Sora.Data.Core.IDataService));
+            var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (dataSvc is null) return 0;
-            var docs = items.Select(a => new S5.Recs.Models.AnimeDoc
+            var docs = items.Select(a => new AnimeDoc
             {
                 Id = a.Id,
                 Title = a.Title,
@@ -178,7 +178,7 @@ internal sealed class SeedService : ISeedService
                 Synopsis = a.Synopsis,
                 Popularity = a.Popularity
             });
-            return await S5.Recs.Models.AnimeDoc.UpsertMany(docs, ct);
+            return await AnimeDoc.UpsertMany(docs, ct);
         }
         catch
         {
@@ -241,7 +241,7 @@ internal sealed class SeedService : ISeedService
     }
 
     // New: Upsert vectors for an existing set of AnimeDoc entities in one go
-    private async Task<int> UpsertVectorsAsync(List<S5.Recs.Models.AnimeDoc> docss, CancellationToken ct)
+    private async Task<int> UpsertVectorsAsync(List<AnimeDoc> docss, CancellationToken ct)
     {
         try
         {

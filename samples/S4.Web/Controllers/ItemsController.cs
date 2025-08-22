@@ -1,12 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
 using Sora.Data.Core.Model;
 using Sora.Web.Attributes;
 using Sora.Web.Controllers;
 
-namespace S4.Web;
+namespace S4.Web.Controllers;
 
 [Route("api/items")]
 [SoraDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]

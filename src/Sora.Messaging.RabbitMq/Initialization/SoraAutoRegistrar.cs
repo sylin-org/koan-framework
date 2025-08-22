@@ -19,11 +19,11 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var busCode = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Keys.DefaultBus, "default") ?? "default";
-        var exchange = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.RabbitMq.Infrastructure.Constants.Configuration.Exchange(busCode), "sora");
+        var busCode = Configuration.Read<string?>(cfg, Constants.Configuration.Keys.DefaultBus, "default") ?? "default";
+        var exchange = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Exchange(busCode), "sora");
         report.AddSetting("Exchange", exchange);
-        var conn = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.RabbitMq.Infrastructure.Constants.Configuration.ConnectionString(busCode), null);
-        var connName = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.RabbitMq.Infrastructure.Constants.Configuration.ConnectionStringName(busCode), null);
+        var conn = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.ConnectionString(busCode), null);
+        var connName = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.ConnectionStringName(busCode), null);
         if (!string.IsNullOrWhiteSpace(conn)) report.AddSetting("ConnectionString", conn, isSecret: true);
         if (!string.IsNullOrWhiteSpace(connName)) report.AddSetting("ConnectionStringName", connName, isSecret: false);
     }

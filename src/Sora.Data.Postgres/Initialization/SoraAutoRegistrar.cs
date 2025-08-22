@@ -29,18 +29,18 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         report.AddModule(ModuleName, ModuleVersion);
         var o = new PostgresOptions
         {
-            ConnectionString = Sora.Core.Configuration.ReadFirst(cfg, "Host=localhost;Port=5432;Database=sora;Username=postgres;Password=postgres",
+            ConnectionString = Configuration.ReadFirst(cfg, "Host=localhost;Port=5432;Database=sora;Username=postgres;Password=postgres",
                 Infrastructure.Constants.Configuration.Keys.ConnectionString,
                 Infrastructure.Constants.Configuration.Keys.AltConnectionString,
                 Infrastructure.Constants.Configuration.Keys.ConnectionStringsPostgres,
                 Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
-            DefaultPageSize = Sora.Core.Configuration.ReadFirst(cfg, 50,
+            DefaultPageSize = Configuration.ReadFirst(cfg, 50,
                 Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
                 Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize),
-            MaxPageSize = Sora.Core.Configuration.ReadFirst(cfg, 200,
+            MaxPageSize = Configuration.ReadFirst(cfg, 200,
                 Infrastructure.Constants.Configuration.Keys.MaxPageSize,
                 Infrastructure.Constants.Configuration.Keys.AltMaxPageSize),
-            SearchPath = Sora.Core.Configuration.ReadFirst(cfg, "public",
+            SearchPath = Configuration.ReadFirst(cfg, "public",
                 Infrastructure.Constants.Configuration.Keys.SearchPath)
         };
         report.AddSetting("ConnectionString", o.ConnectionString, isSecret: true);

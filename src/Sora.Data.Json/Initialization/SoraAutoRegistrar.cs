@@ -26,7 +26,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     {
         report.AddModule(ModuleName, ModuleVersion);
         // ADR-0040: use helper to read DirectoryPath from either primary or default source sections
-        var dir = Sora.Core.Configuration.ReadFirst(cfg, new[]
+        var dir = Configuration.ReadFirst(cfg, new[]
         {
             $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DirectoryPath}",
             $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DirectoryPath}"

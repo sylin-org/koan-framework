@@ -68,9 +68,9 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         => Repo is IVectorCapabilities caps ? caps.Capabilities : VectorCapabilities.None;
 
     // Search overloads
-    public static Task<Sora.Data.Vector.Abstractions.VectorQueryResult<string>> Search(Sora.Data.Vector.Abstractions.VectorQueryOptions options, CancellationToken ct = default)
+    public static Task<VectorQueryResult<string>> Search(VectorQueryOptions options, CancellationToken ct = default)
         => VectorData<TEntity>.SearchAsync(options, ct);
 
-    public static Task<Sora.Data.Vector.Abstractions.VectorQueryResult<string>> Search(float[] query, int? topK = null, object? filter = null, string? vectorName = null, CancellationToken ct = default)
+    public static Task<VectorQueryResult<string>> Search(float[] query, int? topK = null, object? filter = null, string? vectorName = null, CancellationToken ct = default)
         => VectorData<TEntity>.SearchAsync(new VectorQueryOptions(query, TopK: topK, Filter: filter, VectorName: vectorName), ct);
 }

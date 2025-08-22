@@ -25,7 +25,7 @@ public class DataServiceTests
         saved.Id.Should().NotBeNullOrWhiteSpace();
     }
 
-    public class Todo : Sora.Data.Abstractions.IEntity<string>
+    public class Todo : IEntity<string>
     {
         [Identifier]
         public string Id { get; set; } = default!;

@@ -58,10 +58,10 @@ public static class AddSoraSwaggerExtensions
         {
             enabled = opts.Enabled.Value;
         }
-        else if (Sora.Core.SoraEnv.IsProduction)
+        else if (SoraEnv.IsProduction)
         {
-            enabled = cfg.Read(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
-                  || cfg.Read(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+            enabled = cfg.Read(Constants.Configuration.Enabled, false)
+                  || cfg.Read(Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         }
         else
         {
@@ -87,7 +87,7 @@ public static class AddSoraSwaggerExtensions
         });
 
         // Optionally protect UI outside Development
-        if (!Sora.Core.SoraEnv.IsDevelopment && opts.RequireAuthOutsideDevelopment)
+        if (!SoraEnv.IsDevelopment && opts.RequireAuthOutsideDevelopment)
         {
             app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments($"/{opts.RoutePrefix}"), b =>
             {
@@ -108,7 +108,7 @@ public static class AddSoraSwaggerExtensions
         o.IncludeXmlComments = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.IncludeXmlComments}", o.IncludeXmlComments);
         o.RequireAuthOutsideDevelopment = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RequireAuthOutsideDevelopment}", o.RequireAuthOutsideDevelopment);
         // magic flag unified across Sora
-        var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
+        var magic = cfg.Read<bool?>(Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
         if (magic == true) o.Enabled = true;
         return o;
     }
@@ -126,7 +126,7 @@ internal sealed class TransformerMediaTypesOperationFilter : Swashbuckle.AspNetC
 {
     private readonly IServiceProvider _services;
     public TransformerMediaTypesOperationFilter(IServiceProvider services) { _services = services; }
-    public void Apply(Microsoft.OpenApi.Models.OpenApiOperation operation, Swashbuckle.AspNetCore.SwaggerGen.OperationFilterContext context)
+    public void Apply(OpenApiOperation operation, Swashbuckle.AspNetCore.SwaggerGen.OperationFilterContext context)
     {
         var attrType = Type.GetType("Sora.Web.Transformers.EnableEntityTransformersAttribute, Sora.Web.Transformers");
         var registryType = Type.GetType("Sora.Web.Transformers.ITransformerRegistry, Sora.Web.Transformers");
@@ -145,7 +145,7 @@ internal sealed class TransformerMediaTypesOperationFilter : Swashbuckle.AspNetC
             if (list is not null && list.Count > 0 && operation.Responses.TryGetValue("200", out var ok))
             {
                 foreach (var ct in list)
-                    if (!ok.Content.ContainsKey(ct)) ok.Content[ct] = new Microsoft.OpenApi.Models.OpenApiMediaType();
+                    if (!ok.Content.ContainsKey(ct)) ok.Content[ct] = new OpenApiMediaType();
             }
         }
 
@@ -156,10 +156,10 @@ internal sealed class TransformerMediaTypesOperationFilter : Swashbuckle.AspNetC
             var getMi = registryType.GetMethod("GetContentTypes")!.MakeGenericMethod(et);
             var list = (IReadOnlyList<string>?)getMi.Invoke(registry, Array.Empty<object>());
             if (list is null || list.Count == 0) continue;
-            operation.RequestBody ??= new Microsoft.OpenApi.Models.OpenApiRequestBody { Required = true };
+            operation.RequestBody ??= new OpenApiRequestBody { Required = true };
             foreach (var ct in list)
                 if (!operation.RequestBody.Content.ContainsKey(ct))
-                    operation.RequestBody.Content[ct] = new Microsoft.OpenApi.Models.OpenApiMediaType();
+                    operation.RequestBody.Content[ct] = new OpenApiMediaType();
         }
     }
 

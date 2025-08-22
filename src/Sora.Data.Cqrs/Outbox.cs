@@ -67,7 +67,7 @@ public sealed class InMemoryOutboxStore : IOutboxStore
     { _inflight.TryRemove(id, out _); return Task.CompletedTask; }
 }
 
-[Sora.Data.Abstractions.ProviderPriority(0)]
+[Abstractions.ProviderPriority(0)]
 public sealed class InMemoryOutboxFactory : IOutboxStoreFactory
 {
     public string Provider => "inmemory";
@@ -93,7 +93,7 @@ internal sealed class OutboxStoreSelector : IOutboxStore
             .Select(f => new
             {
                 Factory = f,
-                Priority = (f.GetType().GetCustomAttributes(typeof(Sora.Data.Abstractions.ProviderPriorityAttribute), inherit: false).FirstOrDefault() as Sora.Data.Abstractions.ProviderPriorityAttribute)?.Priority ?? 0,
+                Priority = (f.GetType().GetCustomAttributes(typeof(Abstractions.ProviderPriorityAttribute), inherit: false).FirstOrDefault() as Abstractions.ProviderPriorityAttribute)?.Priority ?? 0,
                 Name = f.GetType().Name
             })
             .OrderByDescending(x => x.Priority)

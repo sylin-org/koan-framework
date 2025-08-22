@@ -6,7 +6,7 @@
       "src/Sora.Web.Swagger/Sora.Web.Swagger.csproj",
       "src/Sora.Web.Transformers/Sora.Web.Transformers.csproj",
       "src/Sora.Web.GraphQl/Sora.Web.GraphQl.csproj",
-      "tests/Sora.Web.GraphQl.Tests/Sora.Web.GraphQl.Tests.csproj",
+      
       "samples/S1.Web/S1.Web.csproj",
       "samples/S4.Web/S4.Web.csproj",
       "tests/S1.Web.IntegrationTests/S1.Web.IntegrationTests.csproj",

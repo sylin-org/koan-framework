@@ -48,7 +48,7 @@ public static class HttpInboxServiceCollectionExtensions
         services.AddHttpClient<HttpInboxStore>((sp, http) =>
         {
             var cfg = sp.GetRequiredService<IConfiguration>();
-            var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
+            var endpoint = Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
             if (string.IsNullOrWhiteSpace(endpoint)) return; // nothing to do
             http.BaseAddress = new Uri(endpoint);
             http.Timeout = TimeSpan.FromSeconds(Constants.Configuration.Inbox.Values.DefaultTimeoutSeconds);
@@ -66,7 +66,7 @@ public static class HttpInboxServiceCollectionExtensions
             // Check config dynamically at startup; if endpoint set, wire IInboxStore
             var sp = services.BuildServiceProvider();
             var cfg = sp.GetService<IConfiguration>();
-            var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
+            var endpoint = Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
             if (!string.IsNullOrWhiteSpace(endpoint))
             {
                 // Explicit endpoint takes precedence over any discovered/default inbox store

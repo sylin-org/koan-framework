@@ -7,6 +7,6 @@ namespace Sora.Web.Attributes;
 public sealed class SoraDataBehaviorAttribute : Attribute
 {
     public bool MustPaginate { get; set; } = false;
-    public int DefaultPageSize { get; set; } = Sora.Web.Infrastructure.SoraWebConstants.Defaults.DefaultPageSize;
-    public int MaxPageSize { get; set; } = Sora.Web.Infrastructure.SoraWebConstants.Defaults.MaxPageSize;
+    public int DefaultPageSize { get; set; } = Infrastructure.SoraWebConstants.Defaults.DefaultPageSize;
+    public int MaxPageSize { get; set; } = Infrastructure.SoraWebConstants.Defaults.MaxPageSize;
 }

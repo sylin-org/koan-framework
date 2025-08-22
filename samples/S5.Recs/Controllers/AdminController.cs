@@ -7,7 +7,7 @@ namespace S5.Recs.Controllers;
 
 [ApiController]
 [Route(Constants.Routes.Admin)] // Sora guideline: controllers define routes
-public class AdminController(ISeedService seeder, ILogger<AdminController> _logger, IEnumerable<S5.Recs.Providers.IAnimeProvider> providers) : ControllerBase
+public class AdminController(ISeedService seeder, ILogger<AdminController> _logger, IEnumerable<Providers.IAnimeProvider> providers) : ControllerBase
 {
 
     [HttpPost("seed/start")]

@@ -31,7 +31,7 @@ internal sealed class RelationalMaterializationOptionsConfigurator(IConfiguratio
         if (options.Materialization != RelationalMaterializationPolicy.None && !options.FailOnMismatch)
             options.FailOnMismatch = true;
         // Production safety gate
-        var allowMagic = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+        var allowMagic = Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         options.AllowProductionDdl = options.AllowProductionDdl || allowMagic;
     }
 }

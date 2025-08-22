@@ -85,7 +85,7 @@ public static class SqlServerRegistration
             // Map matching mode
             options.SchemaMatching = so.SchemaMatching == SchemaMatchingMode.Strict ? RelationalSchemaMatchingMode.Strict : RelationalSchemaMatchingMode.Relaxed;
             // Allow production DDL only when explicitly allowed or when provider option permits
-            var allowMagic = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+            var allowMagic = Configuration.Read(cfg, Constants.Configuration.Sora.AllowMagicInProduction, false);
             options.AllowProductionDdl = so.AllowProductionDdl || allowMagic;
         }
     }
@@ -95,52 +95,52 @@ internal sealed class SqlServerOptionsConfigurator(IConfiguration config) : ICon
 {
     public void Configure(SqlServerOptions options)
     {
-        options.ConnectionString = Sora.Core.Configuration.ReadFirst(
+        options.ConnectionString = Configuration.ReadFirst(
             config,
             defaultValue: options.ConnectionString,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlServer,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlServer,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
 
-        options.DefaultPageSize = Sora.Core.Configuration.ReadFirst(
+        options.DefaultPageSize = Configuration.ReadFirst(
             config,
             defaultValue: options.DefaultPageSize,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        options.MaxPageSize = Sora.Core.Configuration.ReadFirst(
+            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+        options.MaxPageSize = Configuration.ReadFirst(
             config,
             defaultValue: options.MaxPageSize,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
+            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
-        var ddlStr = Sora.Core.Configuration.ReadFirst(config, options.DdlPolicy.ToString(),
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.DdlPolicy,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
+        var ddlStr = Configuration.ReadFirst(config, options.DdlPolicy.ToString(),
+            Infrastructure.Constants.Configuration.Keys.DdlPolicy,
+            Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
         if (!string.IsNullOrWhiteSpace(ddlStr) && Enum.TryParse<SchemaDdlPolicy>(ddlStr, true, out var ddl)) options.DdlPolicy = ddl;
 
-        var smStr = Sora.Core.Configuration.ReadFirst(config, options.SchemaMatching.ToString(),
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
+        var smStr = Configuration.ReadFirst(config, options.SchemaMatching.ToString(),
+            Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
+            Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
         if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<SchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
 
         // Serialization/materialization options
-        options.JsonCaseInsensitive = Sora.Core.Configuration.Read(
+        options.JsonCaseInsensitive = Configuration.Read(
             config,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.JsonCaseInsensitive,
+            Infrastructure.Constants.Configuration.Keys.JsonCaseInsensitive,
             options.JsonCaseInsensitive);
-        options.JsonWriteIndented = Sora.Core.Configuration.Read(
+        options.JsonWriteIndented = Configuration.Read(
             config,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.JsonWriteIndented,
+            Infrastructure.Constants.Configuration.Keys.JsonWriteIndented,
             options.JsonWriteIndented);
-        options.JsonIgnoreNullValues = Sora.Core.Configuration.Read(
+        options.JsonIgnoreNullValues = Configuration.Read(
             config,
-            Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.JsonIgnoreNullValues,
+            Infrastructure.Constants.Configuration.Keys.JsonIgnoreNullValues,
             options.JsonIgnoreNullValues);
 
-        options.AllowProductionDdl = Sora.Core.Configuration.Read(
+        options.AllowProductionDdl = Configuration.Read(
             config,
-            Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction,
+            Constants.Configuration.Sora.AllowMagicInProduction,
             options.AllowProductionDdl);
     }
 }
@@ -167,7 +167,7 @@ internal sealed class SqlServerHealthContributor(IOptions<SqlServerOptions> opti
     }
 }
 
-[Sora.Data.Abstractions.ProviderPriority(15)]
+[ProviderPriority(15)]
 public sealed class SqlServerAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider)
@@ -249,7 +249,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }
     }
 
-    private string TableName => Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+    private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
 
     private SqlConnection Open()
     {
@@ -276,7 +276,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                 var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                 var ddl = new MsSqlDdlExecutor(conn);
                 var feats = new MsSqlStoreFeatures();
-                var vReport = (System.Collections.Generic.IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                var vReport = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
                 var ddlAllowed = vReport.TryGetValue("DdlAllowed", out var da) && da is bool db && db;
                 var tableExists = vReport.TryGetValue("TableExists", out var te) && te is bool tb && tb;
                 if (ddlAllowed)
@@ -719,7 +719,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaValidate:
+            case RelationalInstructions.SchemaValidate:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new MsSqlDdlExecutor(conn);
@@ -727,8 +727,8 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
                     return (TResult)report;
                 }
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaEnsureCreated:
+            case DataInstructions.EnsureCreated:
+            case RelationalInstructions.SchemaEnsureCreated:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new MsSqlDdlExecutor(conn);
@@ -742,14 +742,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     }, ct);
                     object ok = true; return (TResult)ok;
                 }
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
+            case DataInstructions.Clear:
                 {
                     // Do not create the table when clearing; only delete if it exists so we honor DDL policy.
                     if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
                     var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
                     object res = del; return (TResult)res;
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaClear:
+            case RelationalInstructions.SchemaClear:
                 {
                     // Schema clear should remove the table when present, but must not create it.
                     if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
@@ -758,21 +758,21 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     try { var key = $"{conn.DataSource}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
                     object res = affected; return (TResult)res;
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlScalar:
+            case RelationalInstructions.SqlScalar:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     var result = await conn.ExecuteScalarAsync(sql, p);
                     return CastScalar<TResult>(result);
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlNonQuery:
+            case RelationalInstructions.SqlNonQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     var affected = await conn.ExecuteAsync(sql, p);
                     object res = affected; return (TResult)res;
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlQuery:
+            case RelationalInstructions.SqlQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
@@ -999,7 +999,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             var cfg = _sp.GetService(typeof(IConfiguration)) as IConfiguration;
             if (cfg is not null)
             {
-                allowMagic = allowMagic || Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+                allowMagic = allowMagic || Configuration.Read(cfg, Constants.Configuration.Sora.AllowMagicInProduction, false);
             }
         }
         catch { }
@@ -1067,7 +1067,7 @@ END";
     }
 
     // Create table with provided columns (Id, Json already included in columns list expected by orchestrator)
-    public void CreateTableWithColumns(string schema, string table, System.Collections.Generic.List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+    public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
     {
         using var cmd = _conn.CreateCommand();
         var safe = System.Text.RegularExpressions.Regex.Replace(table, "[^A-Za-z0-9_]+", "_");

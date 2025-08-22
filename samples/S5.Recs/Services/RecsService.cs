@@ -97,7 +97,7 @@ internal sealed class RecsService : IRecsService
                             query = blended;
                         }
                     }
-                    var res = await Vector<AnimeDoc>.Search(new Sora.Data.Vector.Abstractions.VectorQueryOptions(query, TopK: topK), ct);
+                    var res = await Vector<AnimeDoc>.Search(new VectorQueryOptions(query, TopK: topK), ct);
                     var idToScore = res.Matches.ToDictionary(m => m.Id, m => m.Score);
                     var docs = new List<AnimeDoc>();
                     foreach (var id in idToScore.Keys)

@@ -38,7 +38,7 @@ public static class ServiceCollectionExtensions
                 if (outputFilterType is not null)
                 {
                     // Add as a global filter; attribute on controller will gate actual execution
-                    o.Filters.Add(new Microsoft.AspNetCore.Mvc.TypeFilterAttribute(outputFilterType));
+                    o.Filters.Add(new TypeFilterAttribute(outputFilterType));
                 }
             }
             catch { /* optional package */ }
@@ -78,7 +78,7 @@ public static class ServiceCollectionExtensions
             o.EnableSecureHeaders = true;
             o.EnableStaticFiles = true;
             o.AutoMapControllers = true;
-            o.HealthPath = Sora.Web.Infrastructure.SoraWebConstants.Routes.ApiHealth;
+            o.HealthPath = Infrastructure.SoraWebConstants.Routes.ApiHealth;
         });
         services.Configure<WebPipelineOptions>(p =>
         {

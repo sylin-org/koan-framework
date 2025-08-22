@@ -7,6 +7,25 @@ namespace Sora.Data.Core;
 /// </summary>
 public static class DataServiceExecuteExtensions
 {
+
+    public static async Task<TResult> Execute<TEntity, TResult>(this IDataService data, string sql, object? parameters = null, CancellationToken ct = default) where TEntity : class
+    {
+        if (string.IsNullOrWhiteSpace(sql)) throw new ArgumentException("SQL must be provided.", nameof(sql));
+        var trimmed = sql.TrimStart();
+        if (trimmed.StartsWith("select ", StringComparison.OrdinalIgnoreCase))
+        {
+            // Delegate to query/scalar based on TResult; consumers can explicitly call InstructionSql.Scalar/Query.
+            var instr = InstructionSql.Query(sql, parameters);
+            return await data.Execute<TEntity, TResult>(instr, ct);
+        }
+        var nonQuery = InstructionSql.NonQuery(sql, parameters);
+        if (typeof(TResult) == typeof(bool))
+        {
+            var affected = await data.Execute<TEntity, int>(nonQuery, ct);
+            return (TResult)(object)(affected > 0);
+        }
+        return await data.Execute<TEntity, TResult>(nonQuery, ct);
+    }
     /// <summary>
     /// Execute an instruction for the specified aggregate, resolving its key type from metadata.
     /// </summary>
@@ -36,7 +55,7 @@ public static class DataServiceExecuteExtensions
     /// Execute an instruction when the key type is already known, avoiding reflection.
     /// </summary>
     public static async Task<TResult> Execute<TEntity, TKey, TResult>(this IDataService data, Instruction instruction, CancellationToken ct = default)
-        where TEntity : class, Sora.Data.Abstractions.IEntity<TKey>
+        where TEntity : class, Abstractions.IEntity<TKey>
         where TKey : notnull
     {
         var repo = data.GetRepository<TEntity, TKey>();

@@ -22,5 +22,5 @@ public readonly record struct StorageResolvedName(string Name, string? Namespace
 /// </summary>
 public interface IStorageNamingPolicy
 {
-    StorageResolvedName Resolve(System.Type entityType);
+    StorageResolvedName Resolve(Type entityType);
 }

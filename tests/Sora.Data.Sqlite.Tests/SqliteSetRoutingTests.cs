@@ -54,7 +54,7 @@ public class SqliteSetRoutingTests
         (await repo.QueryAsync(null)).Should().ContainSingle(x => x.Title == "root-1");
 
         // backup set insert
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             await repo.UpsertAsync(new Todo { Title = "backup-1" });
             var inBackup = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Title.StartsWith("backup"));
@@ -63,13 +63,13 @@ public class SqliteSetRoutingTests
 
         // Validate isolation
         (await repo.QueryAsync(null)).Should().OnlyContain(x => x.Title == "root-1");
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             (await repo.QueryAsync(null)).Should().OnlyContain(x => x.Title == "backup-1");
         }
 
         // Delete by predicate within backup
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             var lrepo = (ILinqQueryRepository<Todo, string>)repo;
             var items = await lrepo.QueryAsync(x => x.Title.StartsWith("backup"));
@@ -126,7 +126,7 @@ public class SqliteSetRoutingCountsAndUpdatesTests
         // Seed different counts per set
         int rootCount = 3, backupCount = 5;
         for (int i = 0; i < rootCount; i++) await repo.UpsertAsync(new Todo { Title = $"root-{i}" });
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             for (int i = 0; i < backupCount; i++) await repo.UpsertAsync(new Todo { Title = $"backup-{i}" });
         }
@@ -134,14 +134,14 @@ public class SqliteSetRoutingCountsAndUpdatesTests
         // Insert a shared-id record into both sets to verify cross-set update isolation
         var sharedId = "shared-1";
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared" });
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             await repo.UpsertAsync(new Todo { Id = sharedId, Title = "backup-shared" });
         }
 
         // Verify counts
         (await repo.QueryAsync(null)).Count.Should().Be(rootCount + 1);
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             (await repo.QueryAsync(null)).Count.Should().Be(backupCount + 1);
         }
@@ -152,14 +152,14 @@ public class SqliteSetRoutingCountsAndUpdatesTests
         var rootItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
         rootItems.Should().ContainSingle(x => x.Title == "root-shared-updated");
         // And not in backup
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             var backupItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
             backupItems.Should().ContainSingle(x => x.Title == "backup-shared");
         }
 
         // Clear backup set
-        using (Sora.Data.Core.DataSetContext.With("backup"))
+        using (DataSetContext.With("backup"))
         {
             var allBackup = await repo.QueryAsync(null);
             await repo.DeleteManyAsync(allBackup.Select(i => i.Id));

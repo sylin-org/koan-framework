@@ -10,7 +10,7 @@ using System.Net;
 
 namespace Sora.Data.Weaviate;
 
-[Sora.Data.Abstractions.ProviderPriority(10)]
+[ProviderPriority(10)]
 public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
 {
     public bool CanHandle(string provider) => string.Equals(provider, "weaviate", StringComparison.OrdinalIgnoreCase);
@@ -34,7 +34,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private readonly HttpClient _http;
     private readonly WeaviateOptions _options;
     private readonly IServiceProvider _sp;
-    private readonly Microsoft.Extensions.Logging.ILogger<WeaviateVectorRepository<TEntity, TKey>>? _logger;
+    private readonly ILogger<WeaviateVectorRepository<TEntity, TKey>>? _logger;
     private volatile bool _schemaEnsured;
 
     public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete;
@@ -44,13 +44,13 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         _http = httpFactory.CreateClient("weaviate");
         _options = options.Value;
         _sp = sp;
-        _logger = (Microsoft.Extensions.Logging.ILogger<WeaviateVectorRepository<TEntity, TKey>>?)sp.GetService(typeof(Microsoft.Extensions.Logging.ILogger<WeaviateVectorRepository<TEntity, TKey>>));
+        _logger = (ILogger<WeaviateVectorRepository<TEntity, TKey>>?)sp.GetService(typeof(ILogger<WeaviateVectorRepository<TEntity, TKey>>));
         _http.BaseAddress = new Uri(_options.Endpoint);
         if (_http.Timeout == default)
             _http.Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.DefaultTimeoutSeconds));
     }
 
-    private string ClassName => Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+    private string ClassName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
 
     private async Task EnsureSchemaAsync(CancellationToken ct)
     {
@@ -82,7 +82,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         if (!create.IsSuccessStatusCode)
         {
             // Fallback for older Weaviate versions that require POST /v1/schema
-            if (create.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed)
+            if (create.StatusCode == HttpStatusCode.MethodNotAllowed)
             {
                 _logger?.LogDebug("Weaviate: POST /v1/schema/classes returned 405; retrying legacy endpoint /v1/schema for class {Class}", cls);
                 var legacy = await _http.PostAsJsonAsync("/v1/schema", body, ct);
@@ -325,7 +325,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     // Deterministic UUID (v5-like) from class namespace + id using SHA-1
     private static Guid DeterministicGuidFromString(string @namespace, string input)
     {
-        using var sha1 = System.Security.Cryptography.SHA1.Create();
+        using var sha1 = SHA1.Create();
         var nsBytes = System.Text.Encoding.UTF8.GetBytes(@namespace + ":");
         var nameBytes = System.Text.Encoding.UTF8.GetBytes(input);
         var all = new byte[nsBytes.Length + nameBytes.Length];

@@ -28,8 +28,8 @@ internal sealed class VectorService(IServiceProvider sp) : IVectorService
         var factories = sp.GetServices<IVectorAdapterFactory>().ToList();
         if (factories.Count == 0) return null;
         // 1) Entity-level vector role
-        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(Sora.Data.Vector.Abstractions.VectorAdapterAttribute))
-            as Sora.Data.Vector.Abstractions.VectorAdapterAttribute)?.Provider;
+        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(VectorAdapterAttribute))
+            as VectorAdapterAttribute)?.Provider;
         // 2) App defaults
         desired ??= sp.GetService<IOptions<VectorDefaultsOptions>>()?.Value?.DefaultProvider;
         // 3) Entity source provider (role-based)
@@ -53,7 +53,7 @@ internal sealed class VectorService(IServiceProvider sp) : IVectorService
                     .Select(f => new
                     {
                         Factory = f,
-                        Priority = (f.GetType().GetCustomAttributes(typeof(Sora.Data.Abstractions.ProviderPriorityAttribute), inherit: false).FirstOrDefault() as Sora.Data.Abstractions.ProviderPriorityAttribute)?.Priority ?? 0,
+                        Priority = (f.GetType().GetCustomAttributes(typeof(ProviderPriorityAttribute), inherit: false).FirstOrDefault() as ProviderPriorityAttribute)?.Priority ?? 0,
                         Name = f.GetType().Name
                     })
                     .OrderByDescending(x => x.Priority)

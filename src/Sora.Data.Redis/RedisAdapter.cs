@@ -24,15 +24,15 @@ internal sealed class RedisOptionsConfigurator : IConfigureOptions<RedisOptions>
     public void Configure(RedisOptions o)
     {
         var cs = Sora.Core.Configuration.ReadFirst(_cfg,
-            Sora.Data.Redis.Infrastructure.Constants.Discovery.EnvRedisUrl,
-            Sora.Data.Redis.Infrastructure.Constants.Discovery.EnvRedisConnectionString,
-            $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Data}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.ConnectionString}",
-            $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Sources_Default}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.ConnectionString}");
+            Infrastructure.Constants.Discovery.EnvRedisUrl,
+            Infrastructure.Constants.Discovery.EnvRedisConnectionString,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}");
         if (!string.IsNullOrWhiteSpace(cs)) o.ConnectionString = cs;
         else
         {
             // Multi-endpoint env list; pick the first that responds to a short ping
-            var list = Environment.GetEnvironmentVariable(Sora.Data.Redis.Infrastructure.Constants.Discovery.EnvRedisList);
+            var list = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.EnvRedisList);
             if (!string.IsNullOrWhiteSpace(list))
             {
                 foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
@@ -44,23 +44,23 @@ internal sealed class RedisOptionsConfigurator : IConfigureOptions<RedisOptions>
             }
         }
         var db = Sora.Core.Configuration.ReadFirst(_cfg, o.Database,
-            $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Data}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.Database}",
-            $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Sources_Default}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.Database}");
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.Database}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.Database}");
         o.Database = db;
         var def = Sora.Core.Configuration.ReadFirst(_cfg, o.DefaultPageSize,
-            $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Data}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.DefaultPageSize}",
-            $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Sources_Default}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.DefaultPageSize}");
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}");
         if (def > 0) o.DefaultPageSize = def;
         var max = Sora.Core.Configuration.ReadFirst(_cfg, o.MaxPageSize,
-            $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Data}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.MaxPageSize}",
-            $"{Sora.Data.Redis.Infrastructure.Constants.Configuration.Section_Sources_Default}:{Sora.Data.Redis.Infrastructure.Constants.Configuration.Keys.MaxPageSize}");
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}");
         if (max > 0) o.MaxPageSize = max;
         if (o.DefaultPageSize > o.MaxPageSize) o.DefaultPageSize = o.MaxPageSize;
 
         if (string.IsNullOrWhiteSpace(o.ConnectionString) || string.Equals(o.ConnectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
         {
             // host/docker discovery pattern
-            o.ConnectionString = Sora.Core.SoraEnv.InContainer ? Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultCompose : Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultLocal;
+            o.ConnectionString = Sora.Core.SoraEnv.InContainer ? Infrastructure.Constants.Discovery.DefaultCompose : Infrastructure.Constants.Discovery.DefaultLocal;
         }
     }
 
@@ -78,7 +78,7 @@ internal sealed class RedisOptionsConfigurator : IConfigureOptions<RedisOptions>
     }
 }
 
-[Sora.Data.Abstractions.ProviderPriority(5)]
+[ProviderPriority(5)]
 public sealed class RedisAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider) => string.Equals(provider, "redis", StringComparison.OrdinalIgnoreCase);
@@ -99,7 +99,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
-    Sora.Data.Abstractions.Instructions.IInstructionExecutor<TEntity>
+    Abstractions.Instructions.IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -118,7 +118,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         var sp = Sora.Core.SoraApp.Current;
         if (sp is not null)
         {
-            return Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
+            return Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
         }
         return typeof(TEntity).Name;
     }
@@ -228,14 +228,14 @@ internal sealed class RedisRepository<TEntity, TKey> :
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new RedisBatch(this);
 
-    public Task<TResult> ExecuteAsync<TResult>(Sora.Data.Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
+    public Task<TResult> ExecuteAsync<TResult>(Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
     {
         switch (instruction.Name)
         {
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
+            case Abstractions.Instructions.DataInstructions.EnsureCreated:
                 // Nothing to create for Redis; consider connection + ping
                 return Task.FromResult((TResult)(object)true);
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
+            case Abstractions.Instructions.DataInstructions.Clear:
                 return (Task<TResult>)(object)DeleteAllAsync(ct);
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Redis adapter for {typeof(TEntity).Name}.");

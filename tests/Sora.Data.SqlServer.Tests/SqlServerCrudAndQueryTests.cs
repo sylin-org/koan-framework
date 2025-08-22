@@ -36,7 +36,7 @@ public class SqlServerCrudAndQueryTests : IClassFixture<SqlServerAutoFixture>
         count.Should().BeGreaterThan(0);
     }
 
-    public sealed record Person(string Id) : Sora.Data.Abstractions.IEntity<string>
+    public sealed record Person(string Id) : IEntity<string>
     {
         public string? Name { get; init; }
         public int Age { get; init; }

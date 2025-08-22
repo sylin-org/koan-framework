@@ -10,7 +10,7 @@ namespace Sora.Data.Sqlite.Tests;
 
 public class SqliteRepositoryTests
 {
-    public class Todo : Sora.Data.Abstractions.IEntity<string>
+    public class Todo : IEntity<string>
     {
         [Identifier]
         public string Id { get; set; } = default!;
@@ -33,7 +33,7 @@ public class SqliteRepositoryTests
         sc.AddSqliteAdapter(o =>
         {
             o.ConnectionString = $"Data Source={file}";
-            o.DdlPolicy = Sora.Data.Sqlite.SchemaDdlPolicy.AutoCreate;
+            o.DdlPolicy = SchemaDdlPolicy.AutoCreate;
             o.AllowProductionDdl = true;
         });
         sc.AddSoraDataCore();
@@ -147,7 +147,7 @@ public class SqliteRepositoryTests
         var none = await srepo.QueryAsync("Title = 'none'");
         none.Should().BeEmpty();
 
-        using var cts = new System.Threading.CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await repo.QueryAsync(null, cts.Token));
     }
@@ -161,7 +161,7 @@ public class SqliteRepositoryTests
         var repo = data.GetRepository<Todo, string>();
 
         var many = Enumerable.Range(0, 100).Select(i => new Todo { Title = $"t-{i}" });
-        using var cts = new System.Threading.CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await repo.UpsertManyAsync(many, cts.Token));
     }
@@ -176,7 +176,7 @@ public class SqliteRepositoryTests
 
         var batch = repo.CreateBatch();
         for (int i = 0; i < 10; i++) batch.Add(new Todo { Title = $"b-{i}" });
-        using var cts = new System.Threading.CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await batch.SaveAsync(null, cts.Token));
     }

@@ -64,7 +64,7 @@ internal sealed class PostgresOptionsConfigurator(IConfiguration config) : IConf
 {
     public void Configure(PostgresOptions options)
     {
-        options.ConnectionString = Sora.Core.Configuration.ReadFirst(
+        options.ConnectionString = Configuration.ReadFirst(
             config,
             defaultValue: options.ConnectionString,
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
@@ -72,33 +72,33 @@ internal sealed class PostgresOptionsConfigurator(IConfiguration config) : IConf
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsPostgres,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
 
-        options.DefaultPageSize = Sora.Core.Configuration.ReadFirst(
+        options.DefaultPageSize = Configuration.ReadFirst(
             config,
             defaultValue: options.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        options.MaxPageSize = Sora.Core.Configuration.ReadFirst(
+        options.MaxPageSize = Configuration.ReadFirst(
             config,
             defaultValue: options.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
-        var ddlStr = Sora.Core.Configuration.ReadFirst(config, options.DdlPolicy.ToString(),
+        var ddlStr = Configuration.ReadFirst(config, options.DdlPolicy.ToString(),
             Infrastructure.Constants.Configuration.Keys.DdlPolicy,
             Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
         if (!string.IsNullOrWhiteSpace(ddlStr) && Enum.TryParse<SchemaDdlPolicy>(ddlStr, true, out var ddl)) options.DdlPolicy = ddl;
 
-        var smStr = Sora.Core.Configuration.ReadFirst(config, options.SchemaMatching.ToString(),
+        var smStr = Configuration.ReadFirst(config, options.SchemaMatching.ToString(),
             Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
             Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
         if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<SchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
 
-        options.AllowProductionDdl = Sora.Core.Configuration.Read(
+        options.AllowProductionDdl = Configuration.Read(
             config,
-            Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction,
+            Constants.Configuration.Sora.AllowMagicInProduction,
             options.AllowProductionDdl);
 
-        var sp = Sora.Core.Configuration.ReadFirst(config, options.SearchPath ?? "public",
+        var sp = Configuration.ReadFirst(config, options.SearchPath ?? "public",
             Infrastructure.Constants.Configuration.Keys.SearchPath);
         options.SearchPath = sp;
     }
@@ -136,7 +136,7 @@ internal sealed class PostgresConnectionFactory : Sora.Data.Core.Configuration.I
         => new NpgsqlConnection(connectionString);
 }
 
-[Sora.Data.Abstractions.ProviderPriority(14)]
+[ProviderPriority(14)]
 public sealed class PostgresAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider)
@@ -215,7 +215,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
     }
 
-    private string TableName => Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+    private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
     private string QualifiedTable => (_options.SearchPath is { Length: > 0 } sp ? $"\"{sp}\"." : string.Empty) + "\"" + TableName.Replace("\"", "\"\"") + "\"";
 
     private NpgsqlConnection Open()
@@ -239,7 +239,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
                 var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                 var ddl = new PgDdlExecutor(conn, _options.SearchPath);
                 var feats = new PostgresStoreFeatures();
-                var vReport = (System.Collections.Generic.IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                var vReport = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
                 var ddlAllowed = vReport.TryGetValue("DdlAllowed", out var da) && da is bool db && db;
                 var tableExists = vReport.TryGetValue("TableExists", out var te) && te is bool tb && tb;
                 if (ddlAllowed)
@@ -642,7 +642,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaValidate:
+            case RelationalInstructions.SchemaValidate:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new PgDdlExecutor(conn, _options.SearchPath);
@@ -650,8 +650,8 @@ internal sealed class PostgresRepository<TEntity, TKey> :
                     var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
                     return (TResult)report;
                 }
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaEnsureCreated:
+            case DataInstructions.EnsureCreated:
+            case RelationalInstructions.SchemaEnsureCreated:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new PgDdlExecutor(conn, _options.SearchPath);
@@ -664,29 +664,29 @@ internal sealed class PostgresRepository<TEntity, TKey> :
                     }, ct);
                     object ok = true; return (TResult)ok;
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaClear:
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
+            case RelationalInstructions.SchemaClear:
+            case DataInstructions.Clear:
                 {
                     EnsureTable(conn);
                     var del = await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}");
                     try { var key = $"{conn.Host}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
                     object res = del; return (TResult)res;
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlScalar:
+            case RelationalInstructions.SqlScalar:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     var result = await conn.ExecuteScalarAsync(sql, p);
                     return CastScalar<TResult>(result);
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlNonQuery:
+            case RelationalInstructions.SqlNonQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     var affected = await conn.ExecuteAsync(sql, p);
                     object res = affected; return (TResult)res;
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlQuery:
+            case RelationalInstructions.SqlQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
@@ -769,7 +769,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
             cmd.CommandText = $"CREATE TABLE IF NOT EXISTS \"{Qual(sch)}\".\"{Qual(table)}\" (\"{Qual(idColumn)}\" text PRIMARY KEY, \"{Qual(jsonColumn)}\" jsonb NOT NULL)";
             cmd.ExecuteNonQuery();
         }
-        public void CreateTableWithColumns(string schema, string table, System.Collections.Generic.List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+        public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
         {
             var sch = schema ?? (searchPath ?? "public");
             using var cmd = conn.CreateCommand();
@@ -1001,7 +1001,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
             var cfg = _sp.GetService(typeof(IConfiguration)) as IConfiguration;
             if (cfg is not null)
             {
-                allowMagic = allowMagic || Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+                allowMagic = allowMagic || Configuration.Read(cfg, Constants.Configuration.Sora.AllowMagicInProduction, false);
             }
         }
         catch { }

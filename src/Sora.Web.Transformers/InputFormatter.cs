@@ -27,7 +27,7 @@ internal sealed class EntityInputTransformFormatter : InputFormatter
     }
 
     private static bool ImplementsIEntity(Type t)
-        => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(Sora.Data.Abstractions.IEntity<>));
+        => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(Data.Abstractions.IEntity<>));
 
     public override async Task<InputFormatterResult> ReadRequestBodyAsync(InputFormatterContext context)
     {

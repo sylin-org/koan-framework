@@ -36,10 +36,10 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
                 {
                     enabled = opts.Enabled.Value;
                 }
-                else if (Sora.Core.SoraEnv.IsProduction)
+                else if (SoraEnv.IsProduction)
                 {
-                    enabled = cfg.Read(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false)
-                  || cfg.Read(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+                    enabled = cfg.Read(Constants.Configuration.Enabled, false)
+                  || cfg.Read(Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
                 }
                 else
                 {
@@ -99,7 +99,7 @@ internal sealed class SoraSwaggerStartupFilter : IStartupFilter
             o.IncludeXmlComments = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.IncludeXmlComments}", o.IncludeXmlComments);
             o.RequireAuthOutsideDevelopment = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RequireAuthOutsideDevelopment}", o.RequireAuthOutsideDevelopment);
         }
-        var magic = cfg.Read<bool?>(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
+        var magic = cfg.Read<bool?>(Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction);
         if (magic == true) o.Enabled = true;
         return o;
     }

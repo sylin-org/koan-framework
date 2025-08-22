@@ -41,7 +41,7 @@ public class SqlServerInstructionAndNamingTests : IClassFixture<SqlServerAutoFix
         echoed.Should().Be(2);
     }
 
-    public sealed record Doc(string Id) : Sora.Data.Abstractions.IEntity<string>
+    public sealed record Doc(string Id) : Abstractions.IEntity<string>
     {
         public string? Title { get; init; }
     }

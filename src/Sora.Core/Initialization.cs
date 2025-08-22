@@ -56,7 +56,7 @@ public static class SoraInitialization
         try
         {
             var baseDir = AppContext.BaseDirectory;
-            foreach (var file in System.IO.Directory.GetFiles(baseDir, "Sora.*.dll"))
+            foreach (var file in Directory.GetFiles(baseDir, "Sora.*.dll"))
             {
                 try
                 {

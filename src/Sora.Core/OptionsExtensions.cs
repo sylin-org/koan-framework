@@ -6,7 +6,7 @@ namespace Sora.Core;
 
 public static class OptionsValidation
 {
-    public static IServiceCollection AddValidatedOptions<TOptions>(this IServiceCollection services, IConfiguration config, string sectionName, System.Action<TOptions>? postConfigure = null) where TOptions : class, new()
+    public static IServiceCollection AddValidatedOptions<TOptions>(this IServiceCollection services, IConfiguration config, string sectionName, Action<TOptions>? postConfigure = null) where TOptions : class, new()
     {
         services.AddOptions<TOptions>()
             .BindConfiguration(sectionName)

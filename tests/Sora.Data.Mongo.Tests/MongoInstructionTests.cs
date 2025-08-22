@@ -35,7 +35,7 @@ public class MongoInstructionTests : IClassFixture<MongoAutoFixture>
         sc.AddSoraDataCore();
         sc.AddMongoAdapter();
         // Provide naming resolver for StorageNameRegistry
-        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         return sc.BuildServiceProvider();
     }
 

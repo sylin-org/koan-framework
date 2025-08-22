@@ -9,7 +9,7 @@ namespace Sora.Data.Sqlite.Tests;
 
 public class SqlitePagingOptionsTests
 {
-    public class Todo : Sora.Data.Abstractions.IEntity<string>
+    public class Todo : IEntity<string>
     {
         public string Id { get; set; } = default!;
         public string Title { get; set; } = string.Empty;
@@ -18,7 +18,7 @@ public class SqlitePagingOptionsTests
     private static IServiceProvider BuildServices(string file, int defaultPageSize = 5, int maxPageSize = 7)
     {
         // Reset cross-provider caches so options (like MaxPageSize) from previous tests don't leak
-        Sora.Data.Core.TestHooks.ResetDataConfigs();
+        TestHooks.ResetDataConfigs();
         var sc = new ServiceCollection();
         var cs = $"Data Source={file}";
         var cfg = new ConfigurationBuilder()
@@ -44,14 +44,14 @@ public class SqlitePagingOptionsTests
     [Fact]
     public async Task Linq_With_Options_Paginates_And_Caps_By_MaxPageSize()
     {
-        using var _set = Sora.Data.Core.DataSetContext.With(Guid.NewGuid().ToString("n"));
+        using var _set = DataSetContext.With(Guid.NewGuid().ToString("n"));
         var file = TempFile();
         var sp = BuildServices(file, defaultPageSize: 5, maxPageSize: 7);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
         // Ensure clean slate
-        await data.Execute<Todo, int>(new Sora.Data.Abstractions.Instructions.Instruction("data.clear"));
+        await data.Execute<Todo, int>(new Abstractions.Instructions.Instruction("data.clear"));
 
         for (int i = 0; i < 20; i++) await repo.UpsertAsync(new Todo { Title = $"t-{i}" });
 
@@ -66,14 +66,14 @@ public class SqlitePagingOptionsTests
     [Fact]
     public async Task StringWhere_With_Options_Paginates_And_Caps_By_MaxPageSize()
     {
-        using var _set = Sora.Data.Core.DataSetContext.With(Guid.NewGuid().ToString("n"));
+        using var _set = DataSetContext.With(Guid.NewGuid().ToString("n"));
         var file = TempFile();
         var sp = BuildServices(file, defaultPageSize: 4, maxPageSize: 6);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
         // Ensure clean slate
-        await data.Execute<Todo, int>(new Sora.Data.Abstractions.Instructions.Instruction("data.clear"));
+        await data.Execute<Todo, int>(new Abstractions.Instructions.Instruction("data.clear"));
 
         for (int i = 0; i < 15; i++) await repo.UpsertAsync(new Todo { Title = i % 2 == 0 ? "milk" : "bread" });
 

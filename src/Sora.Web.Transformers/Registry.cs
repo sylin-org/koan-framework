@@ -171,7 +171,7 @@ public static class TransformerServiceCollectionExtensions
         return services;
     }
 
-    internal sealed class TransformerStartupInitializer : global::Sora.Core.ISoraInitializer
+    internal sealed class TransformerStartupInitializer : ISoraInitializer
     {
         public void Initialize(IServiceCollection services)
         {
@@ -189,7 +189,7 @@ public static class TransformerServiceCollectionExtensions
                 b.Bindings.Add(sp =>
                 {
                     var cfg = sp.GetService<IConfiguration>();
-                    var enabled = cfg.Read(Sora.Web.Transformers.Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
+                    var enabled = cfg.Read(Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
                     if (!enabled) return;
 
                     var reg = sp.GetRequiredService<ITransformerRegistry>();

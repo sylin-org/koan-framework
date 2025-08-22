@@ -236,35 +236,35 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         // Bind options with connection string resolution (prefer explicit keys via helper)
         var opts = new RabbitMqOptions();
         // Exchange
-        opts.Exchange = Sora.Core.Configuration.Read<string?>(cfg, "RabbitMq:Exchange", null)
-            ?? Sora.Core.Configuration.Read<string?>(cfg, "Exchange", null)
+        opts.Exchange = Configuration.Read<string?>(cfg, "RabbitMq:Exchange", null)
+            ?? Configuration.Read<string?>(cfg, "Exchange", null)
             ?? opts.Exchange;
         // ExchangeType
-        opts.ExchangeType = Sora.Core.Configuration.Read<string?>(cfg, "RabbitMq:ExchangeType", null)
-            ?? Sora.Core.Configuration.Read<string?>(cfg, "ExchangeType", null)
+        opts.ExchangeType = Configuration.Read<string?>(cfg, "RabbitMq:ExchangeType", null)
+            ?? Configuration.Read<string?>(cfg, "ExchangeType", null)
             ?? opts.ExchangeType;
         // PublisherConfirms
-        opts.PublisherConfirms = Sora.Core.Configuration.Read(cfg, "RabbitMq:PublisherConfirms", opts.PublisherConfirms);
+        opts.PublisherConfirms = Configuration.Read(cfg, "RabbitMq:PublisherConfirms", opts.PublisherConfirms);
         // Prefetch
-        opts.Prefetch = Sora.Core.Configuration.Read(cfg, "RabbitMq:Prefetch", opts.Prefetch);
+        opts.Prefetch = Configuration.Read(cfg, "RabbitMq:Prefetch", opts.Prefetch);
         // DLQ
-        opts.Dlq.Enabled = Sora.Core.Configuration.Read(cfg, "RabbitMq:Dlq:Enabled", opts.Dlq.Enabled);
+        opts.Dlq.Enabled = Configuration.Read(cfg, "RabbitMq:Dlq:Enabled", opts.Dlq.Enabled);
         // Retry
-        opts.Retry.MaxAttempts = Math.Max(1, Sora.Core.Configuration.Read(cfg, "RabbitMq:Retry:MaxAttempts", opts.Retry.MaxAttempts));
-        opts.Retry.FirstDelaySeconds = Math.Max(1, Sora.Core.Configuration.Read(cfg, "RabbitMq:Retry:FirstDelaySeconds", opts.Retry.FirstDelaySeconds));
-        opts.Retry.Backoff = Sora.Core.Configuration.Read<string?>(cfg, "RabbitMq:Retry:Backoff", opts.Retry.Backoff) ?? opts.Retry.Backoff;
-        opts.Retry.MaxDelaySeconds = Sora.Core.Configuration.Read(cfg, "RabbitMq:Retry:MaxDelaySeconds", opts.Retry.MaxDelaySeconds);
+        opts.Retry.MaxAttempts = Math.Max(1, Configuration.Read(cfg, "RabbitMq:Retry:MaxAttempts", opts.Retry.MaxAttempts));
+        opts.Retry.FirstDelaySeconds = Math.Max(1, Configuration.Read(cfg, "RabbitMq:Retry:FirstDelaySeconds", opts.Retry.FirstDelaySeconds));
+        opts.Retry.Backoff = Configuration.Read<string?>(cfg, "RabbitMq:Retry:Backoff", opts.Retry.Backoff) ?? opts.Retry.Backoff;
+        opts.Retry.MaxDelaySeconds = Configuration.Read(cfg, "RabbitMq:Retry:MaxDelaySeconds", opts.Retry.MaxDelaySeconds);
         // ProvisionOnStart
-        opts.ProvisionOnStart = Sora.Core.Configuration.Read(cfg, "RabbitMq:ProvisionOnStart", opts.ProvisionOnStart);
+        opts.ProvisionOnStart = Configuration.Read(cfg, "RabbitMq:ProvisionOnStart", opts.ProvisionOnStart);
         // Subscriptions (minimal: read comma separated routing keys for default group if provided)
         // Keep existing list if already populated by other means
         if (opts.Subscriptions.Count == 0)
         {
-            var rkCsv = Sora.Core.Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:RoutingKeys", null);
-            var name = Sora.Core.Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Name", null);
-            var queue = Sora.Core.Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Queue", null);
-            var dlq = Sora.Core.Configuration.Read(cfg, "RabbitMq:Subscriptions:0:Dlq", true);
-            var concurrency = Math.Max(1, Sora.Core.Configuration.Read(cfg, "RabbitMq:Subscriptions:0:Concurrency", 1));
+            var rkCsv = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:RoutingKeys", null);
+            var name = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Name", null);
+            var queue = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Queue", null);
+            var dlq = Configuration.Read(cfg, "RabbitMq:Subscriptions:0:Dlq", true);
+            var concurrency = Math.Max(1, Configuration.Read(cfg, "RabbitMq:Subscriptions:0:Concurrency", 1));
             if (!string.IsNullOrWhiteSpace(rkCsv) || !string.IsNullOrWhiteSpace(name) || !string.IsNullOrWhiteSpace(queue))
             {
                 opts.Subscriptions.Add(new SubscriptionOption
@@ -280,8 +280,8 @@ public sealed class RabbitMqFactory : IMessageBusFactory
 
         var configRoot = sp.GetService(typeof(IConfiguration)) as IConfiguration;
         // Connection string resolution
-        var connStr = Sora.Core.Configuration.Read<string?>(cfg, "RabbitMq:ConnectionString", null)
-            ?? Sora.Core.Configuration.Read<string?>(cfg, "ConnectionString", null)
+        var connStr = Configuration.Read<string?>(cfg, "RabbitMq:ConnectionString", null)
+            ?? Configuration.Read<string?>(cfg, "ConnectionString", null)
             ?? opts.ConnectionString;
         if (string.IsNullOrWhiteSpace(connStr) && !string.IsNullOrWhiteSpace(opts.ConnectionStringName))
             connStr = configRoot?["ConnectionStrings:" + opts.ConnectionStringName];
@@ -307,9 +307,9 @@ public sealed class RabbitMqFactory : IMessageBusFactory
 
         // Determine effective provisioning default: true normally, false in Production unless Sora:AllowMagicInProduction = true
         bool isProd = false;
-        try { isProd = Sora.Core.SoraEnv.IsProduction; }
-        catch { isProd = string.Equals(Sora.Core.Configuration.ReadFirst(null, Sora.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment) ?? string.Empty, "Production", StringComparison.OrdinalIgnoreCase); }
-        bool allowMagic = Sora.Core.Configuration.Read(configRoot, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+        try { isProd = SoraEnv.IsProduction; }
+        catch { isProd = string.Equals(Configuration.ReadFirst(null, Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment) ?? string.Empty, "Production", StringComparison.OrdinalIgnoreCase); }
+        bool allowMagic = Configuration.Read(configRoot, Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         bool provisionExplicit = cfg["ProvisionOnStart"] is not null; // detect explicit config presence
         bool provisionEffective = provisionExplicit ? opts.ProvisionOnStart : (!isProd || allowMagic);
 
@@ -320,7 +320,7 @@ public sealed class RabbitMqFactory : IMessageBusFactory
             // If no subscriptions were defined, create a single default group subscription bound to all
             if (autoSubWhenEmpty)
             {
-                var msgOpts = sp.GetService(typeof(Microsoft.Extensions.Options.IOptions<Sora.Messaging.MessagingOptions>)) as Microsoft.Extensions.Options.IOptions<Sora.Messaging.MessagingOptions>;
+                var msgOpts = sp.GetService(typeof(IOptions<MessagingOptions>)) as IOptions<MessagingOptions>;
                 var defaultGroup = msgOpts?.Value.DefaultGroup ?? "workers";
                 opts.Subscriptions.Add(new SubscriptionOption { Name = defaultGroup, RoutingKeys = new[] { "#" }, Dlq = true, Concurrency = 1 });
             }
@@ -614,8 +614,8 @@ internal sealed class RabbitMqInboxDiscoveryClient : IInboxDiscoveryClient
         var opts = (IOptions<MessagingOptions>?)_sp.GetService(typeof(IOptions<MessagingOptions>));
         var busCode = opts?.Value.DefaultBus ?? "default";
         // Read connection string from known keys (bus-specific)
-        var connStr = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.RabbitMq.Infrastructure.Constants.Configuration.ConnectionString(busCode), null);
-        var connName = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.RabbitMq.Infrastructure.Constants.Configuration.ConnectionStringName(busCode), null);
+        var connStr = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.ConnectionString(busCode), null);
+        var connName = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.ConnectionStringName(busCode), null);
         if (string.IsNullOrWhiteSpace(connStr) && !string.IsNullOrWhiteSpace(connName))
             connStr = cfg?["ConnectionStrings:" + connName];
         if (string.IsNullOrWhiteSpace(connStr)) return null;
@@ -625,8 +625,8 @@ internal sealed class RabbitMqInboxDiscoveryClient : IInboxDiscoveryClient
         using var channel = connection.CreateModel();
 
         // Ensure exchange exists (idempotent)
-        var exchange = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.RabbitMq.Infrastructure.Constants.Configuration.Exchange(busCode), "sora") ?? "sora";
-        var exchangeType = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.RabbitMq.Infrastructure.Constants.Configuration.ExchangeType(busCode), "topic") ?? "topic";
+        var exchange = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Exchange(busCode), "sora") ?? "sora";
+        var exchangeType = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.ExchangeType(busCode), "topic") ?? "topic";
         channel.ExchangeDeclare(exchange: exchange, type: exchangeType, durable: true, autoDelete: false, arguments: null);
 
         // Create a temporary reply queue and consumer
@@ -737,7 +737,7 @@ internal sealed class RabbitMqInboxDiscoveryInitializer : ISoraInitializer
         using var sp = services.BuildServiceProvider();
         var policy = sp.GetService(typeof(IInboxDiscoveryPolicy)) as IInboxDiscoveryPolicy;
         var cfg = sp.GetService(typeof(IConfiguration)) as IConfiguration;
-        var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
+        var endpoint = Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
         if (!string.IsNullOrWhiteSpace(endpoint)) return; // explicit wins
         if (policy is null || !policy.ShouldDiscover(sp))
         {

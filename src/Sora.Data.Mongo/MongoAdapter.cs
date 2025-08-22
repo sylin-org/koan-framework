@@ -41,7 +41,7 @@ internal static class MongoConstants
 {
     public const string DefaultLocalUri = "mongodb://localhost:27017";
     public const string DefaultComposeUri = "mongodb://mongodb:27017";
-    public const string EnvList = Sora.Data.Mongo.Infrastructure.Constants.Discovery.EnvList; // comma/semicolon-separated list
+    public const string EnvList = Infrastructure.Constants.Discovery.EnvList; // comma/semicolon-separated list
 }
 
 public static class MongoRegistration
@@ -71,30 +71,30 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
     public void Configure(MongoOptions options)
     {
         // Bind provider-specific options using Configuration helper (ADR-0040)
-        options.ConnectionString = Sora.Core.Configuration.ReadFirst(
+        options.ConnectionString = Configuration.ReadFirst(
             config,
             defaultValue: options.ConnectionString,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
-        options.Database = Sora.Core.Configuration.ReadFirst(
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+        options.Database = Configuration.ReadFirst(
             config,
             defaultValue: options.Database,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.Database,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltDatabase);
+            Infrastructure.Constants.Configuration.Keys.Database,
+            Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
         // Paging guardrails
-        options.DefaultPageSize = Sora.Core.Configuration.ReadFirst(
+        options.DefaultPageSize = Configuration.ReadFirst(
             config,
             defaultValue: options.DefaultPageSize,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        options.MaxPageSize = Sora.Core.Configuration.ReadFirst(
+            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+        options.MaxPageSize = Configuration.ReadFirst(
             config,
             defaultValue: options.MaxPageSize,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
+            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
         // If an env list is provided, use the first reachable entry
         try
@@ -117,7 +117,7 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
         catch { /* best-effort */ }
 
         // Resolve from ConnectionStrings:Default when present. Override placeholder/empty.
-        var cs = Sora.Core.Configuration.Read(config, Sora.Data.Mongo.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, null);
+        var cs = Configuration.Read(config, Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, null);
         if (!string.IsNullOrWhiteSpace(cs))
         {
             if (string.IsNullOrWhiteSpace(options.ConnectionString) || string.Equals(options.ConnectionString.Trim(), MongoConstants.DefaultLocalUri, StringComparison.OrdinalIgnoreCase))
@@ -128,7 +128,7 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
         // Final safety default if still unset or sentinel 'auto': prefer docker compose host when containerized
         if (string.IsNullOrWhiteSpace(options.ConnectionString) || string.Equals(options.ConnectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
         {
-            var inContainer = Sora.Core.SoraEnv.InContainer;
+            var inContainer = SoraEnv.InContainer;
             options.ConnectionString = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
         }
 
@@ -180,7 +180,7 @@ internal sealed class MongoHealthContributor(IOptions<MongoOptions> options) : I
             return new HealthReport(Name, HealthState.Healthy, null, null, new Dictionary<string, object?>
             {
                 ["database"] = options.Value.Database,
-                ["connectionString"] = Sora.Core.Redaction.DeIdentify(options.Value.ConnectionString)
+                ["connectionString"] = Redaction.DeIdentify(options.Value.ConnectionString)
             });
         }
         catch (Exception ex)
@@ -190,7 +190,7 @@ internal sealed class MongoHealthContributor(IOptions<MongoOptions> options) : I
     }
 }
 
-[Sora.Data.Abstractions.ProviderPriority(20)]
+[ProviderPriority(20)]
 public sealed class MongoAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider) => string.Equals(provider, "mongo", StringComparison.OrdinalIgnoreCase) || string.Equals(provider, "mongodb", StringComparison.OrdinalIgnoreCase);
@@ -198,7 +198,7 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp) where TEntity : class, IEntity<TKey> where TKey : notnull
     {
         var opts = sp.GetRequiredService<IOptions<MongoOptions>>().Value;
-        var resolver = sp.GetRequiredService<Sora.Data.Abstractions.Naming.IStorageNameResolver>();
+        var resolver = sp.GetRequiredService<IStorageNameResolver>();
         return new MongoRepository<TEntity, TKey>(opts, resolver, sp);
     }
 }
@@ -213,7 +213,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     IWriteCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
-    Sora.Data.Abstractions.Instructions.IInstructionExecutor<TEntity>
+    Abstractions.Instructions.IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -222,23 +222,23 @@ internal sealed class MongoRepository<TEntity, TKey> :
     public QueryCapabilities Capabilities => QueryCapabilities.Linq;
     public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete;
 
-    private readonly Sora.Data.Abstractions.Naming.IStorageNameResolver _nameResolver;
+    private readonly IStorageNameResolver _nameResolver;
     private readonly IServiceProvider _sp;
-    private readonly Sora.Data.Abstractions.Naming.StorageNameResolver.Convention _nameConv;
+    private readonly StorageNameResolver.Convention _nameConv;
     private readonly ILogger? _logger;
     private readonly int _defaultPageSize;
     private readonly int _maxPageSize;
 
-    public MongoRepository(MongoOptions options, Sora.Data.Abstractions.Naming.IStorageNameResolver nameResolver, IServiceProvider sp)
+    public MongoRepository(MongoOptions options, IStorageNameResolver nameResolver, IServiceProvider sp)
     {
         _nameResolver = nameResolver;
         _sp = sp;
         _logger = sp.GetService<ILogger<MongoRepository<TEntity, TKey>>>();
         var client = new MongoClient(options.ConnectionString);
         var db = client.GetDatabase(options.Database);
-        _nameConv = new Sora.Data.Abstractions.Naming.StorageNameResolver.Convention(options.NamingStyle, options.Separator ?? ".", Sora.Data.Abstractions.Naming.NameCasing.AsIs);
+        _nameConv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator ?? ".", NameCasing.AsIs);
         // Initial collection name (may be set-scoped); will be recomputed per call if set changes
-        _collectionName = Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        _collectionName = Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         _collection = db.GetCollection<TEntity>(_collectionName);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
         _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
@@ -246,7 +246,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     }
     private IMongoCollection<TEntity> GetCollection()
     {
-        var name = Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var name = Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         if (!string.Equals(name, _collectionName, StringComparison.Ordinal))
         {
             var clientField = typeof(IMongoCollection<TEntity>).GetProperty("Database")?.GetValue(_collection) as IMongoDatabase;
@@ -381,13 +381,13 @@ internal sealed class MongoRepository<TEntity, TKey> :
     public IBatchSet<TEntity, TKey> CreateBatch() => new MongoBatch(this);
 
     // Instruction execution for fast-path operations
-    public async Task<TResult> ExecuteAsync<TResult>(Sora.Data.Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
+    public async Task<TResult> ExecuteAsync<TResult>(Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
     {
         using var act = MongoTelemetry.Activity.StartActivity("mongo.instruction");
         act?.SetTag("entity", typeof(TEntity).FullName);
         switch (instruction.Name)
         {
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
+            case Abstractions.Instructions.DataInstructions.EnsureCreated:
                 {
                     var col = GetCollection();
                     var db = GetDatabase(col);
@@ -410,7 +410,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
                     object ok = true;
                     return (TResult)ok;
                 }
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
+            case Abstractions.Instructions.DataInstructions.Clear:
                 {
                     var col = GetCollection();
                     var res = await col.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
@@ -545,22 +545,22 @@ internal static class MongoNaming
 {
     public static string ResolveCollectionName(Type entityType, MongoOptions options)
     {
-        var conv = new Sora.Data.Abstractions.Naming.StorageNameResolver.Convention(
+        var conv = new StorageNameResolver.Convention(
             options.NamingStyle,
             options.Separator ?? ".",
-            Sora.Data.Abstractions.Naming.NameCasing.AsIs
+            NameCasing.AsIs
         );
-        return Sora.Data.Abstractions.Naming.StorageNameResolver.Resolve(entityType, conv);
+        return StorageNameResolver.Resolve(entityType, conv);
     }
 }
 
-internal sealed class MongoNamingDefaultsProvider : Sora.Data.Abstractions.Naming.INamingDefaultsProvider
+internal sealed class MongoNamingDefaultsProvider : INamingDefaultsProvider
 {
     public string Provider => "mongo";
-    public Sora.Data.Abstractions.Naming.StorageNameResolver.Convention GetConvention(IServiceProvider services)
+    public StorageNameResolver.Convention GetConvention(IServiceProvider services)
     {
         var opts = services.GetRequiredService<IOptions<MongoOptions>>().Value;
-        return new Sora.Data.Abstractions.Naming.StorageNameResolver.Convention(opts.NamingStyle, opts.Separator ?? ".", Sora.Data.Abstractions.Naming.NameCasing.AsIs);
+        return new StorageNameResolver.Convention(opts.NamingStyle, opts.Separator ?? ".", NameCasing.AsIs);
     }
     public Func<Type, string?>? GetAdapterOverride(IServiceProvider services)
     {

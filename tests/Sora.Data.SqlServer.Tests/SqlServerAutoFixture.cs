@@ -80,10 +80,10 @@ public sealed class SqlServerAutoFixture : IRelationalTestFixture<SqlServerSchem
         var cfg = new ConfigurationBuilder()
             .AddInMemoryCollection(new[]
             {
-                new KeyValuePair<string,string?>(Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.ConnectionString, ConnectionString),
+                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.ConnectionString, ConnectionString),
                 new KeyValuePair<string,string?>("Sora:Environment", "Test"),
-                new KeyValuePair<string,string?>(Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.DefaultPageSize, "5"),
-                new KeyValuePair<string,string?>(Sora.Data.SqlServer.Infrastructure.Constants.Configuration.Keys.MaxPageSize, "50")
+                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.DefaultPageSize, "5"),
+                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.MaxPageSize, "50")
             })
             .Build();
 

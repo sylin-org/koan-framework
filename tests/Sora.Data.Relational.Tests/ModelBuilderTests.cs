@@ -9,7 +9,7 @@ namespace Sora.Data.Relational.Tests;
 
 public class ModelBuilderTests
 {
-    public class Todo : Sora.Data.Abstractions.IEntity<string>
+    public class Todo : IEntity<string>
     {
         [Identifier]
         public string Id { get; set; } = default!;
@@ -34,7 +34,7 @@ public class ModelBuilderTests
     }
 
     [StorageNaming(StorageNamingStyle.FullNamespace)]
-    public class Named : Sora.Data.Abstractions.IEntity<string>
+    public class Named : IEntity<string>
     {
         [Identifier] public string Id { get; set; } = default!;
     }

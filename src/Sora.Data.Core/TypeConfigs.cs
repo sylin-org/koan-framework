@@ -44,7 +44,7 @@ internal static class AggregateConfigs
             .Select(f => new
             {
                 Factory = f,
-                Priority = (f.GetType().GetCustomAttributes(typeof(Sora.Data.Abstractions.ProviderPriorityAttribute), inherit: false).FirstOrDefault() as Sora.Data.Abstractions.ProviderPriorityAttribute)?.Priority ?? 0,
+                Priority = (f.GetType().GetCustomAttributes(typeof(ProviderPriorityAttribute), inherit: false).FirstOrDefault() as ProviderPriorityAttribute)?.Priority ?? 0,
                 Name = f.GetType().Name
             })
             .OrderByDescending(x => x.Priority)
@@ -85,7 +85,7 @@ internal sealed class AggregateConfig<TEntity, TKey>
     private readonly ConcurrentDictionary<string, object> _bags = new();
     public TBag GetOrAddBag<TBag>(string key, Func<TBag> factory) where TBag : class
         => (TBag)_bags.GetOrAdd(key, _ => factory()!);
-    internal System.Collections.Generic.IEnumerable<(string key, object value)> EnumerateBags()
+    internal IEnumerable<(string key, object value)> EnumerateBags()
         => _bags.Select(kvp => (kvp.Key, kvp.Value));
 
     internal AggregateConfig(string provider, AggregateMetadata.IdSpec? id, IServiceProvider sp)

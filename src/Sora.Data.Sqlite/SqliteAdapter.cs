@@ -85,7 +85,7 @@ public static class SqliteRegistration
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Sora.Data.Core.Configuration.IDataProviderConnectionFactory, SqliteConnectionFactory>());
         // Provide naming defaults so relational naming resolves to provider's convention
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(Sora.Data.Abstractions.Naming.INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
+        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
         return services;
     }
 }
@@ -96,47 +96,47 @@ internal sealed class SqliteOptionsConfigurator(IConfiguration config) : IConfig
 {
     public void Configure(SqliteOptions options)
     {
-        options.ConnectionString = Sora.Core.Configuration.ReadFirst(
+        options.ConnectionString = Configuration.ReadFirst(
             config,
             defaultValue: options.ConnectionString,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
         // Paging guardrails
-        options.DefaultPageSize = Sora.Core.Configuration.ReadFirst(
+        options.DefaultPageSize = Configuration.ReadFirst(
             config,
             defaultValue: options.DefaultPageSize,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        options.MaxPageSize = Sora.Core.Configuration.ReadFirst(
+            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+        options.MaxPageSize = Configuration.ReadFirst(
             config,
             defaultValue: options.MaxPageSize,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
+            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
         // Governance
-        var ddlStr = Sora.Core.Configuration.ReadFirst(
+        var ddlStr = Configuration.ReadFirst(
             config,
             defaultValue: options.DdlPolicy.ToString(),
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.DdlPolicy,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
+            Infrastructure.Constants.Configuration.Keys.DdlPolicy,
+            Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
         if (!string.IsNullOrWhiteSpace(ddlStr))
         {
             if (Enum.TryParse<SchemaDdlPolicy>(ddlStr, ignoreCase: true, out var ddl)) options.DdlPolicy = ddl;
         }
-        var smStr = Sora.Core.Configuration.ReadFirst(
+        var smStr = Configuration.ReadFirst(
             config,
             defaultValue: options.SchemaMatching.ToString(),
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
-            Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
+            Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
+            Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
         if (!string.IsNullOrWhiteSpace(smStr))
         {
             if (Enum.TryParse<SchemaMatchingMode>(smStr, ignoreCase: true, out var sm)) options.SchemaMatching = sm;
         }
         // Magic flag for production overrides
-        options.AllowProductionDdl = Sora.Core.Configuration.Read(
+        options.AllowProductionDdl = Configuration.Read(
             config,
-            Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction,
+            Constants.Configuration.Sora.AllowMagicInProduction,
             options.AllowProductionDdl);
     }
 }
@@ -160,14 +160,14 @@ internal sealed class SqliteToRelationalBridgeConfigurator(IOptions<SqliteOption
         // Favor materialized projections for SQLite so projected columns are created and validated
         options.Materialization = RelationalMaterializationPolicy.PhysicalColumns;
         // Production guardrail: for SQLite, default to allowing DDL when AutoCreate is selected to favor local/test usability
-        var magic = Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+        var magic = Configuration.Read(cfg, Constants.Configuration.Sora.AllowMagicInProduction, false);
         options.AllowProductionDdl = so.AllowProductionDdl || magic || options.DdlPolicy == RelationalDdlPolicy.AutoCreate;
         // When materialization policy is None, we still want projections checked if present; leave options.Materialization at default
         // Fail-on-mismatch follows orchestrator defaults; no explicit override here
     }
 }
 
-[Sora.Data.Abstractions.ProviderPriority(10)]
+[ProviderPriority(10)]
 public sealed class SqliteAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider) => string.Equals(provider, "sqlite", StringComparison.OrdinalIgnoreCase);
@@ -227,7 +227,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         _options = options;
         _nameResolver = resolver;
         // Initialize runtime snapshot so AllowMagicInProduction and environment are honored in tests and apps
-        Sora.Core.SoraEnv.TryInitialize(sp);
+        SoraEnv.TryInitialize(sp);
         // Logger: prefer typed logger; fall back to category
         _logger = (sp.GetService(typeof(ILogger<SqliteRepository<TEntity, TKey>>)) as ILogger)
               ?? (sp.GetService(typeof(ILoggerFactory)) is ILoggerFactory lf
@@ -237,12 +237,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
         _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
         // Orchestration options (global, provider-agnostic)
-        _relOptions = (sp.GetService(typeof(Microsoft.Extensions.Options.IOptions<RelationalMaterializationOptions>)) as Microsoft.Extensions.Options.IOptions<RelationalMaterializationOptions>)?.Value
+        _relOptions = (sp.GetService(typeof(IOptions<RelationalMaterializationOptions>)) as IOptions<RelationalMaterializationOptions>)?.Value
                    ?? new RelationalMaterializationOptions();
     }
 
     // Use central registry so DataSetContext is honored (set-aware names)
-    private string TableName => Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+    private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
 
     private IDbConnection Open()
     {
@@ -250,14 +250,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         try
         {
             // Best-effort: create directory for file-based connection strings
-            var builder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(cs);
+            var builder = new SqliteConnectionStringBuilder(cs);
             var dataSource = builder.DataSource;
             if (!string.IsNullOrWhiteSpace(dataSource))
             {
                 var fullPath = dataSource;
-                try { fullPath = System.IO.Path.GetFullPath(dataSource); } catch { }
-                var dir = System.IO.Path.GetDirectoryName(fullPath);
-                if (!string.IsNullOrWhiteSpace(dir)) System.IO.Directory.CreateDirectory(dir);
+                try { fullPath = Path.GetFullPath(dataSource); } catch { }
+                var dir = Path.GetDirectoryName(fullPath);
+                if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
             }
         }
         catch { /* non-fatal */ }
@@ -280,7 +280,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     if (ddl.TableExists(string.Empty, TableName) && required.All(cn => ddl.ColumnExists(string.Empty, TableName, cn))) break;
                 }
                 catch { }
-                System.Threading.Thread.Sleep(delay);
+                Thread.Sleep(delay);
                 delay = Math.Min(200, delay * 2);
             }
         }
@@ -305,7 +305,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var ddl = new SqliteDdlExecutor(conn, table);
         var feats = new SqliteStoreFeatures();
         // Always validate first to discover DDL allowance and current state
-        var vReport = (System.Collections.Generic.IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct).ConfigureAwait(false);
+        var vReport = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct).ConfigureAwait(false);
         var vState = (vReport["State"] as string) ?? "Unknown";
         var vDdlAllowed = vReport.TryGetValue("DdlAllowed", out var vDa) && vDa is bool vb && vb;
         var vTableExists = vReport.TryGetValue("TableExists", out var vTe) && vTe is bool vtb && vtb;
@@ -372,7 +372,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 {
                     var missing = required.Where(c => !ddl.ColumnExists(string.Empty, table, c)).ToArray();
                     if (missing.Length == 0) break;
-                    System.Threading.Thread.Sleep(20);
+                    Thread.Sleep(20);
                 }
             }
             catch { }
@@ -847,14 +847,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaValidate:
+            case RelationalInstructions.SchemaValidate:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
                     var feats = new SqliteStoreFeatures();
-                    var report = (System.Collections.Generic.IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                    var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
                     // Normalize to provider options for tests: override MatchingMode/DdlAllowed and compute missing projected columns
-                    var projections = Sora.Data.Core.ProjectionResolver.Get(typeof(TEntity));
+                    var projections = ProjectionResolver.Get(typeof(TEntity));
                     var required = projections.Select(p => p.ColumnName).ToArray();
                     var tableExists = ddl.TableExists(string.Empty, TableName);
                     // Debug aid (suppressed in Release): PRAGMA table_info snapshot during validate
@@ -883,7 +883,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     {
                         try
                         {
-                            System.Threading.Thread.Sleep(30);
+                            Thread.Sleep(30);
                             missing = required.Where(c => !ddl.ColumnExists(string.Empty, TableName, c)).ToArray();
                         }
                         catch { }
@@ -910,14 +910,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     report["TableExists"] = tableExists;
                     report["MissingColumns"] = missing;
                     // Matching mode: prefer explicit config (including env override)
-                    var modeStr = Sora.Core.Configuration.ReadFirst(
+                    var modeStr = Configuration.ReadFirst(
                         _sp.GetRequiredService<IConfiguration>(),
                         defaultValue: _options.SchemaMatching.ToString(),
-                        Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
-                        Sora.Data.Sqlite.Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
+                        Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
+                        Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
                     if (string.IsNullOrWhiteSpace(modeStr)) modeStr = _options.SchemaMatching.ToString();
                     report["MatchingMode"] = modeStr;
-                    var ddlAllowed = _options.DdlPolicy == SchemaDdlPolicy.AutoCreate && (!Sora.Core.SoraEnv.IsProduction || _options.AllowProductionDdl);
+                    var ddlAllowed = _options.DdlPolicy == SchemaDdlPolicy.AutoCreate && (!SoraEnv.IsProduction || _options.AllowProductionDdl);
                     if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any()) ddlAllowed = false;
                     report["DdlAllowed"] = ddlAllowed;
                     var strict = string.Equals(modeStr, "Strict", StringComparison.OrdinalIgnoreCase);
@@ -925,7 +925,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     report["State"] = state;
                     return (TResult)report;
                 }
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
+            case DataInstructions.EnsureCreated:
                 {
                     if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any())
                     {
@@ -941,7 +941,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     catch (InvalidOperationException ex) when (ex.Message?.Contains("DDL is disabled", StringComparison.OrdinalIgnoreCase) == true)
                     {
                         // Orchestrator refused to perform DDL. Fall back to a best-effort local creation so tests that expect AutoCreate succeed.
-                        var projections = Sora.Data.Core.ProjectionResolver.Get(typeof(TEntity));
+                        var projections = ProjectionResolver.Get(typeof(TEntity));
                         var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
                         allColumns.Add(("Id", typeof(string), false, false, null, false));
                         allColumns.Add(("Json", typeof(string), false, false, null, false));
@@ -953,7 +953,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     }
                     object d_ok = true; return (TResult)d_ok;
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaClear:
+            case RelationalInstructions.SchemaClear:
                 {
                     // Remove the table if present; do not create it.
                     var drop = $"DROP TABLE IF EXISTS \"{TableName}\";";
@@ -962,12 +962,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     try { var cacheKey = ($"{conn.DataSource}/{conn.Database}::{TableName}"); _healthyCache.TryRemove(cacheKey, out _); } catch { }
                     object res = 0; return (TResult)res;
                 }
-            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
+            case DataInstructions.Clear:
                 EnsureOrchestrated(conn);
                 var del = await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
                 object d_res = del;
                 return (TResult)d_res;
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaEnsureCreated:
+            case RelationalInstructions.SchemaEnsureCreated:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
@@ -975,7 +975,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
                     object ok = true; return (TResult)ok;
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlScalar:
+            case RelationalInstructions.SqlScalar:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
@@ -992,7 +992,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         return CastScalar<TResult>(result);
                     }
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlNonQuery:
+            case RelationalInstructions.SqlNonQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     sql = MaybeRewriteInsertForProjection(sql);
@@ -1014,7 +1014,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         return (TResult)res;
                     }
                 }
-            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlQuery:
+            case RelationalInstructions.SqlQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
@@ -1157,7 +1157,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         }
                     }
                     catch { }
-                    System.Threading.Thread.Sleep(delay);
+                    Thread.Sleep(delay);
                     delay = Math.Min(200, delay * 2);
                 }
                 if (sw.ElapsedMilliseconds >= maxMs)
@@ -1343,7 +1343,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         // If wildcard, ensure Id, Json selected (works as-is)
         if (cols.Trim() == "*") return selectSql;
 
-        var projections = Sora.Data.Core.ProjectionResolver.Get(typeof(TEntity));
+        var projections = ProjectionResolver.Get(typeof(TEntity));
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var p in projections)
         {
@@ -1422,7 +1422,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     // If unquoted, replace bare words with projected columns or JSON1 extraction.
     private string RewriteWhereForProjection(string whereSql)
     {
-        var projections = Sora.Data.Core.ProjectionResolver.Get(typeof(TEntity));
+        var projections = ProjectionResolver.Get(typeof(TEntity));
         bool hasBrackets = whereSql.IndexOf('[', StringComparison.Ordinal) >= 0;
         if (hasBrackets)
         {

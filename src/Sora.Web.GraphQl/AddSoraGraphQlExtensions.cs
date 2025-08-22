@@ -322,8 +322,8 @@ public static class AddSoraGraphQlExtensions
                     .Select(f => new
                     {
                         Factory = f,
-                        Priority = (f.GetType().GetCustomAttributes(typeof(Sora.Data.Abstractions.ProviderPriorityAttribute), inherit: false)
-                            .FirstOrDefault() as Sora.Data.Abstractions.ProviderPriorityAttribute)?.Priority ?? 0,
+                        Priority = (f.GetType().GetCustomAttributes(typeof(ProviderPriorityAttribute), inherit: false)
+                            .FirstOrDefault() as ProviderPriorityAttribute)?.Priority ?? 0,
                         Name = f.GetType().Name
                     })
                     .OrderByDescending(x => x.Priority)
@@ -365,7 +365,7 @@ public static class AddSoraGraphQlExtensions
     private static string ResolveStorageNameFactory(Type entityType)
     {
         // Best-effort: use ambient SoraApp.Current if available; otherwise fallback to defaults
-        var sp = Sora.Core.SoraApp.Current;
+        var sp = Core.SoraApp.Current;
         if (sp is not null) return ResolveStorageName(sp, entityType);
         // Fallback path without DI context
         return entityType.Name;

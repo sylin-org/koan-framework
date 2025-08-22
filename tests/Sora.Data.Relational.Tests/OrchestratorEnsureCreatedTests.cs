@@ -44,7 +44,7 @@ public class OrchestratorEnsureCreatedTests
         return (orch, sp);
     }
 
-    [Sora.Data.Abstractions.Annotations.RelationalStorage(Shape = Sora.Data.Abstractions.Annotations.RelationalStorageShape.ComputedProjections)]
+    [RelationalStorage(Shape = RelationalStorageShape.ComputedProjections)]
     public class TodoComputed : IEntity<string>
     {
         [Identifier]
@@ -54,7 +54,7 @@ public class OrchestratorEnsureCreatedTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task EnsureCreated_Honors_Attribute_Shape_Over_Options()
+    public async Task EnsureCreated_Honors_Attribute_Shape_Over_Options()
     {
         // Options say None (JSON), attribute demands ComputedProjections -> should create projections
         var (orch, _) = CreateSut(new RelationalMaterializationOptions
@@ -75,7 +75,7 @@ public class OrchestratorEnsureCreatedTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Validate_FailOnMismatch_Throws_When_Required_Columns_Missing()
+    public async Task Validate_FailOnMismatch_Throws_When_Required_Columns_Missing()
     {
         // Simulate: options require projections; validation finds missing columns; FailOnMismatch=true should be enforced by callers.
         // Here we call ValidateAsync and assert report marks missing; then simulate throwing SchemaMismatchException
@@ -128,7 +128,7 @@ public class OrchestratorEnsureCreatedTests
             _columns[(schema, table)] = set;
         }
 
-        public void CreateTableWithColumns(string schema, string table, System.Collections.Generic.List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
+        public void CreateTableWithColumns(string schema, string table, List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)> columns)
         {
             _tables.Add((schema, table));
             var set = _columns.GetValueOrDefault((schema, table)) ?? new HashSet<string>(StringComparer.Ordinal);
@@ -161,7 +161,7 @@ public class OrchestratorEnsureCreatedTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task EnsureCreated_Json_Creates_Table_With_Id_And_Json_Only()
+    public async Task EnsureCreated_Json_Creates_Table_With_Id_And_Json_Only()
     {
         var (orch, _) = CreateSut();
         var ddl = new FakeDdlExecutor();
@@ -181,7 +181,7 @@ public class OrchestratorEnsureCreatedTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task EnsureCreated_Materialized_Adds_Projection_Columns_And_Indexes()
+    public async Task EnsureCreated_Materialized_Adds_Projection_Columns_And_Indexes()
     {
         var (orch, _) = CreateSut(new RelationalMaterializationOptions
         {

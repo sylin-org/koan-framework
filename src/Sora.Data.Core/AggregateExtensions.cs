@@ -233,57 +233,6 @@ public static class AggregateExtensions
     }
 }
 
-// Wrapper for the common string key case: Data<T>
-public static class Data<TEntity>
-    where TEntity : class, IEntity<string>
-{
-    public static Task<TEntity?> GetAsync(string id, CancellationToken ct = default)
-        => Data<TEntity, string>.GetAsync(id, ct);
-
-    public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
-        => Data<TEntity, string>.All(ct);
-    public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
-        => Data<TEntity, string>.Query(query, ct);
-    public static Task<int> Count(CancellationToken ct = default)
-        => Data<TEntity, string>.CountAllAsync(ct);
-    public static Task<int> Count(string query, CancellationToken ct = default)
-        => Data<TEntity, string>.CountAsync(query, ct);
-
-    public static Task<bool> DeleteAsync(string id, CancellationToken ct = default)
-        => Data<TEntity, string>.DeleteAsync(id, ct);
-
-    public static Task<int> DeleteManyAsync(IEnumerable<string> ids, CancellationToken ct = default)
-        => Data<TEntity, string>.DeleteManyAsync(ids, ct);
-
-    public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
-        => Data<TEntity, string>.UpsertManyAsync(models, ct);
-
-    public static IBatchSet<TEntity, string> Batch()
-        => Data<TEntity, string>.Batch();
-
-    // Instruction execution sugar for common string-key case
-    public static Task<TResult> Execute<TResult>(Instruction instruction, CancellationToken ct = default)
-        => Data<TEntity, string>.Execute<TResult>(instruction, ct);
-
-    public static Task<TResult> Execute<TResult>(Instruction instruction, IDataService data, CancellationToken ct = default)
-        => Data<TEntity, string>.Execute<TResult>(instruction, data, ct);
-
-    // Default NonQuery sugar using raw SQL (returns affected rows)
-    public static Task<int> Execute(string sql, IDataService data, object? parameters = null, CancellationToken ct = default)
-        => Data<TEntity, string>.Execute(sql, data, parameters, ct);
-
-    // Raw SQL sugar using SoraApp.Current (int => NonQuery by default)
-    public static Task<int> Execute(string sql, CancellationToken ct = default)
-        => Data<TEntity, string>.Execute(sql, ct);
-
-    // Generic raw SQL sugar: int => NonQuery, otherwise Scalar
-    public static Task<TResult> Execute<TResult>(string sql, CancellationToken ct = default)
-        => Data<TEntity, string>.Execute<TResult>(sql, ct);
-
-    public static Task<TResult> Execute<TResult>(string sql, IDataService data, object? parameters = null, CancellationToken ct = default)
-        => Data<TEntity, string>.Execute<TResult>(sql, data, parameters, ct);
-}
-
 // Static facade: Data<TEntity,TKey>.GetAsync/QueryAsync/Batch()
 public static class Data<TEntity, TKey>
     where TEntity : class, IEntity<TKey>

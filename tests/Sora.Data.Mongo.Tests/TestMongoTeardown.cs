@@ -10,7 +10,7 @@ internal static class TestMongoTeardown
     {
         try
         {
-            var opts = sp.GetRequiredService<IOptions<Sora.Data.Mongo.MongoOptions>>().Value;
+            var opts = sp.GetRequiredService<IOptions<MongoOptions>>().Value;
             if (!string.IsNullOrWhiteSpace(opts.ConnectionString) && !string.IsNullOrWhiteSpace(opts.Database))
             {
                 var client = new MongoClient(opts.ConnectionString);
