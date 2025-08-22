@@ -232,10 +232,10 @@ internal sealed class RedisRepository<TEntity, TKey> :
     {
         switch (instruction.Name)
         {
-            case global::Sora.Data.DataInstructions.EnsureCreated:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
                 // Nothing to create for Redis; consider connection + ping
                 return Task.FromResult((TResult)(object)true);
-            case global::Sora.Data.DataInstructions.Clear:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
                 return (Task<TResult>)(object)DeleteAllAsync(ct);
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Redis adapter for {typeof(TEntity).Name}.");

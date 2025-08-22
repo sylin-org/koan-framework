@@ -1,4 +1,5 @@
 using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Vector.Filtering;
 
 namespace Sora.Data.Weaviate;
 

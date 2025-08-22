@@ -1,9 +1,11 @@
 ﻿// Boot Sora via DI; JSON adapter self-registers; DataService provides repos
+
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Core;
+using S0.ConsoleJsonRepo;
 using Sora.Data.Core;
+using Sora.Data.Core.Model;
 using Sora.Data.Json;
-using Sora.Domain;
+
 var services = new ServiceCollection();
 // If a path arg is supplied, direct JSON data there; helps tests use isolated temp dirs
 if (args is { Length: > 0 } && !string.IsNullOrWhiteSpace(args[0]))
@@ -28,7 +30,10 @@ Console.WriteLine($"Batch: +{result.Added} ~{result.Updated} -{result.Deleted}")
 var all = await Todo.All();
 Console.WriteLine($"Total items: {all.Count}");
 
-public class Todo : Entity<Todo>
+namespace S0.ConsoleJsonRepo
 {
-    public string Title { get; set; } = string.Empty;
+    public class Todo : Entity<Todo>
+    {
+        public string Title { get; set; } = string.Empty;
+    }
 }

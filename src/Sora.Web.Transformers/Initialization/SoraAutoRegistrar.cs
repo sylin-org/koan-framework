@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core.Extensions;
 
 namespace Sora.Web.Transformers.Initialization;
 

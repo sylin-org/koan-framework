@@ -9,6 +9,8 @@ using Sora.Web.Filtering;
 using Sora.Web.Hooks;
 using Sora.Web.Infrastructure;
 using System.Net.Mime;
+using Sora.Data.Core.Model;
+using Sora.Web.Attributes;
 
 namespace Sora.Web.Controllers;
 
@@ -483,7 +485,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         }
 
         // Implement via domain static helper
-        var removed = await Sora.Domain.Entity<TEntity, TKey>.Remove(q!, ct);
+        var removed = await Entity<TEntity, TKey>.Remove(q!, ct);
         return Ok(new { deleted = removed });
     }
 
@@ -492,7 +494,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> DeleteAll(CancellationToken ct)
     {
         if (!CanRemove) return Forbid();
-        var deleted = await Sora.Domain.Entity<TEntity, TKey>.RemoveAll(ct);
+        var deleted = await Entity<TEntity, TKey>.RemoveAll(ct);
         return Ok(new { deleted });
     }
 

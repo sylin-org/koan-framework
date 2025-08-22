@@ -1,8 +1,6 @@
 using Sora.Core.Observability;
 using Sora.Data.Core;
-using Sora.Web;
-using Sora.Web.Swagger;
-using Sora.Data.Vector;
+using Sora.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,7 +32,7 @@ builder.Services.AddOptions<Sora.Scheduling.SchedulingOptions>()
 
 // Discover and register all IAnimeProvider implementations in this assembly
 var providerInterface = typeof(S5.Recs.Providers.IAnimeProvider);
-var providerTypes = typeof(Program).Assembly.GetTypes()
+var providerTypes = typeof(S5.Recs.Program).Assembly.GetTypes()
     .Where(t => providerInterface.IsAssignableFrom(t) && t is { IsAbstract: false, IsInterface: false });
 foreach (var t in providerTypes)
 {
@@ -49,4 +47,7 @@ var app = builder.Build();
 
 app.Run();
 
-public partial class Program { }
+namespace S5.Recs
+{
+    public partial class Program { }
+}

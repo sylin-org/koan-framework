@@ -1,4 +1,4 @@
-namespace Sora.Data.Relational;
+namespace Sora.Data.Abstractions.Instructions;
 
 /// <summary>
 /// Instruction name constants for relational adapters.

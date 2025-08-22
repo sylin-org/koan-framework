@@ -1,6 +1,8 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 
+namespace S2.Api.IntegrationTests;
+
 public sealed class MongoFixture : Xunit.IAsyncLifetime
 {
     private TestcontainersContainer? _container;

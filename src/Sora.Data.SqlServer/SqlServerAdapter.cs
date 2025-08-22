@@ -719,7 +719,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case global::Sora.Data.Relational.RelationalInstructions.SchemaValidate:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaValidate:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new MsSqlDdlExecutor(conn);
@@ -727,8 +727,8 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
                     return (TResult)report;
                 }
-            case global::Sora.Data.DataInstructions.EnsureCreated:
-            case global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaEnsureCreated:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new MsSqlDdlExecutor(conn);
@@ -742,14 +742,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     }, ct);
                     object ok = true; return (TResult)ok;
                 }
-            case global::Sora.Data.DataInstructions.Clear:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
                 {
                     // Do not create the table when clearing; only delete if it exists so we honor DDL policy.
                     if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
                     var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
                     object res = del; return (TResult)res;
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SchemaClear:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaClear:
                 {
                     // Schema clear should remove the table when present, but must not create it.
                     if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
@@ -758,21 +758,21 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     try { var key = $"{conn.DataSource}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
                     object res = affected; return (TResult)res;
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlScalar:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     var result = await conn.ExecuteScalarAsync(sql, p);
                     return CastScalar<TResult>(result);
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SqlNonQuery:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlNonQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     var affected = await conn.ExecuteAsync(sql, p);
                     object res = affected; return (TResult)res;
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SqlQuery:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);

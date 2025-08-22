@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core.Extensions;
 using Sora.Web.Swagger.Infrastructure;
 using Swashbuckle.AspNetCore.Swagger;
 

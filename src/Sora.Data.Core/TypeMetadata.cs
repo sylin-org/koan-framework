@@ -1,8 +1,8 @@
-using Sora.Data.Abstractions.Annotations;
 using System.Collections.Concurrent;
 using System.Reflection;
+using Sora.Data.Abstractions;
 
-namespace Sora.Data.Core.Metadata;
+namespace Sora.Data.Core;
 
 public static class AggregateMetadata
 {

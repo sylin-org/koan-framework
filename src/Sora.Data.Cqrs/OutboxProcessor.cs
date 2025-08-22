@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using Sora.Data.Core;
 
 namespace Sora.Data.Cqrs;
 
@@ -70,7 +71,7 @@ internal sealed class OutboxProcessor : BackgroundService
             return;
         }
         // Resolve key type via AggregateMetadata
-        var idSpec = Sora.Data.Core.Metadata.AggregateMetadata.GetIdSpec(entityType);
+        var idSpec = AggregateMetadata.GetIdSpec(entityType);
         if (idSpec is null)
         {
             _logger.LogDebug("No Identifier on entity '{Type}', skipping", entry.EntityType);

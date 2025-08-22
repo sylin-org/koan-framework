@@ -847,7 +847,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case global::Sora.Data.Relational.RelationalInstructions.SchemaValidate:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaValidate:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
@@ -925,7 +925,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     report["State"] = state;
                     return (TResult)report;
                 }
-            case global::Sora.Data.DataInstructions.EnsureCreated:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
                 {
                     if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any())
                     {
@@ -953,7 +953,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     }
                     object d_ok = true; return (TResult)d_ok;
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SchemaClear:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaClear:
                 {
                     // Remove the table if present; do not create it.
                     var drop = $"DROP TABLE IF EXISTS \"{TableName}\";";
@@ -962,12 +962,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     try { var cacheKey = ($"{conn.DataSource}/{conn.Database}::{TableName}"); _healthyCache.TryRemove(cacheKey, out _); } catch { }
                     object res = 0; return (TResult)res;
                 }
-            case global::Sora.Data.DataInstructions.Clear:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
                 EnsureOrchestrated(conn);
                 var del = await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
                 object d_res = del;
                 return (TResult)d_res;
-            case global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaEnsureCreated:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new SqliteDdlExecutor(conn, TableName);
@@ -975,7 +975,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
                     object ok = true; return (TResult)ok;
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlScalar:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
@@ -992,7 +992,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         return CastScalar<TResult>(result);
                     }
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SqlNonQuery:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlNonQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     sql = MaybeRewriteInsertForProjection(sql);
@@ -1014,7 +1014,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         return (TResult)res;
                     }
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SqlQuery:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);

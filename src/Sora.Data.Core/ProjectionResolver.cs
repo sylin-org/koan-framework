@@ -1,4 +1,3 @@
-using Sora.Data.Core.Metadata;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
 

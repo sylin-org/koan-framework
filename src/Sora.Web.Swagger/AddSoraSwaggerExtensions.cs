@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Sora.Core;
+using Sora.Core.Extensions;
 using Sora.Web.Swagger.Infrastructure;
 using Swashbuckle.AspNetCore.Swagger;
 

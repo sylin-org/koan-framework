@@ -2,10 +2,10 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Vector.Abstractions;
-using Sora.Data.Core;
 using Xunit;
+
+namespace Sora.Data.Core.Tests;
 
 public class VectorResolutionTests
 {
@@ -44,10 +44,10 @@ public class VectorResolutionTests
         if (cfg != null) sc.AddSingleton<IConfiguration>(cfg);
         sc.AddSoraDataCore();
         sc.AddSingleton<IDataService, DataService>();
-    // Register vector factories: foo, bar, and json
+        // Register vector factories: foo, bar, and json
         sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
         sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
-    sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
+        sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
         return sc.BuildServiceProvider();
     }
 

@@ -1,10 +1,8 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Data.Core.Metadata;
-using System.Collections.Concurrent;
 
-namespace Sora.Data.Core.Configuration;
+namespace Sora.Data.Core;
 
 internal static class AggregateConfigs
 {

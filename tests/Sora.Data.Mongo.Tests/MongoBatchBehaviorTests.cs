@@ -31,7 +31,7 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
         return sc.BuildServiceProvider();
     }
 
-    public record Todo([property: Sora.Data.Abstractions.Annotations.Identifier] string Id, string Title) : IEntity<string>;
+    public record Todo([property: Identifier] string Id, string Title) : IEntity<string>;
 
     [Fact]
     public async Task RequireAtomic_true_on_standalone_should_throw_NotSupported()

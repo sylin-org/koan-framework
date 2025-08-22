@@ -1,4 +1,4 @@
-namespace Sora.Web.Controllers;
+namespace Sora.Web.Attributes;
 
 /// <summary>
 /// Controls default data behaviors for an EntityController: pagination and limits.

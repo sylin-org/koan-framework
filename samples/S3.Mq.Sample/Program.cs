@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using S3.Mq.Sample;
 using Sora.Core;
 using Sora.Data.Core;
 using Sora.Messaging;
@@ -65,12 +66,15 @@ Console.WriteLine("Message sent. Listening... Press Ctrl+C to exit.");
 
 await Task.Delay(-1);
 
-public sealed class Hello { public string Name { get; init; } = string.Empty; }
-
-public sealed class UserRegistered
+namespace S3.Mq.Sample
 {
-    public string UserId { get; init; } = string.Empty;
-    public string Email { get; init; } = string.Empty;
-}
+    public sealed class Hello { public string Name { get; init; } = string.Empty; }
+
+    public sealed class UserRegistered
+    {
+        public string UserId { get; init; } = string.Empty;
+        public string Email { get; init; } = string.Empty;
+    }
 
 // ...existing code...
+}

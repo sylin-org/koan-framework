@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 
-namespace Sora.Data.Abstractions;
+namespace Sora.Data.Abstractions.Vector.Filtering;
 
 // Thin expression -> AST translator for a safe subset.
 public static class VectorFilterExpression

@@ -138,7 +138,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         // Prefer adapter fast-path when available
         if (_inner is IInstructionExecutor<TEntity> exec)
         {
-            try { return await exec.ExecuteAsync<int>(new Instruction(global::Sora.Data.DataInstructions.Clear), ct); }
+            try { return await exec.ExecuteAsync<int>(new Instruction(global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear), ct); }
             catch (NotSupportedException) { /* fall back */ }
         }
         // Fallback: enumerate ids then delete

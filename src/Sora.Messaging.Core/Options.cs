@@ -2,8 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Sora.Messaging.Core.Infrastructure;
 using System.Collections.Concurrent;
+using Sora.Messaging.Infrastructure;
 
 namespace Sora.Messaging;
 

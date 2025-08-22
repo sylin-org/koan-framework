@@ -1,4 +1,4 @@
-namespace Sora.Data.Abstractions.Annotations;
+namespace Sora.Data.Abstractions;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
 public sealed class DataAdapterAttribute : Attribute

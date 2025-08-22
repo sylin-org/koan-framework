@@ -1,9 +1,10 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Sora.Messaging;
 using Xunit;
 
-namespace Sora.Messaging.RabbitMq.IntegrationTests;
+namespace Sora.Mq.RabbitMq.IntegrationTests;
 
 public class InboxDiscoveryPolicyTests
 {

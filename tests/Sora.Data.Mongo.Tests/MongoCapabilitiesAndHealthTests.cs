@@ -13,7 +13,7 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
     private readonly MongoAutoFixture _fx;
     public MongoCapabilitiesAndHealthTests(MongoAutoFixture fx) => _fx = fx;
 
-    public record Todo([property: Sora.Data.Abstractions.Annotations.Identifier] string Id, string Title) : IEntity<string>;
+    public record Todo([property: Identifier] string Id, string Title) : IEntity<string>;
 
     private IServiceProvider BuildServices(string? connString = null)
     {

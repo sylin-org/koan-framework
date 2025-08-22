@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using FluentAssertions;
@@ -9,8 +10,9 @@ using Sora.Core;
 using Sora.Data.Core;
 using Sora.Messaging;
 using Sora.Testing;
-using System.Text.Json;
 using Xunit;
+
+namespace Sora.Mq.RabbitMq.IntegrationTests;
 
 public class DiscoveryCachingTests : IAsyncLifetime
 {

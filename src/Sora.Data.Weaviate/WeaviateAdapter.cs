@@ -233,10 +233,10 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         switch (instruction.Name)
         {
-            case Sora.Data.Vector.VectorInstructions.IndexEnsureCreated:
+            case VectorInstructions.IndexEnsureCreated:
                 await EnsureSchemaAsync(ct);
                 return (TResult)(object)true;
-            case Sora.Data.Vector.VectorInstructions.IndexStats:
+            case VectorInstructions.IndexStats:
                 {
                     await EnsureSchemaAsync(ct);
                     var cls = ClassName;
@@ -255,7 +255,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                     object result = new { count };
                     return (TResult)result;
                 }
-            case Sora.Data.Vector.VectorInstructions.IndexClear:
+            case VectorInstructions.IndexClear:
                 {
                     var allow = instruction.Options != null && instruction.Options.TryGetValue("AllowDestructive", out var v) && v is bool b && b;
                     if (!allow) throw new NotSupportedException("Destructive clear requires Options.AllowDestructive=true.");

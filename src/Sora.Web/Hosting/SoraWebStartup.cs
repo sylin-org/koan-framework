@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Web.Infrastructure;
 using System.Diagnostics;
+using Sora.Web.Options;
 
 namespace Sora.Web.Hosting;
 
@@ -19,7 +20,7 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
         return app =>
         {
             var opts = options.Value;
-            var pipeline = pipelineOptions.Value ?? new Sora.Web.WebPipelineOptions();
+            var pipeline = pipelineOptions.Value ?? new WebPipelineOptions();
             const string appliedKey = "Sora.Web.Applied";
             if (!app.Properties.ContainsKey(appliedKey))
             {

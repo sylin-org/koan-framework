@@ -15,7 +15,7 @@ public class MongoInstructionTests : IClassFixture<MongoAutoFixture>
 
     public class Todo : IEntity<string>
     {
-        [Sora.Data.Abstractions.Annotations.Identifier]
+        [Identifier]
         public string Id { get; set; } = default!;
         public string Title { get; set; } = string.Empty;
     }

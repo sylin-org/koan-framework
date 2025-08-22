@@ -1,4 +1,4 @@
-namespace Sora.Web;
+namespace Sora.Web.Options;
 
 /// <summary>
 /// Options that control Sora's default web pipeline wiring.

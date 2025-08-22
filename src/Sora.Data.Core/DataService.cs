@@ -109,7 +109,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         // 3) Fallback: entity data provider (useful when provider names align, e.g., "weaviate")
         if (string.IsNullOrWhiteSpace(desired))
         {
-            desired = Configuration.AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
+            desired = AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
         }
 
     Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? repo = null;

@@ -5,8 +5,9 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
+using Sora.Web.Options;
 
-namespace Sora.Web;
+namespace Sora.Web.Extensions;
 
 
 

@@ -9,6 +9,8 @@ using Sora.Messaging;
 using Sora.Testing;
 using Xunit;
 
+namespace Sora.Mq.RabbitMq.IntegrationTests;
+
 public class BasicRabbitMqTests : IAsyncLifetime
 {
     private TestcontainersContainer? _rabbit;

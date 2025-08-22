@@ -1,4 +1,4 @@
-namespace Sora.Data.Abstractions;
+namespace Sora.Data.Abstractions.Vector.Filtering;
 
 // Typed, provider-agnostic vector filter AST root with terse builders.
 public abstract record VectorFilter

@@ -2,5 +2,5 @@ namespace Sora.Data.Core;
 
 public static class TestHooks
 {
-    public static void ResetDataConfigs() => Configuration.AggregateConfigs.Reset();
+    public static void ResetDataConfigs() => AggregateConfigs.Reset();
 }

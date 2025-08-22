@@ -269,7 +269,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
     {
         switch (instruction.Name)
         {
-            case global::Sora.Data.DataInstructions.EnsureCreated:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
                 {
                     Directory.CreateDirectory(_baseDir);
                     // Touch the set file to ensure presence
@@ -279,7 +279,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
                     object result = true;
                     return Task.FromResult((TResult)result);
                 }
-            case global::Sora.Data.DataInstructions.Clear:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
                 {
                     var (name, store) = ResolveNameAndStore();
                     var deleted = store.Count;

@@ -2,7 +2,6 @@ using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
-using Sora.Data.Core.Metadata;
 using System.Reflection;
 
 namespace Sora.Data.Relational.Schema;

@@ -18,7 +18,7 @@ public class SqliteCountAndSelectTests
     // Ensure cross-test isolation: reset core caches so each ServiceProvider is honored
     private static void ResetCoreCaches()
     {
-        Sora.Data.Core.Configuration.AggregateConfigs.Reset();
+        AggregateConfigs.Reset();
     }
 
     private static IServiceProvider BuildServices(string file, int defaultPageSize = 5)

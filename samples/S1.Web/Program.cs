@@ -1,6 +1,6 @@
-using Sora.Data.Core;
-using Sora.Web;
 using System.Threading.RateLimiting;
+using Sora.Data.Core;
+using Sora.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,4 +55,7 @@ if (app.Environment.IsDevelopment())
 app.Run();
 
 // Make Program public and partial to help WebApplicationFactory discovery in tests
-public partial class Program { }
+namespace S1.Web
+{
+    public partial class Program { }
+}

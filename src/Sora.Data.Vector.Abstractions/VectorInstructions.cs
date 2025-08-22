@@ -1,4 +1,4 @@
-namespace Sora.Data.Vector;
+namespace Sora.Data.Vector.Abstractions;
 
 /// <summary>
 /// Instruction name constants for vector adapters.

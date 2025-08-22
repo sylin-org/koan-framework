@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sora.Core;
+using Sora.Messaging.Infrastructure;
 
 namespace Sora.Messaging;
 
@@ -41,10 +42,10 @@ public sealed class InboxDiscoveryPolicy : IInboxDiscoveryPolicy
     public bool ShouldDiscover(IServiceProvider sp)
     {
         var cfg = (IConfiguration)sp.GetService(typeof(IConfiguration))!;
-        var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
+        var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
         if (!string.IsNullOrWhiteSpace(endpoint)) return false; // explicit config wins
 
-        var enabledSetting = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery.Enabled, null);
+        var enabledSetting = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Discovery.Enabled, null);
         if (!string.IsNullOrWhiteSpace(enabledSetting))
             return string.Equals(enabledSetting, "true", StringComparison.OrdinalIgnoreCase);
 
@@ -56,9 +57,9 @@ public sealed class InboxDiscoveryPolicy : IInboxDiscoveryPolicy
     public string Reason(IServiceProvider sp)
     {
         var cfg = (IConfiguration)sp.GetService(typeof(IConfiguration))!;
-        var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
+        var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
         if (!string.IsNullOrWhiteSpace(endpoint)) return "explicit-endpoint";
-        var enabledSetting = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Discovery.Enabled, null);
+        var enabledSetting = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Discovery.Enabled, null);
         if (!string.IsNullOrWhiteSpace(enabledSetting))
             return string.Equals(enabledSetting, "true", StringComparison.OrdinalIgnoreCase) ? "enabled-explicit" : "disabled-explicit";
         var isProd = IsProduction();

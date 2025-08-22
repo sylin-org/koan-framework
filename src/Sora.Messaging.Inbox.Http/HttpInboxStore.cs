@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sora.Core;
 using System.Net.Http.Json;
+using Sora.Messaging.Infrastructure;
 
 namespace Sora.Messaging.Inbox.Http;
 
@@ -15,12 +16,12 @@ public sealed class HttpInboxStore : IInboxStore
     {
         try
         {
-            var route = Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Routes.GetStatus.Replace("{key}", Uri.EscapeDataString(key));
+            var route = Constants.Configuration.Inbox.Routes.GetStatus.Replace("{key}", Uri.EscapeDataString(key));
             var resp = await _http.GetAsync(route, ct).ConfigureAwait(false);
             if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return false;
             resp.EnsureSuccessStatusCode();
             var doc = await resp.Content.ReadFromJsonAsync<InboxStatus>(cancellationToken: ct).ConfigureAwait(false);
-            return string.Equals(doc?.Status, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Values.Processed, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(doc?.Status, Constants.Configuration.Inbox.Values.Processed, StringComparison.OrdinalIgnoreCase);
         }
         catch
         {
@@ -30,7 +31,7 @@ public sealed class HttpInboxStore : IInboxStore
 
     public async Task MarkProcessedAsync(string key, CancellationToken ct)
     {
-        var resp = await _http.PostAsJsonAsync(Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Routes.MarkProcessed, new { key }, ct).ConfigureAwait(false);
+        var resp = await _http.PostAsJsonAsync(Constants.Configuration.Inbox.Routes.MarkProcessed, new { key }, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
     }
 
@@ -47,10 +48,10 @@ public static class HttpInboxServiceCollectionExtensions
         services.AddHttpClient<HttpInboxStore>((sp, http) =>
         {
             var cfg = sp.GetRequiredService<IConfiguration>();
-            var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
+            var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
             if (string.IsNullOrWhiteSpace(endpoint)) return; // nothing to do
             http.BaseAddress = new Uri(endpoint);
-            http.Timeout = TimeSpan.FromSeconds(Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Values.DefaultTimeoutSeconds);
+            http.Timeout = TimeSpan.FromSeconds(Constants.Configuration.Inbox.Values.DefaultTimeoutSeconds);
         });
 
         // Auto-discovery initializer: if Endpoint is present, register HttpInboxStore
@@ -65,7 +66,7 @@ public static class HttpInboxServiceCollectionExtensions
             // Check config dynamically at startup; if endpoint set, wire IInboxStore
             var sp = services.BuildServiceProvider();
             var cfg = sp.GetService<IConfiguration>();
-            var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
+            var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
             if (!string.IsNullOrWhiteSpace(endpoint))
             {
                 // Explicit endpoint takes precedence over any discovered/default inbox store

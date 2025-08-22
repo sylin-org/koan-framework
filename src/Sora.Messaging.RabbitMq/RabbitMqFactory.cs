@@ -10,6 +10,7 @@ using Sora.Messaging.Inbox.Http;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using Constants = Sora.Messaging.Infrastructure.Constants;
 
 namespace Sora.Messaging.RabbitMq;
 
@@ -736,7 +737,7 @@ internal sealed class RabbitMqInboxDiscoveryInitializer : ISoraInitializer
         using var sp = services.BuildServiceProvider();
         var policy = sp.GetService(typeof(IInboxDiscoveryPolicy)) as IInboxDiscoveryPolicy;
         var cfg = sp.GetService(typeof(IConfiguration)) as IConfiguration;
-        var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Sora.Messaging.Core.Infrastructure.Constants.Configuration.Inbox.Endpoint, null);
+        var endpoint = Sora.Core.Configuration.Read<string?>(cfg, Constants.Configuration.Inbox.Endpoint, null);
         if (!string.IsNullOrWhiteSpace(endpoint)) return; // explicit wins
         if (policy is null || !policy.ShouldDiscover(sp))
         {

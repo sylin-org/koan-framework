@@ -1,4 +1,4 @@
-namespace Sora.Core.Primitives;
+namespace Sora.Core;
 
 /// <summary>
 /// Minimal helpers for creating compact string identifiers.

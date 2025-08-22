@@ -1,6 +1,6 @@
 using Sora.Core.Observability;
 using Sora.Data.Core;
-using Sora.Web;
+using Sora.Web.Extensions;
 using Sora.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,4 +22,7 @@ var app = builder.Build();
 app.UseSoraSwagger();
 app.Run();
 
-public partial class Program { }
+namespace S2.Api
+{
+    public partial class Program { }
+}

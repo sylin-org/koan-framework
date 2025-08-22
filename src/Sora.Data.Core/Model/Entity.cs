@@ -1,10 +1,9 @@
 using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
 
-namespace Sora.Domain;
+namespace Sora.Data.Core.Model;
 
 // Domain-centric CRTP base with static conveniences, independent of data namespace
-public abstract partial class Entity<TEntity, TKey> : IEntity<TKey>
+public abstract class Entity<TEntity, TKey> : IEntity<TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -53,7 +52,7 @@ public abstract partial class Entity<TEntity, TKey> : IEntity<TKey>
     public static async Task<int> Remove(string query, CancellationToken ct = default)
     {
         var items = await Sora.Data.Core.Data<TEntity, TKey>.Query(query, ct);
-        var ids = System.Linq.Enumerable.Select(items, e => e.Id);
+        var ids = System.Linq.Enumerable.Select<TEntity, TKey>(items, e => e.Id);
         return await Sora.Data.Core.Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
     }
 

@@ -96,7 +96,7 @@ public static class AggregateExtensions
         if (model is null) throw new System.ArgumentNullException(nameof(model));
         var type = model.GetType();
         var (aggType, keyType) = ResolveAggregateContract(type);
-        var id = Sora.Data.Core.Metadata.AggregateMetadata.GetIdValue(model) ?? throw new System.InvalidOperationException("Model has no identifier");
+        var id = AggregateMetadata.GetIdValue(model) ?? throw new System.InvalidOperationException("Model has no identifier");
         var data = DataService();
         var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
         var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;

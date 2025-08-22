@@ -642,7 +642,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         await conn.OpenAsync(ct);
         switch (instruction.Name)
         {
-            case global::Sora.Data.Relational.RelationalInstructions.SchemaValidate:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaValidate:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new PgDdlExecutor(conn, _options.SearchPath);
@@ -650,8 +650,8 @@ internal sealed class PostgresRepository<TEntity, TKey> :
                     var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
                     return (TResult)report;
                 }
-            case global::Sora.Data.DataInstructions.EnsureCreated:
-            case global::Sora.Data.Relational.RelationalInstructions.SchemaEnsureCreated:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.EnsureCreated:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaEnsureCreated:
                 {
                     var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                     var ddl = new PgDdlExecutor(conn, _options.SearchPath);
@@ -664,29 +664,29 @@ internal sealed class PostgresRepository<TEntity, TKey> :
                     }, ct);
                     object ok = true; return (TResult)ok;
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SchemaClear:
-            case global::Sora.Data.DataInstructions.Clear:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SchemaClear:
+            case global::Sora.Data.Abstractions.Instructions.DataInstructions.Clear:
                 {
                     EnsureTable(conn);
                     var del = await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}");
                     try { var key = $"{conn.Host}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
                     object res = del; return (TResult)res;
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SqlScalar:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlScalar:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     var result = await conn.ExecuteScalarAsync(sql, p);
                     return CastScalar<TResult>(result);
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SqlNonQuery:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlNonQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);
                     var affected = await conn.ExecuteAsync(sql, p);
                     object res = affected; return (TResult)res;
                 }
-            case global::Sora.Data.Relational.RelationalInstructions.SqlQuery:
+            case global::Sora.Data.Abstractions.Instructions.RelationalInstructions.SqlQuery:
                 {
                     var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
                     var p = GetParamsFromInstruction(instruction);

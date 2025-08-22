@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Instructions;
 
 namespace Sora.Data.Core;
 
@@ -163,7 +164,7 @@ internal sealed class SoraRuntime : ISoraRuntime
                         if (execIface is not null)
                         {
                             var instrType = typeof(Sora.Data.Abstractions.Instructions.Instruction);
-                            var instruction = Activator.CreateInstance(instrType, Relational.RelationalInstructions.SchemaEnsureCreated, null, null, null);
+                            var instruction = Activator.CreateInstance(instrType, RelationalInstructions.SchemaEnsureCreated, null, null, null);
                             var method = execIface.GetMethod("ExecuteAsync");
                             var task = (System.Threading.Tasks.Task)method!.Invoke(repo, new object?[] { instruction!, default(System.Threading.CancellationToken) })!;
                             task.GetAwaiter().GetResult();
