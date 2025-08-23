@@ -68,6 +68,10 @@
     async getTags(sort){
       const T = (window.S5Const?.ENDPOINTS?.TAGS) || '/api/tags';
       return (await get(`${T}${qsp({ sort })}`)) || [];
+    },
+    async getGenres(sort){
+      const G = (window.S5Const?.ENDPOINTS?.GENRES) || '/api/genres';
+      return (await get(`${G}${qsp({ sort })}`)) || [];
     }
   };
 

@@ -10,6 +10,7 @@ internal static class Constants
     public const string Library = "api/library";
     public const string Anime = "api/anime";
     public const string Tags = "api/tags";
+    public const string Genres = "api/genres";
     }
 
     internal static class Paths

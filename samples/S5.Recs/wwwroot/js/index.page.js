@@ -38,6 +38,8 @@
     initUsers();
     loadRecsSettings();
     if(window.S5Tags && S5Tags.loadTags){ S5Tags.loadTags().then(()=> S5Tags.renderPreferredChips && S5Tags.renderPreferredChips()); }
+  // Populate Genre filter from backend catalog
+  populateGenres();
   setupEventListeners();
   });
 
@@ -119,6 +121,25 @@
     Dom.on('forYouBtn', 'click', () => setViewSource('forYou'));
     Dom.on('freeBrowsingBtn', 'click', () => setViewSource('freeBrowsing'));
     Dom.on('libraryBtn', 'click', () => setViewSource('library'));
+  }
+
+  async function populateGenres(){
+    try{
+      if(!(window.S5Api && typeof window.S5Api.getGenres==='function')) return;
+      const items = await window.S5Api.getGenres('alpha'); // [{ genre, count }]
+      const sel = document.getElementById('genreFilter'); if(!sel) return;
+      const cur = sel.value || '';
+      // Reset to default option
+      sel.innerHTML = '<option value="">All Genres</option>';
+      (items||[]).forEach(it=>{
+        if(!it || !it.genre) return;
+        const opt = document.createElement('option');
+        opt.value = it.genre; opt.textContent = it.genre;
+        sel.appendChild(opt);
+      });
+      // restore selection if still present
+      if(cur && Array.from(sel.options).some(o=>o.value===cur)) sel.value = cur;
+    }catch{}
   }
 
   // Menus

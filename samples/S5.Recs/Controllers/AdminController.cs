@@ -125,6 +125,13 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         return Ok(new { updated = n });
     }
 
+    [HttpPost("genres/rebuild")] // on-demand genre catalog rebuild
+    public async Task<IActionResult> RebuildGenres([FromServices] S5.Recs.Services.ISeedService seeder, CancellationToken ct)
+    {
+        var n = await seeder.RebuildGenreCatalogAsync(ct);
+        return Ok(new { updated = n });
+    }
+
     [HttpPost("seed/vectors")] // vector-only upsert from existing docs
     public IActionResult StartVectorOnly([FromBody] VectorOnlyRequest req)
     {

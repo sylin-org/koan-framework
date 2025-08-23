@@ -93,11 +93,13 @@ window.S5Const = Object.freeze({
     ANIME_BASE: '/api/anime',
     ANIME_BY_IDS: '/api/anime/by-ids',
   TAGS: '/api/tags',
+  GENRES: '/api/genres',
   // Admin endpoints
   ADMIN_STATS: '/admin/stats',
   ADMIN_SEED_START: '/admin/seed/start',
   ADMIN_SEED_VECTORS: '/admin/seed/vectors',
   ADMIN_TAGS_REBUILD: '/admin/tags/rebuild',
+  ADMIN_GENRES_REBUILD: '/admin/genres/rebuild',
   ADMIN_TAGS_CENSOR: '/admin/tags/censor',
   ADMIN_TAGS_CENSOR_ADD: '/admin/tags/censor/add',
   ADMIN_TAGS_CENSOR_REMOVE: '/admin/tags/censor/remove',

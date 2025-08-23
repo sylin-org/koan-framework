@@ -159,6 +159,24 @@ internal sealed class SeedService : ISeedService
         }
     }
 
+    public async Task<int> RebuildGenreCatalogAsync(CancellationToken ct)
+    {
+        try
+        {
+            var docs = await AnimeDoc.All(ct);
+            var counts = CountGenres(ExtractGenres(docs));
+            var genreDocs = BuildGenreDocs(counts);
+            var n = await GenreStatDoc.UpsertMany(genreDocs, ct);
+            _logger?.LogInformation("Rebuilt genre catalog: {Count} genres", counts.Count);
+            return n;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Rebuild genre catalog failed: {Message}", ex.Message);
+            return 0;
+        }
+    }
+
     private Task<List<Anime>> FetchFromProviderAsync(string source, int limit, CancellationToken ct)
     {
         if (_providers.TryGetValue(source, out var provider))
@@ -228,6 +246,15 @@ internal sealed class SeedService : ISeedService
         }
     }
 
+    private static IEnumerable<string> ExtractGenres(IEnumerable<AnimeDoc> items)
+    {
+        foreach (var a in items)
+        {
+            if (a.Genres is { Length: > 0 })
+                foreach (var g in a.Genres) if (!string.IsNullOrWhiteSpace(g)) yield return g.Trim();
+        }
+    }
+
     private static Dictionary<string, int> CountTags(IEnumerable<string> tags)
     {
         var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -247,6 +274,28 @@ internal sealed class SeedService : ISeedService
         foreach (var kv in counts)
         {
             yield return new TagStatDoc { Id = kv.Key.ToLowerInvariant(), Tag = kv.Key, AnimeCount = kv.Value, UpdatedAt = now };
+        }
+    }
+
+    private static Dictionary<string, int> CountGenres(IEnumerable<string> genres)
+    {
+        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var g in genres)
+        {
+            var key = g.Trim();
+            if (key.Length == 0) continue;
+            map.TryGetValue(key, out var c);
+            map[key] = c + 1;
+        }
+        return map;
+    }
+
+    private static IEnumerable<GenreStatDoc> BuildGenreDocs(Dictionary<string, int> counts)
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var kv in counts)
+        {
+            yield return new GenreStatDoc { Id = kv.Key.ToLowerInvariant(), Genre = kv.Key, AnimeCount = kv.Value, UpdatedAt = now };
         }
     }
 

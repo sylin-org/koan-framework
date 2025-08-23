@@ -9,4 +9,5 @@ public interface ISeedService
     Task<object> GetStatusAsync(string jobId, CancellationToken ct);
     Task<(int anime, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct);
     Task<int> RebuildTagCatalogAsync(CancellationToken ct);
+    Task<int> RebuildGenreCatalogAsync(CancellationToken ct);
 }

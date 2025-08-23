@@ -12,6 +12,7 @@
   async function seedDataFrom(source, limit, overwrite){ try{ window.showToast && showToast('Seeding…'); const u=(window.S5Const?.ENDPOINTS?.ADMIN_SEED_START)||'/admin/seed/start'; const r = await fetch(u, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source, limit, overwrite }) }); window.showToast && showToast(r.ok?'Seed started':'Seed failed', r.ok?'success':'error'); if(r.ok){ const d=(window.S5Const?.ADMIN?.QUICK_ACTIONS_REFRESH_DELAY_MS)??1500; setTimeout(()=>{ loadStats(); loadTagsCount(); }, d); }}catch{ window.showToast && showToast('Seed error','error'); } }
   async function vectorUpsert(){ try{ window.showToast && showToast('Vector upsert…'); const lim=(window.S5Const?.ADMIN?.VECTOR_UPSERT_LIMIT)??1000; const u=(window.S5Const?.ENDPOINTS?.ADMIN_SEED_VECTORS)||'/admin/seed/vectors'; const r = await fetch(u, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ limit: lim }) }); window.showToast && showToast(r.ok?'Vectors job started':'Vectors job failed', r.ok?'success':'error'); }catch{ window.showToast && showToast('Vectors error','error'); } }
   async function rebuildTags(){ try{ window.showToast && showToast('Rebuilding tags…'); const u=(window.S5Const?.ENDPOINTS?.ADMIN_TAGS_REBUILD)||'/admin/tags/rebuild'; const r = await fetch(u, { method:'POST' }); window.showToast && showToast(r.ok?'Tags rebuilt':'Tags rebuild failed', r.ok?'success':'error'); if(r.ok){ loadTagsCount(); }}catch{ window.showToast && showToast('Tags error','error'); } }
+  async function rebuildGenres(){ try{ window.showToast && showToast('Rebuilding genres…'); const u=(window.S5Const?.ENDPOINTS?.ADMIN_GENRES_REBUILD)||'/admin/genres/rebuild'; const r = await fetch(u, { method:'POST' }); window.showToast && showToast(r.ok?'Genres rebuilt':'Genres rebuild failed', r.ok?'success':'error'); }catch{ window.showToast && showToast('Genres error','error'); } }
 
   // Settings
   function bindSettings(){
@@ -137,6 +138,6 @@
     const limEl = document.getElementById('importLimit');
     if(limEl && !limEl.value){ limEl.value = String(defLim); }
     // Expose actions for buttons with inline handlers
-  Object.assign(window, { seedDataFromForm, vectorUpsert, rebuildTags, loadAggregates, loadObservability });
+  Object.assign(window, { seedDataFromForm, vectorUpsert, rebuildTags, rebuildGenres, loadAggregates, loadObservability });
   });
 })();
