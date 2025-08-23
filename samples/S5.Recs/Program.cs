@@ -19,6 +19,7 @@ Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.R
 // Local services
 builder.Services.AddSingleton<S5.Recs.Services.ISeedService, S5.Recs.Services.SeedService>();
 builder.Services.AddSingleton<S5.Recs.Services.IRecsService, S5.Recs.Services.RecsService>();
+builder.Services.AddSingleton<S5.Recs.Services.IRecommendationSettingsProvider, S5.Recs.Services.RecommendationSettingsProvider>();
 // Scheduling: tasks are auto-discovered and registered by Sora.Scheduling's auto-registrar
 // Scheduling defaults for S5: don't gate readiness; ensure bootstrap runs on startup
 builder.Services.AddOptions<Sora.Scheduling.SchedulingOptions>()

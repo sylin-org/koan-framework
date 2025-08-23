@@ -42,18 +42,6 @@
               <i class="fas fa-compass mr-2"></i>
               Discover
             </a>
-            <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('trending')">
-              <i class="fas fa-fire mr-2"></i>
-              Trending
-            </a>
-            <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('top-rated')">
-              <i class="fas fa-star mr-2"></i>
-              Top Rated
-            </a>
-            <a href="#" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all" onclick="setActiveTab('watchlist')">
-              <i class="fas fa-bookmark mr-2"></i>
-              Watchlist
-            </a>
           </div>
         </div>
 
@@ -70,74 +58,44 @@
             <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
           </div>
                     
-          <!-- User Profile Selector -->
+          <!-- User Selector (from backend) -->
           <div class="relative">
             <button id="profileButton" onclick="toggleProfileMenu()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 rounded-lg px-3 py-2 transition-colors">
               <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center" id="currentProfileAvatar">
-                <span class="text-white font-bold text-sm" id="currentProfileInitial">C</span>
+                <span class="text-white font-bold text-sm" id="currentProfileInitial">U</span>
               </div>
-              <span class="text-white text-sm" id="currentProfileName">Casual Viewer</span>
+              <span class="text-white text-sm" id="currentProfileName">Loading…</span>
               <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
             </button>
-                        
-            <!-- Profile Dropdown -->
             <div id="profileMenu" class="absolute right-0 mt-2 w-64 bg-slate-800 rounded-lg shadow-xl border border-slate-700 hidden z-50">
               <div class="p-4 border-b border-slate-700">
-                <h3 class="text-white font-semibold mb-2">Switch Profile</h3>
-                <p class="text-gray-400 text-sm">Choose your viewing style for personalized recommendations</p>
+                <h3 class="text-white font-semibold mb-2">Select user</h3>
+                <p class="text-gray-400 text-sm">Users are backed by Mongo</p>
               </div>
-              <div class="p-2">
-                <div class="profile-option flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors" onclick="selectProfile('casual')">
-                  <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                    <span class="text-white font-bold">C</span>
-                  </div>
-                  <div>
-                    <div class="text-white font-medium">Casual Viewer</div>
-                    <div class="text-gray-400 text-sm">Light entertainment, comedy</div>
-                  </div>
-                </div>
-                <div class="profile-option flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors" onclick="selectProfile('serious')">
-                  <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-                    <span class="text-white font-bold">S</span>
-                  </div>
-                  <div>
-                    <div class="text-white font-medium">Serious Critic</div>
-                    <div class="text-gray-400 text-sm">Complex narratives, depth</div>
-                  </div>
-                </div>
-                <div class="profile-option flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors" onclick="selectProfile('otaku')">
-                  <div class="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
-                    <span class="text-white font-bold">O</span>
-                  </div>
-                  <div>
-                    <div class="text-white font-medium">Dedicated Otaku</div>
-                    <div class="text-gray-400 text-sm">All genres, deep culture</div>
-                  </div>
-                </div>
-              </div>
+              <div id="userList" class="p-2 max-h-72 overflow-y-auto"></div>
               <div class="p-2 border-t border-slate-700">
-                <button onclick="createNewProfile()" class="w-full text-left p-3 hover:bg-slate-700 rounded-lg transition-colors text-purple-400 hover:text-purple-300">
-                  <i class="fas fa-plus mr-2"></i>
-                  Create New Profile
-                </button>
+                <div class="flex space-x-2">
+                  <input id="newUserName" placeholder="New user name" class="flex-1 bg-slate-800 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                  <button onclick="createNewUser()" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg">Add</button>
+                </div>
               </div>
             </div>
           </div>
                     
           <!-- Admin Menu -->
           <div class="relative">
-            <button onclick="toggleAdminMenu()" class="p-2 text-gray-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+            <button id="adminButton" onclick="toggleAdminMenu()" class="p-2 text-gray-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
               <i class="fas fa-cog"></i>
             </button>
                         
             <!-- Admin Dropdown -->
             <div id="adminMenu" class="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 hidden z-50">
               <div class="p-2">
-                <a href="admin.html" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                <a href="dashboard.html" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
                   <i class="fas fa-shield-alt mr-2"></i>
-                  Admin Panel
+                  Dashboard
                 </a>
-                <a href="status.html" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                <a href="dashboard.html#status" class="block px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
                   <i class="fas fa-chart-line mr-2"></i>
                   System Status
                 </a>
@@ -210,6 +168,44 @@
             <i class="fas fa-list"></i>
           </button>
         </div>
+
+        <!-- Source Toggle: For You vs Library -->
+        <div class="flex bg-slate-800 rounded-lg p-1">
+          <button id="forYouBtn" class="px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors">For You</button>
+          <button id="libraryBtn" class="px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors">Library</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Try Something New (chips row) -->
+    <div id="tryNewRow" class="mb-4">
+      <div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+        <div class="text-sm text-gray-300 md:min-w-[160px]">
+          <span class="font-medium">Try Something New</span>
+          <span class="text-gray-500"> · up to <span id="preferMaxTags">3</span> tags</span>
+        </div>
+        <div id="preferChips" class="flex flex-wrap gap-2"></div>
+        <button id="expandTagsBtn" class="text-xs px-2 py-1 bg-slate-800 text-gray-300 rounded border border-slate-700 hover:bg-slate-700">Expand</button>
+        <div class="flex items-center gap-2 md:ml-auto">
+          <span class="text-gray-400 text-sm">Boost</span>
+          <input id="preferWeight" type="range" min="0" max="1.0" step="0.05" value="0.2" class="w-40" oninput="document.getElementById('preferWeightVal').textContent=this.value; onPreferredChanged()" />
+          <span id="preferWeightVal" class="text-purple-300 text-sm">0.2</span>
+          <button id="clearPreferBtn" class="text-sm text-gray-400 hover:text-white" onclick="clearPreferred()">Clear</button>
+        </div>
+      </div>
+      <!-- Expanded Tag Panel -->
+      <div id="allTagsPanel" class="mt-3 hidden bg-slate-900 border border-slate-800 rounded-lg p-4">
+        <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-300">Browse tags</span>
+            <select id="tagsSort" class="bg-slate-800 text-white rounded px-2 py-1 text-sm border border-slate-700">
+              <option value="popularity">Popularity</option>
+              <option value="alpha">Alphabetical</option>
+            </select>
+          </div>
+          <input id="tagsSearch" placeholder="Search tags..." class="bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 text-sm w-full md:w-64" />
+        </div>
+        <div id="allTagsList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto"></div>
       </div>
     </div>
 
@@ -258,6 +254,7 @@
             <option value="long">Long (26+ eps)</option>
           </select>
         </div>
+        
       </div>
             
       <div class="flex justify-end space-x-3 mt-6">
@@ -290,6 +287,14 @@
       <p class="text-gray-400">Try adjusting your filters or search terms</p>
     </div>
   </main>
+
+  <!-- Toasts -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-[100] space-y-2"></div>
+
+  <!-- More button -->
+  <div class="flex justify-center my-8">
+    <button id="moreBtn" class="hidden px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg" onclick="loadMore()">More</button>
+  </div>
 
   <!-- Anime Detail Modal -->
   <div id="animeModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden overflow-y-auto">
@@ -371,12 +376,38 @@
   </div>
 
   <script>
-    // Global state
-    let currentProfile = 'casual';
+  // Toasts
+  function showToast(message, type = 'info'){
+    const cont = document.getElementById('toastContainer');
+    if(!cont) return;
+    const el = document.createElement('div');
+    const color = type==='success' ? 'bg-green-600' : type==='error' ? 'bg-red-600' : 'bg-slate-700';
+    el.className = `${color} text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in`;
+    el.innerHTML = `<span>${message}</span>`;
+    cont.appendChild(el);
+    setTimeout(()=>{ el.classList.add('opacity-0'); el.classList.add('transition-opacity'); el.classList.add('duration-300'); }, 2200);
+    setTimeout(()=>{ el.remove(); }, 2600);
+  }
+
+  // Global state
+  let currentUserId = null;
     let currentTab = 'discover';
     let animeData = [];
     let filteredData = [];
     let currentFilters = {};
+  let currentView = 'forYou'; // 'forYou' | 'library'
+  let currentLayout = 'grid'; // 'grid' | 'list'
+  // Try-something-new selections
+  let selectedPreferredTags = [];
+  // Tags catalog fetched from backend with counts
+  let preferTagsCatalog = [];
+  let allTags = [];
+  // Library cache keyed by animeId: { favorite, watched, dropped, rating, updatedAt }
+  let libraryByAnimeId = {};
+  // Paging
+  const PAGE_SIZE = 24;
+  let currentRecsTopK = PAGE_SIZE;
+  let currentLibraryPage = 1;
 
     // Profile configurations
     const profiles = {
@@ -408,8 +439,12 @@
 
     // Initialize
     document.addEventListener('DOMContentLoaded', function() {
-      selectProfile('casual');
-      loadAnimeData();
+      console.debug('[init] DOM ready');
+      initUsers();
+      loadRecsSettings();
+  // Load tags then render chips
+  loadTags().then(()=> renderPreferredChips());
+      // Defer initial content load until a user is selected
       setupEventListeners();
     });
 
@@ -419,21 +454,53 @@
       document.getElementById('sortBy').addEventListener('change', applySortAndFilters);
       document.getElementById('gridViewBtn').addEventListener('click', () => setViewMode('grid'));
       document.getElementById('listViewBtn').addEventListener('click', () => setViewMode('list'));
+      // Chips click handler (event delegation)
+      const chips = document.getElementById('preferChips');
+      if(chips){
+        chips.addEventListener('click', (e)=>{
+          const btn = e.target.closest('[data-tag]');
+          if(!btn) return;
+          const tag = btn.getAttribute('data-tag');
+          togglePreferredTag(tag);
+        });
+      }
+      // Expand/collapse tags panel
+      document.getElementById('expandTagsBtn').addEventListener('click', () => {
+        const p = document.getElementById('allTagsPanel');
+        const open = p.classList.toggle('hidden');
+        document.getElementById('expandTagsBtn').textContent = open ? 'Expand' : 'Collapse';
+        if(!open){ renderAllTags(); }
+      });
+      document.getElementById('tagsSort').addEventListener('change', renderAllTags);
+      document.getElementById('tagsSearch').addEventListener('input', renderAllTags);
+      document.getElementById('allTagsList').addEventListener('click', (e)=>{
+        const btn = e.target.closest('[data-tag]');
+        if(!btn) return;
+        const tag = btn.getAttribute('data-tag');
+        togglePreferredTag(tag);
+        renderAllTags();
+      });
             
       // Filter event listeners
       ['genreFilter', 'ratingFilter', 'yearFilter', 'episodeFilter'].forEach(id => {
         document.getElementById(id).addEventListener('change', applyFilters);
       });
             
-      // Close dropdowns when clicking outside
+      // Close dropdowns when clicking outside (but not when interacting within)
       document.addEventListener('click', function(e) {
-        if (!e.target.closest('#profileButton')) {
+        const profileClickedInside = e.target.closest('#profileMenu') || e.target.closest('#profileButton');
+        if (!profileClickedInside) {
           document.getElementById('profileMenu').classList.add('hidden');
         }
-        if (!e.target.closest('[onclick*="toggleAdminMenu"]')) {
+        const adminClickedInside = e.target.closest('#adminMenu') || e.target.closest('#adminButton');
+        if (!adminClickedInside) {
           document.getElementById('adminMenu').classList.add('hidden');
         }
       });
+
+      // View source toggle
+      document.getElementById('forYouBtn').addEventListener('click', () => setViewSource('forYou'));
+      document.getElementById('libraryBtn').addEventListener('click', () => setViewSource('library'));
     }
 
     // Profile management
@@ -484,10 +551,87 @@
       const menu = document.getElementById('adminMenu');
       menu.classList.toggle('hidden');
     }
+    // Users
+    async function initUsers(attempt=0){
+      try{
+        console.debug('[users] fetching list (attempt', attempt, ')');
+        const r = await fetch('/api/users');
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        const users = await r.json();
+        renderUsers(users);
+        const def = users.find(u=>u.isDefault) || users[0];
+        if(def){ selectUser(def.id, def.name); }
+        else { console.debug('[users] empty user list'); }
+      }catch(e){
+        console.debug('[users] fetch failed', e?.message||e);
+        if(attempt < 5){ setTimeout(()=>initUsers(attempt+1), Math.min(8000, (attempt+1)*1000)); }
+      }
+    }
 
-    function createNewProfile() {
-      alert('Profile creation feature coming soon!');
+    function renderUsers(users){
+      const list = document.getElementById('userList');
+      if(!list) return;
+      list.innerHTML = users.map(u=>`<div class="flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer" onclick="selectUser(${JSON.stringify(u.id)}, ${JSON.stringify(u.name||'User')})">
+        <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">${(u.name||'U').slice(0,1).toUpperCase()}</div>
+        <div class="flex-1"><div class="text-white">${u.name}</div>${u.isDefault?'<div class="text-xs text-gray-400">Default</div>':''}</div>
+      </div>`).join('');
+    }
+
+    async function createNewUser(){
+      const input = document.getElementById('newUserName');
+      const name = input?.value.trim();
+      if(!name) return;
+      const r = await fetch('/api/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
+      if(r.ok){ await initUsers(); input.value=''; }
+    }
+
+    function selectUser(id, name){
+  console.debug('[users] select', id, name);
+      currentUserId = id;
+      document.getElementById('currentProfileInitial').textContent = (name||'U').slice(0,1).toUpperCase();
+      document.getElementById('currentProfileName').textContent = name || 'User';
+      document.getElementById('bannerProfileInitial').textContent = (name||'U').slice(0,1).toUpperCase();
+      document.getElementById('bannerProfileName').textContent = `Welcome back, ${name||'User'}!`;
+      loadUserStats();
       document.getElementById('profileMenu').classList.add('hidden');
+      // Reset paging and load content
+      currentRecsTopK = PAGE_SIZE; currentLibraryPage = 1; hideMoreButton();
+      // Prime library cache, then load content
+      refreshLibraryState().finally(() => loadAnimeData());
+    }
+
+    async function loadUserStats(){
+      if(!currentUserId) return;
+      try{ const r = await fetch(`/api/users/${currentUserId}/stats`); if(r.ok){ const s = await r.json(); document.getElementById('profileStats').textContent = `${s.favorites} favorites • ${s.watched} watched`; } }
+      catch{}
+    }
+
+    // Admin recs settings
+    let recsSettings = { preferTagsWeight: 0.2, maxPreferredTags: 3, diversityWeight: 0.1 };
+    async function loadRecsSettings(){
+      try{ const r = await fetch('/admin/recs-settings'); if(r.ok){ const s = await r.json(); if(s){
+        recsSettings = { preferTagsWeight: s.preferTagsWeight ?? 0.2, maxPreferredTags: s.maxPreferredTags ?? 3, diversityWeight: s.diversityWeight ?? 0.1 };
+        const w = document.getElementById('preferWeight'); if(w){ w.value = recsSettings.preferTagsWeight; }
+        const v = document.getElementById('preferWeightVal'); if(v){ v.textContent = String(recsSettings.preferTagsWeight); }
+        renderPreferredChips();
+      }}}
+      catch{}
+    }
+
+    // Library/cache helpers
+    async function refreshLibraryState(){
+      if(!currentUserId){ libraryByAnimeId = {}; return; }
+      try{
+        // Pull a generous page to cover typical libraries
+        const r = await fetch(`/api/library/${currentUserId}?sort=updatedAt&page=1&pageSize=500`);
+        if(!r.ok){ libraryByAnimeId = {}; return; }
+        const data = await r.json();
+        const map = {};
+        for(const e of (data.items||[])){
+          map[e.animeId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt };
+        }
+        libraryByAnimeId = map;
+      }catch{ libraryByAnimeId = {}; }
     }
 
     // Navigation
@@ -516,31 +660,37 @@
     }
 
     // Data loading
-    async function loadAnimeData() {
+  async function loadAnimeData() {
+      console.debug('[recs] load start. user=', currentUserId, 'topK=', currentRecsTopK);
+      if(!currentUserId){ displayAnime([]); return; }
       try {
-        const recs = await fetchRecommendations({ text: '', topK: 24 });
+    const recs = await fetchRecommendations({ text: '', topK: currentRecsTopK });
         animeData = recs;
         filteredData = [...animeData];
         displayAnime(filteredData);
+    // Show More if we have at least a full page of results
+    const show = filteredData.length >= currentRecsTopK;
+    const btn = document.getElementById('moreBtn'); if(btn){ if(show) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
+    console.debug('[recs] load ok. items=', filteredData.length);
       } catch (error) {
         console.error('Error loading anime data:', error);
-        animeData = generateSampleData();
-        filteredData = [...animeData];
-        displayAnime(filteredData);
+  // Show empty state instead of demo data
+  displayAnime([]);
+    const btn = document.getElementById('moreBtn'); if(btn) btn.classList.add('hidden');
       }
     }
 
-    async function fetchRecommendations({ text, topK = 24 }) {
-      const profile = profiles[currentProfile] || null;
+  async function fetchRecommendations({ text, topK = PAGE_SIZE }) {
+    const weight = parseFloat(document.getElementById('preferWeight')?.value || '0.2');
       const genre = document.getElementById('genreFilter')?.value || '';
       const episodeSel = document.getElementById('episodeFilter')?.value || '';
       const episodesMax = episodeSel === 'short' ? 12 : (episodeSel === 'medium' ? 25 : (episodeSel === 'long' ? 9999 : null));
       const genres = [];
       if (genre) genres.push(genre);
-      if (!genre && profile?.preferences?.length) {
-        // Lightly bias with profile preferences when no explicit genre selected
-        genres.push(...profile.preferences.slice(0, 3));
-      }
+    // Use chips-selected tags
+    let preferTags = [...selectedPreferredTags];
+    const max = recsSettings?.maxPreferredTags ?? 3;
+    if(preferTags.length > max) preferTags = preferTags.slice(0, max);
 
       const body = {
         text: text || '',
@@ -548,15 +698,19 @@
         filters: {
           genres: genres,
           episodesMax: episodesMax,
-          spoilerSafe: true
+          spoilerSafe: true,
+      preferTags: preferTags,
+      preferWeight: weight
         },
-        userId: currentProfile // map profile id to userId for personalization if available
+        userId: currentUserId
       };
+    console.debug('[recs] query', { text, topK, preferTags, weight, genres, episodesMax });
       const r = await fetch('/api/recs/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await r.json();
-      const items = Array.isArray(data.items) ? data.items : [];
-      // Map API results to UI-friendly list
-      return items.map(it => mapItemToAnime(it));
+  const data = await r.json();
+  const items = Array.isArray(data.items) ? data.items : [];
+  // Map API results to UI-friendly list and exclude items already in user's library
+  const mapped = items.map(it => mapItemToAnime(it));
+  return mapped.filter(a => !libraryByAnimeId[a.id]);
     }
 
     function mapItemToAnime(item) {
@@ -570,6 +724,7 @@
         coverUrl: a.coverUrl || '',
         backdrop: a.bannerUrl || a.coverUrl || '',
         rating: computedRating,
+        popularity: a.popularity || 0,
         episodes: a.episodes || 0,
         type: a.type || 'TV',
         year: a.year || '',
@@ -581,56 +736,9 @@
       };
     }
 
-    function generateSampleData() {
-      return [
-        {
-          id: 1,
-          title: "Attack on Titan",
-          englishTitle: "Shingeki no Kyojin",
-          poster: "https://via.placeholder.com/300x400/1a1a1a/ffffff?text=Attack+on+Titan",
-          backdrop: "https://via.placeholder.com/1200x400/2a2a2a/ffffff?text=Attack+on+Titan",
-          rating: 9.0,
-          episodes: 25,
-          type: "TV",
-          year: 2013,
-          status: "Completed",
-          studio: "Mappa",
-          source: "Manga",
-          synopsis: "Humanity fights for survival against giant humanoid Titans that have brought humanity to the brink of extinction.",
-          genres: ["Action", "Drama", "Fantasy", "Military"]
-        },
-        {
-          id: 2,
-          title: "Your Name",
-          englishTitle: "Kimi no Na wa",
-          poster: "https://via.placeholder.com/300x400/1a1a1a/ffffff?text=Your+Name",
-          backdrop: "https://via.placeholder.com/1200x400/2a2a2a/ffffff?text=Your+Name",
-          rating: 8.4,
-          episodes: 1,
-          type: "Movie",
-          year: 2016,
-          status: "Completed",
-          studio: "CoMix Wave Films",
-          source: "Original",
-          synopsis: "Two teenagers share a profound, magical connection upon discovering they are swapping bodies.",
-          genres: ["Romance", "Supernatural", "Drama"]
-        }
-        // Add more sample data as needed
-      ];
-    }
+  // Demo data removed: prefer backend results always
 
-    function filterByProfile() {
-      const profile = profiles[currentProfile];
-      if (!profile) return;
-            
-      // Filter anime based on profile preferences
-      const profileFiltered = animeData.filter(anime => 
-        anime.genres.some(genre => profile.preferences.includes(genre))
-      );
-            
-      filteredData = profileFiltered.length > 0 ? profileFiltered : animeData.slice(0, 12);
-      displayAnime(filteredData);
-    }
+  function filterByProfile() { displayAnime(animeData); }
 
     function loadContentForTab(tab) {
       switch(tab) {
@@ -641,9 +749,8 @@
           filteredData = animeData.sort((a, b) => b.rating - a.rating).slice(0, 24);
           break;
         case 'watchlist':
-          // Load user's watchlist
-          filteredData = []; // Empty for demo
-          break;
+          loadWatchlist();
+          return;
         default:
           filterByProfile();
           return;
@@ -653,6 +760,19 @@
     }
 
     // Display functions
+    function renderHoverRatePicker(animeId){
+      let picker = '<div class="relative group">';
+      picker += '<button class="bg-black bg-opacity-60 hover:bg-opacity-80 text-yellow-300 text-xs px-2 py-1 rounded-full" title="Rate">★</button>';
+      // Vertical stack to avoid horizontal clipping within the image container
+      picker += '<div class="hidden group-hover:flex flex-col absolute right-0 top-full mt-1 bg-black bg-opacity-80 backdrop-blur rounded shadow-lg p-1 z-10">';
+      for(let n=1; n<=5; n++){
+        picker += '<button class="text-xs text-gray-300 hover:text-yellow-300 bg-black bg-opacity-30 hover:bg-opacity-50 rounded px-2 py-1 text-right" '
+               + 'onclick="event.stopPropagation(); openQuickRate(' + __q(animeId) + ', ' + n + ')"'
+               + '>' + n + '</button>';
+      }
+      picker += '</div></div>';
+      return picker;
+    }
     function displayAnime(animeList) {
       const grid = document.getElementById('animeGrid');
       const loading = document.getElementById('loadingState');
@@ -670,22 +790,40 @@
       grid.classList.remove('hidden');
       empty.classList.add('hidden');
       document.getElementById('resultCount').textContent = `Showing ${animeList.length} results`;
-            
-      grid.innerHTML = animeList.map(anime => createAnimeCard(anime)).join('');
+      // Switch layout
+      if(currentLayout === 'list'){
+        grid.className = 'space-y-4';
+        grid.innerHTML = animeList.map(anime => createAnimeListItem(anime)).join('');
+      } else {
+        grid.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6';
+        grid.innerHTML = animeList.map(anime => createAnimeCard(anime)).join('');
+      }
     }
 
-    function createAnimeCard(anime) {
+  // Safely quote JS string arguments for inline handlers
+  function __q(v){ return `'${String(v ?? '').replace(/'/g, "\\'")}'`; }
+
+  function createAnimeCard(anime) {
+  const entry = libraryByAnimeId?.[anime.id] || null;
+  const isFav = !!(entry && entry.favorite);
+  const isWatched = !!(entry && entry.watched);
+  const isDropped = !!(entry && entry.dropped);
+  const userRating = entry && typeof entry.rating === 'number' ? entry.rating : null;
       return `
-        <div class="bg-slate-900 rounded-xl overflow-hidden hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer group" onclick="openAnimeModal(${anime.id})">
+  <div data-anime-id="${anime.id}" class="bg-slate-900 rounded-xl overflow-hidden hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer group" onclick="openDetails(${__q(anime.id)})">
           <div class="aspect-[3/4] relative overflow-hidden">
             <img src="${anime.coverUrl || '/images/missing-cover.svg'}" alt="${anime.title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" onerror="this.onerror=null;this.src='/images/missing-cover.svg'">
             <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div class="absolute top-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded-full">
-              ★ ${anime.rating.toFixed(1)}
+            <div class="absolute top-2 right-2 flex gap-2">
+        ${renderHoverRatePicker(anime.id)}
+      <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isWatched ? 'text-green-300 ring-1 ring-green-400/40 bg-green-900/40' : 'text-green-300'} text-xs px-2 py-1 rounded-full" title="Mark Watched" onclick="event.stopPropagation(); markWatched(${__q(anime.id)})"><i class='fas fa-eye'></i></button>
+      <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isDropped ? 'text-red-300 ring-1 ring-red-400/40 bg-red-900/40' : 'text-red-300'} text-xs px-2 py-1 rounded-full" title="Mark Dropped" onclick="event.stopPropagation(); markDropped(${__q(anime.id)})"><i class='fas fa-times'></i></button>
+      <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isFav ? 'text-pink-300 ring-1 ring-pink-400/40 bg-pink-900/40' : 'text-pink-300'} text-xs px-2 py-1 rounded-full" title="Favorite" onclick="event.stopPropagation(); toggleFavorite(${__q(anime.id)})">♥</button>
             </div>
             <div class="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div class="text-white text-sm font-medium mb-1">${anime.title}</div>
               <div class="text-gray-300 text-xs">${anime.episodes} eps • ${anime.year}</div>
+      ${userRating ? `<div class="mt-1 text-xs text-yellow-300">Your rating: ${userRating}★</div>` : ''}
             </div>
           </div>
           <div class="p-4">
@@ -704,20 +842,67 @@
       `;
     }
 
+  function createAnimeListItem(anime){
+    const entry = libraryByAnimeId?.[anime.id] || null;
+    const isFav = !!(entry && entry.favorite);
+    const isWatched = !!(entry && entry.watched);
+    const isDropped = !!(entry && entry.dropped);
+    const userRating = entry && typeof entry.rating === 'number' ? entry.rating : null;
+    return `
+      <div class="bg-slate-900 rounded-xl overflow-hidden hover:shadow-xl transition-all p-3 flex gap-4 items-stretch cursor-pointer" onclick="openDetails(${__q(anime.id)})">
+        <img src="${anime.coverUrl || '/images/missing-cover.svg'}" alt="${anime.title}" class="w-24 h-32 object-cover rounded-md" onerror="this.onerror=null;this.src='/images/missing-cover.svg'">
+        <div class="flex-1 grid grid-cols-12 gap-3">
+          <div class="col-span-12 md:col-span-9">
+            <div class="flex items-start justify-between gap-3">
+              <h3 class="font-semibold text-white text-base line-clamp-2">${anime.title}</h3>
+              <div class="text-xs text-gray-400 whitespace-nowrap">${anime.year} · ${anime.type}</div>
+            </div>
+            <div class="mt-1 text-xs text-gray-300 line-clamp-2">${anime.synopsis || ''}</div>
+            <div class="flex flex-wrap gap-1 mt-2">
+              ${anime.genres.slice(0,4).map(g=>`<span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">${g}</span>`).join('')}
+            </div>
+            ${userRating ? `<div class="mt-1 text-xs text-yellow-300">Your rating: ${userRating}★</div>` : ''}
+          </div>
+          <div class="col-span-12 md:col-span-3 flex md:flex-col gap-2 md:items-end items-start justify-end">
+            ${renderHoverRatePicker(anime.id)}
+            <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isWatched ? 'text-green-300 ring-1 ring-green-400/40 bg-green-900/40' : 'text-green-300'} text-xs px-2 py-1 rounded-full" title="Mark Watched" onclick="event.stopPropagation(); markWatched(${__q(anime.id)})"><i class='fas fa-eye'></i></button>
+            <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isDropped ? 'text-red-300 ring-1 ring-red-400/40 bg-red-900/40' : 'text-red-300'} text-xs px-2 py-1 rounded-full" title="Mark Dropped" onclick="event.stopPropagation(); markDropped(${__q(anime.id)})"><i class='fas fa-times'></i></button>
+            <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isFav ? 'text-pink-300 ring-1 ring-pink-400/40 bg-pink-900/40' : 'text-pink-300'} text-xs px-2 py-1 rounded-full" title="Favorite" onclick="event.stopPropagation(); toggleFavorite(${__q(anime.id)})">♥</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
     // Search and filtering
-    async function handleGlobalSearch(event) {
+  async function handleGlobalSearch(event) {
+  console.debug('[search] query=', event.target.value);
       const query = event.target.value;
-      if (!query || query.trim().length === 0) {
-        loadContentForTab(currentTab);
+  if (!query || query.trim().length === 0) {
+    if(currentView==='forYou'){ currentRecsTopK = PAGE_SIZE; }
+    const btn = document.getElementById('moreBtn'); if(btn) btn.classList.add('hidden');
+    loadContentForTab(currentTab);
         return;
       }
+      // In Library view, search locally
+      if (currentView === 'library') {
+        const q = query.trim().toLowerCase();
+        const filtered = animeData.filter(a => a.title.toLowerCase().includes(q) || (a.genres||[]).some(g => (g||'').toLowerCase().includes(q)));
+        filteredData = filtered;
+        displayAnime(filteredData);
+        return;
+      }
+      // In For You view, query backend
       try {
-        const recs = await fetchRecommendations({ text: query, topK: 24 });
+  currentRecsTopK = PAGE_SIZE;
+        const recs = await fetchRecommendations({ text: query, topK: currentRecsTopK });
         animeData = recs;
         filteredData = [...animeData];
         displayAnime(filteredData);
+        const btn = document.getElementById('moreBtn'); if(btn){ if(filteredData.length >= currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
       } catch (e) {
         console.error('Search failed', e);
+        const btn = document.getElementById('moreBtn'); if(btn) btn.classList.add('hidden');
       }
     }
 
@@ -761,27 +946,27 @@
       applySortAndFilters();
     }
 
-    function applySortAndFilters() {
+  function applySortAndFilters() {
       const sortBy = document.getElementById('sortBy').value;
             
-      let sorted = [...filteredData];
+    let sorted = [...filteredData];
             
       switch(sortBy) {
         case 'rating':
           sorted.sort((a, b) => b.rating - a.rating);
           break;
         case 'recent':
-          sorted.sort((a, b) => b.year - a.year);
+      sorted.sort((a, b) => (parseInt(b.year||0) || 0) - (parseInt(a.year||0) || 0));
           break;
         case 'popular':
-          sorted.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      sorted.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
           break;
         default:
           // Keep current order for relevance
           break;
       }
-            
-      displayAnime(sorted);
+    filteredData = sorted;
+    displayAnime(filteredData);
     }
 
     function clearFilters() {
@@ -804,8 +989,24 @@
         listBtn.className = 'px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors';
         gridBtn.className = 'px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors';
       }
-            
-      // TODO: Implement list view layout
+      currentLayout = mode;
+      displayAnime(filteredData);
+    }
+
+    function setViewSource(mode) {
+      if (mode === currentView) return;
+      currentView = mode;
+      const fy = document.getElementById('forYouBtn');
+      const lb = document.getElementById('libraryBtn');
+      if (currentView === 'forYou') {
+        fy.className = 'px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors';
+        lb.className = 'px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors';
+        loadAnimeData();
+      } else {
+        lb.className = 'px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors';
+        fy.className = 'px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors';
+        loadLibrary();
+      }
     }
 
     // Modal functions
@@ -827,19 +1028,20 @@
             
       // Rating stars
       const ratingEl = document.getElementById('modalRating');
-      ratingEl.innerHTML = `
-        <span class="text-yellow-400">${'★'.repeat(Math.floor(anime.rating))}</span>
-        <span class="text-gray-500">${'☆'.repeat(5 - Math.floor(anime.rating))}</span>
-        <span class="ml-2 text-white font-semibold">${anime.rating.toFixed(1)}</span>
-      `;
+      const full = '★'.repeat(Math.floor(anime.rating));
+      const empty = '☆'.repeat(5 - Math.floor(anime.rating));
+      ratingEl.innerHTML = '<span class="text-yellow-400">'+full+'</span>'+
+        '<span class="text-gray-500">'+empty+'</span>'+
+        '<span class="ml-2 text-white font-semibold">'+anime.rating.toFixed(1)+'</span>';
             
       // Genres
       const genresEl = document.getElementById('modalGenres');
-      genresEl.innerHTML = anime.genres.map(genre => 
-        `<span class="bg-purple-600 text-white px-3 py-1 rounded-full text-sm">${genre}</span>`
-      ).join('');
+      genresEl.innerHTML = anime.genres.map(genre => {
+        return '<span class="bg-purple-600 text-white px-3 py-1 rounded-full text-sm">'+genre+'</span>';
+      }).join('');
             
-      document.getElementById('animeModal').classList.remove('hidden');
+  window.__currentAnimeId = anime.id;
+  document.getElementById('animeModal').classList.remove('hidden');
       document.body.style.overflow = 'hidden';
     }
 
@@ -848,12 +1050,115 @@
       document.body.style.overflow = 'auto';
     }
 
-    function addToWatchlist() {
-      alert('Added to watchlist! (Feature coming soon)');
+    function openDetails(animeId){
+      // Navigate to a dedicated details page
+      window.location.href = `details.html?id=${encodeURIComponent(animeId)}`;
     }
 
-    function openRatingModal() {
-      alert('Rating feature coming soon!');
+    async function openQuickRate(animeId, rating){
+      if(!currentUserId) return;
+  await fetch('/api/recs/rate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId: currentUserId, animeId, rating }) });
+  await refreshLibraryState();
+  loadUserStats();
+  // Re-render current view to reflect rating badge; if in For You, fade out that card
+  if(currentView==='library') { await loadLibrary(); } else { removeCardFromForYou(animeId); }
+  showToast(`Rated ${rating}★`, 'success');
+    }
+
+    async function addToWatchlist() {
+      if(!currentUserId || !window.__currentAnimeId) return;
+  await fetch(`/api/library/${currentUserId}/${window.__currentAnimeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ watched:true }) });
+  await refreshLibraryState();
+  loadUserStats();
+  if(currentView==='forYou'){ removeCardFromForYou(window.__currentAnimeId); } else { displayAnime(filteredData); }
+  showToast('Marked as watched', 'success');
+    }
+
+    async function openRatingModal() {
+      if(!currentUserId || !window.__currentAnimeId) return;
+  await fetch('/api/recs/rate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId: currentUserId, animeId: window.__currentAnimeId, rating: 5 }) });
+  await refreshLibraryState();
+  loadUserStats();
+      closeAnimeModal();
+  if(currentView==='forYou'){ removeCardFromForYou(window.__currentAnimeId); } else { displayAnime(filteredData); }
+  showToast('Rated 5★', 'success');
+    }
+
+    async function toggleFavorite(animeId){
+      if(!currentUserId) return;
+  await fetch(`/api/library/${currentUserId}/${animeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ favorite:true }) });
+  await refreshLibraryState();
+  loadUserStats();
+  if(currentView==='library') { await loadLibrary(); } else { removeCardFromForYou(animeId); }
+  showToast('Added to favorites', 'success');
+    }
+
+    async function markWatched(animeId){
+      if(!currentUserId) return;
+  await fetch(`/api/library/${currentUserId}/${animeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ watched:true }) });
+  await refreshLibraryState();
+  loadUserStats();
+  if(currentView==='library') { await loadLibrary(); } else { removeCardFromForYou(animeId); }
+  showToast('Marked as watched', 'success');
+    }
+
+    async function markDropped(animeId){
+      if(!currentUserId) return;
+  await fetch(`/api/library/${currentUserId}/${animeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dropped:true }) });
+  await refreshLibraryState();
+  loadUserStats();
+  if(currentView==='library') { await loadLibrary(); } else { removeCardFromForYou(animeId); }
+  showToast('Dropped from list', 'success');
+    }
+
+    async function loadWatchlist(){
+      if(!currentUserId){ displayAnime([]); return; }
+      try{
+        const r = await fetch(`/api/library/${currentUserId}?status=watched&sort=updatedAt&page=1&pageSize=100`);
+        const data = await r.json();
+        const ids = (data.items||[]).map(e=>e.animeId).filter(Boolean);
+        if(ids.length===0){ displayAnime([]); return; }
+        const ra = await fetch(`/api/anime/by-ids?ids=${encodeURIComponent(ids.join(','))}`);
+        const arr = await ra.json();
+        const mapped = arr.map(a => mapItemToAnime({ anime: a, score: a.popularity || 0.7 }));
+        displayAnime(mapped);
+      }catch(e){ console.warn('watchlist load failed', e); displayAnime([]); }
+    }
+
+    async function loadLibrary(){
+  console.debug('[library] load page', currentLibraryPage);
+      if(!currentUserId){ displayAnime([]); return; }
+      try{
+        const r = await fetch(`/api/library/${currentUserId}?sort=updatedAt&page=${currentLibraryPage}&pageSize=${PAGE_SIZE}`);
+        const data = await r.json();
+        const ids = (data.items||[]).map(e=>e.animeId).filter(Boolean);
+        if(currentLibraryPage===1 && ids.length===0){ displayAnime([]); const btn = document.getElementById('moreBtn'); if(btn) btn.classList.add('hidden'); return; }
+        const ra = await fetch(`/api/anime/by-ids?ids=${encodeURIComponent(ids.join(','))}`);
+        const arr = await ra.json();
+        const mapped = arr.map(a => mapItemToAnime({ anime: a, score: a.popularity || 0.7 }));
+        if(currentLibraryPage===1){ animeData = mapped; } else {
+          const seen = new Set(animeData.map(x=>x.id));
+          for(const m of mapped){ if(!seen.has(m.id)) animeData.push(m); }
+        }
+        filteredData = [...animeData];
+        // keep cache fresh for icon highlights
+        for(const e of (data.items||[])){
+          libraryByAnimeId[e.animeId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt };
+        }
+        displayAnime(filteredData);
+        const btn = document.getElementById('moreBtn'); if(btn){ if((data.items||[]).length === PAGE_SIZE) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
+      }catch(e){ console.warn('library load failed', e); displayAnime([]); }
+    }
+
+    // More helpers
+    async function loadMore(){
+      if(currentView==='forYou'){
+        currentRecsTopK += PAGE_SIZE;
+        await loadAnimeData();
+      } else {
+        currentLibraryPage += 1;
+        await loadLibrary();
+      }
     }
 
     // Close modal on backdrop click
@@ -862,6 +1167,97 @@
         closeAnimeModal();
       }
     });
+
+    // Fade-out removal helper (For You only)
+    function removeCardFromForYou(animeId){
+      if(currentView !== 'forYou') return;
+      // remove from data arrays
+      animeData = animeData.filter(a => a.id !== animeId);
+      filteredData = filteredData.filter(a => a.id !== animeId);
+      // animate card removal if present
+      const grid = document.getElementById('animeGrid');
+      const card = grid?.querySelector(`[data-anime-id="${CSS.escape(String(animeId))}"]`);
+      if(card){
+        card.style.transition = 'opacity 250ms ease-out, transform 250ms ease-out';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.96)';
+        setTimeout(()=>{ card.remove();
+          // update count and "More" visibility after removal
+          document.getElementById('resultCount').textContent = `Showing ${filteredData.length} results`;
+          const btn = document.getElementById('moreBtn'); if(btn){ if(filteredData.length >= currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
+        }, 260);
+      } else {
+        // fallback to re-render
+        displayAnime(filteredData);
+      }
+    }
+
+    // Preferred-tags helpers
+    async function loadTags(){
+      try{
+        const r = await fetch('/api/tags?sort=popularity');
+        const data = await r.json();
+        allTags = Array.isArray(data) ? data : [];
+        // Top 8 by popularity for chips row
+        preferTagsCatalog = allTags.slice(0,8).map(t=>t.tag);
+      }catch(e){
+        console.debug('[tags] fetch failed', e?.message||e);
+        // fallback: keep any prefilled list empty
+        preferTagsCatalog = [];
+        allTags = [];
+      }
+    }
+
+    function renderPreferredChips(){
+      const host = document.getElementById('preferChips'); if(!host) return;
+      const max = recsSettings?.maxPreferredTags ?? 3;
+      const maxEl = document.getElementById('preferMaxTags'); if(maxEl) maxEl.textContent = String(max);
+      host.innerHTML = preferTagsCatalog.map(tag => {
+        const sel = selectedPreferredTags.includes(tag);
+        const cls = sel ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700';
+        return `<button type="button" data-tag="${tag}" class="px-2 py-1 text-xs rounded-full border border-slate-700 ${cls}">${tag}</button>`;
+      }).join('');
+    }
+
+    function renderAllTags(){
+      const list = document.getElementById('allTagsList'); if(!list) return;
+      const q = (document.getElementById('tagsSearch')?.value || '').toLowerCase();
+      const sort = document.getElementById('tagsSort')?.value || 'popularity';
+      let items = [...allTags];
+      if(q){ items = items.filter(x => (x.tag||'').toLowerCase().includes(q)); }
+      if(sort === 'alpha'){ items.sort((a,b)=> (a.tag||'').localeCompare(b.tag||'')); }
+      else { items.sort((a,b)=> (b.count||0)-(a.count||0) || (a.tag||'').localeCompare(b.tag||'')); }
+      list.innerHTML = items.map(x=>{
+        const sel = selectedPreferredTags.includes(x.tag);
+        const cls = sel ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700';
+        return `<button type="button" data-tag="${x.tag}" class="px-2 py-1 text-xs rounded-full border border-slate-700 ${cls}">${x.tag} <span class="text-gray-400">(${x.count})</span></button>`;
+      }).join('');
+    }
+
+    function togglePreferredTag(tag){
+      const max = recsSettings?.maxPreferredTags ?? 3;
+      const idx = selectedPreferredTags.indexOf(tag);
+      if(idx >= 0){ selectedPreferredTags.splice(idx,1); }
+      else {
+        if(selectedPreferredTags.length >= max){ showToast(`Select up to ${max} tags`, 'info'); return; }
+        selectedPreferredTags.push(tag);
+      }
+      renderPreferredChips();
+      onPreferredChanged();
+    }
+
+    function clearPreferred(){
+      selectedPreferredTags = [];
+      renderPreferredChips();
+      onPreferredChanged();
+    }
+
+    function onPreferredChanged(){
+      if(currentView !== 'forYou') return;
+      currentRecsTopK = PAGE_SIZE;
+      const btn = document.getElementById('moreBtn'); if(btn) btn.classList.add('hidden');
+      loadAnimeData();
+    }
   </script>
 </body>
 </html>

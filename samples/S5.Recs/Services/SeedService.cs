@@ -48,6 +48,8 @@ internal sealed class SeedService : ISeedService
                 var embedded = await EmbedAndIndexAsync(data, ct);
                 _logger?.LogInformation("Seeding job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
                 var imported = await ImportMongoAsync(data, ct);
+                // Build tag catalog once docs are imported
+                try { await CatalogTagsAsync(data, ct); } catch (Exception ex) { _logger?.LogWarning(ex, "Tag cataloging failed: {Message}", ex.Message); }
                 _progress[jobId] = (data.Count, data.Count, embedded, imported, true, null);
                 _logger?.LogInformation("Seeding job {JobId}: imported {Imported} docs into Mongo", jobId, imported);
                 await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest.json"), JsonSerializer.Serialize(new { jobId, count = data.Count, at = DateTimeOffset.UtcNow }), ct);
@@ -139,6 +141,24 @@ internal sealed class SeedService : ISeedService
         return (animeCount, animeCount, vectorCount);
     }
 
+    public async Task<int> RebuildTagCatalogAsync(CancellationToken ct)
+    {
+        try
+        {
+            var docs = await AnimeDoc.All(ct);
+            var counts = CountTags(ExtractTags(docs));
+            var tagDocs = BuildTagDocs(counts);
+            var n = await TagStatDoc.UpsertMany(tagDocs, ct);
+            _logger?.LogInformation("Rebuilt tag catalog: {Count} tags", counts.Count);
+            return n;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Rebuild tag catalog failed: {Message}", ex.Message);
+            return 0;
+        }
+    }
+
     private Task<List<Anime>> FetchFromProviderAsync(string source, int limit, CancellationToken ct)
     {
         if (_providers.TryGetValue(source, out var provider))
@@ -184,6 +204,67 @@ internal sealed class SeedService : ISeedService
         {
             return 0;
         }
+    }
+
+    private static IEnumerable<string> ExtractTags(IEnumerable<Anime> items)
+    {
+        foreach (var a in items)
+        {
+            if (a.Genres is { Length: > 0 })
+                foreach (var g in a.Genres) if (!string.IsNullOrWhiteSpace(g)) yield return g.Trim();
+            if (a.Tags is { Length: > 0 })
+                foreach (var t in a.Tags) if (!string.IsNullOrWhiteSpace(t)) yield return t.Trim();
+        }
+    }
+
+    private static IEnumerable<string> ExtractTags(IEnumerable<AnimeDoc> items)
+    {
+        foreach (var a in items)
+        {
+            if (a.Genres is { Length: > 0 })
+                foreach (var g in a.Genres) if (!string.IsNullOrWhiteSpace(g)) yield return g.Trim();
+            if (a.Tags is { Length: > 0 })
+                foreach (var t in a.Tags) if (!string.IsNullOrWhiteSpace(t)) yield return t.Trim();
+        }
+    }
+
+    private static Dictionary<string, int> CountTags(IEnumerable<string> tags)
+    {
+        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in tags)
+        {
+            var key = t.Trim();
+            if (key.Length == 0) continue;
+            map.TryGetValue(key, out var c);
+            map[key] = c + 1;
+        }
+        return map;
+    }
+
+    private static IEnumerable<TagStatDoc> BuildTagDocs(Dictionary<string, int> counts)
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var kv in counts)
+        {
+            yield return new TagStatDoc { Id = kv.Key.ToLowerInvariant(), Tag = kv.Key, AnimeCount = kv.Value, UpdatedAt = now };
+        }
+    }
+
+    private async Task CatalogTagsAsync(List<Anime> items, CancellationToken ct)
+    {
+        var counts = CountTags(ExtractTags(items));
+        var docs = BuildTagDocs(counts);
+        await TagStatDoc.UpsertMany(docs, ct);
+        _logger?.LogInformation("Tag catalog updated with {Count} tags", counts.Count);
+    }
+
+    // Utility to rebuild catalog from the current AnimeDoc collection (not used in normal flow)
+    private static async Task CatalogTagsFromDocsAsync(CancellationToken ct)
+    {
+        var docs = await AnimeDoc.All(ct);
+        var counts = CountTags(ExtractTags(docs));
+        var tagDocs = BuildTagDocs(counts);
+        await TagStatDoc.UpsertMany(tagDocs, ct);
     }
 
     // (Removed) Mongo fetch helpers replaced by direct use of AnimeDoc.All(ct) for small collections

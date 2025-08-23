@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Sora Recs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script> tailwind.config = { theme: { extend: { colors: { slate: { 950: '#020617' } } } } };</script>
+</head>
+<body class="bg-slate-950 text-white font-sans">
+  <nav class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
+              <i class="fas fa-gauge text-white text-sm"></i>
+            </div>
+            <h1 class="text-xl font-bold bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent">Dashboard</h1>
+          </div>
+          <div class="hidden md:flex items-center space-x-8 ml-8">
+            <a href="#overview" class="text-white border-b-2 border-red-500 pb-1 px-1"><i class="fas fa-chart-pie mr-2"></i>Overview</a>
+            <a href="#data" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all"><i class="fas fa-database mr-2"></i>Data</a>
+            <a href="#status" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all"><i class="fas fa-heartbeat mr-2"></i>Status</a>
+            <a href="#settings" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all"><i class="fas fa-sliders-h mr-2"></i>Settings</a>
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <a href="index.html" class="text-gray-400 hover:text-white transition-colors"><i class="fas fa-arrow-left mr-2"></i>Back to Browse</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+  <!-- Overview -->
+  <section id="overview" class="space-y-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between"><div><p class="text-gray-400 text-sm">Total Anime</p><p class="text-3xl font-bold text-white mt-2" id="ov-anime">-</p></div><div class="bg-blue-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-film text-blue-500 text-xl"></i></div></div></div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between"><div><p class="text-gray-400 text-sm">Vectors</p><p class="text-3xl font-bold text-white mt-2" id="ov-vectors">-</p></div><div class="bg-yellow-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-brain text-yellow-500 text-xl"></i></div></div></div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between"><div><p class="text-gray-400 text-sm">Tag Catalog</p><p class="text-3xl font-bold text-white mt-2" id="ov-tags">-</p></div><div class="bg-purple-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-tags text-purple-500 text-xl"></i></div></div></div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between"><div><p class="text-gray-400 text-sm">Health</p><p class="text-3xl font-bold text-white mt-2" id="ov-health">-</p></div><div class="bg-green-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-heartbeat text-green-500 text-xl"></i></div></div></div>
+      </div>
+
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-6"><h3 class="text-lg font-semibold text-white">Quick Actions</h3>
+          <div class="flex gap-2">
+            <button onclick="seedData()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-seedling mr-2"></i>Seed Sample Data</button>
+            <button onclick="vectorUpsert()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-brain mr-2"></i>Vectors Only</button>
+            <button onclick="rebuildTags()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-tags mr-2"></i>Rebuild Tags</button>
+          </div>
+        </div>
+        <div id="activity" class="text-sm text-gray-400">Actions appear here.</div>
+      </div>
+    </section>
+
+  <!-- Data -->
+  <section id="data" class="space-y-8 mt-10">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+          <h3 class="text-lg font-semibold text-white mb-4">Import</h3>
+          <div class="flex items-end gap-3">
+            <label class="text-sm text-gray-400">Source
+              <select id="importSource" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700">
+                <option value="anilist">AniList</option>
+                <option value="local">Local JSON</option>
+              </select>
+            </label>
+            <label class="text-sm text-gray-400">Limit
+              <input id="importLimit" type="number" value="200" min="1" max="2000" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 w-28" />
+            </label>
+            <label class="text-sm text-gray-400">Overwrite
+              <input id="importOverwrite" type="checkbox" class="ml-2 align-middle" />
+            </label>
+            <button onclick="seedDataFromForm()" class="ml-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-play mr-2"></i>Start</button>
+          </div>
+        </div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+          <h3 class="text-lg font-semibold text-white mb-4">Vectors</h3>
+          <button onclick="vectorUpsert()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-brain mr-2"></i>Rebuild from Anime</button>
+        </div>
+      </div>
+    </section>
+
+  <!-- Status -->
+  <section id="status" class="space-y-8 mt-10">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between mb-4"><div class="flex items-center space-x-3"><div class="w-10 h-10 bg-blue-500 bg-opacity-20 rounded-lg flex items-center justify-center"><i class="fas fa-code text-blue-500"></i></div><h3 class="text-lg font-semibold text-white">API</h3></div><div class="w-3 h-3 bg-green-500 rounded-full" id="apiDot"></div></div><div class="text-sm text-gray-400">See /.well-known endpoints for detailed metrics.</div></div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between mb-4"><div class="flex items-center space-x-3"><div class="w-10 h-10 bg-purple-500 bg-opacity-20 rounded-lg flex items-center justify-center"><i class="fas fa-database text-purple-500"></i></div><h3 class="text-lg font-semibold text-white">Database</h3></div><div class="w-3 h-3 bg-green-500 rounded-full" id="dbDot"></div></div><div class="text-sm text-gray-400">Mongo connectivity status.</div></div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between mb-4"><div class="flex items-center space-x-3"><div class="w-10 h-10 bg-yellow-500 bg-opacity-20 rounded-lg flex items-center justify-center"><i class="fas fa-search text-yellow-500"></i></div><h3 class="text-lg font-semibold text-white">Vector</h3></div><div class="w-3 h-3 bg-green-500 rounded-full" id="vecDot"></div></div><div class="text-sm text-gray-400">Weaviate readiness.</div></div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between mb-4"><div class="flex items-center space-x-3"><div class="w-10 h-10 bg-orange-500 bg-opacity-20 rounded-lg flex items-center justify-center"><i class="fas fa-layer-group text-orange-500"></i></div><h3 class="text-lg font-semibold text-white">Cache</h3></div><div class="w-3 h-3 bg-green-500 rounded-full" id="cacheDot"></div></div><div class="text-sm text-gray-400">N/A in this sample.</div></div>
+      </div>
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold text-white">Capabilities</h3><button onclick="loadAggregates()" class="text-gray-400 hover:text-white text-sm"><i class="fas fa-rotate mr-1"></i>Refresh</button></div>
+        <pre id="aggregatesJson" class="text-xs text-gray-300 whitespace-pre overflow-auto max-h-64">Loading…</pre>
+      </div>
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold text-white">Observability</h3><button onclick="loadObservability()" class="text-gray-400 hover:text-white text-sm"><i class="fas fa-rotate mr-1"></i>Refresh</button></div>
+        <pre id="observabilityJson" class="text-xs text-gray-300 whitespace-pre overflow-auto max-h-64">Loading…</pre>
+      </div>
+    </section>
+
+  <!-- Settings -->
+  <section id="settings" class="space-y-6 mt-10">
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-white">Recommendation Settings</h3>
+          <div class="flex gap-2">
+            <button id="btnResetRecs" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-200 text-sm"><i class="fas fa-rotate mr-2"></i>Reset</button>
+            <button id="btnSaveRecs" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm"><i class="fas fa-save mr-2"></i>Save</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label class="block text-sm text-gray-300 mb-2" for="ptw">Prefer Tags Weight <span class="text-gray-500">(0–1.0)</span></label>
+            <div class="flex items-center gap-3">
+              <input id="ptw" type="range" min="0" max="1.0" step="0.05" class="w-full" />
+              <input id="ptwNum" type="number" min="0" max="1.0" step="0.05" class="w-24 bg-slate-800 text-white rounded px-2 py-2 border border-slate-700" />
+            </div>
+            <p class="text-xs text-gray-400 mt-2">Boost for matching preferred tags.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm text-gray-300 mb-2" for="mpt">Max Preferred Tags <span class="text-gray-500">(1–5)</span></label>
+            <div class="flex items-center gap-3">
+              <input id="mpt" type="range" min="1" max="5" step="1" class="w-full" />
+              <input id="mptNum" type="number" min="1" max="5" step="1" class="w-24 bg-slate-800 text-white rounded px-2 py-2 border border-slate-700" />
+            </div>
+            <p class="text-xs text-gray-400 mt-2">How many preferred tags to consider.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm text-gray-300 mb-2" for="dw">Diversity Weight <span class="text-gray-500">(0–0.2)</span></label>
+            <div class="flex items-center gap-3">
+              <input id="dw" type="range" min="0" max="0.2" step="0.05" class="w-full" />
+              <input id="dwNum" type="number" min="0" max="0.2" step="0.05" class="w-24 bg-slate-800 text-white rounded px-2 py-2 border border-slate-700" />
+            </div>
+            <p class="text-xs text-gray-400 mt-2">Encourages variety across results.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="fixed top-4 right-4 hidden"></div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => { loadStats(); loadHealth(); loadTagsCount(); loadAggregates(); loadObservability(); bindSettings(); loadRecsSettings(); });
+
+    async function loadStats(){ try{ const r = await fetch('/admin/stats'); if(r.ok){ const s = await r.json(); document.getElementById('ov-anime').textContent=(s.anime||0).toLocaleString(); document.getElementById('ov-vectors').textContent=(s.vectors||0).toLocaleString(); }}catch{}}
+    async function loadTagsCount(){ try{ const r = await fetch('/api/tags?top=1'); const data = r.ok? await r.json():[]; const cReq = await fetch('/api/tags'); const full = cReq.ok? await cReq.json():[]; document.getElementById('ov-tags').textContent = (full.length||0).toLocaleString(); }catch{}}
+    async function loadHealth(){ try{ const r = await fetch('/.well-known/sora/health'); const ok=r.ok; setDot('apiDot', ok); setDot('dbDot', ok); setDot('vecDot', ok); setDot('cacheDot', ok); document.getElementById('ov-health').textContent = ok?'OK':'N/A'; }catch{ setDot('apiDot', false); setDot('dbDot', false); setDot('vecDot', false); setDot('cacheDot', false); document.getElementById('ov-health').textContent='N/A'; }}
+    async function loadObservability(){ try{ const r = await fetch('/.well-known/sora/observability'); document.getElementById('observabilityJson').textContent = r.ok? JSON.stringify(await r.json(), null, 2):'Unavailable'; }catch{ document.getElementById('observabilityJson').textContent='Unavailable'; }}
+    async function loadAggregates(){ try{ const r = await fetch('/.well-known/sora/aggregates'); document.getElementById('aggregatesJson').textContent = r.ok? JSON.stringify(await r.json(), null, 2):'Unavailable'; }catch{ document.getElementById('aggregatesJson').textContent='Unavailable'; }}
+
+    async function seedData(){ await seedDataFrom('anilist', 50, false); }
+    async function seedDataFromForm(){ const src=document.getElementById('importSource').value; const lim=parseInt(document.getElementById('importLimit').value||'200',10); const ow=document.getElementById('importOverwrite').checked; await seedDataFrom(src, lim, ow); }
+    async function seedDataFrom(source, limit, overwrite){ try{ showToast('Seeding…'); const r = await fetch('/admin/seed/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source, limit, overwrite }) }); showToast(r.ok?'Seed started':'Seed failed', r.ok?'success':'error'); if(r.ok){ setTimeout(()=>{ loadStats(); loadTagsCount(); }, 1500); }}catch{ showToast('Seed error','error'); }}
+    async function vectorUpsert(){ try{ showToast('Vector upsert…'); const r = await fetch('/admin/seed/vectors', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ limit: 1000 }) }); showToast(r.ok?'Vectors job started':'Vectors job failed', r.ok?'success':'error'); }catch{ showToast('Vectors error','error'); }}
+    async function rebuildTags(){ try{ showToast('Rebuilding tags…'); const r = await fetch('/admin/tags/rebuild', { method:'POST' }); showToast(r.ok?'Tags rebuilt':'Tags rebuild failed', r.ok?'success':'error'); if(r.ok){ loadTagsCount(); }}catch{ showToast('Tags error','error'); }}
+
+    function showToast(msg, type='success'){ const t=document.getElementById('toast'); t.innerHTML=`<div class="px-4 py-2 rounded-lg ${type==='success'?'bg-green-600':'bg-red-600'} shadow">${msg}</div>`; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 2200); }
+    function setDot(id, ok){ const el=document.getElementById(id); el.className = 'w-3 h-3 rounded-full ' + (ok?'bg-green-500':'bg-red-500'); }
+
+    // Settings pane logic
+    function bindSettings(){
+      const ptw = document.getElementById('ptw');
+      const ptwNum = document.getElementById('ptwNum');
+      const mpt = document.getElementById('mpt');
+      const mptNum = document.getElementById('mptNum');
+      const dw = document.getElementById('dw');
+      const dwNum = document.getElementById('dwNum');
+      if(!ptw||!ptwNum||!mpt||!mptNum||!dw||!dwNum) return;
+
+      // sync pairs
+      const link = (a,b) => {
+        a.addEventListener('input', ()=> b.value = a.value);
+        b.addEventListener('input', ()=> a.value = b.value);
+      };
+      link(ptw, ptwNum); link(mpt, mptNum); link(dw, dwNum);
+
+      document.getElementById('btnSaveRecs').addEventListener('click', saveRecsSettings);
+      document.getElementById('btnResetRecs').addEventListener('click', loadRecsSettings);
+    }
+
+    async function loadRecsSettings(){
+      try{
+        const r = await fetch('/admin/recs-settings');
+        if(!r.ok) throw 0;
+        const s = await r.json();
+        const ptw = document.getElementById('ptw');
+        const ptwNum = document.getElementById('ptwNum');
+        const mpt = document.getElementById('mpt');
+        const mptNum = document.getElementById('mptNum');
+        const dw = document.getElementById('dw');
+        const dwNum = document.getElementById('dwNum');
+        ptw.value = (s.preferTagsWeight ?? 0).toFixed(2);
+        ptwNum.value = (s.preferTagsWeight ?? 0).toFixed(2);
+        mpt.value = s.maxPreferredTags ?? 3;
+        mptNum.value = s.maxPreferredTags ?? 3;
+        dw.value = (s.diversityWeight ?? 0).toFixed(2);
+        dwNum.value = (s.diversityWeight ?? 0).toFixed(2);
+      }catch{ /* keep defaults */ }
+    }
+
+    async function saveRecsSettings(){
+      try{
+        const body = {
+          preferTagsWeight: parseFloat(document.getElementById('ptwNum').value || '0'),
+          maxPreferredTags: parseInt(document.getElementById('mptNum').value || '3', 10),
+          diversityWeight: parseFloat(document.getElementById('dwNum').value || '0')
+        };
+        showToast('Saving settings…');
+        const r = await fetch('/admin/recs-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        showToast(r.ok? 'Settings saved' : 'Save failed', r.ok? 'success':'error');
+      }catch{ showToast('Save error','error'); }
+    }
+  </script>
+</body>
+</html>

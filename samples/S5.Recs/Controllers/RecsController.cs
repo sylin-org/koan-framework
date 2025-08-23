@@ -12,7 +12,17 @@ public class RecsController(IRecsService recs) : ControllerBase
     [HttpPost("query")]
     public IActionResult Query([FromBody] RecsQuery req)
     {
-    var (items, degraded) = recs.QueryAsync(req.Text, req.AnchorAnimeId, req.Filters?.Genres, req.Filters?.EpisodesMax, req.Filters?.SpoilerSafe ?? true, req.TopK, req.UserId, HttpContext.RequestAborted).GetAwaiter().GetResult();
+    var (items, degraded) = recs.QueryAsync(
+        req.Text,
+        req.AnchorAnimeId,
+        req.Filters?.Genres,
+        req.Filters?.EpisodesMax,
+        req.Filters?.SpoilerSafe ?? true,
+        req.TopK,
+        req.UserId,
+        req.Filters?.PreferTags,
+        req.Filters?.PreferWeight,
+        HttpContext.RequestAborted).GetAwaiter().GetResult();
     return Ok(new { items, degraded });
     }
 

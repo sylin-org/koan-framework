@@ -8,4 +8,5 @@ public interface ISeedService
     Task<string> StartVectorUpsertAsync(IEnumerable<AnimeDoc> items, CancellationToken ct);
     Task<object> GetStatusAsync(string jobId, CancellationToken ct);
     Task<(int anime, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct);
+    Task<int> RebuildTagCatalogAsync(CancellationToken ct);
 }

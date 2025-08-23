@@ -1,0 +1,15 @@
+﻿using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Core.Model;
+
+namespace S5.Recs.Models;
+
+[DataAdapter("mongo")]
+[Storage(Name = "RecsSettings")]
+public sealed class SettingsDoc : Entity<SettingsDoc>
+{
+    public double PreferTagsWeight { get; set; } = 0.2;   // 0..1.0
+    public int MaxPreferredTags { get; set; } = 3;        // 1..5
+    public double DiversityWeight { get; set; } = 0.1;    // 0..0.2
+    public DateTimeOffset UpdatedAt { get; set; }
+}
