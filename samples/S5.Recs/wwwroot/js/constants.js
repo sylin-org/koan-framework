@@ -73,11 +73,15 @@ window.S5Const = Object.freeze({
   }),
   RATING: Object.freeze({
     STARS: 5,
-    MIN: 1,
+    MIN: 0,
     MAX: 5,
     DEFAULT_POPULARITY_SCORE: 0.7,
     SCALE_MULTIPLIER: 5,
-    ROUND_TO: 10 // round to 1 decimal place via *10 then /10
+    ROUND_TO: 10, // round to 1 decimal place via *10 then /10
+    STEP: 0.5
+  }),
+  YEAR: Object.freeze({
+    WINDOW_YEARS: 30
   }),
   // Backend endpoints used by the lightweight API client
   ENDPOINTS: Object.freeze({

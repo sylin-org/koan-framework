@@ -13,17 +13,36 @@
     }
   }
 
-  function filter(list, { genre, rating, year, episode } = {}){
+  function filter(list, { genre, ratingMin, ratingMax, yearMin, yearMax, rating, year, episode } = {}){
     let out = Array.isArray(list) ? [...list] : [];
     if (genre) {
       out = out.filter(a => Array.isArray(a.genres) && a.genres.includes(genre));
     }
-    if (rating) {
-      const min = parseFloat(rating);
-      out = out.filter(a => (a.rating || 0) >= min);
+    // Back-compat: single rating => minimum
+    if (rating && (ratingMin == null)) ratingMin = parseFloat(rating);
+    if (ratingMin != null || ratingMax != null) {
+      const rmin = (ratingMin != null) ? parseFloat(ratingMin) : null;
+      const rmax = (ratingMax != null) ? parseFloat(ratingMax) : null;
+      out = out.filter(a => {
+        const r = a.rating ?? 0;
+        if (rmin != null && r < rmin) return false;
+        if (rmax != null && r > rmax) return false;
+        return true;
+      });
     }
-    if (year) {
+    // Back-compat: single year exact match
+    if (year && (yearMin == null && yearMax == null)) {
       out = out.filter(a => String(a.year || '') === String(year));
+    } else if (yearMin != null || yearMax != null) {
+      const ymin = (yearMin != null) ? parseInt(yearMin, 10) : null;
+      const ymax = (yearMax != null) ? parseInt(yearMax, 10) : null;
+      out = out.filter(a => {
+        const y = parseInt(a.year || 0, 10) || null;
+        if (y == null) return (ymin == null || ymax == null); // if missing, include unless both bounds active
+        if (ymin != null && y < ymin) return false;
+        if (ymax != null && y > ymax) return false;
+        return true;
+      });
     }
     if (episode) {
       const [min, max] = getEpisodeRange(episode);

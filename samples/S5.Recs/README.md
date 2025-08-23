@@ -339,7 +339,7 @@ The sample demonstrates how to build rich interactions without complex frontend 
 
 ## Running the sample
 
-**Prerequisites needed**
+**Prerequisites (managed automatically by start.bat)**
 ```bash
 # Required: MongoDB for data storage
 docker run -d -p 27017:27017 mongo:latest
@@ -360,13 +360,16 @@ ollama pull nomic-embed-text
 
 *Can't we just use regular text search?* You could, but you'd miss the magic. Vector search finds content based on meaning, not just keywords. "Romantic space adventure" might find you "Cowboy Bebop" even though those exact words don't appear in the description.
 
-**Start the application**
+**Start the application (recommended)**
 ```bash
 cd samples/S5.Recs
 start.bat
 ```
 
-This script starts MongoDB in Docker and then launches the .NET application. The application will start on `https://localhost:5001` (or the next available port).
+This script builds the container image and starts the full Docker stack (API, MongoDB, Weaviate, Ollama) via docker compose. The app will be available at:
+
+- Website: http://localhost:5084
+- Swagger UI: http://localhost:5084/swagger/index.html
 
 **Initialize with sample data**
 1. Open `/dashboard` in your browser
@@ -380,6 +383,13 @@ This script starts MongoDB in Docker and then launches the .NET application. The
 - Use genre filters and the "Try something new" tag selector
 - Toggle between grid and list views
 - Check your personal library and statistics
+
+### Filters panel (AnimeRadar UX)
+- Rating: dual-range 0–5 stars with 0.5 step. Moving one thumb pushes the other so min ≤ max.
+- Year: dual-range over a rolling 30-year window up to the current year. Max at the top means “present”.
+- Extremes mean ignore: when a thumb is at its outer boundary, that side of the filter is treated as “Any”.
+- Labels update live (e.g., “Rating: 2–4.5★”, “Year: 2010–present”).
+- Today, filters narrow the in-memory TopK results from the server. Server-side pushdown for year/rating is planned to keep ordering fully aligned with vector search.
 
 ## Understanding the code structure
 

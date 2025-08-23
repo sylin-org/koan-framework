@@ -38,7 +38,7 @@
     initUsers();
     loadRecsSettings();
     if(window.S5Tags && S5Tags.loadTags){ S5Tags.loadTags().then(()=> S5Tags.renderPreferredChips && S5Tags.renderPreferredChips()); }
-    setupEventListeners();
+  setupEventListeners();
   });
 
   function setupEventListeners(){
@@ -104,7 +104,9 @@
     }
 
     // Filters
-    ;['genreFilter', 'ratingFilter', 'yearFilter', 'episodeFilter'].forEach(id => Dom.on(id, 'change', applyFilters));
+  // Genre/Episode remain selects; rating/year are dual-range sliders
+  ;['genreFilter', 'episodeFilter'].forEach(id => Dom.on(id, 'change', applyFilters));
+  initDualRangeControls();
 
     // Outside clicks close menus
     document.addEventListener('click', (e) => {
@@ -279,7 +281,7 @@
   const a = item.anime || item;
   const score = typeof item.score === 'number' ? item.score : (typeof a.popularity === 'number' ? a.popularity : ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7));
   const stars = (window.S5Const?.RATING?.STARS) ?? 5;
-  const minR = (window.S5Const?.RATING?.MIN) ?? 1;
+  const minR = (window.S5Const?.RATING?.MIN) ?? 0;
   const maxR = (window.S5Const?.RATING?.MAX) ?? 5;
   const roundTo = (window.S5Const?.RATING?.ROUND_TO) ?? 10;
   const computedRating = Math.max(minR, Math.min(maxR, Math.round(score * stars * roundTo) / roundTo));
@@ -338,8 +340,12 @@
     }catch{ Dom.$('moreBtn')?.classList.add('hidden'); showToast('Search failed', 'error'); }
   }
   window.applyFilters = function(){
-    const genre = Dom.val('genreFilter'); const rating = Dom.val('ratingFilter'); const year = Dom.val('yearFilter'); const episode = Dom.val('episodeFilter');
-    window.filteredData = (window.S5Filters && S5Filters.filter) ? S5Filters.filter(window.animeData, { genre, rating, year, episode }) : [...window.animeData];
+    const genre = Dom.val('genreFilter');
+    const episode = Dom.val('episodeFilter');
+    const { ratingMin, ratingMax, yearMin, yearMax } = readDualRangeValues();
+    window.filteredData = (window.S5Filters && S5Filters.filter)
+      ? S5Filters.filter(window.animeData, { genre, episode, ratingMin, ratingMax, yearMin, yearMax })
+      : [...window.animeData];
     applySortAndFilters();
   };
   window.applySortAndFilters = function(){
@@ -350,7 +356,14 @@
     }
     displayAnime(window.filteredData);
   };
-  window.clearFilters = function(){ Dom.clearValues(['genreFilter','ratingFilter','yearFilter','episodeFilter']); window.applyFilters(); };
+  window.clearFilters = function(){ Dom.clearValues(['genreFilter','episodeFilter']); resetDualRangeValues(); window.applyFilters(); };
+  // Override for dual-range: reset to extremes
+  const _origClear = window.clearFilters;
+  window.clearFilters = function(){
+    Dom.clearValues(['genreFilter','episodeFilter']);
+    resetDualRangeValues();
+    window.applyFilters();
+  };
 
   // Filters panel toggle
   window.toggleFilters = function(){
@@ -458,3 +471,110 @@
     } 
   };
 })();
+
+// Dual-range helpers (module-private)
+function initDualRangeControls(){
+  const R = (window.S5Const && window.S5Const.RATING) || {}; const Y = (window.S5Const && window.S5Const.YEAR) || {};
+  const ratingMin = document.getElementById('ratingMin');
+  const ratingMax = document.getElementById('ratingMax');
+  const yearMin = document.getElementById('yearMin');
+  const yearMax = document.getElementById('yearMax');
+  const ratingStep = typeof R.STEP === 'number' ? R.STEP : 0.5;
+  const rMin = typeof R.MIN === 'number' ? R.MIN : 0;
+  const rMax = typeof R.MAX === 'number' ? R.MAX : 5;
+  if (ratingMin && ratingMax){
+    ratingMin.min = String(rMin); ratingMin.max = String(rMax); ratingMin.step = String(ratingStep); ratingMin.value = String(rMin);
+    ratingMax.min = String(rMin); ratingMax.max = String(rMax); ratingMax.step = String(ratingStep); ratingMax.value = String(rMax);
+    const onRating = (e)=> clampPair(ratingMin, ratingMax, rMin, rMax, ratingStep, updateRatingUi, e?.target);
+    ratingMin.addEventListener('input', onRating);
+    ratingMax.addEventListener('input', onRating);
+    updateRatingUi();
+  }
+  const now = new Date(); const yMaxAbs = now.getFullYear(); const yMinAbs = yMaxAbs - (Y.WINDOW_YEARS || 30);
+  if (yearMin && yearMax){
+    yearMin.min = String(yMinAbs); yearMin.max = String(yMaxAbs); yearMin.step = '1'; yearMin.value = String(yMinAbs);
+    yearMax.min = String(yMinAbs); yearMax.max = String(yMaxAbs); yearMax.step = '1'; yearMax.value = String(yMaxAbs);
+    const onYear = (e)=> clampPair(yearMin, yearMax, yMinAbs, yMaxAbs, 1, updateYearUi, e?.target);
+    yearMin.addEventListener('input', onYear);
+    yearMax.addEventListener('input', onYear);
+    updateYearUi();
+  }
+}
+
+function clampPair(minEl, maxEl, absMin, absMax, step, after, activeEl){
+  const minV = parseFloat(minEl.value);
+  const maxV = parseFloat(maxEl.value);
+  if (minV > maxV){
+    // Push the other thumb to preserve ordering based on which one moved
+    if (activeEl === minEl){
+      // User moved min beyond max → push max to min
+      const snap = v => Math.round(v / step) * step;
+      maxEl.value = String(snap(Math.min(minV, absMax)));
+    } else if (activeEl === maxEl){
+      // User moved max below min → push min to max
+      const snap = v => Math.round(v / step) * step;
+      minEl.value = String(snap(Math.max(maxV, absMin)));
+    } else {
+      // Fallback: align at the crossed value
+      const mid = (minV + maxV) / 2;
+      const snap = v => Math.round(v / step) * step;
+      minEl.value = String(snap(Math.min(mid, absMax)));
+      maxEl.value = String(snap(Math.max(mid, absMin)));
+    }
+  }
+  if (after) after();
+}
+
+function updateRatingUi(){
+  const ratingMin = document.getElementById('ratingMin');
+  const ratingMax = document.getElementById('ratingMax');
+  const prog = document.getElementById('ratingProgress');
+  const label = document.getElementById('ratingLabel');
+  const R = (window.S5Const && window.S5Const.RATING) || {};
+  const r0 = parseFloat(ratingMin.value), r1 = parseFloat(ratingMax.value);
+  const rMin = typeof R.MIN === 'number' ? R.MIN : 0; const rMax = typeof R.MAX === 'number' ? R.MAX : 5;
+  const pct = v => ((v - rMin) / (rMax - rMin)) * 100;
+  if (prog){ prog.style.left = pct(Math.min(r0,r1)) + '%'; prog.style.width = (pct(Math.max(r0,r1)) - pct(Math.min(r0,r1))) + '%'; }
+  if (label){ label.textContent = (r0 <= rMin && r1 >= rMax) ? 'Any' : `Rating: ${r0}–${r1}★`; }
+}
+
+function updateYearUi(){
+  const yearMin = document.getElementById('yearMin');
+  const yearMax = document.getElementById('yearMax');
+  const prog = document.getElementById('yearProgress');
+  const label = document.getElementById('yearLabel');
+  const ymin = parseInt(yearMin.value, 10), ymax = parseInt(yearMax.value, 10);
+  const absMin = parseInt(yearMin.min, 10), absMax = parseInt(yearMax.max, 10);
+  const pct = v => ((v - absMin) / (absMax - absMin)) * 100;
+  if (prog){ prog.style.left = pct(Math.min(ymin,ymax)) + '%'; prog.style.width = (pct(Math.max(ymin,ymax)) - pct(Math.min(ymin,ymax))) + '%'; }
+  if (label){
+    const any = (ymin <= absMin && ymax >= absMax);
+    const present = ymax >= absMax ? 'present' : String(ymax);
+    label.textContent = any ? 'Any' : `Year: ${ymin}–${present}`;
+  }
+}
+
+function readDualRangeValues(){
+  const R = (window.S5Const && window.S5Const.RATING) || {}; const Y = (window.S5Const && window.S5Const.YEAR) || {};
+  const rmin = parseFloat(document.getElementById('ratingMin')?.value ?? 'NaN');
+  const rmax = parseFloat(document.getElementById('ratingMax')?.value ?? 'NaN');
+  const rAbsMin = typeof R.MIN === 'number' ? R.MIN : 0; const rAbsMax = typeof R.MAX === 'number' ? R.MAX : 5;
+  const ratingMin = isNaN(rmin) || rmin <= rAbsMin ? null : rmin;
+  const ratingMax = isNaN(rmax) || rmax >= rAbsMax ? null : rmax;
+  const ymin = parseInt(document.getElementById('yearMin')?.value ?? 'NaN', 10);
+  const ymax = parseInt(document.getElementById('yearMax')?.value ?? 'NaN', 10);
+  const absNow = new Date().getFullYear(); const absMin = absNow - (Y.WINDOW_YEARS || 30);
+  const yearMin = isNaN(ymin) || ymin <= absMin ? null : ymin;
+  const yearMax = isNaN(ymax) || ymax >= absNow ? null : ymax;
+  return { ratingMin, ratingMax, yearMin, yearMax };
+}
+
+function resetDualRangeValues(){
+  const R = (window.S5Const && window.S5Const.RATING) || {}; const Y = (window.S5Const && window.S5Const.YEAR) || {};
+  const rmin = document.getElementById('ratingMin'); const rmax = document.getElementById('ratingMax');
+  const rAbsMin = typeof R.MIN === 'number' ? R.MIN : 0; const rAbsMax = typeof R.MAX === 'number' ? R.MAX : 5;
+  if (rmin && rmax){ rmin.value = String(rAbsMin); rmax.value = String(rAbsMax); updateRatingUi(); }
+  const ymin = document.getElementById('yearMin'); const ymax = document.getElementById('yearMax');
+  const now = new Date().getFullYear(); const absMin = now - (Y.WINDOW_YEARS || 30);
+  if (ymin && ymax){ ymin.value = String(absMin); ymax.value = String(now); updateYearUi(); }
+}
