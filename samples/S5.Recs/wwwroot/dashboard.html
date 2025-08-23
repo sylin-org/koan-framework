@@ -145,79 +145,9 @@
     </section>
   </main>
 
-  <div id="toast" class="fixed top-4 right-4 hidden"></div>
-
-  <script>
-  document.addEventListener('DOMContentLoaded', () => { loadStats(); loadHealth(); loadTagsCount(); loadAggregates(); loadObservability(); bindSettings(); loadRecsSettings(); });
-
-    async function loadStats(){ try{ const r = await fetch('/admin/stats'); if(r.ok){ const s = await r.json(); document.getElementById('ov-anime').textContent=(s.anime||0).toLocaleString(); document.getElementById('ov-vectors').textContent=(s.vectors||0).toLocaleString(); }}catch{}}
-    async function loadTagsCount(){ try{ const r = await fetch('/api/tags?top=1'); const data = r.ok? await r.json():[]; const cReq = await fetch('/api/tags'); const full = cReq.ok? await cReq.json():[]; document.getElementById('ov-tags').textContent = (full.length||0).toLocaleString(); }catch{}}
-    async function loadHealth(){ try{ const r = await fetch('/.well-known/sora/health'); const ok=r.ok; setDot('apiDot', ok); setDot('dbDot', ok); setDot('vecDot', ok); setDot('cacheDot', ok); document.getElementById('ov-health').textContent = ok?'OK':'N/A'; }catch{ setDot('apiDot', false); setDot('dbDot', false); setDot('vecDot', false); setDot('cacheDot', false); document.getElementById('ov-health').textContent='N/A'; }}
-    async function loadObservability(){ try{ const r = await fetch('/.well-known/sora/observability'); document.getElementById('observabilityJson').textContent = r.ok? JSON.stringify(await r.json(), null, 2):'Unavailable'; }catch{ document.getElementById('observabilityJson').textContent='Unavailable'; }}
-    async function loadAggregates(){ try{ const r = await fetch('/.well-known/sora/aggregates'); document.getElementById('aggregatesJson').textContent = r.ok? JSON.stringify(await r.json(), null, 2):'Unavailable'; }catch{ document.getElementById('aggregatesJson').textContent='Unavailable'; }}
-
-    async function seedData(){ await seedDataFrom('anilist', 50, false); }
-    async function seedDataFromForm(){ const src=document.getElementById('importSource').value; const lim=parseInt(document.getElementById('importLimit').value||'200',10); const ow=document.getElementById('importOverwrite').checked; await seedDataFrom(src, lim, ow); }
-    async function seedDataFrom(source, limit, overwrite){ try{ showToast('Seeding…'); const r = await fetch('/admin/seed/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source, limit, overwrite }) }); showToast(r.ok?'Seed started':'Seed failed', r.ok?'success':'error'); if(r.ok){ setTimeout(()=>{ loadStats(); loadTagsCount(); }, 1500); }}catch{ showToast('Seed error','error'); }}
-    async function vectorUpsert(){ try{ showToast('Vector upsert…'); const r = await fetch('/admin/seed/vectors', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ limit: 1000 }) }); showToast(r.ok?'Vectors job started':'Vectors job failed', r.ok?'success':'error'); }catch{ showToast('Vectors error','error'); }}
-    async function rebuildTags(){ try{ showToast('Rebuilding tags…'); const r = await fetch('/admin/tags/rebuild', { method:'POST' }); showToast(r.ok?'Tags rebuilt':'Tags rebuild failed', r.ok?'success':'error'); if(r.ok){ loadTagsCount(); }}catch{ showToast('Tags error','error'); }}
-
-    function showToast(msg, type='success'){ const t=document.getElementById('toast'); t.innerHTML=`<div class="px-4 py-2 rounded-lg ${type==='success'?'bg-green-600':'bg-red-600'} shadow">${msg}</div>`; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 2200); }
-    function setDot(id, ok){ const el=document.getElementById(id); el.className = 'w-3 h-3 rounded-full ' + (ok?'bg-green-500':'bg-red-500'); }
-
-    // Settings pane logic
-    function bindSettings(){
-      const ptw = document.getElementById('ptw');
-      const ptwNum = document.getElementById('ptwNum');
-      const mpt = document.getElementById('mpt');
-      const mptNum = document.getElementById('mptNum');
-      const dw = document.getElementById('dw');
-      const dwNum = document.getElementById('dwNum');
-      if(!ptw||!ptwNum||!mpt||!mptNum||!dw||!dwNum) return;
-
-      // sync pairs
-      const link = (a,b) => {
-        a.addEventListener('input', ()=> b.value = a.value);
-        b.addEventListener('input', ()=> a.value = b.value);
-      };
-      link(ptw, ptwNum); link(mpt, mptNum); link(dw, dwNum);
-
-      document.getElementById('btnSaveRecs').addEventListener('click', saveRecsSettings);
-      document.getElementById('btnResetRecs').addEventListener('click', loadRecsSettings);
-    }
-
-    async function loadRecsSettings(){
-      try{
-        const r = await fetch('/admin/recs-settings');
-        if(!r.ok) throw 0;
-        const s = await r.json();
-        const ptw = document.getElementById('ptw');
-        const ptwNum = document.getElementById('ptwNum');
-        const mpt = document.getElementById('mpt');
-        const mptNum = document.getElementById('mptNum');
-        const dw = document.getElementById('dw');
-        const dwNum = document.getElementById('dwNum');
-        ptw.value = (s.preferTagsWeight ?? 0).toFixed(2);
-        ptwNum.value = (s.preferTagsWeight ?? 0).toFixed(2);
-        mpt.value = s.maxPreferredTags ?? 3;
-        mptNum.value = s.maxPreferredTags ?? 3;
-        dw.value = (s.diversityWeight ?? 0).toFixed(2);
-        dwNum.value = (s.diversityWeight ?? 0).toFixed(2);
-      }catch{ /* keep defaults */ }
-    }
-
-    async function saveRecsSettings(){
-      try{
-        const body = {
-          preferTagsWeight: parseFloat(document.getElementById('ptwNum').value || '0'),
-          maxPreferredTags: parseInt(document.getElementById('mptNum').value || '3', 10),
-          diversityWeight: parseFloat(document.getElementById('dwNum').value || '0')
-        };
-        showToast('Saving settings…');
-        const r = await fetch('/admin/recs-settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-        showToast(r.ok? 'Settings saved' : 'Save failed', r.ok? 'success':'error');
-      }catch{ showToast('Save error','error'); }
-    }
-  </script>
+  <div id="toastContainer" class="fixed top-4 right-4 z-[100] space-y-2"></div>
+  <script src="/js/toasts.js"></script>
+  <script src="/js/dom.js"></script>
+  <script src="/js/dashboard.page.js"></script>
 </body>
 </html>

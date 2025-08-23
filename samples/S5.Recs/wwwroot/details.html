@@ -7,8 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <script>
-  // Safely quote string values for inline handlers
-  function __q(v){ return "'" + String(v ?? '').replace(/'/g, "\\'") + "'"; }
     tailwind.config = { theme: { extend: { colors: { slate: { 950: '#020617' } } } } };
   </script>
   <style>
@@ -22,7 +20,7 @@
   <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
       <div class="flex items-center space-x-3">
-        <button class="text-gray-300 hover:text-white" onclick="goHome()">
+  <button class="text-gray-300 hover:text-white" data-action="go-home">
           <i class="fas fa-arrow-left"></i>
         </button>
         <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
@@ -31,7 +29,7 @@
         <div class="font-semibold">Sora Recs</div>
       </div>
       <div class="relative">
-        <button id="profileBtn" onclick="toggleProfileMenu()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 rounded-lg px-3 py-1.5">
+  <button id="profileBtn" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 rounded-lg px-3 py-1.5">
           <div class="w-7 h-7 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
             <span id="profileInitial" class="text-xs font-bold">U</span>
           </div>
@@ -43,7 +41,7 @@
           <div id="userList" class="max-h-64 overflow-y-auto"></div>
           <div class="p-2 border-t border-slate-700 flex space-x-2">
             <input id="newUserName" class="flex-1 bg-slate-700 rounded px-2 py-1 text-sm" placeholder="New user name" />
-            <button onclick="createNewUser()" class="bg-purple-600 hover:bg-purple-500 text-white text-sm px-3 py-1 rounded">Add</button>
+            <button data-action="create-user" class="bg-purple-600 hover:bg-purple-500 text-white text-sm px-3 py-1 rounded">Add</button>
           </div>
         </div>
       </div>
@@ -68,17 +66,17 @@
         <p id="synopsis" class="text-gray-200 leading-relaxed mb-6"></p>
 
         <div class="flex items-center gap-3">
-          <button onclick="markFavorite()" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg"><i class="fa-regular fa-heart mr-2"></i>Favorite</button>
-          <button onclick="markWatched()" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg"><i class="fa-regular fa-circle-check mr-2"></i>Watched</button>
+      <button data-action="favorite" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg"><i class="fa-regular fa-heart mr-2"></i>Favorite</button>
+      <button data-action="watched" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg"><i class="fa-regular fa-circle-check mr-2"></i>Watched</button>
           <div class="relative group">
             <button class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg"><i class="fa-regular fa-star mr-2"></i>Rate</button>
             <div class="absolute left-0 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-2 hidden group-hover:block">
               <div class="flex space-x-2">
-                <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" onclick="rate(1)">1</button>
-                <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" onclick="rate(2)">2</button>
-                <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" onclick="rate(3)">3</button>
-                <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" onclick="rate(4)">4</button>
-                <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" onclick="rate(5)">5</button>
+        <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" data-rate="1">1</button>
+        <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" data-rate="2">2</button>
+        <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" data-rate="3">3</button>
+        <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" data-rate="4">4</button>
+        <button class="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600" data-rate="5">5</button>
               </div>
             </div>
           </div>
@@ -95,166 +93,8 @@
 
   <!-- Toasts -->
   <div id="toastContainer" class="fixed top-4 right-4 z-[100] space-y-2"></div>
-
-  <script>
-    // Toasts
-    function showToast(message, type = 'info'){
-      const cont = document.getElementById('toastContainer');
-      if(!cont) return;
-      const el = document.createElement('div');
-      const color = type==='success' ? 'bg-green-600' : type==='error' ? 'bg-red-600' : 'bg-slate-700';
-      el.className = `${color} text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2`;
-      el.innerHTML = `<span>${message}</span>`;
-      cont.appendChild(el);
-      setTimeout(()=>{ el.classList.add('opacity-0','transition-opacity','duration-300'); }, 2200);
-      setTimeout(()=>{ el.remove(); }, 2600);
-    }
-    // State
-    let currentUserId = null;
-    let currentAnimeId = null;
-  let currentEntry = null; // library entry for current anime
-    const qs = new URLSearchParams(location.search);
-    currentAnimeId = qs.get('id');
-
-    function goHome(){ location.href = 'index.html'; }
-
-    function toggleProfileMenu(){ document.getElementById('profileMenu').classList.toggle('hidden'); }
-
-    async function initUsers(){
-      try{
-        const r = await fetch('/api/users');
-        const users = await r.json();
-        renderUsers(users);
-        const def = users.find(u=>u.isDefault) || users[0];
-        if(def) selectUser(def.id, def.name);
-      }catch{}
-    }
-
-    function renderUsers(users){
-      const list = document.getElementById('userList');
-      list.innerHTML = users.map(u=>`<div class="flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer" onclick="selectUser(${JSON.stringify(u.id)}, ${JSON.stringify(u.name||'User')})">
-        <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">${(u.name||'U').slice(0,1).toUpperCase()}</div>
-        <div class="flex-1"><div class="text-white">${u.name||'User'}</div>${u.isDefault?'<div class="text-xs text-gray-400">Default</div>':''}</div>
-      </div>`).join('');
-    }
-
-    async function createNewUser(){
-      const input = document.getElementById('newUserName');
-      const name = input?.value.trim(); if(!name) return;
-      const r = await fetch('/api/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
-      if(r.ok){ await initUsers(); input.value=''; }
-    }
-
-    function selectUser(id, name){
-      currentUserId = id;
-      document.getElementById('profileInitial').textContent = (name||'U').slice(0,1).toUpperCase();
-      document.getElementById('profileName').textContent = name || 'User';
-      document.getElementById('profileMenu').classList.add('hidden');
-      // After selecting user, (re)load similar
-  if(currentAnimeId){ loadEntryState(); loadSimilar(currentAnimeId); }
-    }
-
-    // Details
-    async function loadAnime(id){
-      if(!id) return;
-      const r = await fetch(`/api/anime/${encodeURIComponent(id)}`);
-      if(!r.ok) return;
-      const a = await r.json();
-      renderAnime(a);
-      document.getElementById('similarTitle').textContent = `Similar to ${a.title || 'this'}`;
-    }
-
-    function renderAnime(a){
-      document.getElementById('poster').src = a.coverUrl || a.image || a.poster || '/images/missing-cover.svg';
-      const mainTitle = a.title || a.titleEnglish || a.titleRomaji || a.titleNative || a.name || 'Untitled';
-      document.getElementById('title').textContent = mainTitle;
-      // Color accent
-      const dot = document.getElementById('colorDot');
-      if(a.coverColorHex){ dot.style.backgroundColor = a.coverColorHex; dot.classList.remove('hidden'); } else { dot.classList.add('hidden'); }
-      // Alternate titles
-      const altsList = [a.titleEnglish, a.titleRomaji, a.titleNative]
-        .map(x=>x||'').filter(x=>x && x.toLowerCase() !== (mainTitle||'').toLowerCase());
-      document.getElementById('alts').textContent = altsList.length ? `Also known as: ${altsList.join(' • ')}` : '';
-      // Meta
-      const meta = [];
-      if(a.year) meta.push(a.year);
-      if(a.episodes) meta.push(`${a.episodes} eps`);
-      if(typeof a.popularity === 'number') meta.push(`${Math.round(a.popularity*100)}% pop`);
-      if(a.rating) meta.push(`Score ${a.rating}`);
-      document.getElementById('meta').textContent = meta.join(' • ');
-      // Tags and synonyms
-      const tags = Array.from(new Set([...(a.genres||[]), ...(a.tags||[])]));
-      document.getElementById('tags').innerHTML = tags.slice(0,12).map(t=>`<span class="px-2 py-1 rounded bg-slate-800 text-gray-300 text-xs">${t}</span>`).join('');
-      const syns = Array.isArray(a.synonyms) ? a.synonyms.filter(Boolean) : [];
-      document.getElementById('synonyms').innerHTML = syns.slice(0,12).map(s=>`<span class="px-2 py-1 rounded bg-slate-800 text-gray-400 text-xs">${s}</span>`).join('');
-      document.getElementById('synopsis').textContent = a.synopsis || a.description || '—';
-      // reflect current entry state (if available)
-      renderEntryState();
-    }
-
-    // Similar
-    async function loadSimilar(id){
-      if(!currentUserId) { document.getElementById('similar').innerHTML = ''; return; }
-      const body = { userId: currentUserId, anchorAnimeId: id, topK: 12, filters: { spoilerSafe: true } };
-      const r = await fetch('/api/recs/query', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-      if(!r.ok) { document.getElementById('similar').innerHTML = ''; return; }
-      const { items } = await r.json();
-      // Normalize to anime payloads and exclude the current anime
-      const list = (items||[])
-        .map(it => it?.anime || it)
-        .filter(Boolean)
-        .filter(a => a && a.id !== id);
-      renderSimilar(list);
-    }
-
-    function renderSimilar(items){
-      const c = document.getElementById('similar');
-      c.innerHTML = (items||[]).map(anime => `
-        <div class="min-w-[180px] bg-slate-900 rounded-xl overflow-hidden hover:scale-[1.02] hover:shadow-xl transition-all cursor-pointer" onclick="gotoDetails(${__q(anime.id)})">
-          <img src="${anime.coverUrl || anime.image || anime.poster || '/images/missing-cover.svg'}" class="h-48 w-full object-cover" />
-          <div class="p-3">
-            <div class="text-sm font-semibold line-clamp-2">${anime.titleEnglish || anime.title || 'Untitled'}</div>
-            <div class="text-xs text-gray-400 mt-1">${(anime.genres||[]).slice(0,2).join(' • ')}</div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function gotoDetails(id){
-      location.href = `details.html?id=${encodeURIComponent(id)}`;
-    }
-
-    // Actions
-  async function markFavorite(){ if(!currentUserId || !currentAnimeId) return; await fetch(`/api/library/${currentUserId}/${currentAnimeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ favorite:true }) }); await loadEntryState(); showToast('Added to favorites','success'); }
-  async function markWatched(){ if(!currentUserId || !currentAnimeId) return; await fetch(`/api/library/${currentUserId}/${currentAnimeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ watched:true }) }); await loadEntryState(); showToast('Marked as watched','success'); }
-  async function rate(stars){ if(!currentUserId || !currentAnimeId) return; await fetch('/api/recs/rate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId: currentUserId, animeId: currentAnimeId, rating: stars }) }); await loadEntryState(); showToast(`Rated ${stars}★`,'success'); }
-
-    async function loadEntryState(){
-      if(!currentUserId || !currentAnimeId){ currentEntry = null; renderEntryState(); return; }
-      try{
-        const r = await fetch(`/api/library/${currentUserId}?sort=updatedAt&page=1&pageSize=500`);
-        if(!r.ok){ currentEntry = null; renderEntryState(); return; }
-        const data = await r.json();
-        currentEntry = (data.items||[]).find(e=>e.animeId===currentAnimeId) || null;
-      }catch{ currentEntry = null; }
-      renderEntryState();
-    }
-
-    function renderEntryState(){
-      const favBtn = document.querySelector('button[onclick^="markFavorite"]');
-      const watchBtn = document.querySelector('button[onclick^="markWatched"]');
-      if(!favBtn || !watchBtn) return;
-      const fav = !!(currentEntry && currentEntry.favorite);
-      const w = !!(currentEntry && currentEntry.watched);
-      favBtn.className = `bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg ${fav ? 'ring-1 ring-pink-400/40 bg-pink-900/30' : ''}`;
-      watchBtn.className = `bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg ${w ? 'ring-1 ring-green-400/40 bg-green-900/30' : ''}`;
-    }
-
-    // Bootstrap
-    (async function(){
-  await initUsers();
-  if(currentAnimeId){ await loadAnime(currentAnimeId); await loadEntryState(); await loadSimilar(currentAnimeId); }
-    })();
-  </script>
+  <script src="/js/toasts.js"></script>
+  <script src="/js/dom.js"></script>
+  <script src="/js/details.page.js"></script>
 </body>
 </html>

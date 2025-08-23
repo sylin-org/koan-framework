@@ -114,6 +114,8 @@
       href: DX-0038-auto-registration.md
     - name: Sylin prefix and package IDs
       href: DX-0036-sylin-prefix-and-package-ids.md
+    - name: S5.Recs UI refactor and code hygiene
+      href: DX-0039-s5-recs-ui-refactor-and-code-hygiene.md
  - name: AI (AI)
    items:
      - name: Native AI baseline
