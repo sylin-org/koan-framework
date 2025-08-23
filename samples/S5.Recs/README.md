@@ -1,62 +1,51 @@
 # S5.Recs
 
-**Anime recommendations shouldn't be rocket science. They should just work.**
+**This sample demonstrates how to build a complete recommendation engine using Sora.**
 
-S5.Recs demonstrates how to build a modern recommendation engine with Sora—complete with vector search, user personalization, and a polished UI. Start with basic popularity rankings, add AI-powered semantic search when you're ready, scale to complex preference modeling as you grow.
+S5.Recs shows you how to create a modern content recommendation system by combining MongoDB for data storage, optional vector search with Weaviate, and AI embeddings via Ollama. The sample walks through building personalized recommendations, semantic search, user preference modeling, and a responsive web interface—all using Sora's modular architecture.
 
-## What makes it compelling?
+## What this sample teaches
 
-- **Start simple, scale smart**  
-  Works perfectly with just MongoDB and popularity rankings. Add Weaviate for vector search and Ollama for embeddings when you want semantic matching—but they're optional.
+**Core recommendation patterns**  
+This sample demonstrates how to build a hybrid recommendation system that combines popularity-based filtering with personalized user preferences. You'll learn to track user behavior (ratings, favorites, watch status) and use that data to generate increasingly accurate recommendations.
 
-- **Real user patterns**  
-  Track favorites, ratings, watch status, and personal preferences. Build taste profiles that actually improve recommendations over time.
+**AI integration without complexity**  
+The sample shows how to add semantic search and vector embeddings to your application while maintaining graceful fallbacks. When AI services are unavailable, the system continues working with popularity and preference-based recommendations.
 
-- **Production-ready patterns**  
-  Graceful fallbacks, admin controls, real-time seeding, and health monitoring. Everything you'd expect in a production recommendation service.
+**Modular architecture in practice**  
+You'll see how Sora's modular design lets you start simple (just MongoDB) and add complexity incrementally (vector search, AI embeddings) without restructuring your core application code.
 
-- **Beautiful, responsive UI**  
-  Browse anime with grid/list views, filter by genre and year, search semantically, and manage your personal library—all without writing frontend framework code.
+**Production-ready patterns**  
+The sample implements real-world concerns: data seeding pipelines, admin dashboards, health monitoring, user management, and responsive UI design using vanilla JavaScript and modern CSS.
 
-## What you get out of the box
+## How to build an app like this
 
-- **Personalized recommendations**  
-  "For You" feed that learns from ratings, favorites, and viewing history
+**[1] Start with basic data modeling**  
+First, you'll need entities to represent your content and user interactions. We use `AnimeDoc` for content metadata, `UserDoc` for user profiles, and `LibraryEntryDoc` to track user interactions with content.
 
-- **Semantic search**  
-  Find anime by describing what you want: "space opera with political intrigue"
+**[2] Add simple recommendation logic**  
+Begin with popularity-based recommendations filtered by user preferences. This gives you working recommendations immediately while you build more sophisticated features.
 
-- **Smart filtering**  
-  Genre, year, episode count, and rating filters with real-time tag suggestions
+**[3] Implement user preference tracking**  
+Build a system to track user behaviors (ratings, favorites, viewing status) and use that data to build preference profiles. The sample shows how to weight genres and tags based on user interactions.
 
-- **User library management**  
-  Track favorites, watched status, ratings, and personal watchlists
+**[4] Layer in semantic search**  
+Add vector embeddings to enable semantic search ("find something like Cowboy Bebop") alongside keyword-based filtering. The sample demonstrates graceful fallback when vector services are unavailable.
 
-- **Admin dashboard**  
-  Data seeding, vector management, recommendation tuning, and system health
+**[5] Build administration tools**  
+Create admin interfaces for data management, system monitoring, and algorithm tuning. This sample includes data seeding, health checks, and recommendation parameter adjustment.
 
-- **Adaptive UI**  
-  Works on mobile, tablet, and desktop with keyboard navigation and accessibility support
+**[6] Polish the user experience**  
+Implement a responsive web interface with search, filtering, personal libraries, and recommendation browsing. The sample uses vanilla JavaScript with modern patterns like event delegation and modular organization.
 
-## Real-world example
+## Building the recommendation engine step-by-step
 
-First, the essential packages are already included:
+**Step 1: Define your content and user models**
 
-```bash
-# Core framework
-Sora.Core, Sora.Web
-
-# Data access
-Sora.Data.Mongo
-
-# AI and vector search (optional)
-Sora.AI, Sora.Ai.Provider.Ollama, Sora.Data.Weaviate
-```
-
-Then your models become instantly searchable:
+Start by modeling your core entities. The sample uses three main documents:
 
 ```csharp
-// Define your anime entity
+// Content metadata
 public class AnimeDoc : Entity<AnimeDoc>
 {
     public string Title { get; set; } = string.Empty;
@@ -64,195 +53,335 @@ public class AnimeDoc : Entity<AnimeDoc>
     public float Popularity { get; set; }
     public string Synopsis { get; set; } = string.Empty;
     
-    // Vector embeddings automatically generated from synopsis
+    // Optional: Vector embeddings for semantic search
     public float[]? Vector { get; set; }
 }
 
-// Get full recommendation APIs
-[Route("api/[controller]")]
-public class RecsController : ControllerBase
+// User interaction tracking
+public class LibraryEntryDoc : Entity<LibraryEntryDoc>
 {
-    [HttpPost("query")]
-    public async Task<RecsResponse> Query([FromBody] RecsRequest request)
+    public string UserId { get; set; } = string.Empty;
+    public string AnimeId { get; set; } = string.Empty;
+    public bool Favorite { get; set; }
+    public bool Watched { get; set; }
+    public int? Rating { get; set; } // 1-5 stars
+    public DateTime AddedAt { get; set; }
+}
+```
+
+This foundation lets you track what users like and build preferences from their behavior.
+
+**Step 2: Implement basic popularity recommendations**
+
+Before adding complexity, start with simple popularity-based recommendations:
+
+```csharp
+[HttpPost("query")]
+public async Task<RecsResponse> GetRecommendations([FromBody] RecsRequest request)
+{
+    // Start simple: sort by popularity, filter by preferences
+    var query = _animeCollection
+        .Find(a => request.Genres.Count == 0 || a.Genres.Any(g => request.Genres.Contains(g)))
+        .SortByDescending(a => a.Popularity);
+        
+    var results = await query.Limit(request.TopK).ToListAsync();
+    return new RecsResponse { Items = results };
+}
+```
+
+This gives you working recommendations immediately while you build more sophisticated features.
+
+**Step 3: Add user preference modeling**
+
+Track user interactions and build preference profiles:
+
+```csharp
+public async Task UpdateUserPreferences(string userId, string animeId, int rating)
+{
+    // Get the anime to extract genres
+    var anime = await _animeCollection.Find(a => a.Id == animeId).FirstOrDefaultAsync();
+    if (anime == null) return;
+    
+    // Update user's genre preferences based on rating
+    var profile = await GetOrCreateUserProfile(userId);
+    foreach (var genre in anime.Genres)
     {
-        // Hybrid scoring: vector similarity + popularity + user preferences
-        var results = await _recsEngine.GetRecommendations(request);
-        return results;
+        // EWMA update: new preference = α * rating + (1-α) * old preference
+        var currentWeight = profile.GenreWeights.GetValueOrDefault(genre, 0.5f);
+        var normalizedRating = (rating - 3f) / 2f; // Convert 1-5 to -1 to 1
+        profile.GenreWeights[genre] = 0.1f * normalizedRating + 0.9f * currentWeight;
+    }
+    
+    await _profileCollection.ReplaceOneAsync(p => p.Id == profile.Id, profile);
+}
+```
+
+This creates user taste profiles that improve recommendations over time.
+
+**Step 4: Integrate vector search for semantic matching**
+
+Add AI-powered semantic search alongside preference-based recommendations:
+
+```csharp
+public async Task<List<AnimeDoc>> GetSemanticRecommendations(string userId, string? searchText = null)
+{
+    List<AnimeDoc> candidates;
+    
+    if (!string.IsNullOrEmpty(searchText))
+    {
+        // Generate embedding for search text
+        var queryVector = await _aiService.GetEmbedding(searchText);
+        
+        // Vector similarity search
+        candidates = await _vectorStore.SearchSimilar(queryVector, topK: 100);
+    }
+    else
+    {
+        // Use user's preference vector for personalized discovery
+        var profile = await GetUserProfile(userId);
+        if (profile?.PreferenceVector != null)
+        {
+            candidates = await _vectorStore.SearchSimilar(profile.PreferenceVector, topK: 100);
+        }
+        else
+        {
+            // Fallback to popularity when no vector available
+            candidates = await GetPopularContent();
+        }
+    }
+    
+    // Apply user preference scoring
+    return RankByUserPreferences(candidates, userId);
+}
+```
+
+The key insight: always provide fallbacks. When vector search isn't available, the system continues working.
+
+**Step 5: Build administrative interfaces**
+
+Create tools for data management and system monitoring:
+
+```csharp
+[HttpPost("seed/start")]
+public async Task<ActionResult> StartSeeding([FromBody] SeedRequest request)
+{
+    var jobId = Guid.NewGuid().ToString();
+    
+    // Background task for data import
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            // Import content from external API (AniList, etc.)
+            var items = await _contentProvider.FetchContent(request.Source, request.Limit);
+            
+            // Generate embeddings if AI is available
+            if (_aiService.IsAvailable)
+            {
+                foreach (var item in items)
+                {
+                    item.Vector = await _aiService.GetEmbedding(item.Synopsis);
+                }
+            }
+            
+            // Bulk insert with deduplication
+            await _animeCollection.BulkWrite(/* upsert operations */);
+            
+            _logger.LogInformation("Seeding completed: {Count} items", items.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Seeding failed for job {JobId}", jobId);
+        }
+    });
+    
+    return Ok(new { JobId = jobId });
+}
+```
+
+This provides essential operations tooling for production deployment.
+
+**Step 6: Create a responsive user interface**
+
+Build a modern web interface using vanilla JavaScript and progressive enhancement:
+
+```javascript
+// Modular JavaScript architecture
+class RecommendationEngine {
+    async getRecommendations(filters = {}) {
+        const response = await fetch('/api/recs/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: this.currentUser.id,
+                topK: 50,
+                filters: filters,
+                preferTags: this.getSelectedTags()
+            })
+        });
+        return await response.json();
+    }
+    
+    async updateUserRating(animeId, rating) {
+        await fetch('/api/recs/rate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: this.currentUser.id,
+                animeId: animeId,
+                rating: rating
+            })
+        });
+        
+        // Refresh recommendations after rating
+        await this.loadRecommendations();
     }
 }
-
-// Use it naturally
-var recs = await _recsEngine.GetRecommendations(new RecsRequest 
-{ 
-    UserId = user.Id,
-    TopK = 50,
-    Filters = new() { SpoilerSafe = true }
-});
 ```
 
-That's it. You now have:
+The sample demonstrates how to build rich interactions without complex frontend frameworks.
 
-- Personalized "For You" recommendations based on user history
-- Semantic search: "Find me something like Cowboy Bebop but in space"
-- Smart filtering by genre, year, popularity, and custom tags
-- User library management with favorites, ratings, and watch status
-- Admin dashboard for data management and recommendation tuning
+## Key patterns and techniques demonstrated
 
-**That's it.** Real AI-powered recommendations with graceful fallbacks when vectors aren't available.
+**Hybrid recommendation scoring**  
+The sample shows how to combine multiple signals (vector similarity, popularity, user preferences) into a unified relevance score. This approach provides better results than any single method alone.
 
-## Want more? It's already there
+**Graceful degradation**  
+When AI services are unavailable, the system falls back to preference-based and popularity recommendations. This ensures your application remains functional even when optional services fail.
 
-**Need admin controls?**
+**Real-time preference learning**  
+User interactions immediately update preference profiles using exponentially weighted moving averages (EWMA). This balances responsiveness to new preferences with stability from historical data.
 
-Visit `/dashboard` to:
-- Seed data from AniList or local JSON files
-- Monitor recommendation engine health
-- Tune algorithm weights in real-time
-- View usage statistics and system metrics
+**Modular JavaScript architecture**  
+The frontend demonstrates modern vanilla JavaScript patterns: event delegation, module organization, and progressive enhancement. No complex frameworks required.
 
-**Want vector search?**
+**Production data management**  
+The sample includes comprehensive tooling: background job processing, data seeding pipelines, health monitoring, and administrative controls.
 
+## What you'll build by following this sample
+
+**A complete recommendation system** with personalized feeds, semantic search, and user preference modeling
+
+**Modern web interface** with responsive design, real-time filtering, and accessible interactions
+
+**Administrative tools** for content management, system monitoring, and algorithm tuning
+
+**AI integration patterns** that enhance functionality without creating dependencies
+
+**Production-ready architecture** with health checks, background processing, and graceful error handling
+
+## Running the sample
+
+**Prerequisites needed**
 ```bash
-docker run -p 8080:8080 semitechnologies/weaviate:latest
-```
+# Required: MongoDB for data storage
+docker run -d -p 27017:27017 mongo:latest
 
-Now your text searches become semantic: "romantic comedy in a school setting" finds relevant anime even without exact keyword matches.
+# Optional: Weaviate for vector search
+docker run -d -p 8080:8080 semitechnologies/weaviate:latest
 
-**Need local AI embeddings?**
-
-```bash
+# Optional: Ollama for local AI embeddings  
 docker run -d -p 11434:11434 ollama/ollama
 ollama pull nomic-embed-text
 ```
 
-Your anime synopses are now automatically embedded for better similarity matching.
+**Start the application**
+```bash
+cd samples/S5.Recs
+dotnet run
+```
 
-## The user experience
+The application will start on `https://localhost:5001` (or the next available port).
 
-**Browse and discover**
-- Grid or list view with beautiful cover art
-- Real-time search with instant results  
-- Filter by genre, year, rating, episode count
-- "Try something new" with smart tag suggestions
+**Initialize with sample data**
+1. Open `/dashboard` in your browser
+2. Click "Seed Sample Data" to import anime from AniList API
+3. Wait for the import to complete (progress shown in real-time)
+4. Navigate to `/` to browse recommendations
 
-**Personal library**
-- Mark favorites with a single click
-- Track watched/dropped status
-- Rate anime from 1-5 stars
-- View personalized statistics
+**Try the features**
+- Search for anime: "space western" or "slice of life romance"
+- Rate a few titles to see personalization kick in
+- Use genre filters and the "Try something new" tag selector
+- Toggle between grid and list views
+- Check your personal library and statistics
 
-**Smart recommendations**
-- "For You" adapts to your taste over time
-- Excludes already-watched content
-- Boosts similar items to your favorites
-- Introduces diversity to avoid echo chambers
+## Understanding the code structure
 
-## Technical architecture
+**Controllers/** - API endpoints following Sora's controller-only routing pattern
+```
+RecsController.cs     - Recommendation queries and rating submission
+LibraryController.cs  - User library management (favorites, watch status)  
+UsersController.cs    - User profile creation and statistics
+AdminController.cs    - Data seeding and system administration
+```
 
-**Built with Sora patterns**
-- Controllers-only routing (no magic endpoints)
-- Centralized constants (no scattered magic strings)
-- Typed options configuration
-- Clean separation of concerns
+**Services/** - Business logic and recommendation algorithms
+```
+RecsService.cs        - Core recommendation engine with hybrid scoring
+SeedService.cs        - Background data import and processing
+SettingsService.cs    - Configuration management for tunable parameters
+```
 
-**Data design**
-- User-centric library storage (`LibraryEntryDoc`)
-- Preference profiles with genre/tag weights (`UserProfileDoc`)
-- Tunable recommendation settings (`SettingsDoc`)
-- Graceful schema evolution
+**Models/** - Data contracts and entities
+```
+AnimeDoc.cs          - Content metadata with optional vector embeddings
+LibraryEntryDoc.cs   - User interaction tracking (ratings, favorites, status)
+UserProfileDoc.cs    - Preference profiles with genre weights and vectors
+SettingsDoc.cs       - System configuration (recommendation parameters)
+```
 
-**AI integration**
-- Optional vector embeddings via Ollama
-- Hybrid scoring (vector + popularity + preferences)
-- Fallback to popularity when AI unavailable
-- Real-time preference learning
+**wwwroot/** - Static web interface using vanilla JavaScript
+```
+js/index.page.js     - Main browsing interface logic
+js/dashboard.page.js - Administrative interface  
+js/api.js           - API client with error handling
+js/cards.js         - Content rendering components
+js/filters.js       - Search and filtering logic
+```
 
-## Getting started
+## API reference
 
-1. **Prerequisites**
-   ```bash
-   # Required
-   docker run -d -p 27017:27017 mongo:latest
-   
-   # Optional for vector search
-   docker run -d -p 8080:8080 semitechnologies/weaviate:latest
-   
-   # Optional for embeddings
-   docker run -d -p 11434:11434 ollama/ollama
-   ```
-
-2. **Run the sample**
-   ```bash
-   cd samples/S5.Recs
-   dotnet run
-   ```
-
-3. **Seed some data**
-   - Open `/dashboard`
-   - Click "Seed Sample Data" to import from AniList
-   - Or upload your own JSON files
-
-4. **Start exploring**
-   - Browse recommendations at `/`
-   - Try searching: "space western" or "slice of life"
-   - Rate a few anime and watch personalization kick in
-
-## API surface
+This sample exposes several REST endpoints that demonstrate different aspects of building recommendation APIs:
 
 **Recommendations** (`/api/recs`)
-- `POST /query` - Get personalized recommendations with filters
-- `POST /rate` - Rate anime and update user preferences
+- `POST /query` - Get personalized recommendations with optional filters and search text
+- `POST /rate` - Submit user rating and automatically update preference profile
 
-**Library** (`/api/library`)  
-- `GET /{userId}` - Get user's library with pagination and sorting
-- `PUT /{userId}/{animeId}` - Update favorite/watched/rating status
-- `DELETE /{userId}/{animeId}` - Remove from library
+**User Library** (`/api/library`)
+- `GET /{userId}` - Retrieve user's library with pagination, sorting, and status filtering
+- `PUT /{userId}/{animeId}` - Update favorite status, watch state, or rating
+- `DELETE /{userId}/{animeId}` - Remove item from user's library
 
-**Users** (`/api/users`)
-- `GET /` - List users (sample creates default user)
-- `POST /` - Create new user
-- `GET /{id}/stats` - Get user's viewing statistics
+**User Management** (`/api/users`)
+- `GET /` - List all users (sample auto-creates default user if none exist)
+- `POST /` - Create new user profile
+- `GET /{id}/stats` - Get user's viewing statistics (favorites, watched, dropped counts)
 
-**Admin** (`/admin`)
-- Seeding: `POST /seed/start`, `GET /seed/status/{jobId}`
-- Analytics: `GET /stats`, `GET /providers`
-- Tuning: `GET|POST /recs-settings`
+**Administration** (`/admin`)
+- `POST /seed/start` - Start background data import from external sources
+- `GET /seed/status/{jobId}` - Check import progress and status
+- `GET /stats` - System statistics (total content, users, vectors)
+- `GET|POST /recs-settings` - View and update recommendation algorithm parameters
 
-## What it teaches
+## Learning outcomes
 
-**Modern web patterns**
-- Hybrid SPA without complex frameworks
-- Event delegation and modular JavaScript
-- Accessible UI with ARIA support
-- Mobile-responsive design
+**After exploring this sample, you'll understand:**
 
-**Recommendation systems**
-- User preference modeling
-- Hybrid scoring (collaborative + content-based)
-- Cold start handling
-- Real-time personalization
+- How to design entities that support both simple queries and complex recommendation algorithms
+- Techniques for building user preference models that improve over time
+- Patterns for integrating AI services while maintaining system reliability
+- Approaches to creating responsive web interfaces without complex frontend frameworks
+- Methods for building administrative tools that support production operations
+- Strategies for testing recommendation systems and measuring their effectiveness
 
-**Production readiness**
-- Graceful degradation
-- Health monitoring
-- Admin observability
-- Performance optimization
+**You'll also see practical implementations of:**
 
-## Built for
+- Background job processing for data imports and AI operations
+- Real-time UI updates with server-sent events
+- Graceful error handling and system health monitoring
+- Modular JavaScript architecture with event delegation
+- RESTful API design following Sora conventions
+- MongoDB document modeling for recommendation use cases
 
-- **Learning modern .NET patterns** - See how Sora simplifies complex scenarios
-- **Prototyping recommendation features** - Get ideas working fast
-- **Understanding AI integration** - Vector search and embeddings made simple
-- **Building production systems** - Patterns that scale to enterprise needs
-
-## Community & support
-
-- **Source code** - Fully documented and commented
-- **Live demo** - See it running at localhost after `dotnet run`
-- **Extensible** - Add new data sources, algorithms, or UI features
-
-Built with ❤️ to show how recommendation engines should feel: powerful but not overwhelming, smart but predictable, complex under the hood but simple to use.
-
----
-
-**Tech stack:** .NET 9, MongoDB, Weaviate (optional), Ollama (optional) | **UI:** Vanilla JS, Tailwind CSS | **Patterns:** Clean Architecture, Domain-Driven Design
+This sample serves as both a working application and a reference implementation for building similar systems in your own projects.
