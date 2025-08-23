@@ -163,13 +163,18 @@
       <div class="flex flex-wrap items-center space-x-4">
         <h3 class="text-xl font-semibold text-white" id="contentTitle">Discover Anime</h3>
         <div class="flex items-center space-x-2">
-          <button class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm transition-colors" onclick="toggleFilters()">
-            <i class="fas fa-filter mr-2"></i>
-            Filters
-          </button>
           <span class="text-gray-400 text-sm" id="resultCount">Loading…</span>
         </div>
       </div>
+        <div class="flex items-center space-x-4">
+          <!-- Sort Dropdown -->
+          <select id="sortBy" class="bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <option value="relevance">Most Relevant</option>
+            <option value="rating">Highest Rated</option>
+            <option value="recent">Most Recent</option>
+            <option value="popular">Most Popular</option>
+          </select>
+        </div>
             
       <div class="flex items-center space-x-4">
         <!-- Sort Dropdown -->
@@ -190,7 +195,7 @@
           </button>
         </div>
 
-        <!-- Source Toggle: For You vs Free Browsing vs Library -->
+  <!-- Source Toggle: For You vs Free Browsing vs Library -->
         <div class="flex bg-slate-800 rounded-lg p-1">
           <button id="forYouBtn" class="px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors">For You</button>
           <button id="freeBrowsingBtn" class="px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors">Free Browsing</button>
@@ -199,7 +204,7 @@
       </div>
     </div>
 
-    <!-- Try Something New (chips row) -->
+  <!-- Try Something New (chips row) -->
     <div id="tryNewRow" class="mb-4">
       <div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
         <div class="text-sm text-gray-300 md:min-w-[160px]">
@@ -230,31 +235,24 @@
       </div>
     </div>
 
-    <!-- Filters Panel -->
-    <div id="filtersPanel" class="bg-slate-900 rounded-lg p-6 mb-8 border border-slate-800 hidden">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <!-- Filters Row (always visible) -->
+    <div id="filtersPanel" class="bg-slate-900 rounded-lg p-4 mb-6 border border-slate-800">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <div>
           <label class="block text-sm font-medium text-gray-300 mb-2">Genre</label>
           <select id="genreFilter" class="w-full bg-slate-800 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
             <option value="">All Genres</option>
-            <option value="Action">Action</option>
-            <option value="Romance">Romance</option>
-            <option value="Comedy">Comedy</option>
-            <option value="Drama">Drama</option>
-            <option value="Fantasy">Fantasy</option>
           </select>
         </div>
                 
         <div>
           <label class="block text-sm font-medium text-gray-300 mb-2">Rating</label>
           <div class="dual-range">
+            <input id="ratingMin" type="range" min="0" max="5" step="0.5" class="w-full range-input mb-1" aria-label="Minimum rating">
             <div class="relative h-2 bg-slate-800 rounded range-track">
               <div id="ratingProgress" class="absolute h-2 bg-purple-600 rounded range-progress" style="left:0%;width:100%;"></div>
             </div>
-            <div class="relative mt-2">
-              <input id="ratingMin" type="range" min="0" max="5" step="0.5" class="w-full range-input" aria-label="Minimum rating">
-              <input id="ratingMax" type="range" min="0" max="5" step="0.5" class="w-full range-input range-input-overlay" aria-label="Maximum rating">
-            </div>
+            <input id="ratingMax" type="range" min="0" max="5" step="0.5" class="w-full range-input mt-1" aria-label="Maximum rating">
             <div class="text-xs text-gray-400 mt-1" id="ratingLabel">Any</div>
           </div>
         </div>
@@ -262,14 +260,12 @@
         <div>
           <label class="block text-sm font-medium text-gray-300 mb-2">Year</label>
           <div class="dual-range">
+            <!-- These will be initialized to [currentYear-30, currentYear] in JS -->
+            <input id="yearMin" type="range" min="1995" max="2025" step="1" class="w-full range-input mb-1" aria-label="Earliest year">
             <div class="relative h-2 bg-slate-800 rounded range-track">
               <div id="yearProgress" class="absolute h-2 bg-purple-600 rounded range-progress" style="left:0%;width:100%;"></div>
             </div>
-            <div class="relative mt-2">
-              <!-- These will be initialized to [currentYear-30, currentYear] in JS -->
-              <input id="yearMin" type="range" min="1995" max="2025" step="1" class="w-full range-input" aria-label="Earliest year">
-              <input id="yearMax" type="range" min="1995" max="2025" step="1" class="w-full range-input range-input-overlay" aria-label="Latest year">
-            </div>
+            <input id="yearMax" type="range" min="1995" max="2025" step="1" class="w-full range-input mt-1" aria-label="Latest year">
             <div class="text-xs text-gray-400 mt-1" id="yearLabel">Any</div>
           </div>
         </div>
@@ -283,16 +279,6 @@
             <option value="long">Long (26+ eps)</option>
           </select>
         </div>
-        
-      </div>
-            
-      <div class="flex justify-end space-x-3 mt-6">
-        <button onclick="clearFilters()" class="px-4 py-2 text-gray-400 hover:text-white transition-colors">
-          Clear All
-        </button>
-        <button onclick="applyFilters()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors">
-          Apply Filters
-        </button>
       </div>
     </div>
 

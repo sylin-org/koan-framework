@@ -83,6 +83,9 @@ window.S5Const = Object.freeze({
   YEAR: Object.freeze({
     WINDOW_YEARS: 30
   }),
+  FILTERS: Object.freeze({
+    DEBOUNCE_MS: 120
+  }),
   // Backend endpoints used by the lightweight API client
   ENDPOINTS: Object.freeze({
     USERS: '/api/users',

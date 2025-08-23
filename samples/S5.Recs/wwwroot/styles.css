@@ -1397,8 +1397,7 @@ button {
 .dual-range { user-select: none; }
 .dual-range .range-track { position: relative; }
 .dual-range .range-progress { position: absolute; top: 0; height: 0.5rem; border-radius: 0.25rem; }
-.dual-range .range-input { appearance: none; -webkit-appearance: none; background: transparent; position: relative; z-index: 10; width: 100%; }
-.dual-range .range-input-overlay { position: absolute; left: 0; top: 0; z-index: 20; width: 100%; pointer-events: auto; /* interactive area is clipped via JS (clip-path) */ }
+.dual-range .range-input { appearance: none; -webkit-appearance: none; background: transparent; position: relative; width: 100%; }
 .dual-range .range-input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 9999px; background: #a855f7; border: 2px solid #1f2937; cursor: pointer; }
 .dual-range .range-input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 9999px; background: #a855f7; border: 2px solid #1f2937; cursor: pointer; }
 .dual-range .range-input:focus { outline: none; }

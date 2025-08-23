@@ -106,9 +106,17 @@
     }
 
     // Filters
-  // Genre/Episode remain selects; rating/year are dual-range sliders
-  ;['genreFilter', 'episodeFilter'].forEach(id => Dom.on(id, 'change', applyFilters));
-  initDualRangeControls();
+    // Debounced auto-apply across selects and dual-range sliders
+    const debounceMs = (window.S5Const && window.S5Const.FILTERS && typeof window.S5Const.FILTERS.DEBOUNCE_MS === 'number') ? window.S5Const.FILTERS.DEBOUNCE_MS : 120;
+    let applyT = null;
+    function scheduleApply(){
+      if (applyT) clearTimeout(applyT);
+      applyT = setTimeout(() => { applyFilters(); }, debounceMs);
+    }
+    // Genre/Episode selects
+    ['genreFilter', 'episodeFilter'].forEach(id => Dom.on(id, 'change', scheduleApply));
+    // Dual-range sliders initialization + hook into scheduleApply from inside
+    initDualRangeControls(scheduleApply);
 
     // Outside clicks close menus
     document.addEventListener('click', (e) => {
@@ -387,16 +395,7 @@
   };
 
   // Filters panel toggle
-  window.toggleFilters = function(){
-    const panel = Dom.$('filtersPanel');
-    if(!panel) return;
-    panel.classList.toggle('hidden');
-    if(!panel.classList.contains('hidden')){
-      // Focus first control when opening
-      const first = panel.querySelector('select, input, button');
-      if(first) first.focus();
-    }
-  };
+  // Filters panel is always visible now; no toggle.
 
   // View state
   window.setViewMode = function(mode){ const gridBtn=Dom.$('gridViewBtn'); const listBtn=Dom.$('listViewBtn'); if(mode==='grid'){ gridBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; listBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } else { listBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; gridBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } window.currentLayout = mode; displayAnime(window.filteredData); };
@@ -494,7 +493,7 @@
 })();
 
 // Dual-range helpers (module-private)
-function initDualRangeControls(){
+function initDualRangeControls(onChange){
   const R = (window.S5Const && window.S5Const.RATING) || {}; const Y = (window.S5Const && window.S5Const.YEAR) || {};
   const ratingMin = document.getElementById('ratingMin');
   const ratingMax = document.getElementById('ratingMax');
@@ -506,7 +505,7 @@ function initDualRangeControls(){
   if (ratingMin && ratingMax){
     ratingMin.min = String(rMin); ratingMin.max = String(rMax); ratingMin.step = String(ratingStep); ratingMin.value = String(rMin);
     ratingMax.min = String(rMin); ratingMax.max = String(rMax); ratingMax.step = String(ratingStep); ratingMax.value = String(rMax);
-    const onRating = (e)=> clampPair(ratingMin, ratingMax, rMin, rMax, ratingStep, updateRatingUi, e?.target);
+  const onRating = (e)=> { clampPair(ratingMin, ratingMax, rMin, rMax, ratingStep, updateRatingUi, e?.target); if (typeof onChange === 'function') onChange(); };
     ratingMin.addEventListener('input', onRating);
     ratingMax.addEventListener('input', onRating);
     updateRatingUi();
@@ -515,7 +514,7 @@ function initDualRangeControls(){
   if (yearMin && yearMax){
     yearMin.min = String(yMinAbs); yearMin.max = String(yMaxAbs); yearMin.step = '1'; yearMin.value = String(yMinAbs);
     yearMax.min = String(yMinAbs); yearMax.max = String(yMaxAbs); yearMax.step = '1'; yearMax.value = String(yMaxAbs);
-    const onYear = (e)=> clampPair(yearMin, yearMax, yMinAbs, yMaxAbs, 1, updateYearUi, e?.target);
+  const onYear = (e)=> { clampPair(yearMin, yearMax, yMinAbs, yMaxAbs, 1, updateYearUi, e?.target); if (typeof onChange === 'function') onChange(); };
     yearMin.addEventListener('input', onYear);
     yearMax.addEventListener('input', onYear);
     updateYearUi();
@@ -556,14 +555,7 @@ function updateRatingUi(){
   const rMin = typeof R.MIN === 'number' ? R.MIN : 0; const rMax = typeof R.MAX === 'number' ? R.MAX : 5;
   const pct = v => ((v - rMin) / (rMax - rMin)) * 100;
   if (prog){ prog.style.left = pct(Math.min(r0,r1)) + '%'; prog.style.width = (pct(Math.max(r0,r1)) - pct(Math.min(r0,r1))) + '%'; }
-  // Prevent the overlay (max) slider from intercepting clicks on the left side.
-  // Clip its interactive region to the right of the min thumb, keeping a small margin so the max thumb stays grabbable when equal.
-  if (ratingMax){
-    const leftClip = Math.max(0, pct(Math.min(r0, r1)) - 2); // keep ~2% margin for the max knob
-    const clip = `inset(0 0 0 ${leftClip}%)`;
-    ratingMax.style.clipPath = clip;
-    ratingMax.style.webkitClipPath = clip;
-  }
+  // No overlay needed in stacked layout.
   if (label){ label.textContent = (r0 <= rMin && r1 >= rMax) ? 'Any' : `Rating: ${r0}–${r1}★`; }
 }
 
@@ -576,13 +568,7 @@ function updateYearUi(){
   const absMin = parseInt(yearMin.min, 10), absMax = parseInt(yearMax.max, 10);
   const pct = v => ((v - absMin) / (absMax - absMin)) * 100;
   if (prog){ prog.style.left = pct(Math.min(ymin,ymax)) + '%'; prog.style.width = (pct(Math.max(ymin,ymax)) - pct(Math.min(ymin,ymax))) + '%'; }
-  // Clip max slider hit area to the right of the min thumb to avoid blocking min interactions
-  if (yearMax){
-    const leftClip = Math.max(0, pct(Math.min(ymin, ymax)) - 1); // ~1% margin for year knob (finer granularity)
-    const clip = `inset(0 0 0 ${leftClip}%)`;
-    yearMax.style.clipPath = clip;
-    yearMax.style.webkitClipPath = clip;
-  }
+  // No overlay needed in stacked layout.
   if (label){
     const any = (ymin <= absMin && ymax >= absMax);
     const present = ymax >= absMax ? 'present' : String(ymax);
