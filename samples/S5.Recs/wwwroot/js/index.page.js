@@ -535,6 +535,14 @@ function updateRatingUi(){
   const rMin = typeof R.MIN === 'number' ? R.MIN : 0; const rMax = typeof R.MAX === 'number' ? R.MAX : 5;
   const pct = v => ((v - rMin) / (rMax - rMin)) * 100;
   if (prog){ prog.style.left = pct(Math.min(r0,r1)) + '%'; prog.style.width = (pct(Math.max(r0,r1)) - pct(Math.min(r0,r1))) + '%'; }
+  // Prevent the overlay (max) slider from intercepting clicks on the left side.
+  // Clip its interactive region to the right of the min thumb, keeping a small margin so the max thumb stays grabbable when equal.
+  if (ratingMax){
+    const leftClip = Math.max(0, pct(Math.min(r0, r1)) - 2); // keep ~2% margin for the max knob
+    const clip = `inset(0 0 0 ${leftClip}%)`;
+    ratingMax.style.clipPath = clip;
+    ratingMax.style.webkitClipPath = clip;
+  }
   if (label){ label.textContent = (r0 <= rMin && r1 >= rMax) ? 'Any' : `Rating: ${r0}–${r1}★`; }
 }
 
@@ -547,6 +555,13 @@ function updateYearUi(){
   const absMin = parseInt(yearMin.min, 10), absMax = parseInt(yearMax.max, 10);
   const pct = v => ((v - absMin) / (absMax - absMin)) * 100;
   if (prog){ prog.style.left = pct(Math.min(ymin,ymax)) + '%'; prog.style.width = (pct(Math.max(ymin,ymax)) - pct(Math.min(ymin,ymax))) + '%'; }
+  // Clip max slider hit area to the right of the min thumb to avoid blocking min interactions
+  if (yearMax){
+    const leftClip = Math.max(0, pct(Math.min(ymin, ymax)) - 1); // ~1% margin for year knob (finer granularity)
+    const clip = `inset(0 0 0 ${leftClip}%)`;
+    yearMax.style.clipPath = clip;
+    yearMax.style.webkitClipPath = clip;
+  }
   if (label){
     const any = (ymin <= absMin && ymax >= absMax);
     const present = ymax >= absMax ? 'present' : String(ymax);
