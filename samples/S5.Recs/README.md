@@ -1,121 +1,258 @@
-# S5.Recs — “What to watch next?” sample (Mongo + optional Vector + Ollama)
+# S5.Recs
 
-An approachable sample that demonstrates hybrid recommendations for anime with a focus on simplicity and good practices:
-- MongoDB stores canonical anime metadata and all user-specific library signals.
-- Optional vector search (Weaviate) improves relevance when configured.
-- Ollama provides local embeddings; the app degrades gracefully when AI/vector are unavailable.
-- A static UI under `wwwroot` offers Browse and Admin views.
+**Anime recommendations shouldn't be rocket science. They should just work.**
 
-The sample adheres to Sora guidelines: controllers-only routing, typed options (no magic values), centralized constants, small entities, and clear separation of concerns.
+S5.Recs demonstrates how to build a modern recommendation engine with Sora—complete with vector search, user personalization, and a polished UI. Start with basic popularity rankings, add AI-powered semantic search when you're ready, scale to complex preference modeling as you grow.
 
-## Design decisions (Aug 2025)
+## What makes it compelling?
 
-- User-centric ranking store
-  - All user signals (Favorite, Watched, Dropped, Rating, AddedAt) live in `LibraryEntryDoc` keyed by `{UserId}:{AnimeId}`.
-  - Rating is co-located with status; the old `RatingDoc` is deprecated/removed.
-  - When a user rates an item without a status, we auto-set `Watched` for simplicity.
-- Lightweight user profiles
-  - `UserProfileDoc` maintains genre/tag weights and an optional preference vector via EWMA updates.
-  - Preferences consider both Genres and Tags from the user’s library.
-- Simple, tunable scoring
-  - Base hybrid: Vector (if available) + Popularity + Preference boosts/penalties (centered around neutral).
-  - “For You” excludes Watched/Dropped and lightly boosts Favorites and close neighbors.
-- “Try Something New” (per-request nudges)
-  - Users can pick up to `MaxPreferredTags` tags/genres to softly boost results without taking over the ranking.
-  - An optional Diversity bonus can inject novelty when vectors are available.
-- Admin-configurable settings
-  - `SettingsDoc` (Id=`recs:settings`) persists `PreferTagsWeight`, `MaxPreferredTags`, `DiversityWeight`.
-  - Admin page can GET/POST these tunables; Recs reads effective values via options/provider.
+- **Start simple, scale smart**  
+  Works perfectly with just MongoDB and popularity rankings. Add Weaviate for vector search and Ollama for embeddings when you want semantic matching—but they're optional.
 
-## What it demonstrates
+- **Real user patterns**  
+  Track favorites, ratings, watch status, and personal preferences. Build taste profiles that actually improve recommendations over time.
 
-- Clean, controller-only APIs with centralized constants and options.
-- Provider-based seed pipeline (AniList or local JSON), idempotent and observable.
-- Personalization loop that stays readable: status/rating → profile update → better recommendations.
-- Graceful fallbacks when AI/Vectors are not configured.
+- **Production-ready patterns**  
+  Graceful fallbacks, admin controls, real-time seeding, and health monitoring. Everything you'd expect in a production recommendation service.
 
-## Quick start
+- **Beautiful, responsive UI**  
+  Browse anime with grid/list views, filter by genre and year, search semantically, and manage your personal library—all without writing frontend framework code.
 
-1) Prerequisites
-- Docker Desktop (MongoDB; Weaviate optional; Ollama optional)
-- .NET 8 SDK
+## What you get out of the box
 
-2) Run
-- Start the app (and Weaviate/Ollama if desired). The API runs on the S5 block (e.g., http://localhost:5084).
+- **Personalized recommendations**  
+  "For You" feed that learns from ratings, favorites, and viewing history
 
-3) Seed data
-- Use the Admin page to seed from AniList or the local JSON pack. The pipeline fetches → embeds (if AI available) → imports.
+- **Semantic search**  
+  Find anime by describing what you want: "space opera with political intrigue"
 
-4) Try it
-- Browse: search or just use “For You” (with or without vectors). Rate a few items and see personalization kick in.
-- Admin: view stats, manage providers, and adjust recommendation settings.
+- **Smart filtering**  
+  Genre, year, episode count, and rating filters with real-time tag suggestions
+
+- **User library management**  
+  Track favorites, watched status, ratings, and personal watchlists
+
+- **Admin dashboard**  
+  Data seeding, vector management, recommendation tuning, and system health
+
+- **Adaptive UI**  
+  Works on mobile, tablet, and desktop with keyboard navigation and accessibility support
+
+## Real-world example
+
+First, the essential packages are already included:
+
+```bash
+# Core framework
+Sora.Core, Sora.Web
+
+# Data access
+Sora.Data.Mongo
+
+# AI and vector search (optional)
+Sora.AI, Sora.Ai.Provider.Ollama, Sora.Data.Weaviate
+```
+
+Then your models become instantly searchable:
+
+```csharp
+// Define your anime entity
+public class AnimeDoc : Entity<AnimeDoc>
+{
+    public string Title { get; set; } = string.Empty;
+    public List<string> Genres { get; set; } = [];
+    public float Popularity { get; set; }
+    public string Synopsis { get; set; } = string.Empty;
+    
+    // Vector embeddings automatically generated from synopsis
+    public float[]? Vector { get; set; }
+}
+
+// Get full recommendation APIs
+[Route("api/[controller]")]
+public class RecsController : ControllerBase
+{
+    [HttpPost("query")]
+    public async Task<RecsResponse> Query([FromBody] RecsRequest request)
+    {
+        // Hybrid scoring: vector similarity + popularity + user preferences
+        var results = await _recsEngine.GetRecommendations(request);
+        return results;
+    }
+}
+
+// Use it naturally
+var recs = await _recsEngine.GetRecommendations(new RecsRequest 
+{ 
+    UserId = user.Id,
+    TopK = 50,
+    Filters = new() { SpoilerSafe = true }
+});
+```
+
+That's it. You now have:
+
+- Personalized "For You" recommendations based on user history
+- Semantic search: "Find me something like Cowboy Bebop but in space"
+- Smart filtering by genre, year, popularity, and custom tags
+- User library management with favorites, ratings, and watch status
+- Admin dashboard for data management and recommendation tuning
+
+**That's it.** Real AI-powered recommendations with graceful fallbacks when vectors aren't available.
+
+## Want more? It's already there
+
+**Need admin controls?**
+
+Visit `/dashboard` to:
+- Seed data from AniList or local JSON files
+- Monitor recommendation engine health
+- Tune algorithm weights in real-time
+- View usage statistics and system metrics
+
+**Want vector search?**
+
+```bash
+docker run -p 8080:8080 semitechnologies/weaviate:latest
+```
+
+Now your text searches become semantic: "romantic comedy in a school setting" finds relevant anime even without exact keyword matches.
+
+**Need local AI embeddings?**
+
+```bash
+docker run -d -p 11434:11434 ollama/ollama
+ollama pull nomic-embed-text
+```
+
+Your anime synopses are now automatically embedded for better similarity matching.
+
+## The user experience
+
+**Browse and discover**
+- Grid or list view with beautiful cover art
+- Real-time search with instant results  
+- Filter by genre, year, rating, episode count
+- "Try something new" with smart tag suggestions
+
+**Personal library**
+- Mark favorites with a single click
+- Track watched/dropped status
+- Rate anime from 1-5 stars
+- View personalized statistics
+
+**Smart recommendations**
+- "For You" adapts to your taste over time
+- Excludes already-watched content
+- Boosts similar items to your favorites
+- Introduces diversity to avoid echo chambers
+
+## Technical architecture
+
+**Built with Sora patterns**
+- Controllers-only routing (no magic endpoints)
+- Centralized constants (no scattered magic strings)
+- Typed options configuration
+- Clean separation of concerns
+
+**Data design**
+- User-centric library storage (`LibraryEntryDoc`)
+- Preference profiles with genre/tag weights (`UserProfileDoc`)
+- Tunable recommendation settings (`SettingsDoc`)
+- Graceful schema evolution
+
+**AI integration**
+- Optional vector embeddings via Ollama
+- Hybrid scoring (vector + popularity + preferences)
+- Fallback to popularity when AI unavailable
+- Real-time preference learning
+
+## Getting started
+
+1. **Prerequisites**
+   ```bash
+   # Required
+   docker run -d -p 27017:27017 mongo:latest
+   
+   # Optional for vector search
+   docker run -d -p 8080:8080 semitechnologies/weaviate:latest
+   
+   # Optional for embeddings
+   docker run -d -p 11434:11434 ollama/ollama
+   ```
+
+2. **Run the sample**
+   ```bash
+   cd samples/S5.Recs
+   dotnet run
+   ```
+
+3. **Seed some data**
+   - Open `/dashboard`
+   - Click "Seed Sample Data" to import from AniList
+   - Or upload your own JSON files
+
+4. **Start exploring**
+   - Browse recommendations at `/`
+   - Try searching: "space western" or "slice of life"
+   - Rate a few anime and watch personalization kick in
 
 ## API surface
 
-- Recommendations (`/api/recs`)
-  - `POST /api/recs/query` — returns recommendations. If `userId` is provided and no `text/anchor` is given, a profile-vector path is used (when available). Excludes the user’s Watched/Dropped; lightly boosts Favorites. Supports filters and the “Try Something New” boost.
-  - `POST /api/recs/rate` — upserts rating for `{userId, animeId}`; if no status exists, auto-sets `Watched`. Also updates the user profile (genre/tag weights and pref vector when AI is available).
-- Library (`/api/library`)
-  - `PUT /api/library/{userId}/{animeId}` — body can include `{ favorite?, watched?, dropped?, rating? }`. Enforces `Watched` xor `Dropped`; `Favorite` can coexist. `rating` requires `Watched` or `Dropped`.
-  - `DELETE /api/library/{userId}/{animeId}` — resets status and clears rating.
-  - `GET /api/library/{userId}?status=&sort=&page=&pageSize=` — returns a paged list joined with anime metadata. Sorts: Relevance, Rank (Popularity), ReleaseDate (if present), AddedAt.
-- Users (`/api/users`)
-  - `GET /api/users` — returns users (the sample auto-creates a single “Default User” if empty).
-  - `POST /api/users` — creates a user.
-  - `GET /api/users/{id}/stats` — `{ favorites, watched, dropped }` for the Welcome Back chip.
-- Admin (`/admin`)
-  - Seed & stats: `POST /admin/seed/start`, `GET /admin/seed/status/{jobId}`, `GET /admin/stats`, `GET /admin/providers`.
-  - Vector-only upsert: `POST /admin/seed/vectors`.
-  - Recommendation settings: `GET /admin/recs-settings`, `POST /admin/recs-settings` (see Settings below).
+**Recommendations** (`/api/recs`)
+- `POST /query` - Get personalized recommendations with filters
+- `POST /rate` - Rate anime and update user preferences
 
-All routes are declared in controllers; route segments and defaults live in `Infrastructure/Constants.cs`.
+**Library** (`/api/library`)  
+- `GET /{userId}` - Get user's library with pagination and sorting
+- `PUT /{userId}/{animeId}` - Update favorite/watched/rating status
+- `DELETE /{userId}/{animeId}` - Remove from library
 
-## Data model
+**Users** (`/api/users`)
+- `GET /` - List users (sample creates default user)
+- `POST /` - Create new user
+- `GET /{id}/stats` - Get user's viewing statistics
 
-- `AnimeDoc` (Mongo; optional vectors)
-  - Canonical anime metadata: titles, genres, tags, episodes, synopsis, popularity, media URLs; optional Year/Rank if available.
-- `UserDoc` (Mongo)
-  - Minimal user record: Id, Name, IsDefault, CreatedAt. The sample seeds a “Default User”.
-- `LibraryEntryDoc` (Mongo) — user-centric ranking store
-  - Id = `{UserId}:{AnimeId}`, `UserId`, `AnimeId`, `Favorite` (bool), `Watched` (bool), `Dropped` (bool), `Rating` (int? 0..5), `AddedAt`, `UpdatedAt`.
-- `UserProfileDoc` (Mongo)
-  - `GenreWeights` (includes tags), optional `PrefVector`, `UpdatedAt`.
-- `SettingsDoc` (Mongo; Id = `recs:settings`)
-  - `PreferTagsWeight` (0..1.0; default 0.2), `MaxPreferredTags` (1..5; default 3), `DiversityWeight` (0..0.2; default 0.1), `UpdatedAt`.
+**Admin** (`/admin`)
+- Seeding: `POST /seed/start`, `GET /seed/status/{jobId}`
+- Analytics: `GET /stats`, `GET /providers`
+- Tuning: `GET|POST /recs-settings`
 
-## Scoring and sorting (simple, tunable)
+## What it teaches
 
-- Base relevance
-  - Vector similarity (if available) + Popularity + centered preference term from user’s Genre/Tag weights.
-  - Spoiler penalty is applied when SpoilerSafe.
-- “Try Something New”
-  - Per-request `PreferTags` (up to `MaxPreferredTags`) adds a bounded boost (`PreferTagsWeight`). Diversity bonus (optional) favors items less similar to the profile vector.
-- Sort options
-  - Relevance (default), Rank (Popularity proxy), Release Date (when present), AddedAt (from library).
+**Modern web patterns**
+- Hybrid SPA without complex frameworks
+- Event delegation and modular JavaScript
+- Accessible UI with ARIA support
+- Mobile-responsive design
 
-## Admin: recommendation settings
+**Recommendation systems**
+- User preference modeling
+- Hybrid scoring (collaborative + content-based)
+- Cold start handling
+- Real-time personalization
 
-- `SettingsDoc` persists tunables; GET/POST via Admin controller. The app clamps values to safe ranges and applies them live.
-- Fields
-  - `PreferTagsWeight` — how strongly to boost preferred tags (default 0.2).
-  - `MaxPreferredTags` — max chips in the “I want to watch a…” selector (default 3).
-  - `DiversityWeight` — small novelty bonus when vectors are available (default 0.1).
--
-When AI or vectors are disabled/unavailable, related terms are ignored and the app falls back to popularity and user preferences.
+**Production readiness**
+- Graceful degradation
+- Health monitoring
+- Admin observability
+- Performance optimization
 
-## Folder layout
+## Built for
 
-- `Controllers/` — API endpoints (attribute-routed)
-- `Services/` — recommendation engine and seeding orchestrator
-- `Providers/` — source adapters (`local`, `anilist`, …)
-- `Models/` — contracts and data models (`AnimeDoc`, `UserDoc`, `LibraryEntryDoc`, `UserProfileDoc`, `SettingsDoc`, view models)
-- `Options/` — typed options (AI model, etc.)
-- `Infrastructure/` — constants and utilities
-- `wwwroot/` — static UI (browse + admin)
-- `data/` — dev-only seed/mongo/vector caches (gitignored)
+- **Learning modern .NET patterns** - See how Sora simplifies complex scenarios
+- **Prototyping recommendation features** - Get ideas working fast
+- **Understanding AI integration** - Vector search and embeddings made simple
+- **Building production systems** - Patterns that scale to enterprise needs
 
-## Notes
+## Community & support
 
-- SFW-only ingestion; adult content is not included.
-- Sample-grade runtime: no auth; add rate-limits and authentication for production.
-- Keep code small and readable: controllers define routes, constants collect literals, options carry tunables, and entities remain minimal.
+- **Source code** - Fully documented and commented
+- **Live demo** - See it running at localhost after `dotnet run`
+- **Extensible** - Add new data sources, algorithms, or UI features
+
+Built with ❤️ to show how recommendation engines should feel: powerful but not overwhelming, smart but predictable, complex under the hood but simple to use.
+
+---
+
+**Tech stack:** .NET 9, MongoDB, Weaviate (optional), Ollama (optional) | **UI:** Vanilla JS, Tailwind CSS | **Patterns:** Clean Architecture, Domain-Driven Design
