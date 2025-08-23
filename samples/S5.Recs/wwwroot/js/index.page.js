@@ -352,6 +352,18 @@
   };
   window.clearFilters = function(){ Dom.clearValues(['genreFilter','ratingFilter','yearFilter','episodeFilter']); window.applyFilters(); };
 
+  // Filters panel toggle
+  window.toggleFilters = function(){
+    const panel = Dom.$('filtersPanel');
+    if(!panel) return;
+    panel.classList.toggle('hidden');
+    if(!panel.classList.contains('hidden')){
+      // Focus first control when opening
+      const first = panel.querySelector('select, input, button');
+      if(first) first.focus();
+    }
+  };
+
   // View state
   window.setViewMode = function(mode){ const gridBtn=Dom.$('gridViewBtn'); const listBtn=Dom.$('listViewBtn'); if(mode==='grid'){ gridBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; listBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } else { listBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; gridBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } window.currentLayout = mode; displayAnime(window.filteredData); };
   window.setViewSource = function(mode){ 
