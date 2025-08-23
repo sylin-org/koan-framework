@@ -48,8 +48,9 @@ internal sealed class SeedService : ISeedService
                 var embedded = await EmbedAndIndexAsync(data, ct);
                 _logger?.LogInformation("Seeding job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
                 var imported = await ImportMongoAsync(data, ct);
-                // Build tag catalog once docs are imported
+                // Build catalogs once docs are imported
                 try { await CatalogTagsAsync(data, ct); } catch (Exception ex) { _logger?.LogWarning(ex, "Tag cataloging failed: {Message}", ex.Message); }
+                try { await CatalogGenresAsync(data, ct); } catch (Exception ex) { _logger?.LogWarning(ex, "Genre cataloging failed: {Message}", ex.Message); }
                 _progress[jobId] = (data.Count, data.Count, embedded, imported, true, null);
                 _logger?.LogInformation("Seeding job {JobId}: imported {Imported} docs into Mongo", jobId, imported);
                 await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest.json"), JsonSerializer.Serialize(new { jobId, count = data.Count, at = DateTimeOffset.UtcNow }), ct);
@@ -235,6 +236,15 @@ internal sealed class SeedService : ISeedService
         }
     }
 
+    private static IEnumerable<string> ExtractGenres(IEnumerable<Anime> items)
+    {
+        foreach (var a in items)
+        {
+            if (a.Genres is { Length: > 0 })
+                foreach (var g in a.Genres) if (!string.IsNullOrWhiteSpace(g)) yield return g.Trim();
+        }
+    }
+
     private static IEnumerable<string> ExtractTags(IEnumerable<AnimeDoc> items)
     {
         foreach (var a in items)
@@ -305,6 +315,14 @@ internal sealed class SeedService : ISeedService
         var docs = BuildTagDocs(counts);
         await TagStatDoc.UpsertMany(docs, ct);
         _logger?.LogInformation("Tag catalog updated with {Count} tags", counts.Count);
+    }
+
+    private async Task CatalogGenresAsync(List<Anime> items, CancellationToken ct)
+    {
+        var counts = CountGenres(ExtractGenres(items));
+        var docs = BuildGenreDocs(counts);
+        await GenreStatDoc.UpsertMany(docs, ct);
+        _logger?.LogInformation("Genre catalog updated with {Count} genres", counts.Count);
     }
 
     // Utility to rebuild catalog from the current AnimeDoc collection (not used in normal flow)

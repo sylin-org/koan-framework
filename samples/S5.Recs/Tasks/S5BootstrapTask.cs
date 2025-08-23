@@ -37,8 +37,9 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
         if (anime > 0 && vectors > 0)
         {
             _logger?.LogInformation("S5 bootstrap: dataset already present (anime={Anime}, vectors={Vectors}). Skipping seeding.", anime, vectors);
-            // Best-effort ensure tags catalog exists
+            // Best-effort ensure catalogs exist
             _ = _seeder.RebuildTagCatalogAsync(ct);
+            _ = _seeder.RebuildGenreCatalogAsync(ct);
             return;
         }
         if (anime > 0 && vectors == 0)
@@ -68,8 +69,9 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
             if (a >= targetAnime && v >= targetVectors)
             {
                 _logger?.LogInformation("S5 bootstrap: dataset ready (anime={Anime}, vectors={Vectors}).", a, v);
-                // Build tag catalog after initial seed
+                // Build catalogs after initial seed
                 _ = _seeder.RebuildTagCatalogAsync(ct);
+                _ = _seeder.RebuildGenreCatalogAsync(ct);
                 return;
             }
 
@@ -78,6 +80,7 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
             {
                 _logger?.LogWarning("S5 bootstrap: docs ready but vectors still 0 after {Seconds:n0}s. Proceeding without vector features. You can seed vectors later from Admin → Seed.", sw.Elapsed.TotalSeconds);
                 _ = _seeder.RebuildTagCatalogAsync(ct);
+                _ = _seeder.RebuildGenreCatalogAsync(ct);
                 return;
             }
         }
