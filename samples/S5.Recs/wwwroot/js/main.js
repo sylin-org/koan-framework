@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return;
     }
-    // Bottom action buttons
+  // Bottom action buttons (including stars)
     const act = e.target.closest('[data-action]');
     if (act) {
       const action = act.getAttribute('data-action');
@@ -42,6 +42,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const rating = parseInt(act.getAttribute('data-rating') || '0', 10);
         if (rating > 0) window.openQuickRate(id, rating);
       }
+    }
+  });
+
+  // Hover effect for star bars: light stars up to hovered one
+  grid.addEventListener('mouseover', (e) => {
+    const star = e.target.closest('.star-btn');
+    if (!star) return;
+    const bar = star.closest('.star-bar');
+    if (!bar) return;
+    const rating = parseInt(star.getAttribute('data-rating') || '0', 10);
+    const stars = Array.from(bar.querySelectorAll('.star-btn'));
+    stars.forEach(btn => {
+      const r = parseInt(btn.getAttribute('data-rating') || '0', 10);
+      if (r <= rating) btn.classList.add('hover'); else btn.classList.remove('hover');
+    });
+  });
+  grid.addEventListener('mouseout', (e) => {
+    const bar = e.target.closest('.star-bar');
+    // If leaving the entire bar, clear hover
+    if (bar && !bar.contains(e.relatedTarget)) {
+      bar.querySelectorAll('.star-btn.hover').forEach(el => el.classList.remove('hover'));
     }
   });
 

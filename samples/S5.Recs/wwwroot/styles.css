@@ -1403,3 +1403,11 @@ button {
 .dual-range .range-input:focus { outline: none; }
 .dual-range .range-input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(168,85,247,0.4); }
 .dual-range .range-input:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px rgba(168,85,247,0.4); }
+
+/* Star rating bar */
+.star-bar { position: relative; z-index: 5; }
+.star-btn { color: #9ca3af; transition: color .15s ease; }
+.star-btn i { pointer-events: none; }
+.star-btn:hover ~ .star-btn { color: #9ca3af; }
+.star-btn:hover, .star-btn.hover { color: #fbbf24; }
+.star-btn.active { color: #f59e0b; }

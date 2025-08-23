@@ -11,18 +11,20 @@
       .replace(/\"/g, '&quot;')
       .replace(/'/g, '&#39;');
   }
-  function renderHoverRatePicker(animeId){
-    let picker = '<div class="relative group">';
-    picker += '<button class="bg-black bg-opacity-60 hover:bg-opacity-80 text-yellow-300 text-xs px-2 py-1 rounded-full" title="Rate">★</button>';
-    picker += '<div class="hidden group-hover:flex flex-col absolute right-0 top-full mt-1 bg-black bg-opacity-80 backdrop-blur rounded shadow-lg p-1 z-10">';
-  const stars = (window.S5Const && window.S5Const.RATING && typeof window.S5Const.RATING.STARS === 'number') ? window.S5Const.RATING.STARS : 5;
-  for(let n=1; n<=stars; n++){
-      picker += '<button class="text-xs text-gray-300 hover:text-yellow-300 bg-black bg-opacity-30 hover:bg-opacity-50 rounded px-2 py-1 text-right" '
-             + 'data-action="rate" data-id=' + __q(animeId) + ' data-rating="' + n + '"'
-             + '>' + n + '</button>';
+  function renderStarBar(animeId, currentRating){
+    const stars = (window.S5Const && window.S5Const.RATING && typeof window.S5Const.RATING.STARS === 'number') ? window.S5Const.RATING.STARS : 5;
+    let html = '<div class="star-bar flex items-center gap-1 bg-black/50 rounded-md px-2 py-1 border border-slate-700"'
+      + ' data-id=' + __q(animeId) + (currentRating ? ' data-current-rating="' + String(currentRating) + '"' : '') + '>';
+    for (let n=1; n<=stars; n++){
+      const active = currentRating && n <= currentRating ? ' active' : '';
+      html += '<button type="button" class="star-btn text-xs text-gray-400' + active + '"'
+        + ' data-action="rate" data-id=' + __q(animeId) + ' data-rating="' + n + '"'
+        + ' aria-label="Rate ' + n + ' star' + (n>1?'s':'') + '">'
+        + '<i class="fas fa-star"></i>'
+        + '</button>';
     }
-    picker += '</div></div>';
-    return picker;
+    html += '</div>';
+    return html;
   }
 
   function createAnimeCard(anime, state){
@@ -38,10 +40,10 @@
           <div class="aspect-[3/4] relative overflow-hidden cursor-pointer group" data-open-details=${__q(anime.id)} role="button" tabindex="0" title="View details">
             <img src="${anime.coverUrl || '/images/missing-cover.svg'}" alt="${h(anime.title)}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" onerror="this.onerror=null;this.src='/images/missing-cover.svg'" loading="lazy">
             <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div class="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+    <div class="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div class="text-white text-sm font-medium mb-1">${h(anime.title)}</div>
               <div class="text-gray-300 text-xs">${anime.episodes} eps • ${anime.year}</div>
-      ${userRating ? `<div class="mt-1 text-xs text-yellow-300">Your rating: ${userRating}★</div>` : ''}
+  <div class="mt-2 flex justify-start">${renderStarBar(anime.id, userRating)}</div>
             </div>
           </div>
           <div class="p-4">
@@ -54,7 +56,6 @@
               }).join('')}
             </div>
             <div class="mt-2 flex items-center gap-2">
-              ${renderHoverRatePicker(anime.id)}
               <button class="bg-slate-800 hover:bg-slate-700 ${isWatched ? 'text-green-300 ring-1 ring-green-400/40 bg-green-900/20' : 'text-green-300'} text-xs px-2 py-1 rounded-full" title="Mark Watched" data-action="watched" data-id=${__q(anime.id)}><i class='fas fa-eye'></i></button>
               <button class="bg-slate-800 hover:bg-slate-700 ${isDropped ? 'text-red-300 ring-1 ring-red-400/40 bg-red-900/20' : 'text-red-300'} text-xs px-2 py-1 rounded-full" title="Mark Dropped" data-action="dropped" data-id=${__q(anime.id)}><i class='fas fa-times'></i></button>
               <button class="bg-slate-800 hover:bg-slate-700 ${isFav ? 'text-pink-300 ring-1 ring-pink-400/40 bg-pink-900/20' : 'text-pink-300'} text-xs px-2 py-1 rounded-full" title="Favorite" data-action="favorite" data-id=${__q(anime.id)}>♥</button>
@@ -96,7 +97,7 @@
             ${userRating ? `<div class="mt-1 text-xs text-yellow-300">Your rating: ${userRating}★</div>` : ''}
           </div>
            <div class="col-span-12 md:col-span-3 flex md:flex-col gap-2 md:items-end items-start justify-end">
-             ${renderHoverRatePicker(anime.id)}
+             ${renderStarBar(anime.id, userRating)}
              <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isWatched ? 'text-green-300 ring-1 ring-green-400/40 bg-green-900/40' : 'text-green-300'} text-xs px-2 py-1 rounded-full" title="Mark Watched" data-action="watched" data-id=${__q(anime.id)}><i class='fas fa-eye'></i></button>
              <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isDropped ? 'text-red-300 ring-1 ring-red-400/40 bg-red-900/40' : 'text-red-300'} text-xs px-2 py-1 rounded-full" title="Mark Dropped" data-action="dropped" data-id=${__q(anime.id)}><i class='fas fa-times'></i></button>
              <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isFav ? 'text-pink-300 ring-1 ring-pink-400/40 bg-pink-900/40' : 'text-pink-300'} text-xs px-2 py-1 rounded-full" title="Favorite" data-action="favorite" data-id=${__q(anime.id)}>♥</button>
