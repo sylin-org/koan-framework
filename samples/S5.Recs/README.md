@@ -1,8 +1,8 @@
-# S5.Recs
+# AnimeRadar
 
 **This sample demonstrates how to build a complete recommendation engine using Sora.**
 
-S5.Recs shows you how to create a modern content recommendation system by combining MongoDB for data storage, optional vector search with Weaviate, and AI embeddings via Ollama. The sample walks through building personalized recommendations, semantic search, user preference modeling, and a responsive web interface—all using Sora's modular architecture.
+AnimeRadar shows you how to create a modern content recommendation system by combining MongoDB for data storage, optional vector search with Weaviate, and AI embeddings via Ollama. The sample walks through building personalized recommendations, semantic search, user preference modeling, and a responsive web interface—all using Sora's modular architecture.
 
 ## What this sample teaches
 
@@ -30,7 +30,13 @@ Begin with popularity-based recommendations filtered by user preferences. This g
 Build a system to track user behaviors (ratings, favorites, viewing status) and use that data to build preference profiles. The sample shows how to weight genres and tags based on user interactions.
 
 **[4] Layer in semantic search**  
-Add vector embeddings to enable semantic search ("find something like Cowboy Bebop") alongside keyword-based filtering. The sample demonstrates graceful fallback when vector services are unavailable.
+Add vector embeddings to enable semantic search ("find something like Cowboy Bebop") alongside keyword-based filtering. 
+
+*But wait—what exactly is a vector database, and why would we need one?* Think of it this way: when you search for "space western," you're not just looking for anime with those exact words. You want shows that *feel* like space westerns—the themes, atmosphere, and storytelling style. Vector databases store mathematical representations (embeddings) of content that capture semantic meaning, not just keywords.
+
+*How does this tie to user preferences?* As users rate content, we can build a "preference vector" that represents their taste in this mathematical space. Then we can find content that's similar to what they already love, even if it doesn't share obvious keywords.
+
+The sample demonstrates graceful fallback when vector services are unavailable.
 
 **[5] Build administration tools**  
 Create admin interfaces for data management, system monitoring, and algorithm tuning. This sample includes data seeding, health checks, and recommendation parameter adjustment.
@@ -116,11 +122,50 @@ public async Task UpdateUserPreferences(string userId, string animeId, int ratin
 }
 ```
 
+*You might wonder: why use EWMA (Exponentially Weighted Moving Average) instead of just averaging ratings?* EWMA lets recent preferences influence the profile more than old ones, so if your taste changes, the system adapts. The α (alpha) value of 0.1 means new ratings have some impact but don't completely override your established preferences.
+
 This creates user taste profiles that improve recommendations over time.
 
 **Step 4: Integrate vector search for semantic matching**
 
-Add AI-powered semantic search alongside preference-based recommendations:
+*Here's where it gets interesting: how do we find content similar to what users already like?* Vector search lets you find semantically similar content:
+
+```csharp
+// Generate embeddings for new content
+public async Task GenerateEmbeddings(AnimeDoc anime)
+{
+    var text = $"{anime.Title} {string.Join(" ", anime.Genres)} {anime.Synopsis}";
+    var embedding = await _aiService.GetEmbeddingAsync(text);
+    
+    anime.Vector = embedding;
+    await _animeCollection.ReplaceOneAsync(a => a.Id == anime.Id, anime);
+}
+
+// Find similar content using vector similarity
+public async Task<List<AnimeDoc>> FindSimilar(string animeId, int count = 10)
+{
+    var source = await _animeCollection.Find(a => a.Id == animeId).FirstOrDefaultAsync();
+    if (source?.Vector == null) return [];
+    
+    // Use vector database to find similar embeddings
+    var similar = await _vectorDb.SearchAsync(source.Vector, count);
+    return similar.Select(result => result.Payload).ToList();
+}
+```
+
+*What exactly is a vector database, and why would we need one?* Think of it as a search engine that understands meaning, not just keywords. Traditional search looks for exact word matches. Vector search finds content with similar meanings—so searching "space cowboys" might surface "Firefly" even if that show's description never uses those exact words.
+
+The vector database stores numerical representations (embeddings) of your content. When you search, it finds vectors that are "close" to your query vector in this multi-dimensional space. Closeness in vector space means similarity in meaning.
+
+**Step 5: Combine approaches for hybrid recommendations**
+
+*Why not just use one approach?* Different recommendation strategies excel in different situations:
+
+- **Popularity-based**: Great for new users with no history
+- **Preference-based**: Excellent for users with established tastes  
+- **Vector/semantic**: Powerful for discovery and content-based similarity
+
+The magic happens when you combine them:
 
 ```csharp
 public async Task<List<AnimeDoc>> GetSemanticRecommendations(string userId, string? searchText = null)
@@ -150,14 +195,25 @@ public async Task<List<AnimeDoc>> GetSemanticRecommendations(string userId, stri
         }
     }
     
-    // Apply user preference scoring
-    return RankByUserPreferences(candidates, userId);
+    // Apply user preference scoring to rerank results
+    var userProfile = await GetUserProfile(userId);
+    return candidates
+        .Select(anime => new { 
+            Anime = anime, 
+            Score = CalculatePersonalizedScore(anime, userProfile) 
+        })
+        .OrderByDescending(x => x.Score)
+        .Select(x => x.Anime)
+        .Take(request.TopK)
+        .ToList();
 }
 ```
 
-The key insight: always provide fallbacks. When vector search isn't available, the system continues working.
+*Here's the key insight: vector search finds good candidates, but user preferences determine the final ranking.* This gives you both discovery (finding new content) and personalization (ranking by individual taste).
 
-**Step 5: Build administrative interfaces**
+**Step 6: Build administrative interfaces**
+
+*Why separate admin interfaces from user interfaces?* Administrative tasks like seeding data and monitoring systems have different requirements—they need detailed feedback, longer timeouts, and often handle large datasets that would overwhelm a user-facing UI.
 
 Create tools for data management and system monitoring:
 
@@ -199,11 +255,17 @@ public async Task<ActionResult> StartSeeding([FromBody] SeedRequest request)
 }
 ```
 
+*Why run this as a background task instead of blocking the API call?* Data seeding can take several minutes when processing thousands of items and generating embeddings. Users shouldn't have to wait with a frozen browser tab—they should get an immediate job ID and can check progress later.
+
+*What are embeddings, exactly?* Think of them as "coordinates" in a multi-dimensional space where similar content clusters together. When we convert an anime's synopsis into an embedding vector, we're essentially saying "this story lives at coordinates [0.2, -0.5, 0.8, ...]" in a space where similar stories are nearby.
+
 This provides essential operations tooling for production deployment.
 
-**Step 6: Create a responsive user interface**
+**Step 7: Create a responsive user interface**
 
-Build a modern web interface using vanilla JavaScript and progressive enhancement:
+*Why vanilla JavaScript instead of a framework?* For this sample, we want to show core concepts without framework-specific complexity. The patterns you learn here work regardless of whether you later adopt React, Vue, or another framework.
+
+Build a modern web interface using progressive enhancement:
 
 ```javascript
 // Modular JavaScript architecture
@@ -219,44 +281,49 @@ class RecommendationEngine {
                 preferTags: this.getSelectedTags()
             })
         });
+        
+        if (!response.ok) {
+            this.showError('Failed to load recommendations');
+            return [];
+        }
+        
         return await response.json();
     }
     
-    async updateUserRating(animeId, rating) {
-        await fetch('/api/recs/rate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: this.currentUser.id,
-                animeId: animeId,
-                rating: rating
-            })
+    // Event delegation for dynamic content
+    setupEventHandlers() {
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('[data-action="rate"]')) {
+                this.handleRating(e.target);
+            }
+            if (e.target.matches('[data-action="filter-tag"]')) {
+                this.handleTagFilter(e.target);
+            }
         });
-        
-        // Refresh recommendations after rating
-        await this.loadRecommendations();
     }
 }
 ```
+
+*Why use event delegation instead of binding events to each card?* When you have 100+ content cards, creating 100+ event listeners is inefficient. Event delegation uses JavaScript's event bubbling—one listener on the document catches clicks from all child elements. It's faster and works with dynamically added content.
 
 The sample demonstrates how to build rich interactions without complex frontend frameworks.
 
 ## Key patterns and techniques demonstrated
 
 **Hybrid recommendation scoring**  
-The sample shows how to combine multiple signals (vector similarity, popularity, user preferences) into a unified relevance score. This approach provides better results than any single method alone.
+*Why combine multiple approaches instead of picking the "best" one?* Different recommendation methods excel in different situations. Vector similarity excels at content discovery, user preferences ensure personal relevance, and popularity provides a safety net for new users. Combining them gives you the strengths of each approach.
 
 **Graceful degradation**  
-When AI services are unavailable, the system falls back to preference-based and popularity recommendations. This ensures your application remains functional even when optional services fail.
+*What happens when AI services go down?* The system falls back to preference-based and popularity recommendations. This ensures your application remains functional even when optional services fail. Users might not get semantic search, but they still get recommendations.
 
 **Real-time preference learning**  
-User interactions immediately update preference profiles using exponentially weighted moving averages (EWMA). This balances responsiveness to new preferences with stability from historical data.
+*How quickly should the system adapt to new user behavior?* User interactions immediately update preference profiles using exponentially weighted moving averages (EWMA). This balances responsiveness to new preferences with stability from historical data—recent actions matter more, but don't completely override established patterns.
 
 **Modular JavaScript architecture**  
-The frontend demonstrates modern vanilla JavaScript patterns: event delegation, module organization, and progressive enhancement. No complex frameworks required.
+*Why not use a big framework for the frontend?* This sample shows that modern vanilla JavaScript can handle complex interactions cleanly. The patterns here (event delegation, module organization, progressive enhancement) work in any framework—or no framework at all.
 
 **Production data management**  
-The sample includes comprehensive tooling: background job processing, data seeding pipelines, health monitoring, and administrative controls.
+*What about real-world operations?* The sample includes comprehensive tooling: background job processing, data seeding pipelines, health monitoring, and administrative controls. These are the pieces you need for production deployment.
 
 ## What you'll build by following this sample
 
@@ -285,13 +352,21 @@ docker run -d -p 11434:11434 ollama/ollama
 ollama pull nomic-embed-text
 ```
 
+*Wait, why do we need all these services?* Great question! Let's break it down:
+
+- **MongoDB** stores your content and user data—this is required
+- **Weaviate** is a vector database that stores and searches embeddings—this enables semantic search like "find space westerns" 
+- **Ollama** runs AI models locally to convert text into embeddings—this powers the semantic understanding
+
+*Can't we just use regular text search?* You could, but you'd miss the magic. Vector search finds content based on meaning, not just keywords. "Romantic space adventure" might find you "Cowboy Bebop" even though those exact words don't appear in the description.
+
 **Start the application**
 ```bash
 cd samples/S5.Recs
-dotnet run
+start.bat
 ```
 
-The application will start on `https://localhost:5001` (or the next available port).
+This script starts MongoDB in Docker and then launches the .NET application. The application will start on `https://localhost:5001` (or the next available port).
 
 **Initialize with sample data**
 1. Open `/dashboard` in your browser

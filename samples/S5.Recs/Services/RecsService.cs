@@ -39,18 +39,22 @@ internal sealed class RecsService : IRecsService
         int topK,
         string? userId,
         string[]? preferTags,
-        double? preferWeight,
+    double? preferWeight,
+    string? sort,
         CancellationToken ct)
     {
         // Guardrails: sensible defaults and caps for K
         if (topK <= 0) topK = 10; // avoid empty results when a caller sends 0
-        if (topK > 50) topK = 50; // keep requests light for the sample
+    if (topK > 100) topK = 100; // allow up to 100 to match UI page size
         // Try vector-first if text or anchor provided
-        _logger?.LogInformation("Query: text='{Text}' anchor='{Anchor}' genres=[{Genres}] episodesMax={EpisodesMax} spoilerSafe={SpoilerSafe} topK={TopK} user={UserId}",
-            text, anchorAnimeId, genres is null ? string.Empty : string.Join(',', genres), episodesMax, spoilerSafe, topK, userId);
+        _logger?.LogInformation("Query: text='{Text}' anchor='{Anchor}' genres=[{Genres}] episodesMax={EpisodesMax} spoilerSafe={SpoilerSafe} topK={TopK} user={UserId} preferTagsCount={PreferTagsCount}",
+            text, anchorAnimeId, genres is null ? string.Empty : string.Join(',', genres), episodesMax, spoilerSafe, topK, userId, preferTags?.Length ?? 0);
         try
         {
-            if (!string.IsNullOrWhiteSpace(text) || !string.IsNullOrWhiteSpace(anchorAnimeId) || !string.IsNullOrWhiteSpace(userId))
+            if (!string.IsNullOrWhiteSpace(text)
+                || !string.IsNullOrWhiteSpace(anchorAnimeId)
+                || !string.IsNullOrWhiteSpace(userId)
+                || (preferTags is { Length: > 0 }))
             {
                 float[] query;
                 if (!string.IsNullOrWhiteSpace(text))
@@ -86,10 +90,27 @@ internal sealed class RecsService : IRecsService
                     _logger?.LogDebug("Anchor embedding: text?={HasText} dim={Dim}", textAnchor is not null, emb?.Vectors.FirstOrDefault()?.Length ?? 0);
                     query = emb?.Vectors.FirstOrDefault() ?? Array.Empty<float>();
                 }
+                else if (!string.IsNullOrWhiteSpace(userId))
+                {
+                    var prof = await UserProfileDoc.Get(userId!, ct);
+                    query = prof?.PrefVector ?? Array.Empty<float>();
+                }
+                else if (preferTags is { Length: > 0 })
+                {
+                    // Derive an embedding from the selected tags to drive vector search in Free Browsing
+                    var ai = Sora.AI.Ai.TryResolve();
+                    if (ai is not null)
+                    {
+                        var tagText = $"Tags: {string.Join(", ", preferTags.Where(t => !string.IsNullOrWhiteSpace(t)))}";
+                        var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { tagText } }, ct);
+                        query = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+                        _logger?.LogDebug("Embedding from tags: count={Count} dim={Dim}", preferTags.Length, query.Length);
+                    }
+                    else query = Array.Empty<float>();
+                }
                 else
                 {
-                    var prof = !string.IsNullOrWhiteSpace(userId) ? await UserProfileDoc.Get(userId!, ct) : null;
-                    query = prof?.PrefVector ?? Array.Empty<float>();
+                    query = Array.Empty<float>();
                 }
 
                 if (query.Length > 0 && Vector<AnimeDoc>.IsAvailable)
@@ -136,7 +157,7 @@ internal sealed class RecsService : IRecsService
                     var preferTagsWeightEff = Math.Clamp(preferWeight ?? eff.PreferTagsWeight, 0, 1.0);
                     var preferTagsSet = new HashSet<string>((preferTags ?? Array.Empty<string>()).Take(Math.Max(1, eff.MaxPreferredTags)), StringComparer.OrdinalIgnoreCase);
 
-                    var mapped = q.Select(a =>
+                    var mappedQ = q.Select(a =>
                     {
                         var vs = idToScore.TryGetValue(a.Id, out var s) ? s : 0d;
                         var pop = a.Popularity;
@@ -205,12 +226,12 @@ internal sealed class RecsService : IRecsService
                             Score = hybrid,
                             Reasons = reasons.ToArray()
                         };
-                    })
-                    .OrderByDescending(r => r.Score)
-                    .Take(topK)
-                    .ToList();
-                    _logger?.LogInformation("Query: vector path returned {Count} items (degraded=false)", mapped.Count);
-                    return (mapped, false);
+                    }).ToList();
+                    // Apply server-side ordering
+                    var orderedQ = ApplySort(mappedQ, sort);
+                    var takenQ = orderedQ.Take(topK).ToList();
+                    _logger?.LogInformation("Query: vector path returned {Count} items (degraded=false)", takenQ.Count);
+                    return (takenQ, false);
                 }
             }
         }
@@ -230,35 +251,78 @@ internal sealed class RecsService : IRecsService
             }
             if (genres is { Length: > 0 }) docs = docs.Where(a => (a.Genres ?? Array.Empty<string>()).Intersect(genres).Any());
             if (episodesMax is int em) docs = docs.Where(a => a.Episodes is null || a.Episodes <= em);
-            var mapped = docs.Select(a => new Recommendation
+            // Apply prefer-tags soft boost in fallback so Free Browsing honors tags even without user/text
+            var eff = (_sp.GetService(typeof(IRecommendationSettingsProvider)) as IRecommendationSettingsProvider)?.GetEffective()
+                      ?? (Infrastructure.Constants.Scoring.PreferTagsWeightDefault, Infrastructure.Constants.Scoring.MaxPreferredTagsDefault, Infrastructure.Constants.Scoring.DiversityWeightDefault);
+            var preferTagsWeightEff = Math.Clamp(preferWeight ?? eff.PreferTagsWeight, 0, 1.0);
+            var preferTagsSet = new HashSet<string>((preferTags ?? Array.Empty<string>()).Take(Math.Max(1, eff.MaxPreferredTags)), StringComparer.OrdinalIgnoreCase);
+            var mappedDocs = docs.Select(a =>
             {
-                Anime = new Anime
+                // Popularity base with optional tag-based boost
+                var pop = a.Popularity;
+                double preferBoost = 0d;
+                if (preferTagsSet.Count > 0)
                 {
-                    Id = a.Id,
-                    Title = a.Title,
-                    TitleEnglish = a.TitleEnglish,
-                    TitleRomaji = a.TitleRomaji,
-                    TitleNative = a.TitleNative,
-                    Synonyms = a.Synonyms ?? Array.Empty<string>(),
-                    Genres = a.Genres ?? Array.Empty<string>(),
-                    Tags = a.Tags ?? Array.Empty<string>(),
-                    Episodes = a.Episodes,
-                    Synopsis = a.Synopsis,
-                    Popularity = a.Popularity,
-                    CoverUrl = a.CoverUrl,
-                    BannerUrl = a.BannerUrl,
-                    CoverColorHex = a.CoverColorHex
-                },
-                Score = a.Popularity,
-                Reasons = new[] { "popularity" }
-            }).OrderByDescending(r => r.Score).Take(topK).ToList();
-            _logger?.LogInformation("Query: mongo fallback returned {Count} items (degraded=true)", mapped.Count);
-            return (mapped, true);
+                    var keys = new List<string>();
+                    if (a.Genres is { Length: > 0 }) keys.AddRange(a.Genres);
+                    if (a.Tags is { Length: > 0 }) keys.AddRange(a.Tags);
+                    if (keys.Count > 0)
+                    {
+                        var hits = keys.Count(k => preferTagsSet.Contains(k));
+                        if (hits > 0) preferBoost = (double)hits / keys.Count; // 0..1
+                    }
+                }
+                var score = Constants.Scoring.PopularityWeight * pop + preferBoost * preferTagsWeightEff;
+                var reasons = new List<string> { "popularity" };
+                if (preferBoost > 0) reasons.Add("boost");
+
+                return new Recommendation
+                {
+                    Anime = new Anime
+                    {
+                        Id = a.Id,
+                        Title = a.Title,
+                        TitleEnglish = a.TitleEnglish,
+                        TitleRomaji = a.TitleRomaji,
+                        TitleNative = a.TitleNative,
+                        Synonyms = a.Synonyms ?? Array.Empty<string>(),
+                        Genres = a.Genres ?? Array.Empty<string>(),
+                        Tags = a.Tags ?? Array.Empty<string>(),
+                        Episodes = a.Episodes,
+                        Synopsis = a.Synopsis,
+                        Popularity = a.Popularity,
+                        CoverUrl = a.CoverUrl,
+                        BannerUrl = a.BannerUrl,
+                        CoverColorHex = a.CoverColorHex
+                    },
+                    Score = score,
+                    Reasons = reasons.ToArray()
+                };
+            }).ToList();
+            var ordered = ApplySort(mappedDocs, sort);
+            var taken = ordered.Take(topK).ToList();
+            _logger?.LogInformation("Query: mongo fallback returned {Count} items (degraded=true)", taken.Count);
+            return (taken, true);
         }
         catch
         {
             _logger?.LogWarning("Query: no data available; returning empty set (degraded=true)");
             return (Array.Empty<Recommendation>(), true);
+        }
+    }
+
+    private static IEnumerable<Recommendation> ApplySort(IEnumerable<Recommendation> items, string? sort)
+    {
+        var arr = items ?? Array.Empty<Recommendation>();
+        switch ((sort ?? string.Empty).ToLowerInvariant())
+        {
+            case "rating": // Highest Rated
+                return arr.OrderByDescending(r => r.Score);
+            case "popular": // Most Popular
+                return arr.OrderByDescending(r => r.Anime?.Popularity ?? 0);
+            case "relevance":
+            default:
+                return arr.OrderByDescending(r => r.Score);
         }
     }
 

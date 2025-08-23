@@ -13,7 +13,8 @@ public interface IRecsService
         int topK,
         string? userId,
         string[]? preferTags,
-        double? preferWeight,
+    double? preferWeight,
+    string? sort,
         CancellationToken ct);
     Task RateAsync(string userId, string animeId, int rating, CancellationToken ct);
 }

@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - Sora Recs</title>
+  <title>Dashboard - AnimeRadar</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="/styles.css" rel="stylesheet">
+  <script src="/js/constants.js"></script>
   <script> tailwind.config = { theme: { extend: { colors: { slate: { 950: '#020617' } } } } };</script>
 </head>
 <body class="bg-slate-950 text-white font-sans">
@@ -13,17 +15,16 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <div class="flex items-center space-x-4">
-          <div class="flex items-center space-x-3">
+          <a href="index.html" class="flex items-center space-x-3" title="AnimeRadar Home">
             <div class="w-8 h-8 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
               <i class="fas fa-gauge text-white text-sm"></i>
             </div>
             <h1 class="text-xl font-bold bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent">Dashboard</h1>
-          </div>
+          </a>
           <div class="hidden md:flex items-center space-x-8 ml-8">
             <a href="#overview" class="text-white border-b-2 border-red-500 pb-1 px-1"><i class="fas fa-chart-pie mr-2"></i>Overview</a>
             <a href="#data" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all"><i class="fas fa-database mr-2"></i>Data</a>
             <a href="#status" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all"><i class="fas fa-heartbeat mr-2"></i>Status</a>
-            <a href="#settings" class="text-gray-400 hover:text-white pb-1 px-1 border-b-2 border-transparent hover:border-gray-600 transition-all"><i class="fas fa-sliders-h mr-2"></i>Settings</a>
           </div>
         </div>
         <div class="flex items-center space-x-4">
@@ -47,8 +48,7 @@
       <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
         <div class="flex items-center justify-between mb-6"><h3 class="text-lg font-semibold text-white">Quick Actions</h3>
           <div class="flex gap-2">
-            <button onclick="seedData()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-seedling mr-2"></i>Seed Sample Data</button>
-            <button onclick="vectorUpsert()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-brain mr-2"></i>Vectors Only</button>
+            <button onclick="vectorUpsert()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-brain mr-2"></i>Rebuild from Anime</button>
             <button onclick="rebuildTags()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-tags mr-2"></i>Rebuild Tags</button>
           </div>
         </div>
@@ -58,52 +58,27 @@
 
   <!-- Data -->
   <section id="data" class="space-y-8 mt-10">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-          <h3 class="text-lg font-semibold text-white mb-4">Import</h3>
-          <div class="flex items-end gap-3">
-            <label class="text-sm text-gray-400">Source
-              <select id="importSource" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700">
-                <option value="anilist">AniList</option>
-                <option value="local">Local JSON</option>
-              </select>
-            </label>
-            <label class="text-sm text-gray-400">Limit
-              <input id="importLimit" type="number" value="200" min="1" max="2000" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 w-28" />
-            </label>
-            <label class="text-sm text-gray-400">Overwrite
-              <input id="importOverwrite" type="checkbox" class="ml-2 align-middle" />
-            </label>
-            <button onclick="seedDataFromForm()" class="ml-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-play mr-2"></i>Start</button>
-          </div>
-        </div>
-        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-          <h3 class="text-lg font-semibold text-white mb-4">Vectors</h3>
-          <button onclick="vectorUpsert()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-brain mr-2"></i>Rebuild from Anime</button>
+      <!-- Import -->
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <h3 class="text-lg font-semibold text-white mb-4">Import</h3>
+        <div class="flex items-end gap-3">
+          <label class="text-sm text-gray-400">Source
+            <select id="importSource" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700">
+              <option value="anilist">AniList</option>
+              <option value="local">Local JSON</option>
+            </select>
+          </label>
+          <label class="text-sm text-gray-400">Limit
+            <input id="importLimit" type="number" min="1" max="2000" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 w-28" />
+          </label>
+          <label class="text-sm text-gray-400">Overwrite
+            <input id="importOverwrite" type="checkbox" class="ml-2 align-middle" />
+          </label>
+          <button onclick="seedDataFromForm()" class="ml-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-play mr-2"></i>Start</button>
         </div>
       </div>
-    </section>
 
-  <!-- Status -->
-  <section id="status" class="space-y-8 mt-10">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between mb-4"><div class="flex items-center space-x-3"><div class="w-10 h-10 bg-blue-500 bg-opacity-20 rounded-lg flex items-center justify-center"><i class="fas fa-code text-blue-500"></i></div><h3 class="text-lg font-semibold text-white">API</h3></div><div class="w-3 h-3 bg-green-500 rounded-full" id="apiDot"></div></div><div class="text-sm text-gray-400">See /.well-known endpoints for detailed metrics.</div></div>
-        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between mb-4"><div class="flex items-center space-x-3"><div class="w-10 h-10 bg-purple-500 bg-opacity-20 rounded-lg flex items-center justify-center"><i class="fas fa-database text-purple-500"></i></div><h3 class="text-lg font-semibold text-white">Database</h3></div><div class="w-3 h-3 bg-green-500 rounded-full" id="dbDot"></div></div><div class="text-sm text-gray-400">Mongo connectivity status.</div></div>
-        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between mb-4"><div class="flex items-center space-x-3"><div class="w-10 h-10 bg-yellow-500 bg-opacity-20 rounded-lg flex items-center justify-center"><i class="fas fa-search text-yellow-500"></i></div><h3 class="text-lg font-semibold text-white">Vector</h3></div><div class="w-3 h-3 bg-green-500 rounded-full" id="vecDot"></div></div><div class="text-sm text-gray-400">Weaviate readiness.</div></div>
-        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between mb-4"><div class="flex items-center space-x-3"><div class="w-10 h-10 bg-orange-500 bg-opacity-20 rounded-lg flex items-center justify-center"><i class="fas fa-layer-group text-orange-500"></i></div><h3 class="text-lg font-semibold text-white">Cache</h3></div><div class="w-3 h-3 bg-green-500 rounded-full" id="cacheDot"></div></div><div class="text-sm text-gray-400">N/A in this sample.</div></div>
-      </div>
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-        <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold text-white">Capabilities</h3><button onclick="loadAggregates()" class="text-gray-400 hover:text-white text-sm"><i class="fas fa-rotate mr-1"></i>Refresh</button></div>
-        <pre id="aggregatesJson" class="text-xs text-gray-300 whitespace-pre overflow-auto max-h-64">Loading…</pre>
-      </div>
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-        <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold text-white">Observability</h3><button onclick="loadObservability()" class="text-gray-400 hover:text-white text-sm"><i class="fas fa-rotate mr-1"></i>Refresh</button></div>
-        <pre id="observabilityJson" class="text-xs text-gray-300 whitespace-pre overflow-auto max-h-64">Loading…</pre>
-      </div>
-    </section>
-
-  <!-- Settings -->
-  <section id="settings" class="space-y-6 mt-10">
+      <!-- Recommendation Settings -->
       <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-white">Recommendation Settings</h3>
@@ -142,6 +117,46 @@
           </div>
         </div>
       </div>
+
+      <!-- Tag Censor Management -->
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-white">Tag Censor</h3>
+        </div>
+        <p class="text-sm text-gray-400 mb-3">Paste comma or line separated tags to censor. These will be excluded from the tag catalog.</p>
+        <div class="mb-3">
+          <textarea id="censorInput" class="w-full bg-slate-800 text-white rounded px-3 py-2 h-28 border border-slate-700" placeholder="Example: nsfw, hentai\necchi\nsmut"></textarea>
+        </div>
+        <div class="flex items-center gap-2 mb-4">
+          <button id="btnCensorAdd" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><i class="fas fa-plus mr-2"></i>Add to list</button>
+          <button id="btnCensorCopy" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-200 rounded-lg border border-slate-700"><i class="fas fa-copy mr-2"></i>Copy list</button>
+          <button id="btnCensorClear" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-200 rounded-lg border border-slate-700"><i class="fas fa-trash mr-2"></i>Clear list</button>
+        </div>
+        <div class="text-sm text-gray-300">
+          <div class="flex items-center">
+            <span class="font-medium">Current list</span>
+            <span class="ml-1">(<span id="censorCount">0</span>)</span>
+            <button id="btnCensorToggle" class="ml-3 px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-gray-200 rounded border border-slate-700" aria-expanded="false" aria-controls="censorListContainer">Show</button>
+          </div>
+          <div id="censorListContainer" class="mt-2 hidden">
+            <div id="censorList" class="flex flex-wrap gap-2 max-h-40 overflow-y-auto scroll-dark">
+              <!-- rendered chips -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  <!-- Status -->
+  <section id="status" class="space-y-8 mt-10">
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold text-white">Capabilities</h3><button onclick="loadAggregates()" class="text-gray-400 hover:text-white text-sm"><i class="fas fa-rotate mr-1"></i>Refresh</button></div>
+        <pre id="aggregatesJson" class="text-xs text-gray-300 whitespace-pre overflow-auto max-h-64">Loading…</pre>
+      </div>
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold text-white">Observability</h3><button onclick="loadObservability()" class="text-gray-400 hover:text-white text-sm"><i class="fas fa-rotate mr-1"></i>Refresh</button></div>
+        <pre id="observabilityJson" class="text-xs text-gray-300 whitespace-pre overflow-auto max-h-64">Loading…</pre>
+      </div>
     </section>
   </main>
 
@@ -149,5 +164,8 @@
   <script src="/js/toasts.js"></script>
   <script src="/js/dom.js"></script>
   <script src="/js/dashboard.page.js"></script>
+  <footer class="border-t border-slate-800 mt-10 py-6 text-center text-sm text-gray-400">
+    Made with Sora · <a class="text-purple-400 hover:text-purple-300" href="https://github.com/sylin-labs/sora-framework" target="_blank" rel="noopener">github.com/sylin-labs/sora-framework</a>
+  </footer>
 </body>
 </html>

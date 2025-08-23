@@ -17,6 +17,66 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         return Ok(new { jobId = id });
     }
 
+    // Censor tags admin
+    [HttpGet("tags/censor")]
+    public async Task<IActionResult> GetCensorTags(CancellationToken ct)
+    {
+        var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct);
+        return Ok(new { tags = (doc?.Tags ?? new List<string>()).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s).ToArray() });
+    }
+
+    public record CensorTagsRequest(string? Text);
+
+    [HttpPost("tags/censor/add")]
+    public async Task<IActionResult> AddCensorTags([FromBody] CensorTagsRequest req, CancellationToken ct)
+    {
+        var src = req?.Text ?? string.Empty;
+        var parts = src
+            .Replace("\r", "\n")
+            .Split(new[] { '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => s.Trim())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct) ?? new Models.CensorTagsDoc { Id = "recs:censor-tags" };
+        var set = new HashSet<string>(doc.Tags ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+        foreach (var p in parts) set.Add(p);
+        doc.Tags = set.OrderBy(s => s).ToList();
+        doc.UpdatedAt = DateTimeOffset.UtcNow;
+        await Models.CensorTagsDoc.UpsertMany(new[] { doc }, ct);
+        return Ok(new { count = doc.Tags.Count, tags = doc.Tags });
+    }
+
+    [HttpPost("tags/censor/clear")]
+    public async Task<IActionResult> ClearCensorTags(CancellationToken ct)
+    {
+        var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct);
+        if (doc is null) return Ok(new { count = 0, tags = Array.Empty<string>() });
+        doc.Tags = new List<string>();
+        doc.UpdatedAt = DateTimeOffset.UtcNow;
+        await Models.CensorTagsDoc.UpsertMany(new[] { doc }, ct);
+        return Ok(new { count = 0, tags = Array.Empty<string>() });
+    }
+
+    public record RemoveCensorTagRequest(string? Tag);
+
+    [HttpPost("tags/censor/remove")]
+    public async Task<IActionResult> RemoveCensorTag([FromBody] RemoveCensorTagRequest req, CancellationToken ct)
+    {
+        var tag = (req?.Tag ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(tag)) return BadRequest(new { error = "tag is required" });
+        var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct) ?? new Models.CensorTagsDoc { Id = "recs:censor-tags", Tags = new List<string>() };
+        if (doc.Tags is null) doc.Tags = new List<string>();
+        var before = doc.Tags.Count;
+        doc.Tags = doc.Tags.Where(t => !string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (doc.Tags.Count != before)
+        {
+            doc.UpdatedAt = DateTimeOffset.UtcNow;
+            await Models.CensorTagsDoc.UpsertMany(new[] { doc }, ct);
+        }
+        return Ok(new { count = doc.Tags.Count, tags = doc.Tags.OrderBy(s => s).ToArray() });
+    }
+
     [HttpGet("recs-settings")]
     public IActionResult GetRecsSettings([FromServices] S5.Recs.Services.IRecommendationSettingsProvider provider)
     {

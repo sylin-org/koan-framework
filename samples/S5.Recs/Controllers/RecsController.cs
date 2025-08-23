@@ -22,6 +22,7 @@ public class RecsController(IRecsService recs) : ControllerBase
         req.UserId,
         req.Filters?.PreferTags,
         req.Filters?.PreferWeight,
+        req.Sort,
         HttpContext.RequestAborted).GetAwaiter().GetResult();
     return Ok(new { items, degraded });
     }

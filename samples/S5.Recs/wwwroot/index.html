@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Anime Recommendations - Sora Recs</title>
+      <title>AnimeRadar - AI-Powered Anime Recommendations</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="/styles.css" rel="stylesheet">
+  <script src="/js/constants.js"></script>
   <script type="module" src="/js/config.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/cards.js"></script>
@@ -15,6 +17,16 @@
   <script type="module" src="/js/main.js"></script>
   <script src="/js/tags.js"></script>
   <script src="/js/index.page.js"></script>
+  <script>
+    // Apply runtime text constants to placeholders on initial load
+    document.addEventListener('DOMContentLoaded', function(){
+      try{
+        var t = (window.S5Const && window.S5Const.TEXT) || {};
+        var rc = document.getElementById('resultCount'); if(rc && !rc.textContent) rc.textContent = t.LOADING || 'Loading…';
+        var pm = document.getElementById('preferMaxTags'); if(pm && pm.textContent === 'Loading…') pm.textContent = String((window.S5Const && window.S5Const.RECS && window.S5Const.RECS.DEFAULT_MAX_PREFERRED_TAGS) || 3);
+      }catch{}
+    });
+  </script>
   <script>
     tailwind.config = {
       theme: {
@@ -36,14 +48,14 @@
       <div class="flex items-center justify-between h-16">
         <!-- Logo and Brand -->
         <div class="flex items-center space-x-4">
-          <div class="flex items-center space-x-3">
+          <a href="index.html" class="flex items-center space-x-3" title="AnimeRadar Home">
             <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-              <i class="fas fa-film text-white text-sm"></i>
+              <i class="fas fa-satellite-dish text-white text-sm"></i>
             </div>
             <h1 class="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Sora Recs
+              AnimeRadar
             </h1>
-          </div>
+          </a>
                     
           <!-- Main Navigation -->
           <div class="hidden md:flex items-center space-x-8 ml-8">
@@ -155,7 +167,7 @@
             <i class="fas fa-filter mr-2"></i>
             Filters
           </button>
-          <span class="text-gray-400 text-sm" id="resultCount">Showing 24 results</span>
+          <span class="text-gray-400 text-sm" id="resultCount">Loading…</span>
         </div>
       </div>
             
@@ -178,9 +190,10 @@
           </button>
         </div>
 
-        <!-- Source Toggle: For You vs Library -->
+        <!-- Source Toggle: For You vs Free Browsing vs Library -->
         <div class="flex bg-slate-800 rounded-lg p-1">
           <button id="forYouBtn" class="px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors">For You</button>
+          <button id="freeBrowsingBtn" class="px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors">Free Browsing</button>
           <button id="libraryBtn" class="px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors">Library</button>
         </div>
       </div>
@@ -191,14 +204,13 @@
       <div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
         <div class="text-sm text-gray-300 md:min-w-[160px]">
           <span class="font-medium">Try Something New</span>
-          <span class="text-gray-500"> · up to <span id="preferMaxTags">3</span> tags</span>
+          <span class="text-gray-500"> · up to <span id="preferMaxTags">Loading…</span> tags</span>
         </div>
         <div id="preferChips" class="flex flex-wrap gap-2"></div>
         <button id="expandTagsBtn" class="text-xs px-2 py-1 bg-slate-800 text-gray-300 rounded border border-slate-700 hover:bg-slate-700">Expand</button>
         <div class="flex items-center gap-2 md:ml-auto">
           <span class="text-gray-400 text-sm">Boost</span>
-          <input id="preferWeight" type="range" min="0" max="1.0" step="0.05" value="0.2" class="w-40" oninput="document.getElementById('preferWeightVal').textContent=this.value; onPreferredChanged()" />
-          <span id="preferWeightVal" class="text-purple-300 text-sm">0.2</span>
+          <input id="preferWeight" type="range" min="0" max="1.0" step="0.05" value="0.2" class="w-40" />
           <button id="clearPreferBtn" class="text-sm text-gray-400 hover:text-white" onclick="clearPreferred()">Clear</button>
         </div>
       </div>
@@ -207,14 +219,14 @@
         <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between mb-3">
           <div class="flex items-center gap-2">
             <span class="text-sm text-gray-300">Browse tags</span>
-            <select id="tagsSort" class="bg-slate-800 text-white rounded px-2 py-1 text-sm border border-slate-700">
-              <option value="popularity">Popularity</option>
-              <option value="alpha">Alphabetical</option>
-            </select>
+            <div class="flex bg-slate-800 rounded-lg p-1" role="group" aria-label="Tag sort mode">
+              <button id="tagsSortPopularityBtn" class="px-2 py-1 text-xs text-white bg-purple-600 rounded transition-colors" type="button">Popularity</button>
+              <button id="tagsSortAlphaBtn" class="px-2 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors" type="button">A–Z</button>
+            </div>
           </div>
           <input id="tagsSearch" placeholder="Search tags..." class="bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 text-sm w-full md:w-64" />
         </div>
-        <div id="allTagsList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto"></div>
+  <div id="allTagsList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto scroll-dark"></div>
       </div>
     </div>
 
@@ -306,5 +318,8 @@
   </div>
 
   <!-- Page logic moved to /js/index.page.js -->
+  <footer class="border-t border-slate-800 mt-10 py-6 text-center text-sm text-gray-400">
+    Made with Sora · <a class="text-purple-400 hover:text-purple-300" href="https://github.com/sylin-labs/sora-framework" target="_blank" rel="noopener">github.com/sylin-labs/sora-framework</a>
+  </footer>
 </body>
 </html>

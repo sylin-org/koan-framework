@@ -15,7 +15,8 @@
     let picker = '<div class="relative group">';
     picker += '<button class="bg-black bg-opacity-60 hover:bg-opacity-80 text-yellow-300 text-xs px-2 py-1 rounded-full" title="Rate">★</button>';
     picker += '<div class="hidden group-hover:flex flex-col absolute right-0 top-full mt-1 bg-black bg-opacity-80 backdrop-blur rounded shadow-lg p-1 z-10">';
-    for(let n=1; n<=5; n++){
+  const stars = (window.S5Const && window.S5Const.RATING && typeof window.S5Const.RATING.STARS === 'number') ? window.S5Const.RATING.STARS : 5;
+  for(let n=1; n<=stars; n++){
       picker += '<button class="text-xs text-gray-300 hover:text-yellow-300 bg-black bg-opacity-30 hover:bg-opacity-50 rounded px-2 py-1 text-right" '
              + 'data-action="rate" data-id=' + __q(animeId) + ' data-rating="' + n + '"'
              + '>' + n + '</button>';
@@ -46,7 +47,7 @@
           <div class="p-4">
             <h3 class="font-semibold text-white text-sm mb-2 line-clamp-2 group-hover:text-purple-300 transition-colors">${h(anime.title)}</h3>
             <div class="flex flex-wrap gap-1 mb-2">
-              ${anime.genres.slice(0, 2).map(genre => {
+              ${anime.genres.slice(0, (window.S5Const && window.S5Const.TAGS && typeof window.S5Const.TAGS.CHIPS_IN_CARD === 'number' ? window.S5Const.TAGS.CHIPS_IN_CARD : 2)).map(genre => {
                 const sel = selectedPreferredTags.includes(genre);
                 const cls = sel ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700';
                 return `<button type=\"button\" data-tag=\"${h(genre)}\" class=\"text-xs px-2 py-0.5 rounded-full border border-slate-700 ${cls}\">${h(genre)}</button>`;
@@ -86,7 +87,7 @@
             </div>
             <div class="mt-1 text-xs text-gray-300 line-clamp-2">${h(anime.synopsis || '')}</div>
             <div class="flex flex-wrap gap-1 mt-2">
-              ${anime.genres.slice(0,4).map(g=>{
+              ${anime.genres.slice(0,(window.S5Const && window.S5Const.TAGS && typeof window.S5Const.TAGS.CHIPS_IN_LIST === 'number' ? window.S5Const.TAGS.CHIPS_IN_LIST : 4)).map(g=>{
                 const sel = selectedPreferredTags.includes(g);
                 const cls = sel ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-300 hover:bg-slate-700';
                 return `<button type=\"button\" data-tag=\"${h(g)}\" class=\"text-xs px-2 py-0.5 rounded-full border border-slate-700 ${cls}\">${h(g)}</button>`;

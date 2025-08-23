@@ -2,10 +2,13 @@
 // Provides small, pure helpers to keep index.html lean
 (function(){
   function getEpisodeRange(key){
+    const S = (window.S5Const && window.S5Const.EPISODES) || {};
+    const SHORT_MAX = S.SHORT_MAX ?? 12;
+    const MEDIUM_MAX = S.MEDIUM_MAX ?? 25;
     switch(key){
-      case 'short': return [1, 12];
-      case 'medium': return [13, 25];
-      case 'long': return [26, Number.POSITIVE_INFINITY];
+      case 'short': return [1, SHORT_MAX];
+      case 'medium': return [SHORT_MAX + 1, MEDIUM_MAX];
+      case 'long': return [MEDIUM_MAX + 1, Number.POSITIVE_INFINITY];
       default: return [0, Number.POSITIVE_INFINITY];
     }
   }

@@ -14,7 +14,11 @@
   let currentRecsTopK = PAGE_SIZE;
   let currentLibraryPage = 1;
   let selectedPreferredTags = window.selectedPreferredTags || [];
-  let recsSettings = { preferTagsWeight: 0.2, maxPreferredTags: 3, diversityWeight: 0.1 };
+  let recsSettings = { 
+    preferTagsWeight: (window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2, 
+    maxPreferredTags: (window.S5Const?.RECS?.DEFAULT_MAX_PREFERRED_TAGS) ?? 3, 
+    diversityWeight: (window.S5Const?.RECS?.DEFAULT_DIVERSITY_WEIGHT) ?? 0.1 
+  };
 
   // Expose for other modules relying on globals
   Object.assign(window, {
@@ -23,6 +27,14 @@
   });
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Enforce slider config from constants
+    const w = Dom.$('preferWeight');
+    if (w && window.S5Const?.RECS) {
+      if (typeof window.S5Const.RECS.PREFER_WEIGHT_MIN === 'number') w.min = String(window.S5Const.RECS.PREFER_WEIGHT_MIN);
+      if (typeof window.S5Const.RECS.PREFER_WEIGHT_MAX === 'number') w.max = String(window.S5Const.RECS.PREFER_WEIGHT_MAX);
+      if (typeof window.S5Const.RECS.PREFER_WEIGHT_STEP === 'number') w.step = String(window.S5Const.RECS.PREFER_WEIGHT_STEP);
+      if (typeof window.recsSettings?.preferTagsWeight === 'number') w.value = String(window.recsSettings.preferTagsWeight);
+    }
     initUsers();
     loadRecsSettings();
     if(window.S5Tags && S5Tags.loadTags){ S5Tags.loadTags().then(()=> S5Tags.renderPreferredChips && S5Tags.renderPreferredChips()); }
@@ -31,7 +43,19 @@
 
   function setupEventListeners(){
     Dom.on('globalSearch', 'input', handleGlobalSearch);
-    Dom.on('sortBy', 'change', applySortAndFilters);
+  Dom.on('sortBy', 'change', async () => {
+      // For recommendation-backed views, re-fetch so server applies ordering
+      if (window.currentView === 'forYou') {
+        window.currentRecsTopK = PAGE_SIZE;
+        await window.loadAnimeData();
+      } else if (window.currentView === 'freeBrowsing') {
+        window.currentRecsTopK = PAGE_SIZE;
+        await window.loadFreeBrowsingData();
+      } else {
+        // Library is client-side; just re-apply
+        applySortAndFilters();
+      }
+    });
     Dom.on('gridViewBtn', 'click', () => setViewMode('grid'));
     Dom.on('listViewBtn', 'click', () => setViewMode('list'));
     // Tags UI
@@ -46,8 +70,9 @@
     }
     Dom.on('expandTagsBtn', 'click', ()=>{
       const p = Dom.$('allTagsPanel');
-      const open = p.classList.toggle('hidden');
-      Dom.$('expandTagsBtn').textContent = open ? 'Expand' : 'Collapse';
+    const open = p.classList.toggle('hidden');
+    const t = window.S5Const?.TEXT;
+    Dom.$('expandTagsBtn').textContent = open ? (t?.EXPAND || 'Expand') : (t?.COLLAPSE || 'Collapse');
       if(!open && window.S5Tags && S5Tags.renderAllTags){ S5Tags.renderAllTags(); }
     });
     Dom.on('tagsSort', 'change', ()=> S5Tags.renderAllTags && S5Tags.renderAllTags());
@@ -59,6 +84,22 @@
         if(!btn) return;
         const tag = btn.getAttribute('data-tag');
         if(window.S5Tags && S5Tags.togglePreferredTag){ S5Tags.togglePreferredTag(tag); if(S5Tags.renderAllTags) S5Tags.renderAllTags(); }
+      });
+    }
+
+  // Debounced Tag Boost slider: re-render chips immediately for visual cue; reload data after debounce
+    const weightSlider = Dom.$('preferWeight');
+  if (weightSlider) {
+      let tId = null;
+      weightSlider.addEventListener('input', () => {
+        // Update chip visuals immediately
+    if (window.S5Tags && typeof S5Tags.renderPreferredChips === 'function') S5Tags.renderPreferredChips();
+    if (window.S5Tags && typeof S5Tags.renderAllTags === 'function') S5Tags.renderAllTags();
+        // Debounce data reloads
+        if (tId) clearTimeout(tId);
+    tId = setTimeout(() => {
+          if (window.S5Tags && typeof S5Tags.onPreferredChanged === 'function') S5Tags.onPreferredChanged();
+    }, (window.S5Const?.RECS?.TAG_BOOST_DEBOUNCE_MS) ?? 50);
       });
     }
 
@@ -74,6 +115,7 @@
     });
 
     Dom.on('forYouBtn', 'click', () => setViewSource('forYou'));
+    Dom.on('freeBrowsingBtn', 'click', () => setViewSource('freeBrowsing'));
     Dom.on('libraryBtn', 'click', () => setViewSource('library'));
   }
 
@@ -89,7 +131,11 @@
       const def = users.find(u=>u.isDefault) || users[0];
       if(def){ selectUser(def.id, def.name); }
     }catch(e){
-      if(attempt < 5){ setTimeout(()=>initUsers(attempt+1), Math.min(8000, (attempt+1)*1000)); }
+      if(attempt < 5){ 
+        const base = (window.S5Const?.INIT?.RETRY_BASE_MS) ?? 1000;
+        const maxMs = (window.S5Const?.INIT?.RETRY_MAX_MS) ?? 8000;
+        setTimeout(()=>initUsers(attempt+1), Math.min(maxMs, (attempt+1)*base)); 
+      }
     }
   }
   function renderUsers(users){
@@ -123,18 +169,26 @@
   // Settings
   async function loadRecsSettings(){
     try{ const s = await (window.S5Api && window.S5Api.getRecsSettings ? window.S5Api.getRecsSettings() : null); if(s){
-      window.recsSettings = { preferTagsWeight: s.preferTagsWeight ?? 0.2, maxPreferredTags: s.maxPreferredTags ?? 3, diversityWeight: s.diversityWeight ?? 0.1 };
-      const w = Dom.$('preferWeight'); if(w) w.value = window.recsSettings.preferTagsWeight;
-      Dom.text('preferWeightVal', String(window.recsSettings.preferTagsWeight));
-      window.S5Tags && window.S5Tags.renderPreferredChips();
+      window.recsSettings = { 
+        preferTagsWeight: s.preferTagsWeight ?? ((window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2), 
+        maxPreferredTags: s.maxPreferredTags ?? ((window.S5Const?.RECS?.DEFAULT_MAX_PREFERRED_TAGS) ?? 3), 
+        diversityWeight: s.diversityWeight ?? ((window.S5Const?.RECS?.DEFAULT_DIVERSITY_WEIGHT) ?? 0.1) 
+      };
+  const w = Dom.$('preferWeight'); if(w) w.value = window.recsSettings.preferTagsWeight;
+  window.S5Tags && window.S5Tags.renderPreferredChips();
     }}catch{}
   }
+
+  // Small helper to read current weight for other modules
+  window.getCurrentPreferWeight = function(){
+  return parseFloat(Dom.$('preferWeight')?.value || String(window.recsSettings?.preferTagsWeight ?? ((window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2)));
+  };
 
   // Library cache
   async function refreshLibraryState(){
     if(!window.currentUserId){ window.libraryByAnimeId = {}; return; }
     try{
-      const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page:1, pageSize:500 }) : null);
+  const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page:1, pageSize:(window.S5Const?.LIBRARY?.PAGE_SIZE) ?? 500 }) : null);
       if(!data){ window.libraryByAnimeId = {}; return; }
       const map = {};
       for(const e of (data.items||[])) map[e.animeId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt };
@@ -160,37 +214,82 @@
     if(!window.currentUserId){ displayAnime([]); return; }
     try{
       const recs = await fetchRecommendations({ text: '', topK: window.currentRecsTopK });
-      window.animeData = recs; window.filteredData = [...window.animeData]; displayAnime(window.filteredData);
+  window.animeData = recs; window.filteredData = [...window.animeData];
+  // Apply current sort selection after loading
+  if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); }
+  else { displayAnime(window.filteredData); }
       const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
     }catch{ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load recommendations', 'error'); }
   };
 
-  window.fetchRecommendations = async function({ text, topK = PAGE_SIZE }){
-    const weight = parseFloat(Dom.$('preferWeight')?.value || '0.2');
+  window.loadFreeBrowsingData = async function(){
+    try{
+      const recs = await fetchRecommendations({ text: '', topK: window.currentRecsTopK, ignoreUserPreferences: true });
+  window.animeData = recs; window.filteredData = [...window.animeData];
+  // Apply current sort selection after loading
+  if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); }
+  else { displayAnime(window.filteredData); }
+      const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
+    }catch{ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load content', 'error'); }
+  };
+
+  window.fetchRecommendations = async function({ text, topK = PAGE_SIZE, ignoreUserPreferences = false }){
+    const weight = parseFloat(Dom.$('preferWeight')?.value || String((window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2));
     const genre = Dom.val('genreFilter') || '';
     const episodeSel = Dom.val('episodeFilter') || '';
-    const episodesMax = episodeSel === 'short' ? 12 : (episodeSel === 'medium' ? 25 : (episodeSel === 'long' ? 9999 : null));
+    const episodesMax = episodeSel === 'short' 
+      ? ((window.S5Const?.EPISODES?.SHORT_MAX) ?? 12)
+      : (episodeSel === 'medium' 
+        ? ((window.S5Const?.EPISODES?.MEDIUM_MAX) ?? 25)
+        : (episodeSel === 'long' 
+          ? ((window.S5Const?.EPISODES?.LONG_MAX) ?? 9999)
+          : null));
     const genres = []; if(genre) genres.push(genre);
     let preferTags = Array.isArray(window.selectedPreferredTags) ? [...window.selectedPreferredTags] : [];
-    const max = window.recsSettings?.maxPreferredTags ?? 3; if(preferTags.length > max) preferTags = preferTags.slice(0, max);
-    const body = { text: text || '', topK, filters: { genres, episodesMax, spoilerSafe: true, preferTags, preferWeight: weight }, userId: window.currentUserId };
+    const max = window.recsSettings?.maxPreferredTags ?? ((window.S5Const?.RECS?.DEFAULT_MAX_PREFERRED_TAGS) ?? 3); if(preferTags.length > max) preferTags = preferTags.slice(0, max);
+    const sort = Dom.val('sortBy') || null;
+    
+    const body = { 
+      text: text || '', 
+      topK, 
+      sort,
+      filters: { 
+        genres, 
+        episodesMax, 
+        spoilerSafe: true, 
+        preferTags, 
+        preferWeight: weight 
+      }, 
+      userId: ignoreUserPreferences ? null : window.currentUserId 
+    };
+    
     const data = await (window.S5Api && window.S5Api.recsQuery ? window.S5Api.recsQuery(body) : null) || { items: [] };
     const items = Array.isArray(data.items) ? data.items : [];
     const mapped = items.map(it => mapItemToAnime(it));
+    
+    // In free browsing mode, don't filter out library items since user preferences are ignored
+    if (ignoreUserPreferences) {
+      return mapped;
+    }
+    
     return mapped.filter(a => !window.libraryByAnimeId[a.id]);
   };
 
   function mapItemToAnime(item){
-    const a = item.anime || item;
-    const score = typeof item.score === 'number' ? item.score : (typeof a.popularity === 'number' ? a.popularity : 0.7);
-    const computedRating = Math.max(1, Math.min(5, Math.round(score * 5 * 10) / 10));
+  const a = item.anime || item;
+  const score = typeof item.score === 'number' ? item.score : (typeof a.popularity === 'number' ? a.popularity : ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7));
+  const stars = (window.S5Const?.RATING?.STARS) ?? 5;
+  const minR = (window.S5Const?.RATING?.MIN) ?? 1;
+  const maxR = (window.S5Const?.RATING?.MAX) ?? 5;
+  const roundTo = (window.S5Const?.RATING?.ROUND_TO) ?? 10;
+  const computedRating = Math.max(minR, Math.min(maxR, Math.round(score * stars * roundTo) / roundTo));
     return { id:a.id, title: a.titleEnglish || a.title || a.titleRomaji || a.titleNative || 'Untitled', englishTitle:a.titleEnglish||'', coverUrl:a.coverUrl||'', backdrop:a.bannerUrl||a.coverUrl||'', rating:computedRating, popularity:a.popularity||0, episodes:a.episodes||0, type:a.type||'TV', year:a.year||'', status:a.status||'', studio:a.studio||'', source:a.source||'', synopsis:a.synopsis||'', genres: Array.isArray(a.genres)? a.genres : (Array.isArray(a.tags)? a.tags: []) };
   }
 
   function loadContentForTab(tab){
     switch(tab){
-      case 'trending': window.filteredData = window.animeData.sort((a,b)=>(b.popularity||0)-(a.popularity||0)).slice(0,24); break;
-      case 'top-rated': window.filteredData = window.animeData.sort((a,b)=> b.rating-a.rating).slice(0,24); break;
+      case 'trending': window.filteredData = window.animeData.sort((a,b)=>(b.popularity||0)-(a.popularity||0)).slice(0, ((window.S5Const && window.S5Const.UI && typeof window.S5Const.UI.PREVIEW_SECTION_COUNT === 'number') ? window.S5Const.UI.PREVIEW_SECTION_COUNT : 24)); break;
+      case 'top-rated': window.filteredData = window.animeData.sort((a,b)=> b.rating-a.rating).slice(0, ((window.S5Const && window.S5Const.UI && typeof window.S5Const.UI.PREVIEW_SECTION_COUNT === 'number') ? window.S5Const.UI.PREVIEW_SECTION_COUNT : 24)); break;
       case 'watchlist': loadWatchlist(); return;
       default: displayAnime(window.animeData); return;
     }
@@ -201,8 +300,11 @@
   function displayAnime(list){
     const grid = Dom.$('animeGrid'); const loading = Dom.$('loadingState'); const empty = Dom.$('emptyState');
     loading.style.display = 'none';
-    if(!list || list.length===0){ grid.classList.add('hidden'); empty.classList.remove('hidden'); Dom.text('resultCount', 'No results'); return; }
-    grid.classList.remove('hidden'); empty.classList.add('hidden'); Dom.text('resultCount', `Showing ${list.length} results`);
+    if(!list || list.length===0){ grid.classList.add('hidden'); empty.classList.remove('hidden'); Dom.text('resultCount', (window.S5Const?.TEXT?.NO_RESULTS) || 'No results'); return; }
+    grid.classList.remove('hidden'); empty.classList.add('hidden');
+    const tp = (window.S5Const?.TEXT?.RESULTS_PREFIX) || 'Showing ';
+    const ts = (window.S5Const?.TEXT?.RESULTS_SUFFIX) || ' results';
+    Dom.text('resultCount', `${tp}${list.length}${ts}`);
     const state = { libraryByAnimeId: window.libraryByAnimeId, selectedPreferredTags: window.selectedPreferredTags };
     if(window.currentLayout==='list'){ grid.className = 'space-y-4'; grid.innerHTML = list.map(a=>window.S5Cards.createAnimeListItem(a, state)).join(''); }
     else { grid.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6'; grid.innerHTML = list.map(a=>window.S5Cards.createAnimeCard(a, state)).join(''); }
@@ -212,15 +314,26 @@
   // Search & filters
   async function handleGlobalSearch(e){
     const query = e.target.value;
-    if(!query || query.trim().length===0){ if(window.currentView==='forYou'){ window.currentRecsTopK = PAGE_SIZE; } Dom.$('moreBtn')?.classList.add('hidden'); loadContentForTab(window.currentTab); return; }
+    if(!query || query.trim().length===0){ 
+      if(window.currentView==='forYou' || window.currentView==='freeBrowsing'){ 
+        window.currentRecsTopK = PAGE_SIZE; 
+      } 
+      Dom.$('moreBtn')?.classList.add('hidden'); 
+      loadContentForTab(window.currentTab); 
+      return; 
+    }
     if(window.currentView==='library'){
       window.filteredData = (window.S5Filters && S5Filters.search) ? S5Filters.search(window.animeData, query) : window.animeData;
-      displayAnime(window.filteredData); return;
+  // Respect current sort on search within library
+  if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayAnime(window.filteredData); }
+  return;
     }
     try{
       window.currentRecsTopK = PAGE_SIZE;
-      const recs = await window.fetchRecommendations({ text: query, topK: window.currentRecsTopK });
-      window.animeData = recs; window.filteredData = [...window.animeData]; displayAnime(window.filteredData);
+      const isFreeBrowsing = window.currentView === 'freeBrowsing';
+      const recs = await window.fetchRecommendations({ text: query, topK: window.currentRecsTopK, ignoreUserPreferences: isFreeBrowsing });
+  window.animeData = recs; window.filteredData = [...window.animeData];
+  if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayAnime(window.filteredData); }
       const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
     }catch{ Dom.$('moreBtn')?.classList.add('hidden'); showToast('Search failed', 'error'); }
   }
@@ -229,15 +342,48 @@
     window.filteredData = (window.S5Filters && S5Filters.filter) ? S5Filters.filter(window.animeData, { genre, rating, year, episode }) : [...window.animeData];
     applySortAndFilters();
   };
-  window.applySortAndFilters = function(){ const sortBy = Dom.val('sortBy'); window.filteredData = (window.S5Filters && S5Filters.sort) ? S5Filters.sort(window.filteredData, sortBy) : [...window.filteredData]; displayAnime(window.filteredData); };
+  window.applySortAndFilters = function(){
+    const sortBy = Dom.val('sortBy');
+    // Only perform client-side sort for Library. For recommendations, server already ordered.
+    if (window.currentView === 'library') {
+      window.filteredData = (window.S5Filters && S5Filters.sort) ? S5Filters.sort(window.filteredData, sortBy) : [...window.filteredData];
+    }
+    displayAnime(window.filteredData);
+  };
   window.clearFilters = function(){ Dom.clearValues(['genreFilter','ratingFilter','yearFilter','episodeFilter']); window.applyFilters(); };
 
   // View state
   window.setViewMode = function(mode){ const gridBtn=Dom.$('gridViewBtn'); const listBtn=Dom.$('listViewBtn'); if(mode==='grid'){ gridBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; listBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } else { listBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; gridBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } window.currentLayout = mode; displayAnime(window.filteredData); };
-  window.setViewSource = function(mode){ if(mode===window.currentView) return; window.currentView = mode; const fy=Dom.$('forYouBtn'); const lb=Dom.$('libraryBtn'); if(window.currentView==='forYou'){ fy.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; lb.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; window.loadAnimeData(); } else { lb.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; fy.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; loadLibrary(); } };
+  window.setViewSource = function(mode){ 
+    if(mode===window.currentView) return; 
+    window.currentView = mode; 
+    const fy=Dom.$('forYouBtn'); 
+    const fb=Dom.$('freeBrowsingBtn'); 
+    const lb=Dom.$('libraryBtn'); 
+    
+    // Reset all buttons to inactive state
+    fy.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; 
+    fb.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; 
+    lb.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; 
+    
+    // Set active button and load appropriate data
+    if(window.currentView==='forYou'){ 
+      fy.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; 
+      window.loadAnimeData(); 
+    } else if(window.currentView==='freeBrowsing'){ 
+      fb.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; 
+      window.loadFreeBrowsingData(); 
+    } else { 
+      lb.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; 
+      loadLibrary(); 
+    } 
+  };
 
   // Navigation
-  window.openDetails = function(animeId){ window.location.href = `details.html?id=${encodeURIComponent(animeId)}`; };
+  window.openDetails = function(animeId){
+    const d = (window.S5Const && window.S5Const.PATHS && window.S5Const.PATHS.DETAILS) || 'details.html';
+    window.location.href = `${d}?id=${encodeURIComponent(animeId)}`;
+  };
 
   // Actions
   window.openQuickRate = async function(animeId, rating){ if(!window.currentUserId) return; try{ await (window.S5Api && window.S5Api.postRate ? window.S5Api.postRate(window.currentUserId, animeId, rating) : null); await refreshLibraryState(); loadUserStats(); if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast(`Rated ${rating}★`, 'success'); }catch{ showToast('Failed to rate', 'error'); } };
@@ -247,15 +393,56 @@
 
   async function loadWatchlist(){
     if(!window.currentUserId){ displayAnime([]); return; }
-    try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { status:'watched', sort:'updatedAt', page:1, pageSize:100 }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.animeId).filter(Boolean); if(ids.length===0){ displayAnime([]); return; } const arr = await (window.S5Api && window.S5Api.getAnimeByIds ? window.S5Api.getAnimeByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToAnime({ anime: a, score: a.popularity || 0.7 })); displayAnime(mapped); }catch{ displayAnime([]); showToast('Failed to load watchlist', 'error'); }
+    try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { status:'watched', sort:'updatedAt', page:1, pageSize:(window.S5Const?.LIBRARY?.WATCHLIST_PAGE_SIZE) ?? 100 }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.animeId).filter(Boolean); if(ids.length===0){ displayAnime([]); return; } const arr = await (window.S5Api && window.S5Api.getAnimeByIds ? window.S5Api.getAnimeByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToAnime({ anime: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); displayAnime(mapped); }catch{ displayAnime([]); showToast('Failed to load watchlist', 'error'); }
   }
   async function loadLibrary(){
     if(!window.currentUserId){ displayAnime([]); return; }
-    try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page: window.currentLibraryPage, pageSize: PAGE_SIZE }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.animeId).filter(Boolean); if(window.currentLibraryPage===1 && ids.length===0){ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); return; } const arr = await (window.S5Api && window.S5Api.getAnimeByIds ? window.S5Api.getAnimeByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToAnime({ anime: a, score: a.popularity || 0.7 })); if(window.currentLibraryPage===1){ window.animeData = mapped; } else { const seen = new Set(window.animeData.map(x=>x.id)); for(const m of mapped){ if(!seen.has(m.id)) window.animeData.push(m); } } window.filteredData = [...window.animeData]; for(const e of (data.items||[])){ window.libraryByAnimeId[e.animeId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt }; } displayAnime(window.filteredData); const btn = Dom.$('moreBtn'); if(btn){ if((data.items||[]).length === PAGE_SIZE) btn.classList.remove('hidden'); else btn.classList.add('hidden'); } }catch{ displayAnime([]); showToast('Failed to load library', 'error'); }
+  try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page: window.currentLibraryPage, pageSize: PAGE_SIZE }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.animeId).filter(Boolean); if(window.currentLibraryPage===1 && ids.length===0){ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); return; } const arr = await (window.S5Api && window.S5Api.getAnimeByIds ? window.S5Api.getAnimeByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToAnime({ anime: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); if(window.currentLibraryPage===1){ window.animeData = mapped; } else { const seen = new Set(window.animeData.map(x=>x.id)); for(const m of mapped){ if(!seen.has(m.id)) window.animeData.push(m); } } window.filteredData = [...window.animeData]; for(const e of (data.items||[])){ window.libraryByAnimeId[e.animeId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt }; } if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayAnime(window.filteredData); } const btn = Dom.$('moreBtn'); if(btn){ if((data.items||[]).length === PAGE_SIZE) btn.classList.remove('hidden'); else btn.classList.add('hidden'); } }catch{ displayAnime([]); showToast('Failed to load library', 'error'); }
+    const tp = (window.S5Const?.TEXT?.RESULTS_PREFIX) || 'Showing ';
+    const ts = (window.S5Const?.TEXT?.RESULTS_SUFFIX) || ' results';
+    Dom.text('resultCount', `${tp}${window.filteredData.length}${ts}`);
   }
   window.loadLibrary = loadLibrary;
 
-  window.loadMore = async function(){ if(window.currentView==='forYou'){ const inc = (window.S5Config && window.S5Config.MORE_INCREMENT) || PAGE_SIZE; window.currentRecsTopK += inc; await window.loadAnimeData(); } else { window.currentLibraryPage += 1; await loadLibrary(); } };
+  window.loadMore = async function(){ 
+    if(window.currentView==='forYou'){ 
+      const inc = (window.S5Config && window.S5Config.MORE_INCREMENT) || PAGE_SIZE; 
+      window.currentRecsTopK += inc; 
+      await window.loadAnimeData(); 
+    } else if(window.currentView==='freeBrowsing'){ 
+      const inc = (window.S5Config && window.S5Config.MORE_INCREMENT) || PAGE_SIZE; 
+      window.currentRecsTopK += inc; 
+      await window.loadFreeBrowsingData(); 
+    } else { 
+      window.currentLibraryPage += 1; 
+      await loadLibrary(); 
+    } 
+  };
 
-  window.removeCardFromForYou = function(animeId){ if(window.currentView!=='forYou') return; window.animeData = window.animeData.filter(a=>a.id!==animeId); window.filteredData = window.filteredData.filter(a=>a.id!==animeId); const grid = Dom.$('animeGrid'); const card = grid?.querySelector(`[data-anime-id="${CSS.escape(String(animeId))}"]`); if(card){ card.style.transition='opacity 250ms ease-out, transform 250ms ease-out'; card.style.opacity='0'; card.style.transform='scale(0.96)'; setTimeout(()=>{ card.remove(); Dom.text('resultCount', `Showing ${window.filteredData.length} results`); const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); } }, 260); } else { displayAnime(window.filteredData); } };
+  window.removeCardFromForYou = function(animeId){ 
+    // Only remove cards from "For You" mode, not from "Free Browsing" or "Library"
+    if(window.currentView!=='forYou') return; 
+    window.animeData = window.animeData.filter(a=>a.id!==animeId); 
+    window.filteredData = window.filteredData.filter(a=>a.id!==animeId); 
+    const grid = Dom.$('animeGrid'); 
+    const card = grid?.querySelector(`[data-anime-id="${CSS.escape(String(animeId))}"]`); 
+    if(card){ 
+      card.style.transition=`opacity ${(window.S5Const?.UI?.REMOVE_CARD_TRANSITION_MS) ?? 250}ms ease-out, transform ${(window.S5Const?.UI?.REMOVE_CARD_TRANSITION_MS) ?? 250}ms ease-out`; 
+      card.style.opacity='0'; 
+      card.style.transform='scale(0.96)'; 
+      setTimeout(()=>{ 
+        card.remove(); 
+        const tp = (window.S5Const && window.S5Const.TEXT && window.S5Const.TEXT.RESULTS_PREFIX) || 'Showing ';
+        const ts = (window.S5Const && window.S5Const.TEXT && window.S5Const.TEXT.RESULTS_SUFFIX) || ' results';
+        Dom.text('resultCount', `${tp}${window.filteredData.length}${ts}`); 
+        const btn = Dom.$('moreBtn'); 
+        if(btn){ 
+          if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); 
+          else btn.classList.add('hidden'); 
+        } 
+      }, (window.S5Const?.UI?.REMOVE_CARD_TIMEOUT_MS) ?? 260); 
+    } else { 
+      displayAnime(window.filteredData); 
+    } 
+  };
 })();
