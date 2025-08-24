@@ -6,8 +6,7 @@ builder.Services.AddSora();
 
 var app = builder.Build();
 
-app.UseDefaultFiles();
-app.UseStaticFiles();
+// Static files are wired by Sora.Web; no explicit calls needed here.
 app.Run();
 
 namespace S4.Web

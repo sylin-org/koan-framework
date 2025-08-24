@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Sora.Web.Auth.Options;
 using Sora.Web.Auth.Providers;
 using Sora.Web.Auth.Domain;
@@ -9,9 +8,10 @@ namespace Sora.Web.Auth.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddSoraWebAuth(this IServiceCollection services, IConfiguration config)
+    public static IServiceCollection AddSoraWebAuth(this IServiceCollection services)
     {
-        services.AddOptions<AuthOptions>().Bind(config.GetSection(AuthOptions.SectionPath)).ValidateDataAnnotations();
+        // Bind from configuration by section path at runtime (no IConfiguration required here)
+        services.AddOptions<AuthOptions>().BindConfiguration(AuthOptions.SectionPath).ValidateDataAnnotations();
 
         services.AddHttpClient();
 
