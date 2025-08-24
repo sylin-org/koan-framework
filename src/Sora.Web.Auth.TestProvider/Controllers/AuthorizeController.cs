@@ -19,9 +19,9 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
         if (string.IsNullOrWhiteSpace(client_id) || string.IsNullOrWhiteSpace(redirect_uri)) return BadRequest("client_id and redirect_uri are required");
         if (!string.Equals(client_id, o.ClientId, StringComparison.Ordinal)) return Unauthorized();
 
-  // If no user cookie, or caller requested prompt=login, render simple HTML form. Use localStorage to prefill.
-  var forceLogin = string.Equals(prompt, "login", StringComparison.OrdinalIgnoreCase);
-  if (forceLogin || !Request.Cookies.TryGetValue("_tp_user", out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
+        // If no user cookie, or caller requested prompt=login, render simple HTML form. Use localStorage to prefill.
+        var forceLogin = string.Equals(prompt, "login", StringComparison.OrdinalIgnoreCase);
+        if (forceLogin || !Request.Cookies.TryGetValue("_tp_user", out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
         {
             var html = $$"""
 <!doctype html>
@@ -31,15 +31,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
   <form id="f">
     <label>Name <input id="u" /></label><br/>
     <label>Email <input id="e" type="email" /></label><br/>
-    public IActionResult Authorize(
-      [FromQuery] string response_type,
-      [FromQuery] string client_id,
-      [FromQuery] string redirect_uri,
-      [FromQuery] string? scope,
-      [FromQuery] string? state,
-      [FromQuery] string? code_challenge,
-      [FromQuery] string? code_challenge_method,
-      [FromQuery] string? prompt)
+    <button type="submit">Continue</button>
   </form>
   <script>
     const u = document.getElementById('u');
@@ -48,12 +40,9 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
     e.value = localStorage.getItem('tp_e')||'';
     document.getElementById('f').addEventListener('submit', ev => {
       ev.preventDefault();
-      // If forced login requested (prompt=login), ignore any remembered cookie and show the form
-      var forceLogin = string.Equals(prompt, "login", StringComparison.OrdinalIgnoreCase);
-      // If no user cookie (or force login), render simple HTML form. Use localStorage to prefill.
-      if (forceLogin || !Request.Cookies.TryGetValue("_tp_user", out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
+      localStorage.setItem('tp_u', u.value);
       localStorage.setItem('tp_e', e.value);
-  document.cookie = `_tp_user=${encodeURIComponent(u.value)}|${encodeURIComponent(e.value)}; path=/`;
+      document.cookie = `_tp_user=${encodeURIComponent(u.value)}|${encodeURIComponent(e.value)}; path=/`;
       location.reload();
     });
   </script>
