@@ -24,6 +24,10 @@ Headers
 
 Well-known endpoints
 - See well-known-endpoints.md for `/.well-known/sora/*` routes.
+- Authentication routes (Sora.Web.Auth)
+- Discovery: `GET /.well-known/auth/providers`
+- Challenge/Callback: `GET /auth/{provider}/challenge`, `GET /auth/{provider}/callback`
+- Logout: `GET|POST /auth/logout`
 
 References
 - Filtering and query: see Reference/Data Access and WEB-0035 transformer guidance

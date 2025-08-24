@@ -194,6 +194,14 @@ Define providers `google`, `microsoft`, `discord`, `corp-saml` as above. Discove
 - SAML: signature + issuer validation, clock skew guard, replay protection (cache assertion ids), `AllowIdpInitiated` off by default.
 - Tokens not persisted by default; if enabled, encrypt at rest and redact everywhere.
 
+## Login procedures (summary)
+
+- Discover available providers via `GET /.well-known/auth/providers`.
+- Start login with `GET /auth/{provider}/challenge?return={relative-path}`; server sets state/return cookies and redirects to the IdP.
+- Complete login at `GET /auth/{provider}/callback?code=...&state=...`; on success, cookie session is established and a local redirect is performed.
+- Logout via `GET|POST /auth/logout?return=/`.
+- Return URL policy: only relative paths or configured allow-list prefixes are accepted; configure under `Sora:Web:Auth:ReturnUrl:{ DefaultPath, AllowList[] }`.
+
 ## Examples: Discovery and profile payloads
 
 Discovery (truncated):
