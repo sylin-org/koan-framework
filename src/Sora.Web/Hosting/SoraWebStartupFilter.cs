@@ -78,6 +78,24 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
                 if (opts.AutoMapControllers)
                 {
                     app.UseRouting();
+                    // Ensure auth middleware is in the correct position (after routing, before endpoints)
+                    // Safe even if no authentication schemes are registered.
+                    try
+                    {
+                        app.UseAuthentication();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // No authentication services registered; ignore.
+                    }
+                    try
+                    {
+                        app.UseAuthorization();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // No authorization services registered; ignore.
+                    }
                     // Add minimal tracing header for correlation (always safe)
                     app.Use(async (ctx, next) =>
                     {

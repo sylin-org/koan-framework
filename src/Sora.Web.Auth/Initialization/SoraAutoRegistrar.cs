@@ -26,15 +26,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         // Best-effort discovery summary without binding or DI: list provider display names and protocol
         // Strategy: if configured providers exist, list those; otherwise fall back to well-known defaults.
         var section = cfg.GetSection(Options.AuthOptions.SectionPath);
-        var providers = section.GetSection("Providers");
-
-        // Well-known adapter defaults for display purposes
-        var defaults = new Dictionary<string, (string Name, string Type)>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["google"] = ("Google", "oidc"),
-            ["microsoft"] = ("Microsoft", "oidc"),
-            ["discord"] = ("Discord", "oauth2")
-        };
+    var providers = section.GetSection("Providers");
 
         static string PrettyProtocol(string? type)
             => string.IsNullOrWhiteSpace(type) ? "OIDC"
@@ -69,28 +61,31 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             {
                 var id = child.Key;
                 var display = child.GetValue<string>(nameof(Options.ProviderOptions.DisplayName));
-                if (string.IsNullOrWhiteSpace(display))
-                {
-                    display = defaults.TryGetValue(id, out var meta) ? meta.Name : Titleize(id);
-                }
+                if (string.IsNullOrWhiteSpace(display)) display = Titleize(id);
                 var type = child.GetValue<string>(nameof(Options.ProviderOptions.Type));
-                if (string.IsNullOrWhiteSpace(type) && defaults.TryGetValue(id, out var meta2))
-                {
-                    type = meta2.Type;
-                }
+                // Keep type as-is if configured; otherwise leave null and PrettyProtocol will titleize raw value later.
                 detected.Add($"{display} ({PrettyProtocol(type)})");
             }
         }
         else
         {
-            // No explicit config: show well-known defaults as detected
-            foreach (var kvp in defaults)
-            {
-                detected.Add($"{kvp.Value.Name} ({PrettyProtocol(kvp.Value.Type)})");
-            }
+            // No explicit config: nothing to list unless contributors add providers at runtime
         }
 
         report.AddSetting("Providers", detected.Count.ToString());
         report.AddSetting("DetectedProviders", string.Join(", ", detected));
+
+        // Production gating for dynamic providers (adapter/contributor defaults without explicit config)
+        var allowDynamic = Sora.Core.Configuration.Read(cfg, Infrastructure.AuthConstants.Configuration.AllowDynamicProvidersInProduction, false)
+                           || Sora.Core.SoraEnv.AllowMagicInProduction
+                           || Sora.Core.Configuration.Read(cfg, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+        if (Sora.Core.SoraEnv.IsProduction && !allowDynamic)
+        {
+            report.AddSetting("DynamicProvidersInProduction", "disabled (set Sora:Web:Auth:AllowDynamicProvidersInProduction=true or Sora:AllowMagicInProduction=true)");
+        }
+        else
+        {
+            report.AddSetting("DynamicProvidersInProduction", "enabled");
+        }
     }
 }

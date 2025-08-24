@@ -24,7 +24,8 @@ public static class AuthenticationExtensions
             .AddCookie(CookieScheme, o =>
             {
                 o.Cookie.HttpOnly = true;
-                o.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.Always;
+                // UseSameAsRequest supports HTTP in Dev/containers while remaining secure on HTTPS
+                o.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest;
                 o.SlidingExpiration = true;
             });
 

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
 
@@ -10,6 +11,17 @@ public sealed record UpdateLibraryRequest(bool? Favorite, bool? Watched, bool? D
 [Route(Constants.Routes.Library)]
 public class LibraryController : ControllerBase
 {
+    // New: claim-based update (no userId in route)
+    [Authorize]
+    [HttpPut("by-me/{animeId}")]
+    public async Task<IActionResult> UpsertForMe(string animeId, [FromBody] UpdateLibraryRequest body, CancellationToken ct)
+    {
+        var userId = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? User?.FindFirst("sub")?.Value;
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+        return await Upsert(userId, animeId, body, ct);
+    }
+
     [HttpPut("{userId}/{animeId}")]
     public async Task<IActionResult> Upsert(string userId, string animeId, [FromBody] UpdateLibraryRequest body, CancellationToken ct)
     {
@@ -50,10 +62,26 @@ public class LibraryController : ControllerBase
 
     public sealed record ListQuery(string? Status = null, string? Sort = null, int Page = 1, int PageSize = 20);
 
+    // New: claim-based list (no userId in route)
+    [Authorize]
+    [HttpGet("by-me")]
+    public async Task<IActionResult> ListForMe([FromQuery] ListQuery query, CancellationToken ct)
+    {
+        var userId = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? User?.FindFirst("sub")?.Value;
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+        return await ListInternal(userId, query, ct);
+    }
+
     [HttpGet("{userId}")]
     public async Task<IActionResult> List(string userId, [FromQuery] ListQuery query, CancellationToken ct)
     {
-    var all = (await LibraryEntryDoc.All(ct)).Where(x => x.UserId == userId).ToList();
+        return await ListInternal(userId, query, ct);
+    }
+
+    private static async Task<IActionResult> ListInternal(string userId, ListQuery query, CancellationToken ct)
+    {
+        var all = (await LibraryEntryDoc.All(ct)).Where(x => x.UserId == userId).ToList();
         var filtered = query.Status?.ToLowerInvariant() switch
         {
             "favorite" => all.Where(x => x.Favorite),
@@ -70,7 +98,7 @@ public class LibraryController : ControllerBase
 
         var skip = Math.Max(0, (query.Page - 1) * Math.Max(1, query.PageSize));
         var page = ordered.Skip(skip).Take(Math.Max(1, query.PageSize)).ToList();
-        return Ok(new { total = ordered.Count(), items = page });
+        return new OkObjectResult(new { total = ordered.Count(), items = page });
     }
 }
  

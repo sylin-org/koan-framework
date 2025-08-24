@@ -12,6 +12,15 @@ public class RecsController(IRecsService recs) : ControllerBase
     [HttpPost("query")]
     public IActionResult Query([FromBody] RecsQuery req)
     {
+        // If userId is not provided but caller is authenticated, derive from claims
+        string? userId = req.UserId;
+        if (string.IsNullOrWhiteSpace(userId) && HttpContext?.User?.Identity?.IsAuthenticated == true)
+        {
+            userId = HttpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? HttpContext.User.FindFirst("sub")?.Value;
+        }
+
+    var ct = HttpContext?.RequestAborted ?? CancellationToken.None;
     var (items, degraded) = recs.QueryAsync(
         req.Text,
         req.AnchorAnimeId,
@@ -19,11 +28,11 @@ public class RecsController(IRecsService recs) : ControllerBase
         req.Filters?.EpisodesMax,
         req.Filters?.SpoilerSafe ?? true,
         req.TopK,
-        req.UserId,
+        userId,
         req.Filters?.PreferTags,
         req.Filters?.PreferWeight,
         req.Sort,
-        HttpContext.RequestAborted).GetAwaiter().GetResult();
+    ct).GetAwaiter().GetResult();
     return Ok(new { items, degraded });
     }
 

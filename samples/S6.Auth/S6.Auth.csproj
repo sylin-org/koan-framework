@@ -8,5 +8,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
     <ProjectReference Include="..\..\src\Sora.Web.Auth\Sora.Web.Auth.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Auth.Google\Sora.Web.Auth.Google.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Auth.Microsoft\Sora.Web.Auth.Microsoft.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Auth.Discord\Sora.Web.Auth.Discord.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Auth.Oidc\Sora.Web.Auth.Oidc.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Auth.TestProvider\Sora.Web.Auth.TestProvider.csproj" />
   </ItemGroup>
 </Project>
+

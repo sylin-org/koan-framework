@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Generic OIDC adapter for Sora.Web.Auth (handler wiring; no defaults).</Description>
+    <PackageTags>$(CommonPackageTags);auth;oidc;provider</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
+    <ProjectReference Include="..\Sora.Web.Auth\Sora.Web.Auth.csproj" />
+  </ItemGroup>
+</Project>

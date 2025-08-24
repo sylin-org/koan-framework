@@ -1,6 +1,6 @@
 ﻿# Web Authentication (Sora.Web.Auth)
 
-This page defines the contracts, options, and wiring patterns for Sora.Web.Auth (OIDC, OAuth2, SAML) with provider discovery, sign-in, and account linking.
+This page defines the contracts, options, and wiring patterns for Sora.Web.Auth (OIDC, OAuth2, SAML) with provider discovery, sign-in, and account linking. Provider adapters (Google, Microsoft, Discord, generic OIDC) are separate thin modules that self-register defaults via `IAuthProviderContributor`; the core centralizes behavior and composition.
 
 See also: WEB-0043 (multi-protocol auth), ARCH-0040 (constants), WEB-0035 (controllers + transformers), OPS-0015 (config fallback).
 
@@ -67,9 +67,16 @@ Secrets: default config; optional secret-store adapters (Azure Key Vault, AWS Se
 
 ### Settings composition and minimal overrides
 
-- Adapters provide sane defaults (protocol `Type`, endpoints, scopes, icons). You can specify only the minimum credentials, and Sora composes final settings by overlaying your values on top of adapter defaults.
+- Adapters provide sane defaults (protocol `Type`, endpoints, scopes, icons). You can specify only the minimum credentials, and Sora composes final settings by overlaying your values on top of adapter defaults. Defaults are contributed by adapter modules, not hard-coded in the core.
 - Precedence: adapter defaults ← app defaults (if any) ← appsettings.json ← appsettings.{Environment}.json ← environment variables; `SecretRef` resolves last.
 - Missing required keys after composition produce a clear ProblemDetails error at startup or first use.
+
+Production gating
+
+- In Production, providers contributed only by adapters (no explicit `Sora:Web:Auth:Providers:{id}` entry) are disabled by default unless one of the following is set:
+  - `Sora:Web:Auth:AllowDynamicProvidersInProduction=true`, or
+  - `Sora:AllowMagicInProduction=true`.
+- In Development, adapter defaults are active by default for fast starts.
 
 Minimal Discord example (only credentials provided):
 ```

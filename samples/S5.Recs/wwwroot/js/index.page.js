@@ -268,12 +268,14 @@
   // Library cache
   async function refreshLibraryState(){
     if(!window.currentUserId){ window.libraryByAnimeId = {}; return; }
+  console.log('[S5] refreshLibraryState: fetching for user', window.currentUserId);
     try{
   const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page:1, pageSize:(window.S5Const?.LIBRARY?.PAGE_SIZE) ?? 500 }) : null);
       if(!data){ window.libraryByAnimeId = {}; return; }
       const map = {};
       for(const e of (data.items||[])) map[e.animeId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt };
-      window.libraryByAnimeId = map;
+  window.libraryByAnimeId = map;
+  console.log('[S5] refreshLibraryState: cached entries', Object.keys(window.libraryByAnimeId).length);
     }catch{ window.libraryByAnimeId = {}; }
   }
   window.refreshLibraryState = refreshLibraryState;
@@ -344,7 +346,7 @@
   };
 
   window.fetchRecommendations = async function({ text, topK = PAGE_SIZE, ignoreUserPreferences = false }){
-    console.debug('[S5] fetchRecommendations', { text, topK, ignoreUserPreferences });
+  console.log('[S5] fetchRecommendations', { text, topK, ignoreUserPreferences });
     const weight = parseFloat(Dom.$('preferWeight')?.value || String((window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2));
     const genre = Dom.val('genreFilter') || '';
     const episodeSel = Dom.val('episodeFilter') || '';
@@ -517,7 +519,9 @@
   }
   async function loadLibrary(){
     if(!window.currentUserId){ displayAnime([]); return; }
+  console.log('[S5] loadLibrary: page', window.currentLibraryPage);
   try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page: window.currentLibraryPage, pageSize: PAGE_SIZE }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.animeId).filter(Boolean); if(window.currentLibraryPage===1 && ids.length===0){ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); return; } const arr = await (window.S5Api && window.S5Api.getAnimeByIds ? window.S5Api.getAnimeByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToAnime({ anime: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); if(window.currentLibraryPage===1){ window.animeData = mapped; } else { const seen = new Set(window.animeData.map(x=>x.id)); for(const m of mapped){ if(!seen.has(m.id)) window.animeData.push(m); } } window.filteredData = [...window.animeData]; for(const e of (data.items||[])){ window.libraryByAnimeId[e.animeId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt }; } if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayAnime(window.filteredData); } const btn = Dom.$('moreBtn'); if(btn){ if((data.items||[]).length === PAGE_SIZE) btn.classList.remove('hidden'); else btn.classList.add('hidden'); } }catch{ displayAnime([]); showToast('Failed to load library', 'error'); }
+  console.log('[S5] loadLibrary: done, items', (window.filteredData||[]).length);
     const tp = (window.S5Const?.TEXT?.RESULTS_PREFIX) || 'Showing ';
     const ts = (window.S5Const?.TEXT?.RESULTS_SUFFIX) || ' results';
     Dom.text('resultCount', `${tp}${window.filteredData.length}${ts}`);

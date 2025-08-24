@@ -2,12 +2,19 @@
 
 public static class AuthConstants
 {
+    public static class Configuration
+    {
+        public const string Section = "Sora:Web:Auth";
+        public const string AllowDynamicProvidersInProduction = "Sora:Web:Auth:AllowDynamicProvidersInProduction";
+    }
+
     public static class Routes
     {
         public const string Discovery = "/.well-known/auth/providers";
         public const string AuthBase = "/auth";
         public const string Challenge = "/auth/{provider}/challenge";
         public const string Callback = "/auth/{provider}/callback";
+    public const string Logout = "/auth/logout";
         public const string SamlMetadata = "/auth/{provider}/saml/metadata";
         public const string SamlAcs = "/auth/{provider}/saml/acs";
         public const string Me = "/me";

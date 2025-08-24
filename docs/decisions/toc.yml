@@ -84,6 +84,10 @@
       href: WEB-0035-entitycontroller-transformers.md
     - name: Multi-protocol authentication (OIDC/OAuth2/SAML)
       href: WEB-0043-auth-multi-protocol-oauth-oidc-saml.md
+    - name: Web auth discovery and health
+      href: WEB-0044-web-auth-discovery-and-health.md
+    - name: Auth provider adapters as separate modules
+      href: WEB-0045-auth-provider-adapters-separate-projects.md
 - name: Messaging (MESS)
   items:
     - name: Messaging capabilities and negotiation
