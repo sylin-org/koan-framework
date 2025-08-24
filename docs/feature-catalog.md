@@ -2,6 +2,32 @@
 
 A modular .NET framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
 
+## Summary — Pillars at a glance
+
+- Core
+  - Unified runtime/config, health/readiness, secure defaults, auto-registration, boot reports, optional OpenTelemetry.
+- Data
+  - Adapter-agnostic persistence (relational/NoSQL/JSON), pushdown-first, Direct escape hatch, CQRS/outbox, vector module.
+- Storage
+  - Profile-based storage orchestrator with thin providers; local filesystem provider; DX helpers and model-centric API.
+- Web
+  - Controllers-only HTTP (REST/GraphQL), startup pipeline wiring, Swagger by default in dev, payload transformers.
+- Scheduling
+  - Background job orchestrator with OnStartup tasks, timeouts, health facts, and readiness gating.
+- Messaging
+  - Capability-aware semantics (aliases, retry/DLQ, idempotency), RabbitMQ transport, inbox services (HTTP/Redis/InMemory).
+- AI
+  - Chat/embeddings, vector integration, Ollama provider, RAG building blocks, budgets and observability.
+- Services & DX
+  - Tiny templates, auto-registration across modules, decision docs (ADRs), container-smart defaults.
+
+References
+- Data: docs/reference/data-access.md
+- Storage: docs/reference/storage.md
+- Web: docs/reference/web.md
+- Messaging: docs/reference/messaging.md
+- AI: docs/reference/ai.md
+
 ## Pillars → outcomes
 
 - Core
