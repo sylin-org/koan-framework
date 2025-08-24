@@ -2,6 +2,16 @@
 // Exposes window.S5Api with small, resilient wrappers
 (function(){
   const JSON_HDR = { 'Content-Type': 'application/json' };
+  async function parseJsonSafely(r){
+    // Treat 204/205 as success with empty object
+    if(r.status === 204 || r.status === 205) return {};
+    const ct = (r.headers && r.headers.get && r.headers.get('content-type')) || '';
+    if(ct && ct.toLowerCase().includes('application/json')){
+      try{ return await r.json(); }catch{ return {}; }
+    }
+    // No/unknown content-type → return empty object on success
+    return {};
+  }
   function qsp(obj){
     const p = new URLSearchParams();
     for(const [k,v] of Object.entries(obj||{})){
@@ -13,17 +23,17 @@
   }
   async function get(url){
     console.log('[S5Api] GET', url);
-    try{ const r = await fetch(url, { credentials: 'include' }); if(!r.ok) throw new Error('HTTP '+r.status); const data = await r.json(); console.log('[S5Api] GET response', url, data); return data; }
+    try{ const r = await fetch(url, { credentials: 'include' }); if(!r.ok) throw new Error('HTTP '+r.status); const data = await parseJsonSafely(r); console.log('[S5Api] GET response', url, data); return data; }
     catch(e){ console.warn('[S5Api] GET failed', url, e); return null; }
   }
   async function post(url, body){
     console.log('[S5Api] POST', url, body);
-    try{ const r = await fetch(url, { method:'POST', headers: JSON_HDR, body: JSON.stringify(body||{}), credentials: 'include' }); if(!r.ok) throw new Error('HTTP '+r.status); const data = await r.json(); console.log('[S5Api] POST response', url, data); return data; }
+    try{ const r = await fetch(url, { method:'POST', headers: JSON_HDR, body: JSON.stringify(body||{}), credentials: 'include' }); if(!r.ok) throw new Error('HTTP '+r.status); const data = await parseJsonSafely(r); console.log('[S5Api] POST response', url, data); return data; }
     catch(e){ console.warn('[S5Api] POST failed', url, e); return null; }
   }
   async function put(url, body){
     console.log('[S5Api] PUT', url, body);
-    try{ const r = await fetch(url, { method:'PUT', headers: JSON_HDR, body: JSON.stringify(body||{}), credentials: 'include' }); if(!r.ok) throw new Error('HTTP '+r.status); const data = await r.json(); console.log('[S5Api] PUT response', url, data); return data; }
+    try{ const r = await fetch(url, { method:'PUT', headers: JSON_HDR, body: JSON.stringify(body||{}), credentials: 'include' }); if(!r.ok) throw new Error('HTTP '+r.status); const data = await parseJsonSafely(r); console.log('[S5Api] PUT response', url, data); return data; }
     catch(e){ console.warn('[S5Api] PUT failed', url, e); return null; }
   }
 
