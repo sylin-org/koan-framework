@@ -23,13 +23,21 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - Built-in Swagger/OpenAPI auto-registered (dev-on by default; prod opt-in). Idempotent Add wiring; no explicit Add/Use calls required when the module is referenced.
   - HTTP payload transformers for flexible request/response shaping with auto-discovery.
   - GraphQL endpoints auto-generated from IEntity<> types with HotChocolate integration.
+  - Centralized Web Authentication with pluggable IdP adapters and safe flows:
+    - Provider discovery: GET /.well-known/auth/providers
+    - Challenge/callback/logout controller endpoints with safe return URLs and prompt forwarding
+    - Adapters: Google, Microsoft, Discord, generic OIDC, and a Dev TestProvider for local workflows
+    - Production gating of discovery/challenge; cookie-based user session and single sign-out via logout
 - Scheduling
   - Background job orchestrator with OnStartup tasks, per-task timeouts, health facts, and readiness gating. Auto-registered; tasks discovered via DI — no bespoke reflection.
   - Sample: S5 bootstrap task seeds local data and optional vectors on first run without gating readiness by default.
 - Messaging
   - Capability-aware, cross-broker semantics (aliases, DLQ/retry, idempotency) with simple handler wiring.
   - RabbitMQ transport with resilient connection management and config-first options.
-  - Redis-based inbox service for message processing and deduplication.
+  - Redis-based inbox service for message processing and deduplication (Sora.Service.Inbox.Redis):
+    - Endpoints: GET /v1/inbox/{key}, POST /v1/inbox/mark-processed
+    - Config via Sora:Inbox:Redis:ConnectionString (or ConnectionStrings:InboxRedis)
+    - Optional discovery announce on RabbitMQ (Sora:Messaging:Buses:rabbit:*)
   - HTTP and in-memory inbox implementations for testing and lightweight scenarios.
 - AI
   - Turnkey inference (streaming chat, embeddings) with minimal config; Redis-first vector + cache; RAG defaults; observability and budgets; optional sidecar/central proxy; one-call AddSoraAI() and auto-boot discovery.
@@ -95,6 +103,9 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - AI-aware indexer (D3): embed-on-change with Redis vector; embedding versioning and invalidation.
   - Vector & RAG (V1/R1): Redis vector + cache; `/ai/chat` (SSE), `/ai/embed`, `/ai/rag/query`; ai-probe.ps1.
   - AI provider ecosystem: Ollama integration for local models with streaming and health checks; OpenAI-compatible patterns.
+
+- Web & capabilities
+  - Capability Matrix endpoint: GET /.well-known/sora/capabilities to report registered aggregates, providers, and flags (informational; protect or disable in prod).
 
 - Foundations
   - API schemas & SSE format; gRPC draft; tokenization/cost plan; secrets provider; Redis guardrails; pgvector fast-follow plan.
