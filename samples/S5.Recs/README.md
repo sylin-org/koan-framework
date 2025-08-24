@@ -322,6 +322,7 @@ The sample demonstrates how to build rich interactions without complex frontend 
 **Modular JavaScript architecture**  
 *Why not use a big framework for the frontend?* This sample shows that modern vanilla JavaScript can handle complex interactions cleanly. The patterns here (event delegation, module organization, progressive enhancement) work in any framework—or no framework at all.
 
+# S5.Recs — Recommendation Sample App
 **Production data management**  
 *What about real-world operations?* The sample includes comprehensive tooling: background job processing, data seeding pipelines, health monitoring, and administrative controls. These are the pieces you need for production deployment.
 
@@ -329,15 +330,11 @@ The sample demonstrates how to build rich interactions without complex frontend 
 
 **A complete recommendation system** with personalized feeds, semantic search, and user preference modeling
 
-**Modern web interface** with responsive design, real-time filtering, and accessible interactions
 
 **Administrative tools** for content management, system monitoring, and algorithm tuning
-
 **AI integration patterns** that enhance functionality without creating dependencies
 
-**Production-ready architecture** with health checks, background processing, and graceful error handling
 
-## Running the sample
 
 **Prerequisites (managed automatically by start.bat)**
 ```bash
@@ -345,73 +342,50 @@ The sample demonstrates how to build rich interactions without complex frontend 
 docker run -d -p 27017:27017 mongo:latest
 
 # Optional: Weaviate for vector search
-docker run -d -p 8080:8080 semitechnologies/weaviate:latest
 
 # Optional: Ollama for local AI embeddings  
 docker run -d -p 11434:11434 ollama/ollama
 ollama pull nomic-embed-text
-```
 
 *Wait, why do we need all these services?* Great question! Let's break it down:
 
 - **MongoDB** stores your content and user data—this is required
 - **Weaviate** is a vector database that stores and searches embeddings—this enables semantic search like "find space westerns" 
 - **Ollama** runs AI models locally to convert text into embeddings—this powers the semantic understanding
-
 *Can't we just use regular text search?* You could, but you'd miss the magic. Vector search finds content based on meaning, not just keywords. "Romantic space adventure" might find you "Cowboy Bebop" even though those exact words don't appear in the description.
 
 **Start the application (recommended)**
 ```bash
-cd samples/S5.Recs
 start.bat
 ```
 
-This script builds the container image and starts the full Docker stack (API, MongoDB, Weaviate, Ollama) via docker compose. The app will be available at:
-
-- Website: http://localhost:5084
 - Swagger UI: http://localhost:5084/swagger/index.html
 
 **Initialize with sample data**
-1. Open `/dashboard` in your browser
-2. Click "Seed Sample Data" to import anime from AniList API
-3. Wait for the import to complete (progress shown in real-time)
 4. Navigate to `/` to browse recommendations
 
 **Try the features**
 - Search for anime: "space western" or "slice of life romance"
 - Rate a few titles to see personalization kick in
-- Use genre filters and the "Try something new" tag selector
-- Toggle between grid and list views
 - Check your personal library and statistics
-
 ### Filters panel (AnimeRadar UX)
 - Rating: dual-range 0–5 stars with 0.5 step. Moving one thumb pushes the other so min ≤ max.
 - Year: dual-range over a rolling 30-year window up to the current year. Max at the top means “present”.
-- Extremes mean ignore: when a thumb is at its outer boundary, that side of the filter is treated as “Any”.
 - Labels update live (e.g., “Rating: 2–4.5★”, “Year: 2010–present”).
-- Today, filters narrow the in-memory TopK results from the server. Server-side pushdown for year/rating is planned to keep ordering fully aligned with vector search.
 
-### Rating UI (hoverable star bar)
 - Cards and list rows show a horizontal star bar only on hover to reduce visual noise.
 - Hovering a star previews the selection; clicking submits the rating immediately.
 - Action clicks (rate/favorite/watched/dropped) take precedence over “open details” so you can rate without navigating away.
 
-### Tag-based highlighting
-- When you select preferred tags (Try Something New), items that have at least one of those tags are visually highlighted.
 - Highlighting updates after render and whenever tag selection/weights change, so discovery feels responsive.
 
 ## Understanding the code structure
-
 **Controllers/** - API endpoints following Sora's controller-only routing pattern
-```
 RecsController.cs     - Recommendation queries and rating submission
-LibraryController.cs  - User library management (favorites, watch status)  
 UsersController.cs    - User profile creation and statistics
 AdminController.cs    - Data seeding and system administration
 ```
 
-**Services/** - Business logic and recommendation algorithms
-```
 RecsService.cs        - Core recommendation engine with hybrid scoring
 SeedService.cs        - Background data import and processing
 SettingsService.cs    - Configuration management for tunable parameters
