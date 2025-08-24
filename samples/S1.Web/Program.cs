@@ -41,6 +41,8 @@ builder.Services.AddRateLimiter(options =>
 // Optional: use SQLite instead of JSON
 // builder.Services.AddSqliteAdapter(o => o.ConnectionString = "Data Source=.\\data\\s1.sqlite");
 
+// Auth: none in S1 sample (keep API simple)
+
 // Sora.Web wires routing, controllers, static files, secure headers, and /api/health.
 var app = builder.Build();
 
