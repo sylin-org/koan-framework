@@ -10,7 +10,7 @@
   let currentEntry = null;
 
   function goHome(){ const h=(window.S5Const?.PATHS?.HOME)||'index.html'; location.href = h; }
-  function toggleProfileMenu(){ const el=document.getElementById('profileMenu'); if(el) el.classList.toggle('hidden'); }
+  // No dropdown on details page; profile is read-only
   function show(el){ if(el) el.classList.remove('hidden'); }
   function hide(el){ if(el) el.classList.add('hidden'); }
 
@@ -23,10 +23,16 @@
   }
 
   function reflectAuthUi(isAuth, me){
-    // Toggle Login/Logout buttons if present in layout
+    // Toggle Login/Logout buttons
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     if(loginBtn && logoutBtn){ if(isAuth){ hide(loginBtn); show(logoutBtn);} else { show(loginBtn); hide(logoutBtn);} }
+    // Update profile badge
+    const ini=document.getElementById('profileInitial');
+    const nm=document.getElementById('profileName');
+    const display = isAuth ? (me?.displayName || me?.name || 'User') : 'Guest';
+    if(ini) ini.textContent = (display||'U').slice(0,1).toUpperCase();
+    if(nm) nm.textContent = display;
   }
 
   async function openLogin(){
@@ -47,10 +53,7 @@
     }catch{ window.location.href = `/auth/logout?return=/`; }
   }
 
-  async function initUsers(){ try{ const u=(window.S5Const?.ENDPOINTS?.USERS)||'/api/users'; const r = await fetch(u); if(!r.ok) return; const users = await r.json(); renderUsers(users); const def = users.find(u=>u.isDefault) || users[0]; if(def) selectUser(def.id, def.name); }catch{} }
-  function renderUsers(users){ const list = document.getElementById('userList'); if(!list) return; list.innerHTML = users.map(u=>`<div class="flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer" onclick="window.__details.selectUser(${JSON.stringify(u.id)}, ${JSON.stringify(u.name||'User')})"><div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">${(u.name||'U').slice(0,1).toUpperCase()}</div><div class="flex-1"><div class="text-white">${u.name||'User'}</div>${u.isDefault?'<div class="text-xs text-gray-400">Default<\/div>':''}</div></div>`).join(''); }
-  async function createNewUser(){ const input = document.getElementById('newUserName'); const name = input?.value.trim(); if(!name) return; const u=(window.S5Const?.ENDPOINTS?.USERS)||'/api/users'; const r = await fetch(u, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) }); if(r.ok){ await initUsers(); if(input) input.value=''; } }
-  function selectUser(id, name){ currentUserId = id; const ini=document.getElementById('profileInitial'); const nm=document.getElementById('profileName'); if(ini) ini.textContent = (name||'U').slice(0,1).toUpperCase(); if(nm) nm.textContent = name || 'User'; const pm=document.getElementById('profileMenu'); if(pm) pm.classList.add('hidden'); if(currentAnimeId){ loadEntryState(); loadSimilar(currentAnimeId); } }
+  // No user list on details page; always use authenticated user from /me
 
   async function loadAnime(id){ if(!id) return; const b=(window.S5Const?.ENDPOINTS?.ANIME_BASE)||'/api/anime'; const r = await fetch(`${b}/${encodeURIComponent(id)}`); if(!r.ok) return; const a = await r.json(); renderAnime(a); const st=document.getElementById('similarTitle'); if(st) st.textContent = `Similar to ${a.title || 'this'}`; }
   function renderAnime(a){
@@ -121,9 +124,9 @@
   function gotoDetails(id){ const d=(window.S5Const?.PATHS?.DETAILS)||'details.html'; location.href = `${d}?id=${encodeURIComponent(id)}`; }
 
   // Actions
-  async function markFavorite(){ if(!currentUserId || !currentAnimeId) return; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; await fetch(`${b}/${currentUserId}/${currentAnimeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ favorite:true }) }); await loadEntryState(); window.showToast && showToast('Added to favorites','success'); }
-  async function markWatched(){ if(!currentUserId || !currentAnimeId) return; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; await fetch(`${b}/${currentUserId}/${currentAnimeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ watched:true }) }); await loadEntryState(); window.showToast && showToast('Marked as watched','success'); }
-  async function rate(stars){ if(!currentUserId || !currentAnimeId) return; const r=(window.S5Const?.ENDPOINTS?.RATE)||'/api/recs/rate'; await fetch(r, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId: currentUserId, animeId: currentAnimeId, rating: stars }) }); await loadEntryState(); window.showToast && showToast(`Rated ${stars}★`,'success'); }
+  async function markFavorite(){ if(!authState.isAuthenticated){ window.showToast && showToast('Please login first','warning'); return;} if(!currentUserId || !currentAnimeId) return; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; await fetch(`${b}/${currentUserId}/${currentAnimeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ favorite:true }) }); await loadEntryState(); window.showToast && showToast('Added to favorites','success'); }
+  async function markWatched(){ if(!authState.isAuthenticated){ window.showToast && showToast('Please login first','warning'); return;} if(!currentUserId || !currentAnimeId) return; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; await fetch(`${b}/${currentUserId}/${currentAnimeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ watched:true }) }); await loadEntryState(); window.showToast && showToast('Marked as watched','success'); }
+  async function rate(stars){ if(!authState.isAuthenticated){ window.showToast && showToast('Please login first','warning'); return;} if(!currentUserId || !currentAnimeId) return; const r=(window.S5Const?.ENDPOINTS?.RATE)||'/api/recs/rate'; await fetch(r, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId: currentUserId, animeId: currentAnimeId, rating: stars }) }); await loadEntryState(); window.showToast && showToast(`Rated ${stars}★`,'success'); }
 
   async function loadEntryState(){ if(!currentUserId || !currentAnimeId){ currentEntry = null; renderEntryState(); return; } try{ const ps = (window.S5Const?.LIBRARY?.PAGE_SIZE) ?? 500; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; const r = await fetch(`${b}/${currentUserId}?sort=updatedAt&page=1&pageSize=${encodeURIComponent(ps)}`); if(!r.ok){ currentEntry = null; renderEntryState(); return; } const data = await r.json(); currentEntry = (data.items||[]).find(e=>e.animeId===currentAnimeId) || null; }catch{ currentEntry = null; } renderEntryState(); }
   function renderEntryState(){
@@ -154,12 +157,9 @@
     const qs = new URLSearchParams(location.search); currentAnimeId = qs.get('id');
     // Bind top menu buttons
     const backBtn = document.querySelector('button[data-action="go-home"]'); if(backBtn) backBtn.addEventListener('click', goHome);
-  const profileBtn = document.getElementById('profileBtn'); if(profileBtn) profileBtn.addEventListener('click', toggleProfileMenu);
-
-  // Login/Logout button hooks if present in this page's layout
-  const loginBtn = document.getElementById('loginBtn'); if(loginBtn) loginBtn.addEventListener('click', openLogin);
-  const logoutBtn = document.getElementById('logoutBtn'); if(logoutBtn) logoutBtn.addEventListener('click', doLogout);
-  const addUserBtn = document.querySelector('button[data-action="create-user"]'); if(addUserBtn) addUserBtn.addEventListener('click', createNewUser);
+    // Login/Logout button hooks if present in this page's layout
+    const loginBtn = document.getElementById('loginBtn'); if(loginBtn) loginBtn.addEventListener('click', openLogin);
+    const logoutBtn = document.getElementById('logoutBtn'); if(logoutBtn) logoutBtn.addEventListener('click', doLogout);
     // Bind actions
     const favBtn = document.querySelector('button[data-action="favorite"]'); if(favBtn) favBtn.addEventListener('click', markFavorite);
     const watchBtn = document.querySelector('button[data-action="watched"]'); if(watchBtn) watchBtn.addEventListener('click', markWatched);
@@ -201,12 +201,10 @@
       host.appendChild(bar);
     })();
 
-    // Expose callbacks referenced from generated HTML and profile list
-    window.__details = { gotoDetails, selectUser };
-    window.__details.createNewUser = createNewUser;
+  // Expose minimal callbacks referenced from generated HTML
+  window.__details = { gotoDetails };
 
   await ensureAuthState();
-  await initUsers();
     if(currentAnimeId){ await loadAnime(currentAnimeId); await loadEntryState(); await loadSimilar(currentAnimeId); }
   });
 })();
