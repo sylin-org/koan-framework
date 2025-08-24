@@ -37,13 +37,17 @@
         
         <!-- User / Auth Controls -->
         <div class="flex items-center space-x-4">
-          <button id="loginBtn" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg">Login</button>
-          <button id="logoutBtn" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg hidden">Logout</button>
-          <div class="flex items-center space-x-2 bg-slate-800 rounded-lg px-3 py-2">
+          <!-- Current User (display only) -->
+          <div class="hidden md:flex items-center space-x-2 bg-slate-800 rounded-lg px-3 py-2">
             <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
               <span id="profileInitial" class="text-white font-bold text-sm">U</span>
             </div>
             <span id="profileName" class="text-white text-sm">Guest</span>
+          </div>
+          <!-- Auth buttons (controlled by JS reflectAuthUi) -->
+          <div class="hidden md:flex items-center space-x-2">
+            <button id="loginBtn" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg">Login</button>
+            <button id="logoutBtn" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg hidden">Logout</button>
           </div>
         </div>
       </div>
