@@ -18,6 +18,8 @@
       href: reference/data-access.md
     - name: Web
       href: reference/web.md
+    - name: Storage
+      href: reference/storage.md
     - name: Modules
       href: reference/modules.md
     - name: Web Authentication

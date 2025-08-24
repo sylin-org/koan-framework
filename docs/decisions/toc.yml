@@ -110,6 +110,22 @@
       href: MESS-0028-mq-provisioning-plan-diff-apply-modes.md
     - name: Terse handler delegates and semantic aliases
       href: MESS-0029-terse-handler-delegates-and-aliases.md
+   - name: Storage (STOR)
+     items:
+       - name: Storage module and contracts
+         href: STOR-0001-storage-module-and-contracts.md
+       - name: HTTP endpoints and semantics
+         href: STOR-0002-storage-http-endpoints-and-semantics.md
+       - name: Profiles and routing rules
+         href: STOR-0003-storage-profiles-and-routing-rules.md
+       - name: Ingest pipeline and policy steps
+         href: STOR-0004-storage-ingest-pipeline-and-policy-steps.md
+       - name: Local provider (filesystem)
+         href: STOR-0005-storage-local-provider.md
+       - name: Default routing and fallbacks
+         href: STOR-0006-storage-default-routing-and-fallbacks.md
+       - name: DX helpers (naming and semantics)
+         href: STOR-0007-storage-dx-helpers.md
 - name: Ops (OPS)
   items:
     - name: Mongo container default host
