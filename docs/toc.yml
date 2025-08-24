@@ -18,6 +18,8 @@
       href: reference/data-access.md
     - name: Web
       href: reference/web.md
+    - name: Web Authentication
+      href: reference/web-auth.md
     - name: Messaging
       href: reference/messaging.md
     - name: AI

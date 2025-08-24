@@ -82,6 +82,8 @@
       href: WEB-0042-graphql-naming-and-discovery.md
     - name: EntityController transformers
       href: WEB-0035-entitycontroller-transformers.md
+    - name: Multi-protocol authentication (OIDC/OAuth2/SAML)
+      href: WEB-0043-auth-multi-protocol-oauth-oidc-saml.md
 - name: Messaging (MESS)
   items:
     - name: Messaging capabilities and negotiation
