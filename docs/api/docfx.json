@@ -14,7 +14,7 @@
     "content": [
       { "files": ["api/**.yml", "api/index.md"] },
       { "files": ["toc.yml", "assemblies.md", "web-http-api.md", "well-known-endpoints.md", "openapi-generation.md"] },
-      { "files": ["**/*.md"], "exclude": [
+  { "files": ["**/*.md"], "exclude": [
         "bin/**",
         "obj/**",
         "node_modules/**",
@@ -23,6 +23,8 @@
         "guides/core/getting-started.md",
         "guides/core/cqrs-for-humans.md"
       ] }
+  ,
+  { "src": "../../src", "files": ["**/README.md", "**/TECHNICAL.md", "**/ARCHITECTURE.md"], "dest": "modules" }
     ],
     "resource": [
       { "files": ["**/images/**"] },

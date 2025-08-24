@@ -1,19 +1,38 @@
 # Sylin.Sora.Data.Core
 
-Data core for Sora: repository primitives, options, and shared helpers for relational and document providers.
+Data access core for Sora: common primitives, options, and helpers used by relational/document/vector providers and apps.
 
 - Target framework: net9.0
 - License: Apache-2.0
 
-## Install
+## Capabilities
+- Entity contracts and helpers for aggregate storage
+- Options and conventions shared across data adapters
+- Support for paging, streaming, and batching semantics (see references)
+
+## Install (minimal setup)
 
 ```powershell
 dotnet add package Sylin.Sora.Data.Core
 ```
 
-## Notes
-- Common utilities for providers and apps
+## Usage — quick examples
 
-## Links
+- Prefer first-class model statics for top-level data access in your app models:
+	- `Item.All(ct)`
+	- `Item.Query(predicate, ct)`
+	- `Item.FirstPage(pageSize, ct)` and `Item.Page(cursor, ct)`
+	- `Item.QueryStream(predicate, ct)`
+- For large sets, use paging or streaming; don’t materialize unbounded results.
+- If a first-class static isn’t available, you can fall back to the generic facade (second-class): `Data<TEntity, TKey>.Query(...)`.
+
+See TECHNICAL.md for contracts, options, and extension points.
+
+## Customization
+- Configuration and advanced usage are documented in [`TECHNICAL.md`](./TECHNICAL.md).
+
+## References
+- Data access patterns: `/docs/guides/data/all-query-streaming-and-pager.md`
+- Decision: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- Engineering guardrails: `/docs/engineering/index.md`
 - Repo: https://github.com/sylin-labs/sora-framework
-- Data patterns: https://github.com/sylin-labs/sora-framework/blob/dev/docs/guides/data/all-query-streaming-and-pager.md

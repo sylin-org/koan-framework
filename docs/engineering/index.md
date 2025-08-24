@@ -5,6 +5,7 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 ## Read first
 
 - Engineering Guardrails (deep dive): ../guides/core/engineering-guardrails.md
+- Docker/Testcontainers skip guards: ./docker-test-skip-guards.md
 - Architecture Principles (curated ADRs): ../architecture/principles.md
 - Data access semantics (contract): ../guides/data/all-query-streaming-and-pager.md and decisions/DATA-0061-data-access-pagination-and-streaming.md
 - Web transformers and controllers: decisions/WEB-0035-entitycontroller-transformers.md

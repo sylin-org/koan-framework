@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using RabbitMQ.Client;
+using Sora.Messaging.Infrastructure;
 
 namespace Sora.Messaging.RabbitMq;
 
@@ -37,7 +38,7 @@ internal sealed class RabbitMqBus : IMessageBus, IDisposable
             ct.ThrowIfCancellationRequested();
             var type = m.GetType();
             var alias = _aliases?.GetAlias(type) ?? type.FullName ?? type.Name;
-            var partitionSuffix = ResolvePartitionSuffix(type, m);
+            var partitionSuffix = MessageMeta.ResolvePartitionSuffix(type, m);
             var routingKey = (alias + partitionSuffix).Replace(' ', '.');
             var body = JsonSerializer.SerializeToUtf8Bytes(m, type, _json);
 
@@ -50,32 +51,32 @@ internal sealed class RabbitMqBus : IMessageBus, IDisposable
             props.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
             props.Type = alias;
             // Promote [Header] properties
-            props.Headers = ExtractHeaders(type, m);
+            props.Headers = MessageMeta.ExtractHeaders(type, m);
             // Promote [IdempotencyKey] property when present
-            var idk = ResolveIdempotencyKey(type, m);
+            var idk = MessageMeta.ResolveIdempotencyKey(type, m);
             if (!string.IsNullOrEmpty(idk))
             {
                 props.Headers ??= new Dictionary<string, object>();
-                props.Headers["x-idempotency-key"] = idk!;
+                props.Headers[HeaderNames.IdempotencyKey] = idk!;
             }
             // Correlation/Causation: map x-correlation-id header to AMQP CorrelationId; set x-causation-id to MessageId when absent
-            if (props.Headers != null && props.Headers.TryGetValue("x-correlation-id", out var corr) && props.CorrelationId is null)
+            if (props.Headers != null && props.Headers.TryGetValue(HeaderNames.CorrelationId, out var corr) && props.CorrelationId is null)
             {
                 props.CorrelationId = corr?.ToString();
             }
-            if (props.Headers != null && !props.Headers.ContainsKey("x-causation-id"))
+            if (props.Headers != null && !props.Headers.ContainsKey(HeaderNames.CausationId))
             {
-                props.Headers["x-causation-id"] = props.MessageId;
+                props.Headers[HeaderNames.CausationId] = props.MessageId;
             }
 
             // Scheduled delivery fallback via TTL buckets when [DelaySeconds] present
-            var delay = ResolveDelaySeconds(type, m);
+            var delay = MessageMeta.ResolveDelaySeconds(type, m);
             if (delay > 0)
             {
-                var bucket = ChooseRetryBucket(delay, _opts.Retry);
+                var bucket = RetryMath.ChooseBucket(delay, _opts.Retry);
                 props.Headers ??= new Dictionary<string, object>();
-                props.Headers["x-attempt"] = "1";
-                props.Headers["x-retry-bucket"] = bucket.ToString();
+                props.Headers[HeaderNames.Attempt] = "1";
+                props.Headers[HeaderNames.RetryBucket] = bucket.ToString();
                 _channel.BasicPublish(exchange: retryExchange, routingKey: routingKey, mandatory: false, basicProperties: props, body: body);
             }
             else
@@ -93,61 +94,7 @@ internal sealed class RabbitMqBus : IMessageBus, IDisposable
         return Task.CompletedTask;
     }
 
-    private static string ResolvePartitionSuffix(Type type, object message)
-    {
-        var partProp = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .FirstOrDefault(p => p.GetCustomAttribute<PartitionKeyAttribute>(inherit: true) != null);
-        if (partProp is null) return string.Empty;
-        var value = partProp.GetValue(message)?.ToString();
-        if (string.IsNullOrEmpty(value)) return string.Empty;
-        // simple stable hash to a small shard space
-        var hash = Math.Abs(value.GetHashCode()) % 16;
-        return $".p{hash}";
-    }
-
-    private static IDictionary<string, object> ExtractHeaders(Type type, object message)
-    {
-        var dict = new Dictionary<string, object>();
-        foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
-        {
-            var h = p.GetCustomAttribute<HeaderAttribute>(inherit: true);
-            if (h is null) continue;
-            // Do not promote sensitive properties
-            var isSensitive = p.GetCustomAttribute<SensitiveAttribute>(inherit: true) != null;
-            if (isSensitive) continue;
-            var val = p.GetValue(message);
-            if (val is null) continue;
-            // Simple string conversion; could extend for other primitives
-            dict[h.Name] = val.ToString() ?? string.Empty;
-        }
-        return dict;
-    }
-
-    private static int ResolveDelaySeconds(Type type, object message)
-    {
-        foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
-        {
-            var d = p.GetCustomAttribute<DelaySecondsAttribute>(inherit: true);
-            if (d is null) continue;
-            var val = p.GetValue(message);
-            if (val is null) continue;
-            if (int.TryParse(val.ToString(), out var seconds) && seconds > 0) return seconds;
-        }
-        return 0;
-    }
-
-    private static string? ResolveIdempotencyKey(Type type, object message)
-    {
-        foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
-        {
-            var d = p.GetCustomAttribute<IdempotencyKeyAttribute>(inherit: true);
-            if (d is null) continue;
-            var val = p.GetValue(message);
-            var s = val?.ToString();
-            if (!string.IsNullOrWhiteSpace(s)) return s;
-        }
-        return null;
-    }
+    // Extracted to MessageMeta in Core
 
     private static int ChooseRetryBucket(int requestedSeconds, RetryOptions retry)
     {

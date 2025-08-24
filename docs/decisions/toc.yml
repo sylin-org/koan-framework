@@ -2,6 +2,8 @@
   href: index.md
 - name: Architecture (ARCH)
   items:
+    - name: Per-project companion docs — README + TECHNICAL
+      href: ARCH-0042-per-project-companion-docs.md
     - name: Config and constants naming
       href: ARCH-0040-config-and-constants-naming.md
     - name: DDD docs and glossary
@@ -104,6 +106,10 @@
       href: MESS-0026-discovery-over-mq-policy.md
     - name: Standalone MQ services and naming
       href: MESS-0027-standalone-mq-services-and-naming.md
+    - name: MQ provisioning — plan/diff/apply and modes
+      href: MESS-0028-mq-provisioning-plan-diff-apply-modes.md
+    - name: Terse handler delegates and semantic aliases
+      href: MESS-0029-terse-handler-delegates-and-aliases.md
 - name: Ops (OPS)
   items:
     - name: Mongo container default host

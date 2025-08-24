@@ -5,6 +5,10 @@ Data abstractions for Sora: repository contracts, entities, and filtering interf
 - Target framework: net9.0
 - License: Apache-2.0
 
+## Capabilities
+- Core contracts for repositories, entities, filters, and paging/streaming
+- Shared primitives used by adapters and application models
+
 ## Install
 
 ```powershell
@@ -12,8 +16,7 @@ dotnet add package Sylin.Sora.Data.Abstractions
 ```
 
 ## Notes
-- Start here for building adapters or consuming repositories
+- Start here for building adapters or consuming repositories.
 
-## Links
-- Repo: https://github.com/sylin-labs/sora-framework
-- Data guide: https://github.com/sylin-labs/sora-framework/blob/dev/docs/guides/data/working-with-entity-data.md
+## References
+- Data access reference: `~/reference/data-access.md`

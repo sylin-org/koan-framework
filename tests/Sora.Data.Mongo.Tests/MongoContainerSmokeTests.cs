@@ -5,6 +5,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
+using Sora.Testing;
 using Testcontainers.MongoDb;
 using Xunit;
 
@@ -14,9 +15,21 @@ public class MongoContainerSmokeTests : IAsyncLifetime
 {
     private MongoDbContainer? _mongo;
     private string? _connString;
+    private bool _available;
 
     public async Task InitializeAsync()
     {
+        // Probe Docker first to avoid hard failures on environments without Docker
+        var probe = await DockerEnvironment.ProbeAsync();
+        if (!probe.Available)
+        {
+            _available = false;
+            return;
+        }
+        _available = true;
+        // Be nice to CI/dev boxes: disable Ryuk to reduce friction
+        Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
+
         _mongo = new MongoDbBuilder()
             .WithImage("mongo:7")
             .WithPortBinding(0, 27017)
@@ -55,9 +68,10 @@ public class MongoContainerSmokeTests : IAsyncLifetime
         public string Title { get; set; } = string.Empty;
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Crud_roundtrip_against_container()
     {
+        Skip.IfNot(_available, "Docker is not running or misconfigured; skipping container-based test.");
         var sp = BuildServices();
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();

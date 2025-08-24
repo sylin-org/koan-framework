@@ -1,8 +1,14 @@
 # Sora.Data.Relational
 
-Adapter-agnostic relational schema toolkit used by providers like `Sora.Data.Sqlite`.
+Adapter-agnostic relational schema + LINQ translator used by providers like `Sora.Data.Sqlite` and `Sora.Data.SqlServer`.
 
 - Contracts: `IRelationalDialect`, `IRelationalSchemaModel`, `IRelationalSchemaSynchronizer`
+- LINQ translator hooks: `ILinqSqlDialect`, `LinqWhereTranslator<TEntity>`, `RelationalCommandCache`
+
+## Capabilities
+- Build table/index models from entity annotations
+- Add-only schema synchronization (create table/index)
+- Minimal LINQ-to-SQL pushdown for simple predicates and projections
 
 ## LINQ (minimal translator)
 
@@ -19,3 +25,7 @@ Providers can implement `ILinqSqlDialect` (in addition to schema `IRelationalDia
 Notes:
 - Provider-specific SQL grammar belongs in the provider (e.g., `SqliteDialect` in `Sora.Data.Sqlite`).
 - Complex CLR types map to JSON-encoded TEXT columns; simple types map to native types.
+
+## References
+- Data access reference: `~/reference/data-access.md`
+- Decision DATA-0061: `~/decisions/DATA-0061-data-access-pagination-and-streaming.md`

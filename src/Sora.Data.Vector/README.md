@@ -5,6 +5,10 @@ Vector search facade for Sora: first-class static APIs over vector providers.
 - Target framework: net9.0
 - License: Apache-2.0
 
+## Capabilities
+- Provider-agnostic save/search for embeddings
+- Works with Weaviate and other adapters via abstractions
+
 ## Install
 
 ```powershell
@@ -20,4 +24,4 @@ var res = await Vector<MyEntity>.Search(query: embedding, topK: 5);
 ```
 
 ## Links
-- Data access patterns: https://github.com/sylin-labs/sora-framework/blob/dev/docs/guides/data/all-query-streaming-and-pager.md
+- Data access patterns: `~/guides/data/all-query-streaming-and-pager.md`

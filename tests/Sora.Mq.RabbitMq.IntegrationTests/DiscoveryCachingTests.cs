@@ -50,10 +50,10 @@ public class DiscoveryCachingTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Discovery_result_is_cached_for_subsequent_calls()
     {
-        if (!_available) return;
+        Skip.IfNot(_available, "Docker is not running or misconfigured; skipping RabbitMQ discovery caching test.");
         var conn = $"amqp://guest:guest@localhost:{_hostPort}";
         var exchange = "sora-test";
         var group = "workers"; var busCode = "rabbit";
