@@ -3,6 +3,7 @@
 Note: This page contains historical planning materials. For day-to-day development, start with:
 - Engineering front door: engineering/index.md
 - Architecture principles: architecture/principles.md
+- Web Authentication reference: reference/web-auth.md
 
 This documentation set tracks the design and implementation plan for the Sora Framework.
 
@@ -14,6 +15,7 @@ Start here:
 - 03-core-contracts.md — Core interfaces (data, CQRS, messaging, webhooks, AI)
 - 04-adapter-authoring-guide.md — How to build adapters (Relational/Document/Vector)
 - 05-samples-plan.md — Sample apps plan and acceptance criteria
+	- samples/S5.Recs/README.md — Recommendations sample app (auth-enabled UI)
 - 06-generators-considerations.md — Source generator alternatives and decision record
 - 07-implementation-plan.md — Milestones tied to samples (S0–S7) for testable delivery
 - 09-executive-pitch.md — Executive summary and benefits for enterprise architecture, integration, and dev teams

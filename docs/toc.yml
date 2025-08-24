@@ -19,7 +19,8 @@
     - name: Web
       href: reference/web.md
     - name: Web Authentication
-      href: reference/web-auth.md
+  href: reference/web-auth.md
+  homepage: reference/web-auth.md
     - name: Messaging
       href: reference/messaging.md
     - name: AI

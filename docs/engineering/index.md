@@ -42,6 +42,7 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 - Web
   - Controllers only, secure headers defaults, transformers for entity payload shaping.
   - See: ../guides/web/index.md, decisions/WEB-0035-entitycontroller-transformers.md
+  - Auth: centralized challenge/callback/logout and provider discovery — see: ../reference/web-auth.md and ../api/web-http-api.md
 
 - Messaging
   - IBus + IMessageBatch; explicit idempotency/retry options.
