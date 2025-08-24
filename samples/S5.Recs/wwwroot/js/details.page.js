@@ -5,11 +5,47 @@
 
   // State
   let currentUserId = null;
+  const authState = { isAuthenticated: false, me: null };
   let currentAnimeId = null;
   let currentEntry = null;
 
   function goHome(){ const h=(window.S5Const?.PATHS?.HOME)||'index.html'; location.href = h; }
   function toggleProfileMenu(){ const el=document.getElementById('profileMenu'); if(el) el.classList.toggle('hidden'); }
+  function show(el){ if(el) el.classList.remove('hidden'); }
+  function hide(el){ if(el) el.classList.add('hidden'); }
+
+  async function ensureAuthState(){
+    try{
+      const r = await fetch('/me', { credentials: 'include' });
+      if(r.ok){ const me = await r.json(); authState.isAuthenticated = true; authState.me = me; currentUserId = me?.id || null; window.currentUserId = currentUserId; reflectAuthUi(true, me); return; }
+    }catch{}
+    authState.isAuthenticated = false; authState.me = null; currentUserId = null; window.currentUserId = null; reflectAuthUi(false, null);
+  }
+
+  function reflectAuthUi(isAuth, me){
+    // Toggle Login/Logout buttons if present in layout
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if(loginBtn && logoutBtn){ if(isAuth){ hide(loginBtn); show(logoutBtn);} else { show(loginBtn); hide(logoutBtn);} }
+  }
+
+  async function openLogin(){
+    try{
+      const r = await fetch('/.well-known/auth/providers', { credentials: 'include' });
+      const providers = r.ok ? await r.json() : [];
+      const p = Array.isArray(providers) ? providers.find(x=>x.enabled && (x.protocol==='oauth2'||x.protocol==='oidc')) : null;
+      if(!p){ window.showToast && showToast('No login providers available', 'error'); return; }
+      const ret = window.location.pathname + window.location.search;
+      window.location.href = `/auth/${encodeURIComponent(p.id)}/challenge?return=${encodeURIComponent(ret||'/')}`;
+    }catch{ window.showToast && showToast('Login failed to start', 'error'); }
+  }
+
+  async function doLogout(){
+    try{
+      const ret = window.location.pathname + window.location.search;
+      window.location.href = `/auth/logout?return=${encodeURIComponent(ret||'/')}`;
+    }catch{ window.location.href = `/auth/logout?return=/`; }
+  }
 
   async function initUsers(){ try{ const u=(window.S5Const?.ENDPOINTS?.USERS)||'/api/users'; const r = await fetch(u); if(!r.ok) return; const users = await r.json(); renderUsers(users); const def = users.find(u=>u.isDefault) || users[0]; if(def) selectUser(def.id, def.name); }catch{} }
   function renderUsers(users){ const list = document.getElementById('userList'); if(!list) return; list.innerHTML = users.map(u=>`<div class="flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer" onclick="window.__details.selectUser(${JSON.stringify(u.id)}, ${JSON.stringify(u.name||'User')})"><div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">${(u.name||'U').slice(0,1).toUpperCase()}</div><div class="flex-1"><div class="text-white">${u.name||'User'}</div>${u.isDefault?'<div class="text-xs text-gray-400">Default<\/div>':''}</div></div>`).join(''); }
@@ -118,7 +154,11 @@
     const qs = new URLSearchParams(location.search); currentAnimeId = qs.get('id');
     // Bind top menu buttons
     const backBtn = document.querySelector('button[data-action="go-home"]'); if(backBtn) backBtn.addEventListener('click', goHome);
-    const profileBtn = document.getElementById('profileBtn'); if(profileBtn) profileBtn.addEventListener('click', toggleProfileMenu);
+  const profileBtn = document.getElementById('profileBtn'); if(profileBtn) profileBtn.addEventListener('click', toggleProfileMenu);
+
+  // Login/Logout button hooks if present in this page's layout
+  const loginBtn = document.getElementById('loginBtn'); if(loginBtn) loginBtn.addEventListener('click', openLogin);
+  const logoutBtn = document.getElementById('logoutBtn'); if(logoutBtn) logoutBtn.addEventListener('click', doLogout);
   const addUserBtn = document.querySelector('button[data-action="create-user"]'); if(addUserBtn) addUserBtn.addEventListener('click', createNewUser);
     // Bind actions
     const favBtn = document.querySelector('button[data-action="favorite"]'); if(favBtn) favBtn.addEventListener('click', markFavorite);
@@ -165,7 +205,8 @@
     window.__details = { gotoDetails, selectUser };
     window.__details.createNewUser = createNewUser;
 
-    await initUsers();
+  await ensureAuthState();
+  await initUsers();
     if(currentAnimeId){ await loadAnime(currentAnimeId); await loadEntryState(); await loadSimilar(currentAnimeId); }
   });
 })();
