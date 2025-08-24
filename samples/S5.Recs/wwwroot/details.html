@@ -6,6 +6,7 @@
   <title>Anime Details - AnimeRadar</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="/styles.css" rel="stylesheet">
   <script>
     tailwind.config = { theme: { extend: { colors: { slate: { 950: '#020617' } } } } };
   </script>
@@ -83,10 +84,11 @@
         <div class="flex items-center gap-3">
       <button data-action="favorite" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg"><i class="fa-regular fa-heart mr-2"></i>Favorite</button>
       <button data-action="watched" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg"><i class="fa-regular fa-circle-check mr-2"></i>Watched</button>
-          <div class="relative group">
+          <div class="group inline-flex items-center relative">
             <button class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg"><i class="fa-regular fa-star mr-2"></i>Rate</button>
-            <div class="absolute left-0 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-2 hidden group-hover:block">
-              <div id="rateButtons" class="flex space-x-2"></div>
+            <!-- Star panel sits to the right and stays open while pointer is over the group -->
+            <div class="ml-2 hidden group-hover:block">
+              <div id="rateButtons"></div>
             </div>
           </div>
         </div>

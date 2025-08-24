@@ -90,7 +90,28 @@
   async function rate(stars){ if(!currentUserId || !currentAnimeId) return; const r=(window.S5Const?.ENDPOINTS?.RATE)||'/api/recs/rate'; await fetch(r, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId: currentUserId, animeId: currentAnimeId, rating: stars }) }); await loadEntryState(); window.showToast && showToast(`Rated ${stars}★`,'success'); }
 
   async function loadEntryState(){ if(!currentUserId || !currentAnimeId){ currentEntry = null; renderEntryState(); return; } try{ const ps = (window.S5Const?.LIBRARY?.PAGE_SIZE) ?? 500; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; const r = await fetch(`${b}/${currentUserId}?sort=updatedAt&page=1&pageSize=${encodeURIComponent(ps)}`); if(!r.ok){ currentEntry = null; renderEntryState(); return; } const data = await r.json(); currentEntry = (data.items||[]).find(e=>e.animeId===currentAnimeId) || null; }catch{ currentEntry = null; } renderEntryState(); }
-  function renderEntryState(){ const favBtn = document.querySelector('button[data-action="favorite"]'); const watchBtn = document.querySelector('button[data-action="watched"]'); if(!favBtn || !watchBtn) return; const fav = !!(currentEntry && currentEntry.favorite); const w = !!(currentEntry && currentEntry.watched); favBtn.className = `bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg ${fav ? 'ring-1 ring-pink-400/40 bg-pink-900/30' : ''}`; watchBtn.className = `bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg ${w ? 'ring-1 ring-green-400/40 bg-green-900/30' : ''}`; }
+  function renderEntryState(){
+    const favBtn = document.querySelector('button[data-action="favorite"]');
+    const watchBtn = document.querySelector('button[data-action="watched"]');
+    if(!favBtn || !watchBtn) return;
+    const fav = !!(currentEntry && currentEntry.favorite);
+    const w = !!(currentEntry && currentEntry.watched);
+    favBtn.className = `bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg ${fav ? 'ring-1 ring-pink-400/40 bg-pink-900/30' : ''}`;
+    watchBtn.className = `bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg ${w ? 'ring-1 ring-green-400/40 bg-green-900/30' : ''}`;
+    // Refresh star bar active state
+    const host = document.getElementById('rateButtons');
+    if (host) {
+      const curr = (currentEntry && typeof currentEntry.rating === 'number') ? currentEntry.rating : null;
+      const bar = host.querySelector('.star-bar');
+      if (bar) {
+        if (curr != null) bar.setAttribute('data-current-rating', String(curr)); else bar.removeAttribute('data-current-rating');
+        Array.from(bar.querySelectorAll('.star-btn')).forEach(btn => {
+          const n = parseInt(btn.getAttribute('data-rating')||'0',10);
+          if (curr && n <= curr) btn.classList.add('active'); else btn.classList.remove('active');
+        });
+      }
+    }
+  }
 
   // Bootstrap
   document.addEventListener('DOMContentLoaded', async () => {
@@ -102,21 +123,42 @@
     // Bind actions
     const favBtn = document.querySelector('button[data-action="favorite"]'); if(favBtn) favBtn.addEventListener('click', markFavorite);
     const watchBtn = document.querySelector('button[data-action="watched"]'); if(watchBtn) watchBtn.addEventListener('click', markWatched);
-    // Build rating dropdown buttons from constants
+    // Build rating panel using the same star-bar UI as browse cards
     (function(){
       const host = document.getElementById('rateButtons');
       if(!host) return;
       const stars = (window.S5Const && window.S5Const.RATING && typeof window.S5Const.RATING.STARS === 'number') ? window.S5Const.RATING.STARS : 5;
-      const frag = document.createDocumentFragment();
-      for(let n=1; n<=stars; n++){
+      // Clear any previous content
+      host.innerHTML = '';
+      const bar = document.createElement('div');
+      bar.className = 'star-bar flex items-center gap-1 bg-black/50 rounded-md px-2 py-1 border border-slate-700';
+      bar.setAttribute('data-id', currentAnimeId ? String(currentAnimeId) : '');
+      const curr = (currentEntry && typeof currentEntry.rating === 'number') ? currentEntry.rating : null;
+      if (curr != null) bar.setAttribute('data-current-rating', String(curr));
+      for (let n=1; n<=stars; n++){
         const btn = document.createElement('button');
-        btn.className = 'px-3 py-1 bg-slate-700 rounded hover:bg-slate-600';
-        btn.setAttribute('data-rate', String(n));
-        btn.textContent = String(n);
+        btn.type = 'button';
+        btn.className = 'star-btn text-xs text-gray-400' + ((curr && n <= curr) ? ' active' : '');
+        btn.setAttribute('data-rating', String(n));
+        btn.setAttribute('aria-label', `Rate ${n} ${n>1?'stars':'star'}`);
+        btn.innerHTML = '<i class="fas fa-star"></i>';
         btn.addEventListener('click', () => rate(n));
-        frag.appendChild(btn);
+        btn.addEventListener('mouseover', () => {
+          const starsEls = Array.from(bar.querySelectorAll('.star-btn'));
+          starsEls.forEach(el => {
+            const r = parseInt(el.getAttribute('data-rating')||'0',10);
+            if (r <= n) el.classList.add('hover'); else el.classList.remove('hover');
+          });
+        });
+        btn.addEventListener('mouseout', (e) => {
+          // Clear hover when leaving the entire bar
+          if (!bar.contains(e.relatedTarget)) {
+            bar.querySelectorAll('.star-btn.hover').forEach(el => el.classList.remove('hover'));
+          }
+        });
+        bar.appendChild(btn);
       }
-      host.appendChild(frag);
+      host.appendChild(bar);
     })();
 
     // Expose callbacks referenced from generated HTML and profile list
