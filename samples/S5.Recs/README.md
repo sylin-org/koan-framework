@@ -408,6 +408,34 @@ js/cards.js         - Content rendering components
 js/filters.js       - Search and filtering logic
 ```
 
+## Authentication and login
+
+S5.Recs uses Sora.Web.Auth for centralized provider discovery and login flows. Sessions are cookie-based; the UI sends requests with `credentials: 'include'` so the browser carries the session cookie.
+
+- Discover providers (to render the Login menu):
+    - GET `/.well-known/auth/providers` → descriptors `{ id, name, protocol, enabled, state, icon?, scopes? }`.
+    - Present only `enabled` providers; `state` indicates basic config health (e.g., Healthy/Unhealthy).
+- Start login (challenge/redirect):
+    - GET `/auth/{provider}/challenge?return={relative-path}`.
+    - Server sets short-lived `state` and `return` cookies and redirects to the IdP.
+- Complete login (callback):
+    - GET `/auth/{provider}/callback?code=...&state=...`.
+    - On success, the server signs in using cookie scheme `sora.cookie` and performs a local redirect to the sanitized return path (default `/`).
+- Logout:
+    - GET or POST `/auth/logout?return=/` to clear the session and redirect.
+
+Return URL policy
+
+- Return URLs must be a relative path, or match configured allow-listed prefixes.
+- Configure via `Sora:Web:Auth:ReturnUrl:{ DefaultPath, AllowList[] }`.
+
+Development TestProvider (optional)
+
+- When the `Sora.Web.Auth.TestProvider` module is referenced, a local OAuth2 provider appears as "Test (Local)" (id: `test`).
+- Normal login uses `/auth/test/challenge` and `/auth/test/callback` like other providers.
+- The underlying dev IdP endpoints (internal exchange) are served at: `/.testoauth/authorize`, `/.testoauth/token`, `/.testoauth/userinfo`.
+- First-time use shows a minimal HTML form for Name/Email and stores a local cookie to streamline subsequent logins.
+
 ## API reference
 
 This sample exposes several REST endpoints that demonstrate different aspects of building recommendation APIs:
