@@ -2,7 +2,7 @@
 
 This page defines the contracts, options, and wiring patterns for Sora.Web.Auth (OIDC, OAuth2, SAML) with provider discovery, sign-in, and account linking. Provider adapters (Google, Microsoft, Discord, generic OIDC) are separate thin modules that self-register defaults via `IAuthProviderContributor`; the core centralizes behavior and composition.
 
-See also: WEB-0043 (multi-protocol auth), ARCH-0040 (constants), WEB-0035 (controllers + transformers), OPS-0015 (config fallback).
+See also: WEB-0043 (multi-protocol auth), ARCH-0040 (constants), WEB-0035 (controllers + transformers), OPS-0015 (config fallback). For a high-level capability overview, see Feature Catalog → Web.Auth under `../../feature-catalog.md`.
 
 ## Contract (at a glance)
 
