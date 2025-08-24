@@ -9,6 +9,7 @@ public sealed class ProviderDescriptor
     [JsonPropertyName("name")] public required string Name { get; init; }
     [JsonPropertyName("protocol")] public required string Protocol { get; init; }
     [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+    [JsonPropertyName("state")] public string State { get; init; } = "Unknown"; // Healthy | Unhealthy | Unknown
     [JsonPropertyName("icon")] public string? Icon { get; init; }
     [JsonPropertyName("challengeUrl")] public string? ChallengeUrl { get; init; }
     [JsonPropertyName("metadataUrl")] public string? MetadataUrl { get; init; }
@@ -17,7 +18,7 @@ public sealed class ProviderDescriptor
 
 internal static class ProviderDescriptorFactory
 {
-    public static ProviderDescriptor Create(string id, string name, string protocol, bool enabled, string? icon, string[]? scopes)
+    public static ProviderDescriptor Create(string id, string name, string protocol, bool enabled, string state, string? icon, string[]? scopes)
     {
         string? challenge = protocol is AuthConstants.Protocols.Oidc or AuthConstants.Protocols.OAuth2
             ? $"/auth/{id}/challenge"
@@ -29,6 +30,7 @@ internal static class ProviderDescriptorFactory
             Name = name,
             Protocol = protocol,
             Enabled = enabled,
+            State = state,
             Icon = icon,
             ChallengeUrl = challenge,
             MetadataUrl = metadata,

@@ -30,7 +30,8 @@ internal sealed class ProviderRegistry : IProviderRegistry
             var name = string.IsNullOrWhiteSpace(cfg.DisplayName) ? id : cfg.DisplayName!;
             var protocol = cfg.Type ?? InferTypeFromId(id);
             var scopes = cfg.Scopes;
-            yield return ProviderDescriptorFactory.Create(id, name, protocol, cfg.Enabled, cfg.Icon, scopes);
+            var state = EvaluateHealth(protocol, cfg);
+            yield return ProviderDescriptorFactory.Create(id, name, protocol, cfg.Enabled, state, cfg.Icon, scopes);
         }
     }
 
@@ -139,5 +140,33 @@ internal sealed class ProviderRegistry : IProviderRegistry
                 Enabled = true
             }
         };
+    }
+
+    private static string EvaluateHealth(string protocol, ProviderOptions cfg)
+    {
+        // Healthy if minimally configured for the protocol; Unhealthy if enabled but missing required bits; Unknown otherwise
+        var p = protocol?.ToLowerInvariant();
+        if (p == AuthConstants.Protocols.Oidc)
+        {
+            var ok = !string.IsNullOrWhiteSpace(cfg.Authority)
+                  && !string.IsNullOrWhiteSpace(cfg.ClientId)
+                  && (!string.IsNullOrWhiteSpace(cfg.ClientSecret) || !string.IsNullOrWhiteSpace(cfg.SecretRef));
+            return ok ? "Healthy" : (cfg.Enabled ? "Unhealthy" : "Unknown");
+        }
+        if (p == AuthConstants.Protocols.OAuth2)
+        {
+            var ok = !string.IsNullOrWhiteSpace(cfg.AuthorizationEndpoint)
+                  && !string.IsNullOrWhiteSpace(cfg.TokenEndpoint)
+                  && !string.IsNullOrWhiteSpace(cfg.ClientId)
+                  && (!string.IsNullOrWhiteSpace(cfg.ClientSecret) || !string.IsNullOrWhiteSpace(cfg.SecretRef));
+            return ok ? "Healthy" : (cfg.Enabled ? "Unhealthy" : "Unknown");
+        }
+        if (p == AuthConstants.Protocols.Saml)
+        {
+            var ok = !string.IsNullOrWhiteSpace(cfg.EntityId)
+                  && (!string.IsNullOrWhiteSpace(cfg.IdpMetadataUrl) || !string.IsNullOrWhiteSpace(cfg.IdpMetadataXml));
+            return ok ? "Healthy" : (cfg.Enabled ? "Unhealthy" : "Unknown");
+        }
+        return cfg.Enabled ? "Unhealthy" : "Unknown"; // unknown protocol and enabled → suspect
     }
 }
