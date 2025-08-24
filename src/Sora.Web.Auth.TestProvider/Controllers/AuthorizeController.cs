@@ -19,9 +19,9 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
         if (string.IsNullOrWhiteSpace(client_id) || string.IsNullOrWhiteSpace(redirect_uri)) return BadRequest("client_id and redirect_uri are required");
         if (!string.Equals(client_id, o.ClientId, StringComparison.Ordinal)) return Unauthorized();
 
-        // If no user cookie, or caller requested prompt=login, render simple HTML form. Use localStorage to prefill.
-        var forceLogin = string.Equals(prompt, "login", StringComparison.OrdinalIgnoreCase);
-        if (forceLogin || !Request.Cookies.TryGetValue("_tp_user", out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
+  // Render simple HTML form when no user cookie (prompt=login just ensures the prompt appears in that case).
+  var hasCookie = Request.Cookies.TryGetValue("_tp_user", out var userCookie) && !string.IsNullOrWhiteSpace(userCookie);
+  if (!hasCookie)
         {
             var html = $$"""
 <!doctype html>
@@ -49,10 +49,10 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
   <noscript>Enable JavaScript.</noscript>
 </body></html>
 """;
-            return new ContentResult { ContentType = "text/html", Content = html };
+      return new ContentResult { ContentType = "text/html", Content = html };
         }
 
-        var parts = Uri.UnescapeDataString(userCookie).Split('|');
+    var parts = Uri.UnescapeDataString(userCookie).Split('|');
         var profile = new UserProfile(parts.ElementAtOrDefault(0) ?? "dev", parts.ElementAtOrDefault(1) ?? "dev@example.com", null);
         var code = store.IssueCode(profile, TimeSpan.FromMinutes(5), code_challenge);
         var uri = new UriBuilder(redirect_uri);
