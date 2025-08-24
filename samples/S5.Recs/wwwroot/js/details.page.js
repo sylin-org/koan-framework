@@ -35,8 +35,8 @@
       const providers = r.ok ? await r.json() : [];
       const p = Array.isArray(providers) ? providers.find(x=>x.enabled && (x.protocol==='oauth2'||x.protocol==='oidc')) : null;
       if(!p){ window.showToast && showToast('No login providers available', 'error'); return; }
-      const ret = window.location.pathname + window.location.search;
-      window.location.href = `/auth/${encodeURIComponent(p.id)}/challenge?return=${encodeURIComponent(ret||'/')}`;
+  const ret = window.location.pathname + window.location.search;
+  window.location.href = `/auth/${encodeURIComponent(p.id)}/challenge?return=${encodeURIComponent(ret||'/')}&prompt=login`;
     }catch{ window.showToast && showToast('Login failed to start', 'error'); }
   }
 

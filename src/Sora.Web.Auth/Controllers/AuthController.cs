@@ -38,7 +38,10 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         var ru = SanitizeReturnUrl(returnUrl, allowed, def);
     Response.Cookies.Append("sora.auth.return", ru, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
 
-        if (type == AuthConstants.Protocols.OAuth2)
+    // Optional pass-through hints (e.g., prompt=login) for providers that support it
+    var prompt = HttpContext.Request.Query.TryGetValue("prompt", out var p) ? p.ToString() : null;
+
+    if (type == AuthConstants.Protocols.OAuth2)
         {
             // Build authorize URL
             var authz = cfg.AuthorizationEndpoint ?? string.Empty;
@@ -48,6 +51,7 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
             var redirectUri = BuildAbsolute(callback);
             logger.LogDebug("Auth challenge: provider={Provider} callback={Callback} redirectUri={RedirectUri}", provider, callback, redirectUri);
             var url = $"{authz}?response_type=code&client_id={Uri.EscapeDataString(clientId)}&redirect_uri={Uri.EscapeDataString(redirectUri)}&scope={Uri.EscapeDataString(scope)}&state={Uri.EscapeDataString(state)}";
+            if (!string.IsNullOrWhiteSpace(prompt)) url += $"&prompt={Uri.EscapeDataString(prompt)}";
             logger.LogDebug("Auth challenge authorize URL: {AuthorizeUrl}", url);
             return Redirect(url);
         }
@@ -59,7 +63,8 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         var scopeOidc = cfg.Scopes != null && cfg.Scopes.Length > 0 ? string.Join(' ', cfg.Scopes) : "openid profile email";
     var cb = BuildAbsolute(callback);
     logger.LogDebug("OIDC challenge: provider={Provider} callback={Callback} redirectUri={RedirectUri}", provider, callback, cb);
-        var authorizeUrl = $"{authority.TrimEnd('/')}/authorize?response_type=code&client_id={Uri.EscapeDataString(client)}&redirect_uri={Uri.EscapeDataString(cb)}&scope={Uri.EscapeDataString(scopeOidc)}&state={Uri.EscapeDataString(state)}";
+    var authorizeUrl = $"{authority.TrimEnd('/')}/authorize?response_type=code&client_id={Uri.EscapeDataString(client)}&redirect_uri={Uri.EscapeDataString(cb)}&scope={Uri.EscapeDataString(scopeOidc)}&state={Uri.EscapeDataString(state)}";
+    if (!string.IsNullOrWhiteSpace(prompt)) authorizeUrl += $"&prompt={Uri.EscapeDataString(prompt)}";
     logger.LogDebug("OIDC challenge authorize URL: {AuthorizeUrl}", authorizeUrl);
         return Redirect(authorizeUrl);
     }
@@ -176,6 +181,8 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
     {
         // Sign out of cookie auth
         await HttpContext.SignOutAsync(AuthenticationExtensions.CookieScheme);
+    // Best-effort: also clear the local dev TestProvider cookie to avoid silent re-login loops
+    try { Response.Cookies.Delete("_tp_user", new CookieOptions { Path = "/" }); } catch { /* ignore */ }
         var allowed = authOptions.Value.ReturnUrl.AllowList ?? Array.Empty<string>();
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
         var ru = SanitizeReturnUrl(returnUrl, allowed, def);
