@@ -17,6 +17,15 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - CQRS patterns with outbox support for MongoDB and event-driven architectures.
   - Relational orchestration: [RelationalStorage] attribute + EnsureCreated orchestration with attribute > options precedence.
   - Singleflight dedupe for in-flight operations across core and relational adapters.
+- Storage
+  - Storage orchestrator (Sora.Storage) with profile-based routing to thin providers; capability-aware operations (seek/range, stat, server-side copy, presign when supported).
+  - Local filesystem provider (Sora.Storage.Local): safe-by-default (key sanitization, base path enforcement), atomic writes (temp+rename), range reads, lightweight Head, and server-side copy.
+  - Routing defaults and fallbacks: DefaultProfile support; optional SingleProfileOnly fallback for minimal config with startup validation.
+  - Developer experience:
+    - Service helpers: Create/Onboard (text/json/bytes/stream/file/url), Read (full/range), Exists/Head, Transfer (Copy/Move), fluent InProfile.
+    - Model-centric API: StorageEntity<T> + [StorageBinding] attribute for static creators and instance ops (Read/Head/Delete/CopyTo/MoveTo).
+  - Auto-registration and centralized constants; ambient DI resolution via SoraApp for terse usage.
+  - Docs and ADRs: STOR-0001..0007 and Reference → Storage.
 - Web
   - Controller-driven APIs (REST/GraphQL) with guardrails, content negotiation, consistent paging/filtering.
   - Startup filter auto-wires the pipeline: UseDefaultFiles/UseStaticFiles (opt-in), routing, and MapControllers; well-known health endpoints (/health, /health/live, /health/ready).
@@ -59,6 +68,10 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Vector operations: Multi-provider vector search (Redis HNSW, Weaviate GraphQL, planned pgvector) with unified query interface.
 - Data bridge: snapshot export/import (JSONL/CSV/Parquet), CDC via Debezium/Kafka, virtualization (composed reads), scheduled materialization.
 - First-run bootstrap: schedule startup tasks to seed local data and vectors, with readiness gating disabled by default (opt-in when needed).
+- File/object storage:
+  - Local dev and on-prem: drop-in filesystem-backed storage with safe keys, range reads, and simple profile config.
+  - App content and user uploads: stream uploads with hashing (seekable streams), quick probes (Head/Exists), and hot→cold transfers via Copy/Move.
+  - Model-first DX: bind a type to a storage profile and call static creators/instance ops without plumbing code.
 
 ## Strategic opportunities
 
@@ -67,6 +80,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Polyglot without chaos: capability flags make differences explicit; shared policy (naming, projection, pushdown).
 - Observability-first: spans/metrics + boot reports enable SLOs and faster incident response.
   - Explicit opt-in for OpenTelemetry via AddSoraObservability() to avoid surprise telemetry and double-pipeline conflicts; configurable via Sora:Observability.
+- Binary storage standardization: consistent storage patterns across providers (local today; cloud adapters next) with clear capability flags and profile policy.
 - On-ramp path: adapters → transfer/replication → AI-aware indexing → RAG—value compounds with low switching cost.
 - Protocol interop: optional adapters for gRPC (internal), OpenAI-compatible shim, MCP (Model Context Protocol), and AI-RPC to meet teams where they are.
 
@@ -77,6 +91,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Adapter drift → centralized instruction constants, capability flags, relational toolkit + LINQ translator.
 - AI cost/leakage → token/time budgets, prompt hashing, redaction-by-default, model allow-lists.
 - Vector posture → Redis guardrails (memory/persistence/HA); pgvector parity tests; migration utilities.
+- Storage posture → path traversal prevention, atomic writes, startup validation for profiles/defaults, explicit errors when presign is unsupported; range validation with clear 416-style semantics at the web edge.
 
 ## Coming soon (on-ramp and near-term)
 
@@ -106,6 +121,11 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 
 - Web & capabilities
   - Capability Matrix endpoint: GET /.well-known/sora/capabilities to report registered aggregates, providers, and flags (informational; protect or disable in prod).
+
+- Storage
+  - Cloud providers: S3/Azure Blob/GCS adapters with presigned URLs, multi-part/resumable uploads, and lifecycle policies.
+  - Pipeline steps: ingest policy hooks (size/MIME validation, DLP/AV scan, quarantine) with staging strategies.
+  - HTTP surface: Sora.Web.Storage controllers with correct range/ETag/caching semantics and optional presign redirects.
 
 - Foundations
   - API schemas & SSE format; gRPC draft; tokenization/cost plan; secrets provider; Redis guardrails; pgvector fast-follow plan.
