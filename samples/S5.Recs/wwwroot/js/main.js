@@ -6,6 +6,26 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!grid) return;
 
   grid.addEventListener('click', (e) => {
+    // Action buttons (rate/favorite/watched/dropped) take precedence
+    const act = e.target.closest('[data-action]');
+    if (act) {
+      const action = act.getAttribute('data-action');
+      const id = act.getAttribute('data-id');
+      if (!id) return;
+      e.preventDefault();
+      if (action === 'favorite' && window.toggleFavorite) {
+        window.toggleFavorite(id);
+      } else if (action === 'watched' && window.markWatched) {
+        window.markWatched(id);
+      } else if (action === 'dropped' && window.markDropped) {
+        window.markDropped(id);
+      } else if (action === 'rate' && window.openQuickRate) {
+        const rating = parseInt(act.getAttribute('data-rating') || '0', 10);
+        if (rating > 0) window.openQuickRate(id, rating);
+      }
+      return;
+    }
+
     // Open details on image container or image
     const openEl = e.target.closest('[data-open-details]');
     if (openEl) {
@@ -26,23 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return;
     }
-  // Bottom action buttons (including stars)
-    const act = e.target.closest('[data-action]');
-    if (act) {
-      const action = act.getAttribute('data-action');
-      const id = act.getAttribute('data-id');
-      if (!id) return;
-      if (action === 'favorite' && window.toggleFavorite) {
-        window.toggleFavorite(id);
-      } else if (action === 'watched' && window.markWatched) {
-        window.markWatched(id);
-      } else if (action === 'dropped' && window.markDropped) {
-        window.markDropped(id);
-      } else if (action === 'rate' && window.openQuickRate) {
-        const rating = parseInt(act.getAttribute('data-rating') || '0', 10);
-        if (rating > 0) window.openQuickRate(id, rating);
-      }
-    }
+  // (no-op here; actions handled above)
   });
 
   // Hover effect for star bars: light stars up to hovered one

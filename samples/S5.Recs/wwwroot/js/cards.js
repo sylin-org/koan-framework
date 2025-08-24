@@ -78,7 +78,7 @@
     const isDropped = !!(entry && entry.dropped);
     const userRating = entry && typeof entry.rating === 'number' ? entry.rating : null;
     return `
-      <div class="bg-slate-900 rounded-xl overflow-hidden hover:shadow-xl transition-all p-3 flex gap-4 items-stretch">
+  <div class="bg-slate-900 rounded-xl overflow-hidden hover:shadow-xl transition-all p-3 flex gap-4 items-stretch group">
         <img src="${anime.coverUrl || '/images/missing-cover.svg'}" alt="${h(anime.title)}" class="w-24 h-32 object-cover rounded-md cursor-pointer" onerror="this.onerror=null;this.src='/images/missing-cover.svg'" data-open-details=${__q(anime.id)} title="View details" loading="lazy" role="button" tabindex="0">
         <div class="flex-1 grid grid-cols-12 gap-3">
           <div class="col-span-12 md:col-span-9">
@@ -97,7 +97,7 @@
             ${userRating ? `<div class="mt-1 text-xs text-yellow-300">Your rating: ${userRating}★</div>` : ''}
           </div>
            <div class="col-span-12 md:col-span-3 flex md:flex-col gap-2 md:items-end items-start justify-end">
-             ${renderStarBar(anime.id, userRating)}
+             <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-150">${renderStarBar(anime.id, userRating)}</div>
              <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isWatched ? 'text-green-300 ring-1 ring-green-400/40 bg-green-900/40' : 'text-green-300'} text-xs px-2 py-1 rounded-full" title="Mark Watched" data-action="watched" data-id=${__q(anime.id)}><i class='fas fa-eye'></i></button>
              <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isDropped ? 'text-red-300 ring-1 ring-red-400/40 bg-red-900/40' : 'text-red-300'} text-xs px-2 py-1 rounded-full" title="Mark Dropped" data-action="dropped" data-id=${__q(anime.id)}><i class='fas fa-times'></i></button>
              <button class="bg-black bg-opacity-60 hover:bg-opacity-80 ${isFav ? 'text-pink-300 ring-1 ring-pink-400/40 bg-pink-900/40' : 'text-pink-300'} text-xs px-2 py-1 rounded-full" title="Favorite" data-action="favorite" data-id=${__q(anime.id)}>♥</button>
