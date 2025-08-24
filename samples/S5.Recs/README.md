@@ -391,6 +391,15 @@ This script builds the container image and starts the full Docker stack (API, Mo
 - Labels update live (e.g., “Rating: 2–4.5★”, “Year: 2010–present”).
 - Today, filters narrow the in-memory TopK results from the server. Server-side pushdown for year/rating is planned to keep ordering fully aligned with vector search.
 
+### Rating UI (hoverable star bar)
+- Cards and list rows show a horizontal star bar only on hover to reduce visual noise.
+- Hovering a star previews the selection; clicking submits the rating immediately.
+- Action clicks (rate/favorite/watched/dropped) take precedence over “open details” so you can rate without navigating away.
+
+### Tag-based highlighting
+- When you select preferred tags (Try Something New), items that have at least one of those tags are visually highlighted.
+- Highlighting updates after render and whenever tag selection/weights change, so discovery feels responsive.
+
 ## Understanding the code structure
 
 **Controllers/** - API endpoints following Sora's controller-only routing pattern

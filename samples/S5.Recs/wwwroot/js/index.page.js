@@ -76,6 +76,7 @@
     const t = window.S5Const?.TEXT;
     Dom.$('expandTagsBtn').textContent = open ? (t?.EXPAND || 'Expand') : (t?.COLLAPSE || 'Collapse');
       if(!open && window.S5Tags && S5Tags.renderAllTags){ S5Tags.renderAllTags(); }
+      requestAnimationFrame(highlightCardsByPreferredTags);
     });
     Dom.on('tagsSort', 'change', ()=> S5Tags.renderAllTags && S5Tags.renderAllTags());
     Dom.on('tagsSearch', 'input', ()=> S5Tags.renderAllTags && S5Tags.renderAllTags());
@@ -85,7 +86,7 @@
         const btn = e.target.closest('[data-tag]');
         if(!btn) return;
         const tag = btn.getAttribute('data-tag');
-        if(window.S5Tags && S5Tags.togglePreferredTag){ S5Tags.togglePreferredTag(tag); if(S5Tags.renderAllTags) S5Tags.renderAllTags(); }
+        if(window.S5Tags && S5Tags.togglePreferredTag){ S5Tags.togglePreferredTag(tag); if(S5Tags.renderAllTags) S5Tags.renderAllTags(); requestAnimationFrame(highlightCardsByPreferredTags); }
       });
     }
 
@@ -101,6 +102,7 @@
         if (tId) clearTimeout(tId);
     tId = setTimeout(() => {
           if (window.S5Tags && typeof S5Tags.onPreferredChanged === 'function') S5Tags.onPreferredChanged();
+  requestAnimationFrame(highlightCardsByPreferredTags);
     }, (window.S5Const?.RECS?.TAG_BOOST_DEBOUNCE_MS) ?? 50);
       });
     }
@@ -337,10 +339,27 @@
     const ts = (window.S5Const?.TEXT?.RESULTS_SUFFIX) || ' results';
     Dom.text('resultCount', `${tp}${list.length}${ts}`);
     const state = { libraryByAnimeId: window.libraryByAnimeId, selectedPreferredTags: window.selectedPreferredTags };
-    if(window.currentLayout==='list'){ grid.className = 'space-y-4'; grid.innerHTML = list.map(a=>window.S5Cards.createAnimeListItem(a, state)).join(''); }
-    else { grid.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6'; grid.innerHTML = list.map(a=>window.S5Cards.createAnimeCard(a, state)).join(''); }
+  if(window.currentLayout==='list'){ grid.className = 'space-y-4'; grid.innerHTML = list.map(a=>window.S5Cards.createAnimeListItem(a, state)).join(''); }
+  else { grid.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6'; grid.innerHTML = list.map(a=>window.S5Cards.createAnimeCard(a, state)).join(''); }
+  // After rendering, apply highlight based on selected tags
+  requestAnimationFrame(highlightCardsByPreferredTags);
   }
   window.displayAnime = displayAnime;
+  // Highlight cards/list rows that match any selected preferred tags
+  function highlightCardsByPreferredTags(){
+    try{
+      const tags = Array.isArray(window.selectedPreferredTags) ? window.selectedPreferredTags : [];
+      const on = tags.length > 0;
+      const ringCls = 'ring-2 ring-purple-500/60 ring-offset-1 ring-offset-slate-900';
+      const cards = document.querySelectorAll('#animeGrid [data-anime-id]');
+      cards.forEach(el => {
+        const gs = (el.getAttribute('data-genres') || '').split('|').filter(Boolean);
+        const match = on && gs.some(g => tags.includes(g));
+        if (match) { el.classList.add(...ringCls.split(' ')); }
+        else { el.classList.remove(...ringCls.split(' ')); }
+      });
+    }catch{}
+  }
 
   // Search & filters
   async function handleGlobalSearch(e){

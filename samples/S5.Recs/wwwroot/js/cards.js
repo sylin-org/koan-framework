@@ -35,8 +35,11 @@
     const isWatched = !!(entry && entry.watched);
     const isDropped = !!(entry && entry.dropped);
     const userRating = entry && typeof entry.rating === 'number' ? entry.rating : null;
+    const genres = Array.isArray(anime.genres) ? anime.genres : [];
+    const matchPreferred = selectedPreferredTags.length > 0 && genres.some(g => selectedPreferredTags.includes(g));
+    const highlightCls = matchPreferred ? ' ring-2 ring-purple-500/60 ring-offset-1 ring-offset-slate-900' : '';
     return `
-  <div data-anime-id="${anime.id}" class="bg-slate-900 rounded-xl overflow-hidden hover:scale-105 hover:shadow-2xl transition-all duration-300 group">
+  <div data-anime-id="${anime.id}" data-genres="${h(genres.join('|'))}" class="bg-slate-900 rounded-xl overflow-hidden hover:scale-105 hover:shadow-2xl transition-all duration-300 group${highlightCls}">
           <div class="aspect-[3/4] relative overflow-hidden cursor-pointer group" data-open-details=${__q(anime.id)} role="button" tabindex="0" title="View details">
             <img src="${anime.coverUrl || '/images/missing-cover.svg'}" alt="${h(anime.title)}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" onerror="this.onerror=null;this.src='/images/missing-cover.svg'" loading="lazy">
             <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -77,8 +80,11 @@
     const isWatched = !!(entry && entry.watched);
     const isDropped = !!(entry && entry.dropped);
     const userRating = entry && typeof entry.rating === 'number' ? entry.rating : null;
+    const genres = Array.isArray(anime.genres) ? anime.genres : [];
+    const matchPreferred = selectedPreferredTags.length > 0 && genres.some(g => selectedPreferredTags.includes(g));
+    const highlightCls = matchPreferred ? ' ring-2 ring-purple-500/60 ring-offset-1 ring-offset-slate-900' : '';
     return `
-  <div class="bg-slate-900 rounded-xl overflow-hidden hover:shadow-xl transition-all p-3 flex gap-4 items-stretch group">
+      <div data-anime-id="${anime.id}" data-genres="${h(genres.join('|'))}" class="bg-slate-900 rounded-xl overflow-hidden hover:shadow-xl transition-all p-3 flex gap-4 items-stretch group${highlightCls}">
         <img src="${anime.coverUrl || '/images/missing-cover.svg'}" alt="${h(anime.title)}" class="w-24 h-32 object-cover rounded-md cursor-pointer" onerror="this.onerror=null;this.src='/images/missing-cover.svg'" data-open-details=${__q(anime.id)} title="View details" loading="lazy" role="button" tabindex="0">
         <div class="flex-1 grid grid-cols-12 gap-3">
           <div class="col-span-12 md:col-span-9">
