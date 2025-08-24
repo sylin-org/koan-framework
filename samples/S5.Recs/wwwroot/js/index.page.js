@@ -4,6 +4,7 @@
 (function(){
   // Hoist globals the page previously defined to keep behavior unchanged
   let currentUserId = null;
+  let authState = { isAuthenticated: false, me: null };
   let currentTab = 'discover';
   let animeData = [];
   let filteredData = [];
@@ -27,6 +28,8 @@
   });
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Try to detect auth state
+    ensureAuthState();
     // Enforce slider config from constants
     const w = Dom.$('preferWeight');
     if (w && window.S5Const?.RECS) {
@@ -35,7 +38,7 @@
       if (typeof window.S5Const.RECS.PREFER_WEIGHT_STEP === 'number') w.step = String(window.S5Const.RECS.PREFER_WEIGHT_STEP);
       if (typeof window.recsSettings?.preferTagsWeight === 'number') w.value = String(window.recsSettings.preferTagsWeight);
     }
-    initUsers();
+  // Legacy user selector removed
     loadRecsSettings();
     if(window.S5Tags && S5Tags.loadTags){ S5Tags.loadTags().then(()=> S5Tags.renderPreferredChips && S5Tags.renderPreferredChips()); }
   // Populate Genre filter from backend catalog
@@ -120,17 +123,104 @@
     // Dual-range sliders initialization + hook into scheduleApply from inside
     initDualRangeControls(scheduleApply);
 
-    // Outside clicks close menus
+    // Outside clicks close menus (admin only)
     document.addEventListener('click', (e) => {
-      const profileClickedInside = e.target.closest('#profileMenu') || e.target.closest('#profileButton');
-      if (!profileClickedInside) Dom.$('profileMenu').classList.add('hidden');
       const adminClickedInside = e.target.closest('#adminMenu') || e.target.closest('#adminButton');
-      if (!adminClickedInside) Dom.$('adminMenu').classList.add('hidden');
+      if (!adminClickedInside) Dom.$('adminMenu')?.classList.add('hidden');
     });
 
     Dom.on('forYouBtn', 'click', () => setViewSource('forYou'));
     Dom.on('freeBrowsingBtn', 'click', () => setViewSource('freeBrowsing'));
     Dom.on('libraryBtn', 'click', () => setViewSource('library'));
+
+    // Login/Logout buttons if present in layout
+    Dom.on('loginBtn', 'click', openLogin);
+    Dom.on('logoutBtn', 'click', doLogout);
+  }
+
+  async function ensureAuthState(){
+    try{
+      const r = await fetch('/me', { credentials: 'include' });
+      if(r.ok){
+        const me = await r.json();
+    authState.isAuthenticated = true; authState.me = me; currentUserId = me?.id || null; window.currentUserId = currentUserId;
+    console.log('[S5] Auth detected, userId =', window.currentUserId);
+        reflectAuthUi(true, me);
+        // prefer personalized view when authenticated
+    await refreshLibraryState();
+    await setViewSource('forYou');
+        return;
+      }
+    }catch{}
+    authState.isAuthenticated = false; authState.me = null; currentUserId = null;
+  window.currentUserId = null;
+  console.log('[S5] Guest mode');
+    reflectAuthUi(false, null);
+  // anonymous defaults to free browsing
+  await setViewSource('freeBrowsing');
+  }
+
+  function reflectAuthUi(isAuth, me){
+    const hide = (el)=>{ if(el) el.classList.add('hidden'); };
+    const show = (el)=>{ if(el) el.classList.remove('hidden'); };
+    // Tabs (source buttons act as tabs in this layout)
+    const forYouBtn = document.getElementById('forYouBtn');
+    const libraryBtn = document.getElementById('libraryBtn');
+    if(isAuth){
+      show(forYouBtn); show(libraryBtn);
+      forYouBtn.disabled = false;
+      libraryBtn.disabled = false;
+    } else {
+      hide(forYouBtn); show(libraryBtn);
+      forYouBtn.disabled = true;
+      libraryBtn.disabled = true;
+    }
+    // Profile banner
+    if(isAuth){
+      Dom.text('bannerProfileName', `Welcome back, ${me?.displayName || 'User'}!`);
+      Dom.text('currentProfileName', me?.displayName || 'User');
+      Dom.text('currentProfileInitial', (me?.displayName||'U').slice(0,1).toUpperCase());
+      // Fetch and display real stats
+      if(window.S5Api && window.S5Api.getUserStats && me?.id){
+        window.S5Api.getUserStats(me.id).then(stats => {
+          if(stats && typeof stats === 'object'){
+            Dom.text('profileStats', `${stats.favorites ?? 0} favorites`);
+            console.log('[S5] Banner stats updated', stats);
+          } else {
+            // keep defaults
+          }
+        }).catch(e => {
+          console.warn('[S5] Failed to load user stats', e);
+        });
+      }
+    } else {
+      // guest: keep defaults
+    }
+    // Login/Logout buttons
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if(loginBtn && logoutBtn){ if(isAuth){ hide(loginBtn); show(logoutBtn);} else { show(loginBtn); hide(logoutBtn);} }
+  }
+
+  async function openLogin(){
+    try{
+      const r = await fetch('/.well-known/auth/providers', { credentials: 'include' });
+      const providers = r.ok ? await r.json() : [];
+      const p = Array.isArray(providers) ? providers.find(x=>x.enabled && (x.protocol==='oauth2'||x.protocol==='oidc')) : null;
+      if(!p){ showToast('No login providers available', 'error'); return; }
+      const ret = window.location.pathname + window.location.search;
+      window.location.href = `/auth/${encodeURIComponent(p.id)}/challenge?return=${encodeURIComponent(ret||'/')}`;
+    }catch{ showToast('Login failed to start', 'error'); }
+  }
+
+  async function doLogout(){
+    try{
+      const ret = window.location.pathname + window.location.search;
+      // Navigate to server-side logout to clear auth cookie, then redirect back
+      window.location.href = `/auth/logout?return=${encodeURIComponent(ret||'/')}`;
+    }catch{
+      window.location.href = `/auth/logout?return=/`;
+    }
   }
 
   async function populateGenres(){
@@ -153,51 +243,9 @@
   }
 
   // Menus
-  window.toggleProfileMenu = function(){ Dom.$('profileMenu').classList.toggle('hidden'); };
-  window.toggleAdminMenu = function(){ Dom.$('adminMenu').classList.toggle('hidden'); };
+  window.toggleAdminMenu = function(){ Dom.$('adminMenu')?.classList.toggle('hidden'); };
 
-  // Users
-  async function initUsers(attempt=0){
-    try{
-      const users = await (window.S5Api && window.S5Api.getUsers ? window.S5Api.getUsers() : []);
-      renderUsers(users);
-      const def = users.find(u=>u.isDefault) || users[0];
-      if(def){ selectUser(def.id, def.name); }
-    }catch(e){
-      if(attempt < 5){ 
-        const base = (window.S5Const?.INIT?.RETRY_BASE_MS) ?? 1000;
-        const maxMs = (window.S5Const?.INIT?.RETRY_MAX_MS) ?? 8000;
-        setTimeout(()=>initUsers(attempt+1), Math.min(maxMs, (attempt+1)*base)); 
-      }
-    }
-  }
-  function renderUsers(users){
-    const list = Dom.$('userList'); if(!list) return;
-    list.innerHTML = users.map(u=>`<div class=\"flex items-center space-x-3 p-3 hover:bg-slate-700 rounded-lg cursor-pointer\" onclick=\"selectUser(${JSON.stringify(u.id)}, ${JSON.stringify(u.name||'User')})\">\n        <div class=\"w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center\">${(u.name||'U').slice(0,1).toUpperCase()}</div>\n        <div class=\"flex-1\"><div class=\"text-white\">${u.name}</div>${u.isDefault?'<div class="text-xs text-gray-400">Default</div>':''}</div>\n      </div>`).join('');
-  }
-  window.createNewUser = async function(){
-    const input = Dom.$('newUserName');
-    const name = input?.value.trim();
-    if(!name) return;
-    try{ await (window.S5Api && window.S5Api.createUser ? window.S5Api.createUser(name) : Promise.resolve(null)); await initUsers(); input.value=''; showToast('User created', 'success'); }
-    catch{ showToast('Failed to create user', 'error'); }
-  };
-  window.selectUser = function(id, name){
-    window.currentUserId = id;
-    Dom.text('currentProfileInitial', (name||'U').slice(0,1).toUpperCase());
-    Dom.text('currentProfileName', name || 'User');
-    Dom.text('bannerProfileInitial', (name||'U').slice(0,1).toUpperCase());
-    Dom.text('bannerProfileName', `Welcome back, ${name||'User'}!`);
-    loadUserStats();
-    Dom.$('profileMenu').classList.add('hidden');
-    window.currentRecsTopK = PAGE_SIZE; window.currentLibraryPage = 1; Dom.$('moreBtn')?.classList.add('hidden');
-    refreshLibraryState().finally(() => loadAnimeData());
-  };
-  async function loadUserStats(){
-    if(!window.currentUserId) return;
-    try{ const s = await (window.S5Api && window.S5Api.getUserStats ? window.S5Api.getUserStats(window.currentUserId) : null); if(s) Dom.text('profileStats', `${s.favorites} favorites • ${s.watched} watched`); }
-    catch{}
-  }
+  // User selector removed
 
   // Settings
   async function loadRecsSettings(){
@@ -242,31 +290,61 @@
     loadContentForTab(tab);
   };
 
+  // Source selection with auth gating
+  window.setViewSource = async function(source){
+    // Auth-only sources
+    if((source === 'forYou' || source === 'library') && !authState.isAuthenticated){
+      showToast('Please login to access personalized recommendations and your library.', 'info');
+      source = 'freeBrowsing';
+    }
+    window.currentView = source;
+    console.log('[S5] setViewSource →', source);
+    // Toggle button styles
+    const ids = ['forYouBtn','freeBrowsingBtn','libraryBtn'];
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      const active = (id === (source+'Btn'));
+      el.classList.toggle('bg-purple-600', active);
+      el.classList.toggle('text-white', active);
+      el.classList.toggle('text-gray-400', !active);
+    });
+    // Load appropriate data
+    if(source === 'forYou') await window.loadAnimeData();
+    else if(source === 'freeBrowsing') await window.loadFreeBrowsingData();
+    else await window.loadLibrary();
+  };
+
   // Data loading
   window.loadAnimeData = async function(){
-    if(!window.currentUserId){ displayAnime([]); return; }
+  if(!window.currentUserId){ console.warn('[S5] loadAnimeData: no userId'); displayAnime([]); return; }
     try{
+      console.log('[S5] loadAnimeData → recs query', { userId: window.currentUserId, topK: window.currentRecsTopK });
       const recs = await fetchRecommendations({ text: '', topK: window.currentRecsTopK });
   window.animeData = recs; window.filteredData = [...window.animeData];
   // Apply current sort selection after loading
   if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); }
   else { displayAnime(window.filteredData); }
       const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
+      console.log('[S5] loadAnimeData → results', window.filteredData.length);
     }catch{ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load recommendations', 'error'); }
   };
 
   window.loadFreeBrowsingData = async function(){
     try{
-      const recs = await fetchRecommendations({ text: '', topK: window.currentRecsTopK, ignoreUserPreferences: true });
+  console.log('[S5] loadFreeBrowsingData → recs query', { topK: window.currentRecsTopK, ignoreUserPreferences: true });
+  const recs = await fetchRecommendations({ text: '', topK: window.currentRecsTopK, ignoreUserPreferences: true });
   window.animeData = recs; window.filteredData = [...window.animeData];
   // Apply current sort selection after loading
   if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); }
   else { displayAnime(window.filteredData); }
       const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
+  console.log('[S5] loadFreeBrowsingData → results', window.filteredData.length);
     }catch{ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load content', 'error'); }
   };
 
   window.fetchRecommendations = async function({ text, topK = PAGE_SIZE, ignoreUserPreferences = false }){
+    console.debug('[S5] fetchRecommendations', { text, topK, ignoreUserPreferences });
     const weight = parseFloat(Dom.$('preferWeight')?.value || String((window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2));
     const genre = Dom.val('genreFilter') || '';
     const episodeSel = Dom.val('episodeFilter') || '';
@@ -281,7 +359,11 @@
     let preferTags = Array.isArray(window.selectedPreferredTags) ? [...window.selectedPreferredTags] : [];
     const max = window.recsSettings?.maxPreferredTags ?? ((window.S5Const?.RECS?.DEFAULT_MAX_PREFERRED_TAGS) ?? 3); if(preferTags.length > max) preferTags = preferTags.slice(0, max);
     const sort = Dom.val('sortBy') || null;
-    
+    const userId = ignoreUserPreferences ? null : window.currentUserId;
+    if(!ignoreUserPreferences && !userId){
+      console.warn('[S5] fetchRecommendations: No userId for personalized query');
+      return [];
+    }
     const body = { 
       text: text || '', 
       topK, 
@@ -293,18 +375,15 @@
         preferTags, 
         preferWeight: weight 
       }, 
-      userId: ignoreUserPreferences ? null : window.currentUserId 
+      userId
     };
-    
     const data = await (window.S5Api && window.S5Api.recsQuery ? window.S5Api.recsQuery(body) : null) || { items: [] };
     const items = Array.isArray(data.items) ? data.items : [];
     const mapped = items.map(it => mapItemToAnime(it));
-    
     // In free browsing mode, don't filter out library items since user preferences are ignored
     if (ignoreUserPreferences) {
       return mapped;
     }
-    
     return mapped.filter(a => !window.libraryByAnimeId[a.id]);
   };
 
@@ -418,30 +497,7 @@
 
   // View state
   window.setViewMode = function(mode){ const gridBtn=Dom.$('gridViewBtn'); const listBtn=Dom.$('listViewBtn'); if(mode==='grid'){ gridBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; listBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } else { listBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; gridBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } window.currentLayout = mode; displayAnime(window.filteredData); };
-  window.setViewSource = function(mode){ 
-    if(mode===window.currentView) return; 
-    window.currentView = mode; 
-    const fy=Dom.$('forYouBtn'); 
-    const fb=Dom.$('freeBrowsingBtn'); 
-    const lb=Dom.$('libraryBtn'); 
-    
-    // Reset all buttons to inactive state
-    fy.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; 
-    fb.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; 
-    lb.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; 
-    
-    // Set active button and load appropriate data
-    if(window.currentView==='forYou'){ 
-      fy.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; 
-      window.loadAnimeData(); 
-    } else if(window.currentView==='freeBrowsing'){ 
-      fb.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; 
-      window.loadFreeBrowsingData(); 
-    } else { 
-      lb.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; 
-      loadLibrary(); 
-    } 
-  };
+  // (removed duplicate setViewSource; gated async version above is authoritative)
 
   // Navigation
   window.openDetails = function(animeId){

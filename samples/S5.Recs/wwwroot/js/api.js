@@ -12,16 +12,19 @@
     return s ? `?${s}` : '';
   }
   async function get(url){
-    try{ const r = await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
-    catch{ return null; }
+    console.log('[S5Api] GET', url);
+    try{ const r = await fetch(url, { credentials: 'include' }); if(!r.ok) throw new Error('HTTP '+r.status); const data = await r.json(); console.log('[S5Api] GET response', url, data); return data; }
+    catch(e){ console.warn('[S5Api] GET failed', url, e); return null; }
   }
   async function post(url, body){
-    try{ const r = await fetch(url, { method:'POST', headers: JSON_HDR, body: JSON.stringify(body||{}) }); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
-    catch{ return null; }
+    console.log('[S5Api] POST', url, body);
+    try{ const r = await fetch(url, { method:'POST', headers: JSON_HDR, body: JSON.stringify(body||{}), credentials: 'include' }); if(!r.ok) throw new Error('HTTP '+r.status); const data = await r.json(); console.log('[S5Api] POST response', url, data); return data; }
+    catch(e){ console.warn('[S5Api] POST failed', url, e); return null; }
   }
   async function put(url, body){
-    try{ const r = await fetch(url, { method:'PUT', headers: JSON_HDR, body: JSON.stringify(body||{}) }); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
-    catch{ return null; }
+    console.log('[S5Api] PUT', url, body);
+    try{ const r = await fetch(url, { method:'PUT', headers: JSON_HDR, body: JSON.stringify(body||{}), credentials: 'include' }); if(!r.ok) throw new Error('HTTP '+r.status); const data = await r.json(); console.log('[S5Api] PUT response', url, data); return data; }
+    catch(e){ console.warn('[S5Api] PUT failed', url, e); return null; }
   }
 
   const api = {
