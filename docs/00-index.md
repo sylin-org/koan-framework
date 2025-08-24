@@ -4,6 +4,7 @@ Note: This page contains historical planning materials. For day-to-day developme
 - Engineering front door: engineering/index.md
 - Architecture principles: architecture/principles.md
 - Web Authentication reference: reference/web-auth.md
+	- Challenge supports `?return=` and optional `&prompt=login`; Dev TestProvider uses a remembered-user cookie that central logout clears.
 
 This documentation set tracks the design and implementation plan for the Sora Framework.
 

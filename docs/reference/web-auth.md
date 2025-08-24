@@ -202,6 +202,24 @@ Define providers `google`, `microsoft`, `discord`, `corp-saml` as above. Discove
 - Logout via `GET|POST /auth/logout?return=/`.
 - Return URL policy: only relative paths or configured allow-list prefixes are accepted; configure under `Sora:Web:Auth:ReturnUrl:{ DefaultPath, AllowList[] }`.
 
+### Prompt and re-authentication
+
+- The challenge endpoint forwards optional UI hints like `prompt` to the underlying provider, e.g.: `/auth/{provider}/challenge?return=/&prompt=login`.
+- Behavior is provider-specific; some IdPs may ignore `prompt`.
+- Development TestProvider semantics: `prompt=login` will render the sign-in form only when there is no remembered user cookie. If a remembered cookie exists, the TestProvider proceeds directly to issue an authorization code and returns to the app (no form).
+
+Challenge query parameters
+
+- `return`: relative path to navigate to after successful sign-in (required by the UI; defaults to `/` when omitted or invalid).
+- `prompt` (optional): forwarded hint to IdP (e.g., `login`). Unknown hints are safely ignored.
+
+### Development TestProvider specifics
+
+- Endpoints (internal exchange): `/.testoauth/authorize`, `/.testoauth/token`, `/.testoauth/userinfo`.
+- "Remembered user" cookie: the TestProvider stores a lightweight `_tp_user` cookie to streamline subsequent logins during development.
+- Logout integration: the central logout endpoint also deletes `_tp_user` so a subsequent login does not silently auto-sign-in. This keeps Dev behavior predictable for demos and tests.
+- UI guidance (samples): sample UIs may add `&prompt=login` to challenge URLs to encourage an explicit form the first time after logout; providers may still choose to bypass the form when a remembered session exists.
+
 ## Examples: Discovery and profile payloads
 
 Discovery (truncated):

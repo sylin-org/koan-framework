@@ -424,6 +424,11 @@ S5.Recs uses Sora.Web.Auth for centralized provider discovery and login flows. S
 - Logout:
     - GET or POST `/auth/logout?return=/` to clear the session and redirect.
 
+Prompt and re-authentication
+
+- The UI appends `&prompt=login` to `/auth/{provider}/challenge` to prefer an explicit sign-in after logout.
+- Actual behavior depends on the provider. In Dev, the TestProvider will show the form only when no remembered cookie exists; if present, it proceeds to issue a code without the form.
+
 Return URL policy
 
 - Return URLs must be a relative path, or match configured allow-listed prefixes.
@@ -435,6 +440,7 @@ Development TestProvider (optional)
 - Normal login uses `/auth/test/challenge` and `/auth/test/callback` like other providers.
 - The underlying dev IdP endpoints (internal exchange) are served at: `/.testoauth/authorize`, `/.testoauth/token`, `/.testoauth/userinfo`.
 - First-time use shows a minimal HTML form for Name/Email and stores a local cookie to streamline subsequent logins.
+- The central logout endpoint also deletes the TestProvider's `_tp_user` cookie so that logging out truly resets the next sign-in interaction during development.
 
 ## API reference
 
