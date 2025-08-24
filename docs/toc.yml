@@ -4,6 +4,8 @@
   items:
     - name: Front door
       href: engineering/index.md
+    - name: Pillars (quick reference)
+      href: engineering/pillars.md
     - name: Contributor workflow
       href: engineering/contributor-workflow.md
     - name: Developer guidelines
