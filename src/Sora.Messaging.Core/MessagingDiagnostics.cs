@@ -1,3 +1,5 @@
+using Sora.Messaging.Provisioning;
+
 namespace Sora.Messaging;
 
 internal sealed class MessagingDiagnostics : IMessagingDiagnostics

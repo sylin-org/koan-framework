@@ -1,5 +1,5 @@
-﻿using System.Collections.Concurrent;
-using Sora.Web.Auth.Domain;
+﻿using Sora.Web.Auth.Domain;
+using System.Collections.Concurrent;
 
 namespace Sora.Web.Auth.Infrastructure;
 

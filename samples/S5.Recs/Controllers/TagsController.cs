@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
-using Microsoft.Extensions.Options;
 
 namespace S5.Recs.Controllers;
 

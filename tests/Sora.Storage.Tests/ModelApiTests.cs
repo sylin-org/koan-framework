@@ -5,8 +5,11 @@ using Sora.Core;
 using Sora.Storage;
 using Sora.Storage.Model;
 using Sora.Storage.Options;
-using Xunit;
 using System.Text;
+using Sora.Storage.Abstractions;
+using Sora.Storage.Extensions;
+using Sora.Storage.Local;
+using Xunit;
 
 public class ModelApiTests
 {
@@ -118,8 +121,8 @@ public class ModelApiTests
         var sp = BuildServices(temp.Path);
         SoraApp.Current = sp;
 
-    var bytes = Encoding.UTF8.GetBytes("hello-world");
-    var rec = await FileA.Create("blob.bin", bytes: (ReadOnlyMemory<byte>)bytes);
+        var bytes = Encoding.UTF8.GetBytes("hello-world");
+        var rec = await FileA.Create("blob.bin", bytes: (ReadOnlyMemory<byte>)bytes);
 
         // Static OpenRead
         await using (var s = await FileA.OpenRead(rec.Key))

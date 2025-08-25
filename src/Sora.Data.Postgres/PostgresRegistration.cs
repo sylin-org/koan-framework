@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Relational.Orchestration;
@@ -12,7 +13,7 @@ public static class PostgresRegistration
 {
     public static IServiceCollection AddPostgresAdapter(this IServiceCollection services, Action<PostgresOptions>? configure = null)
     {
-    services.AddSoraOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Keys.Section);
+        services.AddSoraOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());

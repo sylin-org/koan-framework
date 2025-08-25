@@ -1,8 +1,10 @@
-﻿namespace Sora.Storage.Extensions;
+﻿using Sora.Storage.Abstractions;
 
-using System.Text;
+namespace Sora.Storage.Extensions;
+
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
+using System.Text;
 
 public static class StorageObjectExtensions
 {

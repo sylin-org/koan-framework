@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Web.Infrastructure;
-using System.Diagnostics;
 using Sora.Web.Options;
+using System.Diagnostics;
 
 namespace Sora.Web.Hosting;
 

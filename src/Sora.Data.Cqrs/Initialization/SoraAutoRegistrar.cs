@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 
 namespace Sora.Data.Cqrs.Initialization;
@@ -14,8 +15,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-    // Standardized options binding/validation
-    services.AddSoraOptions<CqrsOptions>("Sora:Cqrs");
+        // Standardized options binding/validation
+        services.AddSoraOptions<CqrsOptions>("Sora:Cqrs");
         services.TryAddSingleton<ICqrsRouting, CqrsRouting>();
         services.BindOutboxOptions<InMemoryOutboxOptions>("InMemory");
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutboxStoreFactory, InMemoryOutboxFactory>());

@@ -1,8 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
-using Sora.Data.Vector.Abstractions;
 using Sora.Data.Core.Configuration;
+using Sora.Data.Vector.Abstractions;
 using System.Collections.Concurrent;
 
 namespace Sora.Data.Core;
@@ -46,7 +46,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         if (_vecCache.TryGetValue(key, out var existing)) return (IVectorSearchRepository<TEntity, TKey>?)existing;
 
         // Resolve from adapter factories honoring role attributes and defaults.
-    var vectorFactories = sp.GetServices<IVectorAdapterFactory>().ToList();
+        var vectorFactories = sp.GetServices<IVectorAdapterFactory>().ToList();
         if (vectorFactories.Count == 0) return null;
 
         // 1) Role attribute: [VectorAdapter("...")]
@@ -86,8 +86,8 @@ public sealed class DataService(IServiceProvider sp) : IDataService
             desired = AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
         }
 
-    IVectorSearchRepository<TEntity, TKey>? repo = null;
-    IVectorAdapterFactory? factory = null;
+        IVectorSearchRepository<TEntity, TKey>? repo = null;
+        IVectorAdapterFactory? factory = null;
         if (!string.IsNullOrWhiteSpace(desired))
         {
             factory = vectorFactories.FirstOrDefault(f => f.CanHandle(desired!));
@@ -98,7 +98,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
 
         if (repo is not null)
             _vecCache[key] = repo;
-    return repo;
+        return repo;
     }
     // Provider resolution is now handled by TypeConfigs
 }

@@ -14,7 +14,7 @@ public static class TransformerServiceCollectionExtensions
         services.TryAddSingleton<ITransformerRegistry, TransformerRegistry>();
         services.AddSingleton<IEntityTransformer<TEntity, TShape>, TTransformer>();
         // Store a deferred binding that will be executed by the registry on first use
-    services.AddOptions<TransformerBindings>();
+        services.AddOptions<TransformerBindings>();
         services.PostConfigure<TransformerBindings>(b =>
         {
             b.Bindings.Add((sp) =>

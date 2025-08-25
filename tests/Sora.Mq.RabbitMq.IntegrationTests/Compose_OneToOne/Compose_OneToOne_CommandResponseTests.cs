@@ -48,7 +48,7 @@ public sealed class Compose_OneToOne_CommandResponseTests
             },
             group: "client");
 
-    await new CreateOrder { OrderId = "o-1" }.Send();
+        await new CreateOrder { OrderId = "o-1" }.Send();
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
         while (responses.Count == 0 && sw.Elapsed < TimeSpan.FromSeconds(5))

@@ -75,7 +75,7 @@ internal sealed class SchedulingOrchestrator(
 
         int maxConc = jobOpts?.MaxConcurrency ?? attr?.MaxConcurrency ?? (task is IHasMaxConcurrency mc ? mc.MaxConcurrency : 1);
 
-    return new Runner(task, health, id, onStartup, fixedDelay, critical, timeout, maxConc);
+        return new Runner(task, health, id, onStartup, fixedDelay, critical, timeout, maxConc);
     }
 
     private sealed class Runner(
@@ -141,7 +141,7 @@ internal sealed class SchedulingOrchestrator(
             }
         }
 
-    private IReadOnlyDictionary<string, string> Facts(string state)
+        private IReadOnlyDictionary<string, string> Facts(string state)
         {
             var dict = new Dictionary<string, string>
             {

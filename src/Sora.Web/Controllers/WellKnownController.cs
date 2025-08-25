@@ -3,12 +3,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Extensions;
 using Sora.Core.Observability;
 using Sora.Data.Abstractions;
 using Sora.Web.Infrastructure;
-using System.Diagnostics;
-using Sora.Core.Extensions;
 using Sora.Web.Options;
+using System.Diagnostics;
 
 namespace Sora.Web.Controllers;
 

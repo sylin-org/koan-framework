@@ -1,8 +1,8 @@
-using System.Linq.Expressions;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
+using System.Linq.Expressions;
 
 namespace Sora.Data.Core;
 

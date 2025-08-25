@@ -5,6 +5,7 @@ using Sora.AI.Contracts;
 using Sora.AI.Contracts.Options;
 using Sora.AI.Contracts.Routing;
 using Sora.Core;
+using Sora.Core.Modules;
 
 namespace Sora.AI;
 

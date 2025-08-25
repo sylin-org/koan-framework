@@ -1,6 +1,6 @@
-namespace Sora.Web.Infrastructure;
+namespace Sora.AI.Web;
 
-internal static class AiConstants
+internal static class Constants
 {
     internal static class Routes
     {

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 using Sora.Data.Vector.Abstractions;
 
@@ -15,7 +16,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-    services.AddSoraOptions<WeaviateOptions>(Infrastructure.Constants.Configuration.Section);
+        services.AddSoraOptions<WeaviateOptions>(Infrastructure.Constants.Configuration.Section);
         // Post-configure: if Endpoint is not explicitly provided (or left at default), try to self-configure
         services.PostConfigure<WeaviateOptions>(opts =>
         {

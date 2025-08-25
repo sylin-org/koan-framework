@@ -1,11 +1,14 @@
-﻿namespace Sora.Storage.Model;
+﻿using Sora.Storage.Abstractions;
+using Sora.Storage.Extensions;
 
-using System.Text;
-using System.Text.Json;
+namespace Sora.Storage.Model;
+
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
 using Sora.Data.Core.Model;
 using Sora.Storage.Infrastructure;
+using System.Text;
+using System.Text.Json;
 
 // CRTP base for storage-backed entities with static creation helpers
 public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject

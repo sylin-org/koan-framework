@@ -26,7 +26,7 @@ internal sealed class HealthAnnouncements : IHealthAnnouncer, IHealthAnnouncemen
                 Map(s.Status),
                 s.Message,
                 null,
-                s.Facts?.ToDictionary(k => (string)k.Key, v => (object?)v.Value)
+                s.Facts?.ToDictionary(k => k.Key, v => (object?)v.Value)
             ))
             .ToList();
     }

@@ -1,9 +1,9 @@
+using Microsoft.Extensions.Logging;
 using Sora.AI.Contracts.Adapters;
 using Sora.AI.Contracts.Models;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 
 namespace Sora.Ai.Provider.Ollama;
 

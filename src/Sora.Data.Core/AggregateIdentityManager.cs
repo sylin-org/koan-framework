@@ -1,6 +1,6 @@
+using Sora.Core;
 using Sora.Data.Abstractions;
 using System.Reflection;
-using Sora.Core;
 
 namespace Sora.Data.Core;
 

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 
 namespace Sora.Data.Json;
@@ -13,7 +14,7 @@ public static class JsonDataServiceCollectionExtensions
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-    services.AddSoraOptions<JsonDataOptions>();
+        services.AddSoraOptions<JsonDataOptions>();
         if (configure is not null) services.Configure(configure);
         services.AddSingleton<IDataRepository<TEntity, TKey>, JsonRepository<TEntity, TKey>>();
         return services;

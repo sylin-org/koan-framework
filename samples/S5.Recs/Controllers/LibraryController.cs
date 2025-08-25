@@ -56,7 +56,7 @@ public class LibraryController : ControllerBase
     public async Task<IActionResult> Delete(string userId, string animeId, CancellationToken ct)
     {
         var id = LibraryEntryDoc.MakeId(userId, animeId);
-    await LibraryEntryDoc.Remove(id, ct);
+        await LibraryEntryDoc.Remove(id, ct);
         return NoContent();
     }
 
@@ -101,4 +101,4 @@ public class LibraryController : ControllerBase
         return new OkObjectResult(new { total = ordered.Count(), items = page });
     }
 }
- 
+

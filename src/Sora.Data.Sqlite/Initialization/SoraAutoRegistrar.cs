@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
 using Sora.Data.Relational.Orchestration;
@@ -17,14 +18,14 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-    services.AddSoraOptions<SqliteOptions>(Infrastructure.Constants.Configuration.Keys.Section);
+        services.AddSoraOptions<SqliteOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.AddSingleton<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
-    // Ensure relational orchestration services are available (schema validation/creation)
-    services.AddRelationalOrchestration();
-    // Bridge SQLite governance options into relational orchestrator options
-    services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqliteToRelationalBridgeConfigurator>());
+        // Ensure relational orchestration services are available (schema validation/creation)
+        services.AddRelationalOrchestration();
+        // Bridge SQLite governance options into relational orchestrator options
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqliteToRelationalBridgeConfigurator>());
         // Health contributor for readiness checks
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();

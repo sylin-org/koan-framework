@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
 
@@ -16,7 +17,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-    services.AddSoraOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Keys.Section);
+        services.AddSoraOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.AddSingleton<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(PostgresNamingDefaultsProvider), ServiceLifetime.Singleton));

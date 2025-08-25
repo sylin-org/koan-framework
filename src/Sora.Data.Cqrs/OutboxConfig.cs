@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Modules;
 
 namespace Sora.Data.Cqrs;
 

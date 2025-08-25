@@ -1,12 +1,15 @@
-﻿namespace Sora.Storage;
+﻿using Sora.Storage.Abstractions;
 
+namespace Sora.Storage.Extensions;
+
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Sora.Storage;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 public static class StorageServiceHelpers
 {

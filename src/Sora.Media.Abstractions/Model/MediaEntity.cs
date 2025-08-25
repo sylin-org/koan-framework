@@ -1,3 +1,5 @@
+using Sora.Storage.Abstractions;
+
 namespace Sora.Media.Abstractions.Model;
 
 using Sora.Data.Core.Model;
@@ -31,7 +33,7 @@ public abstract class MediaEntity<TEntity> : Sora.Storage.Model.StorageEntity<TE
 
     // Open read stream via storage service using the bound profile/container
     // NOTE: 'new' intentionally hides StorageEntity<TEntity>.OpenRead to allow media-specific binding semantics.
-    public new static async Task<Stream> OpenRead(string key, CancellationToken ct = default)
+    public static new async Task<Stream> OpenRead(string key, CancellationToken ct = default)
     {
         var inst = Get(key);
         // Resolve binding from the model type; prefer instance Container override when present
@@ -41,7 +43,7 @@ public abstract class MediaEntity<TEntity> : Sora.Storage.Model.StorageEntity<TE
             .FirstOrDefault();
         var profile = attr?.Profile ?? string.Empty;
         var container = inst.Container ?? attr?.Container ?? string.Empty;
-        var svc = (Sora.Core.SoraApp.Current?.GetService(typeof(Sora.Storage.IStorageService)) as Sora.Storage.IStorageService)
+        var svc = (Sora.Core.SoraApp.Current?.GetService(typeof(IStorageService)) as IStorageService)
             ?? throw new InvalidOperationException("IStorageService not available");
         return await svc.ReadAsync(profile, container, key, ct).ConfigureAwait(false);
     }

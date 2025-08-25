@@ -1,17 +1,17 @@
-﻿using System.Security.Claims;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Web.Auth.Domain;
+using Sora.Web.Auth.Extensions;
 using Sora.Web.Auth.Infrastructure;
 using Sora.Web.Auth.Options;
 using Sora.Web.Auth.Providers;
-using Sora.Web.Auth.Extensions;
+using System.Security.Claims;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Sora.Web.Auth.Controllers;
 
@@ -28,20 +28,20 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
             return Problem(detail: "SAML challenge is not yet implemented.", statusCode: 501);
 
         // Resolve callback and state
-    var callback = string.IsNullOrWhiteSpace(cfg.CallbackPath) ? $"/auth/{provider}/callback" : cfg.CallbackPath!;
-    var state = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-    // Use Secure only when the request is HTTPS to support HTTP in dev/container scenarios
-    var secure = HttpContext.Request.IsHttps;
-    Response.Cookies.Append("sora.auth.state", state, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
+        var callback = string.IsNullOrWhiteSpace(cfg.CallbackPath) ? $"/auth/{provider}/callback" : cfg.CallbackPath!;
+        var state = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        // Use Secure only when the request is HTTPS to support HTTP in dev/container scenarios
+        var secure = HttpContext.Request.IsHttps;
+        Response.Cookies.Append("sora.auth.state", state, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
         var allowed = authOptions.Value.ReturnUrl.AllowList ?? Array.Empty<string>();
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
         var ru = SanitizeReturnUrl(returnUrl, allowed, def);
-    Response.Cookies.Append("sora.auth.return", ru, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
+        Response.Cookies.Append("sora.auth.return", ru, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
 
-    // Optional pass-through hints (e.g., prompt=login) for providers that support it
-    var prompt = HttpContext.Request.Query.TryGetValue("prompt", out var p) ? p.ToString() : null;
+        // Optional pass-through hints (e.g., prompt=login) for providers that support it
+        var prompt = HttpContext.Request.Query.TryGetValue("prompt", out var p) ? p.ToString() : null;
 
-    if (type == AuthConstants.Protocols.OAuth2)
+        if (type == AuthConstants.Protocols.OAuth2)
         {
             // Build authorize URL
             var authz = cfg.AuthorizationEndpoint ?? string.Empty;
@@ -61,11 +61,11 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         if (string.IsNullOrWhiteSpace(authority)) return Problem(detail: "Authority not configured.", statusCode: 500);
         var client = cfg.ClientId ?? string.Empty;
         var scopeOidc = cfg.Scopes != null && cfg.Scopes.Length > 0 ? string.Join(' ', cfg.Scopes) : "openid profile email";
-    var cb = BuildAbsolute(callback);
-    logger.LogDebug("OIDC challenge: provider={Provider} callback={Callback} redirectUri={RedirectUri}", provider, callback, cb);
-    var authorizeUrl = $"{authority.TrimEnd('/')}/authorize?response_type=code&client_id={Uri.EscapeDataString(client)}&redirect_uri={Uri.EscapeDataString(cb)}&scope={Uri.EscapeDataString(scopeOidc)}&state={Uri.EscapeDataString(state)}";
-    if (!string.IsNullOrWhiteSpace(prompt)) authorizeUrl += $"&prompt={Uri.EscapeDataString(prompt)}";
-    logger.LogDebug("OIDC challenge authorize URL: {AuthorizeUrl}", authorizeUrl);
+        var cb = BuildAbsolute(callback);
+        logger.LogDebug("OIDC challenge: provider={Provider} callback={Callback} redirectUri={RedirectUri}", provider, callback, cb);
+        var authorizeUrl = $"{authority.TrimEnd('/')}/authorize?response_type=code&client_id={Uri.EscapeDataString(client)}&redirect_uri={Uri.EscapeDataString(cb)}&scope={Uri.EscapeDataString(scopeOidc)}&state={Uri.EscapeDataString(state)}";
+        if (!string.IsNullOrWhiteSpace(prompt)) authorizeUrl += $"&prompt={Uri.EscapeDataString(prompt)}";
+        logger.LogDebug("OIDC challenge authorize URL: {AuthorizeUrl}", authorizeUrl);
         return Redirect(authorizeUrl);
     }
 
@@ -152,8 +152,8 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         };
         if (!string.IsNullOrWhiteSpace(name)) claims.Add(new Claim(ClaimTypes.Name, name));
         if (!string.IsNullOrWhiteSpace(picture)) claims.Add(new Claim("picture", picture));
-    var identity = new ClaimsIdentity(claims, AuthenticationExtensions.CookieScheme);
-    await HttpContext.SignInAsync(AuthenticationExtensions.CookieScheme, new ClaimsPrincipal(identity));
+        var identity = new ClaimsIdentity(claims, AuthenticationExtensions.CookieScheme);
+        await HttpContext.SignInAsync(AuthenticationExtensions.CookieScheme, new ClaimsPrincipal(identity));
 
         // Persist external identity link (best-effort)
         try
@@ -181,8 +181,8 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
     {
         // Sign out of cookie auth
         await HttpContext.SignOutAsync(AuthenticationExtensions.CookieScheme);
-    // Best-effort: also clear the local dev TestProvider cookie to avoid silent re-login loops
-    try { Response.Cookies.Delete("_tp_user", new CookieOptions { Path = "/" }); } catch { /* ignore */ }
+        // Best-effort: also clear the local dev TestProvider cookie to avoid silent re-login loops
+        try { Response.Cookies.Delete("_tp_user", new CookieOptions { Path = "/" }); } catch { /* ignore */ }
         var allowed = authOptions.Value.ReturnUrl.AllowList ?? Array.Empty<string>();
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
         var ru = SanitizeReturnUrl(returnUrl, allowed, def);

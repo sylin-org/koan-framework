@@ -1,4 +1,6 @@
-﻿namespace Sora.Media.Core.Operators;
+﻿using Sora.Storage.Abstractions;
+
+namespace Sora.Media.Core.Operators;
 
 using Microsoft.Extensions.Primitives;
 using SixLabors.ImageSharp;

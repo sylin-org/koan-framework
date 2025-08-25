@@ -1,8 +1,8 @@
 ﻿using FluentAssertions;
-using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Messaging;
 using Sora.Mq.RabbitMq.IntegrationTests.Fixtures;
+using System.Collections.Concurrent;
 using Xunit;
 
 namespace Sora.Mq.RabbitMq.IntegrationTests.Compose_OneToMany_Broadcast;
@@ -47,8 +47,8 @@ public sealed class Compose_OneToMany_BroadcastTests
         while (responses.Count < groups.Length && sw.Elapsed < TimeSpan.FromSeconds(5))
             await Task.Delay(50);
 
-    responses.Should().HaveCount(groups.Length);
-    responses.Should().BeEquivalentTo(groups);
+        responses.Should().HaveCount(groups.Length);
+        responses.Should().BeEquivalentTo(groups);
 
         foreach (var h in hosts) await h.DisposeAsync();
     }

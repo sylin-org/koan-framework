@@ -1,12 +1,12 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Vector.Abstractions;
+using System.Net;
+using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Sora.Data.Weaviate;
 
@@ -220,45 +220,45 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                 await EnsureSchemaAsync(ct);
                 return (TResult)(object)true;
             case VectorInstructions.IndexStats:
-            {
-                await EnsureSchemaAsync(ct);
-                var cls = ClassName;
-                var gql = new { query = $"query {{ Aggregate {{ {cls} {{ meta {{ count }} }} }} }}" };
-                var req = JsonContent.Create(gql);
-                var resp = await _http.PostAsync("/v1/graphql", req, ct);
-                if (!resp.IsSuccessStatusCode)
                 {
-                    var body = await resp.Content.ReadAsStringAsync(ct);
-                    throw new InvalidOperationException($"Weaviate stats failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
-                }
-                var txt = await resp.Content.ReadAsStringAsync(ct);
-                var count = ParseAggregateCount(txt);
-                if (typeof(TResult) == typeof(int))
-                    return (TResult)(object)count;
-                object result = new { count };
-                return (TResult)result;
-            }
-            case VectorInstructions.IndexClear:
-            {
-                var allow = instruction.Options != null && instruction.Options.TryGetValue("AllowDestructive", out var v) && v is bool b && b;
-                if (!allow) throw new NotSupportedException("Destructive clear requires Options.AllowDestructive=true.");
-                await EnsureSchemaAsync(ct);
-                var body = new
-                {
-                    @class = ClassName,
-                    where = new { @operator = "IsNotNull", path = new[] { "id" } }
-                };
-                var req = JsonContent.Create(body);
-                var resp = await _http.PostAsync("/v1/batch/objects/delete", req, ct);
-                if (!resp.IsSuccessStatusCode)
-                {
+                    await EnsureSchemaAsync(ct);
+                    var cls = ClassName;
+                    var gql = new { query = $"query {{ Aggregate {{ {cls} {{ meta {{ count }} }} }} }}" };
+                    var req = JsonContent.Create(gql);
+                    var resp = await _http.PostAsync("/v1/graphql", req, ct);
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        var body = await resp.Content.ReadAsStringAsync(ct);
+                        throw new InvalidOperationException($"Weaviate stats failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+                    }
                     var txt = await resp.Content.ReadAsStringAsync(ct);
-                    throw new InvalidOperationException($"Weaviate clear failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {txt}");
+                    var count = ParseAggregateCount(txt);
+                    if (typeof(TResult) == typeof(int))
+                        return (TResult)(object)count;
+                    object result = new { count };
+                    return (TResult)result;
                 }
-                // Return approximate deleted count if provided; else 0
-                object ok = 0;
-                return (TResult)ok;
-            }
+            case VectorInstructions.IndexClear:
+                {
+                    var allow = instruction.Options != null && instruction.Options.TryGetValue("AllowDestructive", out var v) && v is bool b && b;
+                    if (!allow) throw new NotSupportedException("Destructive clear requires Options.AllowDestructive=true.");
+                    await EnsureSchemaAsync(ct);
+                    var body = new
+                    {
+                        @class = ClassName,
+                        where = new { @operator = "IsNotNull", path = new[] { "id" } }
+                    };
+                    var req = JsonContent.Create(body);
+                    var resp = await _http.PostAsync("/v1/batch/objects/delete", req, ct);
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        var txt = await resp.Content.ReadAsStringAsync(ct);
+                        throw new InvalidOperationException($"Weaviate clear failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {txt}");
+                    }
+                    // Return approximate deleted count if provided; else 0
+                    object ok = 0;
+                    return (TResult)ok;
+                }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Weaviate vector adapter.");
         }

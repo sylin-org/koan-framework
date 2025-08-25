@@ -1,5 +1,5 @@
-using System.Linq.Expressions;
 using Sora.Data.Abstractions;
+using System.Linq.Expressions;
 
 namespace Sora.Data.Core;
 

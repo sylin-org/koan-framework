@@ -1,5 +1,5 @@
-﻿using System.Text.Json.Serialization;
-using Sora.Web.Auth.Infrastructure;
+﻿using Sora.Web.Auth.Infrastructure;
+using System.Text.Json.Serialization;
 
 namespace Sora.Web.Auth.Providers;
 

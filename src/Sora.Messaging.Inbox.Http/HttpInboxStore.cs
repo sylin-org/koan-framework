@@ -1,5 +1,5 @@
-using System.Net.Http.Json;
 using Sora.Messaging.Infrastructure;
+using System.Net.Http.Json;
 
 namespace Sora.Messaging.Inbox.Http;
 

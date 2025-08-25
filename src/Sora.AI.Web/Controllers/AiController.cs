@@ -7,7 +7,7 @@ using Sora.AI.Contracts.Routing;
 namespace Sora.AI.Web.Controllers;
 
 [ApiController]
-[Route(AiConstants.Routes.Base)]
+[Route(Constants.Routes.Base)]
 public sealed class AiController : ControllerBase
 {
     private readonly IAi _ai;
@@ -15,7 +15,7 @@ public sealed class AiController : ControllerBase
     public AiController(IAi ai, IAiAdapterRegistry registry)
     { _ai = ai; _registry = registry; }
 
-    [HttpGet(AiConstants.Routes.Health)]
+    [HttpGet(Constants.Routes.Health)]
     public IActionResult Health()
     {
         var total = _registry.All.Count;
@@ -23,11 +23,11 @@ public sealed class AiController : ControllerBase
         return Ok(new { state, adapters = total });
     }
 
-    [HttpGet(AiConstants.Routes.Adapters)]
+    [HttpGet(Constants.Routes.Adapters)]
     public IActionResult Adapters()
         => Ok(_registry.All.Select(a => new { a.Id, a.Name, a.Type }));
 
-    [HttpGet(AiConstants.Routes.Models)]
+    [HttpGet(Constants.Routes.Models)]
     public async Task<IActionResult> Models(CancellationToken ct)
     {
         var results = new List<AiModelDescriptor>();
@@ -43,7 +43,7 @@ public sealed class AiController : ControllerBase
         return Ok(results);
     }
 
-    [HttpGet(AiConstants.Routes.Capabilities)]
+    [HttpGet(Constants.Routes.Capabilities)]
     public async Task<IActionResult> Capabilities(CancellationToken ct)
     {
         var caps = new List<AiCapabilities>();
@@ -55,14 +55,14 @@ public sealed class AiController : ControllerBase
         return Ok(caps);
     }
 
-    [HttpPost(AiConstants.Routes.Chat)]
+    [HttpPost(Constants.Routes.Chat)]
     public async Task<ActionResult<AiChatResponse>> Chat([FromBody] AiChatRequest request, CancellationToken ct)
     {
         var res = await _ai.PromptAsync(request, ct).ConfigureAwait(false);
         return Ok(res);
     }
 
-    [HttpPost(AiConstants.Routes.ChatStream)]
+    [HttpPost(Constants.Routes.ChatStream)]
     public async Task Stream([FromBody] AiChatRequest request, CancellationToken ct)
     {
         Response.StatusCode = 200;
@@ -80,7 +80,7 @@ public sealed class AiController : ControllerBase
         }
     }
 
-    [HttpPost(AiConstants.Routes.Embeddings)]
+    [HttpPost(Constants.Routes.Embeddings)]
     public async Task<ActionResult<AiEmbeddingsResponse>> Embeddings([FromBody] AiEmbeddingsRequest request, CancellationToken ct)
     {
         var res = await _ai.EmbedAsync(request, ct).ConfigureAwait(false);

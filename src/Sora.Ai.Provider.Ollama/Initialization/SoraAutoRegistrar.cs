@@ -2,8 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Sora.Core;
 using Sora.Ai.Provider.Ollama.Health;
+using Sora.Core;
 
 namespace Sora.Ai.Provider.Ollama.Initialization;
 

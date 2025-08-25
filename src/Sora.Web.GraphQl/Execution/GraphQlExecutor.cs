@@ -19,7 +19,7 @@ internal sealed class GraphQlExecutor : IGraphQlExecutor
     {
         var executor = await _executors.GetRequestExecutorAsync();
         var varsDict = VariableNormalizer.ToDict(variables);
-    var debug = DebugToggle.IsEnabled(http);
+        var debug = DebugToggle.IsEnabled(http);
         var rq = QueryRequestBuilder.New()
             .SetQuery(query)
             .SetVariableValues(varsDict)

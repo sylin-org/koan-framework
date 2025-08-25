@@ -1,7 +1,7 @@
-using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using System.Net.Http.Json;
 using Xunit;
 
 namespace S2.Api.IntegrationTests;

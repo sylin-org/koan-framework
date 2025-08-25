@@ -5,8 +5,9 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
-using Sora.Web.Options;
 using Sora.Core;
+using Sora.Core.Modules;
+using Sora.Web.Options;
 
 namespace Sora.Web.Extensions;
 
@@ -23,7 +24,7 @@ public static class ServiceCollectionExtensions
         if (services.Any(d => d.ServiceType == typeof(SoraWebMarker))) return services;
         services.TryAddSingleton<SoraWebMarker>();
 
-    services.AddSoraOptions<SoraWebOptions>("Sora:Web");
+        services.AddSoraOptions<SoraWebOptions>("Sora:Web");
         // Core web bits expected by Sora Web apps
         services.AddRouting();
         // Add controllers with NewtonsoftJson for JSON Patch
@@ -56,7 +57,7 @@ public static class ServiceCollectionExtensions
         });
         // Add input formatter via DI-aware options configurator (no early ServiceProvider build)
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, OptionalTransformerInputFormatterConfigurator>());
-    services.AddSoraOptions<WebPipelineOptions>("Sora:Web:Pipeline");
+        services.AddSoraOptions<WebPipelineOptions>("Sora:Web:Pipeline");
 
         // Observability is wired in Sora.Core's AddSoraObservability; Sora.Web only ensures core web services are present.
         return services;

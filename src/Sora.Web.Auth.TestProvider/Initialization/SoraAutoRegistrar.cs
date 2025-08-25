@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Web.Auth.Providers;
 using Sora.Web.Auth.TestProvider.Infrastructure;
 using Sora.Web.Auth.TestProvider.Options;

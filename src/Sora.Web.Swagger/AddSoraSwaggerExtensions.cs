@@ -2,10 +2,11 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Sora.Core;
-using Microsoft.Extensions.Options;
 using Sora.Core.Extensions;
+using Sora.Core.Modules;
 using Sora.Web.Swagger.Infrastructure;
 using Swashbuckle.AspNetCore.Swagger;
 
@@ -25,9 +26,9 @@ public static class AddSoraSwaggerExtensions
             // Delay resolve until app builds; rely on DI at UseSoraSwagger time if needed.
             // For Add phase, prefer having config passed in; otherwise, we skip config-dependent parts.
         }
-    // Bind typed options (lazy binding if config is not provided now)
-    try { services.AddSoraOptions<SoraWebSwaggerOptions>(Infrastructure.Constants.Configuration.Section); } catch { }
-    services.AddEndpointsApiExplorer();
+        // Bind typed options (lazy binding if config is not provided now)
+        try { services.AddSoraOptions<SoraWebSwaggerOptions>(Infrastructure.Constants.Configuration.Section); } catch { }
+        services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(c =>
         {
             c.SwaggerDoc("v1", new OpenApiInfo { Title = "Sora API", Version = "v1" });
@@ -52,10 +53,10 @@ public static class AddSoraSwaggerExtensions
 
     public static WebApplication UseSoraSwagger(this WebApplication app)
     {
-    var env = app.Environment;
-    var cfg = app.Configuration;
-    var optsMon = app.Services.GetService<IOptions<SoraWebSwaggerOptions>>();
-    var opts = optsMon?.Value ?? GetOptions(cfg);
+        var env = app.Environment;
+        var cfg = app.Configuration;
+        var optsMon = app.Services.GetService<IOptions<SoraWebSwaggerOptions>>();
+        var opts = optsMon?.Value ?? GetOptions(cfg);
 
         bool enabled;
         if (opts.Enabled.HasValue)

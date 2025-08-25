@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 using Sora.Data.Json.Infrastructure;
 
@@ -16,7 +17,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // Bind options from config and register adapter + health contributor
-    services.AddSoraOptions<JsonDataOptions>();
+        services.AddSoraOptions<JsonDataOptions>();
         services.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>, JsonDataOptionsConfigurator>();
         services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, JsonHealthContributor>());

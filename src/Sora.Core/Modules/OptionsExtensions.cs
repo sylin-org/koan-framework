@@ -2,7 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Sora.Core;
+namespace Sora.Core.Modules;
 
 // Centralized helpers for binding and validating options across modules
 public static class OptionsExtensions

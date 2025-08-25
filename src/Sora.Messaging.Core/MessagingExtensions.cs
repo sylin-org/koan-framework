@@ -113,43 +113,43 @@ public static class MessagingExtensions
         public MessageHandlerBuilder On<T>(Action<MessageEnvelope, T> handler)
         { _services.OnMessage<T>(handler); return this; }
 
-    // Terse overloads (no envelope)
-    public MessageHandlerBuilder On<T>(Func<T, CancellationToken, Task> handler)
-    { _services.On(handler); return this; }
+        // Terse overloads (no envelope)
+        public MessageHandlerBuilder On<T>(Func<T, CancellationToken, Task> handler)
+        { _services.On(handler); return this; }
 
-    public MessageHandlerBuilder On<T>(Func<T, Task> handler)
-    { _services.On(handler); return this; }
+        public MessageHandlerBuilder On<T>(Func<T, Task> handler)
+        { _services.On(handler); return this; }
 
-    public MessageHandlerBuilder On<T>(Action<T> handler)
-    { _services.On(handler); return this; }
+        public MessageHandlerBuilder On<T>(Action<T> handler)
+        { _services.On(handler); return this; }
 
-    // Intent-signaling aliases
-    public MessageHandlerBuilder OnCommand<T>(Func<T, CancellationToken, Task> handler)
-    { _services.OnCommand(handler); return this; }
+        // Intent-signaling aliases
+        public MessageHandlerBuilder OnCommand<T>(Func<T, CancellationToken, Task> handler)
+        { _services.OnCommand(handler); return this; }
 
-    public MessageHandlerBuilder OnCommand<T>(Func<T, Task> handler)
-    { _services.OnCommand(handler); return this; }
+        public MessageHandlerBuilder OnCommand<T>(Func<T, Task> handler)
+        { _services.OnCommand(handler); return this; }
 
-    public MessageHandlerBuilder OnCommand<T>(Action<T> handler)
-    { _services.OnCommand(handler); return this; }
+        public MessageHandlerBuilder OnCommand<T>(Action<T> handler)
+        { _services.OnCommand(handler); return this; }
 
-    public MessageHandlerBuilder OnEvent<T>(Func<T, CancellationToken, Task> handler)
-    { _services.OnEvent(handler); return this; }
+        public MessageHandlerBuilder OnEvent<T>(Func<T, CancellationToken, Task> handler)
+        { _services.OnEvent(handler); return this; }
 
-    public MessageHandlerBuilder OnEvent<T>(Func<T, Task> handler)
-    { _services.OnEvent(handler); return this; }
+        public MessageHandlerBuilder OnEvent<T>(Func<T, Task> handler)
+        { _services.OnEvent(handler); return this; }
 
-    public MessageHandlerBuilder OnEvent<T>(Action<T> handler)
-    { _services.OnEvent(handler); return this; }
+        public MessageHandlerBuilder OnEvent<T>(Action<T> handler)
+        { _services.OnEvent(handler); return this; }
 
-    public MessageHandlerBuilder Handle<T>(Func<T, CancellationToken, Task> handler)
-    { _services.Handle(handler); return this; }
+        public MessageHandlerBuilder Handle<T>(Func<T, CancellationToken, Task> handler)
+        { _services.Handle(handler); return this; }
 
-    public MessageHandlerBuilder Handle<T>(Func<T, Task> handler)
-    { _services.Handle(handler); return this; }
+        public MessageHandlerBuilder Handle<T>(Func<T, Task> handler)
+        { _services.Handle(handler); return this; }
 
-    public MessageHandlerBuilder Handle<T>(Action<T> handler)
-    { _services.Handle(handler); return this; }
+        public MessageHandlerBuilder Handle<T>(Action<T> handler)
+        { _services.Handle(handler); return this; }
 
         // Convenience for grouped batches
         public MessageHandlerBuilder OnBatch<T>(Func<MessageEnvelope, Batch<T>, CancellationToken, Task> handler)

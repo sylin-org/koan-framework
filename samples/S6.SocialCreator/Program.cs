@@ -13,7 +13,5 @@ app.MapControllers();
 // Static files and default files are enabled by Sora.Web
 app.Run();
 
-namespace S6.SocialCreator
-{
-	public partial class Program { }
-}
+// Expose Program for WebApplicationFactory in integration tests
+public partial class Program { }

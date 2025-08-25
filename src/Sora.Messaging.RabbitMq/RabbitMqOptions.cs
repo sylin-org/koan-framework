@@ -1,4 +1,5 @@
 using Sora.Messaging;
+using Sora.Messaging.Provisioning;
 
 namespace Sora.Messaging.RabbitMq;
 

@@ -2,8 +2,8 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Text.Json;
 using Sora.Data.Core;
+using System.Text.Json;
 
 namespace Sora.Data.Cqrs;
 

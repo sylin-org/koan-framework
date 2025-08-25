@@ -17,7 +17,7 @@ public sealed class SameProcess_CommandResponseTests
     {
         Skip.IfNot(_rmq.Available, "Docker is not running or misconfigured; skipping RabbitMQ container-based test.");
         var exchange = $"sora-test-{Guid.NewGuid():N}";
-    var correlation = Guid.NewGuid().ToString("N");
+        var correlation = Guid.NewGuid().ToString("N");
 
         var responses = new List<UserCreated>();
         await using var host = MessagingHost.Start(

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Core.Infrastructure;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 using Sora.Data.Relational.Orchestration;
 

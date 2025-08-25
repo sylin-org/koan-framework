@@ -52,7 +52,7 @@ public sealed class Compose_OneToMany_RoundRobinTests
         counts.Sum().Should().Be(m);
         var avg = m / (double)n;
         counts.Min().Should().BeGreaterThan((int)(avg * 0.3));
-    counts.Max().Should().BeLessOrEqualTo((int)(avg * 1.7));
+        counts.Max().Should().BeLessOrEqualTo((int)(avg * 1.7));
 
         foreach (var h in hosts) await h.DisposeAsync();
     }

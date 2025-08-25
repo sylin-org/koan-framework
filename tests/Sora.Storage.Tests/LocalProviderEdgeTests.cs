@@ -2,6 +2,8 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Storage;
+using Sora.Storage.Abstractions;
+using Sora.Storage.Extensions;
 using Sora.Storage.Local;
 using Xunit;
 
@@ -30,14 +32,14 @@ public class LocalProviderEdgeTests
         var svc = sp.GetRequiredService<IStorageService>();
 
         // Non-seek stream
-    var pipe = new System.IO.Pipelines.Pipe();
-    var data = System.Text.Encoding.UTF8.GetBytes("abc123");
-    await pipe.Writer.WriteAsync(data);
-    await pipe.Writer.FlushAsync();
-    pipe.Writer.Complete();
-    var readerStream = pipe.Reader.AsStream(leaveOpen: false);
+        var pipe = new System.IO.Pipelines.Pipe();
+        var data = System.Text.Encoding.UTF8.GetBytes("abc123");
+        await pipe.Writer.WriteAsync(data);
+        await pipe.Writer.FlushAsync();
+        pipe.Writer.Complete();
+        var readerStream = pipe.Reader.AsStream(leaveOpen: false);
 
-    var obj = await svc.PutAsync("default", "", "a/b/nonseek.txt", readerStream, "text/plain");
+        var obj = await svc.PutAsync("default", "", "a/b/nonseek.txt", readerStream, "text/plain");
         obj.Size.Should().Be(0); // not computed for non-seek input in MVP
 
         await using var read = await svc.ReadAsync("default", "", "a/b/nonseek.txt");

@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using S5.Recs.Models;
 using S5.Recs.Infrastructure;
+using S5.Recs.Models;
 
 namespace S5.Recs.Controllers;
 
@@ -32,7 +32,7 @@ public class UsersController : ControllerBase
     [HttpGet("{id}/stats")]
     public async Task<IActionResult> Stats([FromRoute] string id, CancellationToken ct)
     {
-    var all = (await LibraryEntryDoc.All(ct)).Where(e => e.UserId == id).ToList();
+        var all = (await LibraryEntryDoc.All(ct)).Where(e => e.UserId == id).ToList();
         var favorites = all.Count(e => e.Favorite);
         var watched = all.Count(e => e.Watched);
         var dropped = all.Count(e => e.Dropped);

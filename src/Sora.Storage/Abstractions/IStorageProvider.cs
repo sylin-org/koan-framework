@@ -1,4 +1,4 @@
-namespace Sora.Storage;
+namespace Sora.Storage.Abstractions;
 
 public record StorageProviderCapabilities(
     bool SupportsSequentialRead,

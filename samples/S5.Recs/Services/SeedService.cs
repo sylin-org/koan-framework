@@ -1,17 +1,17 @@
-using System.Text.Json;
-using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
 using S5.Recs.Options;
-using Microsoft.Extensions.Options;
+using S5.Recs.Providers;
 using Sora.AI.Contracts;
-using Sora.Data.Core;
 using Sora.Data.Abstractions;
-using Microsoft.Extensions.Logging;
+using Sora.Data.Core;
+using Sora.Data.Vector;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using S5.Recs.Providers;
-using Sora.Data.Vector;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace S5.Recs.Services;
 
@@ -95,7 +95,7 @@ internal sealed class SeedService : ISeedService
 
     public Task<object> GetStatusAsync(string jobId, CancellationToken ct)
     {
-        var p = _progress.TryGetValue(jobId, out var prog) ? prog : (Fetched: 0, Normalized: 0, Embedded: 0, Imported: 0, Completed: false, Error: (string?)null);
+        var p = _progress.TryGetValue(jobId, out var prog) ? prog : (Fetched: 0, Normalized: 0, Embedded: 0, Imported: 0, Completed: false, Error: null);
         //_logger?.LogDebug("Seeding job {JobId} status requested: state={State} fetched={Fetched} normalized={Normalized} embedded={Embedded} imported={Imported}", jobId, p.Completed ? (p.Error is null ? "completed" : "failed") : "running", p.Fetched, p.Normalized, p.Embedded, p.Imported);
         var state = p.Completed ? (p.Error is null ? "completed" : "failed") : "running";
         return Task.FromResult<object>(new { jobId, state, error = p.Error, progress = new { fetched = p.Fetched, normalized = p.Normalized, embedded = p.Embedded, imported = p.Imported } });

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Modules;
 
 namespace Sora.Scheduling.Initialization;
 
@@ -31,7 +32,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     // Required by ISoraInitializer; minimal registration without bespoke discovery.
     public void Initialize(IServiceCollection services)
     {
-    services.AddSoraOptions<SchedulingOptions>("Sora:Scheduling");
+        services.AddSoraOptions<SchedulingOptions>("Sora:Scheduling");
         services.AddHostedService<SchedulingOrchestrator>();
     }
 

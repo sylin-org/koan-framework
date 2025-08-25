@@ -26,7 +26,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         // Best-effort discovery summary without binding or DI: list provider display names and protocol
         // Strategy: if configured providers exist, list those; otherwise fall back to well-known defaults.
         var section = cfg.GetSection(Options.AuthOptions.SectionPath);
-    var providers = section.GetSection("Providers");
+        var providers = section.GetSection("Providers");
 
         static string PrettyProtocol(string? type)
             => string.IsNullOrWhiteSpace(type) ? "OIDC"

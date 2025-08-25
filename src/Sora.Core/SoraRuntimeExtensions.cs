@@ -8,9 +8,9 @@ public static class SoraRuntimeExtensions
 {
     public static IServiceProvider UseSora(this IServiceProvider sp)
     {
-    // Ensure ambient provider is available for terse APIs; always refresh to current provider
-    // This avoids leaking a disposed provider across WebApplicationFactory instances in tests.
-    SoraApp.Current = sp;
+        // Ensure ambient provider is available for terse APIs; always refresh to current provider
+        // This avoids leaking a disposed provider across WebApplicationFactory instances in tests.
+        SoraApp.Current = sp;
         // Initialize SoraEnv once we have DI
         try { SoraEnv.TryInitialize(sp); } catch { }
         var rt = sp.GetService<ISoraRuntime>();

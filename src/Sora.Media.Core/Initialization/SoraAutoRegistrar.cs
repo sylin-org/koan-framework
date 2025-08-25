@@ -1,4 +1,6 @@
-﻿namespace Sora.Media.Core.Initialization;
+﻿using Sora.Core.Modules;
+
+namespace Sora.Media.Core.Initialization;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,8 +16,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-    // Bind options from configuration at Sora:Media:Transforms
-    services.AddSoraOptions<MediaTransformOptions>("Sora:Media:Transforms");
+        // Bind options from configuration at Sora:Media:Transforms
+        services.AddSoraOptions<MediaTransformOptions>("Sora:Media:Transforms");
 
         services.AddSingleton<IMediaOperator, ResizeOperator>();
         services.AddSingleton<IMediaOperator, RotateOperator>();

@@ -17,6 +17,7 @@ using Sora.Web.Hooks;
 using Sora.Web.Infrastructure;
 using System.Diagnostics;
 using System.Reflection;
+using Sora.Core.Modules;
 
 namespace Sora.Web.GraphQl;
 
@@ -32,8 +33,8 @@ public static class AddSoraGraphQlExtensions
         services.AddHttpContextAccessor();
         services.AddSingleton<Execution.IGraphQlExecutor, Execution.GraphQlExecutor>();
 
-    // Bind typed options
-    services.AddSoraOptions<GraphQlOptions>(Infrastructure.Constants.Configuration.Section);
+        // Bind typed options
+        services.AddSoraOptions<GraphQlOptions>(Infrastructure.Constants.Configuration.Section);
 
         var entityTypes = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic)
@@ -44,32 +45,32 @@ public static class AddSoraGraphQlExtensions
             .Select(g => g.First())
             .ToArray();
 
-    var builder = services
-            .AddGraphQLServer()
-            .SetRequestOptions(_ => new RequestExecutorOptions { ExecutionTimeout = TimeSpan.FromSeconds(10) })
-            // Add a safe error filter that enriches errors with diagnostics in extensions
-            .AddErrorFilter<Errors.SoraGraphQlErrorFilter>()
-            .AddQueryType(d =>
-            {
-                d.Name("Query");
-                // Always expose at least one field so the schema is valid
-                d.Field("entities")
-                    .Description("Discovered IEntity<> types exposed in GraphQL (storage-based names)")
-                    .Type<ListType<StringType>>()
-                    .Resolve(ctx =>
-                    {
-                        var sp = ctx.Service<IServiceProvider>();
-                        return entityTypes
-                            .Select(t => ToGraphQlTypeName(ResolveStorageName(sp, t)))
-                            .Distinct()
-                            .OrderBy(n => n)
-                            .ToArray();
-                    });
-                d.Field("status")
-                    .Description("Simple health probe")
-                    .Type<StringType>()
-                    .Resolve("ok");
-            });
+        var builder = services
+                .AddGraphQLServer()
+                .SetRequestOptions(_ => new RequestExecutorOptions { ExecutionTimeout = TimeSpan.FromSeconds(10) })
+                // Add a safe error filter that enriches errors with diagnostics in extensions
+                .AddErrorFilter<Errors.SoraGraphQlErrorFilter>()
+                .AddQueryType(d =>
+                {
+                    d.Name("Query");
+                    // Always expose at least one field so the schema is valid
+                    d.Field("entities")
+                        .Description("Discovered IEntity<> types exposed in GraphQL (storage-based names)")
+                        .Type<ListType<StringType>>()
+                        .Resolve(ctx =>
+                        {
+                            var sp = ctx.Service<IServiceProvider>();
+                            return entityTypes
+                                .Select(t => ToGraphQlTypeName(ResolveStorageName(sp, t)))
+                                .Distinct()
+                                .OrderBy(n => n)
+                                .ToArray();
+                        });
+                    d.Field("status")
+                        .Description("Simple health probe")
+                        .Type<StringType>()
+                        .Resolve("ok");
+                });
 
         // Only add Mutation root type if we have any entities to attach fields to
         if (entityTypes.Length > 0)

@@ -1,4 +1,4 @@
-﻿namespace Sora.Messaging;
+﻿namespace Sora.Messaging.Provisioning;
 
 /// <summary>
 /// Provisioning modes for plan/diff/apply.

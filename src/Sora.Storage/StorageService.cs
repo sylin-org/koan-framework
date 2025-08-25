@@ -1,3 +1,5 @@
+using Sora.Storage.Abstractions;
+
 namespace Sora.Storage;
 
 using Microsoft.Extensions.Logging;
@@ -32,12 +34,12 @@ public sealed class StorageService : IStorageService
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
 
-    // Compute hash and size while preserving original stream semantics.
+        // Compute hash and size while preserving original stream semantics.
         // - If seekable: hash by reading to end and then reset position; write original stream to provider.
         // - If non-seekable: buffer to memory while hashing, then write the buffer to provider.
         string? hashHex = null;
-    long size = 0;
-    bool wasSeekable = content.CanSeek;
+        long size = 0;
+        bool wasSeekable = content.CanSeek;
 
         if (content.CanSeek)
         {
@@ -72,7 +74,7 @@ public sealed class StorageService : IStorageService
 
             await provider.WriteAsync(resolvedContainer, key, content, contentType, ct).ConfigureAwait(false);
         }
-    else
+        else
         {
             using var sha = SHA256.Create();
             using var ms = new MemoryStream();
@@ -248,7 +250,7 @@ public sealed class StorageService : IStorageService
         }
 
         // 3) Fallback mode: SingleProfileOnly -> if exactly one profile defined, use it
-    if (opts.FallbackMode == StorageFallbackMode.SingleProfileOnly)
+        if (opts.FallbackMode == StorageFallbackMode.SingleProfileOnly)
         {
             if (opts.Profiles.Count == 1)
             {

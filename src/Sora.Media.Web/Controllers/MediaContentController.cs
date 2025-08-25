@@ -1,3 +1,5 @@
+using Sora.Storage.Abstractions;
+
 namespace Sora.Media.Web.Controllers;
 
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +11,7 @@ using Microsoft.Extensions.Options;
 
 [ApiController]
 [Route("api/media")] // Consumers can re-route via MapControllerRoute or attribute routing in derived class
-public abstract class MediaContentController<TEntity> : ControllerBase where TEntity : class, Sora.Storage.IStorageObject
+public abstract class MediaContentController<TEntity> : ControllerBase where TEntity : class, IStorageObject
 {
     private readonly IOptions<MediaContentOptions> _options;
 
