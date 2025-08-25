@@ -113,7 +113,7 @@ Discovery (Dev/CI, SoC)
   2) Applies env overrides
   3) Tries localhost default port
   4) Tries compose/Kubernetes hints when applicable
-- Time budgets are lenient; log one success/warn line; redact secrets.
+- Time budgets (defaults): total 3000 ms, per-probe ~300 ms; overridable via env. Log one success/warn line; redact secrets. In Production, discovery disabled by default.
 
 Startup (consumer)
 ```csharp
@@ -122,6 +122,9 @@ builder.Services.AddSoraDefaults(builder.Configuration, builder.Environment);
 builder.Services.AddSoraOracle(builder.Configuration);             // Default
 builder.Services.AddSoraOracle(builder.Configuration, "Reporting"); // Named alias
 ```
+
+Health behavior
+- If the module/alias is disabled, omit the health check registration entirely.
 
 See also
 - ARCH-0044-standardized-module-config-and-discovery.md

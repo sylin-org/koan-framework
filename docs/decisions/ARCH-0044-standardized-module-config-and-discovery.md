@@ -45,12 +45,12 @@ Golden path for all modules (library-first, opt-in):
 6) Discovery knobs and logging
 - Global switches (env): `SORA__DISCOVERY__DISABLED`, `SORA__DISCOVERY__TOTALMS`, `SORA__DISCOVERY__PROBEMS`.
 - Per-module/per-alias overrides allowed (e.g., `SORA__DATA__POSTGRES__DISCOVERY__TOTALMS`, `SORA__DATA__POSTGRES__REPORTING__DISCOVERY__PROBEMS`).
-- Budgets are lenient by default; implementations should cap total discovery time reasonably.
+- Defaults (Development/CI): total budget 3000 ms; per-probe 300 ms. Production discovery remains disabled by default.
 - Log a concise info message on success (host:port, source) and a single warn on failure (tried endpoints, total time). Redact secrets.
 
 7) Health semantics
 - If module enabled and discovery fails: Development/CI → `Degraded`; Production → `Unhealthy`.
-- If module disabled, omit the check or use `NotApplicable`.
+- If module disabled, omit the health check entirely (preferred behavior).
 - If discovery succeeds but auth fails, mark `Unhealthy` with an actionable message.
 
 8) SQLite dev fallback
