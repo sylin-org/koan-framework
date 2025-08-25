@@ -9,7 +9,7 @@ namespace Sora.Data.Sqlite.Tests;
 
 public class SqliteCountAndSelectTests
 {
-    public class Todo : Sora.Data.Abstractions.IEntity<string>
+    public class Todo : IEntity<string>
     {
         public string Id { get; set; } = default!;
         public string Title { get; set; } = string.Empty;
@@ -18,7 +18,7 @@ public class SqliteCountAndSelectTests
     // Ensure cross-test isolation: reset core caches so each ServiceProvider is honored
     private static void ResetCoreCaches()
     {
-        Sora.Data.Core.Configuration.AggregateConfigs.Reset();
+        AggregateConfigs.Reset();
     }
 
     private static IServiceProvider BuildServices(string file, int defaultPageSize = 5)
@@ -49,14 +49,14 @@ public class SqliteCountAndSelectTests
     [Fact]
     public async Task Count_Pushdown_With_Parameters_Works()
     {
-        using var _set = Sora.Data.Core.DataSetContext.With(Guid.NewGuid().ToString("n"));
+        using var _set = DataSetContext.With(Guid.NewGuid().ToString("n"));
         var file = TempFile();
         var sp = BuildServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
         // Ensure clean slate
-        await data.Execute<Todo, int>(new Sora.Data.Abstractions.Instructions.Instruction("data.clear"));
-        var count0 = await data.Execute<Todo, long>(Sora.Data.Abstractions.Instructions.InstructionSql.Scalar("SELECT COUNT(*) FROM Todo"));
+        await data.Execute<Todo, int>(new Abstractions.Instructions.Instruction("data.clear"));
+        var count0 = await data.Execute<Todo, long>(Abstractions.Instructions.InstructionSql.Scalar("SELECT COUNT(*) FROM Todo"));
         count0.Should().Be(0);
 
         for (int i = 0; i < 10; i++) await repo.UpsertAsync(new Todo { Title = i % 2 == 0 ? "milk" : "bread" });
@@ -69,17 +69,17 @@ public class SqliteCountAndSelectTests
     [Fact]
     public async Task FullSelect_Is_Not_Limited_By_DefaultPageSize()
     {
-        using var _set = Sora.Data.Core.DataSetContext.With(Guid.NewGuid().ToString("n"));
+        using var _set = DataSetContext.With(Guid.NewGuid().ToString("n"));
         var file = TempFile();
         var sp = BuildServices(file, defaultPageSize: 3);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
         // Ensure clean slate
-        await data.Execute<Todo, int>(new Sora.Data.Abstractions.Instructions.Instruction("data.clear"));
+        await data.Execute<Todo, int>(new Abstractions.Instructions.Instruction("data.clear"));
 
         var prefix = "p" + Guid.NewGuid().ToString("N").Substring(0, 6);
         for (int i = 0; i < 12; i++) await repo.UpsertAsync(new Todo { Title = $"{prefix}-{i}" });
-        var count1 = await data.Execute<Todo, long>(Sora.Data.Abstractions.Instructions.InstructionSql.Scalar("SELECT COUNT(*) FROM Todo"));
+        var count1 = await data.Execute<Todo, long>(Abstractions.Instructions.InstructionSql.Scalar("SELECT COUNT(*) FROM Todo"));
         count1.Should().Be(12);
 
         var srepo = (IStringQueryRepository<Todo, string>)repo;

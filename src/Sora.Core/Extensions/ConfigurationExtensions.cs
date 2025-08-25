@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 
-namespace Sora.Core;
+namespace Sora.Core.Extensions;
 
 public static class ConfigurationExtensions
 {

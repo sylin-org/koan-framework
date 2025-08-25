@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
-using Sora.Domain;
+using Sora.Web.Attributes;
 using Sora.Web.Controllers;
 
 namespace S1.Web;
@@ -30,8 +30,3 @@ public sealed class TodoController : EntityController<Todo>
 }
 
 // Choose provider: default sqlite; to try json, replace with [DataAdapter("json")]
-[DataAdapter("sqlite")]
-public sealed class Todo : Entity<Todo>
-{
-    public string Title { get; set; } = string.Empty;
-}

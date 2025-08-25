@@ -9,7 +9,7 @@ namespace Sora.Data.Sqlite.Tests;
 
 public class SqliteInstructionExtraTests
 {
-    public class Todo : Sora.Data.Abstractions.IEntity<string>
+    public class Todo : Abstractions.IEntity<string>
     {
         public string Id { get; set; } = default!;
         public string Title { get; set; } = string.Empty;

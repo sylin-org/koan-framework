@@ -2,6 +2,32 @@
 
 A modular .NET framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
 
+## Summary — Pillars at a glance
+
+- Core
+  - Unified runtime/config, health/readiness, secure defaults, auto-registration, boot reports, optional OpenTelemetry.
+- Data
+  - Adapter-agnostic persistence (relational/NoSQL/JSON), pushdown-first, Direct escape hatch, CQRS/outbox, vector module.
+- Storage
+  - Profile-based storage orchestrator with thin providers; local filesystem provider; DX helpers and model-centric API.
+- Web
+  - Controllers-only HTTP (REST/GraphQL), startup pipeline wiring, Swagger by default in dev, payload transformers.
+- Scheduling
+  - Background job orchestrator with OnStartup tasks, timeouts, health facts, and readiness gating.
+- Messaging
+  - Capability-aware semantics (aliases, retry/DLQ, idempotency), RabbitMQ transport, inbox services (HTTP/Redis/InMemory).
+- AI
+  - Chat/embeddings, vector integration, Ollama provider, RAG building blocks, budgets and observability.
+- Services & DX
+  - Tiny templates, auto-registration across modules, decision docs (ADRs), container-smart defaults.
+
+References
+- Data: docs/reference/data-access.md
+- Storage: docs/reference/storage.md
+- Web: docs/reference/web.md
+- Messaging: docs/reference/messaging.md
+- AI: docs/reference/ai.md
+
 ## Pillars → outcomes
 
 - Core
@@ -17,19 +43,36 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - CQRS patterns with outbox support for MongoDB and event-driven architectures.
   - Relational orchestration: [RelationalStorage] attribute + EnsureCreated orchestration with attribute > options precedence.
   - Singleflight dedupe for in-flight operations across core and relational adapters.
+- Storage
+  - Storage orchestrator (Sora.Storage) with profile-based routing to thin providers; capability-aware operations (seek/range, stat, server-side copy, presign when supported).
+  - Local filesystem provider (Sora.Storage.Local): safe-by-default (key sanitization, base path enforcement), atomic writes (temp+rename), range reads, lightweight Head, and server-side copy.
+  - Routing defaults and fallbacks: DefaultProfile support; optional SingleProfileOnly fallback for minimal config with startup validation.
+  - Developer experience:
+    - Service helpers: Create/Onboard (text/json/bytes/stream/file/url), Read (full/range), Exists/Head, Transfer (Copy/Move), fluent InProfile.
+    - Model-centric API: StorageEntity<T> + [StorageBinding] attribute for static creators and instance ops (Read/Head/Delete/CopyTo/MoveTo).
+  - Auto-registration and centralized constants; ambient DI resolution via SoraApp for terse usage.
+  - Docs and ADRs: STOR-0001..0007 and Reference → Storage.
 - Web
   - Controller-driven APIs (REST/GraphQL) with guardrails, content negotiation, consistent paging/filtering.
   - Startup filter auto-wires the pipeline: UseDefaultFiles/UseStaticFiles (opt-in), routing, and MapControllers; well-known health endpoints (/health, /health/live, /health/ready).
   - Built-in Swagger/OpenAPI auto-registered (dev-on by default; prod opt-in). Idempotent Add wiring; no explicit Add/Use calls required when the module is referenced.
   - HTTP payload transformers for flexible request/response shaping with auto-discovery.
   - GraphQL endpoints auto-generated from IEntity<> types with HotChocolate integration.
+  - Centralized Web Authentication with pluggable IdP adapters and safe flows:
+    - Provider discovery: GET /.well-known/auth/providers
+    - Challenge/callback/logout controller endpoints with safe return URLs and prompt forwarding
+    - Adapters: Google, Microsoft, Discord, generic OIDC, and a Dev TestProvider for local workflows
+    - Production gating of discovery/challenge; cookie-based user session and single sign-out via logout
 - Scheduling
   - Background job orchestrator with OnStartup tasks, per-task timeouts, health facts, and readiness gating. Auto-registered; tasks discovered via DI — no bespoke reflection.
   - Sample: S5 bootstrap task seeds local data and optional vectors on first run without gating readiness by default.
 - Messaging
   - Capability-aware, cross-broker semantics (aliases, DLQ/retry, idempotency) with simple handler wiring.
   - RabbitMQ transport with resilient connection management and config-first options.
-  - Redis-based inbox service for message processing and deduplication.
+  - Redis-based inbox service for message processing and deduplication (Sora.Service.Inbox.Redis):
+    - Endpoints: GET /v1/inbox/{key}, POST /v1/inbox/mark-processed
+    - Config via Sora:Inbox:Redis:ConnectionString (or ConnectionStrings:InboxRedis)
+    - Optional discovery announce on RabbitMQ (Sora:Messaging:Buses:rabbit:*)
   - HTTP and in-memory inbox implementations for testing and lightweight scenarios.
 - AI
   - Turnkey inference (streaming chat, embeddings) with minimal config; Redis-first vector + cache; RAG defaults; observability and budgets; optional sidecar/central proxy; one-call AddSoraAI() and auto-boot discovery.
@@ -51,6 +94,10 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Vector operations: Multi-provider vector search (Redis HNSW, Weaviate GraphQL, planned pgvector) with unified query interface.
 - Data bridge: snapshot export/import (JSONL/CSV/Parquet), CDC via Debezium/Kafka, virtualization (composed reads), scheduled materialization.
 - First-run bootstrap: schedule startup tasks to seed local data and vectors, with readiness gating disabled by default (opt-in when needed).
+- File/object storage:
+  - Local dev and on-prem: drop-in filesystem-backed storage with safe keys, range reads, and simple profile config.
+  - App content and user uploads: stream uploads with hashing (seekable streams), quick probes (Head/Exists), and hot→cold transfers via Copy/Move.
+  - Model-first DX: bind a type to a storage profile and call static creators/instance ops without plumbing code.
 
 ## Strategic opportunities
 
@@ -59,6 +106,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Polyglot without chaos: capability flags make differences explicit; shared policy (naming, projection, pushdown).
 - Observability-first: spans/metrics + boot reports enable SLOs and faster incident response.
   - Explicit opt-in for OpenTelemetry via AddSoraObservability() to avoid surprise telemetry and double-pipeline conflicts; configurable via Sora:Observability.
+- Binary storage standardization: consistent storage patterns across providers (local today; cloud adapters next) with clear capability flags and profile policy.
 - On-ramp path: adapters → transfer/replication → AI-aware indexing → RAG—value compounds with low switching cost.
 - Protocol interop: optional adapters for gRPC (internal), OpenAI-compatible shim, MCP (Model Context Protocol), and AI-RPC to meet teams where they are.
 
@@ -69,6 +117,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Adapter drift → centralized instruction constants, capability flags, relational toolkit + LINQ translator.
 - AI cost/leakage → token/time budgets, prompt hashing, redaction-by-default, model allow-lists.
 - Vector posture → Redis guardrails (memory/persistence/HA); pgvector parity tests; migration utilities.
+- Storage posture → path traversal prevention, atomic writes, startup validation for profiles/defaults, explicit errors when presign is unsupported; range validation with clear 416-style semantics at the web edge.
 
 ## Coming soon (on-ramp and near-term)
 
@@ -95,6 +144,14 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - AI-aware indexer (D3): embed-on-change with Redis vector; embedding versioning and invalidation.
   - Vector & RAG (V1/R1): Redis vector + cache; `/ai/chat` (SSE), `/ai/embed`, `/ai/rag/query`; ai-probe.ps1.
   - AI provider ecosystem: Ollama integration for local models with streaming and health checks; OpenAI-compatible patterns.
+
+- Web & capabilities
+  - Capability Matrix endpoint: GET /.well-known/sora/capabilities to report registered aggregates, providers, and flags (informational; protect or disable in prod).
+
+- Storage
+  - Cloud providers: S3/Azure Blob/GCS adapters with presigned URLs, multi-part/resumable uploads, and lifecycle policies.
+  - Pipeline steps: ingest policy hooks (size/MIME validation, DLP/AV scan, quarantine) with staging strategies.
+  - HTTP surface: Sora.Web.Storage controllers with correct range/ETag/caching semantics and optional presign redirects.
 
 - Foundations
   - API schemas & SSE format; gRPC draft; tokenization/cost plan; secrets provider; Redis guardrails; pgvector fast-follow plan.

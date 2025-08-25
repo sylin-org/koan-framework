@@ -16,7 +16,7 @@ public class MongoPagingGuardrailsTests : IClassFixture<MongoAutoFixture>
         _sp = fx.Services;
     }
 
-    private record Todo(string Id, string Title) : Sora.Data.Abstractions.IEntity<string>;
+    private record Todo(string Id, string Title) : IEntity<string>;
 
     // DATA-0061: unpaged queries should materialize the full set
     [Fact]

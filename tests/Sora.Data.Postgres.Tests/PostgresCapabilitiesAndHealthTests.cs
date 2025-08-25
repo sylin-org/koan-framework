@@ -40,7 +40,7 @@ public class PostgresCapabilitiesAndHealthTests : IClassFixture<PostgresAutoFixt
         // BulkUpsert intentionally not asserted yet
     }
 
-    public sealed record TestEntity(string Id) : Sora.Data.Abstractions.IEntity<string>
+    public sealed record TestEntity(string Id) : IEntity<string>
     {
         public string? Name { get; init; }
         public int Age { get; init; }

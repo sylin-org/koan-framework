@@ -1,9 +1,14 @@
 # Sylin.Sora.Data.Mongo
 
-MongoDB data provider for Sora: options binding and repository integration for document databases.
+MongoDB provider for Sora document data with options binding and pushdown-friendly queries.
 
 - Target framework: net9.0
 - License: Apache-2.0
+
+## Capabilities
+- Connection and database binding via options
+- Filter/paging pushdowns for supported predicates
+- Streaming and pager semantics via Sora.Data.Core
 
 ## Install
 
@@ -11,5 +16,27 @@ MongoDB data provider for Sora: options binding and repository integration for d
 dotnet add package Sylin.Sora.Data.Mongo
 ```
 
-## Links
-- Data guide: https://github.com/sylin-labs/sora-framework/blob/dev/docs/guides/data/working-with-entity-data.md
+## Minimal setup
+- Configure a MongoDB URI and database name via options.
+- Keep credentials in secret stores; don’t inline URIs.
+
+## Usage — safe snippets
+- Prefer first-class model statics:
+	- `Book.Query(b => b.Tags.Contains("db"), ct)`
+	- `await foreach (var b in Book.QueryStream(b => b.Score >= 80, ct)) { ... }`
+
+```csharp
+// Page through results for UI
+var page = await Book.FirstPage(20, ct);
+// ... render ...
+if (page.HasMore)
+{
+		page = await Book.Page(page.Cursor, ct);
+}
+```
+
+See TECHNICAL.md for options and pushdown details.
+
+## References
+- Data access reference: `~/reference/data-access.md`
+- Decision DATA-0061: `~/decisions/DATA-0061-data-access-pagination-and-streaming.md`

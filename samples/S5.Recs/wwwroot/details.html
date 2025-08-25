@@ -1,0 +1,105 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anime Details - AnimeRadar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="/styles.css" rel="stylesheet">
+  <script>
+    tailwind.config = { theme: { extend: { colors: { slate: { 950: '#020617' } } } } };
+  </script>
+  <style>
+    .scrollbar-thin::-webkit-scrollbar { height: 8px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: rgba(30,41,59,0.6); }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background-color: rgba(148,163,184,0.5); border-radius: 6px; }
+  </style>
+  </head>
+<body class="bg-slate-950 text-white">
+  <!-- Top bar -->
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center space-x-4">
+          <button class="text-gray-300 hover:text-white" data-action="go-home" title="Back to Home">
+            <i class="fas fa-arrow-left"></i>
+          </button>
+          <a href="index.html" class="flex items-center space-x-3" title="AnimeRadar Home">
+            <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+              <i class="fas fa-satellite-dish text-white text-sm"></i>
+            </div>
+            <h1 class="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              AnimeRadar
+            </h1>
+          </a>
+        </div>
+        
+        <!-- User / Auth Controls -->
+        <div class="flex items-center space-x-4">
+          <!-- Current User (display only) -->
+          <div class="hidden md:flex items-center space-x-2 bg-slate-800 rounded-lg px-3 py-2">
+            <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+              <span id="profileInitial" class="text-white font-bold text-sm">U</span>
+            </div>
+            <span id="profileName" class="text-white text-sm">Guest</span>
+          </div>
+          <!-- Auth buttons (controlled by JS reflectAuthUi) -->
+          <div class="hidden md:flex items-center space-x-2">
+            <button id="loginBtn" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg">Login</button>
+            <button id="logoutBtn" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg hidden">Logout</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Details -->
+    <section id="details" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div>
+        <img id="poster" class="w-full rounded-xl shadow-2xl object-cover" alt="Poster" />
+      </div>
+      <div class="md:col-span-2">
+        <div class="flex items-center gap-2 mb-1">
+          <span id="colorDot" class="w-3 h-3 rounded-full hidden"></span>
+          <h1 id="title" class="text-3xl font-bold">Title</h1>
+        </div>
+        <div id="alts" class="text-gray-400 text-sm mb-2"></div>
+        <div id="meta" class="text-gray-300 mb-4 text-sm">—</div>
+        <div id="tags" class="flex flex-wrap gap-2 mb-2"></div>
+        <div id="synonyms" class="flex flex-wrap gap-2 mb-4"></div>
+        <p id="synopsis" class="text-gray-200 leading-relaxed mb-6"></p>
+
+        <div class="flex items-center gap-3">
+      <button data-action="favorite" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg"><i class="fa-regular fa-heart mr-2"></i>Favorite</button>
+      <button data-action="watched" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg"><i class="fa-regular fa-circle-check mr-2"></i>Watched</button>
+          <div class="group inline-flex items-center relative">
+            <button class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg"><i class="fa-regular fa-star mr-2"></i>Rate</button>
+            <!-- Star panel sits to the right and stays open while pointer is over the group -->
+            <div class="ml-2 hidden group-hover:block">
+              <div id="rateButtons"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Similar carousel -->
+    <section class="mt-10">
+      <h2 id="similarTitle" class="text-xl font-semibold mb-3">Similar</h2>
+      <div id="similar" class="flex gap-4 overflow-x-auto scrollbar-thin pb-2"></div>
+    </section>
+  </main>
+
+  <!-- Toasts -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-[100] space-y-2"></div>
+  <script src="/js/constants.js"></script>
+  <script src="/js/toasts.js"></script>
+  <script src="/js/dom.js"></script>
+  <script src="/js/details.page.js?v=2"></script>
+  <footer class="border-t border-slate-800 mt-10 py-6 text-center text-sm text-gray-400">
+    Made with Sora · <a class="text-purple-400 hover:text-purple-300" href="https://github.com/sylin-labs/sora-framework" target="_blank" rel="noopener">github.com/sylin-labs/sora-framework</a>
+  </footer>
+</body>
+</html>

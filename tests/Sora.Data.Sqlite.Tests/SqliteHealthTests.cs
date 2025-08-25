@@ -26,9 +26,9 @@ public class SqliteHealthTests
     [Fact]
     public async Task Health_is_Healthy_when_connection_opens()
     {
-        var file = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("n") + ".db");
+        var file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("n") + ".db");
         var sp = BuildServices($"Data Source={file}");
-        var hc = sp.GetRequiredService<System.Collections.Generic.IEnumerable<IHealthContributor>>().First(c => c.Name == "data:sqlite");
+        var hc = sp.GetRequiredService<IEnumerable<IHealthContributor>>().First(c => c.Name == "data:sqlite");
         var report = await hc.CheckAsync();
         report.State.Should().Be(HealthState.Healthy);
     }
@@ -38,7 +38,7 @@ public class SqliteHealthTests
     {
         // Intentionally invalid path
         var sp = BuildServices("Data Source=Z:/non-existent-path/noway/never/app.db");
-        var hc = sp.GetRequiredService<System.Collections.Generic.IEnumerable<IHealthContributor>>().First(c => c.Name == "data:sqlite");
+        var hc = sp.GetRequiredService<IEnumerable<IHealthContributor>>().First(c => c.Name == "data:sqlite");
         var report = await hc.CheckAsync();
         report.State.Should().Be(HealthState.Unhealthy);
     }

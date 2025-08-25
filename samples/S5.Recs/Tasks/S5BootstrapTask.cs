@@ -5,7 +5,6 @@ using S5.Recs.Services;
 using Sora.Data.Vector;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Scheduling;
-using Sora.Core;
 
 namespace S5.Recs.Tasks;
 
@@ -38,6 +37,9 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
         if (anime > 0 && vectors > 0)
         {
             _logger?.LogInformation("S5 bootstrap: dataset already present (anime={Anime}, vectors={Vectors}). Skipping seeding.", anime, vectors);
+            // Best-effort ensure catalogs exist
+            _ = _seeder.RebuildTagCatalogAsync(ct);
+            _ = _seeder.RebuildGenreCatalogAsync(ct);
             return;
         }
         if (anime > 0 && vectors == 0)
@@ -67,6 +69,9 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
             if (a >= targetAnime && v >= targetVectors)
             {
                 _logger?.LogInformation("S5 bootstrap: dataset ready (anime={Anime}, vectors={Vectors}).", a, v);
+                // Build catalogs after initial seed
+                _ = _seeder.RebuildTagCatalogAsync(ct);
+                _ = _seeder.RebuildGenreCatalogAsync(ct);
                 return;
             }
 
@@ -74,6 +79,8 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
             if (a >= targetAnime && v < targetVectors && sw.Elapsed >= NoVectorGrace)
             {
                 _logger?.LogWarning("S5 bootstrap: docs ready but vectors still 0 after {Seconds:n0}s. Proceeding without vector features. You can seed vectors later from Admin → Seed.", sw.Elapsed.TotalSeconds);
+                _ = _seeder.RebuildTagCatalogAsync(ct);
+                _ = _seeder.RebuildGenreCatalogAsync(ct);
                 return;
             }
         }
@@ -83,10 +90,3 @@ internal sealed class S5BootstrapTask : IScheduledTask, IOnStartup, IHasTimeout
 }
 
 // Self-registration via Sora.Core discovery
-internal sealed class S5BootstrapTaskRegistration : ISoraInitializer
-{
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddSingleton<IScheduledTask, S5BootstrapTask>();
-    }
-}

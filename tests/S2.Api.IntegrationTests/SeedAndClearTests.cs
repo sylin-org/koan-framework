@@ -1,10 +1,12 @@
-using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Xunit;
+
+namespace S2.Api.IntegrationTests;
 
 public class SeedAndClearTests : IClassFixture<MongoFixture>
 {

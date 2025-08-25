@@ -12,5 +12,7 @@
     <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
   <ProjectReference Include="..\..\src\Sora.Web.Transformers\Sora.Web.Transformers.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
   </ItemGroup>
 </Project>

@@ -7,7 +7,7 @@ namespace Sora.Data.Sqlite.Tests;
 
 public class SqliteAutoFixture : IRelationalTestFixture<SqliteSchemaGovernanceSharedTests.Todo, string>, Xunit.IAsyncLifetime
 {
-    public Sora.Data.Core.IDataService Data { get; private set; } = default!;
+    public IDataService Data { get; private set; } = default!;
     public IServiceProvider ServiceProvider { get; private set; } = default!;
     public bool SkipTests { get; private set; } = false;
     public string? SkipReason { get; private set; }
@@ -15,7 +15,7 @@ public class SqliteAutoFixture : IRelationalTestFixture<SqliteSchemaGovernanceSh
 
     public async Task InitializeAsync()
     {
-        _dbFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sora-sqlite-shared-" + Guid.NewGuid().ToString("n") + ".db");
+        _dbFile = Path.Combine(Path.GetTempPath(), "sora-sqlite-shared-" + Guid.NewGuid().ToString("n") + ".db");
         var cs = $"Data Source={_dbFile}";
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new[]
@@ -30,11 +30,11 @@ public class SqliteAutoFixture : IRelationalTestFixture<SqliteSchemaGovernanceSh
         sc.AddSqliteAdapter(o =>
         {
             o.ConnectionString = cs;
-            o.DdlPolicy = Sora.Data.Sqlite.SchemaDdlPolicy.AutoCreate;
+            o.DdlPolicy = SchemaDdlPolicy.AutoCreate;
             o.AllowProductionDdl = true;
         });
         sc.AddSoraDataCore();
-        sc.AddSingleton<IDataService, Sora.Data.Core.DataService>();
+        sc.AddSingleton<IDataService, DataService>();
         ServiceProvider = sc.BuildServiceProvider();
         Data = ServiceProvider.GetRequiredService<IDataService>();
         // rely on adapter DDL policy (AutoCreate) to create the schema during tests
@@ -43,9 +43,9 @@ public class SqliteAutoFixture : IRelationalTestFixture<SqliteSchemaGovernanceSh
 
     public async Task DisposeAsync()
     {
-        if (!string.IsNullOrEmpty(_dbFile) && System.IO.File.Exists(_dbFile))
+        if (!string.IsNullOrEmpty(_dbFile) && File.Exists(_dbFile))
         {
-            try { System.IO.File.Delete(_dbFile); } catch { }
+            try { File.Delete(_dbFile); } catch { }
         }
         await Task.CompletedTask;
     }

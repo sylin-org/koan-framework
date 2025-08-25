@@ -1,9 +1,10 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Data.Core;
+using Sora.Data.Abstractions;
 using Xunit;
+
+namespace Sora.Data.Core.Tests;
 
 public class DataServiceTests
 {
@@ -24,7 +25,7 @@ public class DataServiceTests
         saved.Id.Should().NotBeNullOrWhiteSpace();
     }
 
-    public class Todo : Sora.Data.Abstractions.IEntity<string>
+    public class Todo : IEntity<string>
     {
         [Identifier]
         public string Id { get; set; } = default!;

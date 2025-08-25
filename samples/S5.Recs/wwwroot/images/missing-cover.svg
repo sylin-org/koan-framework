@@ -1,0 +1,19 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 450" width="300" height="450">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f2937"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="450" fill="url(#g)"/>
+  <g fill="#374151">
+    <rect x="30" y="30" width="240" height="330" rx="8"/>
+    <rect x="60" y="380" width="180" height="16" rx="8"/>
+    <rect x="90" y="404" width="120" height="12" rx="6"/>
+  </g>
+  <g fill="#6b7280" transform="translate(120,140)">
+    <circle cx="30" cy="30" r="30"/>
+    <rect x="15" y="12" width="30" height="36" rx="4" fill="#9ca3af"/>
+  </g>
+  <text x="150" y="235" text-anchor="middle" fill="#9ca3af" font-family="Segoe UI, Roboto, Arial" font-size="14">No cover available</text>
+</svg>

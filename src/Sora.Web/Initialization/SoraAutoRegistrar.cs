@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core.Extensions;
+using Sora.Web.Extensions;
 
 namespace Sora.Web.Initialization;
 
@@ -20,10 +22,10 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var secure = cfg.Read($"{Sora.Web.Infrastructure.ConfigurationConstants.Web.Section}:{Sora.Web.Infrastructure.ConfigurationConstants.Web.Keys.EnableSecureHeaders}", true);
-        var proxied = cfg.Read($"{Sora.Web.Infrastructure.ConfigurationConstants.Web.Section}:{Sora.Web.Infrastructure.ConfigurationConstants.Web.Keys.IsProxiedApi}", false);
-        var csp = cfg.Read<string?>($"{Sora.Web.Infrastructure.ConfigurationConstants.Web.Section}:{Sora.Web.Infrastructure.ConfigurationConstants.Web.Keys.ContentSecurityPolicy}");
-        var autoMap = cfg.Read($"{Sora.Web.Infrastructure.ConfigurationConstants.Web.Section}:{Sora.Web.Infrastructure.ConfigurationConstants.Web.Keys.AutoMapControllers}", true);
+        var secure = cfg.Read($"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.EnableSecureHeaders}", true);
+        var proxied = cfg.Read($"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.IsProxiedApi}", false);
+        var csp = cfg.Read<string?>($"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.ContentSecurityPolicy}");
+        var autoMap = cfg.Read($"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.AutoMapControllers}", true);
         report.AddSetting("EnableSecureHeaders", secure.ToString());
         report.AddSetting("IsProxiedApi", proxied.ToString());
         report.AddSetting("AutoMapControllers", autoMap.ToString());

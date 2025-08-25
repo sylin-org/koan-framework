@@ -1,4 +1,4 @@
-namespace Sora.Data;
+namespace Sora.Data.Abstractions.Instructions;
 
 /// <summary>
 /// Instruction name constants for general, adapter-agnostic operations.

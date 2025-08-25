@@ -92,7 +92,7 @@ public sealed class MongoAutoFixture : IAsyncLifetime
         sc.AddSoraDataCore();
         sc.AddMongoAdapter();
         // Provide naming resolver for StorageNameRegistry
-        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         Services = sc.BuildServiceProvider();
     }
 }

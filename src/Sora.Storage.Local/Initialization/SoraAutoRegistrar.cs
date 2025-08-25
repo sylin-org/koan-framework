@@ -1,0 +1,30 @@
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Sora.Core;
+using Sora.Storage;
+using Sora.Storage.Local;
+
+namespace Sora.Storage.Local.Initialization;
+
+public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
+{
+    public string ModuleName => "Sora.Storage.Local";
+    public string? ModuleVersion => typeof(SoraAutoRegistrar).Assembly.GetName().Version?.ToString();
+
+    public void Initialize(IServiceCollection services)
+    {
+        // Bind Local provider options and register the provider
+        services.AddOptions<LocalStorageOptions>()
+            .BindConfiguration("Sora:Storage:Providers:Local");
+        services.AddSingleton<IStorageProvider, LocalStorageProvider>();
+    }
+
+    public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
+    {
+        report.AddModule(ModuleName, ModuleVersion);
+        var basePath = Core.Configuration.Read(cfg, "Sora:Storage:Providers:Local:BasePath", string.Empty) ?? string.Empty;
+        report.AddSetting("BasePath", string.IsNullOrWhiteSpace(basePath) ? "(not set)" : basePath);
+        report.AddSetting("Capabilities", "seek=true, range=true, presign=false, copy=true");
+    }
+}

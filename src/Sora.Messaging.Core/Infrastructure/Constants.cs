@@ -1,4 +1,4 @@
-namespace Sora.Messaging.Core.Infrastructure;
+namespace Sora.Messaging.Infrastructure;
 
 public static class Constants
 {

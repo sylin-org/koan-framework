@@ -15,14 +15,6 @@ using Sora.Data.Vector;
 
 namespace S5.Recs.Services;
 
-public interface ISeedService
-{
-    Task<string> StartAsync(string source, int limit, bool overwrite, CancellationToken ct);
-    Task<string> StartVectorUpsertAsync(IEnumerable<S5.Recs.Models.AnimeDoc> items, CancellationToken ct);
-    Task<object> GetStatusAsync(string jobId, CancellationToken ct);
-    Task<(int anime, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct);
-}
-
 internal sealed class SeedService : ISeedService
 {
     private readonly string _cacheDir = Constants.Paths.SeedCache;
@@ -56,6 +48,9 @@ internal sealed class SeedService : ISeedService
                 var embedded = await EmbedAndIndexAsync(data, ct);
                 _logger?.LogInformation("Seeding job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
                 var imported = await ImportMongoAsync(data, ct);
+                // Build catalogs once docs are imported
+                try { await CatalogTagsAsync(data, ct); } catch (Exception ex) { _logger?.LogWarning(ex, "Tag cataloging failed: {Message}", ex.Message); }
+                try { await CatalogGenresAsync(data, ct); } catch (Exception ex) { _logger?.LogWarning(ex, "Genre cataloging failed: {Message}", ex.Message); }
                 _progress[jobId] = (data.Count, data.Count, embedded, imported, true, null);
                 _logger?.LogInformation("Seeding job {JobId}: imported {Imported} docs into Mongo", jobId, imported);
                 await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest.json"), JsonSerializer.Serialize(new { jobId, count = data.Count, at = DateTimeOffset.UtcNow }), ct);
@@ -71,7 +66,7 @@ internal sealed class SeedService : ISeedService
     }
 
     // Overload: Start a vector-only job from a provided list of AnimeDoc entities
-    public Task<string> StartVectorUpsertAsync(IEnumerable<S5.Recs.Models.AnimeDoc> itemss, CancellationToken ct)
+    public Task<string> StartVectorUpsertAsync(IEnumerable<AnimeDoc> itemss, CancellationToken ct)
     {
         var items = itemss.ToList();
 
@@ -117,7 +112,7 @@ internal sealed class SeedService : ISeedService
         // Count documents (best-effort)
         try
         {
-            using (Sora.Data.Core.DataSetContext.With(null))
+            using (DataSetContext.With(null))
             {
                 var repo = dataSvc.GetRepository<AnimeDoc, string>();
                 animeCount = await repo.CountAsync(query: null, ct);
@@ -131,7 +126,7 @@ internal sealed class SeedService : ISeedService
         // Count vectors if provider supports instructions (best-effort)
         try
         {
-            using (Sora.Data.Core.DataSetContext.With(null))
+            using (DataSetContext.With(null))
             {
                 if (Vector<AnimeDoc>.IsAvailable)
                 {
@@ -145,6 +140,42 @@ internal sealed class SeedService : ISeedService
         }
 
         return (animeCount, animeCount, vectorCount);
+    }
+
+    public async Task<int> RebuildTagCatalogAsync(CancellationToken ct)
+    {
+        try
+        {
+            var docs = await AnimeDoc.All(ct);
+            var counts = CountTags(ExtractTags(docs));
+            var tagDocs = BuildTagDocs(counts);
+            var n = await TagStatDoc.UpsertMany(tagDocs, ct);
+            _logger?.LogInformation("Rebuilt tag catalog: {Count} tags", counts.Count);
+            return n;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Rebuild tag catalog failed: {Message}", ex.Message);
+            return 0;
+        }
+    }
+
+    public async Task<int> RebuildGenreCatalogAsync(CancellationToken ct)
+    {
+        try
+        {
+            var docs = await AnimeDoc.All(ct);
+            var counts = CountGenres(ExtractGenres(docs));
+            var genreDocs = BuildGenreDocs(counts);
+            var n = await GenreStatDoc.UpsertMany(genreDocs, ct);
+            _logger?.LogInformation("Rebuilt genre catalog: {Count} genres", counts.Count);
+            return n;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Rebuild genre catalog failed: {Message}", ex.Message);
+            return 0;
+        }
     }
 
     private Task<List<Anime>> FetchFromProviderAsync(string source, int limit, CancellationToken ct)
@@ -167,23 +198,140 @@ internal sealed class SeedService : ISeedService
     {
         try
         {
-            var dataSvc = (Sora.Data.Core.IDataService?)_sp.GetService(typeof(Sora.Data.Core.IDataService));
+            var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (dataSvc is null) return 0;
-            var docs = items.Select(a => new S5.Recs.Models.AnimeDoc
+            var docs = items.Select(a => new AnimeDoc
             {
                 Id = a.Id,
                 Title = a.Title,
+                TitleEnglish = a.TitleEnglish,
+                TitleRomaji = a.TitleRomaji,
+                TitleNative = a.TitleNative,
+                Synonyms = a.Synonyms,
                 Genres = a.Genres,
+                Tags = a.Tags,
                 Episodes = a.Episodes,
                 Synopsis = a.Synopsis,
-                Popularity = a.Popularity
+                Popularity = a.Popularity,
+                CoverUrl = a.CoverUrl,
+                BannerUrl = a.BannerUrl,
+                CoverColorHex = a.CoverColorHex
             });
-            return await S5.Recs.Models.AnimeDoc.UpsertMany(docs, ct);
+            return await AnimeDoc.UpsertMany(docs, ct);
         }
         catch
         {
             return 0;
         }
+    }
+
+    private static IEnumerable<string> ExtractTags(IEnumerable<Anime> items)
+    {
+        foreach (var a in items)
+        {
+            if (a.Genres is { Length: > 0 })
+                foreach (var g in a.Genres) if (!string.IsNullOrWhiteSpace(g)) yield return g.Trim();
+            if (a.Tags is { Length: > 0 })
+                foreach (var t in a.Tags) if (!string.IsNullOrWhiteSpace(t)) yield return t.Trim();
+        }
+    }
+
+    private static IEnumerable<string> ExtractGenres(IEnumerable<Anime> items)
+    {
+        foreach (var a in items)
+        {
+            if (a.Genres is { Length: > 0 })
+                foreach (var g in a.Genres) if (!string.IsNullOrWhiteSpace(g)) yield return g.Trim();
+        }
+    }
+
+    private static IEnumerable<string> ExtractTags(IEnumerable<AnimeDoc> items)
+    {
+        foreach (var a in items)
+        {
+            if (a.Genres is { Length: > 0 })
+                foreach (var g in a.Genres) if (!string.IsNullOrWhiteSpace(g)) yield return g.Trim();
+            if (a.Tags is { Length: > 0 })
+                foreach (var t in a.Tags) if (!string.IsNullOrWhiteSpace(t)) yield return t.Trim();
+        }
+    }
+
+    private static IEnumerable<string> ExtractGenres(IEnumerable<AnimeDoc> items)
+    {
+        foreach (var a in items)
+        {
+            if (a.Genres is { Length: > 0 })
+                foreach (var g in a.Genres) if (!string.IsNullOrWhiteSpace(g)) yield return g.Trim();
+        }
+    }
+
+    private static Dictionary<string, int> CountTags(IEnumerable<string> tags)
+    {
+        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in tags)
+        {
+            var key = t.Trim();
+            if (key.Length == 0) continue;
+            map.TryGetValue(key, out var c);
+            map[key] = c + 1;
+        }
+        return map;
+    }
+
+    private static IEnumerable<TagStatDoc> BuildTagDocs(Dictionary<string, int> counts)
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var kv in counts)
+        {
+            yield return new TagStatDoc { Id = kv.Key.ToLowerInvariant(), Tag = kv.Key, AnimeCount = kv.Value, UpdatedAt = now };
+        }
+    }
+
+    private static Dictionary<string, int> CountGenres(IEnumerable<string> genres)
+    {
+        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var g in genres)
+        {
+            var key = g.Trim();
+            if (key.Length == 0) continue;
+            map.TryGetValue(key, out var c);
+            map[key] = c + 1;
+        }
+        return map;
+    }
+
+    private static IEnumerable<GenreStatDoc> BuildGenreDocs(Dictionary<string, int> counts)
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var kv in counts)
+        {
+            yield return new GenreStatDoc { Id = kv.Key.ToLowerInvariant(), Genre = kv.Key, AnimeCount = kv.Value, UpdatedAt = now };
+        }
+    }
+
+    private async Task CatalogTagsAsync(List<Anime> items, CancellationToken ct)
+    {
+        var counts = CountTags(ExtractTags(items));
+        var docs = BuildTagDocs(counts);
+        await TagStatDoc.UpsertMany(docs, ct);
+        _logger?.LogInformation("Tag catalog updated with {Count} tags", counts.Count);
+    }
+
+    private async Task CatalogGenresAsync(List<Anime> items, CancellationToken ct)
+    {
+        var counts = CountGenres(ExtractGenres(items));
+        var docs = BuildGenreDocs(counts);
+        await GenreStatDoc.UpsertMany(docs, ct);
+        _logger?.LogInformation("Genre catalog updated with {Count} genres", counts.Count);
+    }
+
+    // Utility to rebuild catalog from the current AnimeDoc collection (not used in normal flow)
+    private static async Task CatalogTagsFromDocsAsync(CancellationToken ct)
+    {
+        var docs = await AnimeDoc.All(ct);
+        var counts = CountTags(ExtractTags(docs));
+        var tagDocs = BuildTagDocs(counts);
+        await TagStatDoc.UpsertMany(tagDocs, ct);
     }
 
     // (Removed) Mongo fetch helpers replaced by direct use of AnimeDoc.All(ct) for small collections
@@ -241,7 +389,7 @@ internal sealed class SeedService : ISeedService
     }
 
     // New: Upsert vectors for an existing set of AnimeDoc entities in one go
-    private async Task<int> UpsertVectorsAsync(List<S5.Recs.Models.AnimeDoc> docss, CancellationToken ct)
+    private async Task<int> UpsertVectorsAsync(List<AnimeDoc> docss, CancellationToken ct)
     {
         try
         {
@@ -265,7 +413,22 @@ internal sealed class SeedService : ISeedService
             for (int i = 0; i < docs.Count; i += batchSize)
             {
                 var batch = docs.Skip(i).Take(batchSize).ToList();
-                var inputs = batch.Select(d => ($"{d.Title}\n\n{d.Synopsis}\n\nTags: {string.Join(", ", d.Genres ?? Array.Empty<string>())}").Trim()).ToList();
+                // Build enriched embedding text (titles + synonyms + genres + tags)
+                var inputs = batch.Select(d =>
+                {
+                    var titles = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(d.Title)) titles.Add(d.Title!);
+                    if (!string.IsNullOrWhiteSpace(d.TitleEnglish) && d.TitleEnglish != d.Title) titles.Add(d.TitleEnglish!);
+                    if (!string.IsNullOrWhiteSpace(d.TitleRomaji) && d.TitleRomaji != d.Title) titles.Add(d.TitleRomaji!);
+                    if (!string.IsNullOrWhiteSpace(d.TitleNative) && d.TitleNative != d.Title) titles.Add(d.TitleNative!);
+                    if (d.Synonyms is { Length: > 0 }) titles.AddRange(d.Synonyms);
+
+                    var tags = new List<string>();
+                    if (d.Genres is { Length: > 0 }) tags.AddRange(d.Genres);
+                    if (d.Tags is { Length: > 0 }) tags.AddRange(d.Tags);
+
+                    return ($"{string.Join(" / ", titles.Distinct())}\n\n{d.Synopsis}\n\nTags: {string.Join(", ", tags.Distinct())}").Trim();
+                }).ToList();
                 var emb = await ai.EmbedAsync(new Sora.AI.Contracts.Models.AiEmbeddingsRequest { Input = inputs, Model = model }, ct);
                 var tuples = new List<(string Id, float[] Embedding, object? Metadata)>(batch.Count);
                 for (int j = 0; j < batch.Count && j < emb.Vectors.Count; j++)
@@ -295,5 +458,17 @@ internal sealed class SeedService : ISeedService
     }
 
     private static string BuildEmbeddingText(Anime a)
-        => ($"{a.Title}\n\n{a.Synopsis}\n\nTags: {string.Join(", ", a.Genres ?? Array.Empty<string>())}").Trim();
+    {
+        var titles = new List<string>();
+        if (!string.IsNullOrWhiteSpace(a.Title)) titles.Add(a.Title);
+        if (!string.IsNullOrWhiteSpace(a.TitleEnglish) && a.TitleEnglish != a.Title) titles.Add(a.TitleEnglish!);
+        if (!string.IsNullOrWhiteSpace(a.TitleRomaji) && a.TitleRomaji != a.Title) titles.Add(a.TitleRomaji!);
+        if (!string.IsNullOrWhiteSpace(a.TitleNative) && a.TitleNative != a.Title) titles.Add(a.TitleNative!);
+        if (a.Synonyms is { Length: > 0 }) titles.AddRange(a.Synonyms);
+        var tags = new List<string>();
+        if (a.Genres is { Length: > 0 }) tags.AddRange(a.Genres);
+        if (a.Tags is { Length: > 0 }) tags.AddRange(a.Tags);
+        var text = $"{string.Join(" / ", titles.Distinct())}\n\n{a.Synopsis}\n\nTags: {string.Join(", ", tags.Distinct())}";
+        return text.Trim();
+    }
 }

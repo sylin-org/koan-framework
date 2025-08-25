@@ -6,7 +6,7 @@ public class SqlServerSchemaGovernanceTests : RelationalSchemaGovernanceSharedTe
 {
     public SqlServerSchemaGovernanceTests(SqlServerAutoFixture fx) : base(fx) { }
 
-    public class Doc : Sora.Data.Abstractions.IEntity<string>
+    public class Doc : Abstractions.IEntity<string>
     {
         public Doc() { }
         public string Id { get; set; } = string.Empty;

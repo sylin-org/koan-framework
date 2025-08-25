@@ -1,4 +1,4 @@
-namespace Sora.Web;
+namespace Sora.Web.Options;
 
 /// <summary>
 /// Options that control Sora's default web pipeline wiring.
@@ -10,7 +10,7 @@ public sealed class SoraWebOptions
     public bool AutoUse { get; set; } = true;
 
     // When set, a very light in-pipeline handler responds to GET {HealthPath} with { status: "ok" }.
-    public string HealthPath { get; set; } = Sora.Web.Infrastructure.SoraWebConstants.Routes.ApiHealth;
+    public string HealthPath { get; set; } = Infrastructure.SoraWebConstants.Routes.ApiHealth;
 
     // Opt-in static files wiring. If true, UseDefaultFiles()+UseStaticFiles() will be applied.
     public bool EnableStaticFiles { get; set; } = true;

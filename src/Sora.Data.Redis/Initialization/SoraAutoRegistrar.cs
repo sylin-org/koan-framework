@@ -18,7 +18,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     {
         services.AddOptions<RedisOptions>().ValidateDataAnnotations();
         services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
-        services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, RedisHealthContributor>());
         // Connection multiplexer singleton
@@ -28,7 +28,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             var cs = cfg.ConnectionString;
             if (string.IsNullOrWhiteSpace(cs))
             {
-                cs = Sora.Core.SoraEnv.InContainer ? Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultCompose : Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultLocal;
+                cs = SoraEnv.InContainer ? Infrastructure.Constants.Discovery.DefaultCompose : Infrastructure.Constants.Discovery.DefaultLocal;
             }
             return ConnectionMultiplexer.Connect(cs);
         });
@@ -41,12 +41,12 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         new RedisOptionsConfigurator(cfg).Configure(o);
         report.AddSetting("Database", o.Database.ToString());
         report.AddSetting("ConnectionString", o.ConnectionString ?? string.Empty, isSecret: true);
-        report.AddSetting(Sora.Data.Redis.Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
-        report.AddSetting(Sora.Data.Redis.Infrastructure.Constants.Bootstrap.DefaultPageSize, o.DefaultPageSize.ToString());
-        report.AddSetting(Sora.Data.Redis.Infrastructure.Constants.Bootstrap.MaxPageSize, o.MaxPageSize.ToString());
+        report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, o.DefaultPageSize.ToString());
+        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, o.MaxPageSize.ToString());
         // Discovery visibility
-        report.AddSetting("Discovery:EnvList", Sora.Data.Redis.Infrastructure.Constants.Discovery.EnvRedisList, isSecret: false);
-        report.AddSetting("Discovery:DefaultLocal", Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultLocal, isSecret: false);
-        report.AddSetting("Discovery:DefaultCompose", Sora.Data.Redis.Infrastructure.Constants.Discovery.DefaultCompose, isSecret: false);
+        report.AddSetting("Discovery:EnvList", Infrastructure.Constants.Discovery.EnvRedisList, isSecret: false);
+        report.AddSetting("Discovery:DefaultLocal", Infrastructure.Constants.Discovery.DefaultLocal, isSecret: false);
+        report.AddSetting("Discovery:DefaultCompose", Infrastructure.Constants.Discovery.DefaultCompose, isSecret: false);
     }
 }

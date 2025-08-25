@@ -13,7 +13,7 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
     private readonly MongoAutoFixture _fx;
     public MongoCapabilitiesAndHealthTests(MongoAutoFixture fx) => _fx = fx;
 
-    public record Todo([property: Sora.Data.Abstractions.Annotations.Identifier] string Id, string Title) : IEntity<string>;
+    public record Todo([property: Identifier] string Id, string Title) : IEntity<string>;
 
     private IServiceProvider BuildServices(string? connString = null)
     {
@@ -29,7 +29,7 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
         sc.AddSingleton<IConfiguration>(cfg);
         sc.AddSoraDataCore();
         sc.AddMongoAdapter();
-        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         return sc.BuildServiceProvider();
     }
 

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Sora.Data.Abstractions;
+namespace Sora.Data.Abstractions.Vector.Filtering;
 
 public static class VectorFilterJson
 {

@@ -1,7 +1,8 @@
 using Sora.Core.Observability;
 using Sora.Data.Core;
-using Sora.Web;
+using Sora.Web.Extensions;
 using Sora.Web.Swagger;
+using Sora.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,9 +18,16 @@ builder.Services.AddSoraObservability();
 // Enable Mongo adapter via discovery or explicit registration (optional)
 // builder.Services.AddMongoAdapter();
 
+// Wire messaging core + RabbitMQ so diagnostics surface is populated when used
+builder.Services.AddMessagingCore();
+// RabbitMQ registers via auto-registrar when the assembly is referenced; no explicit AddRabbitMq needed
+
 var app = builder.Build();
 // Enable Swagger UI per policy: Dev by default; in non-dev only when Sora__Web__Swagger__Enabled=true or SORA_MAGIC_ENABLE_SWAGGER=true
 app.UseSoraSwagger();
 app.Run();
 
-public partial class Program { }
+namespace S2.Api
+{
+    public partial class Program { }
+}

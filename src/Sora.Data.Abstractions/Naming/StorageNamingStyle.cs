@@ -10,17 +10,3 @@ public enum StorageNamingStyle
     /// <summary>Use the full namespace-qualified name (e.g., My.App.Todo).</summary>
     FullNamespace = 1,
 }
-
-/// <summary>
-/// Resolved storage name components.
-/// For relational: Namespace = schema, Name = table. For document: Namespace = database (optional), Name = collection.
-/// </summary>
-public readonly record struct StorageResolvedName(string Name, string? Namespace = null);
-
-/// <summary>
-/// Contract for adapters to implement naming derivation.
-/// </summary>
-public interface IStorageNamingPolicy
-{
-    StorageResolvedName Resolve(System.Type entityType);
-}

@@ -63,3 +63,6 @@ wwwroot/.cache/
 node_modules/
 **/node_modules/
 /other
+ 
+# Docker runtime status artifacts (avoid committing transient ps outputs)
+/samples/**/ps.json

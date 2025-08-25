@@ -11,12 +11,12 @@ internal sealed class OllamaAdapter : IAiAdapter
 {
     private readonly HttpClient _http;
     private readonly string _defaultModel;
-    private readonly Microsoft.Extensions.Logging.ILogger<OllamaAdapter>? _logger;
+    private readonly ILogger<OllamaAdapter>? _logger;
     public string Id { get; }
     public string Name { get; }
     public string Type => Infrastructure.Constants.Adapter.Type;
 
-    public OllamaAdapter(string id, string name, HttpClient http, string? defaultModel, Microsoft.Extensions.Logging.ILogger<OllamaAdapter>? logger = null)
+    public OllamaAdapter(string id, string name, HttpClient http, string? defaultModel, ILogger<OllamaAdapter>? logger = null)
     { Id = id; Name = name; _http = http; _defaultModel = defaultModel ?? string.Empty; _logger = logger; }
 
     public bool CanServe(AiChatRequest request)

@@ -1,6 +1,6 @@
 # Sylin.Sora.Data.Weaviate
 
-Weaviate vector database provider for Sora: schema utilities, filter translation, and health.
+Weaviate adapter for Sora vector data.
 
 - Target framework: net9.0
 - License: Apache-2.0
@@ -11,5 +11,9 @@ Weaviate vector database provider for Sora: schema utilities, filter translation
 dotnet add package Sylin.Sora.Data.Weaviate
 ```
 
+## Capabilities
+- Save/search embeddings for entities via Sora.Data.Vector facade
+- Weaviate client options and class mapping helpers
+
 ## Links
-- Adapter matrix: https://github.com/sylin-labs/sora-framework/blob/dev/docs/reference/adapter-matrix.md
+- Data access patterns: `~/guides/data/all-query-streaming-and-pager.md`

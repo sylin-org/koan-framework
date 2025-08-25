@@ -1,4 +1,4 @@
-namespace Sora.Web;
+namespace Sora.Web.Options;
 
 /// <summary>
 /// Toggles for optional pipeline components managed by Sora.

@@ -1,5 +1,6 @@
 using Sora.Data.Abstractions;
 using System.Text.Json;
+using Sora.Data.Abstractions.Vector.Filtering;
 using Xunit;
 
 namespace Sora.Testing.Vector;

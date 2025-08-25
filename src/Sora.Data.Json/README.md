@@ -5,11 +5,19 @@ JSON file-backed data provider for Sora: simple repository for demos, tests, and
 - Target framework: net9.0
 - License: Apache-2.0
 
+## Capabilities
+- Local file storage with simple filtering and paging semantics
+- Great for seed data and smoke tests
+
 ## Install
 
 ```powershell
 dotnet add package Sylin.Sora.Data.Json
 ```
 
-## Links
-- Data patterns: https://github.com/sylin-labs/sora-framework/blob/dev/docs/guides/data/all-query-streaming-and-pager.md
+## Usage
+- Use `FirstPage/Page` for UI-like reads; avoid All on large files.
+- Prefer first-class statics on your models where available.
+
+## References
+- Data patterns: `~/guides/data/all-query-streaming-and-pager.md`

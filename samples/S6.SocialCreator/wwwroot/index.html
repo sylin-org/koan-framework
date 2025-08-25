@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>S6 Social Creator</title>
+  <link rel="stylesheet" href="/styles.css"/>
+  <script src="/lib/htmx/htmx.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>S6 Social Creator</h1>
+    <div class="card">
+      <h2>Upload</h2>
+      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop a file here or click to select">
+        Drop a file here or click to select
+      </div>
+      <form id="upload-form" hx-post="/api/upload" hx-target="#upload-result" hx-swap="innerHTML" enctype="multipart/form-data" hx-on::after-request="if(event.detail.successful){ htmx.trigger('#gallery', 'refresh') }" style="margin-top:10px">
+        <label>File: <input id="file-input" type="file" name="file" required></label>
+        <button type="submit">Upload</button>
+      </form>
+      <div id="upload-result"></div>
+      <!doctype html>
+      <html lang="en" ng-app="s6App">
+      <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <title>S6 Social Creator</title>
+        <link rel="stylesheet" href="/styles.css"/>
+        <!-- AngularJS from CDN -->
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+        <script>
+          (function(){
+            'use strict';
+            var app = angular.module('s6App', []);
+
+            app.directive('dropzone', function(){
+              return {
+                restrict: 'A',
+                scope: {
+                  onFiles: '&'
+                },
+                link: function(scope, el){
+                  var over = function(e){ e.preventDefault(); e.stopPropagation(); el.addClass('is-dragover'); };
+                  var leave = function(e){ e.preventDefault(); e.stopPropagation(); el.removeClass('is-dragover'); };
+                  var drop = function(e){
+                    e.preventDefault(); e.stopPropagation(); el.removeClass('is-dragover');
+                    var files = (e.originalEvent || e).dataTransfer && (e.originalEvent || e).dataTransfer.files;
+                    if (files && files.length){ scope.$apply(function(){ scope.onFiles({ files: files }); }); }
+                  };
+                  el[0].addEventListener('dragover', over);
+                  el[0].addEventListener('dragenter', over);
+                  el[0].addEventListener('dragleave', leave);
+                  el[0].addEventListener('dragend', leave);
+                  el[0].addEventListener('drop', drop);
+                }
+              };
+            });
+
+            app.controller('AppCtrl', function($scope, $http){
+              $scope.uploading = false;
+              $scope.lastResult = null;
+              $scope.gallery = [];
+
+              $scope.pickFile = function(element){
+                if (element.files && element.files.length){ $scope.uploadFiles(element.files); element.value = ''; }
+              };
+
+              $scope.handleDrop = function(files){ $scope.uploadFiles(files); };
+
+              $scope.uploadFiles = function(files){
+                var file = files[0];
+                if (!file) return;
+                var fd = new FormData();
+                fd.append('file', file, file.name);
+                $scope.uploading = true;
+                $http.post('/api/upload', fd, { headers: { 'Content-Type': undefined }, transformRequest: angular.identity })
+                  .then(function(resp){
+                    $scope.lastResult = resp.data;
+                    // Add to gallery (front-end only placeholder)
+                    $scope.gallery.unshift({ name: file.name, key: resp.data.key, url: '/api/media/' + resp.data.key, type: file.type, size: file.size });
+                  })
+                  .catch(function(err){
+                    $scope.lastResult = { error: (err.data || 'Upload failed') };
+                  })
+                  .finally(function(){ $scope.uploading = false; });
+              };
+            });
+          })();
+        </script>
+      </head>
+      <body ng-controller="AppCtrl">
+        <div class="container">
+          <h1>S6 Social Creator</h1>
+
+          <div class="card">
+            <h2>Upload</h2>
+            <div class="dropzone" dropzone on-files="handleDrop(files)">
+              <p>Drag & drop a file here</p>
+              <p><small>or</small></p>
+              <label class="btn">
+                Choose file
+                <input type="file" style="display:none" onchange="angular.element(this).scope().pickFile(this)">
+              </label>
+            </div>
+            <div class="upload-status" ng-if="uploading">Uploading…</div>
+            <div class="upload-result" ng-if="!uploading && lastResult">
+              <div ng-if="lastResult.error" class="error">{{ lastResult.error }}</div>
+              <div ng-if="!lastResult.error">
+                <strong>Uploaded:</strong> <code>{{ lastResult.key }}</code>
+                <div><a ng-href="/api/media/{{ lastResult.key }}" target="_blank">Open</a></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Gallery (recent uploads)</h2>
+            <div class="gallery">
+              <div class="gallery-item" ng-repeat="it in gallery track by it.key">
+                <a ng-href="{{ it.url }}" target="_blank">{{ it.name }}</a>
+                <small class="muted">{{ it.type || 'file' }} • {{ it.size | number }} bytes</small>
+              </div>
+              <small class="muted" ng-if="!gallery.length">Uploads appear here after you add them.</small>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+        })();
+      </script>
+    </div>
+    <hr/>
+    <div id="gallery" class="card">
+      <h2>Gallery (recent uploads)</h2>
+      <div id="gallery-items">
+        <small>Coming soon: list from storage</small>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -8,32 +8,6 @@ using System.Collections.Concurrent;
 namespace Sora.Data.Core;
 
 /// <summary>
-/// Provides access to aggregate repositories resolved from configured adapters.
-/// Acts as a thin service-layer entry point used by high-level extensions.
-/// </summary>
-public interface IDataService
-{
-    /// <summary>
-    /// Get a repository for the specified aggregate and key type.
-    /// Implementations may cache resolved repositories for performance.
-    /// </summary>
-    IDataRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
-    where TEntity : class, IEntity<TKey>
-        where TKey : notnull;
-
-    /// <summary>
-    /// Escape-hatch entry for direct commands against a named source or adapter.
-    /// Returns a session for running ad-hoc queries/commands with optional connection override.
-    /// </summary>
-    Sora.Data.Core.Direct.IDirectSession Direct(string sourceOrAdapter);
-
-    // Vector repository accessor (optional adapter). Returns null if no vector adapter is configured for the entity.
-    Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull;
-}
-
-/// <summary>
 /// Default <see cref="IDataService"/> implementation.
 /// Uses <see cref="AggregateConfigs"/> to resolve and cache repositories per (entity,key) pair.
 /// </summary>
@@ -57,27 +31,27 @@ public sealed class DataService(IServiceProvider sp) : IDataService
     }
 
     /// <inheritdoc />
-    public Sora.Data.Core.Direct.IDirectSession Direct(string sourceOrAdapter)
+    public Direct.IDirectSession Direct(string sourceOrAdapter)
     {
-        var svc = sp.GetService<Sora.Data.Core.Direct.IDirectDataService>()
+        var svc = sp.GetService<Direct.IDirectDataService>()
             ?? throw new InvalidOperationException("IDirectDataService not registered. AddSoraDataDirect() required.");
         return svc.Direct(sourceOrAdapter);
     }
 
-    public Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
+    public IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
         var key = (typeof(TEntity), typeof(TKey));
-        if (_vecCache.TryGetValue(key, out var existing)) return (Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>?)existing;
+        if (_vecCache.TryGetValue(key, out var existing)) return (IVectorSearchRepository<TEntity, TKey>?)existing;
 
         // Resolve from adapter factories honoring role attributes and defaults.
-    var vectorFactories = sp.GetServices<Sora.Data.Vector.Abstractions.IVectorAdapterFactory>().ToList();
+    var vectorFactories = sp.GetServices<IVectorAdapterFactory>().ToList();
         if (vectorFactories.Count == 0) return null;
 
         // 1) Role attribute: [VectorAdapter("...")]
-        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(Sora.Data.Vector.Abstractions.VectorAdapterAttribute))
-            as Sora.Data.Vector.Abstractions.VectorAdapterAttribute)?.Provider;
+        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(VectorAdapterAttribute))
+            as VectorAdapterAttribute)?.Provider;
 
         // 2) App default: Sora:Data:VectorDefaults:DefaultProvider
         if (string.IsNullOrWhiteSpace(desired))
@@ -109,11 +83,11 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         // 3) Fallback: entity data provider (useful when provider names align, e.g., "weaviate")
         if (string.IsNullOrWhiteSpace(desired))
         {
-            desired = Configuration.AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
+            desired = AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
         }
 
-    Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? repo = null;
-    Sora.Data.Vector.Abstractions.IVectorAdapterFactory? factory = null;
+    IVectorSearchRepository<TEntity, TKey>? repo = null;
+    IVectorAdapterFactory? factory = null;
         if (!string.IsNullOrWhiteSpace(desired))
         {
             factory = vectorFactories.FirstOrDefault(f => f.CanHandle(desired!));

@@ -7,6 +7,8 @@ using Sora.Core.Observability;
 using Sora.Data.Abstractions;
 using Sora.Web.Infrastructure;
 using System.Diagnostics;
+using Sora.Core.Extensions;
+using Sora.Web.Options;
 
 namespace Sora.Web.Controllers;
 
@@ -37,7 +39,7 @@ public sealed class WellKnownController(
         var opts = obsOptions?.Value ?? new ObservabilityOptions();
         // Respect OTLP env vars if Options not configured
         var otlpEndpoint = opts.Otlp.Endpoint
-            ?? cfg.Read<string?>(Sora.Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Endpoint, null);
+            ?? cfg.Read<string?>(Core.Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Endpoint, null);
 
         var payload = new
         {
@@ -67,7 +69,7 @@ public sealed class WellKnownController(
     }
 
     [HttpGet(SoraWebConstants.Routes.WellKnownScheduling)]
-    public IActionResult Scheduling([FromServices] Sora.Core.IHealthAggregator aggregator, [FromServices] IOptions<Sora.Scheduling.SchedulingOptions>? sched)
+    public IActionResult Scheduling([FromServices] IHealthAggregator aggregator, [FromServices] IOptions<Scheduling.SchedulingOptions>? sched)
     {
         if (!CanExposeObservability()) return NotFound();
 

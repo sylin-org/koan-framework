@@ -27,11 +27,11 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
         sc.AddSingleton<IConfiguration>(cfg);
         sc.AddSoraDataCore();
         sc.AddMongoAdapter();
-        sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         return sc.BuildServiceProvider();
     }
 
-    public record Todo([property: Sora.Data.Abstractions.Annotations.Identifier] string Id, string Title) : IEntity<string>;
+    public record Todo([property: Identifier] string Id, string Title) : IEntity<string>;
 
     [Fact]
     public async Task RequireAtomic_true_on_standalone_should_throw_NotSupported()

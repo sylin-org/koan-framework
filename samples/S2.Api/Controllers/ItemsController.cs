@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
-using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
+using Sora.Web.Attributes;
 using Sora.Web.Controllers;
 
-namespace S2.Api;
+namespace S2.Api.Controllers;
 
 [Route("api/items")]
 [Sora.Web.Transformers.EnableEntityTransformers]
@@ -25,10 +25,4 @@ public sealed class ItemsController : EntityController<Item>
         var deleted = await Item.RemoveAll(ct);
         return Ok(new { deleted });
     }
-}
-
-[DataAdapter("mongo")]
-public sealed class Item : Sora.Domain.Entity<Item>
-{
-    public string Name { get; set; } = string.Empty;
 }

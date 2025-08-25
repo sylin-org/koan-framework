@@ -82,9 +82,9 @@ public sealed class PostgresAutoFixture : IRelationalTestFixture<PostgresSchemaG
         var cfg = new ConfigurationBuilder()
             .AddInMemoryCollection(new[]
             {
-                new KeyValuePair<string,string?>(Sora.Data.Postgres.Infrastructure.Constants.Configuration.Keys.ConnectionString, ConnectionString),
-                new KeyValuePair<string,string?>(Sora.Data.Postgres.Infrastructure.Constants.Configuration.Keys.DefaultPageSize, "10"),
-                new KeyValuePair<string,string?>(Sora.Data.Postgres.Infrastructure.Constants.Configuration.Keys.MaxPageSize, "50"),
+                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.ConnectionString, ConnectionString),
+                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.DefaultPageSize, "10"),
+                new KeyValuePair<string,string?>(Infrastructure.Constants.Configuration.Keys.MaxPageSize, "50"),
                 new KeyValuePair<string,string?>("Sora:Environment", "Test")
             })
             .Build();
@@ -96,7 +96,7 @@ public sealed class PostgresAutoFixture : IRelationalTestFixture<PostgresSchemaG
         services.AddPostgresAdapter(o =>
         {
             o.ConnectionString = ConnectionString;
-            o.DdlPolicy = Sora.Data.Postgres.SchemaDdlPolicy.AutoCreate;
+            o.DdlPolicy = SchemaDdlPolicy.AutoCreate;
             o.AllowProductionDdl = true;
         });
         ServiceProvider = services.BuildServiceProvider();

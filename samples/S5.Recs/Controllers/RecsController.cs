@@ -12,7 +12,27 @@ public class RecsController(IRecsService recs) : ControllerBase
     [HttpPost("query")]
     public IActionResult Query([FromBody] RecsQuery req)
     {
-    var (items, degraded) = recs.QueryAsync(req.Text, req.AnchorAnimeId, req.Filters?.Genres, req.Filters?.EpisodesMax, req.Filters?.SpoilerSafe ?? true, req.TopK, req.UserId, HttpContext.RequestAborted).GetAwaiter().GetResult();
+        // If userId is not provided but caller is authenticated, derive from claims
+        string? userId = req.UserId;
+        if (string.IsNullOrWhiteSpace(userId) && HttpContext?.User?.Identity?.IsAuthenticated == true)
+        {
+            userId = HttpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? HttpContext.User.FindFirst("sub")?.Value;
+        }
+
+    var ct = HttpContext?.RequestAborted ?? CancellationToken.None;
+    var (items, degraded) = recs.QueryAsync(
+        req.Text,
+        req.AnchorAnimeId,
+        req.Filters?.Genres,
+        req.Filters?.EpisodesMax,
+        req.Filters?.SpoilerSafe ?? true,
+        req.TopK,
+        userId,
+        req.Filters?.PreferTags,
+        req.Filters?.PreferWeight,
+        req.Sort,
+    ct).GetAwaiter().GetResult();
     return Ok(new { items, degraded });
     }
 
@@ -23,7 +43,3 @@ public class RecsController(IRecsService recs) : ControllerBase
         return Ok(new { ok = true });
     }
 }
-
-public record RecsQuery(string? Text, string? AnchorAnimeId, Filters? Filters, int TopK = 20, string? UserId = null);
-public record Filters(string[]? Genres, int? EpisodesMax, bool SpoilerSafe = true);
-public record RateRequest(string UserId, string AnimeId, int Rating);

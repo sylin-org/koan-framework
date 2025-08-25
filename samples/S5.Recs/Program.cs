@@ -1,8 +1,6 @@
 using Sora.Core.Observability;
 using Sora.Data.Core;
-using Sora.Web;
-using Sora.Web.Swagger;
-using Sora.Data.Vector;
+using Sora.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +19,10 @@ Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.R
 // Local services
 builder.Services.AddSingleton<S5.Recs.Services.ISeedService, S5.Recs.Services.SeedService>();
 builder.Services.AddSingleton<S5.Recs.Services.IRecsService, S5.Recs.Services.RecsService>();
+builder.Services.AddSingleton<S5.Recs.Services.IRecommendationSettingsProvider, S5.Recs.Services.RecommendationSettingsProvider>();
+// Tag catalog options (censor list)
+builder.Services.AddOptions<S5.Recs.Options.TagCatalogOptions>()
+    .Bind(builder.Configuration.GetSection("S5:Recs:Tags"));
 // Scheduling: tasks are auto-discovered and registered by Sora.Scheduling's auto-registrar
 // Scheduling defaults for S5: don't gate readiness; ensure bootstrap runs on startup
 builder.Services.AddOptions<Sora.Scheduling.SchedulingOptions>()
@@ -34,7 +36,7 @@ builder.Services.AddOptions<Sora.Scheduling.SchedulingOptions>()
 
 // Discover and register all IAnimeProvider implementations in this assembly
 var providerInterface = typeof(S5.Recs.Providers.IAnimeProvider);
-var providerTypes = typeof(Program).Assembly.GetTypes()
+var providerTypes = typeof(S5.Recs.Program).Assembly.GetTypes()
     .Where(t => providerInterface.IsAssignableFrom(t) && t is { IsAbstract: false, IsInterface: false });
 foreach (var t in providerTypes)
 {
@@ -49,4 +51,7 @@ var app = builder.Build();
 
 app.Run();
 
-public partial class Program { }
+namespace S5.Recs
+{
+    public partial class Program { }
+}

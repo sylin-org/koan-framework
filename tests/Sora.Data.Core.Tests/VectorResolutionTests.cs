@@ -2,15 +2,15 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Vector.Abstractions;
-using Sora.Data.Core;
 using Xunit;
+
+namespace Sora.Data.Core.Tests;
 
 public class VectorResolutionTests
 {
     // Fake vector repo and factory used to assert selection
-    private sealed class FakeVectorRepo<TEntity, TKey> : Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>
+    private sealed class FakeVectorRepo<TEntity, TKey> : IVectorSearchRepository<TEntity, TKey>
         where TEntity : class, IEntity<TKey> where TKey : notnull
     {
         public string ProviderName { get; }
@@ -19,14 +19,14 @@ public class VectorResolutionTests
         public Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default) => Task.FromResult(0);
         public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default) => Task.FromResult(true);
         public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Task.FromResult(0);
-        public Task<Sora.Data.Vector.Abstractions.VectorQueryResult<TKey>> SearchAsync(Sora.Data.Vector.Abstractions.VectorQueryOptions options, CancellationToken ct = default)
-            => Task.FromResult(new Sora.Data.Vector.Abstractions.VectorQueryResult<TKey>(Array.Empty<Sora.Data.Vector.Abstractions.VectorMatch<TKey>>(), null));
+        public Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
+            => Task.FromResult(new VectorQueryResult<TKey>(Array.Empty<VectorMatch<TKey>>(), null));
     }
 
-    private sealed class FakeVectorFactory(string provider) : Sora.Data.Vector.Abstractions.IVectorAdapterFactory
+    private sealed class FakeVectorFactory(string provider) : IVectorAdapterFactory
     {
         public bool CanHandle(string provider) => string.Equals(provider, Provider, StringComparison.OrdinalIgnoreCase);
-        public Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp) where TEntity : class, IEntity<TKey> where TKey : notnull
+        public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp) where TEntity : class, IEntity<TKey> where TKey : notnull
             => new FakeVectorRepo<TEntity, TKey>(Provider);
         public string Provider { get; } = provider;
     }
@@ -34,7 +34,7 @@ public class VectorResolutionTests
     [SourceAdapter("json")]
     private sealed class A : IEntity<string> { [Identifier] public string Id { get; set; } = string.Empty; }
 
-    [Sora.Data.Vector.Abstractions.VectorAdapter("foo")]
+    [VectorAdapter("foo")]
     [SourceAdapter("json")]
     private sealed class B : IEntity<string> { [Identifier] public string Id { get; set; } = string.Empty; }
 
@@ -44,10 +44,10 @@ public class VectorResolutionTests
         if (cfg != null) sc.AddSingleton<IConfiguration>(cfg);
         sc.AddSoraDataCore();
         sc.AddSingleton<IDataService, DataService>();
-    // Register vector factories: foo, bar, and json
+        // Register vector factories: foo, bar, and json
         sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
         sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
-    sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
+        sc.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("json"));
         return sc.BuildServiceProvider();
     }
 

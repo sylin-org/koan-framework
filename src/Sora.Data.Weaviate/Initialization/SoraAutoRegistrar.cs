@@ -15,7 +15,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddOptions<WeaviateOptions>().BindConfiguration(Sora.Data.Weaviate.Infrastructure.Constants.Configuration.Section).ValidateDataAnnotations();
+        services.AddOptions<WeaviateOptions>().BindConfiguration(Infrastructure.Constants.Configuration.Section).ValidateDataAnnotations();
         // Post-configure: if Endpoint is not explicitly provided (or left at default), try to self-configure
         services.PostConfigure<WeaviateOptions>(opts =>
         {
@@ -32,9 +32,9 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             }
             catch { /* best-effort; remain with configured/default endpoint */ }
         });
-        services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(Sora.Data.Abstractions.Naming.INamingDefaultsProvider), typeof(WeaviateNamingDefaultsProvider), ServiceLifetime.Singleton));
-        services.AddSingleton<Sora.Data.Vector.Abstractions.IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
+        services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
+        services.TryAddEnumerable(new ServiceDescriptor(typeof(Abstractions.Naming.INamingDefaultsProvider), typeof(WeaviateNamingDefaultsProvider), ServiceLifetime.Singleton));
+        services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, WeaviateHealthContributor>());
         services.AddHttpClient("weaviate");
     }
@@ -42,12 +42,12 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var endpoint = Sora.Core.Configuration.Read(cfg, "Sora:Data:Weaviate:Endpoint", null) ?? "http://localhost:8085";
+        var endpoint = Configuration.Read(cfg, "Sora:Data:Weaviate:Endpoint", null) ?? "http://localhost:8085";
         report.AddSetting("Weaviate:Endpoint", endpoint, isSecret: false);
         // Discovery visibility
-        report.AddSetting("Discovery:EnvList", Sora.Data.Weaviate.Infrastructure.Constants.Discovery.EnvList, isSecret: false);
-        report.AddSetting("Discovery:DefaultLocal", $"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
-        report.AddSetting("Discovery:DefaultCompose", $"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.WellKnownServiceName}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
+        report.AddSetting("Discovery:EnvList", Infrastructure.Constants.Discovery.EnvList, isSecret: false);
+        report.AddSetting("Discovery:DefaultLocal", $"http://{Infrastructure.Constants.Discovery.Localhost}:{Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
+        report.AddSetting("Discovery:DefaultCompose", $"http://{Infrastructure.Constants.Discovery.WellKnownServiceName}:{Infrastructure.Constants.Discovery.DefaultPort}", isSecret: false);
     }
 
     private static bool IsDefault(string endpoint)
@@ -67,17 +67,17 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         }
 
         // Read environment-driven list (comma/semicolon separated) for parity with Ollama
-        var list = Environment.GetEnvironmentVariable(Sora.Data.Weaviate.Infrastructure.Constants.Discovery.EnvList);
+        var list = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.EnvList);
         if (!string.IsNullOrWhiteSpace(list))
         {
             foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) Add(part);
         }
 
         // Well-known defaults in strict host-first order
-        Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.HostDocker}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
-        Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
-        Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.WellKnownServiceName}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.DefaultPort}");
-        Add($"http://{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.Localhost}:{Sora.Data.Weaviate.Infrastructure.Constants.Discovery.LocalFallbackPort}");
+        Add($"http://{Infrastructure.Constants.Discovery.HostDocker}:{Infrastructure.Constants.Discovery.DefaultPort}");
+        Add($"http://{Infrastructure.Constants.Discovery.Localhost}:{Infrastructure.Constants.Discovery.DefaultPort}");
+        Add($"http://{Infrastructure.Constants.Discovery.WellKnownServiceName}:{Infrastructure.Constants.Discovery.DefaultPort}");
+        Add($"http://{Infrastructure.Constants.Discovery.Localhost}:{Infrastructure.Constants.Discovery.LocalFallbackPort}");
 
         foreach (var u in ordered) yield return u;
     }
@@ -89,7 +89,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     {
         try
         {
-            using var http = new System.Net.Http.HttpClient { Timeout = timeout };
+            using var http = new HttpClient { Timeout = timeout };
             // Prefer well-known readiness endpoint (no version prefix in some Weaviate releases)
             var readyUrl = baseUrl + "/.well-known/ready";
             System.Diagnostics.Debug.WriteLine($"[Sora.Data.Weaviate] Probe GET {readyUrl}");

@@ -39,7 +39,7 @@ public class SqlServerCapabilitiesAndHealthTests : IClassFixture<SqlServerAutoFi
         wc.Writes.Should().HaveFlag(WriteCapabilities.BulkUpsert);
     }
 
-    public sealed record TestEntity(string Id) : Sora.Data.Abstractions.IEntity<string>
+    public sealed record TestEntity(string Id) : IEntity<string>
     {
         public string? Name { get; init; }
         public int Age { get; init; }

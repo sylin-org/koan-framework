@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using FluentAssertions;
@@ -11,8 +12,9 @@ using Sora.Data.Core;
 using Sora.Messaging;
 using Sora.Messaging.Inbox.Http;
 using Sora.Testing;
-using System.Text.Json;
 using Xunit;
+
+namespace Sora.Mq.RabbitMq.IntegrationTests;
 
 public class DiscoveryE2ETests : IAsyncLifetime
 {
@@ -50,10 +52,10 @@ public class DiscoveryE2ETests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Discovery_over_Rabbit_returns_endpoint_and_wires_HttpInboxStore()
     {
-        if (!_available) return;
+        Skip.IfNot(_available, "Docker is not running or misconfigured; skipping RabbitMQ discovery test.");
         var conn = $"amqp://guest:guest@localhost:{_hostPort}";
 
         // Spin a lightweight announce responder in-test

@@ -1,15 +1,7 @@
-using Sora.Data.Core.Metadata;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
 
 namespace Sora.Data.Core;
-
-public sealed record ProjectedProperty(
-    PropertyInfo Property,
-    string ColumnName,
-    bool IsEnum,
-    bool IsIndexed
-);
 
 public static class ProjectionResolver
 {

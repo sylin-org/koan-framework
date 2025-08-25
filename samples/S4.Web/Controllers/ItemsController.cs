@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
-using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Core;
+using Sora.Web.Attributes;
 using Sora.Web.Controllers;
 
-namespace S4.Web;
+namespace S4.Web.Controllers;
 
 [Route("api/items")]
 [SoraDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
@@ -27,9 +27,3 @@ public sealed class ItemsController : EntityController<Item>
 }
 
 // GraphQL endpoint is provided by Sora.Web.GraphQl's centralized controller (/graphql).
-
-[DataAdapter("mongo")]
-public sealed class Item : Sora.Domain.Entity<Item>
-{
-    public string Name { get; set; } = string.Empty;
-}

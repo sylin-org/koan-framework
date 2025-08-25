@@ -5,16 +5,39 @@ ASP.NET Core integration for Sora: controller-first routing, health endpoints, w
 - Target framework: net9.0
 - License: Apache-2.0
 
-## Install
+## Capabilities
+- MVC controller-first routing (attribute-routed)
+- Health endpoints and OpenAPI wiring (opt-in)
+- Transformers for payload shaping (see WEB-0035)
+
+## Install (minimal setup)
 
 ```powershell
 dotnet add package Sylin.Sora.Web
 ```
 
-## Notes
-- Prefer MVC controllers with attribute routing
-- Health endpoints and OpenAPI wiring are opt-in via config
+## Usage — quick examples
 
-## Links
-- Web API: https://github.com/sylin-labs/sora-framework/blob/dev/docs/api/web-http-api.md
-- Decisions: https://github.com/sylin-labs/sora-framework/blob/dev/docs/decisions/WEB-0035-entitycontroller-transformers.md
+- Expose REST endpoints via controllers, not inline endpoints:
+
+```csharp
+public sealed class ItemsController : EntityController<Item, Guid>
+{
+	// GET /api/items
+	[HttpGet("api/items")]
+	public async Task<IActionResult> GetAll(CancellationToken ct)
+		=> Ok(await Item.FirstPage(50, ct));
+}
+```
+
+- Use transformers for response shaping; see decision WEB-0035.
+
+See TECHNICAL.md for contracts, options, and integration details.
+
+## Customization
+- Configuration and advanced usage are documented in [`TECHNICAL.md`](./TECHNICAL.md).
+
+## References
+- Web API conventions: `/docs/api/web-http-api.md`
+- Decision: `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
+- Engineering guardrails: `/docs/engineering/index.md`

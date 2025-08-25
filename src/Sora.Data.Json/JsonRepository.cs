@@ -1,112 +1,12 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
-using Sora.Data.Json.Infrastructure;
 using System.Collections.Concurrent;
-using System.ComponentModel.DataAnnotations;
 using System.Linq.Expressions;
 using System.Text.Json;
 
 namespace Sora.Data.Json;
 
-/// <summary>
-/// Options for the JSON file-backed data adapter.
-/// </summary>
-public sealed class JsonDataOptions
-{
-    [Required]
-    public string DirectoryPath { get; set; } = ".\\data";
-    // Paging guardrails (used only via options paths for explicit paging; no-options materialization is handled by facade loops)
-    public int DefaultPageSize { get; set; } = 1000;
-    public int MaxPageSize { get; set; } = 10_000;
-}
-
-public static class JsonDataServiceCollectionExtensions
-{
-    /// <summary>
-    /// Register a JSON repository for a specific aggregate pair.
-    /// </summary>
-    public static IServiceCollection AddJsonData<TEntity, TKey>(this IServiceCollection services, Action<JsonDataOptions>? configure = null)
-    where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        services.AddOptions<JsonDataOptions>();
-        if (configure is not null) services.Configure(configure);
-        services.AddSingleton<IDataRepository<TEntity, TKey>, JsonRepository<TEntity, TKey>>();
-        return services;
-    }
-}
-
-[Sora.Data.Abstractions.ProviderPriority(0)]
-public sealed class JsonAdapterFactory : IDataAdapterFactory
-{
-    public bool CanHandle(string provider) => string.Equals(provider, "json", StringComparison.OrdinalIgnoreCase);
-
-    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
-    where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        var opts = sp.GetRequiredService<IOptions<JsonDataOptions>>();
-        return new JsonRepository<TEntity, TKey>(opts);
-    }
-}
-
-public static class JsonAdapterRegistration
-{
-    /// <summary>
-    /// Register the JSON adapter for discovery; optionally configure options.
-    /// </summary>
-    public static IServiceCollection AddJsonAdapter(this IServiceCollection services, Action<JsonDataOptions>? configure = null)
-    {
-        services.AddOptions<JsonDataOptions>();
-        if (configure is not null) services.Configure(configure);
-        services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
-        return services;
-    }
-}
-
 // Self-registration hook so the adapter is available with AddSoraDataCore()
-/// <summary>
-/// Auto-registers the JSON adapter and health contributor during Sora initialization.
-/// </summary>
-// legacy initializer removed in favor of standardized auto-registrar
-
-internal sealed class JsonDataOptionsConfigurator : Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>
-{
-    private readonly IConfiguration? _config;
-    // Prefer IConfiguration when available; do not fail if it's missing (non-host apps)
-    public JsonDataOptionsConfigurator() { }
-    public JsonDataOptionsConfigurator(IConfiguration config) { _config = config; }
-    public void Configure(JsonDataOptions options)
-    {
-        // ADR-0040: avoid Bind; read via helper with centralized keys
-        // Prefer explicit DirectoryPath if provided in either section, otherwise keep default
-        var dir = Sora.Core.Configuration.ReadFirst(_config, new[]
-        {
-            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DirectoryPath}",
-            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DirectoryPath}"
-        });
-        if (!string.IsNullOrWhiteSpace(dir))
-            options.DirectoryPath = dir!;
-
-        // Optional paging guardrails
-        var dps = Sora.Core.Configuration.ReadFirst(_config, new[]
-        {
-            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DefaultPageSize}",
-            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DefaultPageSize}"
-        });
-        if (int.TryParse(dps, out var dpsVal) && dpsVal > 0) options.DefaultPageSize = dpsVal;
-        var mps = Sora.Core.Configuration.ReadFirst(_config, new[]
-        {
-            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.MaxPageSize}",
-            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.MaxPageSize}"
-        });
-        if (int.TryParse(mps, out var mpsVal) && mpsVal > 0) options.MaxPageSize = mpsVal;
-        if (options.DefaultPageSize > options.MaxPageSize)
-            options.DefaultPageSize = options.MaxPageSize;
-    }
-}
 
 /// <summary>
 /// In-memory dictionary with JSON file persistence per aggregate.
@@ -119,7 +19,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
     ILinqQueryRepositoryWithOptions<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
-    Sora.Data.Abstractions.Instructions.IInstructionExecutor<TEntity>
+    Abstractions.Instructions.IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -265,11 +165,11 @@ internal sealed class JsonRepository<TEntity, TKey> :
     public IBatchSet<TEntity, TKey> CreateBatch() => new JsonBatch(this);
 
     // Instruction execution for fast-path operations (e.g., clear all)
-    public Task<TResult> ExecuteAsync<TResult>(Sora.Data.Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
+    public Task<TResult> ExecuteAsync<TResult>(Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
     {
         switch (instruction.Name)
         {
-            case global::Sora.Data.DataInstructions.EnsureCreated:
+            case Abstractions.Instructions.DataInstructions.EnsureCreated:
                 {
                     Directory.CreateDirectory(_baseDir);
                     // Touch the set file to ensure presence
@@ -279,7 +179,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
                     object result = true;
                     return Task.FromResult((TResult)result);
                 }
-            case global::Sora.Data.DataInstructions.Clear:
+            case Abstractions.Instructions.DataInstructions.Clear:
                 {
                     var (name, store) = ResolveNameAndStore();
                     var deleted = store.Count;
@@ -342,7 +242,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         if (sp is not null)
         {
             // Delegate to central naming registry which is set-aware
-            return Sora.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
+            return Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);
         }
         return typeof(TEntity).Name;
     }

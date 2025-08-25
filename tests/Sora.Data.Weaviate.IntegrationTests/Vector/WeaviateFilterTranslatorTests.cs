@@ -1,4 +1,5 @@
 using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Vector.Filtering;
 using Xunit;
 
 namespace Sora.Data.Weaviate.IntegrationTests.Vector;

@@ -100,6 +100,14 @@ See also:
 When a user asks to “document X”, choose the right target(s) and produce instruction-first content (no tutorials). Use this routing guide and checklist.
 
 Routing map (what to create/edit)
+// Per-project module docs (ARCH-0042)
+- When asked to “document a module/project,” implement `ARCH-0042`:
+  - Create or update per-project companion docs at the project root:
+    - `src/<Project>/README.md` — informational (capabilities, minimal setup, 2–4 safe usage snippets).
+    - `src/<Project>/TECHNICAL.md` (or `ARCHITECTURE.md`) — reference + architecture (contracts, options, design/ops, extensibility, performance, security, operations).
+  - Align samples with Sora guardrails: controllers (no inline endpoints), first-class data model statics (`All/Query/FirstPage/Page/Stream`), no magic values (use constants/options).
+  - Cross-link relevant ADRs and guides; keep snippets production-safe and short.
+  - Reference: `/docs/decisions/ARCH-0042-per-project-companion-docs.md`.
 - Architecture decision (ADR): when the ask is a policy, tradeoff, or framework-wide behavior.
   - Create `docs/decisions/<ID>-<slug>.md` with front-matter (id, slug, domain, status, date, title).
   - Sections: Context → Decision → Scope → Consequences → Implementation notes → Follow-ups → References.

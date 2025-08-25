@@ -4,6 +4,8 @@
   items:
     - name: Front door
       href: engineering/index.md
+    - name: Pillars (quick reference)
+      href: engineering/pillars.md
     - name: Contributor workflow
       href: engineering/contributor-workflow.md
     - name: Developer guidelines
@@ -18,6 +20,13 @@
       href: reference/data-access.md
     - name: Web
       href: reference/web.md
+    - name: Storage
+      href: reference/storage.md
+    - name: Modules
+      href: reference/modules.md
+    - name: Web Authentication
+  href: reference/web-auth.md
+  homepage: reference/web-auth.md
     - name: Messaging
       href: reference/messaging.md
     - name: AI

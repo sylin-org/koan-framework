@@ -1,24 +1,22 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Data.Abstractions.Annotations;
+using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Core;
 using Xunit;
+using DataServiceExecuteExtensions = Sora.Data.Relational.Extensions.DataServiceExecuteExtensions;
 
 namespace Sora.Data.Sqlite.Tests;
 
 public class SqliteInstructionTests
 {
-    public class Todo : Sora.Data.Abstractions.IEntity<string>
+    public class Todo : IEntity<string>
     {
         [Identifier]
         public string Id { get; set; } = default!;
         public string Title { get; set; } = string.Empty;
 
-        // Test-local sugar: allow Todo.Execute(sql, ...) defaulting to NonQuery (no return)
-        public static async System.Threading.Tasks.Task Execute(string sql, IDataService data, object? parameters = null, System.Threading.CancellationToken ct = default)
-            => await Data<Todo>.Execute(sql, data, parameters, ct);
     }
 
     private static IServiceProvider BuildServices(string file)
@@ -54,7 +52,9 @@ public class SqliteInstructionTests
         var ensured = await data.Execute<Todo, bool>(new Instruction("relational.schema.ensureCreated"));
         ensured.Should().BeTrue();
 
-        await Todo.Execute("INSERT INTO Todo(Id, Title) VALUES(@id,@t)", data, new { id = "1", t = "x" });
+        var newId = Guid.NewGuid().ToString("n");
+        await DataServiceExecuteExtensions.Execute<Todo, bool>(data,
+            "INSERT INTO Todo(Id, Title) VALUES(@id,@t)", new { id = newId, t = "hello" });
 
         var count = await data.Execute<Todo, long>(InstructionSql.Scalar("SELECT COUNT(*) FROM Todo"));
         count.Should().Be(1);

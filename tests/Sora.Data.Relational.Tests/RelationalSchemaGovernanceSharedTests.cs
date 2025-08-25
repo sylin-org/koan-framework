@@ -44,12 +44,13 @@ public abstract class RelationalSchemaGovernanceSharedTests<TFixture, TEntity, T
         await repo.UpsertAsync(sample);
 
         // Validate schema
-        var rep = await Data.Execute<TEntity, TKey, object>(new Instruction("relational.schema.validate")) as IDictionary<string, object?>;
-        rep.Should().NotBeNull();
-        (rep!["TableExists"] as bool? ?? false).Should().BeTrue();
+        var repMaybe = await Data.Execute<TEntity, TKey, object>(new Instruction("relational.schema.validate")) as IDictionary<string, object?>;
+        repMaybe.Should().NotBeNull();
+        var rep = repMaybe!; // non-null after assertion
+        (rep["TableExists"] as bool? ?? false).Should().BeTrue();
         var missing = rep["MissingColumns"] as IEnumerable<string> ?? Array.Empty<string>();
         missing.Should().BeEmpty();
-        (rep["State"] as string ?? string.Empty).Should().Be("Healthy");
+            (rep["State"] as string ?? string.Empty).Should().Be("Healthy");
     }
 
     [Fact]
@@ -57,9 +58,10 @@ public abstract class RelationalSchemaGovernanceSharedTests<TFixture, TEntity, T
     {
         if (Fixture.SkipTests) return;
         // This test assumes DDL is disabled in the fixture
-        var rep = await Data.Execute<TEntity, TKey, object>(new Instruction("relational.schema.validate")) as IDictionary<string, object?>;
-        rep.Should().NotBeNull();
-        var st = rep["State"] as string ?? string.Empty;
+        var repMaybe = await Data.Execute<TEntity, TKey, object>(new Instruction("relational.schema.validate")) as IDictionary<string, object?>;
+        repMaybe.Should().NotBeNull();
+        var rep = repMaybe!;
+    var st = rep["State"] as string ?? string.Empty;
         st.Should().BeOneOf("Unhealthy", "Degraded");
     }
 
@@ -74,10 +76,11 @@ public abstract class RelationalSchemaGovernanceSharedTests<TFixture, TEntity, T
         // Now validate with V2 (more columns) but DDL disabled
         // This requires fixture to swap entity type or columns
         // Override in derived if needed
-        var rep = await Data.Execute<TEntity, TKey, object>(new Instruction("relational.schema.validate")) as IDictionary<string, object?>;
-        rep.Should().NotBeNull();
-        (rep!["TableExists"] as bool? ?? false).Should().BeTrue();
-        var missing = rep["MissingColumns"] as IEnumerable<string> ?? Array.Empty<string>();
+    var repMaybe = await Data.Execute<TEntity, TKey, object>(new Instruction("relational.schema.validate")) as IDictionary<string, object?>;
+    repMaybe.Should().NotBeNull();
+    var rep = repMaybe!;
+    (rep["TableExists"] as bool? ?? false).Should().BeTrue();
+    var missing = rep["MissingColumns"] as IEnumerable<string> ?? Array.Empty<string>();
         // Some fixtures provide a V2 type to detect missing projected columns; others may not.
         // Require the overall state to be Degraded when a mismatch is expected, but allow Healthy for fixtures
         // that didn't perform a V1->V2 swap.
@@ -87,14 +90,4 @@ public abstract class RelationalSchemaGovernanceSharedTests<TFixture, TEntity, T
             missing.Should().NotBeEmpty();
         }
     }
-}
-
-public interface IRelationalTestFixture<TEntity, TKey>
-    where TEntity : class, IEntity<TKey>
-    where TKey : notnull
-{
-    IDataService Data { get; }
-    IServiceProvider ServiceProvider { get; }
-    bool SkipTests { get; }
-    string? SkipReason { get; }
 }

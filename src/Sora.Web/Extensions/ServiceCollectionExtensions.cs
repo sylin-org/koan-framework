@@ -5,8 +5,9 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
+using Sora.Web.Options;
 
-namespace Sora.Web;
+namespace Sora.Web.Extensions;
 
 
 
@@ -37,7 +38,7 @@ public static class ServiceCollectionExtensions
                 if (outputFilterType is not null)
                 {
                     // Add as a global filter; attribute on controller will gate actual execution
-                    o.Filters.Add(new Microsoft.AspNetCore.Mvc.TypeFilterAttribute(outputFilterType));
+                    o.Filters.Add(new TypeFilterAttribute(outputFilterType));
                 }
             }
             catch { /* optional package */ }
@@ -77,7 +78,7 @@ public static class ServiceCollectionExtensions
             o.EnableSecureHeaders = true;
             o.EnableStaticFiles = true;
             o.AutoMapControllers = true;
-            o.HealthPath = Sora.Web.Infrastructure.SoraWebConstants.Routes.ApiHealth;
+            o.HealthPath = Infrastructure.SoraWebConstants.Routes.ApiHealth;
         });
         services.Configure<WebPipelineOptions>(p =>
         {
@@ -113,24 +114,3 @@ public static class ServiceCollectionExtensions
 }
 
 // Internal DI-aware configurator to register optional transformer input formatter when package is present
-internal sealed class OptionalTransformerInputFormatterConfigurator : IConfigureOptions<MvcOptions>
-{
-    private readonly IServiceProvider _sp;
-    public OptionalTransformerInputFormatterConfigurator(IServiceProvider sp) => _sp = sp;
-
-    public void Configure(MvcOptions options)
-    {
-        try
-        {
-            var formatterType = Type.GetType("Sora.Web.Transformers.EntityInputTransformFormatter, Sora.Web.Transformers");
-            if (formatterType is null) return;
-            var formatter = (Microsoft.AspNetCore.Mvc.Formatters.IInputFormatter?)ActivatorUtilities.CreateInstance(_sp, formatterType);
-            if (formatter is not null)
-            {
-                // Put first so it can claim matching content types before JSON
-                options.InputFormatters.Insert(0, formatter);
-            }
-        }
-        catch { /* optional */ }
-    }
-}

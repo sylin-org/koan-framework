@@ -1,8 +1,4 @@
 using Sora.Data.Core;
-using Sora.Core.Observability;
-using Sora.Web;
-using Sora.Web.Swagger;
-using Sora.Web.GraphQl;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,8 +6,10 @@ builder.Services.AddSora();
 
 var app = builder.Build();
 
-app.UseDefaultFiles();
-app.UseStaticFiles();
+// Static files are wired by Sora.Web; no explicit calls needed here.
 app.Run();
 
-public partial class Program { }
+namespace S4.Web
+{
+    public partial class Program { }
+}

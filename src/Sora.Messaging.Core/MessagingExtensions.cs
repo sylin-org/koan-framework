@@ -51,6 +51,48 @@ public static class MessagingExtensions
         return services;
     }
 
+    // Ultra-terse handler registration (no envelope parameter)
+    // Async with CancellationToken
+    public static IServiceCollection On<T>(this IServiceCollection services, Func<T, CancellationToken, Task> handler)
+        => services.OnMessage<T>((_, msg, ct) => handler(msg, ct));
+
+    // Async without CancellationToken
+    public static IServiceCollection On<T>(this IServiceCollection services, Func<T, Task> handler)
+        => services.OnMessage<T>((_, msg, ct) => handler(msg));
+
+    // Sync
+    public static IServiceCollection On<T>(this IServiceCollection services, Action<T> handler)
+        => services.OnMessage<T>((_, msg) => handler(msg));
+
+    // Semantic aliases for intent signaling (map to On<T>)
+    public static IServiceCollection OnCommand<T>(this IServiceCollection services, Func<T, CancellationToken, Task> handler)
+        => services.On(handler);
+
+    public static IServiceCollection OnCommand<T>(this IServiceCollection services, Func<T, Task> handler)
+        => services.On(handler);
+
+    public static IServiceCollection OnCommand<T>(this IServiceCollection services, Action<T> handler)
+        => services.On(handler);
+
+    public static IServiceCollection OnEvent<T>(this IServiceCollection services, Func<T, CancellationToken, Task> handler)
+        => services.On(handler);
+
+    public static IServiceCollection OnEvent<T>(this IServiceCollection services, Func<T, Task> handler)
+        => services.On(handler);
+
+    public static IServiceCollection OnEvent<T>(this IServiceCollection services, Action<T> handler)
+        => services.On(handler);
+
+    // Readability alias
+    public static IServiceCollection Handle<T>(this IServiceCollection services, Func<T, CancellationToken, Task> handler)
+        => services.On(handler);
+
+    public static IServiceCollection Handle<T>(this IServiceCollection services, Func<T, Task> handler)
+        => services.On(handler);
+
+    public static IServiceCollection Handle<T>(this IServiceCollection services, Action<T> handler)
+        => services.On(handler);
+
     // Register multiple handlers in one fluent block
     public static IServiceCollection OnMessages(this IServiceCollection services, Action<MessageHandlerBuilder> configure)
     {
@@ -70,6 +112,44 @@ public static class MessagingExtensions
 
         public MessageHandlerBuilder On<T>(Action<MessageEnvelope, T> handler)
         { _services.OnMessage<T>(handler); return this; }
+
+    // Terse overloads (no envelope)
+    public MessageHandlerBuilder On<T>(Func<T, CancellationToken, Task> handler)
+    { _services.On(handler); return this; }
+
+    public MessageHandlerBuilder On<T>(Func<T, Task> handler)
+    { _services.On(handler); return this; }
+
+    public MessageHandlerBuilder On<T>(Action<T> handler)
+    { _services.On(handler); return this; }
+
+    // Intent-signaling aliases
+    public MessageHandlerBuilder OnCommand<T>(Func<T, CancellationToken, Task> handler)
+    { _services.OnCommand(handler); return this; }
+
+    public MessageHandlerBuilder OnCommand<T>(Func<T, Task> handler)
+    { _services.OnCommand(handler); return this; }
+
+    public MessageHandlerBuilder OnCommand<T>(Action<T> handler)
+    { _services.OnCommand(handler); return this; }
+
+    public MessageHandlerBuilder OnEvent<T>(Func<T, CancellationToken, Task> handler)
+    { _services.OnEvent(handler); return this; }
+
+    public MessageHandlerBuilder OnEvent<T>(Func<T, Task> handler)
+    { _services.OnEvent(handler); return this; }
+
+    public MessageHandlerBuilder OnEvent<T>(Action<T> handler)
+    { _services.OnEvent(handler); return this; }
+
+    public MessageHandlerBuilder Handle<T>(Func<T, CancellationToken, Task> handler)
+    { _services.Handle(handler); return this; }
+
+    public MessageHandlerBuilder Handle<T>(Func<T, Task> handler)
+    { _services.Handle(handler); return this; }
+
+    public MessageHandlerBuilder Handle<T>(Action<T> handler)
+    { _services.Handle(handler); return this; }
 
         // Convenience for grouped batches
         public MessageHandlerBuilder OnBatch<T>(Func<MessageEnvelope, Batch<T>, CancellationToken, Task> handler)

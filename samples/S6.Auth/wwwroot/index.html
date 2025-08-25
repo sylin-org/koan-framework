@@ -1,0 +1,42 @@
+﻿<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>S6.Auth — Providers</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+      .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+      .muted { color: #666; }
+      code { background: #f6f6f6; padding: 2px 4px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>Authentication Providers</h1>
+    <p class="muted">Loaded from <code>/.well-known/auth/providers</code>.</p>
+    <div id="providers" class="grid"></div>
+    <script>
+      async function load() {
+        try {
+          const res = await fetch('/.well-known/auth/providers');
+          const data = await res.json();
+          const root = document.getElementById('providers');
+          root.innerHTML = '';
+          for (const p of data) {
+            const el = document.createElement('div');
+            el.className = 'card';
+            el.innerHTML = `<strong>${p.name}</strong><br/>` +
+              `<div class="muted">${p.protocol}${p.scopes ? ' · ' + p.scopes.join(', ') : ''}</div>` +
+              (p.challengeUrl ? `<div><a href="${p.challengeUrl}">Sign in with ${p.name}</a></div>` : '') +
+              (p.metadataUrl ? `<div><a href="${p.metadataUrl}">SAML Metadata</a></div>` : '');
+            root.appendChild(el);
+          }
+        } catch (e) {
+          document.getElementById('providers').innerHTML = '<div class="card">Failed to load providers.</div>';
+        }
+      }
+      load();
+    </script>
+  </body>
+  </html>

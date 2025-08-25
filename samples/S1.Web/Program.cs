@@ -1,6 +1,6 @@
-using Sora.Data.Core;
-using Sora.Web;
 using System.Threading.RateLimiting;
+using Sora.Data.Core;
+using Sora.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +41,8 @@ builder.Services.AddRateLimiter(options =>
 // Optional: use SQLite instead of JSON
 // builder.Services.AddSqliteAdapter(o => o.ConnectionString = "Data Source=.\\data\\s1.sqlite");
 
+// Auth: none in S1 sample (keep API simple)
+
 // Sora.Web wires routing, controllers, static files, secure headers, and /api/health.
 var app = builder.Build();
 
@@ -55,4 +57,7 @@ if (app.Environment.IsDevelopment())
 app.Run();
 
 // Make Program public and partial to help WebApplicationFactory discovery in tests
-public partial class Program { }
+namespace S1.Web
+{
+    public partial class Program { }
+}
