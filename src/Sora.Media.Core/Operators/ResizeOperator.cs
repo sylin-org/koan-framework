@@ -63,7 +63,20 @@ public sealed class ResizeOperator : IMediaOperator
 
     public async Task<(string? ContentType, long BytesWritten)> Execute(Stream source, string sourceContentType, Stream destination, IReadOnlyDictionary<string, string> parameters, MediaTransformOptions options, CancellationToken ct)
     {
-        using var image = await Image.LoadAsync(source, ct).ConfigureAwait(false);
+        if (source.CanSeek)
+        {
+            try { source.Position = 0; } catch { /* best effort */ }
+        }
+        Image image;
+        try
+        {
+            image = await Image.LoadAsync(source, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("resize: failed to decode source image stream", ex);
+        }
+        using var _ = image;
 
         int? w = parameters.TryGetValue("w", out var sw) && int.TryParse(sw, out var wi) ? wi : null;
         int? h = parameters.TryGetValue("h", out var sh) && int.TryParse(sh, out var hi) ? hi : null;

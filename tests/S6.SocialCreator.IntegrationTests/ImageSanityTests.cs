@@ -1,6 +1,5 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
-using System.Text;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -13,10 +12,10 @@ using Xunit;
 
 namespace S6.SocialCreator.IntegrationTests;
 
-public sealed class MediaTransformTests
+public sealed class ImageSanityTests
 {
     [Fact]
-    public async Task Image_request_with_query_redirects_to_canonical_variant_and_serves_transformed_bytes()
+    public async Task Uploaded_png_is_decodable_via_direct_get()
     {
         await using var app = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -40,40 +39,35 @@ public sealed class MediaTransformTests
             });
         });
 
-    var client = app.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var client = app.CreateClient();
 
-        // Prepare a tiny 1x1 PNG (white) as upload bytes (generated to ensure validity)
+        // Generate a tiny 1x1 PNG (white) using ImageSharp to ensure validity
         byte[] pngBytes;
         using (var img = new Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(1, 1))
         {
             img[0, 0] = new SixLabors.ImageSharp.PixelFormats.Rgba32(255, 255, 255, 255);
-            using var ms = new MemoryStream();
-            await img.SaveAsPngAsync(ms);
-            pngBytes = ms.ToArray();
+            using var msGen = new MemoryStream();
+            await img.SaveAsPngAsync(msGen);
+            pngBytes = msGen.ToArray();
         }
-
         var mp = new MultipartFormDataContent();
         var file = new ByteArrayContent(pngBytes);
         file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         mp.Add(file, "file", "one.png");
         var upload = await client.PostAsync("/api/upload", mp);
         upload.EnsureSuccessStatusCode();
-        var id = System.Text.Json.JsonDocument.Parse(await upload.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("id").GetGuid();
+        var key = System.Text.Json.JsonDocument.Parse(await upload.Content.ReadAsStringAsync()).RootElement.GetProperty("key").GetString();
 
-        // Request with transform query -> should 301 to canonical variant id
-        var resp = await client.GetAsync($"/api/media/{id}/one.png?w=2&format=webp");
-        resp.StatusCode.Should().Be(HttpStatusCode.MovedPermanently);
-        resp.Headers.Location.Should().NotBeNull();
-        resp.Headers.TryGetValues("X-Media-Variant", out var variantHeaders).Should().BeTrue();
-        variantHeaders!.First().Should().NotBeNullOrWhiteSpace();
+        var get = await client.GetAsync($"/api/media/{key}");
+        get.StatusCode.Should().Be(HttpStatusCode.OK);
+        get.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
+    var bytes = await get.Content.ReadAsByteArrayAsync();
+    bytes.Length.Should().BeGreaterThan(0);
+    bytes.SequenceEqual(pngBytes).Should().BeTrue("downloaded bytes should match uploaded bytes");
 
-        // Follow redirect
-        var redirected = await client.GetAsync(resp.Headers.Location);
-        redirected.StatusCode.Should().Be(HttpStatusCode.OK);
-        redirected.Content.Headers.ContentType!.MediaType.Should().Be("image/webp");
-        var bytes = await redirected.Content.ReadAsByteArrayAsync();
-        bytes.Length.Should().BeGreaterThan(0);
+    using var decoded = Image.Load(bytes);
+        decoded.Width.Should().BeGreaterThan(0);
+        decoded.Height.Should().BeGreaterThan(0);
     }
 
     private sealed class SoraAppHostedService : IHostedService

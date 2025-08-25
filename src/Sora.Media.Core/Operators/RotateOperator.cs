@@ -43,7 +43,16 @@ public sealed class RotateOperator : IMediaOperator
 
     public async Task<(string? ContentType, long BytesWritten)> Execute(Stream source, string sourceContentType, Stream destination, IReadOnlyDictionary<string, string> parameters, MediaTransformOptions options, CancellationToken ct)
     {
-        using var image = await Image.LoadAsync(source, ct).ConfigureAwait(false);
+        Image image;
+        try
+        {
+            image = await Image.LoadAsync(source, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("rotate: failed to decode source image stream", ex);
+        }
+        using var _ = image;
 
         var exif = parameters.TryGetValue("exif", out var se) && bool.TryParse(se, out var b) ? b : true;
         if (exif)

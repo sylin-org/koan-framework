@@ -32,8 +32,15 @@ public sealed class MediaController : MediaContentController<ProfileMedia>
 	[HttpGet("{id:guid}/{*filename}")]
 	public async Task<IActionResult> GetById(Guid id, string? filename, CancellationToken ct)
 	{
-		var key = id.ToString("N");
+		var srcExt = System.IO.Path.GetExtension(filename ?? string.Empty);
+		var key = id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? string.Empty : srcExt.ToLowerInvariant());
 		var stat = await StorageEntity<ProfileMedia>.Head(key, ct);
+		if (stat is null)
+		{
+			// Fallback: try without extension (older uploads)
+			key = id.ToString("N");
+			stat = await StorageEntity<ProfileMedia>.Head(key, ct);
+		}
 		if (stat is null) return NotFound();
 
 		// Primitive-only: if this is already a variant (DerivationKey), skip transforms
@@ -49,8 +56,7 @@ public sealed class MediaController : MediaContentController<ProfileMedia>
 
 		// Canonical signature
 	(string hash, string json) = SignatureUtility.BuildSignature(key, stat, ops);
-		var ext = System.IO.Path.GetExtension(filename ?? string.Empty);
-		var flairName = string.IsNullOrWhiteSpace(filename) ? (id.ToString("N") + (string.IsNullOrWhiteSpace(ext) ? string.Empty : ext)) : filename!;
+		var flairName = string.IsNullOrWhiteSpace(filename) ? (id.ToString("N") + (string.IsNullOrWhiteSpace(srcExt) ? string.Empty : srcExt)) : filename!;
 
 		// Variant storage path
 		var variantKey = $"variants/{key}/{hash}/{flairName}";
@@ -65,8 +71,10 @@ public sealed class MediaController : MediaContentController<ProfileMedia>
 		}
 
 		// Create variant on-the-fly
-		await using var src = await StorageEntity<ProfileMedia>.OpenRead(key, ct);
-		await using var temp = new MemoryStream();
+		await using var srcFile = await StorageEntity<ProfileMedia>.OpenRead(key, ct);
+		await using var src = new MemoryStream();
+		await srcFile.CopyToAsync(src, ct);
+		src.Position = 0;
 
 		// Execute pipeline serially
 		string contentType = stat.ContentType ?? "application/octet-stream";
@@ -81,6 +89,25 @@ public sealed class MediaController : MediaContentController<ProfileMedia>
 			if (!ReferenceEquals(current, src)) current.Dispose();
 			current = next;
 			if (result.ContentType is { } ctNew) contentType = ctNew;
+		}
+
+
+		// Persist using an extension that matches the final content type when possible
+		string finalExt = srcExt;
+		if (!string.IsNullOrWhiteSpace(contentType))
+		{
+			finalExt = contentType switch
+			{
+				"image/webp" => ".webp",
+				"image/jpeg" => ".jpg",
+				"image/png" => ".png",
+				_ => srcExt
+			};
+		}
+		if (!string.IsNullOrWhiteSpace(finalExt) && !flairName.EndsWith(finalExt, StringComparison.OrdinalIgnoreCase))
+		{
+			flairName = System.IO.Path.GetFileNameWithoutExtension(flairName) + finalExt;
+			variantKey = $"variants/{key}/{hash}/{flairName}";
 		}
 
 		// Persist

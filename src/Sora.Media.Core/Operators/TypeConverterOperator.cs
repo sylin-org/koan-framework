@@ -42,7 +42,20 @@ public sealed class TypeConverterOperator : IMediaOperator
 
     public async Task<(string? ContentType, long BytesWritten)> Execute(Stream source, string sourceContentType, Stream destination, IReadOnlyDictionary<string, string> parameters, MediaTransformOptions options, CancellationToken ct)
     {
-        using var image = await Image.LoadAsync(source, ct).ConfigureAwait(false);
+        if (source.CanSeek)
+        {
+            try { source.Position = 0; } catch { /* ignore */ }
+        }
+        Image image;
+        try
+        {
+            image = await Image.LoadAsync(source, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("typeConverter: failed to decode source image stream", ex);
+        }
+        using var _ = image;
         var fmt = parameters.TryGetValue("format", out var f) ? f : "png";
         int? q = parameters.TryGetValue("q", out var sq) && int.TryParse(sq, out var qi) ? qi : null;
 

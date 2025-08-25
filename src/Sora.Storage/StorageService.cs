@@ -32,32 +32,22 @@ public sealed class StorageService : IStorageService
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
 
-        string? hashHex = null;
+        // Write directly without pre-reading for hashing to avoid issues with non-standard streams
         long size = 0;
         if (content.CanSeek)
         {
-            var originalPos = content.Position;
-            try
-            {
-                content.Position = 0;
-                using var sha = SHA256.Create();
-                var buffer = new byte[64 * 1024];
-                int read;
-                while ((read = await content.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
-                {
-                    sha.TransformBlock(buffer, 0, read, null, 0);
-                }
-                sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                hashHex = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
-                size = content.Length;
-            }
-            finally
-            {
-                content.Position = originalPos;
-            }
+            try { size = content.Length; } catch { size = 0; }
         }
 
-        await provider.WriteAsync(resolvedContainer, key, content, contentType, ct);
+        await provider.WriteAsync(resolvedContainer, key, content, contentType, ct).ConfigureAwait(false);
+
+        // Best-effort stat after write if size unknown
+        string? hashHex = null;
+        if (size == 0 && provider is IStatOperations statOps)
+        {
+            var stat = await statOps.HeadAsync(resolvedContainer, key, ct).ConfigureAwait(false);
+            if (stat?.Length is long len) size = len;
+        }
         return new StorageObject
         {
             Id = $"{provider.Name}:{resolvedContainer}:{key}",

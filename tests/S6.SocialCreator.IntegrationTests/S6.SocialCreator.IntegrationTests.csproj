@@ -13,6 +13,7 @@
   <PackageReference Include="xunit" Version="2.9.2" />
   <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.0" />
+  <PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\samples\S6.SocialCreator\S6.SocialCreator.csproj" />
