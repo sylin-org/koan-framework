@@ -6,6 +6,8 @@
       href: ARCH-0042-per-project-companion-docs.md
     - name: Lightweight parity roadmap — Observability/Resilience/Recipes
       href: ARCH-0043-lightweight-parity-roadmap.md
+    - name: Standardized module config, dev defaults, and discovery
+      href: ARCH-0044-standardized-module-config-and-discovery.md
     - name: Config and constants naming
       href: ARCH-0040-config-and-constants-naming.md
     - name: DDD docs and glossary
