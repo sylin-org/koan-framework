@@ -4,6 +4,8 @@
   items:
     - name: Per-project companion docs — README + TECHNICAL
       href: ARCH-0042-per-project-companion-docs.md
+    - name: Lightweight parity roadmap — Observability/Resilience/Recipes
+      href: ARCH-0043-lightweight-parity-roadmap.md
     - name: Config and constants naming
       href: ARCH-0040-config-and-constants-naming.md
     - name: DDD docs and glossary
