@@ -26,11 +26,3 @@ public interface IMediaOperator
     // Execute on a source stream and write to destination; return content-type if changed, else null
     Task<(string? ContentType, long BytesWritten)> Execute(Stream source, string sourceContentType, Stream destination, IReadOnlyDictionary<string, string> parameters, MediaTransformOptions options, CancellationToken ct);
 }
-
-public interface IMediaOperatorRegistry
-{
-    IReadOnlyList<IMediaOperator> Operators { get; }
-    IMediaOperator? FindById(string id);
-    // Given an incoming query bag, select operators and normalized params per operator in precedence order
-    IReadOnlyList<(IMediaOperator Op, IReadOnlyDictionary<string, string> Params)> ResolveOperators(IDictionary<string, StringValues> query, ObjectStat sourceStat, string? contentType, MediaTransformOptions options);
-}

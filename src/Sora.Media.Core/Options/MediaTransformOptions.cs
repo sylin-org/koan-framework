@@ -1,8 +1,5 @@
 ﻿namespace Sora.Media.Core.Options;
 
-public enum MediaTransformStrictness { Relaxed, Strict }
-public enum MediaOperatorPlacement { Free, Pre, Terminal }
-
 public sealed class MediaTransformOptions
 {
     // Global strictness for unknown params and duplicate handling

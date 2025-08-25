@@ -38,5 +38,3 @@ public sealed class DevTokenStore
         profile = entry.Profile; return true;
     }
 }
-
-public readonly record struct UserProfile(string Username, string Email, string? AvatarUrl);

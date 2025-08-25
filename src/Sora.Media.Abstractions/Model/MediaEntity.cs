@@ -48,11 +48,3 @@ public abstract class MediaEntity<TEntity> : Sora.Storage.Model.StorageEntity<TE
         return await svc.ReadAsync(profile, container, key, ct).ConfigureAwait(false);
     }
 }
-
-public interface IMediaObject : IStorageObject
-{
-    string? SourceMediaId { get; }
-    string? RelationshipType { get; }
-    string? DerivationKey { get; }
-    string? ThumbnailMediaId { get; }
-}

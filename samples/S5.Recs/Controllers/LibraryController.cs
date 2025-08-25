@@ -5,8 +5,6 @@ using S5.Recs.Models;
 
 namespace S5.Recs.Controllers;
 
-public sealed record UpdateLibraryRequest(bool? Favorite, bool? Watched, bool? Dropped, int? Rating);
-
 [ApiController]
 [Route(Constants.Routes.Library)]
 public class LibraryController : ControllerBase
