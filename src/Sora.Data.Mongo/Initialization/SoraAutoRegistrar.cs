@@ -15,7 +15,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddOptions<MongoOptions>().ValidateDataAnnotations();
+    services.AddSoraOptions<MongoOptions>();
         services.AddSingleton<IConfigureOptions<MongoOptions>, MongoOptionsConfigurator>();
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(Abstractions.Naming.INamingDefaultsProvider), typeof(MongoNamingDefaultsProvider), ServiceLifetime.Singleton));

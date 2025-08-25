@@ -53,7 +53,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Register(IServiceCollection services)
     {
-        services.AddOptions<YourVectorOptions>().BindConfiguration("Sora:Data:YourVector");
+    services.AddSoraOptions<YourVectorOptions>(config, "Sora:Data:YourVector");
         services.AddSingleton<IVectorAdapterFactory, YourVectorAdapterFactory>();
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, YourVectorHealthContributor>());
         // Provide default naming behavior if your provider needs custom defaults

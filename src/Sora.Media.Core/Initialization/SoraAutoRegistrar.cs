@@ -14,8 +14,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // Bind options from configuration at Sora:Media:Transforms
-        services.AddOptions<MediaTransformOptions>().BindConfiguration("Sora:Media:Transforms");
+    // Bind options from configuration at Sora:Media:Transforms
+    services.AddSoraOptions<MediaTransformOptions>("Sora:Media:Transforms");
 
         services.AddSingleton<IMediaOperator, ResizeOperator>();
         services.AddSingleton<IMediaOperator, RotateOperator>();

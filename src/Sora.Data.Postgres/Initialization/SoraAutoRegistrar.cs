@@ -16,7 +16,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddOptions<PostgresOptions>().ValidateDataAnnotations();
+    services.AddSoraOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.AddSingleton<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(PostgresNamingDefaultsProvider), ServiceLifetime.Singleton));

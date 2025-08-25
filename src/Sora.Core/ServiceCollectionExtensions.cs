@@ -26,9 +26,9 @@ public static class ServiceCollectionExtensions
 
         // Best-effort early initialization when provider is built later
 
-        // Legacy health registry removed in greenfield; aggregator is the single source of truth
-        // Health Aggregator (push-first)
-        services.AddOptions<HealthAggregatorOptions>().BindConfiguration("Sora:Health:Aggregator");
+    // Legacy health registry removed in greenfield; aggregator is the single source of truth
+    // Health Aggregator (push-first)
+    services.AddSoraOptions<HealthAggregatorOptions>("Sora:Health:Aggregator");
         services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HealthAggregatorOptions>>().Value);
         services.AddSingleton<IHealthAggregator, HealthAggregator>();
         // Bridge legacy contributors (registered by adapters) into aggregator

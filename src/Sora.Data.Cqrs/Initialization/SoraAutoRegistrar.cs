@@ -14,8 +14,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // Mirror existing initializer behavior
-        services.AddOptions<CqrsOptions>().BindConfiguration("Sora:Cqrs").ValidateDataAnnotations();
+    // Standardized options binding/validation
+    services.AddSoraOptions<CqrsOptions>("Sora:Cqrs");
         services.TryAddSingleton<ICqrsRouting, CqrsRouting>();
         services.BindOutboxOptions<InMemoryOutboxOptions>("InMemory");
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutboxStoreFactory, InMemoryOutboxFactory>());

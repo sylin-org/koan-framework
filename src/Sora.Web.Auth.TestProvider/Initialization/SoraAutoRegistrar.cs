@@ -17,7 +17,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         services.AddSingleton<DevTokenStore>();
-        services.AddOptions<TestProviderOptions>().BindConfiguration(TestProviderOptions.SectionPath);
+    services.AddSoraOptions<TestProviderOptions>(TestProviderOptions.SectionPath);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuthProviderContributor, TestProviderContributor>());
     }
 

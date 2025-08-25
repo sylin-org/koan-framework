@@ -16,9 +16,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // Bind options and register orchestrator if not already present
-        services.AddOptions<StorageOptions>()
-            .BindConfiguration(StorageConstants.Constants.Configuration.Section)
-            .ValidateDataAnnotations();
+    services.AddSoraOptions<StorageOptions>(StorageConstants.Constants.Configuration.Section);
 
         if (!services.Any(d => d.ServiceType == typeof(IStorageService)))
         {

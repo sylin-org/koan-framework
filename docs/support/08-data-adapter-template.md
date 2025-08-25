@@ -55,7 +55,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Register(IServiceCollection services)
     {
-        services.AddOptions<YourDataOptions>().BindConfiguration("Sora:Data:YourData");
+    services.AddSoraOptions<YourDataOptions>(config, "Sora:Data:YourData");
         services.AddSingleton<IDataAdapterFactory, YourDataAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<INamingDefaultsProvider, YourDataNamingDefaultsProvider>());
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, YourDataHealthContributor>());

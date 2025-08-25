@@ -17,7 +17,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddOptions<SqliteOptions>().ValidateDataAnnotations();
+    services.AddSoraOptions<SqliteOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.AddSingleton<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));

@@ -14,13 +14,14 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Initialize(IServiceCollection services, IConfiguration cfg, IHostEnvironment env)
     {
         // Options: Sora:Scheduling
-        services.AddOptions<SchedulingOptions>()
-            .Bind(cfg.GetSection("Sora:Scheduling"))
+        services.AddSoraOptions<SchedulingOptions>(cfg, "Sora:Scheduling")
             .PostConfigure(opts =>
             {
                 // Dev default enabled, Prod default disabled unless explicitly enabled
-                if (env.IsDevelopment()) { opts.Enabled = opts.Enabled; }
-                else if (!cfg.GetSection("Sora:Scheduling").Exists()) opts.Enabled = false;
+                if (!env.IsDevelopment() && !cfg.GetSection("Sora:Scheduling").Exists())
+                {
+                    opts.Enabled = false;
+                }
             });
 
         // Tasks are expected to self-register via Sora.Core ISoraInitializer in their own assemblies.
@@ -30,7 +31,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     // Required by ISoraInitializer; minimal registration without bespoke discovery.
     public void Initialize(IServiceCollection services)
     {
-        services.AddOptions<SchedulingOptions>();
+    services.AddSoraOptions<SchedulingOptions>("Sora:Scheduling");
         services.AddHostedService<SchedulingOrchestrator>();
     }
 

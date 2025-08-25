@@ -13,7 +13,7 @@ public static class SqlServerRegistration
 {
     public static IServiceCollection AddSqlServerAdapter(this IServiceCollection services, Action<SqlServerOptions>? configure = null)
     {
-        services.AddOptions<SqlServerOptions>().ValidateDataAnnotations();
+        services.AddSoraOptions<SqlServerOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         services.AddRelationalOrchestration();

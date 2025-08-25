@@ -12,7 +12,7 @@ public static class PostgresRegistration
 {
     public static IServiceCollection AddPostgresAdapter(this IServiceCollection services, Action<PostgresOptions>? configure = null)
     {
-        services.AddOptions<PostgresOptions>().ValidateDataAnnotations();
+    services.AddSoraOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());

@@ -12,7 +12,7 @@ public static class SqliteRegistration
 {
     public static IServiceCollection AddSqliteAdapter(this IServiceCollection services, Action<SqliteOptions>? configure = null)
     {
-        services.AddOptions<SqliteOptions>().ValidateDataAnnotations();
+    services.AddSoraOptions<SqliteOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         services.AddRelationalOrchestration();

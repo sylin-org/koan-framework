@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Sora.Core;
 using Sora.Web.Auth.Options;
 using Sora.Web.Auth.Providers;
 using Sora.Web.Auth.Domain;
@@ -13,7 +14,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddSoraWebAuth(this IServiceCollection services)
     {
         // Bind from configuration by section path at runtime (no IConfiguration required here)
-        services.AddOptions<AuthOptions>().BindConfiguration(AuthOptions.SectionPath).ValidateDataAnnotations();
+    services.AddSoraOptions<AuthOptions>(AuthOptions.SectionPath);
 
         services.AddHttpClient();
 

@@ -1,4 +1,5 @@
 using Sora.Core.Observability;
+using Sora.Core;
 using Sora.Data.Core;
 using Sora.Web.Extensions;
 
@@ -21,18 +22,15 @@ builder.Services.AddSingleton<S5.Recs.Services.ISeedService, S5.Recs.Services.Se
 builder.Services.AddSingleton<S5.Recs.Services.IRecsService, S5.Recs.Services.RecsService>();
 builder.Services.AddSingleton<S5.Recs.Services.IRecommendationSettingsProvider, S5.Recs.Services.RecommendationSettingsProvider>();
 // Tag catalog options (censor list)
-builder.Services.AddOptions<S5.Recs.Options.TagCatalogOptions>()
-    .Bind(builder.Configuration.GetSection("S5:Recs:Tags"));
+builder.Services.AddSoraOptions<S5.Recs.Options.TagCatalogOptions>(builder.Configuration, "S5:Recs:Tags");
 // Scheduling: tasks are auto-discovered and registered by Sora.Scheduling's auto-registrar
 // Scheduling defaults for S5: don't gate readiness; ensure bootstrap runs on startup
-builder.Services.AddOptions<Sora.Scheduling.SchedulingOptions>()
-    .Bind(builder.Configuration.GetSection("Sora:Scheduling"))
-    .PostConfigure(opts =>
-    {
-        opts.ReadinessGate = false;
-        if (!opts.Jobs.ContainsKey("s5:bootstrap"))
-            opts.Jobs["s5:bootstrap"] = new Sora.Scheduling.SchedulingOptions.JobOptions { OnStartup = true };
-    });
+builder.Services.AddSoraOptions<Sora.Scheduling.SchedulingOptions>(builder.Configuration, "Sora:Scheduling", opts =>
+{
+    opts.ReadinessGate = false;
+    if (!opts.Jobs.ContainsKey("s5:bootstrap"))
+        opts.Jobs["s5:bootstrap"] = new Sora.Scheduling.SchedulingOptions.JobOptions { OnStartup = true };
+});
 
 // Discover and register all IAnimeProvider implementations in this assembly
 var providerInterface = typeof(S5.Recs.Providers.IAnimeProvider);

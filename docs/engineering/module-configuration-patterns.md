@@ -57,11 +57,7 @@ public static class OracleServiceCollectionExtensions
         string alias = OracleConstants.DefaultAlias,
         Action<OracleOptions>? postConfigure = null)
     {
-        services.AddOptions<OracleOptions>(alias)
-            .Bind(config.GetSection(OracleConstants.SectionPath(alias)))
-            .ValidateDataAnnotations()
-            .PostConfigure(o => postConfigure?.Invoke(o))
-            .ValidateOnStart();
+        services.AddSoraOptions<OracleOptions>(config, OracleConstants.SectionPath(alias), o => postConfigure?.Invoke(o));
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<OracleOptions>, OracleOptionsValidator>());
 
@@ -130,3 +126,13 @@ See also
 - ARCH-0044-standardized-module-config-and-discovery.md
 - ARCH-0040-config-and-constants-naming.md
 - ARCH-0039-soraenv-static-runtime.md
+
+## Intentional deviations
+
+Most modules should use `services.AddSoraOptions<TOptions>(...)` for binding + validation. A few cases intentionally diverge:
+
+- Transformers (Sora.Web.Transformers): uses deferred runtime discovery with `AddOptions + PostConfigure` to register bindings on first use. This avoids hard configuration coupling and fits late-bound transformer discovery.
+- Ollama provider (Sora.Ai.Provider.Ollama): registers `AddOptions<OllamaServiceOptions[]>()` to support multiple services discovered/registered at runtime. The array pattern is by design.
+- SoraInitialization.SoraOptions (Sora.Core): a lightweight, in-proc flag container registered via `AddOptions<SoraOptions>()` without external configuration paths or validation.
+
+These exceptions are scoped; all other modules should follow the standardized `AddSoraOptions` golden path per ARCH-0044.

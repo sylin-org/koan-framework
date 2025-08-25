@@ -33,9 +33,9 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<Configuration.IDataConnectionResolver, Configuration.DefaultDataConnectionResolver>();
         // Provide a default storage name resolver so naming works even without adapter-specific registration (e.g., JSON adapter)
         services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
-        services.AddOptions<Options.DirectOptions>().BindConfiguration("Sora:Data:Direct");
+    services.AddSoraOptions<Options.DirectOptions>("Sora:Data:Direct");
     // Vector defaults now live in Sora.Data.Vector; apps should call AddSoraDataVector() to enable vector features.
-        services.AddOptions<DataRuntimeOptions>();
+    services.AddSoraOptions<DataRuntimeOptions>();
         services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
         services.AddSingleton<IDataService, DataService>();
         services.AddSingleton<IDataDiagnostics, DataDiagnostics>();

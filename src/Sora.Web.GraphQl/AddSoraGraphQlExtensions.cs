@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Sora.Core;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
@@ -30,6 +32,9 @@ public static class AddSoraGraphQlExtensions
         services.AddHttpContextAccessor();
         services.AddSingleton<Execution.IGraphQlExecutor, Execution.GraphQlExecutor>();
 
+    // Bind typed options
+    services.AddSoraOptions<GraphQlOptions>(Infrastructure.Constants.Configuration.Section);
+
         var entityTypes = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic)
             .SelectMany(SafeGetTypes)
@@ -39,7 +44,7 @@ public static class AddSoraGraphQlExtensions
             .Select(g => g.First())
             .ToArray();
 
-        var builder = services
+    var builder = services
             .AddGraphQLServer()
             .SetRequestOptions(_ => new RequestExecutorOptions { ExecutionTimeout = TimeSpan.FromSeconds(10) })
             // Add a safe error filter that enriches errors with diagnostics in extensions

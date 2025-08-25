@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sora.AI.Contracts;
 using Sora.AI.Contracts.Options;
 using Sora.AI.Contracts.Routing;
+using Sora.Core;
 
 namespace Sora.AI;
 
@@ -11,9 +12,14 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddAi(this IServiceCollection services, IConfiguration? config = null)
     {
-        services.AddOptions<AiOptions>();
         if (config is not null)
-            services.Configure<AiOptions>(config.GetSection("Sora:Ai"));
+        {
+            services.AddSoraOptions<AiOptions>(config, "Sora:Ai");
+        }
+        else
+        {
+            services.AddSoraOptions<AiOptions>("Sora:Ai");
+        }
 
         services.TryAddSingleton<IAiAdapterRegistry, InMemoryAdapterRegistry>();
         services.TryAddSingleton<IAiRouter, DefaultAiRouter>();

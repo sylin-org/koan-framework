@@ -15,7 +15,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddOptions<WeaviateOptions>().BindConfiguration(Infrastructure.Constants.Configuration.Section).ValidateDataAnnotations();
+    services.AddSoraOptions<WeaviateOptions>(Infrastructure.Constants.Configuration.Section);
         // Post-configure: if Endpoint is not explicitly provided (or left at default), try to self-configure
         services.PostConfigure<WeaviateOptions>(opts =>
         {

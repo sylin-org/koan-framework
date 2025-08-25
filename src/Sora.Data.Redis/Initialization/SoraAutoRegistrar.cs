@@ -16,7 +16,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddOptions<RedisOptions>().ValidateDataAnnotations();
+    services.AddSoraOptions<RedisOptions>();
         services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();

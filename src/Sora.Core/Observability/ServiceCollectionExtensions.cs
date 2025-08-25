@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Sora.Core;
 
 namespace Sora.Core.Observability;
 
@@ -11,7 +12,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddSoraObservability(this IServiceCollection services, Action<ObservabilityOptions>? configure = null)
     {
-        services.AddOptions<ObservabilityOptions>().BindConfiguration(Infrastructure.Constants.Configuration.Observability.Section);
+    services.AddSoraOptions<ObservabilityOptions>(Infrastructure.Constants.Configuration.Observability.Section);
         if (configure is not null) services.Configure(configure);
 
         using var tmp = services.BuildServiceProvider();

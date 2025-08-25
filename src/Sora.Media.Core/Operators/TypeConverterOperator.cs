@@ -84,7 +84,8 @@ public sealed class TypeConverterOperator : IMediaOperator
         {
             if (query.TryGetValue(a, out var sv) && sv.Count > 0)
             {
-                value = sv[0];
+                var s0 = sv[0];
+                value = s0 ?? string.Empty;
                 return true;
             }
         }
