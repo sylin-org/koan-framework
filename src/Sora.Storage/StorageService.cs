@@ -32,29 +32,89 @@ public sealed class StorageService : IStorageService
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
 
-        // Write directly without pre-reading for hashing to avoid issues with non-standard streams
-        long size = 0;
+    // Compute hash and size while preserving original stream semantics.
+        // - If seekable: hash by reading to end and then reset position; write original stream to provider.
+        // - If non-seekable: buffer to memory while hashing, then write the buffer to provider.
+        string? hashHex = null;
+    long size = 0;
+    bool wasSeekable = content.CanSeek;
+
         if (content.CanSeek)
         {
-            try { size = content.Length; } catch { size = 0; }
+            long originalPos = 0;
+            try { originalPos = content.Position; } catch { originalPos = 0; }
+
+            using (var sha = SHA256.Create())
+            {
+                var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(81920);
+                try
+                {
+                    int read;
+                    while ((read = await content.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
+                    {
+                        sha.TransformBlock(buffer, 0, read, null, 0);
+                    }
+                    sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                    hashHex = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
+                }
+                finally
+                {
+                    System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+                }
+            }
+
+            // Reset to original position for provider write
+            if (content.CanSeek)
+                content.Seek(originalPos, SeekOrigin.Begin);
+
+            // Determine size if available
+            try { size = content.Length - originalPos; } catch { size = 0; }
+
+            await provider.WriteAsync(resolvedContainer, key, content, contentType, ct).ConfigureAwait(false);
+        }
+    else
+        {
+            using var sha = SHA256.Create();
+            using var ms = new MemoryStream();
+            var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(81920);
+            try
+            {
+                int read;
+                while ((read = await content.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
+                {
+                    sha.TransformBlock(buffer, 0, read, null, 0);
+                    await ms.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+                }
+                sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                hashHex = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
+            }
+            finally
+            {
+                System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+            }
+
+            ms.Position = 0;
+            // Intentionally keep reported size as 0 for non-seekable uploads (contract: size unknown)
+            // Tests assert this behavior. We still write the full buffered content.
+            size = 0;
+            await provider.WriteAsync(resolvedContainer, key, ms, contentType, ct).ConfigureAwait(false);
         }
 
-        await provider.WriteAsync(resolvedContainer, key, content, contentType, ct).ConfigureAwait(false);
-
-        // Best-effort stat after write if size unknown
-        string? hashHex = null;
-        if (size == 0 && provider is IStatOperations statOps)
+        // If seekable and size could not be determined, attempt best-effort stat.
+        // For non-seekable uploads we intentionally leave size as 0.
+        if (wasSeekable && size == 0 && provider is IStatOperations statOps)
         {
             var stat = await statOps.HeadAsync(resolvedContainer, key, ct).ConfigureAwait(false);
             if (stat?.Length is long len) size = len;
         }
+
         return new StorageObject
         {
             Id = $"{provider.Name}:{resolvedContainer}:{key}",
             Key = key,
             Name = key,
             ContentType = contentType,
-            Size = content.CanSeek ? size : 0,
+            Size = size,
             ContentHash = hashHex,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = null,
