@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Media contracts for Sora: models, transforms, tasks, and events.</Description>
+    <PackageTags>$(CommonPackageTags);media;images;video;pdf;transform;pipelines</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
+    <ProjectReference Include="..\Sora.Storage\Sora.Storage.csproj" />
+    <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

@@ -18,6 +18,11 @@ Storage
 - Why: Simple, safe file/object storage with clean routing and developer ergonomics.
 - References: reference/storage.md, decisions/STOR-0001-storage-module-and-contracts.md
 
+Media
+- What: First-class media handling (upload, variants, derivatives, pipelines/tasks) with ancestry and DX-first model statics.
+- Why: Enterprise-grade media with low cognitive load; safe on-demand transforms; CDN-friendly delivery.
+- References: reference/media.md, decisions/MEDIA-0001-media-pillar-baseline-and-storage-integration.md
+
 Web
 - What: Controllers-only HTTP (REST/GraphQL), startup pipeline wiring, Swagger in dev, payload transformers.
 - Why: Clear, testable web surfaces with consistent semantics.

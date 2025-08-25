@@ -59,6 +59,10 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         return From(obj);
     }
 
+    // Convenience overload to ensure byte[] goes to binary path (not JSON generic)
+    public static Task<TEntity> Create(string name, byte[] bytes, string? contentType = "application/octet-stream", CancellationToken ct = default)
+        => Create(name, (ReadOnlyMemory<byte>)bytes, contentType, ct);
+
     public static async Task<TEntity> Onboard(string name, Stream content, string? contentType = null, CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
@@ -85,6 +89,19 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         return await Storage().ReadRangeAsString(profile, container, Key, from, to, encoding, ct).ConfigureAwait(false);
     }
 
+    // Stream-based reads (DX helpers)
+    public async Task<Stream> OpenRead(CancellationToken ct = default)
+    {
+        var (profile, container) = InstanceBinding();
+        return await Storage().ReadAsync(profile, container, Key, ct).ConfigureAwait(false);
+    }
+
+    public async Task<(Stream Stream, long? Length)> OpenReadRange(long? from = null, long? to = null, CancellationToken ct = default)
+    {
+        var (profile, container) = InstanceBinding();
+        return await Storage().ReadRangeAsync(profile, container, Key, from, to, ct).ConfigureAwait(false);
+    }
+
     public async Task<ObjectStat?> Head(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
@@ -100,18 +117,23 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     public async Task<TTarget> CopyTo<TTarget>(CancellationToken ct = default)
         where TTarget : class, IStorageObject
     {
-    var (sourceProfile, sourceContainer) = InstanceBinding();
-    var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
-    var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: false, ct).ConfigureAwait(false);
+        // If this is a lightweight proxy (no provider known), defer to default profile resolution
+        var (sourceProfile, sourceContainer) = string.IsNullOrWhiteSpace(Provider)
+            ? ("", "")
+            : InstanceBinding();
+        var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
+        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: false, ct).ConfigureAwait(false);
         return To<TTarget>(obj);
     }
 
     public async Task<TTarget> MoveTo<TTarget>(CancellationToken ct = default)
         where TTarget : class, IStorageObject
     {
-    var (sourceProfile, sourceContainer) = InstanceBinding();
-    var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
-    var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: true, ct).ConfigureAwait(false);
+        var (sourceProfile, sourceContainer) = string.IsNullOrWhiteSpace(Provider)
+            ? ("", "")
+            : InstanceBinding();
+        var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
+        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: true, ct).ConfigureAwait(false);
         return To<TTarget>(obj);
     }
 
@@ -129,6 +151,25 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         // Prefer the type-level binding; allow instance Container override when set
         var overrideContainer = string.IsNullOrWhiteSpace(Container) ? null : Container;
         return ResolveBinding(overrideContainer);
+    }
+
+    // Static key-first helpers (DX): operate by key using type-level binding
+    public static Task<Stream> OpenRead(string key, CancellationToken ct = default)
+    {
+        var (profile, container) = ResolveBinding();
+        return Storage().ReadAsync(profile, container, key, ct);
+    }
+
+    public static Task<(Stream Stream, long? Length)> OpenReadRange(string key, long? from = null, long? to = null, CancellationToken ct = default)
+    {
+        var (profile, container) = ResolveBinding();
+        return Storage().ReadRangeAsync(profile, container, key, from, to, ct);
+    }
+
+    public static Task<ObjectStat?> Head(string key, CancellationToken ct = default)
+    {
+        var (profile, container) = ResolveBinding();
+        return Storage().HeadAsync(profile, container, key, ct);
     }
 
     // Map from StorageObject to TEntity (shallow copy of storage metadata)

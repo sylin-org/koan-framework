@@ -6,6 +6,7 @@ using Sora.Storage;
 using Sora.Storage.Model;
 using Sora.Storage.Options;
 using Xunit;
+using System.Text;
 
 public class ModelApiTests
 {
@@ -79,6 +80,59 @@ public class ModelApiTests
         (await storage.ExistsAsync("cold", "", rec.Key)).Should().BeTrue();
 
         await storage.EnsureDeleted("cold", "", rec.Key);
+    }
+
+    [Fact]
+    public async Task Model_OpenRead_And_Range_Works()
+    {
+        using var temp = new TempFolder();
+        var sp = BuildServices(temp.Path);
+        SoraApp.Current = sp;
+
+        var content = "abcdefghijklmnopqrstuvwxyz";
+        var rec = await FileA.CreateTextFile("alpha.txt", content, "text/plain; charset=utf-8");
+
+        // Instance OpenRead
+        await using (var s = await FileA.Get(rec.Key).OpenRead())
+        using (var sr = new StreamReader(s))
+        {
+            var all = await sr.ReadToEndAsync();
+            all.Should().Be(content);
+        }
+
+        // Instance OpenReadRange (5..9 inclusive => 5 chars)
+        var (rangeStream, len) = await FileA.Get(rec.Key).OpenReadRange(5, 9);
+        len.Should().Be(5);
+        await using (rangeStream)
+        using (var sr2 = new StreamReader(rangeStream))
+        {
+            var part = await sr2.ReadToEndAsync();
+            part.Should().Be(content.Substring(5, 5));
+        }
+    }
+
+    [Fact]
+    public async Task Model_KeyFirst_OpenRead_And_Head_Works()
+    {
+        using var temp = new TempFolder();
+        var sp = BuildServices(temp.Path);
+        SoraApp.Current = sp;
+
+    var bytes = Encoding.UTF8.GetBytes("hello-world");
+    var rec = await FileA.Create("blob.bin", bytes: (ReadOnlyMemory<byte>)bytes);
+
+        // Static OpenRead
+        await using (var s = await FileA.OpenRead(rec.Key))
+        using (var ms = new MemoryStream())
+        {
+            await s.CopyToAsync(ms);
+            ms.ToArray().Should().BeEquivalentTo(bytes);
+        }
+
+        // Static Head
+        var stat = await FileA.Head(rec.Key);
+        stat.Should().NotBeNull();
+        stat!.Length.Should().Be(bytes.Length);
     }
 
     private sealed class TempFolder : IDisposable

@@ -30,9 +30,9 @@ public static class StorageServiceHelpers
 
     public static Task<StorageObject> CreateJson<T>(this IStorageService svc, string key, T value, JsonSerializerOptions? options = null, string profile = "", string container = "", string contentType = "application/json; charset=utf-8", CancellationToken ct = default)
     {
-        // Route through Create(JObject) to centralize JSON handling
-        var jobj = value is JObject jo ? jo : JObject.FromObject(value!);
-        return svc.Create(key, jobj, contentType, profile, container, ct);
+        // Serialize any value (object, array, primitive) using System.Text.Json for broad compatibility
+        var json = System.Text.Json.JsonSerializer.Serialize(value, options ?? new JsonSerializerOptions());
+        return svc.CreateJson(key, json, profile, container, contentType, ct);
     }
 
     public static Task<StorageObject> Create(this IStorageService svc, string key, ReadOnlyMemory<byte> bytes, string? contentType = "application/octet-stream", string profile = "", string container = "", CancellationToken ct = default)

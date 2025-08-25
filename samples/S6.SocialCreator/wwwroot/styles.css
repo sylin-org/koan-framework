@@ -1,0 +1,13 @@
+.container{max-width:880px;margin:0 auto;padding:24px;font-family:system-ui,sans-serif}
+.card{border:1px solid #ddd;border-radius:8px;padding:16px;margin-block:12px}
+label{display:block;margin-bottom:8px}
+/* Dropzone */
+.dropzone{border:2px dashed #bbb;border-radius:8px;padding:24px;text-align:center;color:#666}
+.dropzone.is-dragover{background:#f7f7f7;border-color:#777;color:#333}
+.btn{display:inline-block;padding:8px 12px;border:1px solid #ccc;border-radius:6px;background:#fafafa;cursor:pointer}
+.btn:hover{background:#f0f0f0}
+.upload-status{color:#555;margin-top:8px}
+.upload-result{margin-top:8px}
+.error{color:#b00020}
+.muted{color:#888}
+.gallery-item{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid #f0f0f0}
