@@ -1,6 +1,6 @@
 # Sora CLI — orchestration usage
 
-This page summarizes how to use the Sora CLI to validate your environment, export Compose, and start/stop apps locally.
+This page summarizes how to use the Sora CLI to validate your environment, export Compose, inspect a project, and start/stop apps locally.
 
 ## Contract
 
@@ -47,6 +47,19 @@ Notes
 After install, a friendly executable `Sora.exe` is available in `dist/bin` (add that folder to PATH to call `Sora` globally).
 
 ## Common scenarios
+
+No-args context card (in a Sora-compatible project folder)
+```pwsh
+Sora
+# First line prints: "Use -h for help"
+# Then a concise Context Card with providers, project/files, services, ports/health, and suggested one-liners.
+```
+
+Inspect (explicit)
+```pwsh
+Sora inspect
+Sora inspect --json
+```
 
 Validate environment
 ```pwsh
@@ -97,6 +110,7 @@ Sora export compose -v --explain
 JSON output (where supported)
 ```pwsh
 Sora doctor --json
+Sora inspect --json
 ```
 
 ## Deeper walkthrough: start S5.Recs locally
@@ -225,6 +239,7 @@ This bypasses Sora’s planner/policies; prefer Sora for consistent profiles, po
   - or `podman compose -f .sora/compose.yml ps` / `... logs`
 - PATH issues: run `./scripts/cli-install.ps1` to add `dist/bin` to PATH, then open a new shell.
 - Compose not found: ensure you ran `Sora export compose` at the repo root; Compose is written under `.sora/`.
+- No project detected (no-args/inspect): the CLI prints the help hint then `No Sora project detected here.` and exits with code 2.
 
 ## See also
 

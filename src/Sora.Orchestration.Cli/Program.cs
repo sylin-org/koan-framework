@@ -12,11 +12,11 @@ using System.Reflection;
 using System.Net;
 using System.Net.Sockets;
 
-// Minimal DX-first CLI: export, doctor, up, down, status, logs
-// Flags: -v/-vv, --json (for explain/status), --dry-run, --explain
+// Minimal DX-first CLI: export, doctor, up, down, status, logs, inspect
+// Flags: -v/-vv, --json (for explain/status/inspect), --dry-run, --explain
 
 var (cmd, rest) = args.Length == 0
-    ? ("help", Array.Empty<string>())
+    ? ("inspect", Array.Empty<string>())
     : (args[0].ToLowerInvariant(), args.Skip(1).ToArray());
 
 // Discover adapter-declared default endpoints and register a scheme resolver
@@ -30,12 +30,13 @@ return cmd switch
     "down"   => await DownAsync(rest),
     "status" => await StatusAsync(rest),
     "logs"   => await LogsAsync(rest),
+    "inspect"=> await InspectAsync(rest),
     _        => Help()
 };
 
 static int Help()
 {
-    Console.WriteLine("sora <command> [options]\nCommands: export, doctor, up, down, status, logs");
+    Console.WriteLine("sora <command> [options]\nCommands: export, doctor, up, down, status, logs, inspect");
     return 1;
 }
 
@@ -301,6 +302,126 @@ static async Task<int> StatusAsync(string[] args)
             if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
         }
     }
+    return 0;
+}
+
+static async Task<int> InspectAsync(string[] args)
+{
+    var json = HasFlag(args, "--json");
+    var quiet = HasFlag(args, "--quiet") || Environment.GetEnvironmentVariable("SORA_NO_INSPECT") == "1";
+    var engineArg = FindArg(args, "--engine");
+    var profile = ResolveProfile(FindArg(args, "--profile"));
+    var basePortVal = FindArg(args, "--base-port");
+    var basePort = int.TryParse(basePortVal, out var bp) && bp >= 0 ? bp : (int?)null;
+
+    // First line: help hint (always)
+    Console.WriteLine("Use -h for help");
+    if (quiet) return 0;
+
+    // Detect project: descriptor or existing compose file
+    var cwd = Directory.GetCurrentDirectory();
+    var descriptor = Constants.OrchestrationDescriptorCandidates
+        .Select(name => Path.Combine(cwd, name))
+        .FirstOrDefault(File.Exists);
+    var composePath = Path.Combine(cwd, Constants.DefaultComposePath.Replace('/', Path.DirectorySeparatorChar));
+    var projectDetected = descriptor is not null || File.Exists(composePath);
+    if (!projectDetected)
+    {
+        if (json)
+        {
+            var payload = new { detected = false, cwd };
+            Console.WriteLine(JsonSerializer.Serialize(payload));
+        }
+        else
+        {
+            Console.WriteLine("No Sora project detected here.");
+        }
+        return 2;
+    }
+
+    // Provider availability snapshot
+    var providers = new List<IHostingProvider> { new DockerProvider(), new PodmanProvider() };
+    var availability = new List<object>();
+    foreach (var p in providers)
+    {
+        var (ok, reason) = await p.IsAvailableAsync();
+        var info = p.EngineInfo();
+        availability.Add(new { id = p.Id, available = ok, reason, engine = new { info.Name, info.Version, info.Endpoint } });
+    }
+
+    // Build plan-derived hints
+    var plan = Planner.Build(profile);
+    if (basePort is { }) plan = ApplyBasePort(plan, basePort.Value);
+    if (profile != Profile.Prod) plan = PortAllocator.AutoAvoidPorts(plan);
+    var conflicts = Planner.FindConflictingPorts(plan.Services.SelectMany(s => s.Ports.Select(p => p.Host)));
+
+    // Project metadata
+    var projectName = new DirectoryInfo(cwd).Name;
+    var envPath = Path.Combine(cwd, ".env");
+    var files = new List<string>();
+    if (descriptor is not null) files.Add(Path.GetFileName(descriptor));
+    if (File.Exists(composePath)) files.Add(Constants.DefaultComposePath);
+    if (File.Exists(envPath)) files.Add(".env");
+
+    if (json)
+    {
+        var payload = new
+        {
+            detected = true,
+            cwd,
+            project = new { name = projectName, profile = profile.ToString(), compose = Constants.DefaultComposePath },
+            providers = availability,
+            services = plan.Services.Select(s => new
+            {
+                id = s.Id,
+                image = s.Image,
+                ports = s.Ports.Select(p => new { host = p.Host, container = p.Container }),
+                health = s.Health is not null
+            }),
+            files,
+            conflicts
+        };
+        Console.WriteLine(JsonSerializer.Serialize(payload));
+        return 0;
+    }
+
+    // Human card
+    Console.WriteLine($"CLI: Sora | profile: {profile}");
+    Console.WriteLine($"Project: {projectName} ({cwd})");
+    Console.WriteLine($"Files: {(files.Count == 0 ? "(none)" : string.Join(", ", files))}");
+    Console.WriteLine("Providers:");
+    foreach (dynamic p in availability)
+    {
+        var id = (string)p.GetType().GetProperty("id")!.GetValue(p)!;
+        var available = (bool)p.GetType().GetProperty("available")!.GetValue(p)!;
+        var eng = p.GetType().GetProperty("engine")!.GetValue(p)!;
+        var engName = (string?)eng.GetType().GetProperty("Name")!.GetValue(eng) ?? string.Empty;
+        var engVer = (string?)eng.GetType().GetProperty("Version")!.GetValue(eng) ?? string.Empty;
+        Console.WriteLine($"- {id}: {(available ? "OK" : "NOT AVAILABLE")} {(string.IsNullOrWhiteSpace(engVer) ? string.Empty : $"- {engName} {engVer}")}");
+    }
+    Console.WriteLine($"Services: {plan.Services.Count}");
+    foreach (var s in plan.Services)
+    {
+        var ports = s.Ports is null || s.Ports.Count == 0 ? "-" : string.Join(", ", s.Ports.Select(p => $"{p.Host}:{p.Container}"));
+        var health = s.Health is null ? "no" : "yes";
+        Console.WriteLine($"  -> {s.Id}: ports [{ports}], health: {health}");
+    }
+    if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
+
+    // One-liners (easy to copy)
+    Console.WriteLine("Next steps:");
+    Console.WriteLine("  Sora up");
+    Console.WriteLine("  Sora status");
+    // Pick a likely service for logs if available, otherwise show placeholder
+    var svcHint = plan.Services.Select(s => s.Id).FirstOrDefault(id => id.Equals("api", StringComparison.OrdinalIgnoreCase))
+                 ?? plan.Services.Select(s => s.Id).FirstOrDefault()
+                 ?? "[service]";
+    Console.WriteLine($"  Sora logs --service {svcHint} --tail 100");
+    Console.WriteLine("  Sora down --remove-orphans");
+    Console.WriteLine("  Sora export compose");
+    Console.WriteLine("  Sora doctor");
+    Console.WriteLine("  Sora status --json");
+
     return 0;
 }
 
