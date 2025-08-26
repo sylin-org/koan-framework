@@ -12,6 +12,7 @@ This page summarizes how to use the Sora CLI to validate your environment, expor
   - Engine actions: up/down/status/logs via Docker or Podman.
 - Error modes
   - Engine missing/not running; port conflicts; invalid profile for gated actions.
+  - Readiness timeout: containers are up but not all services satisfied the ready criteria within the timeout.
 - Success
   - CLI emits a plan, exports Compose, and can start/stop services with clear status.
 
@@ -27,6 +28,7 @@ Notes
 - Profile policy (mounts): Local/Staging = bind; CI = named; Prod = none.
 - Conflict policy: non‑prod warns; Prod fails on conflicts.
 - “Up” is gated for Staging/Prod.
+ - Exit codes: 0 = success; 4 = readiness timeout.
 
 ## Install the CLI
 
@@ -59,6 +61,11 @@ Sora export compose
 Start app (Local profile)
 ```pwsh
 Sora up --profile Local
+```
+
+If startup is pulling large images on first run, consider raising the timeout:
+```pwsh
+Sora up --profile Local --timeout 300
 ```
 
 Stop app and prune data
@@ -132,6 +139,39 @@ Sora logs
 Sora down --prune-data
 ```
 
+### Project example: S5.Recs (quick op sheet)
+
+From the repo root, this sequence validates the engine, exports Compose, brings the stack up, checks status and endpoints, then tears down.
+
+```pwsh
+# 1) Validate your container engine
+Sora doctor --json
+
+# 2) Export Compose (Local profile)
+Sora export compose --profile Local
+
+# 3) Up with a generous timeout (first run pulls images)
+Sora up --profile Local --timeout 300
+
+# 4) Status and quick checks
+Sora status
+docker compose -f .sora/compose.yml ps   # or: podman compose -f .sora/compose.yml ps
+
+# API health (PowerShell)
+Invoke-RestMethod http://127.0.0.1:5084/health/live | Format-List
+
+# DBs (PowerShell)
+Test-NetConnection 127.0.0.1 -Port 5081  # Mongo
+Invoke-RestMethod http://127.0.0.1:5082/v1/ | Out-Null  # Weaviate
+
+# 5) Tear down and prune data
+Sora down --prune-data
+```
+
+Notes
+- If `Sora up` exits with code 4 (readiness timeout), services may still be progressing. Run `Sora status` and `Sora logs --tail 200`, or use engine-native `compose ps/logs` as above.
+- You can force the engine via `--engine docker|podman` if both are installed.
+
 ### Path B — From binaries (no build)
 
 1) Ensure `Sora.exe` is available (publish or download), then run from the repo root:
@@ -180,6 +220,9 @@ This bypasses Sora’s planner/policies; prefer Sora for consistent profiles, po
 
 - Engine not detected: ensure Docker/Podman is installed and running; try `--engine`.
 - Port conflicts: on non‑prod, CLI bumps to free ports; set a different `--base-port` if needed.
+- Readiness timeout (exit code 4): services may still be starting. Run `Sora status` and `Sora logs --tail 200` to inspect. You can also use engine-native commands:
+  - `docker compose -f .sora/compose.yml ps` and `docker compose -f .sora/compose.yml logs --tail=200`
+  - or `podman compose -f .sora/compose.yml ps` / `... logs`
 - PATH issues: run `./scripts/cli-install.ps1` to add `dist/bin` to PATH, then open a new shell.
 - Compose not found: ensure you ran `Sora export compose` at the repo root; Compose is written under `.sora/`.
 

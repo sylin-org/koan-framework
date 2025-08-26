@@ -37,6 +37,21 @@ Notes
  - Port conflicts policy: `prod` always fails fast on conflicts; non-prod defaults to warn but can be forced to fail with `--conflicts fail`.
  - Auto-avoid tuning: set `SORA_PORT_PROBE_MAX` to control the max number of upward port probes (default: 200).
 
+### Readiness semantics and timeouts
+
+- Providers poll container state using the specific exported compose file (`compose -f .sora/compose.yml ps`) to avoid cross-project noise.
+- A service is considered ready when its state is Running; when a healthcheck exists, it must report Healthy.
+- If the timeout elapses before all services meet the criteria, `sora up` exits with a non-zero code and prints a concise message. In non-critical local scenarios, containers may still be progressing toward readiness; use Status/Logs to inspect.
+
+Exit codes (subset)
+- 0: Success
+- 4: Readiness timeout (containers started but didn’t meet the ready condition within the timeout)
+
+On-timeout diagnostics (suggested)
+- `sora status` — shows provider/engine and service states
+- `sora logs --tail 200` — recent logs across services
+- `docker compose -f .sora/compose.yml ps` and `docker compose -f .sora/compose.yml logs --tail=200` (or `podman compose ...`) for engine-native views
+
 ## Hosting providers (adapters)
 
 Providers implement a simple contract to run/inspect stacks.
@@ -83,6 +98,19 @@ Local dev (Docker Desktop preferred)
 
 Export compose only
 - `sora export compose --profile ci` → writes `.sora/compose.yml` tuned for CI (ephemeral volumes, deterministic ports).
+
+### Project example: S5.Recs (CLI from repo root)
+
+```pwsh
+Sora doctor --json
+Sora export compose --profile Local
+Sora up --profile Local --timeout 300
+Sora status
+docker compose -f .sora/compose.yml ps   # or: podman compose -f .sora/compose.yml ps
+# Quick health
+Invoke-RestMethod http://127.0.0.1:5084/health/live | Format-List
+Sora down --prune-data
+```
 
 ## References
 
