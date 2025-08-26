@@ -93,6 +93,7 @@ Sora is modular by nature. Each of its components works independently—and shin
 | **Messaging** | Reliable queues via RabbitMQ, Redis, or in-memory                   |
 | **AI**        | Embeddings, vector search, chat, and RAG via local or remote models |
 | **Recipes**   | Best-practice bundles for reliability, telemetry, and scale         |
+| **Orchestration** | DevHost CLI to export/run local deps via Docker/Podman (Compose v2) |
 
 ---
 
@@ -135,3 +136,34 @@ Sora is open-source, MIT-licensed, and community-friendly. We welcome contributi
 **License:** Apache 2.0
 **Requirements:** .NET 9 SDK
 **Current version:** v0.2.18
+
+---
+
+## 🚀 Orchestration & CLI quickstart
+
+Run local dependencies and export Compose via the Sora CLI (single-file binary published to `dist/bin/Sora.exe`). See `docs/reference/sora-cli.md`.
+
+```pwsh
+# Install/publish the CLI into dist/bin and add to PATH
+./scripts/cli-all.ps1
+
+# Validate engine and environment
+Sora doctor --json
+
+# Export a Compose v2 file (writes .sora/compose.yml)
+Sora export compose --profile Local
+
+# Bring services up and wait for readiness (health when defined)
+Sora up --profile Local --timeout 300
+
+# Inspect status and endpoints; view logs
+Sora status
+Sora logs
+
+# Tear down and prune data
+Sora down --prune-data
+```
+
+More: `docs/reference/orchestration.md` and `docs/reference/sora-cli.md`.
+
+Media assets for docs/README live under `resources/image/` (e.g., `resources/image/0_2.jpg`).

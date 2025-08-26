@@ -23,7 +23,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Recipes
   - Intention-driven bootstrap bundles (health checks, telemetry, reliability, workers) that layer predictable defaults on top of referenced modules; activate via package, config, or code with dry-run and capability gating.
 - Orchestration
-  - DevHost CLI and adapters to bring up local dependencies (Docker/Podman) and export deterministic artifacts (Compose v2 today). Profile-aware behavior (local/ci run; staging/prod export-only), readiness waits, port-conflict policy, and endpoint hints.
+  - DevHost CLI and adapters to bring up local dependencies (Docker/Podman) and export deterministic artifacts (Compose v2 today). Profile-aware behavior (local/ci run; staging/prod export-only), scoped readiness waits, port-conflict policy, endpoint hints, and single-binary distribution (dist/bin/Sora.exe) with publish/install scripts.
 
 References
 - Data: docs/reference/data-access.md
@@ -85,6 +85,13 @@ References
   - Turnkey inference (streaming chat, embeddings) with minimal config; Redis-first vector + cache; RAG defaults; observability and budgets; optional sidecar/central proxy; one-call AddSoraAI() and auto-boot discovery.
   - Ollama provider integration for local AI models with streaming support and health monitoring.
   - Weaviate vector database adapter with GraphQL query translation and KNN search capabilities.
+- Orchestration
+  - DevHost CLI: export, up, down, status, logs with Docker-first then Podman fallback; JSON/verbose modes for tooling.
+  - Deterministic export: emits `.sora/compose.yml` with profile-aware mounts and safe quoting; descriptor-first planning.
+  - Readiness semantics: services must be Running; if a healthcheck exists it must be Healthy. Timeout maps to exit code 4 with clear guidance.
+  - Engine hygiene: pre-run `compose down -v --remove-orphans`, per-run project isolation (COMPOSE_PROJECT_NAME), `compose config` preflight.
+  - Ports: conflict auto-avoid in non‑prod with optional `--base-port`; prod fails fast; status surfaces live endpoints and conflicts.
+  - Distribution: single-file CLI published to `dist/bin` with a friendly alias `Sora.exe` and helper scripts to publish/install/verify.
 - Services & DX
   - Fast onboarding (Tiny\* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
   - Auto-registration across modules reduces boilerplate; templates and samples rely on controllers-only routing (no inline endpoints).
@@ -206,3 +213,7 @@ References
 ---
 
 See also: `docs/decisions/index.md` for architectural decisions and `docs/guides/*` for topic guides.
+
+## Media resources
+
+- Repository media assets (for README/docs): `resources/image/` (example: `resources/image/0_2.jpg`).
