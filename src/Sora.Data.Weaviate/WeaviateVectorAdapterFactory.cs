@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Vector.Abstractions;
+using Sora.Orchestration;
 
 namespace Sora.Data.Weaviate;
 
 [ProviderPriority(10)]
+[DefaultEndpoint("http", "weaviate", 8080, "tcp", "weaviate", UriPattern = "http://{host}:{port}")]
+[HostMount("/var/lib/weaviate")]
 public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
 {
     public bool CanHandle(string provider) => string.Equals(provider, "weaviate", StringComparison.OrdinalIgnoreCase);

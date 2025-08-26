@@ -10,6 +10,7 @@
     <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
     <ProjectReference Include="..\Sora.Data.Relational\Sora.Data.Relational.csproj" />
+  <ProjectReference Include="..\Sora.Orchestration.Abstractions\Sora.Orchestration.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />

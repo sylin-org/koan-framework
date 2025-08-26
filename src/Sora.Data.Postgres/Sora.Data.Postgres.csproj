@@ -21,5 +21,6 @@
     <ProjectReference Include="..\Sora.Data.Relational\Sora.Data.Relational.csproj" />
     <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
+  <ProjectReference Include="..\Sora.Orchestration.Abstractions\Sora.Orchestration.Abstractions.csproj" />
   </ItemGroup>
 </Project>

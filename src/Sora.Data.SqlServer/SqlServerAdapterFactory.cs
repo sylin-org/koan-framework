@@ -2,10 +2,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
+using Sora.Orchestration;
 
 namespace Sora.Data.SqlServer;
 
 [ProviderPriority(15)]
+[DefaultEndpoint("mssql", "db", 1433, "tcp", "mssql", "sqlserver", "microsoft/sqlserver", UriPattern = "mssql://{host}:{port}")]
+[HostMount("/var/opt/mssql")]
 public sealed class SqlServerAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider)

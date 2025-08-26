@@ -20,6 +20,10 @@
       href: ARCH-0041-docs-posture-instructions-over-tutorials.md
     - name: Recipes — intention-driven bootstrap and layered config
       href: ARCH-0046-recipes-intention-driven-bootstrap-and-layered-config.md
+    - name: Orchestration — hosting providers and exporters as adapters
+      href: ARCH-0047-orchestration-hosting-and-exporters-as-pluggable-adapters.md
+    - name: Endpoint resolution and persistence mounts
+      href: ARCH-0048-endpoint-resolution-and-persistence-mounts.md
 - name: Data (DATA)
   items:
     - name: Data access semantics (All/Query; streaming; pager)

@@ -7,6 +7,8 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 - Engineering Guardrails (deep dive): ../guides/core/engineering-guardrails.md
 - Docker/Testcontainers skip guards: ./docker-test-skip-guards.md
 - Architecture Principles (curated ADRs): ../architecture/principles.md
+- Orchestration (DevHost, providers, exporters): ../reference/orchestration.md
+- Orchestration adapter authoring (endpoints & mounts): ./orchestration-adapter-authoring.md
 - Data access semantics (contract): ../guides/data/all-query-streaming-and-pager.md and decisions/DATA-0061-data-access-pagination-and-streaming.md
 - Web transformers and controllers: decisions/WEB-0035-entitycontroller-transformers.md
 - Constants and configuration naming: decisions/ARCH-0040-config-and-constants-naming.md
@@ -53,6 +55,12 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 - AI
   - AddAiDefaults + MapAgentEndpoints; local-first providers; safety filters on in Dev.
   - See: ../guides/ai/index.md and src/Sora.Ai.Provider.Ollama/README.md
+
+- Orchestration
+  - DX-first DevHost with hosting providers (Docker/Podman) and exporters (Compose now; Helm/ACA later).
+  - CLI: `sora up|down|status|logs|doctor|export` with profiles (SORA_ENV) and verbosity flags.
+  - See: ../reference/orchestration.md and decisions/ARCH-0047-orchestration-hosting-and-exporters-as-pluggable-adapters.md
+    - Authoring adapters: engineering/orchestration-adapter-authoring.md
 
 - Config & constants
   - Use Sora.Core.Configuration helpers; centralize names; avoid ad-hoc cfg["..."] lookups.
