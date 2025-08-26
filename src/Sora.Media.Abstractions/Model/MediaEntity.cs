@@ -43,7 +43,7 @@ public abstract class MediaEntity<TEntity> : Sora.Storage.Model.StorageEntity<TE
             .FirstOrDefault();
         var profile = attr?.Profile ?? string.Empty;
         var container = inst.Container ?? attr?.Container ?? string.Empty;
-        var svc = (Sora.Core.SoraApp.Current?.GetService(typeof(IStorageService)) as IStorageService)
+    var svc = (Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService)
             ?? throw new InvalidOperationException("IStorageService not available");
         return await svc.ReadAsync(profile, container, key, ct).ConfigureAwait(false);
     }

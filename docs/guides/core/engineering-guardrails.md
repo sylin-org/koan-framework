@@ -86,7 +86,7 @@ Standard
 - Each assembly exposes a single registrar at `/Initialization/SoraAutoRegistrar.cs` implementing `Sora.Core.ISoraAutoRegistrar`.
 - Registrar contract:
   - Initialize(IServiceCollection): wire services and options. Keep idempotent; avoid provider rebuilds.
-  - Describe(SoraBootstrapReport, IConfiguration, IHostEnvironment): add a module header and a few key settings to the startup report.
+  - Describe(BootReport, IConfiguration, IHostEnvironment): add a module header and a few key settings to the startup report.
 
 Describe expectations
 - Include stable, high-signal settings (flags, route prefixes, provider names). Avoid volatile values.

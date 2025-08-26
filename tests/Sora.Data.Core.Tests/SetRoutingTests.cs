@@ -29,7 +29,9 @@ public class SetRoutingTests
         sc.AddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
         sc.AddJsonAdapter(o => o.DirectoryPath = dir);
         var sp = sc.BuildServiceProvider();
-        sp.UseSora();
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
         return sp;
     }
 
@@ -39,7 +41,11 @@ public class SetRoutingTests
         var dir = Path.Combine(Path.GetTempPath(), "sora-set-tests", Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(dir);
         var sp = BuildJson(dir);
-        SoraApp.Current = sp;
+    Sora.Core.Hosting.App.AppHost.Current = sp;
+    // Greenfield boot: ambient provider + runtime start
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         // root (no suffix)
         var t1 = new Todo { Title = "root-1" };

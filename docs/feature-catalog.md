@@ -50,7 +50,7 @@ References
   - Developer experience:
     - Service helpers: Create/Onboard (text/json/bytes/stream/file/url), Read (full/range), Exists/Head, Transfer (Copy/Move), fluent InProfile.
     - Model-centric API: StorageEntity<T> + [StorageBinding] attribute for static creators and instance ops (Read/Head/Delete/CopyTo/MoveTo).
-  - Auto-registration and centralized constants; ambient DI resolution via SoraApp for terse usage.
+  - Auto-registration and centralized constants; ambient DI resolution via AppHost for terse usage.
   - Docs and ADRs: STOR-0001..0007 and Reference → Storage.
 - Web
   - Controller-driven APIs (REST/GraphQL) with guardrails, content negotiation, consistent paging/filtering.

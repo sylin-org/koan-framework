@@ -8,18 +8,20 @@ using Microsoft.Extensions.Logging;
 using Sora.AI.Contracts;
 using Sora.AI.Contracts.Routing;
 using Sora.Core;
+using Sora.Core.Observability.Health;
+using Sora.Core.Observability.Probes;
 
 namespace Sora.AI.Web;
 
 /// Subscribes to the Health Aggregator to report AI service health.
 internal sealed class AiHealthSubscriber : IHostedService
 {
-    private readonly IHealthAggregator _agg;
+    private readonly Sora.Core.Observability.Health.IHealthAggregator _agg;
     private readonly IAiAdapterRegistry _registry;
     private readonly ILogger<AiHealthSubscriber> _log;
     private IDisposable? _sub;
 
-    public AiHealthSubscriber(IHealthAggregator agg, IAiAdapterRegistry registry, ILogger<AiHealthSubscriber> log)
+    public AiHealthSubscriber(Sora.Core.Observability.Health.IHealthAggregator agg, IAiAdapterRegistry registry, ILogger<AiHealthSubscriber> log)
     { _agg = agg; _registry = registry; _log = log; }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -48,7 +50,7 @@ internal sealed class AiHealthSubscriber : IHostedService
             var ready = all.Count; // Using total count as readiness indicator; detailed reachability is checked by contributors
             _agg.Push(
                 component: "ai",
-                status: HealthStatus.Healthy,
+                status: Sora.Core.Observability.Health.HealthStatus.Healthy,
                 message: "ok",
                 ttl: TimeSpan.FromSeconds(30),
                 facts: new Dictionary<string, string>
@@ -61,7 +63,7 @@ internal sealed class AiHealthSubscriber : IHostedService
         catch (Exception ex)
         {
             _log.LogWarning(ex, "AI health push failed");
-            _agg.Push("ai", HealthStatus.Degraded, ex.Message, ttl: TimeSpan.FromSeconds(15));
+            _agg.Push("ai", Sora.Core.Observability.Health.HealthStatus.Degraded, ex.Message, ttl: TimeSpan.FromSeconds(15));
         }
         return Task.CompletedTask;
     }

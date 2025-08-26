@@ -60,7 +60,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<INamingDefaultsProvider, YourVectorNamingDefaultsProvider>());
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
     {
         var opts = cfg.GetSection("Sora:Data:YourVector");
         report.AddConfig("YourVector:Endpoint", opts["Endpoint"], sensitive: true);

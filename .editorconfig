@@ -1,0 +1,17 @@
+﻿root = true
+
+[*.cs]
+# Prefer file-scoped namespaces (enforced via IDE analyzer severity)
+dotnet_style_namespace_declarations = file_scoped:suggestion
+
+# Var usage and usings
+csharp_style_var_elsewhere = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+
+# Using directive placement
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# Newline options
+end_of_line = crlf
+insert_final_newline = true

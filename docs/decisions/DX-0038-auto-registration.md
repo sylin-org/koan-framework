@@ -16,7 +16,7 @@ We want Sora modules to "just work" when referenced, with minimal host boilerpla
 - "Reference = intent": Adding a project/package reference is sufficient to enable a module.
 - Each assembly provides `/Initialization/SoraAutoRegistrar.cs` implementing `Sora.Core.ISoraAutoRegistrar`.
   - Initialize(IServiceCollection): idempotently registers services/options/startup filters.
-  - Describe(SoraBootstrapReport, IConfiguration, IHostEnvironment): contributes a short, redacted summary to the boot report.
+  - Describe(BootReport, IConfiguration, IHostEnvironment): contributes a short, redacted summary to the boot report.
 - Assemblies may also declare internal `ISoraInitializer` helpers to support staged boot or discovery flows (e.g., deferred wiring after reading configuration or performing network discovery). These remain internal implementation details invoked by the registrar and must be idempotent.
 - The boot runtime aggregates all registrars, prints the report by default outside Production, and in Production when observability is enabled.
 - Legacy scattered `ISoraInitializer` classes are removed in favor of the single registrar per assembly.

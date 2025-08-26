@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Hosting;
+using Sora.Core.Observability.Probes;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Core;
 
@@ -7,10 +9,10 @@ namespace Sora.Core;
 internal sealed class HealthContributorsBridge : IHostedService
 {
     private readonly IHealthRegistry _registry;
-    private readonly IHealthAggregator _agg;
+    private readonly Sora.Core.Observability.Health.IHealthAggregator _agg;
     private readonly List<IDisposable> _subscriptions = new();
 
-    public HealthContributorsBridge(IHealthRegistry registry, IHealthAggregator agg)
+    public HealthContributorsBridge(IHealthRegistry registry, Sora.Core.Observability.Health.IHealthAggregator agg)
     { _registry = registry; _agg = agg; }
 
     public Task StartAsync(CancellationToken cancellationToken)

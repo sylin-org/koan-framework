@@ -370,8 +370,8 @@ public static class AddSoraGraphQlExtensions
 
     private static string ResolveStorageNameFactory(Type entityType)
     {
-        // Best-effort: use ambient SoraApp.Current if available; otherwise fallback to defaults
-        var sp = Core.SoraApp.Current;
+    // Best-effort: use ambient AppHost.Current if available; otherwise fallback to defaults
+    var sp = Sora.Core.Hosting.App.AppHost.Current;
         if (sp is not null) return ResolveStorageName(sp, entityType);
         // Fallback path without DI context
         return entityType.Name;

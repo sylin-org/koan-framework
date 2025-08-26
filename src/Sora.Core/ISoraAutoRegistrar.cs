@@ -7,5 +7,5 @@ public interface ISoraAutoRegistrar : ISoraInitializer
 {
     string ModuleName { get; }
     string? ModuleVersion { get; }
-    void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env);
+    void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env);
 }

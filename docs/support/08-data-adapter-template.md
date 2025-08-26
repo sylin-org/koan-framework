@@ -61,7 +61,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, YourDataHealthContributor>());
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
     {
         var opts = cfg.GetSection("Sora:Data:YourData");
         report.AddConfig("YourData:Endpoint", opts["Endpoint"], sensitive: true);

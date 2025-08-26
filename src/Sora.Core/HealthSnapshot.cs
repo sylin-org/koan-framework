@@ -1,7 +1,2 @@
-namespace Sora.Core;
-
-public sealed record HealthSnapshot(
-    HealthStatus Overall,
-    IReadOnlyList<HealthSample> Components,
-    DateTimeOffset AsOfUtc
-);
+// Moved to Observability/Health/HealthSnapshot.cs
+namespace Sora.Core { internal static class _HealthSnapshotMoved { } }

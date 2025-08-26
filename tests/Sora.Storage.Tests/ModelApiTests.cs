@@ -42,8 +42,8 @@ public class ModelApiTests
     {
         using var temp = new TempFolder();
         var sp = BuildServices(temp.Path);
-        // Ambient DI for model-centric API
-        SoraApp.Current = sp;
+    // Ambient DI for model-centric API
+    Sora.Core.Hosting.App.AppHost.Current = sp;
         var storage = sp.GetRequiredService<IStorageService>();
 
         // Create via model
@@ -71,7 +71,7 @@ public class ModelApiTests
     {
         using var temp = new TempFolder();
         var sp = BuildServices(temp.Path);
-        SoraApp.Current = sp;
+    Sora.Core.Hosting.App.AppHost.Current = sp;
         var storage = sp.GetRequiredService<IStorageService>();
 
         var rec = await FileA.CreateTextFile("move.txt", "data");
@@ -90,7 +90,7 @@ public class ModelApiTests
     {
         using var temp = new TempFolder();
         var sp = BuildServices(temp.Path);
-        SoraApp.Current = sp;
+    Sora.Core.Hosting.App.AppHost.Current = sp;
 
         var content = "abcdefghijklmnopqrstuvwxyz";
         var rec = await FileA.CreateTextFile("alpha.txt", content, "text/plain; charset=utf-8");
@@ -119,7 +119,7 @@ public class ModelApiTests
     {
         using var temp = new TempFolder();
         var sp = BuildServices(temp.Path);
-        SoraApp.Current = sp;
+    Sora.Core.Hosting.App.AppHost.Current = sp;
 
         var bytes = Encoding.UTF8.GetBytes("hello-world");
         var rec = await FileA.Create("blob.bin", bytes: (ReadOnlyMemory<byte>)bytes);

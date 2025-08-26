@@ -23,7 +23,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, JsonHealthContributor>());
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
         // ADR-0040: use helper to read DirectoryPath from either primary or default source sections

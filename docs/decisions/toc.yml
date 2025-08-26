@@ -2,6 +2,8 @@
   href: index.md
 - name: Architecture (ARCH)
   items:
+    - name: Foundational SoC namespaces and Abstractions
+      href: ARCH-0045-foundational-soc-namespaces-and-abstractions.md
     - name: Per-project companion docs — README + TECHNICAL
       href: ARCH-0042-per-project-companion-docs.md
     - name: Lightweight parity roadmap — Observability/Resilience/Recipes

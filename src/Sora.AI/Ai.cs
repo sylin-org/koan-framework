@@ -33,7 +33,7 @@ public static class Ai
         get
         {
             if (_override.Value is IAi) return true;
-            var sp = SoraApp.Current;
+            var sp = Sora.Core.Hosting.App.AppHost.Current;
             if (sp is null) return false;
             var ia = sp.GetService<IAi>();
             if (ia is not null) return true;
@@ -47,7 +47,7 @@ public static class Ai
     public static IAi? TryResolve()
     {
         if (_override.Value is IAi o) return o;
-        var sp = SoraApp.Current;
+    var sp = Sora.Core.Hosting.App.AppHost.Current;
         if (sp is null) return null;
         var ia = sp.GetService<IAi>();
         if (ia is not null) return ia;
@@ -61,7 +61,7 @@ public static class Ai
     private static IAi Resolve()
     {
         if (_override.Value is IAi o) return o;
-        var sp = SoraApp.Current ?? throw new InvalidOperationException("AI not configured; call services.AddSora() or AddAi() and ensure provider.UseSora().");
+    var sp = Sora.Core.Hosting.App.AppHost.Current ?? throw new InvalidOperationException("AI not configured; call services.AddSora() or AddAi() and ensure AppHost.Current is set during startup.");
         _resolver ??= CreateResolver(sp);
         return _resolver(sp);
     }

@@ -23,7 +23,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSora();
 
 var app = builder.Build();
-app.UseSora();
+// Greenfield boot
+Sora.Core.Hosting.App.AppHost.Current = app.Services;
+try { Sora.Core.SoraEnv.TryInitialize(app.Services); } catch { }
+(app.Services.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+(app.Services.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 app.Run();
 ```
 

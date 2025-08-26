@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 
+using Sora.Core.Observability.Health;
+
 namespace Sora.Core;
 
 internal sealed class HealthRegistry : IHealthRegistry

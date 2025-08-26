@@ -10,6 +10,10 @@ public static class Constants
     }
     public static class Configuration
     {
+        public static class Direct
+        {
+            public const string Section = "Sora:Data:Direct";
+        }
         public static class Runtime
         {
             public const string Section = "Sora:Data:Runtime";

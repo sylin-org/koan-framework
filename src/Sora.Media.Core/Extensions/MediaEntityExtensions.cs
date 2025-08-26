@@ -11,7 +11,7 @@ using Sora.Storage;
 public static class MediaEntityExtensions
 {
     private static IStorageService Storage()
-        => SoraApp.Current?.GetService(typeof(IStorageService)) as IStorageService
+    => Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService
            ?? throw new InvalidOperationException("IStorageService not available");
 
     // Url helper — presigned when supported; falls back to a routed fetch URL (left to Web layer later)

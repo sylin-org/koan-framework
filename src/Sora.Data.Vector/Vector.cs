@@ -11,11 +11,11 @@ namespace Sora.Data.Vector;
 public class Vector<TEntity> where TEntity : class, IEntity<string>
 {
     private static IVectorSearchRepository<TEntity, string> Repo
-        => (((Sora.Core.SoraApp.Current?.GetService(typeof(IVectorService))) as IVectorService)?.TryGetRepository<TEntity, string>())
+    => (((Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IVectorService))) as IVectorService)?.TryGetRepository<TEntity, string>())
             ?? throw new InvalidOperationException("No vector adapter configured for this entity.");
 
     private static IVectorSearchRepository<TEntity, string>? TryRepo
-        => ((Sora.Core.SoraApp.Current?.GetService(typeof(IVectorService))) as IVectorService)?.TryGetRepository<TEntity, string>();
+    => ((Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IVectorService))) as IVectorService)?.TryGetRepository<TEntity, string>();
 
     public static bool IsAvailable => TryRepo is not null;
 

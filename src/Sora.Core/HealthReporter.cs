@@ -2,7 +2,7 @@ namespace Sora.Core;
 
 public static class HealthReporter
 {
-    // Static convenience one-liners; resolves announcer from SoraApp.Current when available
+    // Static convenience one-liners; resolves announcer from AppHost.Current when available
     public static void Healthy(string name) => Resolve()?.Healthy(name);
     public static void Degraded(string name, string? description = null, IReadOnlyDictionary<string, object?>? data = null, TimeSpan? ttl = null)
         => Resolve()?.Degraded(name, description, data, ttl);
@@ -11,7 +11,7 @@ public static class HealthReporter
 
     private static IHealthAnnouncer? Resolve()
     {
-        try { return SoraApp.Current?.GetService(typeof(IHealthAnnouncer)) as IHealthAnnouncer; }
+    try { return Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IHealthAnnouncer)) as IHealthAnnouncer; }
         catch { return null; }
     }
 }

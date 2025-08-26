@@ -22,7 +22,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddSingleton<IStorageProvider, LocalStorageProvider>();
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
         var basePath = Core.Configuration.Read(cfg, $"{LocalStorageConstants.Configuration.Section}:{LocalStorageConstants.Configuration.Keys.BasePath}", string.Empty) ?? string.Empty;

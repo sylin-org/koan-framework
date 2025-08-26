@@ -105,7 +105,10 @@ public class DiscoveryE2ETests : IAsyncLifetime
         services.AddSora();
 
         var sp = services.BuildServiceProvider();
-        sp.UseSora();
+    Sora.Core.Hosting.App.AppHost.Current = sp;
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         // After UseSora, discovery initializer should have run; HttpInboxStore should be registered if found
         var http = sp.GetService<HttpInboxStore>();

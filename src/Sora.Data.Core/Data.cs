@@ -11,8 +11,8 @@ public static class Data<TEntity, TKey>
     where TKey : notnull
 {
     private static IDataRepository<TEntity, TKey> Repo
-        => SoraApp.Current?.GetService<IDataService>()?.GetRepository<TEntity, TKey>()
-           ?? throw new System.InvalidOperationException("SoraApp.Current is not set. Call services.AddSora(); then provider.UseSora() during startup.");
+    => Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()?.GetRepository<TEntity, TKey>()
+           ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
 
     public static IQueryCapabilities QueryCaps
         => Repo as IQueryCapabilities ?? new Caps(QueryCapabilities.None);
@@ -187,7 +187,7 @@ public static class Data<TEntity, TKey>
     public static class Vector
     {
         private static Sora.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey> Repo
-            => SoraApp.Current?.GetService<IDataService>()?.GetRequiredVectorRepository<TEntity, TKey>()
+            => Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()?.GetRequiredVectorRepository<TEntity, TKey>()
                ?? throw new System.InvalidOperationException("No vector repository available for this entity.");
 
         public static Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
@@ -300,8 +300,8 @@ public static class Data<TEntity, TKey>
     // Instruction execution sugar via IDataService-backed repository
     public static Task<TResult> Execute<TResult>(Instruction instruction, CancellationToken ct = default)
     {
-        var ds = SoraApp.Current?.GetService<IDataService>()
-                 ?? throw new System.InvalidOperationException("SoraApp.Current is not set. Call services.AddSora(); then provider.UseSora() during startup.");
+    var ds = Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
+                 ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
         return DataServiceExecuteExtensions.Execute<TEntity, TResult>(ds, instruction, ct);
     }
 
@@ -311,8 +311,8 @@ public static class Data<TEntity, TKey>
     // Raw SQL sugar helpers
     public static Task<int> Execute(string sql, CancellationToken ct = default)
     {
-        var ds = SoraApp.Current?.GetService<IDataService>()
-                 ?? throw new System.InvalidOperationException("SoraApp.Current is not set. Call services.AddSora(); then provider.UseSora() during startup.");
+    var ds = Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
+                 ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
         return DataServiceExecuteExtensions.Execute<TEntity, int>(ds, InstructionSql.NonQuery(sql), ct);
     }
 
@@ -321,8 +321,8 @@ public static class Data<TEntity, TKey>
 
     public static Task<TResult> Execute<TResult>(string sql, CancellationToken ct = default)
     {
-        var ds = SoraApp.Current?.GetService<IDataService>()
-                 ?? throw new System.InvalidOperationException("SoraApp.Current is not set. Call services.AddSora(); then provider.UseSora() during startup.");
+    var ds = Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
+         ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
         var instr = typeof(TResult) == typeof(int)
             ? InstructionSql.NonQuery(sql)
             : InstructionSql.Scalar(sql);

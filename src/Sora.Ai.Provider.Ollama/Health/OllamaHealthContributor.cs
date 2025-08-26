@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Sora.AI.Contracts.Adapters;
 using Sora.AI.Contracts.Routing;
 using Sora.Core;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Ai.Provider.Ollama.Health;
 
@@ -21,7 +22,7 @@ internal sealed class OllamaHealthContributor : IHealthContributor
         var adapters = _registry.All.Where(a => string.Equals(a.Type, Infrastructure.Constants.Adapter.Type, StringComparison.OrdinalIgnoreCase)).ToList();
         if (adapters.Count == 0)
         {
-            return new HealthReport(Name, HealthState.Unhealthy, "no ollama adapters registered");
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, "no ollama adapters registered", null, null);
         }
 
         // Collect models across all reachable adapters with short per-call timeout
@@ -50,7 +51,7 @@ internal sealed class OllamaHealthContributor : IHealthContributor
 
         if (reachable == 0)
         {
-            return new HealthReport(Name, HealthState.Unhealthy, "all ollama endpoints unreachable", null, data);
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, "all ollama endpoints unreachable", null, data);
         }
 
         // Required models (optional): Sora:Ai:Ollama:RequiredModels: [ "all-minilm", ... ]
@@ -59,9 +60,9 @@ internal sealed class OllamaHealthContributor : IHealthContributor
         if (missing.Length > 0)
         {
             data["required.missing"] = missing;
-            return new HealthReport(Name, HealthState.Unhealthy, $"missing models: {string.Join(", ", missing)}", null, data);
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, $"missing models: {string.Join(", ", missing)}", null, data);
         }
 
-        return new HealthReport(Name, HealthState.Healthy, null, null, data);
+    return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Healthy, null, null, data);
     }
 }

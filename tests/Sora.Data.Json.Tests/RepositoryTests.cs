@@ -173,8 +173,8 @@ public class RepositoryTests
     {
         var dir = TempDir();
         var sp = BuildServices(dir);
-        // Set SoraApp.Current so JSON repo can resolve set-aware physical names
-        Sora.Core.SoraApp.Current = sp;
+    // Set AppHost.Current so JSON repo can resolve set-aware physical names
+    Sora.Core.Hosting.App.AppHost.Current = sp;
 
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
@@ -281,6 +281,6 @@ public class RepositoryTests
         var hc = sp.GetServices<Sora.Core.IHealthContributor>().FirstOrDefault(h => h.Name == "data:json");
         hc.Should().NotBeNull();
         var report = await hc!.CheckAsync();
-        report.State.Should().Be(Sora.Core.HealthState.Healthy);
+    report.State.Should().Be(Sora.Core.Observability.Health.HealthState.Healthy);
     }
 }

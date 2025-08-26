@@ -1,21 +1,23 @@
+using Sora.Core.Observability.Health;
+
 namespace Sora.Core;
 
 // Adapter over the new IHealthAggregator for backward compatibility with HealthReporter
 internal sealed class HealthAnnouncements : IHealthAnnouncer, IHealthAnnouncementsStore
 {
-    private readonly IHealthAggregator _agg;
-    private readonly HealthAggregatorOptions _opt;
-    public HealthAnnouncements(IHealthAggregator agg, HealthAggregatorOptions opt)
+    private readonly Sora.Core.Observability.Health.IHealthAggregator _agg;
+    private readonly Sora.Core.Observability.Health.HealthAggregatorOptions _opt;
+    public HealthAnnouncements(Sora.Core.Observability.Health.IHealthAggregator agg, Sora.Core.Observability.Health.HealthAggregatorOptions opt)
     { _agg = agg; _opt = opt; }
 
     public void Healthy(string name)
-        => _agg.Push(name, HealthStatus.Healthy, message: null, ttl: null, facts: null);
+    => _agg.Push(name, Sora.Core.Observability.Health.HealthStatus.Healthy, message: null, ttl: null, facts: null);
 
     public void Degraded(string name, string? description = null, IReadOnlyDictionary<string, object?>? data = null, TimeSpan? ttl = null)
-        => _agg.Push(name, HealthStatus.Degraded, description, ttl, ToFacts(data));
+    => _agg.Push(name, Sora.Core.Observability.Health.HealthStatus.Degraded, description, ttl, ToFacts(data));
 
     public void Unhealthy(string name, string? description = null, IReadOnlyDictionary<string, object?>? data = null, TimeSpan? ttl = null)
-        => _agg.Push(name, HealthStatus.Unhealthy, description, ttl, ToFacts(data));
+    => _agg.Push(name, Sora.Core.Observability.Health.HealthStatus.Unhealthy, description, ttl, ToFacts(data));
 
     public IReadOnlyList<HealthReport> Snapshot()
     {
@@ -43,7 +45,7 @@ internal sealed class HealthAnnouncements : IHealthAnnouncer, IHealthAnnouncemen
         return dict;
     }
 
-    private static HealthState Map(HealthStatus s) => s switch
+    private static HealthState Map(Sora.Core.Observability.Health.HealthStatus s) => s switch
     {
         HealthStatus.Healthy => HealthState.Healthy,
         HealthStatus.Degraded => HealthState.Degraded,

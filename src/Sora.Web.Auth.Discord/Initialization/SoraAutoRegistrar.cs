@@ -17,7 +17,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuthProviderContributor, DiscordProviderContributor>());
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
         report.AddSetting("Provides", "discord (OAuth2)");

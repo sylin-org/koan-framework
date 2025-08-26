@@ -35,8 +35,8 @@ public class MediaBasicsTests
     public async Task Upload_Read_And_Delete_Work()
     {
         using var temp = new TempFolder();
-        var sp = BuildServices(temp.Path);
-        SoraApp.Current = sp;
+    var sp = BuildServices(temp.Path);
+    Sora.Core.Hosting.App.AppHost.Current = sp;
         var storage = sp.GetRequiredService<IStorageService>();
 
         // Upload via MediaEntity first-class API
@@ -77,8 +77,8 @@ public class MediaBasicsTests
         var services = new ServiceCollection();
         services.AddSoraStorage(config);
         services.AddSoraLocalStorageProvider(config);
-        var sp = services.BuildServiceProvider();
-        SoraApp.Current = sp;
+    var sp = services.BuildServiceProvider();
+    Sora.Core.Hosting.App.AppHost.Current = sp;
 
         var storage = sp.GetRequiredService<IStorageService>();
 

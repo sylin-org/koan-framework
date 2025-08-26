@@ -1,5 +1,4 @@
 using Sora.Data.Core;
-using Sora.Web;
 using Sora.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,11 +16,6 @@ builder.Services.AddMongoAdapter(o => o.ConnectionString = cs);
 // Swagger auto-registers via Sora initializer
 
 var app = builder.Build();
-
-app.UseSoraWeb();
-// Swagger UI wired automatically by startup filter
-
-app.UseDefaultFiles();
-app.UseStaticFiles();
+// Web pipeline is wired by Sora's startup filter (AddSora().AsWebApi()).
 
 app.Run($"http://0.0.0.0:__PORT__");

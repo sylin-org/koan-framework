@@ -1,5 +1,4 @@
 using Sora.Data.Core;
-using Sora.Web;
 using Sora.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,11 +11,7 @@ builder.Services.AddSqliteAdapter(o => o.ConnectionString = "Data Source=./data/
 // Swagger auto-registers via Sora initializer
 
 var app = builder.Build();
-
-app.UseSoraWeb();
-// Swagger UI wired automatically by startup filter
-
-app.UseStaticFiles();
+// Web pipeline is wired by Sora's startup filter (AddSora().AsWebApi()).
 
 app.MapGet("/", () => Results.Redirect("/swagger"));
 

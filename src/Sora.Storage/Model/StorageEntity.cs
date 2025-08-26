@@ -37,8 +37,8 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     }
 
     private static IStorageService Storage()
-        => (SoraApp.Current?.GetService(typeof(IStorageService)) as IStorageService)
-           ?? throw new InvalidOperationException("IStorageService not available. Ensure SoraInitialization.InitializeModules() ran and SoraApp.Current is set.");
+    => (Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService)
+           ?? throw new InvalidOperationException("IStorageService not available. Ensure AppBootstrapper.InitializeModules() ran and AppHost.Current is set (greenfield boot).");
 
     // Static creators
     public static async Task<TEntity> CreateTextFile(string name, string content, string? contentType = "text/plain; charset=utf-8", CancellationToken ct = default)

@@ -193,7 +193,7 @@ public static class MessagingExtensions
     }
     private static IMessageBus Resolve(string? busCode = null)
     {
-        var sp = SoraApp.Current ?? throw new InvalidOperationException("SoraApp.Current is not set. Call services.AddSora(); then provider.UseSora() during startup.");
+    var sp = Sora.Core.Hosting.App.AppHost.Current ?? throw new InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot set AppHost.Current during startup.");
         var sel = (IMessageBusSelector?)sp.GetService(typeof(IMessageBusSelector))
             ?? throw new InvalidOperationException("Messaging is not configured. Reference a provider package or register explicitly.");
         return busCode is null ? sel.ResolveDefault(sp) : sel.Resolve(sp, busCode);

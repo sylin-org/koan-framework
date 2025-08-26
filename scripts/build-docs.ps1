@@ -188,6 +188,12 @@ try {
   if ($Clean) {
     Write-Heading "Cleaning target directory"
     if (Test-Path $targetDest) { Remove-Item -Recurse -Force $targetDest }
+    # Also clean generated API YAML to avoid stale UIDs from removed types lingering in the repo
+    $apiDir = Join-Path $configDir 'api'
+    if (Test-Path $apiDir) {
+      Write-Host "Cleaning API metadata: $apiDir" -ForegroundColor DarkGray
+      Remove-Item -Recurse -Force $apiDir
+    }
   }
 
   # Logs directory

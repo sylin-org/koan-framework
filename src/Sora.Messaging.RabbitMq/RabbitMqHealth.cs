@@ -1,4 +1,5 @@
 using Sora.Core;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Messaging.RabbitMq;
 
@@ -18,13 +19,13 @@ internal sealed class RabbitMqHealth : IHealthContributor
             if (bus is RabbitMqBus rabbit)
             {
                 // Fast path: connected if channel open; more advanced checks can be added later
-                return Task.FromResult(new HealthReport(Name, HealthState.Healthy, "connected"));
+                return Task.FromResult(new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Healthy, "connected", null, null));
             }
-            return Task.FromResult(new HealthReport(Name, HealthState.Degraded, "RabbitMQ not the default bus"));
+            return Task.FromResult(new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Degraded, "RabbitMQ not the default bus", null, null));
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new HealthReport(Name, HealthState.Unhealthy, ex.Message, ex));
+            return Task.FromResult(new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null));
         }
     }
 }

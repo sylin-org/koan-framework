@@ -29,7 +29,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
 
     private string Keyspace()
     {
-        var sp = Sora.Core.SoraApp.Current;
+    var sp = Sora.Core.Hosting.App.AppHost.Current;
         if (sp is not null)
         {
             return Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);

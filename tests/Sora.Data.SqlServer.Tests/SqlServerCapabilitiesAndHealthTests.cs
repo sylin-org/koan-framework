@@ -24,7 +24,7 @@ public class SqlServerCapabilitiesAndHealthTests : IClassFixture<SqlServerAutoFi
         var contributors = _fx.ServiceProvider.GetRequiredService<System.Collections.Generic.IEnumerable<IHealthContributor>>();
         var sql = contributors.First(c => c.Name == "data:sqlserver");
         var report = await sql.CheckAsync(default);
-        report.State.Should().Be(HealthState.Healthy);
+    report.State.Should().Be(Sora.Core.Observability.Health.HealthState.Healthy);
 
         var data = _fx.Data;
         var repo = data.GetRepository<TestEntity, string>();

@@ -30,7 +30,7 @@ public class SqliteHealthTests
         var sp = BuildServices($"Data Source={file}");
         var hc = sp.GetRequiredService<IEnumerable<IHealthContributor>>().First(c => c.Name == "data:sqlite");
         var report = await hc.CheckAsync();
-        report.State.Should().Be(HealthState.Healthy);
+    report.State.Should().Be(Sora.Core.Observability.Health.HealthState.Healthy);
     }
 
     [Fact]
@@ -40,6 +40,6 @@ public class SqliteHealthTests
         var sp = BuildServices("Data Source=Z:/non-existent-path/noway/never/app.db");
         var hc = sp.GetRequiredService<IEnumerable<IHealthContributor>>().First(c => c.Name == "data:sqlite");
         var report = await hc.CheckAsync();
-        report.State.Should().Be(HealthState.Unhealthy);
+    report.State.Should().Be(Sora.Core.Observability.Health.HealthState.Unhealthy);
     }
 }

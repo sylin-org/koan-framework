@@ -17,7 +17,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         // We intentionally avoid double-registering since AddSora() is the canonical entry point.
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
         var ensure = cfg.Read(Infrastructure.Constants.Configuration.Runtime.EnsureSchemaOnStart, true);

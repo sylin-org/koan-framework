@@ -2,13 +2,14 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Scheduling;
 
 internal sealed class SchedulingOrchestrator(
     IOptionsMonitor<SchedulingOptions> options,
     IEnumerable<IScheduledTask> tasks,
-    IHealthAggregator health,
+    Sora.Core.Observability.Health.IHealthAggregator health,
     ILogger<SchedulingOrchestrator> logger,
     IHostEnvironment env
 ) : BackgroundService
@@ -80,7 +81,7 @@ internal sealed class SchedulingOrchestrator(
 
     private sealed class Runner(
         IScheduledTask task,
-        IHealthAggregator health,
+    Sora.Core.Observability.Health.IHealthAggregator health,
         string id,
         bool onStartup,
         TimeSpan? fixedDelay,
@@ -108,25 +109,25 @@ internal sealed class SchedulingOrchestrator(
                 if (cts is not null) cts.CancelAfter(timeout!.Value);
                 var runCt = cts?.Token ?? ct;
 
-                health.Push($"scheduling:task:{id}", HealthStatus.Healthy, message: "running", ttl: TimeSpan.FromSeconds(30), facts: Facts("running"));
+                health.Push($"scheduling:task:{id}", Sora.Core.Observability.Health.HealthStatus.Healthy, message: "running", ttl: TimeSpan.FromSeconds(30), facts: Facts("running"));
                 try
                 {
                     await task.RunAsync(runCt);
                     Interlocked.Increment(ref _success);
                     _lastError = null;
-                    health.Push($"scheduling:task:{id}", HealthStatus.Healthy, message: "ok", ttl: TimeSpan.FromMinutes(5), facts: Facts("ok"));
+                    health.Push($"scheduling:task:{id}", Sora.Core.Observability.Health.HealthStatus.Healthy, message: "ok", ttl: TimeSpan.FromMinutes(5), facts: Facts("ok"));
                 }
                 catch (OperationCanceledException) when (runCt.IsCancellationRequested)
                 {
                     Interlocked.Increment(ref _fail);
                     _lastError = "timeout";
-                    health.Push($"scheduling:task:{id}", HealthStatus.Unhealthy, message: "timeout", ttl: TimeSpan.FromMinutes(5), facts: Facts("timeout"));
+                    health.Push($"scheduling:task:{id}", Sora.Core.Observability.Health.HealthStatus.Unhealthy, message: "timeout", ttl: TimeSpan.FromMinutes(5), facts: Facts("timeout"));
                 }
                 catch (Exception ex)
                 {
                     Interlocked.Increment(ref _fail);
                     _lastError = ex.GetType().Name;
-                    health.Push($"scheduling:task:{id}", HealthStatus.Unhealthy, message: ex.Message, ttl: TimeSpan.FromMinutes(5), facts: Facts("error"));
+                    health.Push($"scheduling:task:{id}", Sora.Core.Observability.Health.HealthStatus.Unhealthy, message: ex.Message, ttl: TimeSpan.FromMinutes(5), facts: Facts("error"));
                 }
                 finally
                 {

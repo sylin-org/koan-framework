@@ -80,7 +80,10 @@ public class BasicRabbitMqTests : IAsyncLifetime
         services.AddSingleton<IMessageHandler<Hello>, HelloHandler>();
 
         var sp = services.BuildServiceProvider();
-        sp.UseSora();
+    Sora.Core.Hosting.App.AppHost.Current = sp;
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         await new Hello { Name = "Sora" }.Send();
 
@@ -117,7 +120,10 @@ public class BasicRabbitMqTests : IAsyncLifetime
         services.AddSingleton<IMessageHandler<MyPartitionedEvent>, PartitionedHandler>();
 
         var sp = services.BuildServiceProvider();
-        sp.UseSora();
+    Sora.Core.Hosting.App.AppHost.Current = sp;
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         await new MyPartitionedEvent { UserId = "user-42", Value = 7 }.Send();
         await Task.Delay(500);
@@ -169,7 +175,10 @@ public class BasicRabbitMqTests : IAsyncLifetime
         services.AddSingleton<IMessageHandler<Confirmable>, ConfirmableHandler>();
 
         var sp = services.BuildServiceProvider();
-        sp.UseSora();
+    Sora.Core.Hosting.App.AppHost.Current = sp;
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         await new Confirmable { Name = "ok" }.Send();
         await Task.Delay(300);
@@ -217,7 +226,10 @@ public class BasicRabbitMqTests : IAsyncLifetime
         services.AddSingleton<IMessageHandler<Batch<User>>>(batchHandler);
 
         var sp = services.BuildServiceProvider();
-        sp.UseSora();
+    Sora.Core.Hosting.App.AppHost.Current = sp;
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         var users = new[] { new User { Id = "u1" }, new User { Id = "u2" } };
         await users.SendAsBatch();
@@ -266,7 +278,10 @@ public class BasicRabbitMqTests : IAsyncLifetime
         services.AddSingleton<IMessageHandler<Hello>>(handler);
 
         var sp = services.BuildServiceProvider();
-        sp.UseSora();
+    Sora.Core.Hosting.App.AppHost.Current = sp;
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         await new Hello { Name = "auto" }.Send();
         await Task.Delay(300);
@@ -301,7 +316,10 @@ public class BasicRabbitMqTests : IAsyncLifetime
         services.AddSingleton<IMessageHandler<RetryMessage>>(handler);
 
         var sp = services.BuildServiceProvider();
-        sp.UseSora();
+    Sora.Core.Hosting.App.AppHost.Current = sp;
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         await new RetryMessage { Key = "k-1" }.Send();
 
@@ -369,8 +387,12 @@ public class BasicRabbitMqTests : IAsyncLifetime
         services.AddSora();
         services.AddSingleton<IMessageHandler<InboxSample>>(handler);
 
-        var sp = services.BuildServiceProvider();
-        sp.UseSora();
+    var sp = services.BuildServiceProvider();
+    // Greenfield boot: set AppHost, init env, and start runtime
+    Sora.Core.Hosting.App.AppHost.Current = sp;
+    try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         var msg1 = new InboxSample { OrderId = "o-1", Key = "same" };
         var msg2 = new InboxSample { OrderId = "o-1", Key = "same" };

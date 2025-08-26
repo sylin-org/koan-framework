@@ -24,7 +24,7 @@ Sora is modular and provider-agnostic. Core principles:
 ## Web package layout
 Sora.Web is organized for clarity:
 - Controllers — MVC endpoints like Health and Capabilities; entity base controller.
-- Hosting — Startup filter and `UseSoraWeb` to wire static files and MVC.
+- Hosting — Startup filter wires static files, secure headers, health, and MVC by default (no inline `MapGet/MapPost`).
 - Infrastructure — small helpers used by controllers/hosting only.
 
 This keeps endpoints out of startup code and avoids "god classes" while making discovery predictable.

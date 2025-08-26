@@ -1,16 +1,18 @@
 using System.Collections.Concurrent;
+using Sora.Core.Observability.Probes;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Core;
 
-internal sealed class HealthAggregator : IHealthAggregator
+internal sealed class HealthAggregator : Sora.Core.Observability.Health.IHealthAggregator
 {
-    private readonly HealthAggregatorOptions _options;
-    private readonly ConcurrentDictionary<string, HealthSample> _samples = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Sora.Core.Observability.Health.HealthAggregatorOptions _options;
+    private readonly ConcurrentDictionary<string, Sora.Core.Observability.Health.HealthSample> _samples = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _probeLock = new();
     private DateTimeOffset _lastSnapshotAt = DateTimeOffset.MinValue;
     private readonly ConcurrentDictionary<string, List<Action<ProbeRequestedEventArgs>>> _scopedHandlers = new(StringComparer.OrdinalIgnoreCase);
 
-    public HealthAggregator(HealthAggregatorOptions options)
+    public HealthAggregator(Sora.Core.Observability.Health.HealthAggregatorOptions options)
     {
         _options = options;
     }
@@ -73,7 +75,7 @@ internal sealed class HealthAggregator : IHealthAggregator
         }
     }
 
-    public void Push(string component, HealthStatus status, string? message = null, TimeSpan? ttl = null, IReadOnlyDictionary<string, string>? facts = null)
+    public void Push(string component, Sora.Core.Observability.Health.HealthStatus status, string? message = null, TimeSpan? ttl = null, IReadOnlyDictionary<string, string>? facts = null)
     {
         var now = DateTimeOffset.UtcNow;
         // Clamp message length
@@ -104,29 +106,29 @@ internal sealed class HealthAggregator : IHealthAggregator
                 _options.Ttl.MinTtl.TotalMilliseconds,
                 _options.Ttl.MaxTtl.TotalMilliseconds));
 
-        var sample = new HealthSample(component, status, message, now, effectiveTtl, facts);
+    var sample = new Sora.Core.Observability.Health.HealthSample(component, status, message, now, effectiveTtl, facts);
         _samples.AddOrUpdate(component, sample, (_, _) => sample);
         _lastSnapshotAt = now;
     }
 
-    public HealthSnapshot GetSnapshot()
+    public Sora.Core.Observability.Health.HealthSnapshot GetSnapshot()
     {
         var now = DateTimeOffset.UtcNow;
-        var list = new List<HealthSample>();
+    var list = new List<Sora.Core.Observability.Health.HealthSample>();
         foreach (var kv in _samples.ToArray())
         {
             var s = kv.Value;
             if (s.Ttl is not null && (s.TimestampUtc + s.Ttl.Value) <= now)
             {
                 // TTL elapsed: represent as Unknown; keep sample to compute overall
-                s = s with { Status = HealthStatus.Unknown };
+                s = s with { Status = Sora.Core.Observability.Health.HealthStatus.Unknown };
                 _samples.TryUpdate(kv.Key, s, kv.Value);
             }
             list.Add(s);
         }
 
         // Overall: worst state; Unknown handling via policy
-        HealthStatus overall = HealthStatus.Healthy;
+    Sora.Core.Observability.Health.HealthStatus overall = Sora.Core.Observability.Health.HealthStatus.Healthy;
         foreach (var s in list)
         {
             if (_options.Policy.ConsiderOnlyCriticalForOverall)
@@ -135,18 +137,18 @@ internal sealed class HealthAggregator : IHealthAggregator
                 if (!critical) continue;
             }
             var status = s.Status;
-            if (status == HealthStatus.Unknown)
+            if (status == Sora.Core.Observability.Health.HealthStatus.Unknown)
             {
                 var required = _options.Policy.RequiredComponents.Any(r => string.Equals(r, s.Component, StringComparison.OrdinalIgnoreCase));
                 if (_options.Policy.TreatUnknownAsDegradedForRequired && required)
-                    status = HealthStatus.Degraded;
+                    status = Sora.Core.Observability.Health.HealthStatus.Degraded;
                 else
                     continue;
             }
             if ((int)status > (int)overall) overall = status;
         }
 
-        return new HealthSnapshot(overall, list.OrderBy(x => x.Component).ToList(), now);
+    return new Sora.Core.Observability.Health.HealthSnapshot(overall, list.OrderBy(x => x.Component).ToList(), now);
     }
 
     public IDisposable Subscribe(string component, Action<ProbeRequestedEventArgs> handler)

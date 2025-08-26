@@ -1,3 +1,2 @@
-namespace Sora.Core;
-
-public enum HealthStatus { Healthy, Degraded, Unhealthy, Unknown }
+// Moved to Observability/Health/HealthStatus.cs
+namespace Sora.Core { internal static class _HealthStatusMoved { } }

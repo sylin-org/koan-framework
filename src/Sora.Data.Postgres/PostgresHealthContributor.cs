@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Sora.Core;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Data.Postgres;
 
@@ -16,11 +17,11 @@ internal sealed class PostgresHealthContributor(IOptions<PostgresOptions> option
             await conn.OpenAsync(ct);
             await using var cmd = new NpgsqlCommand("SELECT 1", conn);
             _ = await cmd.ExecuteScalarAsync(ct);
-            return new HealthReport(Name, HealthState.Healthy);
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Healthy, null, null, null);
         }
         catch (Exception ex)
         {
-            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, ex);
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
         }
     }
 }

@@ -22,7 +22,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, OllamaHealthContributor>());
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
         var nodes = cfg.GetSection(Infrastructure.Constants.Configuration.ServicesRoot).GetChildren().ToList();
