@@ -10,6 +10,8 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - Adapter-agnostic persistence (relational/NoSQL/JSON), pushdown-first, Direct escape hatch, CQRS/outbox, vector module.
 - Storage
   - Profile-based storage orchestrator with thin providers; local filesystem provider; DX helpers and model-centric API.
+- Media
+  - First-class media objects, HTTP bytes/HEAD endpoints with range/conditional support, cache-control, variants/derivatives, and transform pipelines integrated with Storage profiles.
 - Web
   - Controllers-only HTTP (REST/GraphQL), startup pipeline wiring, Swagger by default in dev, payload transformers.
 - Scheduling
@@ -28,6 +30,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 References
 - Data: docs/reference/data-access.md
 - Storage: docs/reference/storage.md
+- Media: docs/reference/media.md
 - Web: docs/reference/web.md
 - Messaging: docs/reference/messaging.md
 - AI: docs/reference/ai.md
@@ -85,6 +88,12 @@ References
   - Turnkey inference (streaming chat, embeddings) with minimal config; Redis-first vector + cache; RAG defaults; observability and budgets; optional sidecar/central proxy; one-call AddSoraAI() and auto-boot discovery.
   - Ollama provider integration for local AI models with streaming support and health monitoring.
   - Weaviate vector database adapter with GraphQL query translation and KNN search capabilities.
+- Media
+  - MediaObject<T> static API: Upload, Get, Open, Url, Ensure, Derivatives, Ancestors/Descendants, RunTask/StreamTask.
+  - HTTP endpoints (Sora.Media.Web): GET/HEAD bytes with conditional and range requests; proper Accept-Ranges, Content-Range, ETag/Last-Modified, and Cache-Control.
+  - Derivatives/variants: idempotent by DerivationKey, linked via SourceMediaId + RelationshipType; variant routing and canonical signatures per ADR MEDIA-0003.
+  - Transform pipeline (Sora.Media.Core): operator registry (resize, rotate, type-convert), strictness and placement options, predictable signatures.
+  - Storage integration: profile-based placement (hot/cold), presigned URLs when supported, CDN-friendly headers, and safe key handling via Storage.
 - Orchestration
   - DevHost CLI: export, up, down, status, logs with Docker-first then Podman fallback; JSON/verbose modes for tooling.
   - Deterministic export: emits `.sora/compose.yml` with profile-aware mounts and safe quoting; descriptor-first planning.
@@ -214,6 +223,3 @@ References
 
 See also: `docs/decisions/index.md` for architectural decisions and `docs/guides/*` for topic guides.
 
-## Media resources
-
-- Repository media assets (for README/docs): `resources/image/` (example: `resources/image/0_2.jpg`).
