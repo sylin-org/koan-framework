@@ -1,10 +1,11 @@
 ﻿using RabbitMQ.Client;
+using Sora.Messaging.Provisioning;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Net;
 using System.Text.Json;
 
-namespace Sora.Messaging.RabbitMq;
+namespace Sora.Messaging.RabbitMq.Provisioning;
 
 using Sora.Messaging.Infrastructure;
 internal sealed class RabbitMqProvisioner : ITopologyPlanner, ITopologyInspector, ITopologyDiffer, ITopologyApplier
@@ -112,7 +113,7 @@ internal sealed class RabbitMqProvisioner : ITopologyPlanner, ITopologyInspector
                 qArgs["x-dead-letter-exchange"] = dlx;
             queues.Add(new QueueSpec(q, Arguments: qArgs, Dlq: dlx is not null ? new DlqSpec(dlx) : null));
 
-            var rks = (sub.RoutingKeys is { Length: > 0 }) ? sub.RoutingKeys : new[] { "#" };
+            var rks = sub.RoutingKeys is { Length: > 0 } ? sub.RoutingKeys : new[] { "#" };
             foreach (var rk in rks)
                 bindings.Add(new BindingSpec(opts.Exchange, q, "queue", rk));
         }
@@ -141,7 +142,7 @@ internal sealed class RabbitMqProvisioner : ITopologyPlanner, ITopologyInspector
             var exTask = http.GetAsync($"/api/exchanges/{vhEsc}");
             var qTask = http.GetAsync($"/api/queues/{vhEsc}");
             var bTask = http.GetAsync($"/api/bindings/{vhEsc}");
-            HttpResponseMessage[] responses = System.Threading.Tasks.Task.WhenAll(exTask, qTask, bTask).GetAwaiter().GetResult();
+            HttpResponseMessage[] responses = Task.WhenAll(exTask, qTask, bTask).GetAwaiter().GetResult();
 
             if (responses.Any(r => r.StatusCode == HttpStatusCode.Unauthorized))
                 return new CurrentTopology(Array.Empty<ExchangeSpec>(), Array.Empty<QueueSpec>(), Array.Empty<BindingSpec>());
@@ -343,7 +344,7 @@ internal sealed class RabbitMqProvisioner : ITopologyPlanner, ITopologyInspector
     }
 
     private static IEnumerable<int> RabbitMqFactory_CompatComputeRetryBuckets(RetryOptions retry)
-        => Sora.Messaging.RabbitMq.RabbitMqFactory.ComputeRetryBuckets_PublicShim(retry);
+        => RabbitMqFactory.ComputeRetryBuckets_PublicShim(retry);
 
     private static (string? baseUrl, string? vhost, string? basicAuth) BuildMgmtContext(RabbitMqOptions opts)
     {

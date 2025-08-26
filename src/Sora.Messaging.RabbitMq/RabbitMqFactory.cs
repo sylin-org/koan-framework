@@ -5,10 +5,12 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Sora.Core;
-using System.Text;
-using System.Text.Json;
 using Sora.Messaging;
 using Sora.Messaging.Infrastructure;
+using Sora.Messaging.Provisioning;
+using Sora.Messaging.RabbitMq.Provisioning;
+using System.Text;
+using System.Text.Json;
 
 namespace Sora.Messaging.RabbitMq;
 
@@ -97,7 +99,7 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         var connection = factory.CreateConnection($"sora-{busCode}");
         var channel = connection.CreateModel();
 
-    if (opts.Prefetch > 0) channel.BasicQos(0, (ushort)Math.Min(ushort.MaxValue, opts.Prefetch), global: false);
+        if (opts.Prefetch > 0) channel.BasicQos(0, (ushort)Math.Min(ushort.MaxValue, opts.Prefetch), global: false);
 
         // Determine effective provisioning default: true normally, false in Production unless Sora:AllowMagicInProduction = true
         bool isProd = false;
@@ -124,9 +126,9 @@ public sealed class RabbitMqFactory : IMessageBusFactory
 
         // Provisioning: plan/inspect/diff/apply
         var msgOptsAccessor = sp.GetService(typeof(IOptions<MessagingOptions>)) as IOptions<MessagingOptions>;
-    var msgOpts = msgOptsAccessor?.Value ?? new MessagingOptions();
+        var msgOpts = msgOptsAccessor?.Value ?? new MessagingOptions();
         var provisioner = new RabbitMqProvisioner();
-    var desired = provisioner.Plan(busCode, msgOpts.DefaultGroup, opts, new RabbitMqCapabilities(), sp.GetService(typeof(ITypeAliasRegistry)) as ITypeAliasRegistry);
+        var desired = provisioner.Plan(busCode, msgOpts.DefaultGroup, opts, new RabbitMqCapabilities(), sp.GetService(typeof(ITypeAliasRegistry)) as ITypeAliasRegistry);
         CurrentTopology current = new(Array.Empty<ExchangeSpec>(), Array.Empty<QueueSpec>(), Array.Empty<BindingSpec>());
         if (mode != ProvisioningMode.Off && mode != ProvisioningMode.CreateIfMissing)
         {
@@ -134,7 +136,7 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         }
         var diff = provisioner.Diff(desired, current);
         var diagSvc = sp.GetService(typeof(IMessagingDiagnostics)) as IMessagingDiagnostics;
-            if (mode == ProvisioningMode.DryRun)
+        if (mode == ProvisioningMode.DryRun)
         {
             // Record effective plan and provisioning diagnostics; no apply
             var capsTmp = new RabbitMqCapabilities();
@@ -165,7 +167,7 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         // Ensure base exchange exists (idempotent); provisioner already declared in most modes 
         channel.ExchangeDeclare(exchange: opts.Exchange, type: opts.ExchangeType, durable: true, autoDelete: false, arguments: null);
 
-    var caps = new RabbitMqCapabilities();
+        var caps = new RabbitMqCapabilities();
 
         var plan = Negotiation.BuildPlan(busCode, ProviderName, caps, opts.Retry, opts.Dlq, requestDelay: false);
 

@@ -1,8 +1,8 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sora.Web.Auth.Domain;
 using Sora.Web.Auth.Infrastructure;
+using System.Security.Claims;
 
 namespace Sora.Web.Auth.Controllers;
 

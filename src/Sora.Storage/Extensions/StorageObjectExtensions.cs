@@ -1,14 +1,16 @@
-﻿namespace Sora.Storage.Extensions;
+﻿using Sora.Storage.Abstractions;
 
-using System.Text;
+namespace Sora.Storage.Extensions;
+
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
+using System.Text;
 
 public static class StorageObjectExtensions
 {
     private static IStorageService Storage()
-        => (SoraApp.Current?.GetService(typeof(IStorageService)) as IStorageService)
-           ?? throw new InvalidOperationException("IStorageService not available. Ensure SoraInitialization.InitializeModules() ran and SoraApp.Current is set.");
+    => (Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService)
+           ?? throw new InvalidOperationException("IStorageService not available. Ensure AppBootstrapper.InitializeModules() ran and AppHost.Current is set (greenfield boot).");
 
     public static Task<string> ReadAllText(this IStorageObject obj, Encoding? encoding = null, CancellationToken ct = default)
     {

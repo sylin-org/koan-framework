@@ -1,3 +1,1 @@
-namespace Sora.Core;
-
-public enum ProbeReason { Startup, Manual, TtlExpiry, StaleSnapshot, PolicyRefresh }
+// Moved to Sora.Core.Observability.Probes.ProbeReason

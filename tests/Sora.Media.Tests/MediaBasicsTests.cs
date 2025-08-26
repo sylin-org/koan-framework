@@ -3,8 +3,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
 using Sora.Media.Core;
+using Sora.Media.Core.Extensions;
 using Sora.Media.Core.Model;
 using Sora.Storage;
+using Sora.Storage.Abstractions;
+using Sora.Storage.Extensions;
+using Sora.Storage.Local;
 using Xunit;
 
 namespace Sora.Media.Tests;
@@ -32,7 +36,7 @@ public class MediaBasicsTests
     {
         using var temp = new TempFolder();
         var sp = BuildServices(temp.Path);
-        SoraApp.Current = sp;
+        Sora.Core.Hosting.App.AppHost.Current = sp;
         var storage = sp.GetRequiredService<IStorageService>();
 
         // Upload via MediaEntity first-class API
@@ -74,7 +78,7 @@ public class MediaBasicsTests
         services.AddSoraStorage(config);
         services.AddSoraLocalStorageProvider(config);
         var sp = services.BuildServiceProvider();
-        SoraApp.Current = sp;
+        Sora.Core.Hosting.App.AppHost.Current = sp;
 
         var storage = sp.GetRequiredService<IStorageService>();
 
@@ -82,16 +86,16 @@ public class MediaBasicsTests
         // For simplicity, create directly via storage then exercise model transfer helpers
         await storage.CreateTextFile("file.txt", "x", profile: "hot");
         var proxy = Sora.Media.Abstractions.Model.MediaEntity<ProfileMedia>.Get("file.txt");
-    var copied = await proxy.CopyTo<ColdProfileMedia>();
-    copied.Container.Should().Be("cold");
-    (await storage.ExistsAsync("cold", "cold", "file.txt")).Should().BeTrue();
+        var copied = await proxy.CopyTo<ColdProfileMedia>();
+        copied.Container.Should().Be("cold");
+        (await storage.ExistsAsync("cold", "cold", "file.txt")).Should().BeTrue();
 
-    var moved = await proxy.MoveTo<ColdProfileMedia>();
-    moved.Container.Should().Be("cold");
-    (await storage.ExistsAsync("hot", "hot", "file.txt")).Should().BeFalse();
-    (await storage.ExistsAsync("cold", "cold", "file.txt")).Should().BeTrue();
+        var moved = await proxy.MoveTo<ColdProfileMedia>();
+        moved.Container.Should().Be("cold");
+        (await storage.ExistsAsync("hot", "hot", "file.txt")).Should().BeFalse();
+        (await storage.ExistsAsync("cold", "cold", "file.txt")).Should().BeTrue();
 
-    await storage.EnsureDeleted("cold", "cold", "file.txt");
+        await storage.EnsureDeleted("cold", "cold", "file.txt");
     }
 
     private sealed class TempFolder : IDisposable

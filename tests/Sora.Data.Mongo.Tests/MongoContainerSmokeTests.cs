@@ -30,12 +30,25 @@ public class MongoContainerSmokeTests : IAsyncLifetime
         // Be nice to CI/dev boxes: disable Ryuk to reduce friction
         Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
 
-        _mongo = new MongoDbBuilder()
-            .WithImage("mongo:7")
-            .WithPortBinding(0, 27017)
-            .Build();
-        await _mongo.StartAsync();
-        _connString = _mongo.GetConnectionString();
+        try
+        {
+            _mongo = new MongoDbBuilder()
+                .WithImage("mongo:7")
+                .WithPortBinding(0, 27017)
+                .Build();
+            await _mongo.StartAsync();
+            _connString = _mongo.GetConnectionString();
+        }
+        catch
+        {
+            // Docker might be installed but not usable (auth/config). Mark unavailable to skip tests.
+            _available = false;
+            if (_mongo is not null)
+            {
+                try { await _mongo.DisposeAsync(); } catch { }
+                _mongo = null;
+            }
+        }
     }
 
     public async Task DisposeAsync()

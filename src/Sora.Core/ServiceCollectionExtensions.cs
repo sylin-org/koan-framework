@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Sora.Core.Modules;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Core;
 
@@ -28,15 +30,19 @@ public static class ServiceCollectionExtensions
 
         // Legacy health registry removed in greenfield; aggregator is the single source of truth
         // Health Aggregator (push-first)
-        services.AddOptions<HealthAggregatorOptions>().BindConfiguration("Sora:Health:Aggregator");
-        services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HealthAggregatorOptions>>().Value);
-        services.AddSingleton<IHealthAggregator, HealthAggregator>();
+        // Note: Fully qualify Options type to avoid collision with Sora.Core.HealthAggregatorOptions.
+        services.AddSoraOptions<Sora.Core.Observability.Health.HealthAggregatorOptions>("Sora:Health:Aggregator");
+        services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Sora.Core.Observability.Health.HealthAggregatorOptions>>().Value);
+        services.AddSingleton<Sora.Core.Observability.Health.IHealthAggregator, Sora.Core.Observability.Health.HealthAggregator>();
         // Bridge legacy contributors (registered by adapters) into aggregator
         services.AddSingleton<IHealthRegistry, HealthRegistry>();
         services.AddHostedService<HealthContributorsBridge>();
-        services.AddHostedService<HealthAggregatorScheduler>();
+        services.AddHostedService<HealthProbeScheduler>();
         // Kick a startup probe so readiness is populated early
         services.AddHostedService<StartupProbeService>();
+        // Hosting runtime: apps depend on greenfield IAppRuntime
+        if (!services.Any(d => d.ServiceType == typeof(Sora.Core.Hosting.Runtime.IAppRuntime)))
+            services.AddSingleton<Sora.Core.Hosting.Runtime.IAppRuntime, Sora.Core.Hosting.Runtime.AppRuntime>();
         return services;
     }
 }

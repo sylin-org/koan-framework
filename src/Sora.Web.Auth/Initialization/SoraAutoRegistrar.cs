@@ -19,14 +19,14 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.SoraWebAuthStartupFilter>());
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
 
         // Best-effort discovery summary without binding or DI: list provider display names and protocol
         // Strategy: if configured providers exist, list those; otherwise fall back to well-known defaults.
         var section = cfg.GetSection(Options.AuthOptions.SectionPath);
-    var providers = section.GetSection("Providers");
+        var providers = section.GetSection("Providers");
 
         static string PrettyProtocol(string? type)
             => string.IsNullOrWhiteSpace(type) ? "OIDC"

@@ -1,15 +1,17 @@
+using Sora.Storage.Abstractions;
+
 namespace Sora.Media.Web.Controllers;
 
 using Microsoft.AspNetCore.Mvc;
-using Sora.Storage.Model;
-using Sora.Storage;
+using Microsoft.Extensions.Options;
 using Sora.Media.Web.Infrastructure;
 using Sora.Media.Web.Options;
-using Microsoft.Extensions.Options;
+using Sora.Storage;
+using Sora.Storage.Model;
 
 [ApiController]
 [Route("api/media")] // Consumers can re-route via MapControllerRoute or attribute routing in derived class
-public abstract class MediaContentController<TEntity> : ControllerBase where TEntity : class, Sora.Storage.IStorageObject
+public abstract class MediaContentController<TEntity> : ControllerBase where TEntity : class, IStorageObject
 {
     private readonly IOptions<MediaContentOptions> _options;
 
@@ -31,7 +33,7 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
         if (stat is null) return NotFound();
 
         // Conditional GET with ETag / If-Modified-Since
-    if (Request.Headers.TryGetValue(HttpHeaderNames.IfNoneMatch, out var inm) && !string.IsNullOrWhiteSpace(stat.ETag))
+        if (Request.Headers.TryGetValue(HttpHeaderNames.IfNoneMatch, out var inm) && !string.IsNullOrWhiteSpace(stat.ETag))
         {
             if (inm.Any(v => string.Equals(v, stat.ETag, StringComparison.Ordinal)))
             {
@@ -39,7 +41,7 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
                 return StatusCode(304);
             }
         }
-    if (Request.Headers.TryGetValue(HttpHeaderNames.IfModifiedSince, out var ims) && stat.LastModified.HasValue)
+        if (Request.Headers.TryGetValue(HttpHeaderNames.IfModifiedSince, out var ims) && stat.LastModified.HasValue)
         {
             if (DateTimeOffset.TryParse(ims.ToString(), out var since))
             {
@@ -56,7 +58,7 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
         }
 
         // Range request handling
-    if (Request.Headers.TryGetValue(HttpHeaderNames.Range, out var rangeHeader) && rangeHeader.Count > 0)
+        if (Request.Headers.TryGetValue(HttpHeaderNames.Range, out var rangeHeader) && rangeHeader.Count > 0)
         {
             var (from, to) = ParseRange(rangeHeader.ToString());
             var length = stat.Length;
@@ -116,9 +118,9 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
     {
         var stat = await StorageEntity<TEntity>.Head(key, ct);
         if (stat is null) return NotFound();
-    Response.Headers[HttpHeaderNames.AcceptRanges] = "bytes";
-    SetEntityHeaders(stat, key);
-    ConfigureResponse(HttpContext.Response, stat);
+        Response.Headers[HttpHeaderNames.AcceptRanges] = "bytes";
+        SetEntityHeaders(stat, key);
+        ConfigureResponse(HttpContext.Response, stat);
         if (stat.Length.HasValue) Response.ContentLength = stat.Length.Value;
         Response.ContentType = ResolveContentType(stat, key);
         return Ok();
@@ -126,10 +128,10 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
 
     private async Task<IActionResult> SendFullAsync(string key, ObjectStat stat, CancellationToken ct)
     {
-    var full = await StorageEntity<TEntity>.OpenRead(key, ct);
-    SetEntityHeaders(stat, key);
-    Response.Headers[HttpHeaderNames.AcceptRanges] = "bytes";
-    ConfigureResponse(HttpContext.Response, stat);
+        var full = await StorageEntity<TEntity>.OpenRead(key, ct);
+        SetEntityHeaders(stat, key);
+        Response.Headers[HttpHeaderNames.AcceptRanges] = "bytes";
+        ConfigureResponse(HttpContext.Response, stat);
         if (stat.Length.HasValue) Response.ContentLength = stat.Length.Value;
         return File(full, ResolveContentType(stat, key));
     }
@@ -139,8 +141,8 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
 
     protected virtual void SetEntityHeaders(ObjectStat stat, string key)
     {
-    if (!string.IsNullOrWhiteSpace(stat.ETag)) Response.Headers[HttpHeaderNames.ETag] = stat.ETag!;
-    if (stat.LastModified.HasValue) Response.Headers[HttpHeaderNames.LastModified] = stat.LastModified.Value.ToString("R");
+        if (!string.IsNullOrWhiteSpace(stat.ETag)) Response.Headers[HttpHeaderNames.ETag] = stat.ETag!;
+        if (stat.LastModified.HasValue) Response.Headers[HttpHeaderNames.LastModified] = stat.LastModified.Value.ToString("R");
         Response.ContentType = ResolveContentType(stat, key);
     }
 
@@ -183,7 +185,7 @@ public abstract class MediaContentController<TEntity> : ControllerBase where TEn
 
     private void SetInvalidRange(long length)
     {
-    Response.Headers[HttpHeaderNames.AcceptRanges] = "bytes";
-    Response.Headers[HttpHeaderNames.ContentRange] = $"bytes */{length}";
+        Response.Headers[HttpHeaderNames.AcceptRanges] = "bytes";
+        Response.Headers[HttpHeaderNames.ContentRange] = $"bytes */{length}";
     }
 }

@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Sora.AI.Contracts.Routing;
 using Sora.Ai.Provider.Ollama.Options;
+using Sora.AI.Contracts.Routing;
 
 namespace Sora.Ai.Provider.Ollama.Initialization;
 

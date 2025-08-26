@@ -5,18 +5,7 @@ using Sora.Web.Auth.Options;
 
 namespace Sora.Web.Auth.Providers;
 
-public interface IProviderRegistry
-{
-    IReadOnlyDictionary<string, ProviderOptions> EffectiveProviders { get; }
-    IEnumerable<ProviderDescriptor> GetDescriptors();
-}
-
 // Extensibility point: other packages can contribute provider defaults (e.g., a TestProvider in development).
-public interface IAuthProviderContributor
-{
-    // Return additional provider defaults keyed by id. Do not read configuration here; stick to static defaults.
-    IReadOnlyDictionary<string, ProviderOptions> GetDefaults();
-}
 
 internal sealed class ProviderRegistry : IProviderRegistry
 {

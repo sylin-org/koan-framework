@@ -16,7 +16,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddSoraDataVector();
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
         var def = Configuration.Read(cfg, "Sora:Data:VectorDefaults:DefaultProvider", null);

@@ -1,5 +1,5 @@
-﻿using Sora.Web.Extensions;
-using Sora.Data.Core;
+﻿using Sora.Data.Core;
+using Sora.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 

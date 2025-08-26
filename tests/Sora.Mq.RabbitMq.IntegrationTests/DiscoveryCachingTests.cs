@@ -1,4 +1,3 @@
-using System.Text.Json;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using FluentAssertions;
@@ -10,6 +9,7 @@ using Sora.Core;
 using Sora.Data.Core;
 using Sora.Messaging;
 using Sora.Testing;
+using System.Text.Json;
 using Xunit;
 
 namespace Sora.Mq.RabbitMq.IntegrationTests;
@@ -98,7 +98,10 @@ public class DiscoveryCachingTests : IAsyncLifetime
         services.AddSingleton<IConfiguration>(cfg);
         services.AddSora();
         var sp = services.BuildServiceProvider();
-        sp.UseSora();
+        Sora.Core.Hosting.App.AppHost.Current = sp;
+        try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
+    (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+        (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         // First discovery: triggers ping
         var client = sp.GetRequiredService<IInboxDiscoveryClient>();

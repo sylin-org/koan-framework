@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Data.SqlServer;
 
@@ -17,11 +18,11 @@ internal sealed class SqlServerHealthContributor(IOptions<SqlServerOptions> opti
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT 1";
             _ = await cmd.ExecuteScalarAsync(ct);
-            return new HealthReport(Name, HealthState.Healthy);
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Healthy, null, null, null);
         }
         catch (Exception ex)
         {
-            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, ex);
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
         }
     }
 }

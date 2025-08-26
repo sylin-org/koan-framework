@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Web.Infrastructure;
-using System.Diagnostics;
 using Sora.Web.Options;
+using System.Diagnostics;
 
 namespace Sora.Web.Hosting;
 
@@ -25,7 +25,12 @@ internal sealed class SoraWebStartupFilter(IOptions<SoraWebOptions> options, IOp
             if (!app.Properties.ContainsKey(appliedKey))
             {
                 app.Properties[appliedKey] = true;
-                app.ApplicationServices.UseSora().StartSora();
+                // Greenfield boot: set AppHost, initialize env, run runtime
+                Sora.Core.Hosting.App.AppHost.Current = app.ApplicationServices;
+                try { Sora.Core.SoraEnv.TryInitialize(app.ApplicationServices); } catch { }
+                var rt = app.ApplicationServices.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime;
+                rt?.Discover();
+                rt?.Start();
 
                 // Dev-only: reserve space for future diagnostics (SoC: data modules own their config and reporting)
                 if (pipeline.UseExceptionHandler)

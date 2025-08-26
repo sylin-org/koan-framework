@@ -1,13 +1,15 @@
 using Microsoft.Extensions.Logging;
+using Sora.Core.Observability.Health;
+using Sora.Core.Observability.Probes;
 
 namespace Sora.Core;
 
 internal sealed class StartupProbeService : Microsoft.Extensions.Hosting.IHostedService
 {
-    private readonly IHealthAggregator _agg;
+    private readonly Sora.Core.Observability.Health.IHealthAggregator _agg;
     private readonly IHealthRegistry _registry;
     private readonly ILogger<StartupProbeService>? _log;
-    public StartupProbeService(IHealthAggregator agg, IHealthRegistry registry, ILogger<StartupProbeService>? log = null)
+    public StartupProbeService(Sora.Core.Observability.Health.IHealthAggregator agg, IHealthRegistry registry, ILogger<StartupProbeService>? log = null)
     { _agg = agg; _registry = registry; _log = log; }
     public Task StartAsync(CancellationToken cancellationToken)
     {

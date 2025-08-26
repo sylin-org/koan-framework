@@ -1,6 +1,3 @@
-using System.Collections.Concurrent;
-using System.Data;
-using System.Linq.Expressions;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
@@ -17,6 +14,9 @@ using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
 using Sora.Data.Relational.Orchestration;
+using System.Collections.Concurrent;
+using System.Data;
+using System.Linq.Expressions;
 
 namespace Sora.Data.Sqlite;
 
@@ -676,193 +676,193 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         switch (instruction.Name)
         {
             case RelationalInstructions.SchemaValidate:
-            {
-                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                var ddl = new SqliteDdlExecutor(conn, TableName);
-                var feats = new SqliteStoreFeatures();
-                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
-                // Normalize to provider options for tests: override MatchingMode/DdlAllowed and compute missing projected columns
-                var projections = ProjectionResolver.Get(typeof(TEntity));
-                var required = projections.Select(p => p.ColumnName).ToArray();
-                var tableExists = ddl.TableExists(string.Empty, TableName);
-                // Debug aid (suppressed in Release): PRAGMA table_info snapshot during validate
+                {
+                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                    var ddl = new SqliteDdlExecutor(conn, TableName);
+                    var feats = new SqliteStoreFeatures();
+                    var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                    // Normalize to provider options for tests: override MatchingMode/DdlAllowed and compute missing projected columns
+                    var projections = ProjectionResolver.Get(typeof(TEntity));
+                    var required = projections.Select(p => p.ColumnName).ToArray();
+                    var tableExists = ddl.TableExists(string.Empty, TableName);
+                    // Debug aid (suppressed in Release): PRAGMA table_info snapshot during validate
 #if DEBUG
-                try
-                {
-                    using var dbg = conn.CreateCommand();
-                    dbg.CommandText = $"PRAGMA table_info('{TableName}')";
-                    using var rdr = dbg.ExecuteReader();
-                    System.Diagnostics.Debug.WriteLine($"[VALIDATE] PRAGMA table_info for {TableName} (begin):");
-                    while (rdr.Read())
-                    {
-                        var nm = rdr.IsDBNull(1) ? "(null)" : rdr.GetString(1);
-                        var tp = rdr.IsDBNull(2) ? "(null)" : rdr.GetString(2);
-                        System.Diagnostics.Debug.WriteLine($"[VALIDATE]   name={nm}, type={tp}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[VALIDATE] PRAGMA table_info failed for {TableName}: {ex.Message}");
-                }
-#endif
-                var missing = required.Where(c => !ddl.ColumnExists(string.Empty, TableName, c)).ToArray();
-                // Quick retry to avoid races where another operation creates columns concurrently
-                if (missing.Length > 0)
-                {
                     try
                     {
-                        Thread.Sleep(30);
-                        missing = required.Where(c => !ddl.ColumnExists(string.Empty, TableName, c)).ToArray();
+                        using var dbg = conn.CreateCommand();
+                        dbg.CommandText = $"PRAGMA table_info('{TableName}')";
+                        using var rdr = dbg.ExecuteReader();
+                        System.Diagnostics.Debug.WriteLine($"[VALIDATE] PRAGMA table_info for {TableName} (begin):");
+                        while (rdr.Read())
+                        {
+                            var nm = rdr.IsDBNull(1) ? "(null)" : rdr.GetString(1);
+                            var tp = rdr.IsDBNull(2) ? "(null)" : rdr.GetString(2);
+                            System.Diagnostics.Debug.WriteLine($"[VALIDATE]   name={nm}, type={tp}");
+                        }
                     }
-                    catch { }
-                }
-                // Debug: print ColumnExists outcome per required column (debug only)
-#if DEBUG
-                try
-                {
-                    foreach (var c in required)
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[VALIDATE] PRAGMA table_info failed for {TableName}: {ex.Message}");
+                    }
+#endif
+                    var missing = required.Where(c => !ddl.ColumnExists(string.Empty, TableName, c)).ToArray();
+                    // Quick retry to avoid races where another operation creates columns concurrently
+                    if (missing.Length > 0)
                     {
                         try
                         {
-                            var exists = ddl.ColumnExists(string.Empty, TableName, c);
-                            System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists check: table={TableName}, column={c}, exists={exists}");
+                            Thread.Sleep(30);
+                            missing = required.Where(c => !ddl.ColumnExists(string.Empty, TableName, c)).ToArray();
                         }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists check error for {c}: {ex.Message}");
-                        }
+                        catch { }
                     }
-                }
-                catch { }
-#endif
-                report["TableExists"] = tableExists;
-                report["MissingColumns"] = missing;
-                // Matching mode: prefer explicit config (including env override)
-                var modeStr = Configuration.ReadFirst(
-                    _sp.GetRequiredService<IConfiguration>(),
-                    defaultValue: _options.SchemaMatching.ToString(),
-                    Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
-                    Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
-                if (string.IsNullOrWhiteSpace(modeStr)) modeStr = _options.SchemaMatching.ToString();
-                report["MatchingMode"] = modeStr;
-                var ddlAllowed = _options.DdlPolicy == SchemaDdlPolicy.AutoCreate && (!SoraEnv.IsProduction || _options.AllowProductionDdl);
-                if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any()) ddlAllowed = false;
-                report["DdlAllowed"] = ddlAllowed;
-                var strict = string.Equals(modeStr, "Strict", StringComparison.OrdinalIgnoreCase);
-                var state = !tableExists ? (strict ? "Unhealthy" : "Degraded") : (missing.Length > 0 ? (strict ? "Unhealthy" : "Degraded") : "Healthy");
-                report["State"] = state;
-                return (TResult)report;
-            }
-            case DataInstructions.EnsureCreated:
-            {
-                if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any())
-                {
-                    object ok_readonly = true; return (TResult)ok_readonly;
-                }
-                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                var ddl = new SqliteDdlExecutor(conn, TableName);
-                var feats = new SqliteStoreFeatures();
-                try
-                {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
-                }
-                catch (InvalidOperationException ex) when (ex.Message?.Contains("DDL is disabled", StringComparison.OrdinalIgnoreCase) == true)
-                {
-                    // Orchestrator refused to perform DDL. Fall back to a best-effort local creation so tests that expect AutoCreate succeed.
-                    var projections = ProjectionResolver.Get(typeof(TEntity));
-                    var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
-                    allColumns.Add(("Id", typeof(string), false, false, null, false));
-                    allColumns.Add(("Json", typeof(string), false, false, null, false));
-                    foreach (var p in projections)
+                    // Debug: print ColumnExists outcome per required column (debug only)
+#if DEBUG
+                    try
                     {
-                        allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
+                        foreach (var c in required)
+                        {
+                            try
+                            {
+                                var exists = ddl.ColumnExists(string.Empty, TableName, c);
+                                System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists check: table={TableName}, column={c}, exists={exists}");
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[VALIDATE] ColumnExists check error for {c}: {ex.Message}");
+                            }
+                        }
                     }
-                    ((dynamic)ddl).CreateTableWithColumns(string.Empty, TableName, allColumns);
+                    catch { }
+#endif
+                    report["TableExists"] = tableExists;
+                    report["MissingColumns"] = missing;
+                    // Matching mode: prefer explicit config (including env override)
+                    var modeStr = Configuration.ReadFirst(
+                        _sp.GetRequiredService<IConfiguration>(),
+                        defaultValue: _options.SchemaMatching.ToString(),
+                        Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
+                        Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
+                    if (string.IsNullOrWhiteSpace(modeStr)) modeStr = _options.SchemaMatching.ToString();
+                    report["MatchingMode"] = modeStr;
+                    var ddlAllowed = _options.DdlPolicy == SchemaDdlPolicy.AutoCreate && (!SoraEnv.IsProduction || _options.AllowProductionDdl);
+                    if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any()) ddlAllowed = false;
+                    report["DdlAllowed"] = ddlAllowed;
+                    var strict = string.Equals(modeStr, "Strict", StringComparison.OrdinalIgnoreCase);
+                    var state = !tableExists ? (strict ? "Unhealthy" : "Degraded") : (missing.Length > 0 ? (strict ? "Unhealthy" : "Degraded") : "Healthy");
+                    report["State"] = state;
+                    return (TResult)report;
                 }
-                object d_ok = true; return (TResult)d_ok;
-            }
+            case DataInstructions.EnsureCreated:
+                {
+                    if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any())
+                    {
+                        object ok_readonly = true; return (TResult)ok_readonly;
+                    }
+                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                    var ddl = new SqliteDdlExecutor(conn, TableName);
+                    var feats = new SqliteStoreFeatures();
+                    try
+                    {
+                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message?.Contains("DDL is disabled", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        // Orchestrator refused to perform DDL. Fall back to a best-effort local creation so tests that expect AutoCreate succeed.
+                        var projections = ProjectionResolver.Get(typeof(TEntity));
+                        var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
+                        allColumns.Add(("Id", typeof(string), false, false, null, false));
+                        allColumns.Add(("Json", typeof(string), false, false, null, false));
+                        foreach (var p in projections)
+                        {
+                            allColumns.Add((p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
+                        }
+                        ((dynamic)ddl).CreateTableWithColumns(string.Empty, TableName, allColumns);
+                    }
+                    object d_ok = true; return (TResult)d_ok;
+                }
             case RelationalInstructions.SchemaClear:
-            {
-                // Remove the table if present; do not create it.
-                var drop = $"DROP TABLE IF EXISTS \"{TableName}\";";
-                try { await conn.ExecuteAsync(drop); } catch { }
-                // Invalidate health cache so a subsequent operation will re-ensure the schema
-                try { var cacheKey = ($"{conn.DataSource}/{conn.Database}::{TableName}"); _healthyCache.TryRemove(cacheKey, out _); } catch { }
-                object res = 0; return (TResult)res;
-            }
+                {
+                    // Remove the table if present; do not create it.
+                    var drop = $"DROP TABLE IF EXISTS \"{TableName}\";";
+                    try { await conn.ExecuteAsync(drop); } catch { }
+                    // Invalidate health cache so a subsequent operation will re-ensure the schema
+                    try { var cacheKey = ($"{conn.DataSource}/{conn.Database}::{TableName}"); _healthyCache.TryRemove(cacheKey, out _); } catch { }
+                    object res = 0; return (TResult)res;
+                }
             case DataInstructions.Clear:
                 EnsureOrchestrated(conn);
                 var del = await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
                 object d_res = del;
                 return (TResult)d_res;
             case RelationalInstructions.SchemaEnsureCreated:
-            {
-                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                var ddl = new SqliteDdlExecutor(conn, TableName);
-                var feats = new SqliteStoreFeatures();
-                await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
-                object ok = true; return (TResult)ok;
-            }
+                {
+                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                    var ddl = new SqliteDdlExecutor(conn, TableName);
+                    var feats = new SqliteStoreFeatures();
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
+                    object ok = true; return (TResult)ok;
+                }
             case RelationalInstructions.SqlScalar:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                try
                 {
-                    var result = await conn.ExecuteScalarAsync(sql, p);
-                    return CastScalar<TResult>(result);
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    try
+                    {
+                        var result = await conn.ExecuteScalarAsync(sql, p);
+                        return CastScalar<TResult>(result);
+                    }
+                    catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+                    {
+                        Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                        EnsureOrchestrated(conn);
+                        var result = await conn.ExecuteScalarAsync(sql, p);
+                        return CastScalar<TResult>(result);
+                    }
                 }
-                catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-                {
-                    Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                    EnsureOrchestrated(conn);
-                    var result = await conn.ExecuteScalarAsync(sql, p);
-                    return CastScalar<TResult>(result);
-                }
-            }
             case RelationalInstructions.SqlNonQuery:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                sql = MaybeRewriteInsertForProjection(sql);
-                // Ensure table exists if targeting this entity table
-                try { EnsureOrchestrated(conn); } catch { }
-                var p = GetParamsFromInstruction(instruction);
-                try
                 {
-                    var affected = await conn.ExecuteAsync(sql, p);
-                    object res = affected;
-                    return (TResult)res;
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    sql = MaybeRewriteInsertForProjection(sql);
+                    // Ensure table exists if targeting this entity table
+                    try { EnsureOrchestrated(conn); } catch { }
+                    var p = GetParamsFromInstruction(instruction);
+                    try
+                    {
+                        var affected = await conn.ExecuteAsync(sql, p);
+                        object res = affected;
+                        return (TResult)res;
+                    }
+                    catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+                    {
+                        Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                        EnsureOrchestrated(conn);
+                        var affected = await conn.ExecuteAsync(sql, p);
+                        object res = affected;
+                        return (TResult)res;
+                    }
                 }
-                catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-                {
-                    Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                    EnsureOrchestrated(conn);
-                    var affected = await conn.ExecuteAsync(sql, p);
-                    object res = affected;
-                    return (TResult)res;
-                }
-            }
             case RelationalInstructions.SqlQuery:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                // Best-effort ensure for entity table
-                try { EnsureOrchestrated(conn); } catch { }
-                try
                 {
-                    var rows = await conn.QueryAsync(sql, p);
-                    var list = MapDynamicRows(rows);
-                    return (TResult)(object)list;
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    // Best-effort ensure for entity table
+                    try { EnsureOrchestrated(conn); } catch { }
+                    try
+                    {
+                        var rows = await conn.QueryAsync(sql, p);
+                        var list = MapDynamicRows(rows);
+                        return (TResult)(object)list;
+                    }
+                    catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+                    {
+                        Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                        EnsureOrchestrated(conn);
+                        var rows = await conn.QueryAsync(sql, p);
+                        var list = MapDynamicRows(rows);
+                        return (TResult)(object)list;
+                    }
                 }
-                catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-                {
-                    Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                    EnsureOrchestrated(conn);
-                    var rows = await conn.QueryAsync(sql, p);
-                    var list = MapDynamicRows(rows);
-                    return (TResult)(object)list;
-                }
-            }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by SQLite adapter for {typeof(TEntity).Name}.");
         }

@@ -12,5 +12,3 @@ public sealed class UserDoc : Entity<UserDoc>
     public bool IsDefault { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
-
-public sealed record CreateUserRequest(string Name);

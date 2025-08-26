@@ -1,10 +1,10 @@
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Sora.Core;
+using System.Text;
+using System.Text.Json;
 
 namespace Sora.Messaging.RabbitMq;
 

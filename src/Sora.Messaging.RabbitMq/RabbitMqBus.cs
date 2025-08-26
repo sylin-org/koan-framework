@@ -1,7 +1,7 @@
-using System.Reflection;
-using System.Text.Json;
 using RabbitMQ.Client;
 using Sora.Messaging.Infrastructure;
+using System.Reflection;
+using System.Text.Json;
 
 namespace Sora.Messaging.RabbitMq;
 

@@ -1,9 +1,11 @@
+using Sora.Storage.Abstractions;
+
 namespace Sora.Storage.Local;
 
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Options;
 using Sora.Storage;
+using System.Security.Cryptography;
+using System.Text;
 
 public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IServerSideCopy
 {
@@ -77,10 +79,10 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         var path = GetPath(container, key);
         if (!File.Exists(path)) return Task.FromResult<ObjectStat?>(null);
         var fi = new FileInfo(path);
-    // Generate a lightweight, stable ETag from file LastWriteTimeUtc and Length (hex-encoded)
-    // This avoids hashing content while still changing whenever the file is modified.
-    var etag = $"\"{fi.LastWriteTimeUtc.Ticks:X}-{fi.Length:X}\"";
-    var stat = new ObjectStat(fi.Length, null, fi.LastWriteTimeUtc, etag);
+        // Generate a lightweight, stable ETag from file LastWriteTimeUtc and Length (hex-encoded)
+        // This avoids hashing content while still changing whenever the file is modified.
+        var etag = $"\"{fi.LastWriteTimeUtc.Ticks:X}-{fi.Length:X}\"";
+        var stat = new ObjectStat(fi.Length, null, fi.LastWriteTimeUtc, etag);
         return Task.FromResult<ObjectStat?>(stat);
     }
 

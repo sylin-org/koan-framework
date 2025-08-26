@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sora.Messaging;
+using Sora.Messaging.Provisioning;
 
 namespace S2.Api.Controllers;
 

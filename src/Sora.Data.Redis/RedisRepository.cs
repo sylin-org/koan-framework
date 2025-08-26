@@ -1,8 +1,8 @@
-using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using StackExchange.Redis;
+using System.Linq.Expressions;
 
 namespace Sora.Data.Redis;
 
@@ -29,7 +29,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
 
     private string Keyspace()
     {
-        var sp = Sora.Core.SoraApp.Current;
+        var sp = Sora.Core.Hosting.App.AppHost.Current;
         if (sp is not null)
         {
             return Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(sp);

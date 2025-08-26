@@ -1,10 +1,10 @@
-using System.Linq.Expressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
+using System.Linq.Expressions;
 
 namespace Sora.Data.Mongo;
 
@@ -193,35 +193,35 @@ internal sealed class MongoRepository<TEntity, TKey> :
         switch (instruction.Name)
         {
             case Abstractions.Instructions.DataInstructions.EnsureCreated:
-            {
-                var col = GetCollection();
-                var db = GetDatabase(col);
-                // Ensure collection exists (will no-op if it already exists)
-                var name = _collectionName;
-                try
                 {
-                    var existing = await db.ListCollectionNamesAsync(cancellationToken: ct);
-                    var names = await existing.ToListAsync(ct);
-                    if (!names.Contains(name, StringComparer.Ordinal))
+                    var col = GetCollection();
+                    var db = GetDatabase(col);
+                    // Ensure collection exists (will no-op if it already exists)
+                    var name = _collectionName;
+                    try
                     {
-                        await db.CreateCollectionAsync(name, cancellationToken: ct);
-                        _logger?.LogInformation("Mongo ensureCreated created collection {Name}", name);
+                        var existing = await db.ListCollectionNamesAsync(cancellationToken: ct);
+                        var names = await existing.ToListAsync(ct);
+                        if (!names.Contains(name, StringComparer.Ordinal))
+                        {
+                            await db.CreateCollectionAsync(name, cancellationToken: ct);
+                            _logger?.LogInformation("Mongo ensureCreated created collection {Name}", name);
+                        }
                     }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", name);
+                    }
+                    object ok = true;
+                    return (TResult)ok;
                 }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", name);
-                }
-                object ok = true;
-                return (TResult)ok;
-            }
             case Abstractions.Instructions.DataInstructions.Clear:
-            {
-                var col = GetCollection();
-                var res = await col.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
-                object result = (int)res.DeletedCount;
-                return (TResult)result;
-            }
+                {
+                    var col = GetCollection();
+                    var res = await col.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
+                    object result = (int)res.DeletedCount;
+                    return (TResult)result;
+                }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Mongo adapter for {typeof(TEntity).Name}.");
         }

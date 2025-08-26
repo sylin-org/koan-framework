@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Data.Weaviate;
 
@@ -29,17 +30,17 @@ public sealed class WeaviateHealthContributor(IHttpClientFactory httpFactory, IO
             if (resp.IsSuccessStatusCode)
             {
                 logger?.LogDebug("Weaviate health: ready ({Status})", (int)resp.StatusCode);
-                return new HealthReport(Name, HealthState.Healthy);
+                return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Healthy, null, null, null);
             }
             else
             {
                 logger?.LogDebug("Weaviate health: not ready ({Status})", (int)resp.StatusCode);
-                return new HealthReport(Name, HealthState.Unhealthy, $"HTTP {(int)resp.StatusCode}");
+                return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, $"HTTP {(int)resp.StatusCode}", null, null);
             }
         }
         catch (Exception ex)
         {
-            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, ex);
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
         }
     }
 }

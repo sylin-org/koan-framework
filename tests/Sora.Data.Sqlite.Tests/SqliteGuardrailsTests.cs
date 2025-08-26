@@ -48,18 +48,18 @@ public class SqliteGuardrailsTests
         var repo = data.GetRepository<Todo, string>();
         for (int i = 0; i < 20; i++) await repo.UpsertAsync(new Todo { Title = $"t-{i}" });
 
-    var all = await repo.QueryAsync(null);
-    // DATA-0061: Unpaged queries return the full set
-    all.Count.Should().Be(20);
+        var all = await repo.QueryAsync(null);
+        // DATA-0061: Unpaged queries return the full set
+        all.Count.Should().Be(20);
 
         var srepo = (IStringQueryRepository<Todo, string>)repo;
-    var whereLimited = await srepo.QueryAsync("Title LIKE 't-%'");
-    // String-based WHERE without options is default-limited
-    whereLimited.Count.Should().Be(5);
+        var whereLimited = await srepo.QueryAsync("Title LIKE 't-%'");
+        // String-based WHERE without options is default-limited
+        whereLimited.Count.Should().Be(5);
 
         var linqRepo = (ILinqQueryRepository<Todo, string>)repo;
-    var linqLimited = await linqRepo.QueryAsync(x => x.Title.StartsWith("t-"));
-    // LINQ unpaged returns full set
-    linqLimited.Count.Should().Be(20);
+        var linqLimited = await linqRepo.QueryAsync(x => x.Title.StartsWith("t-"));
+        // LINQ unpaged returns full set
+        linqLimited.Count.Should().Be(20);
     }
 }

@@ -1,6 +1,6 @@
-using System.Text.Json;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
+using System.Text.Json;
 
 namespace S5.Recs.Providers;
 

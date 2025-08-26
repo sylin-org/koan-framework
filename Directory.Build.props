@@ -27,6 +27,12 @@
     <PackageReleaseNotes>See release notes: https://github.com/sylin-labs/sora-framework/releases</PackageReleaseNotes>
     <!-- Common tags; projects can append by using $(CommonPackageTags) in their PackageTags -->
     <CommonPackageTags>sora;framework;modular;dotnet;aspnetcore;cqrs;ddd;messaging;data;opentelemetry</CommonPackageTags>
+
+  <!-- Baseline language/features across the repo -->
+  <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
+  <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
+  <!-- Prefer a modern compiler; projects can override if needed -->
+  <LangVersion Condition="'$(LangVersion)' == ''">latestMajor</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <!-- Unified versioning across the repo via Nerdbank.GitVersioning -->

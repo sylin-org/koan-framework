@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 
 namespace Sora.Data.Cqrs.Initialization;
@@ -14,8 +15,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // Mirror existing initializer behavior
-        services.AddOptions<CqrsOptions>().BindConfiguration("Sora:Cqrs").ValidateDataAnnotations();
+        // Standardized options binding/validation
+        services.AddSoraOptions<CqrsOptions>("Sora:Cqrs");
         services.TryAddSingleton<ICqrsRouting, CqrsRouting>();
         services.BindOutboxOptions<InMemoryOutboxOptions>("InMemory");
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutboxStoreFactory, InMemoryOutboxFactory>());
@@ -24,7 +25,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         services.AddHostedService<OutboxProcessor>();
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
         var defaultProfile = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Keys.DefaultProfile, null);

@@ -8,7 +8,7 @@ What it does
 - Does not support presigned URLs.
 
 Register
-- Auto-registers via SoraAutoRegistrar. Ensure SoraInitialization.InitializeModules(services) is called at startup.
+- Auto-registers via SoraAutoRegistrar. Ensure AppBootstrapper.InitializeModules(services) is called at startup.
 - Required option: Sora:Storage:Providers:Local:BasePath → an absolute directory path.
 
 Profile example

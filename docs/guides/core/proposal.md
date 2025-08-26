@@ -12,7 +12,7 @@ Key updates for Sora
 - AI: AddAiDefaults, MapAgentEndpoints, in-memory vector store by default; upgrade on config.
 
 Boot semantics (DX)
-- Preferred boot flow: services.AddSora(); var provider = services.BuildServiceProvider(); provider.UseSora();
+- Preferred boot flow: services.AddSora(); var sp = services.BuildServiceProvider(); set AppHost.Current, initialize SoraEnv, then call IAppRuntime.Discover()/Start.
 - For console/dev, `services.StartSora()` is available and will ensure IConfiguration is present and run discovery/start.
 
 Reliability & graceful degradation

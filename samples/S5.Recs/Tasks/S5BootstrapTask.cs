@@ -1,10 +1,10 @@
-using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using S5.Recs.Models;
 using S5.Recs.Services;
 using Sora.Data.Vector;
-using Microsoft.Extensions.DependencyInjection;
 using Sora.Scheduling;
+using System.Diagnostics;
 
 namespace S5.Recs.Tasks;
 

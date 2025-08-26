@@ -1,3 +1,5 @@
+using Sora.Core.Observability.Health;
+
 namespace Sora.Core;
 
 public interface IHealthContributor

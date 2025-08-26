@@ -19,7 +19,7 @@ Sora offers a small, optional Instruction API so you can access provider-specifi
   - Query (rows):
     - `var rows = await data.Execute<Todo, System.Collections.Generic.IReadOnlyList<System.Collections.Generic.Dictionary<string, object?}}>(InstructionSql.Query("SELECT Id, Json FROM Todo"));`
 
-- Static facade using SoraApp.Current (app context):
+- Static facade using AppHost.Current (app context):
   - `await Data<Todo>.Execute<int>("INSERT INTO Todo(Id,Title) VALUES(@id,@t)");`
   - `var count = await Data<Todo>.Execute<long>("SELECT COUNT(*) FROM Todo");`
 

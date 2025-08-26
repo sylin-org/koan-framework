@@ -30,7 +30,7 @@ builder.Services.AddSora();
 // builder.Services.AddRabbitMq();
 
 var app = builder.Build();
-app.UseSora();
+// Greenfield boot handled by host templates; ensure AppHost.Current is set and IAppRuntime started.
 app.Run();
 ```
 

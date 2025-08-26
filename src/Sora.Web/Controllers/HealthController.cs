@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
+using Sora.Core.Observability.Health;
+using Sora.Core.Observability.Probes;
 using Sora.Web.Infrastructure;
 
 namespace Sora.Web.Controllers;
@@ -10,7 +12,7 @@ namespace Sora.Web.Controllers;
 [Produces("application/json")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 [Route(SoraWebConstants.Routes.HealthBase)]
-public sealed class HealthController(IHostEnvironment env, IHealthAggregator aggregator) : ControllerBase
+public sealed class HealthController(IHostEnvironment env, Sora.Core.Observability.Health.IHealthAggregator aggregator) : ControllerBase
 {
     // Human-friendly info endpoint; simple up check (no dependencies)
     [HttpGet]
@@ -47,7 +49,7 @@ public sealed class HealthController(IHostEnvironment env, IHealthAggregator agg
             : new { status = snap.Overall.ToString().ToLowerInvariant() };
 
         Response.Headers["Cache-Control"] = SoraWebConstants.Policies.NoStore;
-        if (snap.Overall == HealthStatus.Unhealthy)
+        if (snap.Overall == Sora.Core.Observability.Health.HealthStatus.Unhealthy)
         {
             // Important: return an ObjectResult with 503, not Ok(payload) which would override the status code.
             return StatusCode(StatusCodes.Status503ServiceUnavailable, payload);

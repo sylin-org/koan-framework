@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-
-using S5.Recs.Services;
 using S5.Recs.Infrastructure;
+using S5.Recs.Services;
 
 namespace S5.Recs.Controllers;
 
@@ -89,7 +88,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("recs-settings")]
     public IActionResult SetRecsSettings([FromBody] RecsSettingsRequest req, [FromServices] S5.Recs.Services.IRecommendationSettingsProvider provider)
     {
-    var ptw = Math.Clamp(req.PreferTagsWeight, 0, 1.0);
+        var ptw = Math.Clamp(req.PreferTagsWeight, 0, 1.0);
         var mpt = Math.Clamp(req.MaxPreferredTags, 1, 5);
         var dw = Math.Clamp(req.DiversityWeight, 0, 0.2);
         var doc = new Models.SettingsDoc { Id = "recs:settings", PreferTagsWeight = ptw, MaxPreferredTags = mpt, DiversityWeight = dw, UpdatedAt = DateTimeOffset.UtcNow };

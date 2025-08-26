@@ -1,11 +1,11 @@
 using Sora.Data.Abstractions;
+using Sora.Data.Abstractions.Vector.Filtering;
 using Sora.Data.Vector.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Sora.Data.Abstractions.Vector.Filtering;
 using Xunit;
 
 namespace Sora.Testing.Vector;

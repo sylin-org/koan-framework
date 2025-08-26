@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-
-using S5.Recs.Services;
 using S5.Recs.Infrastructure;
+using S5.Recs.Services;
 
 namespace S5.Recs.Controllers;
 
@@ -20,20 +19,20 @@ public class RecsController(IRecsService recs) : ControllerBase
                      ?? HttpContext.User.FindFirst("sub")?.Value;
         }
 
-    var ct = HttpContext?.RequestAborted ?? CancellationToken.None;
-    var (items, degraded) = recs.QueryAsync(
-        req.Text,
-        req.AnchorAnimeId,
-        req.Filters?.Genres,
-        req.Filters?.EpisodesMax,
-        req.Filters?.SpoilerSafe ?? true,
-        req.TopK,
-        userId,
-        req.Filters?.PreferTags,
-        req.Filters?.PreferWeight,
-        req.Sort,
-    ct).GetAwaiter().GetResult();
-    return Ok(new { items, degraded });
+        var ct = HttpContext?.RequestAborted ?? CancellationToken.None;
+        var (items, degraded) = recs.QueryAsync(
+            req.Text,
+            req.AnchorAnimeId,
+            req.Filters?.Genres,
+            req.Filters?.EpisodesMax,
+            req.Filters?.SpoilerSafe ?? true,
+            req.TopK,
+            userId,
+            req.Filters?.PreferTags,
+            req.Filters?.PreferWeight,
+            req.Sort,
+        ct).GetAwaiter().GetResult();
+        return Ok(new { items, degraded });
     }
 
     [HttpPost("rate")]

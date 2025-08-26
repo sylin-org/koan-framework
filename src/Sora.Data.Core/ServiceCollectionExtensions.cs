@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 
 namespace Sora.Data.Core;
@@ -13,6 +14,14 @@ public static class ServiceCollectionExtensions
     {
         services.AddSoraCore();
         var svc = services.AddSoraDataCore();
+        // Apply active recipes if Sora.Recipe.Abstractions is referenced
+        try
+        {
+            var ext = Type.GetType("Sora.Recipe.SoraRecipeServiceCollectionExtensions, Sora.Recipe.Abstractions");
+            var mi = ext?.GetMethod("ApplyActiveRecipes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            mi?.Invoke(null, new object?[] { services });
+        }
+        catch { /* optional */ }
         // If Sora.Data.Direct is referenced, auto-register it (no hard reference from Core)
         try
         {
@@ -29,27 +38,26 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddSoraDataCore(this IServiceCollection services)
     {
         // Initialize modules (adapters, etc.) that opt-in via ISoraInitializer
-        SoraInitialization.InitializeModules(services);
+        Sora.Core.Hosting.Bootstrap.AppBootstrapper.InitializeModules(services);
         services.TryAddSingleton<Configuration.IDataConnectionResolver, Configuration.DefaultDataConnectionResolver>();
         // Provide a default storage name resolver so naming works even without adapter-specific registration (e.g., JSON adapter)
         services.TryAddSingleton<Sora.Data.Abstractions.Naming.IStorageNameResolver, Sora.Data.Abstractions.Naming.DefaultStorageNameResolver>();
-        services.AddOptions<Options.DirectOptions>().BindConfiguration("Sora:Data:Direct");
-    // Vector defaults now live in Sora.Data.Vector; apps should call AddSoraDataVector() to enable vector features.
-        services.AddOptions<DataRuntimeOptions>();
+        services.AddSoraOptions<Options.DirectOptions>(Infrastructure.Constants.Configuration.Direct.Section);
+        // Vector defaults now live in Sora.Data.Vector; apps should call AddSoraDataVector() to enable vector features.
+        services.AddSoraOptions<DataRuntimeOptions>();
         services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
         services.AddSingleton<IDataService, DataService>();
         services.AddSingleton<IDataDiagnostics, DataDiagnostics>();
-        services.AddSingleton<ISoraRuntime, SoraRuntime>();
         // Decorate repositories registered as IDataRepository<,>
         services.TryDecorate(typeof(IDataRepository<,>), typeof(RepositoryFacade<,>));
         return services;
     }
 
-    // One-liner startup: builds provider, runs discovery, starts runtime
+    // One-liner startup: builds provider, runs discovery, starts runtime (greenfield)
     public static IServiceProvider StartSora(this IServiceCollection services)
     {
         // Avoid duplicate registration if already configured
-        if (!services.Any(d => d.ServiceType == typeof(ISoraRuntime)))
+        if (!services.Any(d => d.ServiceType == typeof(Sora.Core.Hosting.Runtime.IAppRuntime)))
             services.AddSora();
 
         // Provide a default IConfiguration only if the host hasn't already registered one
@@ -62,9 +70,11 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IConfiguration>(cfg);
         }
         var sp = services.BuildServiceProvider();
-        SoraApp.Current = sp;
-        sp.UseSora();
-        sp.StartSora();
+        Sora.Core.Hosting.App.AppHost.Current = sp;
+        try { SoraEnv.TryInitialize(sp); } catch { }
+        var rt = sp.GetService<Sora.Core.Hosting.Runtime.IAppRuntime>();
+        rt?.Discover();
+        rt?.Start();
         return sp;
     }
 }

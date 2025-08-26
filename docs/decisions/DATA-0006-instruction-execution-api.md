@@ -64,7 +64,7 @@ This preserves SoC: the entity stays a POCO; the execution capability is optiona
   - `await data.Execute<Todo,int>(InstructionSql.NonQuery("INSERT ...", new { ... }));`
   - `var count = await data.Execute<Todo,long>(InstructionSql.Scalar("SELECT COUNT(*) FROM Todo"));`
 
-- Static facades (require SoraApp.Current in app context):
+- Static facades (require AppHost.Current in app context):
   - `await Data<Todo>.Execute<int>("INSERT ..."); // NonQuery by default for int`
   - `var count = await Data<Todo>.Execute<long>("SELECT COUNT(*) FROM Todo"); // Scalar`
 

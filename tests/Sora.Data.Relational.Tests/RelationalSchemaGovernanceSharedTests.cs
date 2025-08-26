@@ -50,7 +50,7 @@ public abstract class RelationalSchemaGovernanceSharedTests<TFixture, TEntity, T
         (rep["TableExists"] as bool? ?? false).Should().BeTrue();
         var missing = rep["MissingColumns"] as IEnumerable<string> ?? Array.Empty<string>();
         missing.Should().BeEmpty();
-            (rep["State"] as string ?? string.Empty).Should().Be("Healthy");
+        (rep["State"] as string ?? string.Empty).Should().Be("Healthy");
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public abstract class RelationalSchemaGovernanceSharedTests<TFixture, TEntity, T
         var repMaybe = await Data.Execute<TEntity, TKey, object>(new Instruction("relational.schema.validate")) as IDictionary<string, object?>;
         repMaybe.Should().NotBeNull();
         var rep = repMaybe!;
-    var st = rep["State"] as string ?? string.Empty;
+        var st = rep["State"] as string ?? string.Empty;
         st.Should().BeOneOf("Unhealthy", "Degraded");
     }
 
@@ -76,11 +76,11 @@ public abstract class RelationalSchemaGovernanceSharedTests<TFixture, TEntity, T
         // Now validate with V2 (more columns) but DDL disabled
         // This requires fixture to swap entity type or columns
         // Override in derived if needed
-    var repMaybe = await Data.Execute<TEntity, TKey, object>(new Instruction("relational.schema.validate")) as IDictionary<string, object?>;
-    repMaybe.Should().NotBeNull();
-    var rep = repMaybe!;
-    (rep["TableExists"] as bool? ?? false).Should().BeTrue();
-    var missing = rep["MissingColumns"] as IEnumerable<string> ?? Array.Empty<string>();
+        var repMaybe = await Data.Execute<TEntity, TKey, object>(new Instruction("relational.schema.validate")) as IDictionary<string, object?>;
+        repMaybe.Should().NotBeNull();
+        var rep = repMaybe!;
+        (rep["TableExists"] as bool? ?? false).Should().BeTrue();
+        var missing = rep["MissingColumns"] as IEnumerable<string> ?? Array.Empty<string>();
         // Some fixtures provide a V2 type to detect missing projected columns; others may not.
         // Require the overall state to be Degraded when a mismatch is expected, but allow Healthy for fixtures
         // that didn't perform a V1->V2 swap.

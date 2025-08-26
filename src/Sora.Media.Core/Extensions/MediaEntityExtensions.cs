@@ -1,4 +1,6 @@
-namespace Sora.Media.Core;
+using Sora.Storage.Abstractions;
+
+namespace Sora.Media.Core.Extensions;
 
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core;
@@ -9,7 +11,7 @@ using Sora.Storage;
 public static class MediaEntityExtensions
 {
     private static IStorageService Storage()
-        => (SoraApp.Current?.GetService(typeof(IStorageService)) as IStorageService)
+    => Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService
            ?? throw new InvalidOperationException("IStorageService not available");
 
     // Url helper — presigned when supported; falls back to a routed fetch URL (left to Web layer later)
@@ -34,8 +36,8 @@ public static class MediaEntityExtensions
     private static (string Profile, string? Container) ResolveBinding<TEntity>(string? instanceContainer)
     {
         var t = typeof(TEntity);
-        var attr = t.GetCustomAttributes(typeof(Sora.Storage.Infrastructure.StorageBindingAttribute), inherit: false)
-            .OfType<Sora.Storage.Infrastructure.StorageBindingAttribute>().FirstOrDefault();
+        var attr = t.GetCustomAttributes(typeof(Storage.Infrastructure.StorageBindingAttribute), inherit: false)
+            .OfType<Storage.Infrastructure.StorageBindingAttribute>().FirstOrDefault();
         var profile = attr?.Profile ?? string.Empty;
         var container = instanceContainer ?? attr?.Container ?? string.Empty;
         return (profile, container);

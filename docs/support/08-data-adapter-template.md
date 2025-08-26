@@ -55,13 +55,13 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Register(IServiceCollection services)
     {
-        services.AddOptions<YourDataOptions>().BindConfiguration("Sora:Data:YourData");
+    services.AddSoraOptions<YourDataOptions>(config, "Sora:Data:YourData");
         services.AddSingleton<IDataAdapterFactory, YourDataAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<INamingDefaultsProvider, YourDataNamingDefaultsProvider>());
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, YourDataHealthContributor>());
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
     {
         var opts = cfg.GetSection("Sora:Data:YourData");
         report.AddConfig("YourData:Endpoint", opts["Endpoint"], sensitive: true);

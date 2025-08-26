@@ -10,6 +10,7 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 - Data access semantics (contract): ../guides/data/all-query-streaming-and-pager.md and decisions/DATA-0061-data-access-pagination-and-streaming.md
 - Web transformers and controllers: decisions/WEB-0035-entitycontroller-transformers.md
 - Constants and configuration naming: decisions/ARCH-0040-config-and-constants-naming.md
+- Module configuration patterns (SoC + DX): ./module-configuration-patterns.md
 
 ## Top directives (short)
 
@@ -51,7 +52,7 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 
 - AI
   - AddAiDefaults + MapAgentEndpoints; local-first providers; safety filters on in Dev.
-  - See: ../guides/ai/index.md
+  - See: ../guides/ai/index.md and src/Sora.Ai.Provider.Ollama/README.md
 
 - Config & constants
   - Use Sora.Core.Configuration helpers; centralize names; avoid ad-hoc cfg["..."] lookups.

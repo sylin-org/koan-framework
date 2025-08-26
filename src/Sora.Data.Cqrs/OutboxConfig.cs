@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Sora.Core;
+using Sora.Core.Modules;
 
 namespace Sora.Data.Cqrs;
 
@@ -14,7 +16,7 @@ public static class OutboxConfig
     /// </summary>
     public static OptionsBuilder<TOptions> BindOutboxOptions<TOptions>(this IServiceCollection services, string adapterName)
         where TOptions : class
-        => services.AddOptions<TOptions>().BindConfiguration($"Sora:Cqrs:Outbox:{adapterName}");
+        => services.AddSoraOptions<TOptions>($"Sora:Cqrs:Outbox:{adapterName}");
 
     /// <summary>
     /// Resolve a connection string using Sora conventions.

@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
@@ -30,6 +33,9 @@ public static class AddSoraGraphQlExtensions
         services.AddHttpContextAccessor();
         services.AddSingleton<Execution.IGraphQlExecutor, Execution.GraphQlExecutor>();
 
+        // Bind typed options
+        services.AddSoraOptions<GraphQlOptions>(Infrastructure.Constants.Configuration.Section);
+
         var entityTypes = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic)
             .SelectMany(SafeGetTypes)
@@ -40,31 +46,31 @@ public static class AddSoraGraphQlExtensions
             .ToArray();
 
         var builder = services
-            .AddGraphQLServer()
-            .SetRequestOptions(_ => new RequestExecutorOptions { ExecutionTimeout = TimeSpan.FromSeconds(10) })
-            // Add a safe error filter that enriches errors with diagnostics in extensions
-            .AddErrorFilter<Errors.SoraGraphQlErrorFilter>()
-            .AddQueryType(d =>
-            {
-                d.Name("Query");
-                // Always expose at least one field so the schema is valid
-                d.Field("entities")
-                    .Description("Discovered IEntity<> types exposed in GraphQL (storage-based names)")
-                    .Type<ListType<StringType>>()
-                    .Resolve(ctx =>
-                    {
-                        var sp = ctx.Service<IServiceProvider>();
-                        return entityTypes
-                            .Select(t => ToGraphQlTypeName(ResolveStorageName(sp, t)))
-                            .Distinct()
-                            .OrderBy(n => n)
-                            .ToArray();
-                    });
-                d.Field("status")
-                    .Description("Simple health probe")
-                    .Type<StringType>()
-                    .Resolve("ok");
-            });
+                .AddGraphQLServer()
+                .SetRequestOptions(_ => new RequestExecutorOptions { ExecutionTimeout = TimeSpan.FromSeconds(10) })
+                // Add a safe error filter that enriches errors with diagnostics in extensions
+                .AddErrorFilter<Errors.SoraGraphQlErrorFilter>()
+                .AddQueryType(d =>
+                {
+                    d.Name("Query");
+                    // Always expose at least one field so the schema is valid
+                    d.Field("entities")
+                        .Description("Discovered IEntity<> types exposed in GraphQL (storage-based names)")
+                        .Type<ListType<StringType>>()
+                        .Resolve(ctx =>
+                        {
+                            var sp = ctx.Service<IServiceProvider>();
+                            return entityTypes
+                                .Select(t => ToGraphQlTypeName(ResolveStorageName(sp, t)))
+                                .Distinct()
+                                .OrderBy(n => n)
+                                .ToArray();
+                        });
+                    d.Field("status")
+                        .Description("Simple health probe")
+                        .Type<StringType>()
+                        .Resolve("ok");
+                });
 
         // Only add Mutation root type if we have any entities to attach fields to
         if (entityTypes.Length > 0)
@@ -364,8 +370,8 @@ public static class AddSoraGraphQlExtensions
 
     private static string ResolveStorageNameFactory(Type entityType)
     {
-        // Best-effort: use ambient SoraApp.Current if available; otherwise fallback to defaults
-        var sp = Core.SoraApp.Current;
+        // Best-effort: use ambient AppHost.Current if available; otherwise fallback to defaults
+        var sp = Sora.Core.Hosting.App.AppHost.Current;
         if (sp is not null) return ResolveStorageName(sp, entityType);
         // Fallback path without DI context
         return entityType.Name;

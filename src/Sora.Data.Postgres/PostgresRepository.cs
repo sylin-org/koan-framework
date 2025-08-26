@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +12,7 @@ using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
 using Sora.Data.Relational.Orchestration;
+using System.Linq.Expressions;
 
 namespace Sora.Data.Postgres;
 
@@ -486,57 +486,57 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         switch (instruction.Name)
         {
             case RelationalInstructions.SchemaValidate:
-            {
-                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                var ddl = new PgDdlExecutor(conn, _options.SearchPath);
-                var feats = new PostgresStoreFeatures();
-                var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
-                return (TResult)report;
-            }
+                {
+                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                    var ddl = new PgDdlExecutor(conn, _options.SearchPath);
+                    var feats = new PostgresStoreFeatures();
+                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                    return (TResult)report;
+                }
             case DataInstructions.EnsureCreated:
             case RelationalInstructions.SchemaEnsureCreated:
-            {
-                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                var ddl = new PgDdlExecutor(conn, _options.SearchPath);
-                var feats = new PostgresStoreFeatures();
-                var key = $"{conn.Host}/{conn.Database}::{TableName}";
-                await Singleflight.RunAsync(key, async kct =>
                 {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
-                    _healthyCache[key] = true;
-                }, ct);
-                object ok = true; return (TResult)ok;
-            }
+                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                    var ddl = new PgDdlExecutor(conn, _options.SearchPath);
+                    var feats = new PostgresStoreFeatures();
+                    var key = $"{conn.Host}/{conn.Database}::{TableName}";
+                    await Singleflight.RunAsync(key, async kct =>
+                    {
+                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
+                        _healthyCache[key] = true;
+                    }, ct);
+                    object ok = true; return (TResult)ok;
+                }
             case RelationalInstructions.SchemaClear:
             case DataInstructions.Clear:
-            {
-                EnsureTable(conn);
-                var del = await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}");
-                try { var key = $"{conn.Host}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
-                object res = del; return (TResult)res;
-            }
+                {
+                    EnsureTable(conn);
+                    var del = await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}");
+                    try { var key = $"{conn.Host}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
+                    object res = del; return (TResult)res;
+                }
             case RelationalInstructions.SqlScalar:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var result = await conn.ExecuteScalarAsync(sql, p);
-                return CastScalar<TResult>(result);
-            }
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var result = await conn.ExecuteScalarAsync(sql, p);
+                    return CastScalar<TResult>(result);
+                }
             case RelationalInstructions.SqlNonQuery:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var affected = await conn.ExecuteAsync(sql, p);
-                object res = affected; return (TResult)res;
-            }
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var affected = await conn.ExecuteAsync(sql, p);
+                    object res = affected; return (TResult)res;
+                }
             case RelationalInstructions.SqlQuery:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var rows = await conn.QueryAsync(sql, p);
-                var list = MapDynamicRows(rows);
-                return (TResult)(object)list;
-            }
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var rows = await conn.QueryAsync(sql, p);
+                    var list = MapDynamicRows(rows);
+                    return (TResult)(object)list;
+                }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Postgres adapter for {typeof(TEntity).Name}.");
         }

@@ -1,6 +1,3 @@
-using System.Linq.Expressions;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
@@ -16,6 +13,9 @@ using Sora.Data.Abstractions.Naming;
 using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
 using Sora.Data.Relational.Orchestration;
+using System.Linq.Expressions;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Sora.Data.SqlServer;
 
@@ -543,66 +543,66 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         switch (instruction.Name)
         {
             case RelationalInstructions.SchemaValidate:
-            {
-                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                var ddl = new MsSqlDdlExecutor(conn);
-                var feats = new MsSqlStoreFeatures();
-                var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
-                return (TResult)report;
-            }
+                {
+                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                    var ddl = new MsSqlDdlExecutor(conn);
+                    var feats = new MsSqlStoreFeatures();
+                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
+                    return (TResult)report;
+                }
             case DataInstructions.EnsureCreated:
             case RelationalInstructions.SchemaEnsureCreated:
-            {
-                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                var ddl = new MsSqlDdlExecutor(conn);
-                var feats = new MsSqlStoreFeatures();
-                // Decide based on attribute > options precedence handled by orchestrator
-                var key = $"{conn.DataSource}/{conn.Database}::{TableName}";
-                await Singleflight.RunAsync(key, async kct =>
                 {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
-                    _healthyCache[key] = true;
-                }, ct);
-                object ok = true; return (TResult)ok;
-            }
+                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                    var ddl = new MsSqlDdlExecutor(conn);
+                    var feats = new MsSqlStoreFeatures();
+                    // Decide based on attribute > options precedence handled by orchestrator
+                    var key = $"{conn.DataSource}/{conn.Database}::{TableName}";
+                    await Singleflight.RunAsync(key, async kct =>
+                    {
+                        await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, kct);
+                        _healthyCache[key] = true;
+                    }, ct);
+                    object ok = true; return (TResult)ok;
+                }
             case DataInstructions.Clear:
-            {
-                // Do not create the table when clearing; only delete if it exists so we honor DDL policy.
-                if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
-                var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
-                object res = del; return (TResult)res;
-            }
+                {
+                    // Do not create the table when clearing; only delete if it exists so we honor DDL policy.
+                    if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
+                    var del = await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
+                    object res = del; return (TResult)res;
+                }
             case RelationalInstructions.SchemaClear:
-            {
-                // Schema clear should remove the table when present, but must not create it.
-                if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
-                var drop = $"IF OBJECT_ID(N'[dbo].[{TableName}]', N'U') IS NOT NULL DROP TABLE [dbo].[{TableName}];";
-                var affected = await conn.ExecuteAsync(drop);
-                try { var key = $"{conn.DataSource}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
-                object res = affected; return (TResult)res;
-            }
+                {
+                    // Schema clear should remove the table when present, but must not create it.
+                    if (!TableExists(conn)) { object res0 = 0; return (TResult)res0; }
+                    var drop = $"IF OBJECT_ID(N'[dbo].[{TableName}]', N'U') IS NOT NULL DROP TABLE [dbo].[{TableName}];";
+                    var affected = await conn.ExecuteAsync(drop);
+                    try { var key = $"{conn.DataSource}/{conn.Database}::{TableName}"; _healthyCache.TryRemove(key, out _); } catch { }
+                    object res = affected; return (TResult)res;
+                }
             case RelationalInstructions.SqlScalar:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var result = await conn.ExecuteScalarAsync(sql, p);
-                return CastScalar<TResult>(result);
-            }
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var result = await conn.ExecuteScalarAsync(sql, p);
+                    return CastScalar<TResult>(result);
+                }
             case RelationalInstructions.SqlNonQuery:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var affected = await conn.ExecuteAsync(sql, p);
-                object res = affected; return (TResult)res;
-            }
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var affected = await conn.ExecuteAsync(sql, p);
+                    object res = affected; return (TResult)res;
+                }
             case RelationalInstructions.SqlQuery:
-            {
-                var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                var p = GetParamsFromInstruction(instruction);
-                var rows = await conn.QueryAsync(sql, p);
-                var list = MapDynamicRows(rows);
-                return (TResult)(object)list;
-            }
+                {
+                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
+                    var p = GetParamsFromInstruction(instruction);
+                    var rows = await conn.QueryAsync(sql, p);
+                    var list = MapDynamicRows(rows);
+                    return (TResult)(object)list;
+                }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by SQL Server adapter for {typeof(TEntity).Name}.");
         }

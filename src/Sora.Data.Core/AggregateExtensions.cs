@@ -12,8 +12,8 @@ namespace Sora.Data.Core;
 public static class AggregateExtensions
 {
     private static IDataService DataService()
-        => SoraApp.Current?.GetService<IDataService>()
-            ?? throw new System.InvalidOperationException("SoraApp.Current is not set. Call services.AddSora(); then provider.UseSora() during startup.");
+        => Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
+            ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
 
     // Instance-level convenience: model.Upsert() (generic key)
     /// <summary>

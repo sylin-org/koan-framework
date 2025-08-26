@@ -2,6 +2,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Storage;
+using Sora.Storage.Abstractions;
+using Sora.Storage.Extensions;
 using Sora.Storage.Local;
 using System.Net;
 using System.Net.Http;

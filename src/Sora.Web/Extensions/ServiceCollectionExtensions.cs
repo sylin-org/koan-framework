@@ -5,6 +5,9 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
+using Sora.Core;
+using Sora.Core.Modules;
+using Sora.Web.Infrastructure;
 using Sora.Web.Options;
 
 namespace Sora.Web.Extensions;
@@ -22,7 +25,7 @@ public static class ServiceCollectionExtensions
         if (services.Any(d => d.ServiceType == typeof(SoraWebMarker))) return services;
         services.TryAddSingleton<SoraWebMarker>();
 
-        services.AddOptions<SoraWebOptions>();
+        services.AddSoraOptions<SoraWebOptions>(ConfigurationConstants.Web.Section);
         // Core web bits expected by Sora Web apps
         services.AddRouting();
         // Add controllers with NewtonsoftJson for JSON Patch
@@ -55,7 +58,7 @@ public static class ServiceCollectionExtensions
         });
         // Add input formatter via DI-aware options configurator (no early ServiceProvider build)
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, OptionalTransformerInputFormatterConfigurator>());
-        services.AddOptions<WebPipelineOptions>();
+        services.AddSoraOptions<WebPipelineOptions>(ConfigurationConstants.Web.Section + ":Pipeline");
 
         // Observability is wired in Sora.Core's AddSoraObservability; Sora.Web only ensures core web services are present.
         return services;
@@ -78,7 +81,7 @@ public static class ServiceCollectionExtensions
             o.EnableSecureHeaders = true;
             o.EnableStaticFiles = true;
             o.AutoMapControllers = true;
-            o.HealthPath = Infrastructure.SoraWebConstants.Routes.ApiHealth;
+            o.HealthPath = SoraWebConstants.Routes.ApiHealth;
         });
         services.Configure<WebPipelineOptions>(p =>
         {

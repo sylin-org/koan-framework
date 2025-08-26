@@ -9,7 +9,7 @@ namespace S5.Recs.Models;
 [Storage(Name = "UserProfiles")]
 public sealed class UserProfileDoc : Entity<UserProfileDoc>
 {
-    public Dictionary<string,double> GenreWeights { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, double> GenreWeights { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public float[]? PrefVector { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }

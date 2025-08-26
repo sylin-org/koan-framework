@@ -1,7 +1,4 @@
-﻿using System.Net;
-using System.Net.Http.Headers;
-using System.Text;
-using FluentAssertions;
+﻿using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -9,6 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SixLabors.ImageSharp;
 using Sora.Core;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
 using Xunit;
 
 namespace S6.SocialCreator.IntegrationTests;
@@ -36,11 +36,11 @@ public sealed class MediaTransformTests
             });
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<IHostedService>(sp => new SoraAppHostedService(sp));
+                services.AddSingleton<IHostedService>(sp => new AppHostHostedService(sp));
             });
         });
 
-    var client = app.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var client = app.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         // Prepare a tiny 1x1 PNG (white) as upload bytes (generated to ensure validity)
         byte[] pngBytes;
@@ -76,18 +76,18 @@ public sealed class MediaTransformTests
         bytes.Length.Should().BeGreaterThan(0);
     }
 
-    private sealed class SoraAppHostedService : IHostedService
+    private sealed class AppHostHostedService : IHostedService
     {
         private readonly IServiceProvider _sp;
-        public SoraAppHostedService(IServiceProvider sp) => _sp = sp;
+        public AppHostHostedService(IServiceProvider sp) => _sp = sp;
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            SoraApp.Current = _sp;
+            Sora.Core.Hosting.App.AppHost.Current = _sp;
             return Task.CompletedTask;
         }
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            if (ReferenceEquals(SoraApp.Current, _sp)) SoraApp.Current = null;
+            if (ReferenceEquals(Sora.Core.Hosting.App.AppHost.Current, _sp)) Sora.Core.Hosting.App.AppHost.Current = null;
             return Task.CompletedTask;
         }
     }

@@ -1,3 +1,5 @@
+using Sora.Storage.Abstractions;
+
 namespace Sora.Storage;
 
 public sealed class StorageObject : IStorageObject

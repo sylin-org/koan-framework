@@ -1,8 +1,8 @@
 using Sora.Core.Observability;
 using Sora.Data.Core;
+using Sora.Messaging;
 using Sora.Web.Extensions;
 using Sora.Web.Swagger;
-using Sora.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 

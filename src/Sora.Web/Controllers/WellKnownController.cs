@@ -3,12 +3,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Extensions;
 using Sora.Core.Observability;
+using Sora.Core.Observability.Health;
 using Sora.Data.Abstractions;
 using Sora.Web.Infrastructure;
-using System.Diagnostics;
-using Sora.Core.Extensions;
 using Sora.Web.Options;
+using System.Diagnostics;
 
 namespace Sora.Web.Controllers;
 
@@ -69,7 +70,7 @@ public sealed class WellKnownController(
     }
 
     [HttpGet(SoraWebConstants.Routes.WellKnownScheduling)]
-    public IActionResult Scheduling([FromServices] IHealthAggregator aggregator, [FromServices] IOptions<Scheduling.SchedulingOptions>? sched)
+    public IActionResult Scheduling([FromServices] Sora.Core.Observability.Health.IHealthAggregator aggregator, [FromServices] IOptions<Scheduling.SchedulingOptions>? sched)
     {
         if (!CanExposeObservability()) return NotFound();
 

@@ -1,9 +1,8 @@
-﻿using System.Collections.Generic;
-using Sora.Web.Auth.Infrastructure;
+﻿using Sora.Web.Auth.Infrastructure;
 using Sora.Web.Auth.Options;
 using Sora.Web.Auth.Providers;
 
-namespace Sora.Web.Auth.Discord;
+namespace Sora.Web.Auth.Discord.Providers;
 
 internal sealed class DiscordProviderContributor : IAuthProviderContributor
 {
@@ -19,7 +18,7 @@ internal sealed class DiscordProviderContributor : IAuthProviderContributor
                 AuthorizationEndpoint = "https://discord.com/api/oauth2/authorize",
                 TokenEndpoint = "https://discord.com/api/oauth2/token",
                 UserInfoEndpoint = "https://discord.com/api/users/@me",
-                Scopes = new []{"identify","email"},
+                Scopes = new[] { "identify", "email" },
                 Enabled = true
             }
         };

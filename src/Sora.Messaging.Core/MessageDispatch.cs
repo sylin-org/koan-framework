@@ -2,10 +2,6 @@
 
 namespace Sora.Messaging;
 
-public enum DispatchResultKind { Success, DuplicateSkipped, NoHandler, DeserializationSkipped, Failure }
-
-public sealed record DispatchOutcome(DispatchResultKind Kind, int Attempt, string IdempotencyKey);
-
 // Central consumer dispatcher: builds envelope, de-dups, resolves handler, and invokes it.
 public static class MessageDispatch
 {

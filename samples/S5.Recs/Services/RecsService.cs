@@ -1,15 +1,15 @@
-using System;
-using System.Linq;
-using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
+using S5.Recs.Infrastructure;
 using S5.Recs.Models;
-using Sora.Data.Core;
-using Sora.Data.Abstractions;
 using Sora.AI.Contracts;
 using Sora.AI.Contracts.Models;
-using S5.Recs.Infrastructure;
-using Microsoft.Extensions.Logging;
-using Sora.Data.Vector.Abstractions;
+using Sora.Data.Abstractions;
+using Sora.Data.Core;
 using Sora.Data.Vector;
+using Sora.Data.Vector.Abstractions;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace S5.Recs.Services;
 
@@ -45,7 +45,7 @@ internal sealed class RecsService : IRecsService
     {
         // Guardrails: sensible defaults and caps for K
         if (topK <= 0) topK = 10; // avoid empty results when a caller sends 0
-    if (topK > 100) topK = 100; // allow up to 100 to match UI page size
+        if (topK > 100) topK = 100; // allow up to 100 to match UI page size
         // Try vector-first if text or anchor provided
         _logger?.LogInformation("Query: text='{Text}' anchor='{Anchor}' genres=[{Genres}] episodesMax={EpisodesMax} spoilerSafe={SpoilerSafe} topK={TopK} user={UserId} preferTagsCount={PreferTagsCount}",
             text, anchorAnimeId, genres is null ? string.Empty : string.Join(',', genres), episodesMax, spoilerSafe, topK, userId, preferTags?.Length ?? 0);
@@ -329,15 +329,15 @@ internal sealed class RecsService : IRecsService
     public async Task RateAsync(string userId, string animeId, int rating, CancellationToken ct)
     {
         _logger?.LogInformation("Rating: user={UserId} anime={AnimeId} rating={Rating}", userId, animeId, rating);
-    var data = (IDataService?)_sp.GetService(typeof(IDataService));
-    if (data is null) return;
-    // Upsert status+rating in LibraryEntry
-    var id = $"{userId}:{animeId}";
-    var entry = await LibraryEntryDoc.Get(id, ct) ?? new LibraryEntryDoc { Id = id, UserId = userId, AnimeId = animeId, AddedAt = DateTimeOffset.UtcNow };
-    entry.Rating = Math.Max(0, Math.Min(5, rating));
-    if (!entry.Watched && !entry.Dropped) entry.Watched = true; // auto-set watched
-    entry.UpdatedAt = DateTimeOffset.UtcNow;
-    await LibraryEntryDoc.UpsertMany(new[] { entry }, ct);
+        var data = (IDataService?)_sp.GetService(typeof(IDataService));
+        if (data is null) return;
+        // Upsert status+rating in LibraryEntry
+        var id = $"{userId}:{animeId}";
+        var entry = await LibraryEntryDoc.Get(id, ct) ?? new LibraryEntryDoc { Id = id, UserId = userId, AnimeId = animeId, AddedAt = DateTimeOffset.UtcNow };
+        entry.Rating = Math.Max(0, Math.Min(5, rating));
+        if (!entry.Watched && !entry.Dropped) entry.Watched = true; // auto-set watched
+        entry.UpdatedAt = DateTimeOffset.UtcNow;
+        await LibraryEntryDoc.UpsertMany(new[] { entry }, ct);
 
         // Update profile preferences using simple EWMA over genres and tags
         var a = await AnimeDoc.Get(animeId, ct);

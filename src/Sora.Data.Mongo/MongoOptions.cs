@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using Sora.Data.Abstractions.Naming;
+using System.ComponentModel.DataAnnotations;
 
 namespace Sora.Data.Mongo;
 

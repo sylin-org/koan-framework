@@ -1,4 +1,6 @@
-﻿namespace Sora.Media.Core.Operators;
+﻿using Sora.Storage.Abstractions;
+
+namespace Sora.Media.Core.Operators;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -43,7 +45,7 @@ public sealed class MediaOperatorRegistry : IMediaOperatorRegistry
             }
         }
 
-    var selected = new List<(IMediaOperator Op, IReadOnlyDictionary<string, string> Params)>();
+        var selected = new List<(IMediaOperator Op, IReadOnlyDictionary<string, string> Params)>();
         var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Helper to test content-type support (prefix match allowed)

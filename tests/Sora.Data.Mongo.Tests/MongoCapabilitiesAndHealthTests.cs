@@ -58,7 +58,7 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
         hc.Should().ContainSingle(h => h.Name == "data:mongo");
         var mongo = hc.Single(h => h.Name == "data:mongo");
         var report = await mongo.CheckAsync();
-        report.State.Should().Be(HealthState.Healthy);
+        report.State.Should().Be(Sora.Core.Observability.Health.HealthState.Healthy);
         await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 
@@ -71,7 +71,7 @@ public class MongoCapabilitiesAndHealthTests : IClassFixture<MongoAutoFixture>
         hc.Should().ContainSingle(h => h.Name == "data:mongo");
         var mongo = hc.Single(h => h.Name == "data:mongo");
         var report = await mongo.CheckAsync();
-        report.State.Should().Be(HealthState.Unhealthy);
+        report.State.Should().Be(Sora.Core.Observability.Health.HealthState.Unhealthy);
         await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }

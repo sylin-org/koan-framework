@@ -1,8 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
-using Sora.Data.Vector.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.Vector;
+using Sora.Data.Vector.Abstractions;
 using Sora.Testing.Vector;
 using Xunit;
 

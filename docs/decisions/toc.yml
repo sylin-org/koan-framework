@@ -2,8 +2,14 @@
   href: index.md
 - name: Architecture (ARCH)
   items:
+    - name: Foundational SoC namespaces and Abstractions
+      href: ARCH-0045-foundational-soc-namespaces-and-abstractions.md
     - name: Per-project companion docs — README + TECHNICAL
       href: ARCH-0042-per-project-companion-docs.md
+    - name: Lightweight parity roadmap — Observability/Resilience/Recipes
+      href: ARCH-0043-lightweight-parity-roadmap.md
+    - name: Standardized module config, dev defaults, and discovery
+      href: ARCH-0044-standardized-module-config-and-discovery.md
     - name: Config and constants naming
       href: ARCH-0040-config-and-constants-naming.md
     - name: DDD docs and glossary
@@ -12,6 +18,8 @@
       href: ARCH-0039-soraenv-static-runtime.md
     - name: Docs posture — instructions over tutorials
       href: ARCH-0041-docs-posture-instructions-over-tutorials.md
+    - name: Recipes — intention-driven bootstrap and layered config
+      href: ARCH-0046-recipes-intention-driven-bootstrap-and-layered-config.md
 - name: Data (DATA)
   items:
     - name: Data access semantics (All/Query; streaming; pager)

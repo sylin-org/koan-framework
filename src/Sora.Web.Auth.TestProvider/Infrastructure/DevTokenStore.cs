@@ -4,8 +4,8 @@ namespace Sora.Web.Auth.TestProvider.Infrastructure;
 
 public sealed class DevTokenStore
 {
-    private readonly ConcurrentDictionary<string,(DateTimeOffset Exp, UserProfile Profile, string? CodeChallenge)> _codes = new();
-    private readonly ConcurrentDictionary<string,(DateTimeOffset Exp, UserProfile Profile)> _tokens = new();
+    private readonly ConcurrentDictionary<string, (DateTimeOffset Exp, UserProfile Profile, string? CodeChallenge)> _codes = new();
+    private readonly ConcurrentDictionary<string, (DateTimeOffset Exp, UserProfile Profile)> _tokens = new();
 
     public string IssueCode(UserProfile profile, TimeSpan ttl, string? codeChallenge)
     {
@@ -38,5 +38,3 @@ public sealed class DevTokenStore
         profile = entry.Profile; return true;
     }
 }
-
-public readonly record struct UserProfile(string Username, string Email, string? AvatarUrl);

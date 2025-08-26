@@ -1,8 +1,8 @@
-using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Net.Http.Headers;
 using Microsoft.Extensions.Logging;
 using S5.Recs.Models;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace S5.Recs.Providers;
 
@@ -20,7 +20,7 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
         using var client = http.CreateClient();
         var list = new List<Anime>(capacity: Math.Max(100, Math.Min(2000, limit)));
 
-    var query = @"query ($page:Int,$perPage:Int){ Page(page:$page,perPage:$perPage){ pageInfo{ hasNextPage currentPage lastPage perPage total } media(type:ANIME,isAdult:false,sort:POPULARITY_DESC){ id siteUrl title{romaji english native} synonyms episodes genres tags{name rank} description(asHtml:false) averageScore popularity coverImage{extraLarge large medium color} bannerImage } } }";
+        var query = @"query ($page:Int,$perPage:Int){ Page(page:$page,perPage:$perPage){ pageInfo{ hasNextPage currentPage lastPage perPage total } media(type:ANIME,isAdult:false,sort:POPULARITY_DESC){ id siteUrl title{romaji english native} synonyms episodes genres tags{name rank} description(asHtml:false) averageScore popularity coverImage{extraLarge large medium color} bannerImage } } }";
         int pageNum = 1;
         bool hasNext = true;
         int perPage = Math.Clamp(limit >= 50 ? 50 : limit, 1, 50);
@@ -129,7 +129,8 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
                             popularity = Math.Clamp(Math.Log10(Math.Max(1, p)) / 5.0, 0.0, 1.0);
                         }
 
-                        list.Add(new Anime {
+                        list.Add(new Anime
+                        {
                             Id = $"anilist:{id}",
                             Title = title!,
                             TitleEnglish = tEn,

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Data.Abstractions;
+using System.Collections.Concurrent;
 
 namespace Sora.Data.Core;
 

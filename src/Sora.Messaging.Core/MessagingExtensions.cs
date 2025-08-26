@@ -113,43 +113,43 @@ public static class MessagingExtensions
         public MessageHandlerBuilder On<T>(Action<MessageEnvelope, T> handler)
         { _services.OnMessage<T>(handler); return this; }
 
-    // Terse overloads (no envelope)
-    public MessageHandlerBuilder On<T>(Func<T, CancellationToken, Task> handler)
-    { _services.On(handler); return this; }
+        // Terse overloads (no envelope)
+        public MessageHandlerBuilder On<T>(Func<T, CancellationToken, Task> handler)
+        { _services.On(handler); return this; }
 
-    public MessageHandlerBuilder On<T>(Func<T, Task> handler)
-    { _services.On(handler); return this; }
+        public MessageHandlerBuilder On<T>(Func<T, Task> handler)
+        { _services.On(handler); return this; }
 
-    public MessageHandlerBuilder On<T>(Action<T> handler)
-    { _services.On(handler); return this; }
+        public MessageHandlerBuilder On<T>(Action<T> handler)
+        { _services.On(handler); return this; }
 
-    // Intent-signaling aliases
-    public MessageHandlerBuilder OnCommand<T>(Func<T, CancellationToken, Task> handler)
-    { _services.OnCommand(handler); return this; }
+        // Intent-signaling aliases
+        public MessageHandlerBuilder OnCommand<T>(Func<T, CancellationToken, Task> handler)
+        { _services.OnCommand(handler); return this; }
 
-    public MessageHandlerBuilder OnCommand<T>(Func<T, Task> handler)
-    { _services.OnCommand(handler); return this; }
+        public MessageHandlerBuilder OnCommand<T>(Func<T, Task> handler)
+        { _services.OnCommand(handler); return this; }
 
-    public MessageHandlerBuilder OnCommand<T>(Action<T> handler)
-    { _services.OnCommand(handler); return this; }
+        public MessageHandlerBuilder OnCommand<T>(Action<T> handler)
+        { _services.OnCommand(handler); return this; }
 
-    public MessageHandlerBuilder OnEvent<T>(Func<T, CancellationToken, Task> handler)
-    { _services.OnEvent(handler); return this; }
+        public MessageHandlerBuilder OnEvent<T>(Func<T, CancellationToken, Task> handler)
+        { _services.OnEvent(handler); return this; }
 
-    public MessageHandlerBuilder OnEvent<T>(Func<T, Task> handler)
-    { _services.OnEvent(handler); return this; }
+        public MessageHandlerBuilder OnEvent<T>(Func<T, Task> handler)
+        { _services.OnEvent(handler); return this; }
 
-    public MessageHandlerBuilder OnEvent<T>(Action<T> handler)
-    { _services.OnEvent(handler); return this; }
+        public MessageHandlerBuilder OnEvent<T>(Action<T> handler)
+        { _services.OnEvent(handler); return this; }
 
-    public MessageHandlerBuilder Handle<T>(Func<T, CancellationToken, Task> handler)
-    { _services.Handle(handler); return this; }
+        public MessageHandlerBuilder Handle<T>(Func<T, CancellationToken, Task> handler)
+        { _services.Handle(handler); return this; }
 
-    public MessageHandlerBuilder Handle<T>(Func<T, Task> handler)
-    { _services.Handle(handler); return this; }
+        public MessageHandlerBuilder Handle<T>(Func<T, Task> handler)
+        { _services.Handle(handler); return this; }
 
-    public MessageHandlerBuilder Handle<T>(Action<T> handler)
-    { _services.Handle(handler); return this; }
+        public MessageHandlerBuilder Handle<T>(Action<T> handler)
+        { _services.Handle(handler); return this; }
 
         // Convenience for grouped batches
         public MessageHandlerBuilder OnBatch<T>(Func<MessageEnvelope, Batch<T>, CancellationToken, Task> handler)
@@ -193,7 +193,7 @@ public static class MessagingExtensions
     }
     private static IMessageBus Resolve(string? busCode = null)
     {
-        var sp = SoraApp.Current ?? throw new InvalidOperationException("SoraApp.Current is not set. Call services.AddSora(); then provider.UseSora() during startup.");
+        var sp = Sora.Core.Hosting.App.AppHost.Current ?? throw new InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot set AppHost.Current during startup.");
         var sel = (IMessageBusSelector?)sp.GetService(typeof(IMessageBusSelector))
             ?? throw new InvalidOperationException("Messaging is not configured. Reference a provider package or register explicitly.");
         return busCode is null ? sel.ResolveDefault(sp) : sel.Resolve(sp, busCode);

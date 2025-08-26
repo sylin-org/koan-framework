@@ -11,7 +11,7 @@ Storage orchestrator for Sora apps. Simple, profile-based routing with first-cla
 
 ## Setup
 
-- Registration: Packages auto-register via the framework pipeline. Call `SoraInitialization.InitializeModules(services)` once. Providers (e.g., Local) self-register.
+- Registration: Packages auto-register via the framework pipeline. Call `AppBootstrapper.InitializeModules(services)` once. Providers (e.g., Local) self-register.
 - Core options:
   - `Sora:Storage:Profiles:<name>` → `{ Provider, Container }`
   - `Sora:Storage:DefaultProfile` → string (optional)
@@ -19,7 +19,7 @@ Storage orchestrator for Sora apps. Simple, profile-based routing with first-cla
   - `Sora:Storage:ValidateOnStart` → `bool` (default `true`)
 
 Notes
-- Ambient DI: APIs resolve `IStorageService` from `SoraApp.Current`. In app host, this is set during startup (built into Sora templates).
+- Ambient DI: APIs resolve `IStorageService` from `AppHost.Current`. In app host, this is set during startup (built into Sora templates).
 
 ## Model‑centric API (recommended)
 

@@ -1,183 +1,137 @@
 # Sora Framework
 
-**Building backend services should feel like playing with Legos, not assembling puzzles with missing pieces.**
+**Build services like you're talking to your code, not fighting it.**
 
-Sora is designed to having a conversation with your code rather than wrestling with it. Start with a three-file API, add vector search when you need it, scale to enterprise patterns when you're ready.
+Sora is a backend framework for .NET developers who value clarity, comfort, and the ability to grow. Whether you're spinning up a quick prototype or scaling into enterprise-grade patterns, Sora keeps the path clear. Start with a three-file API. Add messaging, vector search, or AI when you're ready. Nothing more, nothing less.
 
-## What makes Sora different?
+---
 
-- **Start simple, grow smart**  
-   Your first API can be three files. When you need CQRS, messaging, AI, or vector search, they're there—but they don't get in your way until you're ready.
+## 🧱 From First Line to First Endpoint
 
-- **Familiar, but better**  
-   Controllers work like you expect. Configuration follows .NET conventions. No magic, no surprises—just the good parts of what you already know, refined.
-
-- **Batteries included, assembly optional**  
-  Health checks, OpenAPI docs, flexible data access, message handling, and AI integration all work out of the box. Use what you need, ignore the rest.
-
-```csharp
-// This is a complete, working API with persistence
-using Sora.Web;
-
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSora();
-
-var app = builder.Build();
-app.UseSora();
-app.Run();
-```
-
-## Why choose Sora?
-
-- **Zero to API in minutes**  
-  Real CRUD endpoints with just `EntityController<T>`
-
-- **Escape hatches everywhere**  
-  Drop to raw SQL, custom controllers, or provider-specific features
-
-- **Modular by design**  
-  Add SQLite, MongoDB, Redis, RabbitMQ, AI providers, or vector search as you grow
-
-- **AI-ready**  
-  Built-in streaming chat, embeddings, vector search, and RAG patterns
-
-- **Production ready**  
-  Health checks, OpenAPI docs, observability, and message reliability built-in
-
-- **Predictable**  
-  Convention over configuration, but configuration always wins
-
-## Core philosophy
-
-- **Start simple, grow smart**  
-  Begin with basics, add complexity only when needed
-
-- **Familiarity first**  
-  Uses patterns you already know (Controllers, DI, EF-style entities)
-
-- **Developer experience**  
-  Clear error messages, helpful defaults, minimal friction
-
-- **Everything is optional**  
-  Data providers, messaging, AI, vector search—add what you need, when you need it
-
-## Real-World Example
-
-First, install the essential packages:
+Let’s start simple:
 
 ```bash
 dotnet add package Sora.Core
-```
 
-```bash
 dotnet add package Sora.Web
+
+dotnet add package Sora.Data.Sqlite
 ```
 
-```bash
-dotnet add package Sora.Data.Sqlite  # or your preferred data adapter
-```
-
-Then write your code:
+Then:
 
 ```csharp
-// Define your model
 public class Todo : Entity<Todo>
 {
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = "";
     public bool IsDone { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
-// Get a full REST API
 [Route("api/[controller]")]
 public class TodosController : EntityController<Todo> { }
+```
 
-// Use it naturally
+That’s a full REST API:
+
+- `GET /api/todos`
+- `POST /api/todos`
+- `PUT /api/todos/{id}`
+- Health checks at `/health`
+
+It works. Right now. No ceremony.
+
+---
+
+## 🌱 A Framework That Grows With You
+
+Sora isn’t trying to impress you with magic. It earns trust by staying out of your way—until you need more.
+
+- Add AI? One line.
+- Need vector search? Drop in a package.
+- Ready for messaging? Plug it in.
+- CQRS? Recipes exist.
+
+You never pay for complexity you didn’t ask for.
+
+```bash
+dotnet add package Sora.Web.Swagger           # Interactive docs
+
+dotnet add package Sora.AI                    # Local LLMs with Ollama
+
+dotnet add package Sora.Data.Weaviate         # Semantic search
+
+dotnet add package Sora.Messaging.RabbitMq    # Production messaging
+
+dotnet add package Sora.Web.GraphQl           # REST + GraphQL side-by-side
+```
+
+Everything integrates naturally. No glue scripts. No boilerplate.
+
+---
+
+## 🧭 Philosophy: Start Simple, Grow Smart
+
+Sora is designed by developers who’ve scaled codebases and lived to talk about it.
+
+- **Minimal friction**: Build a real service in a single file.
+- **Clear structure**: Follow .NET conventions, not opinions.
+- **Honest complexity**: Add what you need, skip what you don’t.
+- **Escape hatches everywhere**: Drop to raw SQL, write custom controllers, or override behavior freely.
+
+---
+
+## 🔧 The Pillars Behind the Curtain
+
+Sora is modular by nature. Each of its components works independently—and shines together.
+
+| Pillar        | Purpose                                                             |
+| ------------- | ------------------------------------------------------------------- |
+| **Core**      | Unified runtime, secure defaults, health checks, observability      |
+| **Web**       | REST and GraphQL from your models, Swagger UI, clean routing        |
+| **Data**      | Unified access to SQL, NoSQL, JSON, and vector DBs                  |
+| **Storage**   | File/blob handling from local to cloud with profiles                |
+| **Messaging** | Reliable queues via RabbitMQ, Redis, or in-memory                   |
+| **AI**        | Embeddings, vector search, chat, and RAG via local or remote models |
+| **Recipes**   | Best-practice bundles for reliability, telemetry, and scale         |
+
+---
+
+## 🧪 Real Use, Not Just Hello World
+
+Sora is already being used to build:
+
+- Microservices with event sourcing and inbox/outbox patterns
+- Developer tools with built-in AI assistance
+- Internal apps with rapid UI prototyping and Swagger docs
+
+It’s ready for you too.
+
+```csharp
 var todo = await new Todo { Title = "Learn Sora" }.Save();
 var todos = await Todo.Where(t => !t.IsDone);
 ```
 
-That's it. You now have:
+---
 
-- `GET /api/todos` - List all todos
-- `POST /api/todos` - Create new todo
-- `GET /api/todos/{id}` - Get specific todo
-- `PUT /api/todos/{id}` - Update todo
-- `DELETE /api/todos/{id}` - Delete todo
-- Automatic health checks at `/health`
+## 🛠 Getting Started
 
-**That's it.** Real data, clean routing, and production patterns—all working.
-
-## And now, what if I want to see my API specs?
-
-Add interactive API documentation with one package:
-
-```bash
-dotnet add package Sora.Web.Swagger
-```
-
-Now visit `/swagger` to explore and test your endpoints interactively. No additional configuration needed; Swagger auto-discovers your controllers and generates beautiful, interactive docs.
-
-## Need more? Just add it
-
-**Want AI chat and embeddings?**
-
-```bash
-dotnet add package Sora.AI
-dotnet add package Sora.Ai.Provider.Ollama
-```
-
-Now you have `/ai/chat` with streaming and `/ai/embed` endpoints working with local models.
-
-**Need vector search?**
-
-```bash
-dotnet add package Sora.Data.Weaviate
-```
-
-Your entities can now be embedded and searched semantically.
-
-**Want reliable messaging?**
-
-```bash
-dotnet add package Sora.Messaging.RabbitMq
-```
-
-Send messages, handle failures, and process with inbox patterns.
-
-**GraphQL from your REST models?**
-
-```bash
-dotnet add package Sora.Web.GraphQl
-```
-
-Your `EntityController<T>` now serves both REST and GraphQL automatically.
-
-## Getting started
-
-1. **Documentation** - Read the engineering front door and reference pages
-2. **Examples** - Explore real applications in the `samples/` directory
-3. **Docs style** - See `docs/engineering/docs-style-and-checklist.md` for contribution rules
-
-## Built for
-
-- **Rapid prototyping** - Get ideas into code fast, add AI features with a single line
-- **Microservices** - Lightweight, focused services with built-in messaging and observability
-- **Modern APIs** - REST + GraphQL from the same models, with vector search when you need it
-- **Enterprise applications** - Scales to complex patterns (CQRS, Event Sourcing, AI workflows)
-
-## Community & support
-
-- **GitHub Issues** - Bug reports and feature requests
-- **Discussions** - Questions and community help
-- **Contributing** - See our [guidelines](CONTRIBUTING.md)
-
-Built with ❤️ for .NET developers who want to focus on solving problems, not fighting frameworks.
+1. Clone or create a new project with the Sora template
+2. Explore the `samples/` directory
+3. Browse documentation under `/docs/engineering`
+4. Try something real—you’ll know in 10 minutes if it clicks
 
 ---
 
-**License:** Apache 2.0 | **Requirements:** .NET 9 SDK | **Current:** v0.2.18
+## ❤️ For developers who love clarity
 
-Quick links
-- Engineering front door: `/docs/engineering/index.md`
-- Architecture principles: `/docs/architecture/principles.md`
+Sora is open-source, MIT-licensed, and community-friendly. We welcome contributions, ideas, and questions. Built by folks who got tired of choosing between simplicity and power.
+
+- GitHub Issues for bugs/requests
+- GitHub Discussions for questions
+- See [CONTRIBUTING.md](CONTRIBUTING.md) to jump in
+
+---
+
+**License:** Apache 2.0
+**Requirements:** .NET 9 SDK
+**Current version:** v0.2.18

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Core.Infrastructure;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 using Sora.Data.Relational.Orchestration;
 
@@ -13,7 +14,7 @@ public static class SqlServerRegistration
 {
     public static IServiceCollection AddSqlServerAdapter(this IServiceCollection services, Action<SqlServerOptions>? configure = null)
     {
-        services.AddOptions<SqlServerOptions>().ValidateDataAnnotations();
+        services.AddSoraOptions<SqlServerOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         services.AddRelationalOrchestration();

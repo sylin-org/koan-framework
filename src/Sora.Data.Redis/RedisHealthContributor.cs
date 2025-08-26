@@ -1,4 +1,5 @@
 using Sora.Core;
+using Sora.Core.Observability.Health;
 using StackExchange.Redis;
 
 namespace Sora.Data.Redis;
@@ -15,11 +16,11 @@ internal sealed class RedisHealthContributor(IConnectionMultiplexer muxer) : IHe
             var db = muxer.GetDatabase();
             // PING check
             var pong = await db.PingAsync();
-            return new HealthReport(Name, HealthState.Healthy, null, null, new Dictionary<string, object?> { ["latencyMs"] = pong.TotalMilliseconds });
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Healthy, null, null, new Dictionary<string, object?> { ["latencyMs"] = pong.TotalMilliseconds });
         }
         catch (Exception ex)
         {
-            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, ex, null);
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
         }
     }
 }

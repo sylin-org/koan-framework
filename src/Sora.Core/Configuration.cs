@@ -70,11 +70,11 @@ public static class Configuration
     public static T Read<T>(IConfiguration? cfg, string key, T defaultValue)
     {
         // If cfg not provided, try ambient provider
-        if (cfg is null && SoraApp.Current is not null)
+        if (cfg is null && Sora.Core.Hosting.App.AppHost.Current is not null)
         {
             try
             {
-                var sp = SoraApp.Current;
+                var sp = Sora.Core.Hosting.App.AppHost.Current;
                 if (sp is not null)
                 {
                     cfg = sp?.GetService(typeof(IConfiguration)) as IConfiguration;

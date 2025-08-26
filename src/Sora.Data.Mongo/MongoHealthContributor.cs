@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Sora.Core;
+using Sora.Core.Observability.Health;
 
 namespace Sora.Data.Mongo;
 
@@ -21,7 +22,7 @@ internal sealed class MongoHealthContributor(IOptions<MongoOptions> options) : I
             var db = client.GetDatabase(options.Value.Database);
             // ping
             await db.RunCommandAsync((Command<BsonDocument>)new BsonDocument("ping", 1), cancellationToken: ct);
-            return new HealthReport(Name, HealthState.Healthy, null, null, new Dictionary<string, object?>
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Healthy, null, null, new Dictionary<string, object?>
             {
                 ["database"] = options.Value.Database,
                 ["connectionString"] = Redaction.DeIdentify(options.Value.ConnectionString)
@@ -29,7 +30,7 @@ internal sealed class MongoHealthContributor(IOptions<MongoOptions> options) : I
         }
         catch (Exception ex)
         {
-            return new HealthReport(Name, HealthState.Unhealthy, ex.Message, ex);
+            return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
         }
     }
 }

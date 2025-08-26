@@ -2,6 +2,8 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Storage;
+using Sora.Storage.Abstractions;
+using Sora.Storage.Extensions;
 using Sora.Storage.Local;
 using Sora.Storage.Options;
 using Xunit;
@@ -31,10 +33,10 @@ public class LocalProviderTests
         var svc = sp.GetRequiredService<IStorageService>();
 
         var content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("hello world"));
-    var obj = await svc.PutAsync("default", "", "folder1/hello.txt", content, "text/plain");
+        var obj = await svc.PutAsync("default", "", "folder1/hello.txt", content, "text/plain");
         obj.Provider.Should().Be("local");
         obj.Container.Should().Be("test");
-    obj.ContentHash.Should().Be("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
+        obj.ContentHash.Should().Be("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
 
         await using (var read = await svc.ReadAsync("default", "", "folder1/hello.txt"))
         {
@@ -123,13 +125,13 @@ public class LocalProviderTests
 
         await svc.CreateTextFile("copyme.txt", "copy", profile: "hot");
 
-    // CopyTo (deleteSource=false)
-    await svc.CopyTo("hot", "", "copyme.txt", "cold");
+        // CopyTo (deleteSource=false)
+        await svc.CopyTo("hot", "", "copyme.txt", "cold");
         (await svc.ExistsAsync("hot", "", "copyme.txt")).Should().BeTrue();
         (await svc.ExistsAsync("cold", "", "copyme.txt")).Should().BeTrue();
 
-    // MoveTo (deleteSource=true)
-    await svc.MoveTo("hot", "", "copyme.txt", "cold");
+        // MoveTo (deleteSource=true)
+        await svc.MoveTo("hot", "", "copyme.txt", "cold");
         (await svc.ExistsAsync("hot", "", "copyme.txt")).Should().BeFalse();
         (await svc.ExistsAsync("cold", "", "copyme.txt")).Should().BeTrue();
 

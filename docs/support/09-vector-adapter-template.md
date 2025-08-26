@@ -53,14 +53,14 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Register(IServiceCollection services)
     {
-        services.AddOptions<YourVectorOptions>().BindConfiguration("Sora:Data:YourVector");
+    services.AddSoraOptions<YourVectorOptions>(config, "Sora:Data:YourVector");
         services.AddSingleton<IVectorAdapterFactory, YourVectorAdapterFactory>();
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, YourVectorHealthContributor>());
         // Provide default naming behavior if your provider needs custom defaults
         services.TryAddEnumerable(ServiceDescriptor.Singleton<INamingDefaultsProvider, YourVectorNamingDefaultsProvider>());
     }
 
-    public void Describe(SoraBootstrapReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
+    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
     {
         var opts = cfg.GetSection("Sora:Data:YourVector");
         report.AddConfig("YourVector:Endpoint", opts["Endpoint"], sensitive: true);

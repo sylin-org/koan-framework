@@ -1,4 +1,4 @@
-namespace Sora.Storage;
+namespace Sora.Storage.Abstractions;
 
 using Sora.Data.Abstractions;
 
