@@ -52,7 +52,7 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 
 - AI
   - AddAiDefaults + MapAgentEndpoints; local-first providers; safety filters on in Dev.
-  - See: ../guides/ai/index.md
+  - See: ../guides/ai/index.md and src/Sora.Ai.Provider.Ollama/README.md
 
 - Config & constants
   - Use Sora.Core.Configuration helpers; centralize names; avoid ad-hoc cfg["..."] lookups.

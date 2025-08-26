@@ -31,15 +31,18 @@ internal sealed class OllamaAdapter : IAiAdapter
         if (string.IsNullOrWhiteSpace(model))
             throw new InvalidOperationException("Ollama adapter requires a model name.");
         var prompt = BuildPrompt(request);
-        var body = new
+        var bodyObj = new Dictionary<string, object?>
         {
-            model,
-            prompt,
-            stream = false,
-            options = MapOptions(request.Options)
+            ["model"] = model,
+            ["prompt"] = prompt,
+            ["stream"] = false,
+            ["options"] = MapOptions(request.Options)
         };
+        if (request.Options?.Think is bool thinkFlag)
+            bodyObj["think"] = thinkFlag;
+        var body = bodyObj;
         _logger?.LogDebug("Ollama: POST {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);
-        using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.GeneratePath, body, ct).ConfigureAwait(false);
+    using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.GeneratePath, body, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull }, ct).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -62,7 +65,16 @@ internal sealed class OllamaAdapter : IAiAdapter
         if (string.IsNullOrWhiteSpace(model))
             throw new InvalidOperationException("Ollama adapter requires a model name.");
         var prompt = BuildPrompt(request);
-        var body = JsonSerializer.Serialize(new { model, prompt, stream = true, options = MapOptions(request.Options) });
+        var streamBody = new Dictionary<string, object?>
+        {
+            ["model"] = model,
+            ["prompt"] = prompt,
+            ["stream"] = true,
+            ["options"] = MapOptions(request.Options)
+        };
+        if (request.Options?.Think is bool thinkFlag2)
+            streamBody["think"] = thinkFlag2;
+    var body = JsonSerializer.Serialize(streamBody, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
         using var httpReq = new HttpRequestMessage(HttpMethod.Post, Infrastructure.Constants.Api.GeneratePath)
         { Content = new StringContent(body, Encoding.UTF8, "application/json") };
         _logger?.LogDebug("Ollama: STREAM {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);
@@ -152,14 +164,38 @@ internal sealed class OllamaAdapter : IAiAdapter
         return sb.ToString();
     }
 
-    private static object MapOptions(AiPromptOptions? o)
-        => o is null ? new { } : new
+    private static IDictionary<string, object?> MapOptions(AiPromptOptions? o)
+    {
+        if (o is null) return new Dictionary<string, object?>();
+        var dict = new Dictionary<string, object?>
         {
-            temperature = o.Temperature,
-            top_p = o.TopP,
-            num_predict = o.MaxOutputTokens,
-            stop = o.Stop
+            ["temperature"] = o.Temperature,
+            ["top_p"] = o.TopP,
+            ["num_predict"] = o.MaxOutputTokens,
+            ["stop"] = o.Stop
         };
+        if (o.VendorOptions is { Count: > 0 })
+        {
+            foreach (var kv in o.VendorOptions)
+            {
+                // Promote JsonElement to raw boxed value when possible
+                dict[kv.Key] = kv.Value.ValueKind switch
+                {
+                    JsonValueKind.String => kv.Value.GetString(),
+                    JsonValueKind.Number => TryGetNumber(kv.Value),
+                    JsonValueKind.True => true,
+                    JsonValueKind.False => false,
+                    JsonValueKind.Array => kv.Value, // keep as JsonElement for serializer
+                    JsonValueKind.Object => kv.Value,
+                    _ => null
+                };
+            }
+        }
+        return dict;
+    }
+
+    private static object? TryGetNumber(JsonElement el)
+        => el.TryGetInt64(out var l) ? l : (el.TryGetDouble(out var d) ? d : null);
 
     private static async IAsyncEnumerable<T?> ReadJsonLinesAsync<T>(HttpResponseMessage resp, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
