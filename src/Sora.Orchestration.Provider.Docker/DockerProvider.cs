@@ -34,28 +34,50 @@ public sealed class DockerProvider : IHostingProvider
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(timeout);
-            while (true)
+            try
             {
-                cts.Token.ThrowIfCancellationRequested();
-                try
+                while (true)
                 {
-                    var status = await Status(new StatusOptions(Service: null), cts.Token);
-                    if (status.Services.Count == 0)
+                    if (cts.IsCancellationRequested)
+                        throw new TimeoutException($"services not ready within {timeout.TotalSeconds:n0}s");
+                    try
                     {
-                        await Task.Delay(300, cts.Token);
-                        continue;
+                        var services = await ComposeStatusForFile(composePath, cts.Token);
+                        if (services.Count == 0)
+                        {
+                            await Task.Delay(300, cts.Token);
+                            continue;
+                        }
+                        var allOk = services.All(s =>
+                            string.Equals(s.State, "running", StringComparison.OrdinalIgnoreCase) &&
+                            (s.Health is null || string.Equals(s.Health, "healthy", StringComparison.OrdinalIgnoreCase)));
+                        if (allOk) break;
                     }
-                    var allOk = status.Services.All(s =>
-                        string.Equals(s.State, "running", StringComparison.OrdinalIgnoreCase) &&
-                        (s.Health is null || string.Equals(s.Health, "healthy", StringComparison.OrdinalIgnoreCase)));
-                    if (allOk) break;
+                    catch
+                    {
+                        // ignore transient errors during readiness
+                    }
+                    await Task.Delay(500, cts.Token);
                 }
-                catch
-                {
-                    // ignore transient errors during readiness
-                }
-                await Task.Delay(500, cts.Token);
             }
+            catch (OperationCanceledException)
+            {
+                throw new TimeoutException($"services not ready within {timeout.TotalSeconds:n0}s");
+            }
+        }
+    }
+
+    private async Task<List<(string Service, string State, string? Health)>> ComposeStatusForFile(string composePath, CancellationToken ct)
+    {
+        try
+        {
+            var (code, stdout, _) = await Run("docker", $"compose -f \"{composePath}\" ps --format json", ct);
+            if (code != 0 || string.IsNullOrWhiteSpace(stdout)) return new();
+            return ParseComposePsJson(stdout);
+        }
+        catch
+        {
+            return new();
         }
     }
 

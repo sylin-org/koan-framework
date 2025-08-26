@@ -115,6 +115,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sora.Data.Mongo.Tests", "te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S5.Recs", "samples\S5.Recs\S5.Recs.csproj", "{179A2BCA-03E4-CD52-43D5-7CEAF92B7BFB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Orchestration.E2E.Tests", "tests\Sora.Orchestration.E2E.Tests\Sora.Orchestration.E2E.Tests.csproj", "{A8DABCF5-6B7D-4F8F-9E90-0C5B5EAF4A5E}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S4.Web", "samples\S4.Web\S4.Web.csproj", "{4C320E9A-5EEE-FB1B-9CA5-2AC5CC41009F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sora.Web.Auth", "src\Sora.Web.Auth\Sora.Web.Auth.csproj", "{57CC71E9-833A-47E0-A8BD-C5ABCC269827}"

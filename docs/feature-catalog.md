@@ -22,6 +22,8 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - Tiny templates, auto-registration across modules, decision docs (ADRs), container-smart defaults.
 - Recipes
   - Intention-driven bootstrap bundles (health checks, telemetry, reliability, workers) that layer predictable defaults on top of referenced modules; activate via package, config, or code with dry-run and capability gating.
+- Orchestration
+  - DevHost CLI and adapters to bring up local dependencies (Docker/Podman) and export deterministic artifacts (Compose v2 today). Profile-aware behavior (local/ci run; staging/prod export-only), readiness waits, port-conflict policy, and endpoint hints.
 
 References
 - Data: docs/reference/data-access.md
@@ -30,6 +32,8 @@ References
 - Messaging: docs/reference/messaging.md
 - AI: docs/reference/ai.md
 - Recipes: docs/reference/recipes.md
+- Orchestration: docs/reference/orchestration.md
+- Sora CLI: docs/reference/sora-cli.md
 
 ## Pillars → outcomes
 
@@ -84,6 +88,7 @@ References
 - Services & DX
   - Fast onboarding (Tiny\* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
   - Auto-registration across modules reduces boilerplate; templates and samples rely on controllers-only routing (no inline endpoints).
+  - DevHost CLI streamlines local runs and CI exports; Windows-first scripts help publish/install/verify a single-file `Sora` binary.
   - Container-smart defaults and discovery lists for adapters and AI providers; see Guides → "Container-smart defaults" and ADR OPS-0051.
   
 ## Recipes
@@ -108,6 +113,7 @@ References
 - Modern UI backends: REST + GraphQL from the same model with consistent naming and filter semantics.
 - AI assist & RAG: `/ai/chat` with SSE, `/ai/embed`, and `/ai/rag/query` with citations; Redis vector and cache by default; Weaviate and pgvector support.
 - Vector operations: Multi-provider vector search (Redis HNSW, Weaviate GraphQL, planned pgvector) with unified query interface.
+- Local dev orchestration: use `sora up` to start Postgres/Redis/etc., with health-gated readiness and clear endpoint hints; `sora export compose` for CI/staging.
 - Data bridge: snapshot export/import (JSONL/CSV/Parquet), CDC via Debezium/Kafka, virtualization (composed reads), scheduled materialization.
 - First-run bootstrap: schedule startup tasks to seed local data and vectors, with readiness gating disabled by default (opt-in when needed).
 - File/object storage:
@@ -134,6 +140,7 @@ References
 - AI cost/leakage → token/time budgets, prompt hashing, redaction-by-default, model allow-lists.
 - Vector posture → Redis guardrails (memory/persistence/HA); pgvector parity tests; migration utilities.
 - Storage posture → path traversal prevention, atomic writes, startup validation for profiles/defaults, explicit errors when presign is unsupported; range validation with clear 416-style semantics at the web edge.
+- Orchestration posture → explicit profiles; no auto-mounts in prod; port-conflict fail-fast in prod; redact secrets in human-readable output; descriptor-first resolution.
 
 ## Coming soon (on-ramp and near-term)
 
