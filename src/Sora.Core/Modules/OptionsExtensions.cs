@@ -44,4 +44,46 @@ public static class OptionsExtensions
         if (validateOnStart) builder.ValidateOnStart();
         return builder;
     }
+
+    // --- Layering helpers (encode intent; establish predictable precedence) ---
+
+    // 1) Provider defaults — register early so later layers can override
+    public static OptionsBuilder<TOptions> WithProviderDefaults<TOptions>(this OptionsBuilder<TOptions> builder, Action<TOptions> configure)
+        where TOptions : class
+    {
+        builder.Services.Configure(configure);
+        return builder;
+    }
+
+    // 2) Recipe defaults — soft defaults after provider defaults
+    public static OptionsBuilder<TOptions> WithRecipeDefaults<TOptions>(this OptionsBuilder<TOptions> builder, Action<TOptions> configure)
+        where TOptions : class
+    {
+        builder.Services.Configure(configure);
+        return builder;
+    }
+
+    // 3) Bind from configuration — appsettings/env usually wins over defaults
+    public static OptionsBuilder<TOptions> BindFromConfiguration<TOptions>(this OptionsBuilder<TOptions> builder, IConfigurationSection section)
+        where TOptions : class
+    {
+        builder.Bind(section);
+        return builder;
+    }
+
+    // 4) Code overrides — host-level adjustments registered late
+    public static OptionsBuilder<TOptions> WithCodeOverrides<TOptions>(this OptionsBuilder<TOptions> builder, Action<TOptions> configure)
+        where TOptions : class
+    {
+        builder.Services.Configure(configure);
+        return builder;
+    }
+
+    // 5) Recipe forced overrides — last-wins via PostConfigure; guard usage via config flags
+    public static OptionsBuilder<TOptions> WithRecipeForcedOverrides<TOptions>(this OptionsBuilder<TOptions> builder, Action<TOptions> postConfigure)
+        where TOptions : class
+    {
+        builder.Services.PostConfigure(postConfigure);
+        return builder;
+    }
 }

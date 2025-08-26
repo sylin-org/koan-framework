@@ -14,6 +14,14 @@ public static class ServiceCollectionExtensions
     {
         services.AddSoraCore();
         var svc = services.AddSoraDataCore();
+        // Apply active recipes if Sora.Recipe.Abstractions is referenced
+        try
+        {
+            var ext = Type.GetType("Sora.Recipe.SoraRecipeServiceCollectionExtensions, Sora.Recipe.Abstractions");
+            var mi = ext?.GetMethod("ApplyActiveRecipes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            mi?.Invoke(null, new object?[] { services });
+        }
+        catch { /* optional */ }
         // If Sora.Data.Direct is referenced, auto-register it (no hard reference from Core)
         try
         {

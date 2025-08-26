@@ -24,6 +24,8 @@
       href: reference/storage.md
     - name: Modules
       href: reference/modules.md
+    - name: Recipes
+      href: reference/recipes.md
     - name: Web Authentication
   href: reference/web-auth.md
   homepage: reference/web-auth.md

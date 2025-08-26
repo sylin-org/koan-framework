@@ -20,6 +20,8 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - Chat/embeddings, vector integration, Ollama provider, RAG building blocks, budgets and observability.
 - Services & DX
   - Tiny templates, auto-registration across modules, decision docs (ADRs), container-smart defaults.
+- Recipes
+  - Intention-driven bootstrap bundles (health checks, telemetry, reliability, workers) that layer predictable defaults on top of referenced modules; activate via package, config, or code with dry-run and capability gating.
 
 References
 - Data: docs/reference/data-access.md
@@ -27,6 +29,7 @@ References
 - Web: docs/reference/web.md
 - Messaging: docs/reference/messaging.md
 - AI: docs/reference/ai.md
+- Recipes: docs/reference/recipes.md
 
 ## Pillars → outcomes
 
@@ -82,6 +85,19 @@ References
   - Fast onboarding (Tiny\* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
   - Auto-registration across modules reduces boilerplate; templates and samples rely on controllers-only routing (no inline endpoints).
   - Container-smart defaults and discovery lists for adapters and AI providers; see Guides → "Container-smart defaults" and ADR OPS-0051.
+  
+## Recipes
+
+- Intention-driven bootstrap bundles that apply best-practice operational wiring on top of modules you already reference.
+- Activation modes:
+  - Reference = intent (add a `Sora.Recipe.*` package),
+  - Config-only selection via `Sora:Recipes:Active`,
+  - Code: `services.AddRecipe<T>()` or `services.AddRecipe("name")`.
+- Deterministic options layering: Provider defaults < Recipe defaults < AppSettings/Env < Code overrides < Forced overrides (disabled by default; gated by `Sora:Recipes:AllowOverrides` + per-recipe `Sora:Recipes:<Name>:ForceOverrides`).
+- Capability gating: recipes only apply when prereqs exist (check registered services or configured options). Avoid duplicate wiring.
+- Diagnostics: stable EventIds (Applying 41000, AppliedOk 41001, SkippedNotActive 41002, SkippedShouldApplyFalse 41003, DryRun 41004, ApplyFailed 41005) and a dry-run mode via `Sora:Recipes:DryRun=true` to preview without DI mutations.
+- Guardrails: infra-only wiring (no inline endpoints), controller-only HTTP surface, no magic values—use options/constants.
+- Example package: `Sora.Recipe.Observability` adds health checks and resilient HttpClient policies when applicable.
 
 ## Scenarios and benefits
 

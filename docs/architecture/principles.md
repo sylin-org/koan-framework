@@ -38,6 +38,18 @@ References: MESS-0021..0027.
 
 References: ARCH-0033 (OTel), OPS-0050 (scheduling/bootstrap unification).
 
+## Integration recipes
+
+- Intention-driven bootstrap bundles that apply best-practice wiring (health checks, telemetry, resilience, workers) on top of referenced modules.
+- Activation: reference = intent (Sora.Recipe.*), plus explicit `AddRecipe<T>()` and config-only selection via `Sora:Recipes:Active` for precise control/AOT.
+- Deterministic layering: Provider defaults < Recipe defaults < AppSettings/Env < Code overrides < Recipe forced overrides. Forced overrides are off by default and gated by `Sora:Recipes:AllowOverrides` and per-recipe `Sora:Recipes:<Name>:ForceOverrides`.
+- Capability gating: apply only when prereqs exist; prefer checking registered services or configured options over raw key sniffing.
+- Logging + dry-run: stable event ids for apply/skip/fail; `Sora:Recipes:DryRun=true` logs decisions without mutating DI.
+- Guardrails: infra-only wiring (no inline endpoints); respect controller-only HTTP routes; no magic values—use options/constants.
+- Discovery: explicit registration and/or assembly attributes; avoid broad scans to remain trimming/AOT friendly.
+
+References: ARCH-0046 (recipes), ARCH-0040 (config/constants), WEB-0035 (controller-only routes), Reference: Recipes (`../reference/recipes.md`).
+
 ## Lifetimes and scope
 
 - Singleton for clients/factories and orchestrators; Transient for stateless helpers; Scoped only when truly needed.
