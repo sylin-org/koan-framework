@@ -167,19 +167,21 @@ internal sealed class OllamaAdapter : IAiAdapter
     private static IDictionary<string, object?> MapOptions(AiPromptOptions? o)
     {
         if (o is null) return new Dictionary<string, object?>();
-        var dict = new Dictionary<string, object?>
+        var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["temperature"] = o.Temperature,
             ["top_p"] = o.TopP,
             ["num_predict"] = o.MaxOutputTokens,
-            ["stop"] = o.Stop
+            ["stop"] = o.Stop,
+            ["seed"] = o.Seed
         };
         if (o.VendorOptions is { Count: > 0 })
         {
             foreach (var kv in o.VendorOptions)
             {
+                var normKey = NormalizeOllamaOptionKey(kv.Key);
                 // Promote JsonElement to raw boxed value when possible
-                dict[kv.Key] = kv.Value.ValueKind switch
+                dict[normKey] = kv.Value.ValueKind switch
                 {
                     JsonValueKind.String => kv.Value.GetString(),
                     JsonValueKind.Number => TryGetNumber(kv.Value),
@@ -196,6 +198,24 @@ internal sealed class OllamaAdapter : IAiAdapter
 
     private static object? TryGetNumber(JsonElement el)
         => el.TryGetInt64(out var l) ? l : (el.TryGetDouble(out var d) ? d : null);
+
+    private static string NormalizeOllamaOptionKey(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return key;
+        var k = key.Trim();
+        // Normalize common synonyms and casing to Ollama's expected names
+        if (k.Equals("temp", StringComparison.OrdinalIgnoreCase) || k.Equals("temperature", StringComparison.OrdinalIgnoreCase))
+            return "temperature";
+        if (k.Equals("top_p", StringComparison.OrdinalIgnoreCase) || k.Equals("topp", StringComparison.OrdinalIgnoreCase) || k.Equals("topP", StringComparison.Ordinal))
+            return "top_p";
+        if (k.Equals("max_tokens", StringComparison.OrdinalIgnoreCase) || k.Equals("max_new_tokens", StringComparison.OrdinalIgnoreCase) || k.Equals("maxOutputTokens", StringComparison.Ordinal) || k.Equals("max_output_tokens", StringComparison.OrdinalIgnoreCase) || k.Equals("num_predict", StringComparison.OrdinalIgnoreCase))
+            return "num_predict";
+        if (k.Equals("stop_sequences", StringComparison.OrdinalIgnoreCase) || k.Equals("stopSequences", StringComparison.Ordinal) || k.Equals("stops", StringComparison.OrdinalIgnoreCase) || k.Equals("stop", StringComparison.OrdinalIgnoreCase))
+            return "stop";
+        if (k.Equals("seed", StringComparison.OrdinalIgnoreCase))
+            return "seed";
+        return k; // passthrough as-is
+    }
 
     private static async IAsyncEnumerable<T?> ReadJsonLinesAsync<T>(HttpResponseMessage resp, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
