@@ -24,7 +24,7 @@ internal sealed class TestProviderContributor(IConfiguration cfg, IHostEnvironme
                 UserInfoEndpoint = "/.testoauth/userinfo",
                 ClientId = o.ClientId,
                 ClientSecret = o.ClientSecret,
-                Scopes = new []{ "identify", "email" },
+                Scopes = new[] { "identify", "email" },
                 Enabled = true
             }
         };

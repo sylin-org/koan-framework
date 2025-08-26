@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.Modules;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Annotations;
 using Sora.Data.Abstractions.Naming;
@@ -17,7 +18,6 @@ using Sora.Web.Hooks;
 using Sora.Web.Infrastructure;
 using System.Diagnostics;
 using System.Reflection;
-using Sora.Core.Modules;
 
 namespace Sora.Web.GraphQl;
 
@@ -370,8 +370,8 @@ public static class AddSoraGraphQlExtensions
 
     private static string ResolveStorageNameFactory(Type entityType)
     {
-    // Best-effort: use ambient AppHost.Current if available; otherwise fallback to defaults
-    var sp = Sora.Core.Hosting.App.AppHost.Current;
+        // Best-effort: use ambient AppHost.Current if available; otherwise fallback to defaults
+        var sp = Sora.Core.Hosting.App.AppHost.Current;
         if (sp is not null) return ResolveStorageName(sp, entityType);
         // Fallback path without DI context
         return entityType.Name;

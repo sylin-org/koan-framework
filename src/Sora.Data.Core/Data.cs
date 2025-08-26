@@ -300,8 +300,8 @@ public static class Data<TEntity, TKey>
     // Instruction execution sugar via IDataService-backed repository
     public static Task<TResult> Execute<TResult>(Instruction instruction, CancellationToken ct = default)
     {
-    var ds = Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
-                 ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
+        var ds = Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
+                     ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
         return DataServiceExecuteExtensions.Execute<TEntity, TResult>(ds, instruction, ct);
     }
 
@@ -311,8 +311,8 @@ public static class Data<TEntity, TKey>
     // Raw SQL sugar helpers
     public static Task<int> Execute(string sql, CancellationToken ct = default)
     {
-    var ds = Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
-                 ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
+        var ds = Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
+                     ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
         return DataServiceExecuteExtensions.Execute<TEntity, int>(ds, InstructionSql.NonQuery(sql), ct);
     }
 
@@ -321,8 +321,8 @@ public static class Data<TEntity, TKey>
 
     public static Task<TResult> Execute<TResult>(string sql, CancellationToken ct = default)
     {
-    var ds = Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
-         ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
+        var ds = Sora.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()
+             ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot (AppHost.Current + IAppRuntime).");
         var instr = typeof(TResult) == typeof(int)
             ? InstructionSql.NonQuery(sql)
             : InstructionSql.Scalar(sql);

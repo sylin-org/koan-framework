@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Hosting;
-using Sora.Core.Observability.Probes;
 using Microsoft.Extensions.Logging;
+using Sora.Core.Observability.Probes;
 using System.Collections.Concurrent;
 
 namespace Sora.Core.Observability.Health;

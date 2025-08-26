@@ -1,9 +1,9 @@
-﻿using System.Collections.Generic;
-using Sora.Web.Auth.Infrastructure;
+﻿using Sora.Web.Auth.Infrastructure;
 using Sora.Web.Auth.Options;
 using Sora.Web.Auth.Providers;
+using System.Collections.Generic;
 
-namespace Sora.Web.Auth.Google;
+namespace Sora.Web.Auth.Google.Providers;
 
 internal sealed class GoogleProviderContributor : IAuthProviderContributor
 {
@@ -17,7 +17,7 @@ internal sealed class GoogleProviderContributor : IAuthProviderContributor
                 DisplayName = "Google",
                 Icon = "/icons/google.svg",
                 Authority = "https://accounts.google.com",
-                Scopes = new []{"openid","email","profile"},
+                Scopes = new[] { "openid", "email", "profile" },
                 Enabled = true
             }
         };

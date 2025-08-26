@@ -25,7 +25,7 @@ public class PostgresCapabilitiesAndHealthTests : IClassFixture<PostgresAutoFixt
         var contributors = _fx.ServiceProvider.GetRequiredService<System.Collections.Generic.IEnumerable<IHealthContributor>>();
         var pg = contributors.First(c => c.Name == "data:postgres");
         var report = await pg.CheckAsync(default);
-    report.State.Should().Be(Sora.Core.Observability.Health.HealthState.Healthy);
+        report.State.Should().Be(Sora.Core.Observability.Health.HealthState.Healthy);
 
         var data = _fx.Data;
         var repo = data.GetRepository<TestEntity, string>();

@@ -5,11 +5,11 @@ using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Core.Extensions;
 using Sora.Core.Observability;
+using Sora.Core.Observability.Health;
 using Sora.Data.Abstractions;
 using Sora.Web.Infrastructure;
 using Sora.Web.Options;
 using System.Diagnostics;
-using Sora.Core.Observability.Health;
 
 namespace Sora.Web.Controllers;
 

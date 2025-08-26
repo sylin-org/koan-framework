@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Sora.AI.Contracts;
@@ -10,6 +5,11 @@ using Sora.AI.Contracts.Routing;
 using Sora.Core;
 using Sora.Core.Observability.Health;
 using Sora.Core.Observability.Probes;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sora.AI.Web;
 
@@ -27,7 +27,7 @@ internal sealed class AiHealthSubscriber : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         // Targeted subscription for component "ai"
-    _sub = _agg.Subscribe("ai", e => { _ = PushAsync(); });
+        _sub = _agg.Subscribe("ai", e => { _ = PushAsync(); });
         // Optionally also respond to broadcasts by pushing
         _handler ??= OnProbeRequested;
         _agg.ProbeRequested += _handler;

@@ -13,10 +13,10 @@ public sealed class MessagingHost : IAsyncDisposable
     private MessagingHost(ServiceProvider sp)
     {
         _sp = sp;
-    Sora.Core.Hosting.App.AppHost.Current = _sp;
-    try { Sora.Core.SoraEnv.TryInitialize(_sp); } catch { }
-    ( _sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime )?.Discover();
-    ( _sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime )?.Start();
+        Sora.Core.Hosting.App.AppHost.Current = _sp;
+        try { Sora.Core.SoraEnv.TryInitialize(_sp); } catch { }
+    (_sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+        (_sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
     }
 
     public static MessagingHost Start(

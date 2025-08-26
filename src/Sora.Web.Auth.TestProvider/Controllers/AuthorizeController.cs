@@ -11,7 +11,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
 {
     [HttpGet]
     [Route(".testoauth/authorize")]
-  public IActionResult Authorize([FromQuery] string response_type, [FromQuery] string client_id, [FromQuery] string redirect_uri, [FromQuery] string? scope, [FromQuery] string? state, [FromQuery] string? code_challenge, [FromQuery] string? code_challenge_method, [FromQuery] string? prompt)
+    public IActionResult Authorize([FromQuery] string response_type, [FromQuery] string client_id, [FromQuery] string redirect_uri, [FromQuery] string? scope, [FromQuery] string? state, [FromQuery] string? code_challenge, [FromQuery] string? code_challenge_method, [FromQuery] string? prompt)
     {
         var o = opts.Value;
         if (!(env.IsDevelopment() || o.Enabled)) return NotFound();
@@ -19,8 +19,8 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
         if (string.IsNullOrWhiteSpace(client_id) || string.IsNullOrWhiteSpace(redirect_uri)) return BadRequest("client_id and redirect_uri are required");
         if (!string.Equals(client_id, o.ClientId, StringComparison.Ordinal)) return Unauthorized();
 
-  // Render simple HTML form when no user cookie (prompt=login just ensures the prompt appears in that case).
-  if (!Request.Cookies.TryGetValue("_tp_user", out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
+        // Render simple HTML form when no user cookie (prompt=login just ensures the prompt appears in that case).
+        if (!Request.Cookies.TryGetValue("_tp_user", out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
         {
             var html = $$"""
 <!DOCTYPE html>
@@ -104,12 +104,12 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
 </body>
 </html>
 """;
-    return new ContentResult { ContentType = "text/html", Content = html };
+            return new ContentResult { ContentType = "text/html", Content = html };
         }
 
-  // At this point userCookie is present and non-empty.
-  var decoded = Uri.UnescapeDataString(userCookie ?? string.Empty);
-  var parts = decoded.Split('|');
+        // At this point userCookie is present and non-empty.
+        var decoded = Uri.UnescapeDataString(userCookie ?? string.Empty);
+        var parts = decoded.Split('|');
         var profile = new UserProfile(parts.ElementAtOrDefault(0) ?? "dev", parts.ElementAtOrDefault(1) ?? "dev@example.com", null);
         var code = store.IssueCode(profile, TimeSpan.FromMinutes(5), code_challenge);
         var uri = new UriBuilder(redirect_uri);

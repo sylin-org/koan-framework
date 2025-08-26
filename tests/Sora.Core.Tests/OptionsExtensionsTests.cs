@@ -2,8 +2,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using System.ComponentModel.DataAnnotations;
 using Sora.Core.Modules;
+using System.ComponentModel.DataAnnotations;
 using Xunit;
 
 namespace Sora.Core.Tests;
@@ -43,11 +43,11 @@ public class OptionsExtensionsTests
     [Fact]
     public void AddSoraOptions_ValidateOnStart_Fails_When_Required_Missing()
     {
-    var services = new ServiceCollection();
-    var cfg = new ConfigurationBuilder().Build();
-    services.AddSingleton<IConfiguration>(cfg);
-    services.AddSoraOptions<SampleOptions>("Sora:Missing");
-    using var sp = services.BuildServiceProvider();
+        var services = new ServiceCollection();
+        var cfg = new ConfigurationBuilder().Build();
+        services.AddSingleton<IConfiguration>(cfg);
+        services.AddSoraOptions<SampleOptions>("Sora:Missing");
+        using var sp = services.BuildServiceProvider();
         var act = () => sp.GetRequiredService<IOptions<SampleOptions>>().Value.Name?.ToString();
         act.Should().Throw<OptionsValidationException>();
     }

@@ -1,9 +1,9 @@
 ﻿using RabbitMQ.Client;
+using Sora.Messaging.Provisioning;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Sora.Messaging.Provisioning;
 
 namespace Sora.Messaging.RabbitMq.Provisioning;
 

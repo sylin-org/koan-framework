@@ -63,6 +63,6 @@ internal sealed class OllamaHealthContributor : IHealthContributor
             return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Unhealthy, $"missing models: {string.Join(", ", missing)}", null, data);
         }
 
-    return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Healthy, null, null, data);
+        return new HealthReport(Name, Sora.Core.Observability.Health.HealthState.Healthy, null, null, data);
     }
 }

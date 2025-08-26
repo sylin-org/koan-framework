@@ -10,8 +10,8 @@ public static class InboxConfigurationExtensions
 {
     public static IServiceCollection AddInboxConfiguration(this IServiceCollection services)
     {
-    services.AddSoraOptions<InboxClientOptions>(Constants.Configuration.Inbox.Section);
-    services.AddSoraOptions<DiscoveryOptions>(Constants.Configuration.Discovery.Section);
+        services.AddSoraOptions<InboxClientOptions>(Constants.Configuration.Inbox.Section);
+        services.AddSoraOptions<DiscoveryOptions>(Constants.Configuration.Discovery.Section);
         services.TryAddSingleton<IInboxDiscoveryPolicy, InboxDiscoveryPolicy>();
         return services;
     }

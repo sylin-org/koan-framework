@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Core.Observability;
+using Microsoft.Extensions.Hosting;
 using Sora.Core.Hosting.Bootstrap;
+using Sora.Core.Observability;
 
 namespace Sora.Core.Hosting.Runtime;
 

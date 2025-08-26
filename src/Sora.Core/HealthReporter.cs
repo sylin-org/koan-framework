@@ -11,7 +11,7 @@ public static class HealthReporter
 
     private static IHealthAnnouncer? Resolve()
     {
-    try { return Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IHealthAnnouncer)) as IHealthAnnouncer; }
+        try { return Sora.Core.Hosting.App.AppHost.Current?.GetService(typeof(IHealthAnnouncer)) as IHealthAnnouncer; }
         catch { return null; }
     }
 }

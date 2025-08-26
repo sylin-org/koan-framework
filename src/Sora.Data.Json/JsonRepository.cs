@@ -238,7 +238,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
 
     private static string ComputePhysicalName()
     {
-    var sp = Sora.Core.Hosting.App.AppHost.Current;
+        var sp = Sora.Core.Hosting.App.AppHost.Current;
         if (sp is not null)
         {
             // Delegate to central naming registry which is set-aware

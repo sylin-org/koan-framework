@@ -49,7 +49,7 @@ public sealed class HealthController(IHostEnvironment env, Sora.Core.Observabili
             : new { status = snap.Overall.ToString().ToLowerInvariant() };
 
         Response.Headers["Cache-Control"] = SoraWebConstants.Policies.NoStore;
-    if (snap.Overall == Sora.Core.Observability.Health.HealthStatus.Unhealthy)
+        if (snap.Overall == Sora.Core.Observability.Health.HealthStatus.Unhealthy)
         {
             // Important: return an ObjectResult with 503, not Ok(payload) which would override the status code.
             return StatusCode(StatusCodes.Status503ServiceUnavailable, payload);

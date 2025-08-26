@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
-using Sora.Core.Observability.Probes;
 using Sora.Core.Observability.Health;
+using Sora.Core.Observability.Probes;
 
 namespace Sora.Core;
 

@@ -7,5 +7,3 @@ public sealed record HealthReport(
     TimeSpan? Ttl,
     IReadOnlyDictionary<string, object?>? Data
 );
-
-public enum HealthState { Healthy, Degraded, Unhealthy }

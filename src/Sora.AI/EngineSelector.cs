@@ -16,7 +16,7 @@ public readonly struct EngineSelector
     // Chat helpers (provider override supported via route hints)
     public Task<string> Prompt(string message, AiPromptOptions? opts = null, CancellationToken ct = default)
     {
-    var ai = Ai.TryResolve() ?? throw new InvalidOperationException("AI not available. Configure AddAi() and ensure AppHost.Current is set (greenfield boot).");
+        var ai = Ai.TryResolve() ?? throw new InvalidOperationException("AI not available. Configure AddAi() and ensure AppHost.Current is set (greenfield boot).");
         var req = new AiChatRequest
         {
             Messages = new() { new AiMessage("user", message) },
@@ -29,7 +29,7 @@ public readonly struct EngineSelector
 
     public IAsyncEnumerable<AiChatChunk> Stream(string message, AiPromptOptions? opts = null, CancellationToken ct = default)
     {
-    var ai = Ai.TryResolve() ?? throw new InvalidOperationException("AI not available. Configure AddAi() and ensure AppHost.Current is set (greenfield boot).");
+        var ai = Ai.TryResolve() ?? throw new InvalidOperationException("AI not available. Configure AddAi() and ensure AppHost.Current is set (greenfield boot).");
         var req = new AiChatRequest
         {
             Messages = new() { new AiMessage("user", message) },

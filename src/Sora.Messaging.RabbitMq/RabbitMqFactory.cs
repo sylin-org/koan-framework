@@ -7,10 +7,10 @@ using RabbitMQ.Client.Events;
 using Sora.Core;
 using Sora.Messaging;
 using Sora.Messaging.Infrastructure;
-using System.Text;
-using System.Text.Json;
 using Sora.Messaging.Provisioning;
 using Sora.Messaging.RabbitMq.Provisioning;
+using System.Text;
+using System.Text.Json;
 
 namespace Sora.Messaging.RabbitMq;
 

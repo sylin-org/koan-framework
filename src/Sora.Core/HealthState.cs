@@ -1,1 +1,0 @@
-namespace Sora.Core { internal static class _HealthStateMoved { } }

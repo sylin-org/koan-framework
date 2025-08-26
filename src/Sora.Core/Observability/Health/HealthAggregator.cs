@@ -1,5 +1,5 @@
-﻿using System.Collections.Concurrent;
-using Sora.Core.Observability.Probes;
+﻿using Sora.Core.Observability.Probes;
+using System.Collections.Concurrent;
 
 namespace Sora.Core.Observability.Health;
 
