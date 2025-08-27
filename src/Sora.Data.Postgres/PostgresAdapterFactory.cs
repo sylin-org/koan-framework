@@ -3,12 +3,25 @@ using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
 using Sora.Orchestration;
+using Sora.Orchestration.Abstractions.Attributes;
 
 namespace Sora.Data.Postgres;
 
 [ProviderPriority(14)]
-[DefaultEndpoint("postgres", "db", 5432, "tcp", "postgres", "postgresql", "bitnami/postgresql", UriPattern = "postgres://{host}:{port}")]
-[HostMount("/var/lib/postgresql/data")]
+[ServiceId("postgres")]
+[ContainerDefaults(
+    image: "postgres",
+    Tag = "16",
+    Ports = new[] { 5432 },
+    Volumes = new[] { "./Data/postgres:/var/lib/postgresql/data" },
+    Env = new[] { "POSTGRES_USER=postgres", "POSTGRES_PASSWORD", "POSTGRES_DB=sora" }
+)]
+[EndpointDefaults(EndpointMode.Container, scheme: "postgres", host: "postgres", port: 5432, UriPattern = "postgres://{host}:{port}")]
+[EndpointDefaults(EndpointMode.Local, scheme: "postgres", host: "localhost", port: 5432, UriPattern = "postgres://{host}:{port}")]
+[AppEnvDefaults(
+    "Sora__Data__Postgres__ConnectionString={scheme}://{host}:{port}",
+    "Sora__Data__Postgres__Database=sora"
+)]
 public sealed class PostgresAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider)

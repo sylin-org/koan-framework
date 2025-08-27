@@ -26,6 +26,10 @@ public sealed class ComposeExporter : IArtifactExporter
     var mountMap = DiscoverHostMounts();
 
         yaml.AppendLine("services:");
+        // Pre-compute which services have HTTP healthchecks
+        var healthyIds = new HashSet<string>(plan.Services
+            .Where(s => s.Health is not null && !string.IsNullOrWhiteSpace(s.Health.HttpEndpoint))
+            .Select(s => s.Id), StringComparer.OrdinalIgnoreCase);
         foreach (var svc in plan.Services)
         {
             // Ensure host mounts for persistence are present according to profile:
@@ -33,7 +37,7 @@ public sealed class ComposeExporter : IArtifactExporter
             // - CI: named volumes (data_{service} -> /container/path)
             // - Prod: do not inject mounts
             var enriched = EnsureHostMounts(svc, mountMap, profile);
-            WriteService(yaml, enriched, namedVolumes, indent: 2);
+            WriteService(yaml, enriched, healthyIds, namedVolumes, indent: 2);
         }
 
         if (namedVolumes.Count > 0)
@@ -62,8 +66,30 @@ public sealed class ComposeExporter : IArtifactExporter
                 if (t is null) continue;
                 var mounts = t.GetCustomAttributes(typeof(HostMountAttribute), inherit: false).Cast<HostMountAttribute>().ToArray();
                 if (mounts.Length == 0) continue;
+
+                // Prefer ContainerDefaultsAttribute.Image as the image prefix source
+                var containerDefaults = t.GetCustomAttributes(typeof(Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute), inherit: false)
+                    .Cast<Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute>()
+                    .FirstOrDefault();
+
+                if (containerDefaults is not null && !string.IsNullOrWhiteSpace(containerDefaults.Image))
+                {
+                    var prefix = containerDefaults.Image;
+                    if (!map.TryGetValue(prefix, out var list))
+                    {
+                        list = new List<string>();
+                        map[prefix] = list;
+                    }
+                    foreach (var m in mounts)
+                    {
+                        if (!list.Contains(m.ContainerPath, StringComparer.OrdinalIgnoreCase))
+                            list.Add(m.ContainerPath);
+                    }
+                    continue;
+                }
+
+                // Back-compat: use DefaultEndpointAttribute.ImagePrefixes if present
                 var endpoints = t.GetCustomAttributes(typeof(DefaultEndpointAttribute), inherit: false).Cast<DefaultEndpointAttribute>().ToArray();
-                // Require image prefixes to associate mounts to container images
                 if (endpoints.Length == 0) continue;
                 foreach (var ep in endpoints)
                 {
@@ -149,11 +175,13 @@ public sealed class ComposeExporter : IArtifactExporter
                 AddForTarget("/var/opt/mssql");
             else if (img.Contains("weaviate") && !HasTarget("/var/lib/weaviate"))
                 AddForTarget("/var/lib/weaviate");
+            else if (img.Contains("ollama") && !HasTarget("/root/.ollama"))
+                AddForTarget("/root/.ollama");
         }
         return svc with { Volumes = vols };
     }
 
-    static void WriteService(StringBuilder yaml, ServiceSpec svc, HashSet<string> namedVolumes, int indent)
+    static void WriteService(StringBuilder yaml, ServiceSpec svc, IReadOnlySet<string> healthyServiceIds, HashSet<string> namedVolumes, int indent)
     {
         var pad = new string(' ', indent);
         yaml.Append(pad).Append(svc.Id).AppendLine(":");
@@ -202,13 +230,15 @@ public sealed class ComposeExporter : IArtifactExporter
                 yaml.Append(pad).Append("    retries: ").AppendLine(svc.Health.Retries.Value.ToString());
         }
 
-        if (svc.DependsOn.Count > 0)
+    if (svc.DependsOn.Count > 0)
         {
             yaml.Append(pad).AppendLine("  depends_on:");
             foreach (var dep in svc.DependsOn)
             {
                 yaml.Append(pad).Append("    ").Append(dep).AppendLine(":");
-                yaml.Append(pad).AppendLine("      condition: service_healthy");
+        // If the dependency service has no health, use service_started to avoid waiting on a nonexistent check.
+        var cond = healthyServiceIds.Contains(dep) ? "service_healthy" : "service_started";
+                yaml.Append(pad).Append("      condition: ").AppendLine(cond);
             }
         }
     }

@@ -12,4 +12,7 @@
   <ProjectReference Include="..\Sora.Orchestration.Provider.Docker\Sora.Orchestration.Provider.Docker.csproj" />
   <ProjectReference Include="..\Sora.Orchestration.Provider.Podman\Sora.Orchestration.Provider.Podman.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
+  </ItemGroup>
 </Project>

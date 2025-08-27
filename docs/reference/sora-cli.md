@@ -52,7 +52,13 @@ No-args context card (in a Sora-compatible project folder)
 ```pwsh
 Sora
 # First line prints: "Use -h for help"
-# Then a concise Context Card with providers, project/files, services, ports/health, and suggested one-liners.
+# Then a concise Context Card with:
+# - Providers (Docker/Podman availability)
+# - Project and key files (compose, csproj)
+# - Services (planned ports/health)
+# - Compose services (discovered from compose.yml)
+# - Dependencies (database, vector, AI, auth)
+# - Suggested one-liners
 ```
 
 Inspect (explicit)
@@ -60,6 +66,17 @@ Inspect (explicit)
 Sora inspect
 Sora inspect --json
 ```
+
+Inspect JSON (contract — selected fields)
+- providers: [{ name, ok, version }]
+- project: { name, path, files: [] }
+- services: [{ id, image, ports: ["HOST:CONTAINER"], health: true|false }]
+- composeServices: ["api", "db", ...]
+- dependencies: { database?: "mongodb|postgres|redis|sqlite|none", vector?: "weaviate|qdrant|pinecone|none", ai?: "ollama|openai|none", auth?: "enabled|disabled" }
+
+Notes
+- Dependency detection prefers concrete configuration over heuristics: compose.yml > csproj references > planned service images.
+- In samples (e.g., S5.Recs), you’ll typically see db: mongodb, vector: weaviate, ai: ollama, auth: enabled.
 
 Validate environment
 ```pwsh

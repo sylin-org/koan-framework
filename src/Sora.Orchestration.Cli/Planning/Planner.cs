@@ -12,51 +12,18 @@ internal static class Planner
         {
             return fromFile!;
         }
-
-        // 2) Env-driven prototype plans
-        var provider = Get("Sora:Data:Provider") ?? Get("SORA_DATA_PROVIDER");
-        if (string.Equals(provider, "postgres", StringComparison.OrdinalIgnoreCase))
+    // 2) Discovery-driven draft (CLI scans assemblies for manifests)
+        var draft = ProjectDependencyAnalyzer.DiscoverDraft(profile);
+        if (draft is not null && draft.Services.Count > 0)
         {
-            var pw = Get("Sora:Data:Postgres:Password") ?? Get("SORA_DATA_POSTGRES_PASSWORD") ?? "pw";
-            return new Plan(
-                profile,
-                new[]
-                {
-                    new ServiceSpec(
-                        Id: "db",
-                        Image: "postgres:16",
-                        Env: new Dictionary<string,string?>{ ["POSTGRES_PASSWORD"] = pw },
-                        Ports: new List<(int,int)>{ (5432,5432) },
-                        Volumes: new List<(string,string,bool)>{ ("pgdata", "/var/lib/postgresql/data", true) },
-                        Health: new HealthSpec("http://localhost:5432/", TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(1), 5),
-                        DependsOn: Array.Empty<string>()
-                    )
-                }
-            );
-        }
-        if (string.Equals(provider, "redis", StringComparison.OrdinalIgnoreCase))
-        {
-            return new Plan(
-                profile,
-                new[]
-                {
-                    new ServiceSpec(
-                        Id: "cache",
-                        Image: "redis:7",
-                        Env: new Dictionary<string,string?>(),
-                        Ports: new List<(int,int)>{ (6379,6379) },
-                        Volumes: Array.Empty<(string,string,bool)>(),
-                        Health: new HealthSpec(null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(1), 5),
-                        DependsOn: Array.Empty<string>()
-                    )
-                }
-            );
+            var overrides = Overrides.Load();
+            if (overrides is not null)
+                draft = Overrides.Apply(draft, overrides);
+            return FromDraft(profile, draft);
         }
         // Fallback to demo plan
         return Demo(profile);
     }
-
-    static string? Get(string key) => Environment.GetEnvironmentVariable(key);
 
     static Plan Demo(Profile profile)
         => new(
@@ -115,7 +82,7 @@ internal static class Planner
             }
             catch
             {
-                // Ignore parse errors; fall back to env/demo.
+                // Ignore parse errors; fall back to discovery/demo.
             }
         }
         plan = null;
@@ -188,6 +155,74 @@ internal static class Planner
         var target = parts[1];
         var named = !(source.StartsWith(".") || source.StartsWith("/") || source.Contains('\\'));
         return (source, target, named);
+    }
+
+    internal sealed class Overrides
+    {
+        public string? Mode { get; set; } // Container | Local | Auto (future)
+        public Dictionary<string, Service>? Services { get; set; }
+        public sealed class Service
+        {
+            public string? Image { get; set; }
+            public Dictionary<string,string?>? Env { get; set; }
+            public List<string>? Volumes { get; set; }
+        }
+
+    public static Overrides? Load()
+        {
+            try
+            {
+                var cwd = Directory.GetCurrentDirectory();
+                foreach (var rel in Constants.OverrideCandidates)
+                {
+                    var path = Path.Combine(cwd, rel.Replace('/', Path.DirectorySeparatorChar));
+                    if (!File.Exists(path)) continue;
+                    var json = File.ReadAllText(path);
+                    return System.Text.Json.JsonSerializer.Deserialize<Overrides>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+            }
+            catch { }
+            return null;
+        }
+
+    public static PlanDraft Apply(PlanDraft draft, Overrides ov)
+        {
+            var list = new List<ServiceRequirement>(draft.Services.Count);
+            foreach (var s in draft.Services)
+            {
+                var id = s.Id;
+                Overrides.Service? svc = null;
+                if (ov.Services is not null) ov.Services.TryGetValue(id, out svc);
+                var img = svc is not null && !string.IsNullOrWhiteSpace(svc.Image) ? svc.Image! : s.Image;
+                var env = new Dictionary<string,string?>(s.Env);
+                if (svc is not null && svc.Env is not null)
+                {
+                    foreach (var kv in svc.Env) env[kv.Key] = kv.Value;
+                }
+                var volumes = new List<string>(s.Volumes);
+                if (svc is not null && svc.Volumes is not null)
+                {
+                    foreach (var v in svc.Volumes) if (!string.IsNullOrWhiteSpace(v)) volumes.Add(v);
+                }
+                list.Add(new ServiceRequirement(
+                    id,
+                    img,
+                    env,
+                    s.ContainerPorts,
+                    volumes,
+                    s.AppEnv,
+                    // Keep endpoint data as-is; mode selection for token replacement will be extended in future
+                    s.EndpointScheme,
+                    s.EndpointHost,
+                    s.EndpointUriPattern,
+                    s.LocalScheme,
+                    s.LocalHost,
+                    s.LocalPort,
+                    s.LocalUriPattern
+                ));
+            }
+            return new PlanDraft(list, draft.IncludeApp, draft.AppHttpPort);
+        }
     }
 
     // Descriptor model (intentionally minimal)
@@ -303,5 +338,85 @@ internal static class Planner
             }
             return map;
         }
+    }
+
+    internal static Plan FromDraft(Profile profile, PlanDraft draft)
+    {
+        var services = new List<ServiceSpec>();
+        // Backing services from draft
+        foreach (var r in draft.Services)
+        {
+            var ports = r.ContainerPorts.Select(p => (p, p)).ToList();
+            var vols = new List<(string,string,bool)>();
+            foreach (var v in r.Volumes)
+            {
+                var parsed = ParseVolume(v);
+                if (parsed is { }) vols.Add(parsed.Value);
+            }
+            HealthSpec? health = null;
+            if (!string.IsNullOrWhiteSpace(r.HealthHttpPath))
+            {
+                // Only create HTTP health checks for http/https schemes.
+                var scheme = string.IsNullOrEmpty(r.EndpointScheme) ? "http" : r.EndpointScheme;
+                if (string.Equals(scheme, "http", StringComparison.OrdinalIgnoreCase) || string.Equals(scheme, "https", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Build an HTTP endpoint using container mode defaults: http(s)://{id}:{port}{path}
+                    var port = r.ContainerPorts.FirstOrDefault();
+                    var http = scheme + "://" + (string.IsNullOrEmpty(r.EndpointHost) ? r.Id : r.EndpointHost) + ":" + (port == 0 ? 80 : port) + r.HealthHttpPath;
+                    health = new HealthSpec(
+                        HttpEndpoint: http,
+                        Interval: r.HealthIntervalSeconds is null ? null : TimeSpan.FromSeconds(r.HealthIntervalSeconds.Value),
+                        Timeout: r.HealthTimeoutSeconds is null ? null : TimeSpan.FromSeconds(r.HealthTimeoutSeconds.Value),
+                        Retries: r.HealthRetries
+                    );
+                }
+            }
+            services.Add(new ServiceSpec(r.Id, r.Image, new Dictionary<string,string?>(r.Env), ports, vols, health, Array.Empty<string>()));
+        }
+
+        // Optionally include app service with env derived from manifests
+        if (draft.IncludeApp)
+        {
+            var cwd = Directory.GetCurrentDirectory();
+            var appName = new DirectoryInfo(cwd).Name.ToLowerInvariant();
+            var image = $"sora-{appName}:dev";
+            var depIds = services.Select(s => s.Id).ToArray();
+            var appEnv = new Dictionary<string,string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = profile == Profile.Local ? "Development" : null,
+                ["ASPNETCORE_URLS"] = $"http://+:{draft.AppHttpPort}"
+            };
+            // Apply AppEnvironment tokens per requirement
+            var overrides = Overrides.Load();
+            var mode = overrides?.Mode;
+            foreach (var r in draft.Services)
+            {
+                foreach (var kv in r.AppEnv)
+                {
+                    var val = kv.Value;
+                    if (val is null) continue;
+                    // Replace tokens with port/scheme/host from selected mode (default: container)
+                    var useLocal = string.Equals(mode, "Local", StringComparison.OrdinalIgnoreCase);
+                    var port = useLocal ? (r.LocalPort ?? r.ContainerPorts.FirstOrDefault()) : r.ContainerPorts.FirstOrDefault();
+                    val = val
+                        .Replace("{serviceId}", r.Id)
+                        .Replace("{port}", port == 0 ? string.Empty : port.ToString())
+                        .Replace("{scheme}", useLocal ? (r.LocalScheme ?? r.EndpointScheme ?? string.Empty) : (r.EndpointScheme ?? string.Empty))
+                        .Replace("{host}", useLocal ? (r.LocalHost ?? r.Id) : (r.EndpointHost ?? r.Id));
+                    appEnv[kv.Key] = val;
+                }
+            }
+            services.Insert(0, new ServiceSpec(
+                Id: "api",
+                Image: image,
+                Env: appEnv,
+                Ports: new List<(int,int)> { (draft.AppHttpPort, draft.AppHttpPort) },
+                Volumes: new List<(string,string,bool)>(),
+                Health: null,
+                DependsOn: depIds
+            ));
+        }
+
+        return new Plan(profile, services);
     }
 }

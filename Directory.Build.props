@@ -48,6 +48,13 @@
     <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)icon.png')" />
   <None Include="$(MSBuildThisFileDirectory)resources\image\0_2.jpg" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)resources\image\0_2.jpg')" />
   </ItemGroup>
+  <!-- Attach in-repo Roslyn generators to all projects for local builds -->
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src\Sora.Orchestration.Generators\Sora.Orchestration.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      Condition="Exists('$(MSBuildThisFileDirectory)src\Sora.Orchestration.Generators\Sora.Orchestration.Generators.csproj') and '$(MSBuildProjectName)' != 'Sora.Orchestration.Generators'" />
+  </ItemGroup>
   <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)icon.png')">
     <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>

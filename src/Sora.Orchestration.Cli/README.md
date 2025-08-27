@@ -131,3 +131,54 @@ Notes
 - Console outputs (doctor/logs) redact sensitive values by key pattern. JSON outputs are not redacted.
 - status prints endpoint hints from the planned services and flags conflicting ports when detected.
 - `up` is disabled for Staging/Prod; use `export compose` to generate artifacts instead.
+
+## Planning and discovery (how plans are built)
+
+Precedence (first hit wins):
+- Descriptor file in project root: `sora.orchestration.yml|yaml|json`.
+- Environment-driven prototype: `SORA_DATA_PROVIDER=postgres|redis` shortcuts.
+- Discovery via generated manifest (preferred) or reflection of adapter attributes.
+- Fallback demo plan (single Postgres).
+
+Generated manifest: adapters annotate with attributes (ServiceId, ContainerDefaults, EndpointDefaults, AppEnvDefaults); a source generator emits `Sora.Orchestration.__SoraOrchestrationManifest.Json`. The CLI prefers this manifest over reflection for stability and speed.
+
+Token substitution in AppEnv: `{serviceId}`, `{port}`, `{scheme}`, `{host}` are replaced from endpoint defaults. By default, Container mode values are used; see Overrides below to switch to Local mode.
+
+## Overrides (per-project, optional)
+
+File locations (first found wins):
+- `.sora/overrides.json`
+- `overrides.sora.json`
+
+Schema (partial):
+```json
+{
+	"Mode": "Local", // or "Container" (default)
+	"Services": {
+		"mongo": {
+			"Image": "mongo:7",
+			"Env": { "MONGO_INITDB_ROOT_USERNAME": "root" },
+			"Volumes": [ "./Data/mongo:/data/db" ]
+		}
+	}
+}
+```
+
+Behavior:
+- Mode: when set to Local, token substitution in AppEnv uses Local endpoint defaults (scheme/host/port) if provided by the adapter; otherwise falls back to Container values.
+- Services: per-service `Env` is merged (overrides existing keys), `Volumes` are appended, and `Image` replaces the discovered image/tag when provided.
+- Overrides apply after discovery and before rendering/export.
+
+Examples:
+```pwsh
+# Force Local endpoint tokens and tweak Mongo env/volume
+New-Item -ItemType Directory -Force -Path .sora | Out-Null
+'{"Mode":"Local","Services":{"mongo":{"Env":{"MONGO_INITDB_ROOT_USERNAME":"root"},"Volumes":["./Data/mongo:/data/db"]}}}' | \
+	Set-Content .sora/overrides.json
+
+sora export compose
+```
+
+See also
+- Docs: /docs/engineering/index.md, /docs/architecture/principles.md
+- Decisions: /docs/decisions/WEB-0035-entitycontroller-transformers.md, /docs/decisions/DATA-0061-data-access-pagination-and-streaming.md

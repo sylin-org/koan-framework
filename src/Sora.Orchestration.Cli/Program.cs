@@ -324,7 +324,9 @@ static async Task<int> InspectAsync(string[] args)
         .Select(name => Path.Combine(cwd, name))
         .FirstOrDefault(File.Exists);
     var composePath = Path.Combine(cwd, Constants.DefaultComposePath.Replace('/', Path.DirectorySeparatorChar));
-    var projectDetected = descriptor is not null || File.Exists(composePath);
+    var hasCsproj = Directory.EnumerateFiles(cwd, "*.csproj", SearchOption.TopDirectoryOnly).Any();
+    var csprojPath = hasCsproj ? Directory.EnumerateFiles(cwd, "*.csproj", SearchOption.TopDirectoryOnly).FirstOrDefault() : null;
+    var projectDetected = descriptor is not null || File.Exists(composePath) || hasCsproj;
     if (!projectDetected)
     {
         if (json)
@@ -362,6 +364,11 @@ static async Task<int> InspectAsync(string[] args)
     if (descriptor is not null) files.Add(Path.GetFileName(descriptor));
     if (File.Exists(composePath)) files.Add(Constants.DefaultComposePath);
     if (File.Exists(envPath)) files.Add(".env");
+    if (hasCsproj && csprojPath is not null) files.Add(Path.GetFileName(csprojPath));
+
+    // Infer dependencies (best-effort, read-only): DB, Vector DB, AI provider(s), Auth
+    var deps = InferDependencies(plan, cwd, csprojPath);
+    var composeServices = DetectComposeServices(cwd);
 
     if (json)
     {
@@ -379,7 +386,9 @@ static async Task<int> InspectAsync(string[] args)
                 health = s.Health is not null
             }),
             files,
-            conflicts
+            conflicts,
+            composeServices,
+            dependencies = deps
         };
         Console.WriteLine(JsonSerializer.Serialize(payload));
         return 0;
@@ -406,6 +415,25 @@ static async Task<int> InspectAsync(string[] args)
         var health = s.Health is null ? "no" : "yes";
         Console.WriteLine($"  -> {s.Id}: ports [{ports}], health: {health}");
     }
+    if (composeServices is { Count: > 0 })
+    {
+        Console.WriteLine($"Compose services: {composeServices.Count}");
+        foreach (var n in composeServices)
+            Console.WriteLine($"  => {n}");
+    }
+    // Dependencies summary
+    if (deps is not null)
+    {
+        var db = deps.TryGetValue("database", out var dbVal) ? dbVal : null;
+        var vect = deps.TryGetValue("vector", out var veVal) ? veVal : null;
+        var ai = deps.TryGetValue("ai", out var aiVal) ? aiVal : null;
+        var auth = deps.TryGetValue("auth", out var auVal) ? auVal : null;
+        Console.WriteLine("Dependencies:");
+        if (db is not null) Console.WriteLine($"  db: {db}");
+        if (vect is not null) Console.WriteLine($"  vector: {vect}");
+        if (ai is not null) Console.WriteLine($"  ai: {ai}");
+        if (auth is not null) Console.WriteLine($"  auth: {auth}");
+    }
     if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
 
     // One-liners (easy to copy)
@@ -423,6 +451,102 @@ static async Task<int> InspectAsync(string[] args)
     Console.WriteLine("  Sora status --json");
 
     return 0;
+}
+
+// Heuristics to infer dependencies from plan, compose files, and project references
+static Dictionary<string, string>? InferDependencies(Plan plan, string cwd, string? csprojPath)
+{
+    string? db = null, vector = null, ai = null, auth = null;
+
+    // Compose-derived hints (highest precedence)
+    bool cMongo = false, cPostgres = false, cWeaviate = false, cOllama = false;
+    foreach (var rel in Constants.ComposeProbeCandidates)
+    {
+        var path = Path.Combine(cwd, rel.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(path)) continue;
+        try
+        {
+            var text = File.ReadAllText(path).ToLowerInvariant();
+        if (text.Contains("image: postgres")) cPostgres = true;
+        if (text.Contains("image: mongo")) cMongo = true;
+        if (Regex.IsMatch(text, @"connectionstring:\s*""?mongodb://")) cMongo = true;
+        if (text.Contains("weaviate")) cWeaviate = true;
+        if (text.Contains("ollama")) cOllama = true;
+        }
+        catch { /* best-effort */ }
+    }
+
+    // Inspect project references for auth/web/data providers (second precedence)
+    if (!string.IsNullOrWhiteSpace(csprojPath) && File.Exists(csprojPath))
+    {
+        try
+        {
+            var xml = File.ReadAllText(csprojPath);
+            var lower = xml.ToLowerInvariant();
+        if (lower.Contains("sora.web.auth")) auth = "enabled";
+        if (lower.Contains("sora.data.weaviate")) vector ??= "weaviate";
+        if (lower.Contains("sora.data.mongo")) db ??= "mongodb";
+        }
+        catch { /* ignore */ }
+    }
+
+    // Plan-derived hints (lowest precedence)
+    var images = plan.Services.Select(s => s.Image?.ToLowerInvariant() ?? string.Empty).ToList();
+    if (images.Any(i => i.Contains("postgres"))) db ??= "postgres";
+    if (images.Any(i => i.Contains("mongo"))) db ??= "mongodb";
+    if (images.Any(i => i.Contains("redis"))) db ??= "redis";
+    if (images.Any(i => i.Contains("weaviate"))) vector ??= "weaviate";
+    if (images.Any(i => i.Contains("qdrant"))) vector ??= "qdrant";
+    if (images.Any(i => i.Contains("pinecone"))) vector ??= "pinecone";
+    if (images.Any(i => i.Contains("ollama"))) ai ??= "ollama";
+
+    // Apply compose overrides last (compose wins if present)
+    if (cMongo) db = "mongodb"; else if (cPostgres) db = db ?? "postgres";
+    if (cWeaviate) vector = "weaviate";
+    if (cOllama) ai = "ollama";
+
+    var result = new Dictionary<string, string>();
+    if (db is not null) result["database"] = db;
+    if (vector is not null) result["vector"] = vector;
+    if (ai is not null) result["ai"] = ai;
+    if (auth is not null) result["auth"] = auth;
+    return result.Count == 0 ? null : result;
+}
+
+// Returns distinct service ids discovered in known compose files (best-effort)
+static List<string>? DetectComposeServices(string cwd)
+{
+    var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var rel in Constants.ComposeProbeCandidates)
+    {
+        var path = Path.Combine(cwd, rel.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(path)) continue;
+        try
+        {
+            var text = File.ReadAllText(path);
+            // Very small heuristic: capture lines under services: with 2-space indent like "  <name>:"
+            var idx = text.IndexOf("services:", StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) continue;
+            var block = text[(idx + 9)..];
+            foreach (var raw in block.Split('\n'))
+            {
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                if (!raw.StartsWith("  "))
+                {
+                    // Reached next top-level key
+                    if (!raw.StartsWith(" ")) break;
+                    continue;
+                }
+                var m = Regex.Match(raw, @"^\x20\x20([A-Za-z0-9._-]+):\s*$");
+                if (m.Success)
+                {
+                    set.Add(m.Groups[1].Value);
+                }
+            }
+        }
+        catch { /* ignore */ }
+    }
+    return set.Count == 0 ? null : set.OrderBy(s => s).ToList();
 }
 
 static async Task<int> LogsAsync(string[] args)

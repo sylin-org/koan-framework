@@ -14,6 +14,8 @@
       href: engineering/docs-engagement-plan.md
     - name: Orchestration adapter authoring
       href: engineering/orchestration-adapter-authoring.md
+    - name: Orchestration manifest generator
+      href: engineering/orchestration-manifest-generator.md
 - name: Architecture Principles
   href: architecture/principles.md
 - name: Reference

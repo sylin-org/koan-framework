@@ -3,12 +3,24 @@ using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
 using Sora.Orchestration;
+using Sora.Orchestration.Abstractions.Attributes;
 
 namespace Sora.Data.SqlServer;
 
 [ProviderPriority(15)]
-[DefaultEndpoint("mssql", "db", 1433, "tcp", "mssql", "sqlserver", "microsoft/sqlserver", UriPattern = "mssql://{host}:{port}")]
-[HostMount("/var/opt/mssql")]
+[ServiceId("mssql")]
+[ContainerDefaults(
+    image: "mcr.microsoft.com/mssql/server",
+    Tag = "2022-latest",
+    Ports = new[] { 1433 },
+    Volumes = new[] { "./Data/mssql:/var/opt/mssql" },
+    Env = new[] { "ACCEPT_EULA=Y", "SA_PASSWORD" }
+)]
+[EndpointDefaults(EndpointMode.Container, scheme: "mssql", host: "mssql", port: 1433, UriPattern = "mssql://{host}:{port}")]
+[EndpointDefaults(EndpointMode.Local, scheme: "mssql", host: "localhost", port: 1433, UriPattern = "mssql://{host}:{port}")]
+[AppEnvDefaults(
+    "Sora__Data__SqlServer__ConnectionString={scheme}://{host}:{port}"
+)]
 public sealed class SqlServerAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider)
