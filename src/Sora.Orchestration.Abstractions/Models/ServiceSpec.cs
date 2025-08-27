@@ -10,6 +10,7 @@ public sealed record ServiceSpec(
     IReadOnlyList<(int Host, int Container)> Ports,
     IReadOnlyList<(string Source, string Target, bool Named)> Volumes,
     HealthSpec? Health,
+    ServiceType? Type,
     IReadOnlyList<string> DependsOn
 );
 

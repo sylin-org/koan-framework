@@ -24,6 +24,7 @@ public class ComposeExporterEnvTests
                     Ports: Array.Empty<(int,int)>(),
                     Volumes: Array.Empty<(string,string,bool)>(),
                     Health: null,
+                    Type: null,
                     DependsOn: Array.Empty<string>()
                 )
             }

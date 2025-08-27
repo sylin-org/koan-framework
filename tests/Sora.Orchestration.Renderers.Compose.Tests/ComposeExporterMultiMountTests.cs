@@ -25,6 +25,7 @@ public class ComposeExporterMultiMountTests
                     Ports: new List<(int,int)>(),
                     Volumes: new List<(string,string,bool)>(),
                     Health: null,
+                    Type: null,
                     DependsOn: Array.Empty<string>()
                 )
             }
@@ -55,6 +56,7 @@ public class ComposeExporterMultiMountTests
                     Ports: new List<(int,int)>(),
                     Volumes: new List<(string,string,bool)>{ ("./Data/db", "/var/lib/serviceA", false) },
                     Health: null,
+                    Type: null,
                     DependsOn: Array.Empty<string>()
                 )
             }

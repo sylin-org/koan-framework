@@ -9,6 +9,7 @@ public sealed record ServiceRequirement(
     IReadOnlyList<int> ContainerPorts,
     IReadOnlyList<string> Volumes,
     IReadOnlyDictionary<string,string?> AppEnv,
+    ServiceType? Type = null,
     string? EndpointScheme = null,
     string? EndpointHost = null,
     string? EndpointUriPattern = null,
@@ -19,7 +20,14 @@ public sealed record ServiceRequirement(
     string? HealthHttpPath = null,
     int? HealthIntervalSeconds = null,
     int? HealthTimeoutSeconds = null,
-    int? HealthRetries = null
+    int? HealthRetries = null,
+    string? Name = null,
+    string? QualifiedCode = null,
+    string? Subtype = null,
+    int? Deployment = null,
+    string? Description = null,
+    IReadOnlyList<string>? Provides = null,
+    IReadOnlyList<string>? Consumes = null
 );
 
 public sealed record PlanDraft(

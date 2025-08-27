@@ -24,6 +24,7 @@ public class ComposeExporterProfileMountsTests
                     Ports: new List<(int,int)>(),
                     Volumes: new List<(string,string,bool)>(),
                     Health: null,
+                    Type: null,
                     DependsOn: Array.Empty<string>()
                 )
             }
@@ -55,6 +56,7 @@ public class ComposeExporterProfileMountsTests
                     Ports: new List<(int,int)>(),
                     Volumes: new List<(string,string,bool)>(),
                     Health: null,
+                    Type: null,
                     DependsOn: Array.Empty<string>()
                 )
             }

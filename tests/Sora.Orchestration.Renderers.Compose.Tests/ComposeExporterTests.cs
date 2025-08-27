@@ -19,6 +19,7 @@ public class ComposeExporterTests
                     Ports: new List<(int,int)>{ (5432,5432) },
                     Volumes: new List<(string,string,bool)>{ ("pgdata", "/var/lib/postgresql/data", true) },
                     Health: new HealthSpec("http://localhost:5432/", TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(1), 5),
+                    Type: null,
                     DependsOn: Array.Empty<string>()
                 ),
                 // Minimal app that depends on db so depends_on emits condition: service_healthy
@@ -29,6 +30,7 @@ public class ComposeExporterTests
                     Ports: Array.Empty<(int,int)>(),
                     Volumes: Array.Empty<(string,string,bool)>(),
                     Health: null,
+                    Type: null,
                     DependsOn: new[]{ "db" }
                 )
             }

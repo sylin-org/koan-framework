@@ -24,6 +24,7 @@ public class ComposeExporterMountTests
                     Ports: new List<(int,int)>{ (5432,5432) },
                     Volumes: new List<(string,string,bool)>(),
                     Health: null,
+                    Type: null,
                     DependsOn: Array.Empty<string>()
                 )
             }
@@ -55,6 +56,7 @@ public class ComposeExporterMountTests
                     Ports: new List<(int,int)>(),
                     Volumes: new List<(string,string,bool)>{ ("./Data/db", "/var/lib/postgresql/data", false) },
                     Health: null,
+                    Type: null,
                     DependsOn: Array.Empty<string>()
                 )
             }

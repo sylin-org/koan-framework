@@ -48,4 +48,10 @@ public sealed class OrchestrationServiceManifestAttribute : Attribute
     public int HealthIntervalSeconds { get; set; }
     public int HealthTimeoutSeconds { get; set; }
     public int HealthRetries { get; set; }
+
+    /// <summary>
+    /// Declarative service type (database, vector, ai, app, or generic service). Optional.
+    /// When provided, this value will be surfaced to tooling (CLI Inspect) instead of image-based heuristics.
+    /// </summary>
+    public ServiceType? Type { get; set; }
 }

@@ -7,10 +7,13 @@ namespace Sora.Orchestration.Cli.Planning;
 
 internal static class ProjectDependencyAnalyzer
 {
+    public static List<(string Id, string Name, string Protocol, string? Icon)>? ManifestAuthProviders { get; private set; }
+
     public static PlanDraft? DiscoverDraft(Profile profile)
     {
         try
         {
+            var authAccum = new List<(string Id, string Name, string Protocol, string? Icon)>();
             var cwd = Directory.GetCurrentDirectory();
             var csproj = Directory.EnumerateFiles(cwd, "*.csproj", SearchOption.TopDirectoryOnly).FirstOrDefault();
             if (csproj is null) return null;
@@ -111,7 +114,12 @@ internal static class ProjectDependencyAnalyzer
                     var t = asm.GetType("Sora.Orchestration.__SoraOrchestrationManifest", throwOnError: false, ignoreCase: false);
                     if (t is null) continue;
                     var json = t.GetField("Json", BindingFlags.Public | BindingFlags.Static)?.GetRawConstantValue() as string;
-                    if (!string.IsNullOrEmpty(json)) reqs.AddRange(ParseManifestJson(json!));
+                    if (!string.IsNullOrEmpty(json))
+                    {
+                        reqs.AddRange(ParseManifestJson(json!));
+                        var aps = ParseAuthProviders(json!);
+                        if (aps is { Count: > 0 }) authAccum.AddRange(aps);
+                    }
                 }
                 catch { }
             }
@@ -147,6 +155,16 @@ internal static class ProjectDependencyAnalyzer
                 .GroupBy(r => r.Id, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
                 .ToList();
+
+            // Union auth providers across manifests by id
+            if (authAccum.Count > 0)
+            {
+                ManifestAuthProviders = authAccum
+                    .GroupBy(a => a.Id, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
 
             return new PlanDraft(distinct, IncludeApp: isWeb, AppHttpPort: 8080);
         }
@@ -215,13 +233,50 @@ internal static class ProjectDependencyAnalyzer
                 int? healthTimeout = el.TryGetProperty("healthTimeout", out var htEl) && htEl.ValueKind == JsonValueKind.Number ? htEl.GetInt32() : null;
                 int? healthRetries = el.TryGetProperty("healthRetries", out var hrEl) && hrEl.ValueKind == JsonValueKind.Number ? hrEl.GetInt32() : null;
 
+                ServiceType? type = null;
+                if (el.TryGetProperty("type", out var tEl) && tEl.ValueKind == JsonValueKind.Number)
+                {
+                    try { type = (ServiceType)tEl.GetInt32(); } catch { }
+                }
+                string? name = el.TryGetProperty("name", out var nEl) ? nEl.GetString() : null;
+                string? qCode = el.TryGetProperty("qualifiedCode", out var qcEl) ? qcEl.GetString() : null;
+                string? subtype = el.TryGetProperty("subtype", out var stEl) ? stEl.GetString() : null;
+                int? deployment = el.TryGetProperty("deployment", out var dkEl) && dkEl.ValueKind == JsonValueKind.Number ? dkEl.GetInt32() : null;
+                string? desc = el.TryGetProperty("description", out var dEl) ? dEl.GetString() : null;
+                List<string>? provides = el.TryGetProperty("provides", out var prEl) && prEl.ValueKind == JsonValueKind.Array ? prEl.EnumerateArray().Select(x => x.GetString() ?? string.Empty).Where(s => !string.IsNullOrEmpty(s)).ToList() : null;
+                List<string>? consumes = el.TryGetProperty("consumes", out var coEl) && coEl.ValueKind == JsonValueKind.Array ? coEl.EnumerateArray().Select(x => x.GetString() ?? string.Empty).Where(s => !string.IsNullOrEmpty(s)).ToList() : null;
+
                 list.Add(new ServiceRequirement(id!, image!, env, ports, volumes, appEnv,
+                    type,
                     endpointScheme, endpointHost, endpointPattern, localScheme, localHost, localPort, localPattern,
-                    healthPath, healthInterval, healthTimeout, healthRetries));
+                    healthPath, healthInterval, healthTimeout, healthRetries,
+                    name, qCode, subtype, deployment, desc, provides, consumes));
             }
         }
         catch { }
         return list;
+    }
+
+    private static List<(string Id, string Name, string Protocol, string? Icon)>? ParseAuthProviders(string json)
+    {
+        try
+        {
+            var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("authProviders", out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return null;
+            var list = new List<(string, string, string, string?)>();
+            foreach (var el in arr.EnumerateArray())
+            {
+                var id = el.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+                var name = el.TryGetProperty("name", out var nEl) ? nEl.GetString() : null;
+                var protocol = el.TryGetProperty("protocol", out var pEl) ? pEl.GetString() : null;
+                var icon = el.TryGetProperty("icon", out var iEl) ? iEl.GetString() : null;
+                if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(name))
+                    list.Add((id!, name!, protocol ?? string.Empty, icon));
+            }
+            return list.Count == 0 ? null : list;
+        }
+        catch { return null; }
     }
 
     private static int[] ExtractIntArray(CustomAttributeTypedArgument arg)
@@ -271,6 +326,7 @@ internal static class ProjectDependencyAnalyzer
                 var env = new Dictionary<string,string?>();
                 var appEnv = new Dictionary<string,string?>();
                 var volumes = Array.Empty<string>();
+                ServiceType? type = null;
                 string? healthPath = null; int? healthInterval = null; int? healthTimeout = null; int? healthRetries = null;
                 foreach (var na in cad.NamedArguments)
                 {
@@ -284,6 +340,9 @@ internal static class ProjectDependencyAnalyzer
                             break;
                         case nameof(OrchestrationServiceManifestAttribute.Volumes):
                             volumes = ExtractStringArray(na.TypedValue);
+                            break;
+                        case nameof(OrchestrationServiceManifestAttribute.Type):
+                            if (na.TypedValue.Value is int et) type = (ServiceType)et;
                             break;
                         case "HealthPath":
                             healthPath = na.TypedValue.Value?.ToString();
@@ -299,7 +358,7 @@ internal static class ProjectDependencyAnalyzer
                             break;
                     }
                 }
-                reqs.Add(new ServiceRequirement(id!, image!, env, ports, volumes, appEnv, null, null, null, null, null, null, null, healthPath, healthInterval, healthTimeout, healthRetries));
+                reqs.Add(new ServiceRequirement(id!, image!, env, ports, volumes, appEnv, type, null, null, null, null, null, null, null, healthPath, healthInterval, healthTimeout, healthRetries));
                 added = true;
             }
         }
@@ -322,6 +381,7 @@ internal static class ProjectDependencyAnalyzer
                 string? endpointScheme = null; string? endpointHost = null; string? endpointPattern = null;
                 string? localScheme = null; string? localHost = null; int? localPort = null; string? localPattern = null;
                 string? healthPath = null; int? healthInterval = null; int? healthTimeout = null; int? healthRetries = null;
+                ServiceType? svcType = null;
 
                 foreach (var cad in type.GetCustomAttributesData())
                 {
@@ -399,11 +459,20 @@ internal static class ProjectDependencyAnalyzer
                             }
                         }
                     }
+                    else if (string.Equals(full, "Sora.Orchestration.OrchestrationServiceManifestAttribute", StringComparison.Ordinal))
+                    {
+                        foreach (var na in cad.NamedArguments)
+                        {
+                            if (na.MemberName == nameof(OrchestrationServiceManifestAttribute.Type) && na.TypedValue.Value is int et)
+                                svcType = (ServiceType)et;
+                        }
+                    }
                 }
 
                 if (!string.IsNullOrWhiteSpace(sid) && !string.IsNullOrWhiteSpace(image))
                 {
                     reqs.Add(new ServiceRequirement(sid!, image!, env, ports, volumes.ToArray(), appEnv,
+                        svcType,
                         endpointScheme, endpointHost, endpointPattern, localScheme, localHost, localPort, localPattern,
                         healthPath, healthInterval, healthTimeout, healthRetries));
                     added = true;

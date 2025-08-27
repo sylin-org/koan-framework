@@ -16,6 +16,8 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
     private const string EndpointDefaultsAttr = "Sora.Orchestration.Abstractions.Attributes.EndpointDefaultsAttribute";
     private const string AppEnvDefaultsAttr = "Sora.Orchestration.Abstractions.Attributes.AppEnvDefaultsAttribute";
     private const string HealthDefaultsAttr = "Sora.Orchestration.Abstractions.Attributes.HealthEndpointDefaultsAttribute";
+    private const string OrchestrationServiceManifestAttr = "Sora.Orchestration.OrchestrationServiceManifestAttribute";
+    private const string SoraServiceAttr = "Sora.Orchestration.SoraServiceAttribute";
 
     public void Initialize(GeneratorInitializationContext context) { }
 
@@ -24,6 +26,56 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         try
         {
             var candidates = new List<ServiceCandidate>();
+            var authProviders = new List<AuthProviderCandidate>();
+            var manifestTypesById = new Dictionary<string, int>();
+            // Collect assembly-level attributes for auth provider descriptors once per compilation
+            try
+            {
+                var asm = context.Compilation.Assembly;
+                foreach (var a in asm.GetAttributes())
+                {
+                    var full = a.AttributeClass?.ToDisplayString();
+                    if (full == "Sora.Web.Auth.Attributes.AuthProviderDescriptorAttribute")
+                    {
+                        string id = a.ConstructorArguments.Length > 0 ? a.ConstructorArguments[0].Value?.ToString() ?? string.Empty : string.Empty;
+                        string name = a.ConstructorArguments.Length > 1 ? a.ConstructorArguments[1].Value?.ToString() ?? string.Empty : string.Empty;
+                        string protocol = a.ConstructorArguments.Length > 2 ? a.ConstructorArguments[2].Value?.ToString() ?? string.Empty : string.Empty;
+                        string? icon = null;
+                        foreach (var na in a.NamedArguments)
+                        {
+                            if (na.Key == "Icon") icon = na.Value.Value?.ToString();
+                        }
+                        if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(name))
+                            authProviders.Add(new AuthProviderCandidate(id, name, protocol, icon));
+                    }
+                    else if (full == OrchestrationServiceManifestAttr)
+                    {
+                        // Capture declared service type per service id from assembly-level manifest
+                        string id = a.ConstructorArguments.Length > 0 ? a.ConstructorArguments[0].Value?.ToString() ?? string.Empty : string.Empty;
+                        int? t = null;
+                        foreach (var na in a.NamedArguments)
+                        {
+                            if (na.Key == "Type")
+                            {
+                                if (na.Value.Value is int et) t = et;
+                                else if (na.Value.Value is short sh) t = sh;
+                                else if (na.Value.Value is byte by) t = by;
+                                else if (na.Value.Value is long lg) t = unchecked((int)lg);
+                                else if (na.Value.Value is null) { }
+                                else
+                                {
+                                    // Fallback: try parsing ToString when Roslyn gives enum name
+                                    var s = na.Value.Value.ToString();
+                                    if (int.TryParse(s, out var vi)) t = vi;
+                                }
+                            }
+                        }
+                        if (!string.IsNullOrWhiteSpace(id) && t is int ti)
+                            manifestTypesById[id] = ti;
+                    }
+                }
+            }
+            catch { }
             AppCandidate? app = null;
             foreach (var tree in context.Compilation.SyntaxTrees)
             {
@@ -40,8 +92,12 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                     var appEnv = new Dictionary<string, string?>();
                     var volumes = new List<string>();
                     string? scheme = null; string? host = null; int? endpointPort = null; string? uriPattern = null;
+                    int? declaredType = null;
                     string? localScheme = null; string? localHost = null; int? localPort = null; string? localPattern = null;
                     string? healthPath = null; int? healthInterval = null; int? healthTimeout = null; int? healthRetries = null;
+                    // Unified metadata (optional)
+                    string? svcName = null; string? qualifiedCode = null; string? subtype = null; int? deployment = null; string? svcDescription = null;
+                    var provides = new List<string>(); var consumes = new List<string>();
 
                     // Capture app metadata when class implements ISoraManifest or has SoraAppAttribute
                     try
@@ -60,7 +116,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                         case "DefaultPublicPort": port = (int?)na.Value.Value; break;
                                         case "AppCode": code = na.Value.Value?.ToString(); break;
                                         case "AppName": name = na.Value.Value?.ToString(); break;
-                                        case "Description": description = na.Value.Value?.ToString(); break;
+                                        case "Description": svcDescription = na.Value.Value?.ToString(); break;
                                     }
                                 }
                             }
@@ -72,6 +128,71 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                     foreach (var a in sym.GetAttributes())
                     {
                         var full = a.AttributeClass?.ToDisplayString();
+                        if (string.Equals(full, SoraServiceAttr, StringComparison.Ordinal))
+                        {
+                            // Minimal capture: Kind (int), ShortCode, Name, optional image/tag/ports/health
+                            try
+                            {
+                                if (a.ConstructorArguments.Length >= 3)
+                                {
+                                    // constructor: (ServiceKind kind, string shortCode, string name)
+                                    var kindVal = a.ConstructorArguments[0].Value;
+                                    // Map ServiceKind (App=0,Database=1,Vector=2,Ai=3,...) to ServiceType (Service=0,App=1,Database=2,Vector=3,Ai=4)
+                                    int? kindInt = null;
+                                    try
+                                    {
+                                        if (kindVal is int ki) kindInt = ki; else if (int.TryParse(kindVal?.ToString(), out var kp)) kindInt = kp;
+                                    }
+                                    catch { }
+                                    if (kindInt is int k)
+                                    {
+                                        declaredType = k switch
+                                        {
+                                            0 => 1, // App
+                                            1 => 2, // Database
+                                            2 => 3, // Vector
+                                            3 => 4, // Ai
+                                            _ => 0  // Other -> generic service
+                                        };
+                                    }
+                                    sid ??= a.ConstructorArguments[1].Value?.ToString();
+                                    svcName ??= a.ConstructorArguments[2].Value?.ToString();
+                                }
+                                foreach (var na in a.NamedArguments)
+                                {
+                                    switch (na.Key)
+                                    {
+                                        case "ContainerImage": image ??= na.Value.Value?.ToString(); break;
+                                        case "DefaultTag": tag ??= na.Value.Value?.ToString(); break;
+                                        case "DefaultPorts":
+                                            if (na.Value.Values is { Length: > 0 })
+                                                ports.AddRange(na.Value.Values.Select(v => (int)(v.Value ?? 0)));
+                                            break;
+                                        case "HealthEndpoint": healthPath = na.Value.Value?.ToString(); break;
+                                        case "QualifiedCode": qualifiedCode = na.Value.Value?.ToString(); break;
+                                        case "Subtype": subtype = na.Value.Value?.ToString(); break;
+                                        case "Description": svcDescription = na.Value.Value?.ToString(); break;
+                                        case "DeploymentKind":
+                                            try
+                                            {
+                                                var dv = na.Value.Value;
+                                                if (dv is int di) deployment = di; else if (int.TryParse(dv?.ToString(), out var dp)) deployment = dp;
+                                            }
+                                            catch { }
+                                            break;
+                                        case "Provides":
+                                            if (na.Value.Values is { Length: > 0 })
+                                                provides.AddRange(na.Value.Values.Select(v => v.Value?.ToString()).Where(s => !string.IsNullOrEmpty(s))!);
+                                            break;
+                                        case "Consumes":
+                                            if (na.Value.Values is { Length: > 0 })
+                                                consumes.AddRange(na.Value.Values.Select(v => v.Value?.ToString()).Where(s => !string.IsNullOrEmpty(s))!);
+                                            break;
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
                         if (string.Equals(full, ServiceIdAttr, StringComparison.Ordinal))
                         {
                             if (a.ConstructorArguments.Length > 0)
@@ -169,6 +290,12 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                         }
                     }
 
+                    // If a declared type exists in assembly-level manifest for this service id, prefer it
+                    if (declaredType is null && !string.IsNullOrWhiteSpace(sid) && manifestTypesById.TryGetValue(sid!, out var mt))
+                    {
+                        declaredType = mt;
+                    }
+
                     if (!string.IsNullOrWhiteSpace(sid) && !string.IsNullOrWhiteSpace(image))
                     {
                         if (!string.IsNullOrEmpty(tag)) image = image + ":" + tag;
@@ -176,14 +303,16 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                         if (endpointPort is null && ports.Count > 0) endpointPort = ports[0];
                         candidates.Add(new ServiceCandidate(sid!, image!, ports.ToArray(), env, volumes.ToArray(), appEnv,
                             scheme, host, endpointPort, uriPattern, localScheme, localHost, localPort, localPattern,
-                            healthPath, healthInterval, healthTimeout, healthRetries));
+                            healthPath, healthInterval, healthTimeout, healthRetries, declaredType,
+                            svcName, qualifiedCode, subtype, deployment, svcDescription, provides.ToArray(), consumes.ToArray()));
                     }
                 }
             }
 
-            if (candidates.Count == 0) return;
+            // Generate a manifest if we have any useful data: services, app metadata, or auth providers
+            if (candidates.Count == 0 && authProviders.Count == 0 && app is null) return;
 
-            var json = BuildJson(candidates, app);
+        var json = BuildJson(candidates, app, authProviders);
             var src = "namespace Sora.Orchestration { public static class __SoraOrchestrationManifest { public const string Json = \"" + Escape(json) + "\"; } }";
             context.AddSource("__SoraOrchestrationManifest.g.cs", SourceText.From(src, Encoding.UTF8));
         }
@@ -193,21 +322,39 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         }
     }
 
-    private static string BuildJson(List<ServiceCandidate> items, AppCandidate? app)
+    private static string BuildJson(List<ServiceCandidate> items, AppCandidate? app, List<AuthProviderCandidate> providers)
     {
         var sb = new StringBuilder();
         sb.Append('{');
         if (app is not null)
         {
             sb.Append("\"app\": {");
+            var before = sb.Length;
             if (!string.IsNullOrEmpty(app.Code)) sb.Append(Prop("code", app.Code)).Append(',');
             if (!string.IsNullOrEmpty(app.Name)) sb.Append(Prop("name", app.Name)).Append(',');
             if (!string.IsNullOrEmpty(app.Description)) sb.Append(Prop("description", app.Description)).Append(',');
             if (app.DefaultPublicPort is int dp) sb.Append(Prop("defaultPublicPort", dp)).Append(',');
-            if (sb.Length > 0 && sb[sb.Length - 1] == ',') sb.Length -= 1; // trim trailing comma
+            if (sb.Length > before && sb[sb.Length - 1] == ',') sb.Length -= 1; // trim trailing comma
             sb.Append("},");
         }
-        sb.Append("\"services\": [");
+                if (providers is { Count: > 0 })
+                {
+                        sb.Append("\"authProviders\": [");
+                        for (int i = 0; i < providers.Count; i++)
+                        {
+                                var p = providers[i];
+                                if (i > 0) sb.Append(',');
+                                sb.Append('{')
+                                    .Append(Prop("id", p.Id)).Append(',')
+                                    .Append(Prop("name", p.Name)).Append(',')
+                                    .Append(Prop("protocol", p.Protocol));
+                                if (!string.IsNullOrEmpty(p.Icon)) sb.Append(',').Append(Prop("icon", p.Icon!));
+                                sb.Append('}');
+                        }
+                        sb.Append("],");
+                }
+
+                sb.Append("\"services\": [");
         for (int i = 0; i < items.Count; i++)
         {
             var s = items[i];
@@ -219,6 +366,10 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                 .Append(',').Append(Prop("env", s.Env))
                 .Append(',').Append(Prop("volumes", s.Volumes))
                 .Append(',').Append(Prop("appEnv", s.AppEnv));
+            if (!string.IsNullOrEmpty(s.Name)) sb.Append(',').Append(Prop("name", s.Name!));
+            if (!string.IsNullOrEmpty(s.QualifiedCode)) sb.Append(',').Append(Prop("qualifiedCode", s.QualifiedCode!));
+            if (!string.IsNullOrEmpty(s.Subtype)) sb.Append(',').Append(Prop("subtype", s.Subtype!));
+            if (!string.IsNullOrEmpty(s.Description)) sb.Append(',').Append(Prop("description", s.Description!));
             if (!string.IsNullOrEmpty(s.Scheme)) sb.Append(',').Append(Prop("scheme", s.Scheme!));
             if (!string.IsNullOrEmpty(s.Host)) sb.Append(',').Append(Prop("host", s.Host!));
             if (s.EndpointPort is int ep) sb.Append(',').Append(Prop("endpointPort", ep));
@@ -231,6 +382,10 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             if (s.HealthInterval is int hi) sb.Append(',').Append(Prop("healthInterval", hi));
             if (s.HealthTimeout is int ht) sb.Append(',').Append(Prop("healthTimeout", ht));
             if (s.HealthRetries is int hr) sb.Append(',').Append(Prop("healthRetries", hr));
+            if (s.Type is int t) sb.Append(',').Append(Prop("type", t));
+            if (s.Deployment is int dk) sb.Append(',').Append(Prop("deployment", dk));
+            if (s.Provides is { Length: > 0 }) sb.Append(',').Append(Prop("provides", s.Provides));
+            if (s.Consumes is { Length: > 0 }) sb.Append(',').Append(Prop("consumes", s.Consumes));
             sb.Append('}');
         }
         sb.Append("]}");
@@ -260,6 +415,16 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         }
     }
 
+    private sealed class AuthProviderCandidate
+    {
+        public string Id { get; }
+        public string Name { get; }
+        public string Protocol { get; }
+        public string? Icon { get; }
+        public AuthProviderCandidate(string id, string name, string protocol, string? icon)
+        { Id = id; Name = name; Protocol = protocol; Icon = icon; }
+    }
+
     private sealed class ServiceCandidate
     {
         public string Id { get; }
@@ -280,6 +445,14 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
     public int? HealthInterval { get; }
     public int? HealthTimeout { get; }
     public int? HealthRetries { get; }
+    public int? Type { get; }
+    public string? Name { get; }
+    public string? QualifiedCode { get; }
+    public string? Subtype { get; }
+    public int? Deployment { get; }
+    public string? Description { get; }
+    public string[]? Provides { get; }
+    public string[]? Consumes { get; }
 
         public ServiceCandidate(
             string id,
@@ -299,7 +472,15 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             string? healthPath,
             int? healthInterval,
             int? healthTimeout,
-            int? healthRetries)
+            int? healthRetries,
+            int? type,
+            string? name,
+            string? qualifiedCode,
+            string? subtype,
+            int? deployment,
+            string? description,
+            string[]? provides,
+            string[]? consumes)
         {
             Id = id;
             Image = image;
@@ -319,6 +500,14 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             HealthInterval = healthInterval;
             HealthTimeout = healthTimeout;
             HealthRetries = healthRetries;
+            Type = type;
+            Name = name;
+            QualifiedCode = qualifiedCode;
+            Subtype = subtype;
+            Deployment = deployment;
+            Description = description;
+            Provides = provides;
+            Consumes = consumes;
         }
     }
 

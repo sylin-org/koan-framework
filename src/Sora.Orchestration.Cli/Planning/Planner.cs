@@ -307,7 +307,7 @@ internal static class Planner
                     s.Health.Retries
                 );
             }
-            services.Add(new ServiceSpec(s.Id, s.Image ?? string.Empty, env, ports, volumes, health, s.DependsOn?.ToArray() ?? Array.Empty<string>()));
+            services.Add(new ServiceSpec(s.Id, s.Image ?? string.Empty, env, ports, volumes, health, null, s.DependsOn?.ToArray() ?? Array.Empty<string>()));
         }
         return new Plan(profile, services);
     }
@@ -386,6 +386,7 @@ internal static class Planner
                     s.ContainerPorts,
                     volumes,
                     s.AppEnv,
+                    s.Type,
                     // Keep endpoint data as-is; mode selection for token replacement will be extended in future
                     s.EndpointScheme,
                     s.EndpointHost,
@@ -518,6 +519,25 @@ internal static class Planner
     internal static Plan FromDraft(Profile profile, PlanDraft draft)
     {
         var services = new List<ServiceSpec>();
+
+        // Compute inter-service dependencies based on Provides/Consumes tokens
+        // Build token -> provider ids map
+        var providersByToken = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in draft.Services)
+        {
+            if (r.Provides is null) continue;
+            foreach (var token in r.Provides)
+            {
+                if (string.IsNullOrWhiteSpace(token)) continue;
+                if (!providersByToken.TryGetValue(token, out var list))
+                {
+                    list = new List<string>();
+                    providersByToken[token] = list;
+                }
+                if (!list.Contains(r.Id, StringComparer.OrdinalIgnoreCase)) list.Add(r.Id);
+            }
+        }
+
         // Backing services from draft
         foreach (var r in draft.Services)
         {
@@ -546,7 +566,23 @@ internal static class Planner
                     );
                 }
             }
-            services.Add(new ServiceSpec(r.Id, r.Image, new Dictionary<string,string?>(r.Env), ports, vols, health, Array.Empty<string>()));
+
+            // Determine depends_on from consumed tokens
+            var depends = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (r.Consumes is not null)
+            {
+                foreach (var token in r.Consumes)
+                {
+                    if (string.IsNullOrWhiteSpace(token)) continue;
+                    if (!providersByToken.TryGetValue(token, out var provs) || provs is null) continue;
+                    foreach (var pid in provs)
+                    {
+                        if (!string.Equals(pid, r.Id, StringComparison.OrdinalIgnoreCase)) depends.Add(pid);
+                    }
+                }
+            }
+
+            services.Add(new ServiceSpec(r.Id, r.Image, new Dictionary<string,string?>(r.Env), ports, vols, health, r.Type, depends.ToArray()));
         }
 
         // Optionally include app service with env derived from manifests
@@ -588,6 +624,7 @@ internal static class Planner
                 Ports: new List<(int,int)> { (draft.AppHttpPort, draft.AppHttpPort) },
                 Volumes: new List<(string,string,bool)>(),
                 Health: null,
+                Type: ServiceType.App,
                 DependsOn: depIds
             ));
         }

@@ -381,8 +381,8 @@ static async Task<int> InspectAsync(string[] args)
     var portOverride = int.TryParse(portOverrideVal, out var pov) && pov > 0 ? pov : (int?)null;
     var exposeInternals = HasFlag(args, "--expose-internals");
 
-    // First line: help hint (always)
-    Console.WriteLine("Use -h for help");
+    // First line: help hint (human mode only)
+    if (!json && !quiet) Console.WriteLine("Use -h for help");
     if (quiet) return 0;
 
     // Detect project: descriptor or existing compose file
@@ -398,8 +398,8 @@ static async Task<int> InspectAsync(string[] args)
     {
         if (json)
         {
-            var payload = new { detected = false, cwd };
-            Console.WriteLine(JsonSerializer.Serialize(payload));
+            var detectedPayload = new { detected = false, cwd };
+            Console.WriteLine(JsonSerializer.Serialize(detectedPayload));
         }
         else
         {
@@ -437,28 +437,41 @@ static async Task<int> InspectAsync(string[] args)
     if (File.Exists(envPath)) files.Add(".env");
     if (hasCsproj && csprojPath is not null) files.Add(Path.GetFileName(csprojPath));
 
-    // Infer dependencies (best-effort, read-only): DB, Vector DB, AI provider(s), Auth
-    var deps = InferDependencies(plan, cwd, csprojPath);
-    var composeServices = DetectComposeServices(cwd);
+    // Dependencies (declarative, no heuristics): derive from plan ServiceType
+    var deps = ComputeDependenciesFromPlan(plan);
+
+    // Discover configured auth providers from appsettings.* (non-inferential)
+    var authProviders = DiscoverAuthProviders(cwd);
+
+    // If none configured, surface adapter capabilities from generated manifest (attributes)
+    List<(string Id, string Name, string Protocol)>? authCapabilities = null;
+    if (authProviders is null || authProviders.Count == 0)
+    {
+        try
+        {
+            // Triggers manifest scan and fills ProjectDependencyAnalyzer.ManifestAuthProviders
+            _ = Sora.Orchestration.Cli.Planning.ProjectDependencyAnalyzer.DiscoverDraft(profile);
+            var list = Sora.Orchestration.Cli.Planning.ProjectDependencyAnalyzer.ManifestAuthProviders;
+            if (list is { Count: > 0 })
+            {
+                authCapabilities = list
+                    .Select(p => (p.Id, p.Name, PrettyProtocol(p.Protocol)))
+                    .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+        }
+        catch { }
+    }
+
+    // App summary (ids/ports) for JSON payload
+    var appSvcForJson = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
+    var appIds = appSvcForJson is not null ? new[] { appSvcForJson.Id } : Array.Empty<string>();
+    var appPorts = appSvcForJson is not null
+        ? appSvcForJson.Ports.Select(p => new { host = p.Host, container = p.Container }).ToArray()
+        : Array.Empty<object>();
 
     if (json)
     {
-        // Identify app service(s) to surface chosen app port(s)
-        var appIds = plan.Services
-            .Where(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase))
-            .Select(s => s.Id)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var appPorts = plan.Services
-            .Where(s => appIds.Contains(s.Id, StringComparer.OrdinalIgnoreCase))
-            .SelectMany(s => s.Ports.Select(p => new
-            {
-                service = s.Id,
-                host = p.Host,
-                container = p.Container,
-                source = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(s.Id, out var a) ? a.Source : null
-            }))
-            .ToArray();
         var payload = new
         {
             detected = true,
@@ -472,11 +485,24 @@ static async Task<int> InspectAsync(string[] args)
                 id = s.Id,
                 image = s.Image,
                 ports = s.Ports.Select(p => new { host = p.Host, container = p.Container }),
-                health = s.Health is not null
+                health = s.Health is not null,
+                type = s.Type switch
+                {
+                    Sora.Orchestration.ServiceType.App => "app",
+                    Sora.Orchestration.ServiceType.Database => "database",
+                    Sora.Orchestration.ServiceType.Vector => "vector",
+                    Sora.Orchestration.ServiceType.Ai => "ai",
+                    _ => "service"
+                }
             }),
+            auth = authProviders is null && authCapabilities is null ? null : new
+            {
+                count = authProviders?.Count ?? 0,
+                providers = authProviders?.Select(p => new { id = p.Id, name = p.Name, protocol = p.Protocol }),
+                capabilities = authCapabilities?.Select(p => new { id = p.Id, name = p.Name, protocol = p.Protocol })
+            },
             files,
             conflicts,
-            composeServices,
             dependencies = deps
         };
         Console.WriteLine(JsonSerializer.Serialize(payload));
@@ -505,12 +531,12 @@ static async Task<int> InspectAsync(string[] args)
     var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
     if (appSvc is not null && appSvc.Ports.Count > 0)
     {
-        var appPorts = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
+        var appPortsText = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
         var src = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(appSvc.Id, out var a)
             ? a.Source
             : "unknown";
         Console.WriteLine("APPLICATION   PORT          SOURCE        NETWORKS");
-        Console.WriteLine($"{appSvc.Id,-13} {appPorts,-13} {src,-13} {OrchestrationConstants.InternalNetwork} + {OrchestrationConstants.ExternalNetwork}");
+        Console.WriteLine($"{appSvc.Id,-13} {appPortsText,-13} {src,-13} {OrchestrationConstants.InternalNetwork} + {OrchestrationConstants.ExternalNetwork}");
         Console.WriteLine();
     }
 
@@ -521,20 +547,39 @@ static async Task<int> InspectAsync(string[] args)
         var ports = s.Ports is null || s.Ports.Count == 0 ? "internal" :
                     s.Ports.Any(p => p.Host > 0) ? string.Join(", ", s.Ports.Where(p => p.Host > 0).Select(p => p.Host.ToString())) : "internal";
         var health = s.Health is null ? "-" : "✓";
-        var type = s.Id.Equals("api", StringComparison.OrdinalIgnoreCase) ? "app" :
-                  s.Image?.ToLowerInvariant() switch
-                  {
-                      var img when img?.Contains("mongo") == true => "database",
-                      var img when img?.Contains("postgres") == true => "database",
-                      var img when img?.Contains("redis") == true => "database",
-                      var img when img?.Contains("weaviate") == true => "vector",
-                      var img when img?.Contains("qdrant") == true => "vector",
-                      var img when img?.Contains("ollama") == true => "ai",
-                      _ => "service"
-                  };
+        var type = s.Type switch
+        {
+            Sora.Orchestration.ServiceType.App => "app",
+            Sora.Orchestration.ServiceType.Database => "database",
+            Sora.Orchestration.ServiceType.Vector => "vector",
+            Sora.Orchestration.ServiceType.Ai => "ai",
+            _ => "service"
+        };
         Console.WriteLine($"{s.Id,-13} {ports,-13} {health,-9} {type}");
     }
     Console.WriteLine();
+
+    // Auth: show configured providers and capabilities (both when present)
+    if (authProviders is { Count: > 0 })
+    {
+        // Align with SERVICES columns: [SERVICES(13)] [PORTS(13)] [HEALTH(9)]
+        Console.WriteLine($"{"AUTH",-13} {"PROVIDERS",-13} {"PROTOCOL",-9}");
+        foreach (var ap in authProviders)
+        {
+            Console.WriteLine($"{"",-13} {ap.Name,-13} {ap.Protocol,-9}");
+        }
+        Console.WriteLine();
+    }
+    if (authCapabilities is { Count: > 0 })
+    {
+        // Align with SERVICES columns: [SERVICES(13)] [PORTS(13)] [HEALTH(9)]
+        Console.WriteLine($"{"AUTH CAPABILITIES",-27} {"PROTOCOL",-9}");
+        foreach (var ap in authCapabilities)
+        {
+            Console.WriteLine($"  {ap.Name,-25} {ap.Protocol,-9}");
+        }
+        Console.WriteLine();
+    }
 
     // Dependencies section
     if (deps is not null)
@@ -543,7 +588,8 @@ static async Task<int> InspectAsync(string[] args)
         if (deps.TryGetValue("database", out var dbVal) && dbVal is not null) depItems.Add(dbVal);
         if (deps.TryGetValue("vector", out var veVal) && veVal is not null) depItems.Add(veVal);
         if (deps.TryGetValue("ai", out var aiVal) && aiVal is not null) depItems.Add(aiVal);
-        if (deps.TryGetValue("auth", out var auVal) && auVal is not null) depItems.Add("auth-enabled");
+        if (authProviders is { Count: > 0 }) depItems.Add($"auth:{authProviders.Count}");
+        else if (deps.TryGetValue("auth", out var auVal) && auVal is not null) depItems.Add("auth-enabled");
         if (depItems.Count > 0)
         {
             Console.WriteLine($"DEPENDENCIES  {string.Join(" | ", depItems)}");
@@ -570,101 +616,118 @@ static async Task<int> InspectAsync(string[] args)
     return 0;
 }
 
-// Heuristics to infer dependencies from plan, compose files, and project references
-static Dictionary<string, string>? InferDependencies(Plan plan, string cwd, string? csprojPath)
+// Declarative dependencies: derive from plan ServiceType; no compose/csproj/image heuristics
+static Dictionary<string, string>? ComputeDependenciesFromPlan(Plan plan)
 {
-    string? db = null, vector = null, ai = null, auth = null;
+    string? Pick(string kind)
+        => plan.Services
+            .FirstOrDefault(s => kind switch
+            {
+                "database" => s.Type == Sora.Orchestration.ServiceType.Database,
+                "vector" => s.Type == Sora.Orchestration.ServiceType.Vector,
+                "ai" => s.Type == Sora.Orchestration.ServiceType.Ai,
+                _ => false
+            })?.Id;
 
-    // Compose-derived hints (highest precedence)
-    bool cMongo = false, cPostgres = false, cWeaviate = false, cOllama = false;
-    foreach (var rel in Constants.ComposeProbeCandidates)
-    {
-        var path = Path.Combine(cwd, rel.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(path)) continue;
-        try
-        {
-            var text = File.ReadAllText(path).ToLowerInvariant();
-            if (text.Contains("image: postgres")) cPostgres = true;
-            if (text.Contains("image: mongo")) cMongo = true;
-            if (Regex.IsMatch(text, @"connectionstring:\s*""?mongodb://")) cMongo = true;
-            if (text.Contains("weaviate")) cWeaviate = true;
-            if (text.Contains("ollama")) cOllama = true;
-        }
-        catch { /* best-effort */ }
-    }
+    var db = Pick("database");
+    var vec = Pick("vector");
+    var ai = Pick("ai");
 
-    // Inspect project references for auth/web/data providers (second precedence)
-    if (!string.IsNullOrWhiteSpace(csprojPath) && File.Exists(csprojPath))
-    {
-        try
-        {
-            var xml = File.ReadAllText(csprojPath);
-            var lower = xml.ToLowerInvariant();
-            if (lower.Contains("sora.web.auth")) auth = "enabled";
-            if (lower.Contains("sora.data.weaviate")) vector ??= "weaviate";
-            if (lower.Contains("sora.data.mongo")) db ??= "mongodb";
-        }
-        catch { /* ignore */ }
-    }
-
-    // Plan-derived hints (lowest precedence)
-    var images = plan.Services.Select(s => s.Image?.ToLowerInvariant() ?? string.Empty).ToList();
-    if (images.Any(i => i.Contains("postgres"))) db ??= "postgres";
-    if (images.Any(i => i.Contains("mongo"))) db ??= "mongodb";
-    if (images.Any(i => i.Contains("redis"))) db ??= "redis";
-    if (images.Any(i => i.Contains("weaviate"))) vector ??= "weaviate";
-    if (images.Any(i => i.Contains("qdrant"))) vector ??= "qdrant";
-    if (images.Any(i => i.Contains("pinecone"))) vector ??= "pinecone";
-    if (images.Any(i => i.Contains("ollama"))) ai ??= "ollama";
-
-    // Apply compose overrides last (compose wins if present)
-    if (cMongo) db = "mongodb"; else if (cPostgres) db = db ?? "postgres";
-    if (cWeaviate) vector = "weaviate";
-    if (cOllama) ai = "ollama";
-
-    var result = new Dictionary<string, string>();
-    if (db is not null) result["database"] = db;
-    if (vector is not null) result["vector"] = vector;
-    if (ai is not null) result["ai"] = ai;
-    if (auth is not null) result["auth"] = auth;
-    return result.Count == 0 ? null : result;
+    var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    if (!string.IsNullOrWhiteSpace(db)) dict["database"] = db!;
+    if (!string.IsNullOrWhiteSpace(vec)) dict["vector"] = vec!;
+    if (!string.IsNullOrWhiteSpace(ai)) dict["ai"] = ai!;
+    return dict.Count == 0 ? null : dict;
 }
 
-// Returns distinct service ids discovered in known compose files (best-effort)
-static List<string>? DetectComposeServices(string cwd)
+// Read-only scan of appsettings.* for configured auth providers
+static List<(string Id, string Name, string Protocol)>? DiscoverAuthProviders(string cwd)
 {
-    var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    foreach (var rel in Constants.ComposeProbeCandidates)
+    try
     {
-        var path = Path.Combine(cwd, rel.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(path)) continue;
-        try
+        var files = new[] { "appsettings.json", "appsettings.Local.json", "appsettings.Development.json" }
+            .Select(f => Path.Combine(cwd, f))
+            .Where(File.Exists)
+            .ToArray();
+        if (files.Length == 0) return null;
+
+        // Merge providers across files, latter override earlier
+        var map = new Dictionary<string, (string? Name, string? Type)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in files)
         {
-            var text = File.ReadAllText(path);
-            // Very small heuristic: capture lines under services: with 2-space indent like "  <name>:"
-            var idx = text.IndexOf("services:", StringComparison.OrdinalIgnoreCase);
-            if (idx < 0) continue;
-            var block = text[(idx + 9)..];
-            foreach (var raw in block.Split('\n'))
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            if (!TryGet(doc.RootElement, "Sora", out var sora)) continue;
+            if (!TryGet(sora, "Web", out var web)) continue;
+            if (!TryGet(web, "Auth", out var auth)) continue;
+            if (!TryGet(auth, "Providers", out var providers) || providers.ValueKind != JsonValueKind.Object) continue;
+            foreach (var prop in providers.EnumerateObject())
             {
-                if (string.IsNullOrWhiteSpace(raw)) continue;
-                if (!raw.StartsWith("  "))
-                {
-                    // Reached next top-level key
-                    if (!raw.StartsWith(" ")) break;
-                    continue;
-                }
-                var m = Regex.Match(raw, @"^\x20\x20([A-Za-z0-9._-]+):\s*$");
-                if (m.Success)
-                {
-                    set.Add(m.Groups[1].Value);
-                }
+                var id = prop.Name;
+                var obj = prop.Value;
+                string? name = null; string? type = null;
+                if (TryGet(obj, "DisplayName", out var dn) && dn.ValueKind == JsonValueKind.String) name = dn.GetString();
+                if (TryGet(obj, "Type", out var tp) && tp.ValueKind == JsonValueKind.String) type = tp.GetString();
+                // override
+                if (map.TryGetValue(id, out var existing))
+                    map[id] = (name ?? existing.Name, type ?? existing.Type);
+                else
+                    map[id] = (name, type);
             }
         }
-        catch { /* ignore */ }
+        if (map.Count == 0) return null;
+        var list = new List<(string Id, string Name, string Protocol)>(map.Count);
+        foreach (var (id, v) in map)
+        {
+            var name = string.IsNullOrWhiteSpace(v.Name) ? Titleize(id) : v.Name!;
+            var protocol = PrettyProtocol(v.Type);
+            list.Add((id, name, protocol));
+        }
+        // Stable order by name
+        return list.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
-    return set.Count == 0 ? null : set.OrderBy(s => s).ToList();
+    catch { return null; }
 }
+
+static bool TryGet(JsonElement element, string name, out JsonElement result)
+{
+    foreach (var p in element.EnumerateObject())
+    {
+        if (p.NameEquals(name) || p.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+        {
+            result = p.Value;
+            return true;
+        }
+    }
+    result = default;
+    return false;
+}
+
+static string PrettyProtocol(string? type)
+    => string.IsNullOrWhiteSpace(type) ? "OIDC"
+       : type!.ToLowerInvariant() switch
+       {
+           "oidc" => "OIDC",
+           "oauth2" or "oauth" => "OAuth",
+           "saml" => "SAML",
+           "ldap" => "LDAP",
+           _ => type
+       };
+
+static string Titleize(string id)
+{
+    if (string.IsNullOrWhiteSpace(id)) return id;
+    var parts = id.Replace('-', ' ').Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    for (var i = 0; i < parts.Length; i++)
+    {
+        var p = parts[i];
+        parts[i] = char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p.Substring(1) : string.Empty);
+    }
+    return string.Join(' ', parts);
+}
+
+// Best-effort: infer auth adapter capabilities from project references (Google/Microsoft/Discord/OIDC)
+// Attribute-based: read referenced assemblies to find AuthProviderDescriptorAttribute without loading runtime DI
+// (intentionally removed) — SoC: capabilities are sourced from the generated manifest only
 
 static async Task<int> LogsAsync(string[] args)
 {

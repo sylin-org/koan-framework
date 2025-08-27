@@ -23,6 +23,7 @@ public class ComposeExporterMoreTests
                     Ports: new List<(int,int)>{ (5432,5432) },
                     Volumes: new List<(string,string,bool)>{ ("pgdata", "/var/lib/postgresql/data", true) },
                     Health: new HealthSpec("http://localhost:5432/", TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(2), 10),
+                    Type: null,
                     DependsOn: Array.Empty<string>()
                 ),
                 new ServiceSpec(
@@ -32,6 +33,7 @@ public class ComposeExporterMoreTests
                     Ports: Array.Empty<(int,int)>(),
                     Volumes: Array.Empty<(string,string,bool)>(),
                     Health: null,
+                    Type: null,
                     DependsOn: new[]{ "db" }
                 )
             }
