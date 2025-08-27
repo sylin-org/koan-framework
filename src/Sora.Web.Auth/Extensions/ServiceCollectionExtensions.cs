@@ -37,6 +37,9 @@ public static class ServiceCollectionExtensions
                 o.Cookie.HttpOnly = true;
                 // Allow HTTP in Development/container scenarios; production should run behind HTTPS/terminator
                 o.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest;
+                o.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
+                o.Cookie.Path = "/";
+                o.Cookie.Name = ".AspNetCore.sora.cookie";
                 o.SlidingExpiration = true;
             });
         return services;
