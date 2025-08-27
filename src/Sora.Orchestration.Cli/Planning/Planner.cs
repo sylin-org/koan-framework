@@ -27,6 +27,61 @@ internal static class Planner
 
     // Demo plan removed (no back-compat). If nothing is discovered, Build() returns an empty plan.
 
+    /// <summary>
+    /// For non-Prod profiles, skip backing services whose host ports are already in use.
+    /// Also rewrites the app (api) env to point to localhost for the skipped services and drops depends_on edges.
+    /// Returns a new Plan and outputs the skipped service ids.
+    /// </summary>
+    public static Plan ApplyPortConflictSkip(Plan plan, Profile profile, out List<string> skippedServiceIds)
+    {
+        skippedServiceIds = new List<string>();
+        if (profile == Profile.Prod) return plan; // never skip in prod
+
+        // Identify conflicting ports
+        var hostPorts = plan.Services.SelectMany(s => s.Ports.Select(p => p.Host)).Distinct().ToList();
+        var conflicts = FindConflictingPorts(hostPorts).ToHashSet();
+        if (conflicts.Count == 0) return plan;
+
+        // Choose services to skip (any with a conflicting host port), but never skip the app (api)
+        var toSkip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in plan.Services)
+        {
+            if (string.Equals(s.Id, "api", StringComparison.OrdinalIgnoreCase)) continue;
+            if (s.Ports.Any(p => conflicts.Contains(p.Host))) toSkip.Add(s.Id);
+        }
+        if (toSkip.Count == 0) return plan;
+
+        skippedServiceIds = toSkip.ToList();
+
+        // Filter services
+        var kept = plan.Services.Where(s => !toSkip.Contains(s.Id)).ToList();
+
+        // Rewrite api env and depends_on if present
+        var apiIndex = kept.FindIndex(s => string.Equals(s.Id, "api", StringComparison.OrdinalIgnoreCase));
+        if (apiIndex >= 0)
+        {
+            var api = kept[apiIndex];
+            // Patch env values: replace "://{id}:" with "://localhost:" for each skipped id
+            var env = new Dictionary<string, string?>(api.Env, StringComparer.Ordinal);
+            foreach (var k in env.Keys.ToList())
+            {
+                var val = env[k];
+                if (val is null) continue;
+                var newVal = val;
+                foreach (var id in toSkip)
+                {
+                    newVal = newVal.Replace("://" + id + ":", "://localhost:", StringComparison.OrdinalIgnoreCase);
+                }
+                env[k] = newVal;
+            }
+            // Drop depends_on for skipped services
+            var deps = api.DependsOn.Where(d => !toSkip.Contains(d)).ToArray();
+            kept[apiIndex] = api with { Env = env, DependsOn = deps };
+        }
+
+        return new Plan(plan.Profile, kept);
+    }
+
     public static IReadOnlyList<int> FindConflictingPorts(IEnumerable<int> ports)
     {
         var conflicts = new List<int>();

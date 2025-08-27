@@ -2,12 +2,12 @@ services:
   api:
     image: "sora-s5.recs:dev"
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../../..
+      dockerfile: samples/S5.Recs/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
       ASPNETCORE_URLS: "http://+:8080"
-      Sora__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
+      Sora__Data__Mongo__ConnectionString: "mongodb://localhost:27017"
       Sora__Data__Mongo__Database: "sora"
       Sora__Ai__AutoDiscoveryEnabled: "true"
       Sora__Ai__AllowDiscoveryInNonDev: "true"
@@ -16,18 +16,10 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      mongo:
-        condition: service_started
       ollama:
         condition: service_healthy
       weaviate:
         condition: service_healthy
-  mongo:
-    image: "mongo:7"
-    ports:
-      - "27018:27017"
-    volumes:
-      - ./Data/mongo:/data/db
   ollama:
     image: "ollama/ollama:latest"
     ports:
@@ -35,7 +27,7 @@ services:
     volumes:
       - ./Data/ollama:/root/.ollama
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://ollama:11434/api/tags || exit 1"]
+      test: ["CMD-SHELL", "(curl -fsS http://ollama:11434/api/tags || wget -q -O- http://ollama:11434/api/tags || bash -lc 'exec 3<>/dev/tcp/ollama/11434') >/dev/null 2>&1 || exit 1"]
       interval: 5s
       timeout: 2s
       retries: 12
@@ -49,11 +41,11 @@ services:
       CLUSTER_HOSTNAME: "node1"
       RAFT_BOOTSTRAP_EXPECT: "1"
     ports:
-      - "8081:8080"
+      - "8080:8080"
     volumes:
       - ./Data/weaviate:/var/lib/weaviate
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://weaviate:8080/v1/.well-known/ready || exit 1"]
+      test: ["CMD-SHELL", "(curl -fsS http://weaviate:8080/v1/.well-known/ready || wget -q -O- http://weaviate:8080/v1/.well-known/ready || bash -lc 'exec 3<>/dev/tcp/weaviate/8080') >/dev/null 2>&1 || exit 1"]
       interval: 5s
       timeout: 2s
       retries: 12

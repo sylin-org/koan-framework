@@ -2,7 +2,7 @@
 
 namespace Sora.Orchestration.Provider.Docker;
 
-public sealed class DockerProvider : IHostingProvider
+public sealed partial class DockerProvider : IHostingProvider
 {
     public string Id => "docker";
     public int Priority => 100; // Windows-first default
@@ -204,16 +204,45 @@ public sealed class DockerProvider : IHostingProvider
     internal static List<(string Service, string State, string? Health)> ParseComposePsJson(string stdout)
     {
         var result = new List<(string Service, string State, string? Health)>();
+        if (string.IsNullOrWhiteSpace(stdout)) return result;
         try
         {
-            using var doc = System.Text.Json.JsonDocument.Parse(stdout);
-            foreach (var el in doc.RootElement.EnumerateArray())
+            // Docker may emit either a JSON array or NDJSON (one JSON object per line)
+            var trimmed = stdout.TrimStart();
+            if (trimmed.StartsWith("["))
             {
-                var name = el.TryGetProperty("Name", out var np) ? np.GetString() : null;
-                var state = el.TryGetProperty("State", out var sp) ? sp.GetString() : null;
-                var health = el.TryGetProperty("Health", out var hp) ? hp.GetString() : null;
-                if (!string.IsNullOrEmpty(name))
-                    result.Add((name!, state ?? string.Empty, health));
+                using var doc = System.Text.Json.JsonDocument.Parse(stdout);
+                foreach (var el in doc.RootElement.EnumerateArray())
+                {
+                    var name = el.TryGetProperty("Name", out var np) ? np.GetString() : null;
+                    var state = el.TryGetProperty("State", out var sp) ? sp.GetString() : null;
+                    var health = el.TryGetProperty("Health", out var hp) ? hp.GetString() : null;
+                    if (string.IsNullOrWhiteSpace(health)) health = null; // normalize empty to null (no healthcheck)
+                    if (!string.IsNullOrEmpty(name))
+                        result.Add((name!, state ?? string.Empty, health));
+                }
+            }
+            else
+            {
+                // NDJSON: parse each JSON object line independently
+                var lines = stdout.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                {
+                    var l = line.Trim();
+                    if (!l.StartsWith("{")) continue;
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(l);
+                        var el = doc.RootElement;
+                        var name = el.TryGetProperty("Name", out var np) ? np.GetString() : null;
+                        var state = el.TryGetProperty("State", out var sp) ? sp.GetString() : null;
+                        var health = el.TryGetProperty("Health", out var hp) ? hp.GetString() : null;
+                        if (string.IsNullOrWhiteSpace(health)) health = null; // normalize empty to null
+                        if (!string.IsNullOrEmpty(name))
+                            result.Add((name!, state ?? string.Empty, health));
+                    }
+                    catch { /* ignore bad lines */ }
+                }
             }
         }
         catch
@@ -226,10 +255,53 @@ public sealed class DockerProvider : IHostingProvider
     internal static IReadOnlyList<PortBinding> ParseComposePsPorts(string stdout)
     {
         var list = new List<PortBinding>();
+        if (string.IsNullOrWhiteSpace(stdout)) return list;
         try
         {
-            using var doc = System.Text.Json.JsonDocument.Parse(stdout);
-            foreach (var el in doc.RootElement.EnumerateArray())
+            var trimmed = stdout.TrimStart();
+            if (trimmed.StartsWith("["))
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(stdout);
+                ExtractPortsFromJsonArray(doc.RootElement, list);
+            }
+            else
+            {
+                var lines = stdout.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                {
+                    var l = line.Trim();
+                    if (!l.StartsWith("{")) continue;
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(l);
+                        ExtractPortsFromJsonArray(new System.Text.Json.JsonElement[] { doc.RootElement }.ToJsonArrayElement(), list);
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
+        return list;
+    }
+
+}
+
+internal static class JsonElementArrayHelper
+{
+    // Helper to adapt a single element into an array-like iteration without allocations elsewhere
+    public static System.Text.Json.JsonElement ToJsonArrayElement(this System.Text.Json.JsonElement[] elements)
+    {
+        // Build a JSON array string from the single element(s) and parse once
+        using var doc = System.Text.Json.JsonDocument.Parse("[" + string.Join(',', elements.Select(e => e.GetRawText())) + "]");
+        return doc.RootElement;
+    }
+}
+
+public sealed partial class DockerProvider
+{
+        private static void ExtractPortsFromJsonArray(System.Text.Json.JsonElement root, List<PortBinding> list)
+        {
+            foreach (var el in root.EnumerateArray())
             {
                 var name = el.TryGetProperty("Name", out var np) ? np.GetString() : null;
                 if (string.IsNullOrEmpty(name)) continue;
@@ -249,45 +321,43 @@ public sealed class DockerProvider : IHostingProvider
                 }
             }
         }
-        catch { }
-        return list;
-    }
 
-    static IEnumerable<PortBinding> ParsePortsString(string ports, string service)
-    {
-        // Example segments: "0.0.0.0:8080->80/tcp", ":::8080->80/tcp"
-        var segments = ports.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (var seg in segments)
+        private static IEnumerable<PortBinding> ParsePortsString(string ports, string service)
         {
-            // Split address:host->container/proto
-            // Address may be omitted; default localhost
-            var arrowIdx = seg.IndexOf("->", StringComparison.Ordinal);
-            if (arrowIdx < 0) continue;
-            var left = seg.Substring(0, arrowIdx);
-            var right = seg.Substring(arrowIdx + 2);
-            var proto = "tcp";
-            var slashIdx = right.IndexOf('/', StringComparison.Ordinal);
-            if (slashIdx >= 0)
+            // Example segments: "0.0.0.0:8080->80/tcp", ":::8080->80/tcp"
+            var segments = ports.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var seg in segments)
             {
-                proto = right.Substring(slashIdx + 1).Trim();
-                right = right.Substring(0, slashIdx);
+                // Split address:host->container/proto
+                // Address may be omitted; default localhost
+                var arrowIdx = seg.IndexOf("->", StringComparison.Ordinal);
+                if (arrowIdx < 0) continue;
+                var left = seg.Substring(0, arrowIdx);
+                var right = seg.Substring(arrowIdx + 2);
+                var proto = "tcp";
+                var slashIdx = right.IndexOf('/', StringComparison.Ordinal);
+                if (slashIdx >= 0)
+                {
+                    proto = right.Substring(slashIdx + 1).Trim();
+                    right = right.Substring(0, slashIdx);
+                }
+                // left: may be "0.0.0.0:8080" or just "8080"
+                string? address = null;
+                int hostPort;
+                var colonIdx = left.LastIndexOf(':');
+                if (colonIdx >= 0)
+                {
+                    address = left.Substring(0, colonIdx).Trim();
+                    var hostStr = left.Substring(colonIdx + 1).Trim();
+                    if (!int.TryParse(hostStr, out hostPort)) continue;
+                }
+                else
+                {
+                    if (!int.TryParse(left.Trim(), out hostPort)) continue;
+                }
+                if (!int.TryParse(right.Trim(), out var container)) continue;
+                yield return new PortBinding(service, hostPort, container, proto, string.IsNullOrWhiteSpace(address) ? null : address);
             }
-            // left: may be "0.0.0.0:8080" or just "8080"
-            string? address = null;
-            int hostPort;
-            var colonIdx = left.LastIndexOf(':');
-            if (colonIdx >= 0)
-            {
-                address = left.Substring(0, colonIdx).Trim();
-                var hostStr = left.Substring(colonIdx + 1).Trim();
-                if (!int.TryParse(hostStr, out hostPort)) continue;
-            }
-            else
-            {
-                if (!int.TryParse(left.Trim(), out hostPort)) continue;
-            }
-            if (!int.TryParse(right.Trim(), out var container)) continue;
-            yield return new PortBinding(service, hostPort, container, proto, string.IsNullOrWhiteSpace(address) ? null : address);
-        }
     }
 }
+

@@ -15,8 +15,9 @@ public sealed class ComposeExporter : IArtifactExporter
         ArgumentNullException.ThrowIfNull(plan);
         if (string.IsNullOrWhiteSpace(outPath)) throw new ArgumentException("Output path required", nameof(outPath));
 
-        var dir = Path.GetDirectoryName(outPath);
-        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+    var dir = Path.GetDirectoryName(outPath);
+    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+    var composeDir = string.IsNullOrEmpty(dir) ? Directory.GetCurrentDirectory() : dir;
 
     var yaml = new StringBuilder();
         // Compose v2+ typically omits the top-level version field.
@@ -37,7 +38,7 @@ public sealed class ComposeExporter : IArtifactExporter
             // - CI: named volumes (data_{service} -> /container/path)
             // - Prod: do not inject mounts
             var enriched = EnsureHostMounts(svc, mountMap, profile);
-            WriteService(yaml, enriched, healthyIds, namedVolumes, indent: 2);
+            WriteService(yaml, enriched, healthyIds, namedVolumes, indent: 2, composeDir);
         }
 
         if (namedVolumes.Count > 0)
@@ -205,7 +206,7 @@ public sealed class ComposeExporter : IArtifactExporter
         return svc with { Volumes = vols };
     }
 
-    static void WriteService(StringBuilder yaml, ServiceSpec svc, IReadOnlySet<string> healthyServiceIds, HashSet<string> namedVolumes, int indent)
+    static void WriteService(StringBuilder yaml, ServiceSpec svc, IReadOnlySet<string> healthyServiceIds, HashSet<string> namedVolumes, int indent, string composeDir)
     {
         var pad = new string(' ', indent);
         yaml.Append(pad).Append(svc.Id).AppendLine(":");
@@ -221,12 +222,18 @@ public sealed class ComposeExporter : IArtifactExporter
                 if (hasProject)
                 {
                     yaml.Append(pad).AppendLine("  build:");
-                    yaml.Append(pad).Append("    context: ").AppendLine(EscapeScalar("."));
-                    // Prefer a Dockerfile if present
+                    // Prefer using the repository root as build context so project references outside the sample folder are available
+                    var repoRoot = FindRepoRoot(cwd);
+                    var contextDir = repoRoot ?? cwd;
+                    var relContext = ToPosixPath(Path.GetRelativePath(composeDir, contextDir));
+                    if (string.IsNullOrEmpty(relContext)) relContext = ".";
+                    yaml.Append(pad).Append("    context: ").AppendLine(EscapeScalar(relContext));
+                    // Prefer a Dockerfile if present; dockerfile path is relative to the context directory
                     var dockerfile = Directory.EnumerateFiles(cwd, "Dockerfile", SearchOption.TopDirectoryOnly).FirstOrDefault();
                     if (!string.IsNullOrEmpty(dockerfile))
                     {
-                        yaml.Append(pad).Append("    dockerfile: ").AppendLine(EscapeScalar(Path.GetFileName(dockerfile)));
+                        var relDockerfile = ToPosixPath(Path.GetRelativePath(contextDir, dockerfile));
+                        yaml.Append(pad).Append("    dockerfile: ").AppendLine(EscapeScalar(relDockerfile));
                     }
                 }
             }
@@ -266,7 +273,10 @@ public sealed class ComposeExporter : IArtifactExporter
         if (svc.Health is not null && !string.IsNullOrWhiteSpace(svc.Health.HttpEndpoint))
         {
             yaml.Append(pad).AppendLine("  healthcheck:");
-            var test = $"curl -fsS {svc.Health.HttpEndpoint} || exit 1";
+            // Try curl first; if not installed, fall back to wget; finally try bash /dev/tcp to probe the port
+            var hp = ParseHostPortFromUrl(svc.Health.HttpEndpoint);
+            var tcpProbe = hp is null ? string.Empty : $" || bash -lc 'exec 3<>/dev/tcp/{hp.Value.host}/{hp.Value.port}'";
+            var test = $"(curl -fsS {svc.Health.HttpEndpoint} || wget -q -O- {svc.Health.HttpEndpoint}{tcpProbe}) >/dev/null 2>&1 || exit 1";
             yaml.Append(pad).Append("    test: [\"CMD-SHELL\", \"").Append(EscapeJson(test)).AppendLine("\"]");
             if (svc.Health.Interval is not null)
                 yaml.Append(pad).Append("    interval: ").AppendLine(ToDuration(svc.Health.Interval.Value));
@@ -330,5 +340,41 @@ public sealed class ComposeExporter : IArtifactExporter
         if (ts.TotalSeconds == Math.Round(ts.TotalSeconds))
             return $"{(int)ts.TotalSeconds}s";
         return $"{ts.TotalMilliseconds}ms";
+    }
+
+    static string? FindRepoRoot(string start)
+    {
+        try
+        {
+            var dir = new DirectoryInfo(start);
+            while (dir is not null)
+            {
+                // Heuristics: presence of solution file or a src/ folder marks the repo root
+                var hasSln = dir.EnumerateFiles("*.sln", SearchOption.TopDirectoryOnly).Any();
+                var hasSrc = dir.EnumerateDirectories("src", SearchOption.TopDirectoryOnly).Any();
+                if (hasSln || hasSrc)
+                    return dir.FullName;
+                dir = dir.Parent;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    static string ToPosixPath(string path)
+        => path.Replace('\\', '/');
+
+    static (string host, int port)? ParseHostPortFromUrl(string url)
+    {
+        try
+        {
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                var port = uri.IsDefaultPort ? (string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase) ? 443 : 80) : uri.Port;
+                return (uri.Host, port);
+            }
+        }
+        catch { }
+        return null;
     }
 }

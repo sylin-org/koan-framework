@@ -195,8 +195,22 @@ static async Task<int> UpAsync(string[] args)
         Console.Error.WriteLine($"up is disabled for profile '{profile.ToString().ToLowerInvariant()}'; use 'sora export compose' to generate artifacts for this environment.");
         return 2;
     }
+    // Detect port conflicts early and, in non-prod default mode, skip conflicting services (warn) instead of failing
+    var initialConflicts = Planner.FindConflictingPorts(plan.Services.SelectMany(s => s.Ports.Select(p => p.Host)));
+    List<string> skipped = new();
+    if (profile != Profile.Prod && initialConflicts.Count > 0 && conflictsMode != "fail")
+    {
+        var newPlan = Planner.ApplyPortConflictSkip(plan, profile, out skipped);
+        if (skipped.Count > 0)
+        {
+            Console.WriteLine($"warning: ports in use on host — skipping services: {string.Join(", ", skipped)} (ports: {string.Join(", ", initialConflicts)})");
+            plan = newPlan;
+        }
+    }
+
     var exporter = new ComposeExporter();
-    Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+    var outDir = Path.GetDirectoryName(outPath);
+    if (!string.IsNullOrEmpty(outDir)) Directory.CreateDirectory(outDir);
     await exporter.GenerateAsync(plan, profile, outPath);
 
     var provider = await SelectProviderAsync(engineArg);
@@ -208,7 +222,8 @@ static async Task<int> UpAsync(string[] args)
         Console.WriteLine($"provider: {provider.Id} | engine: {ei.Name} {ei.Version} | file: {outPath}");
         Console.WriteLine($"services: {plan.Services.Count}");
     Console.WriteLine($"profile: {profile} | timeout: {timeout.TotalSeconds:n0}s{(basePort is { } ? $" | base-port: {basePort}" : string.Empty)}{(conflictsMode is { } ? $" | conflicts: {conflictsMode}" : string.Empty)}");
-        if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
+    if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
+    if (skipped.Count > 0) Console.WriteLine($"skipped services: {string.Join(", ", skipped)}");
     }
     if (dryRun) return 0;
 
@@ -222,6 +237,11 @@ static async Task<int> UpAsync(string[] args)
     {
         Console.Error.WriteLine($"port conflicts detected: {string.Join(", ", conflicts)}");
         return 4;
+    }
+    // Non-prod default: warn and continue when ports are occupied by host services
+    if (profile != Profile.Prod && conflicts.Count > 0 && conflictsMode != "fail")
+    {
+        Console.WriteLine($"warning: ports in use on host — continuing: {string.Join(", ", conflicts)}");
     }
 
     try
