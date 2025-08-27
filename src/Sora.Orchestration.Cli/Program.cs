@@ -26,12 +26,12 @@ return cmd switch
 {
     "export" => await ExportAsync(rest),
     "doctor" => await DoctorAsync(rest),
-    "up"     => await UpAsync(rest),
-    "down"   => await DownAsync(rest),
+    "up" => await UpAsync(rest),
+    "down" => await DownAsync(rest),
     "status" => await StatusAsync(rest),
-    "logs"   => await LogsAsync(rest),
-    "inspect"=> await InspectAsync(rest),
-    _        => Help()
+    "logs" => await LogsAsync(rest),
+    "inspect" => await InspectAsync(rest),
+    _ => Help()
 };
 
 static int Help()
@@ -150,9 +150,9 @@ static async Task<int> ExportAsync(string[] args)
         var exporter = new ComposeExporter();
         await exporter.GenerateAsync(plan, profile, outPath);
         Console.WriteLine($"compose exported -> {outPath}");
-    // Surface port conflicts after export for quick feedback
-    var conflicts = Planner.FindConflictingPorts(plan.Services.SelectMany(s => s.Ports.Select(p => p.Host)));
-    if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
+        // Surface port conflicts after export for quick feedback
+        var conflicts = Planner.FindConflictingPorts(plan.Services.SelectMany(s => s.Ports.Select(p => p.Host)));
+        if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
         return 0;
     }
     Console.Error.WriteLine($"Unknown export format: {format}");
@@ -237,19 +237,19 @@ static async Task<int> UpAsync(string[] args)
         var ei = provider.EngineInfo();
         Console.WriteLine($"provider: {provider.Id} | engine: {ei.Name} {ei.Version} | file: {outPath}");
         Console.WriteLine($"services: {plan.Services.Count}");
-    Console.WriteLine($"profile: {profile} | timeout: {timeout.TotalSeconds:n0}s{(basePort is { } ? $" | base-port: {basePort}" : string.Empty)}{(conflictsMode is { } ? $" | conflicts: {conflictsMode}" : string.Empty)}");
-    Console.WriteLine($"networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
-    var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
-    if (appSvc is not null && appSvc.Ports.Count > 0)
-    {
-        var appPorts = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
-        var src = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(appSvc.Id, out var a)
-            ? a.Source
-            : "unknown";
-        Console.WriteLine($"app: {appSvc.Id} @ {appPorts} (source: {src})");
-    }
-    if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
-    if (skipped.Count > 0) Console.WriteLine($"skipped services: {string.Join(", ", skipped)}");
+        Console.WriteLine($"profile: {profile} | timeout: {timeout.TotalSeconds:n0}s{(basePort is { } ? $" | base-port: {basePort}" : string.Empty)}{(conflictsMode is { } ? $" | conflicts: {conflictsMode}" : string.Empty)}");
+        Console.WriteLine($"networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
+        var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
+        if (appSvc is not null && appSvc.Ports.Count > 0)
+        {
+            var appPorts = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
+            var src = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(appSvc.Id, out var a)
+                ? a.Source
+                : "unknown";
+            Console.WriteLine($"app: {appSvc.Id} @ {appPorts} (source: {src})");
+        }
+        if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
+        if (skipped.Count > 0) Console.WriteLine($"skipped services: {string.Join(", ", skipped)}");
     }
     if (dryRun) return 0;
 
@@ -323,7 +323,7 @@ static async Task<int> StatusAsync(string[] args)
             var health = s.Health is null ? string.Empty : $" ({s.Health})";
             Console.WriteLine($"- {s.Service}: {s.State}{health}");
         }
-    // Live ports (provider runtime)
+        // Live ports (provider runtime)
         var live = await provider.LivePorts();
         if (live.Count > 0)
         {
@@ -331,17 +331,17 @@ static async Task<int> StatusAsync(string[] args)
             foreach (var g in live.GroupBy(p => p.Service))
             {
                 var list = string.Join(", ", g.Select(p => EndpointFormatter.FormatLiveEndpoint(p)));
-        Console.WriteLine($"  => {g.Key}: {list}");
+                Console.WriteLine($"  => {g.Key}: {list}");
             }
         }
         // Endpoint hints (plan-derived, provider-agnostic): scheme://host:port for each service with mapped ports
-    var plan = Planner.Build(profile);
-    if (basePort is { }) plan = ApplyBasePort(plan, basePort.Value);
-    if (profile != Profile.Prod)
-    {
-        plan = Planner.AssignAppPublicPort(plan, portOverride, exposeInternals, persist: !noPersist);
-        plan = PortAllocator.AutoAvoidPorts(plan);
-    }
+        var plan = Planner.Build(profile);
+        if (basePort is { }) plan = ApplyBasePort(plan, basePort.Value);
+        if (profile != Profile.Prod)
+        {
+            plan = Planner.AssignAppPublicPort(plan, portOverride, exposeInternals, persist: !noPersist);
+            plan = PortAllocator.AutoAvoidPorts(plan);
+        }
         if (plan.Services.Count > 0)
         {
             Console.WriteLine($"networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
@@ -358,8 +358,8 @@ static async Task<int> StatusAsync(string[] args)
             foreach (var svc in plan.Services)
             {
                 if (svc.Ports is null || svc.Ports.Count == 0) continue;
-        var list = string.Join(", ", svc.Ports.Select(p => Sora.Orchestration.Cli.Formatting.EndpointFormatter
-            .GetPlanHint(svc.Image, p.Item2, p.Item1)));
+                var list = string.Join(", ", svc.Ports.Select(p => Sora.Orchestration.Cli.Formatting.EndpointFormatter
+                    .GetPlanHint(svc.Image, p.Item2, p.Item1)));
                 Console.WriteLine($"  -> {svc.Id}: {list}");
             }
             var conflicts = Planner.FindConflictingPorts(plan.Services.SelectMany(s => s.Ports.Select(p => p.Host)));
@@ -451,7 +451,8 @@ static async Task<int> InspectAsync(string[] args)
             .ToArray();
         var appPorts = plan.Services
             .Where(s => appIds.Contains(s.Id, StringComparer.OrdinalIgnoreCase))
-            .SelectMany(s => s.Ports.Select(p => new {
+            .SelectMany(s => s.Ports.Select(p => new
+            {
                 service = s.Id,
                 host = p.Host,
                 container = p.Container,
@@ -517,11 +518,12 @@ static async Task<int> InspectAsync(string[] args)
     Console.WriteLine("SERVICES      PORTS         HEALTH    TYPE");
     foreach (var s in plan.Services)
     {
-        var ports = s.Ports is null || s.Ports.Count == 0 ? "internal" : 
+        var ports = s.Ports is null || s.Ports.Count == 0 ? "internal" :
                     s.Ports.Any(p => p.Host > 0) ? string.Join(", ", s.Ports.Where(p => p.Host > 0).Select(p => p.Host.ToString())) : "internal";
         var health = s.Health is null ? "-" : "✓";
-        var type = s.Id.Equals("api", StringComparison.OrdinalIgnoreCase) ? "app" : 
-                  s.Image?.ToLowerInvariant() switch {
+        var type = s.Id.Equals("api", StringComparison.OrdinalIgnoreCase) ? "app" :
+                  s.Image?.ToLowerInvariant() switch
+                  {
                       var img when img?.Contains("mongo") == true => "database",
                       var img when img?.Contains("postgres") == true => "database",
                       var img when img?.Contains("redis") == true => "database",
@@ -547,8 +549,8 @@ static async Task<int> InspectAsync(string[] args)
             Console.WriteLine($"DEPENDENCIES  {string.Join(" | ", depItems)}");
         }
     }
-    
-    if (conflicts.Count > 0) 
+
+    if (conflicts.Count > 0)
     {
         Console.WriteLine($"CONFLICTS     {string.Join(", ", conflicts)}");
     }
@@ -558,7 +560,7 @@ static async Task<int> InspectAsync(string[] args)
     Console.WriteLine("COMMANDS");
     Console.WriteLine("sora up                  # Start all services");
     Console.WriteLine("sora status              # Check service status");
-    Console.WriteLine("sora export compose     # Generate artifacts");
+    Console.WriteLine("sora export compose      # Generate artifacts");
     // Pick a likely service for logs if available, otherwise show placeholder
     var svcHint = plan.Services.Select(s => s.Id).FirstOrDefault(id => id.Equals("api", StringComparison.OrdinalIgnoreCase))
                  ?? plan.Services.Select(s => s.Id).FirstOrDefault()
@@ -582,11 +584,11 @@ static Dictionary<string, string>? InferDependencies(Plan plan, string cwd, stri
         try
         {
             var text = File.ReadAllText(path).ToLowerInvariant();
-        if (text.Contains("image: postgres")) cPostgres = true;
-        if (text.Contains("image: mongo")) cMongo = true;
-        if (Regex.IsMatch(text, @"connectionstring:\s*""?mongodb://")) cMongo = true;
-        if (text.Contains("weaviate")) cWeaviate = true;
-        if (text.Contains("ollama")) cOllama = true;
+            if (text.Contains("image: postgres")) cPostgres = true;
+            if (text.Contains("image: mongo")) cMongo = true;
+            if (Regex.IsMatch(text, @"connectionstring:\s*""?mongodb://")) cMongo = true;
+            if (text.Contains("weaviate")) cWeaviate = true;
+            if (text.Contains("ollama")) cOllama = true;
         }
         catch { /* best-effort */ }
     }
@@ -598,9 +600,9 @@ static Dictionary<string, string>? InferDependencies(Plan plan, string cwd, stri
         {
             var xml = File.ReadAllText(csprojPath);
             var lower = xml.ToLowerInvariant();
-        if (lower.Contains("sora.web.auth")) auth = "enabled";
-        if (lower.Contains("sora.data.weaviate")) vector ??= "weaviate";
-        if (lower.Contains("sora.data.mongo")) db ??= "mongodb";
+            if (lower.Contains("sora.web.auth")) auth = "enabled";
+            if (lower.Contains("sora.data.weaviate")) vector ??= "weaviate";
+            if (lower.Contains("sora.data.mongo")) db ??= "mongodb";
         }
         catch { /* ignore */ }
     }
