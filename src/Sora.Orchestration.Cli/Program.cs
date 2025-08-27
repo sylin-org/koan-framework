@@ -482,22 +482,25 @@ static async Task<int> InspectAsync(string[] args)
         return 0;
     }
 
-    // Human card
-    Console.WriteLine($"CLI: Sora | profile: {profile}");
-    Console.WriteLine($"Project: {projectName} ({cwd})");
-    Console.WriteLine($"Files: {(files.Count == 0 ? "(none)" : string.Join(", ", files))}");
-    Console.WriteLine("Providers:");
+    // Human card - Enhanced Aligned Columns format
+    Console.WriteLine($"== Sora Context: {projectName} ==");
+    Console.WriteLine($"Profile: {profile} | Path: {new DirectoryInfo(cwd).Name}");
+    Console.WriteLine();
+
+    // Providers section
+    Console.WriteLine("PROVIDERS     STATUS    VERSION");
     foreach (dynamic p in availability)
     {
         var id = (string)p.GetType().GetProperty("id")!.GetValue(p)!;
         var available = (bool)p.GetType().GetProperty("available")!.GetValue(p)!;
         var eng = p.GetType().GetProperty("engine")!.GetValue(p)!;
-        var engName = (string?)eng.GetType().GetProperty("Name")!.GetValue(eng) ?? string.Empty;
         var engVer = (string?)eng.GetType().GetProperty("Version")!.GetValue(eng) ?? string.Empty;
-        Console.WriteLine($"- {id}: {(available ? "OK" : "NOT AVAILABLE")} {(string.IsNullOrWhiteSpace(engVer) ? string.Empty : $"- {engName} {engVer}")}");
+        var status = available ? "✓" : "✗";
+        Console.WriteLine($"{id,-13} {status,-9} {engVer}");
     }
-    Console.WriteLine($"Networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
-    // App port(s)
+    Console.WriteLine();
+
+    // Application section
     var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
     if (appSvc is not null && appSvc.Ports.Count > 0)
     {
@@ -505,49 +508,62 @@ static async Task<int> InspectAsync(string[] args)
         var src = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(appSvc.Id, out var a)
             ? a.Source
             : "unknown";
-        Console.WriteLine($"App: {appSvc.Id} @ {appPorts} (source: {src})");
+        Console.WriteLine("APPLICATION   PORT          SOURCE        NETWORKS");
+        Console.WriteLine($"{appSvc.Id,-13} {appPorts,-13} {src,-13} {OrchestrationConstants.InternalNetwork} + {OrchestrationConstants.ExternalNetwork}");
+        Console.WriteLine();
     }
-    Console.WriteLine($"Services: {plan.Services.Count}");
+
+    // Services section
+    Console.WriteLine("SERVICES      PORTS         HEALTH    TYPE");
     foreach (var s in plan.Services)
     {
-        var ports = s.Ports is null || s.Ports.Count == 0 ? "-" : string.Join(", ", s.Ports.Select(p => $"{p.Host}:{p.Container}"));
-        var health = s.Health is null ? "no" : "yes";
-        Console.WriteLine($"  -> {s.Id}: ports [{ports}], health: {health}");
+        var ports = s.Ports is null || s.Ports.Count == 0 ? "internal" : 
+                    s.Ports.Any(p => p.Host > 0) ? string.Join(", ", s.Ports.Where(p => p.Host > 0).Select(p => p.Host.ToString())) : "internal";
+        var health = s.Health is null ? "-" : "✓";
+        var type = s.Id.Equals("api", StringComparison.OrdinalIgnoreCase) ? "app" : 
+                  s.Image?.ToLowerInvariant() switch {
+                      var img when img?.Contains("mongo") == true => "database",
+                      var img when img?.Contains("postgres") == true => "database",
+                      var img when img?.Contains("redis") == true => "database",
+                      var img when img?.Contains("weaviate") == true => "vector",
+                      var img when img?.Contains("qdrant") == true => "vector",
+                      var img when img?.Contains("ollama") == true => "ai",
+                      _ => "service"
+                  };
+        Console.WriteLine($"{s.Id,-13} {ports,-13} {health,-9} {type}");
     }
-    if (composeServices is { Count: > 0 })
-    {
-        Console.WriteLine($"Compose services: {composeServices.Count}");
-        foreach (var n in composeServices)
-            Console.WriteLine($"  => {n}");
-    }
-    // Dependencies summary
+    Console.WriteLine();
+
+    // Dependencies section
     if (deps is not null)
     {
-        var db = deps.TryGetValue("database", out var dbVal) ? dbVal : null;
-        var vect = deps.TryGetValue("vector", out var veVal) ? veVal : null;
-        var ai = deps.TryGetValue("ai", out var aiVal) ? aiVal : null;
-        var auth = deps.TryGetValue("auth", out var auVal) ? auVal : null;
-        Console.WriteLine("Dependencies:");
-        if (db is not null) Console.WriteLine($"  db: {db}");
-        if (vect is not null) Console.WriteLine($"  vector: {vect}");
-        if (ai is not null) Console.WriteLine($"  ai: {ai}");
-        if (auth is not null) Console.WriteLine($"  auth: {auth}");
+        var depItems = new List<string>();
+        if (deps.TryGetValue("database", out var dbVal) && dbVal is not null) depItems.Add(dbVal);
+        if (deps.TryGetValue("vector", out var veVal) && veVal is not null) depItems.Add(veVal);
+        if (deps.TryGetValue("ai", out var aiVal) && aiVal is not null) depItems.Add(aiVal);
+        if (deps.TryGetValue("auth", out var auVal) && auVal is not null) depItems.Add("auth-enabled");
+        if (depItems.Count > 0)
+        {
+            Console.WriteLine($"DEPENDENCIES  {string.Join(" | ", depItems)}");
+        }
     }
-    if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
+    
+    if (conflicts.Count > 0) 
+    {
+        Console.WriteLine($"CONFLICTS     {string.Join(", ", conflicts)}");
+    }
+    Console.WriteLine();
 
-    // One-liners (easy to copy)
-    Console.WriteLine("Next steps:");
-    Console.WriteLine("  Sora up");
-    Console.WriteLine("  Sora status");
+    // Commands section
+    Console.WriteLine("COMMANDS");
+    Console.WriteLine("sora up                  # Start all services");
+    Console.WriteLine("sora status              # Check service status");
+    Console.WriteLine("sora export compose     # Generate artifacts");
     // Pick a likely service for logs if available, otherwise show placeholder
     var svcHint = plan.Services.Select(s => s.Id).FirstOrDefault(id => id.Equals("api", StringComparison.OrdinalIgnoreCase))
                  ?? plan.Services.Select(s => s.Id).FirstOrDefault()
                  ?? "[service]";
-    Console.WriteLine($"  Sora logs --service {svcHint} --tail 100");
-    Console.WriteLine("  Sora down --remove-orphans");
-    Console.WriteLine("  Sora export compose");
-    Console.WriteLine("  Sora doctor");
-    Console.WriteLine("  Sora status --json");
+    Console.WriteLine($"sora logs --service {svcHint} --tail 100");
 
     return 0;
 }
