@@ -24,6 +24,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         try
         {
             var candidates = new List<ServiceCandidate>();
+            AppCandidate? app = null;
             foreach (var tree in context.Compilation.SyntaxTrees)
             {
                 var sm = context.Compilation.GetSemanticModel(tree, ignoreAccessibility: true);
@@ -41,6 +42,32 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                     string? scheme = null; string? host = null; int? endpointPort = null; string? uriPattern = null;
                     string? localScheme = null; string? localHost = null; int? localPort = null; string? localPattern = null;
                     string? healthPath = null; int? healthInterval = null; int? healthTimeout = null; int? healthRetries = null;
+
+                    // Capture app metadata when class implements ISoraManifest or has SoraAppAttribute
+                    try
+                    {
+                        var implementsManifest = sym.AllInterfaces.Any(i => i.ToDisplayString() == "Sora.Orchestration.ISoraManifest");
+                        var appAttr = sym.GetAttributes().FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == "Sora.Orchestration.SoraAppAttribute");
+                        if (implementsManifest || appAttr is not null)
+                        {
+                            string? code = null, name = null, description = null; int? port = null;
+                            if (appAttr is not null)
+                            {
+                                foreach (var na in appAttr.NamedArguments)
+                                {
+                                    switch (na.Key)
+                                    {
+                                        case "DefaultPublicPort": port = (int?)na.Value.Value; break;
+                                        case "AppCode": code = na.Value.Value?.ToString(); break;
+                                        case "AppName": name = na.Value.Value?.ToString(); break;
+                                        case "Description": description = na.Value.Value?.ToString(); break;
+                                    }
+                                }
+                            }
+                            app ??= new AppCandidate(code, name, description, port);
+                        }
+                    }
+                    catch { }
 
                     foreach (var a in sym.GetAttributes())
                     {
@@ -156,7 +183,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
 
             if (candidates.Count == 0) return;
 
-            var json = BuildJson(candidates);
+            var json = BuildJson(candidates, app);
             var src = "namespace Sora.Orchestration { public static class __SoraOrchestrationManifest { public const string Json = \"" + Escape(json) + "\"; } }";
             context.AddSource("__SoraOrchestrationManifest.g.cs", SourceText.From(src, Encoding.UTF8));
         }
@@ -166,10 +193,21 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         }
     }
 
-    private static string BuildJson(List<ServiceCandidate> items)
+    private static string BuildJson(List<ServiceCandidate> items, AppCandidate? app)
     {
         var sb = new StringBuilder();
-        sb.Append('{').Append("\"services\": [");
+        sb.Append('{');
+        if (app is not null)
+        {
+            sb.Append("\"app\": {");
+            if (!string.IsNullOrEmpty(app.Code)) sb.Append(Prop("code", app.Code)).Append(',');
+            if (!string.IsNullOrEmpty(app.Name)) sb.Append(Prop("name", app.Name)).Append(',');
+            if (!string.IsNullOrEmpty(app.Description)) sb.Append(Prop("description", app.Description)).Append(',');
+            if (app.DefaultPublicPort is int dp) sb.Append(Prop("defaultPublicPort", dp)).Append(',');
+            if (sb.Length > 0 && sb[sb.Length - 1] == ',') sb.Length -= 1; // trim trailing comma
+            sb.Append("},");
+        }
+        sb.Append("\"services\": [");
         for (int i = 0; i < items.Count; i++)
         {
             var s = items[i];
@@ -282,5 +320,15 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             HealthTimeout = healthTimeout;
             HealthRetries = healthRetries;
         }
+    }
+
+    private sealed class AppCandidate
+    {
+        public string? Code { get; }
+        public string? Name { get; }
+        public string? Description { get; }
+        public int? DefaultPublicPort { get; }
+        public AppCandidate(string? code, string? name, string? description, int? port)
+        { Code = code; Name = name; Description = description; DefaultPublicPort = port; }
     }
 }

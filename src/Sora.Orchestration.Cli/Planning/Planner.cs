@@ -5,6 +5,10 @@ namespace Sora.Orchestration.Cli.Planning;
 
 internal static class Planner
 {
+    // Captures the most recent host/container port assignment per app service for UX reporting
+    internal static readonly Dictionary<string, (int Host, int Container, string Source)> LastPortAssignments
+        = new(StringComparer.OrdinalIgnoreCase);
+
     public static Plan Build(Profile profile)
     {
         // 1) Descriptor file (YAML/JSON) if present → highest precedence
@@ -99,6 +103,137 @@ internal static class Planner
             }
         }
         return conflicts;
+    }
+
+    // Assign the public host port for the app (id=="api") and avoid publishing adapter ports.
+    // Precedence: explicitPort (from CLI) > .sora manifest AssignedPublicPort > generated/attribute default > deterministic [30000,50000].
+    public static Plan AssignAppPublicPort(Plan plan, int? explicitPort = null, bool exposeInternals = false, bool persist = true)
+    {
+        if (plan.Services.Count == 0) return plan;
+    LastPortAssignments.Clear();
+        var services = plan.Services.ToList();
+        var cwd = Directory.GetCurrentDirectory();
+        int? defaultFromCode = null;
+        // Try to read generated manifest app.defaultPublicPort via ProjectDependencyAnalyzer to avoid duplication
+        try
+        {
+            var draft = ProjectDependencyAnalyzer.DiscoverDraft(Profile.Local);
+            // We used draft.AppHttpPort for historical; keep it as default when present
+            if (draft is not null && draft.IncludeApp && draft.AppHttpPort > 0)
+                defaultFromCode = draft.AppHttpPort;
+        }
+        catch { }
+
+        var lm = LaunchManifest.Load(cwd);
+
+        // Select primary app(s): heuristic — service with ASPNETCORE_URLS or id=="api"
+        var appCandidates = services
+            .Select((s, idx) => (s, idx))
+            .Where(t => t.s.Env.ContainsKey("ASPNETCORE_URLS") || string.Equals(t.s.Id, "api", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (appCandidates.Count == 0)
+        {
+            // fallback to first service as app
+            appCandidates.Add((services[0], 0));
+        }
+
+        foreach (var (app, appIdx) in appCandidates)
+        {
+            var containerPort = app.Ports.FirstOrDefault().Container;
+            if (containerPort == 0) containerPort = 8080;
+            // Per-service desired from launch manifest allocations if present
+            int? desired = explicitPort;
+            string source;
+            if (desired is null)
+            {
+                if (lm?.Allocations is not null && lm.Allocations.TryGetValue(app.Id, out var allocFound) && allocFound is not null)
+                {
+                    desired = allocFound.AssignedPublicPort;
+                    source = "launch-alloc";
+                }
+                else
+                {
+                    desired = lm?.App.AssignedPublicPort;
+                    source = desired is not null ? "launch-app" : (defaultFromCode is not null ? "code-default" : "deterministic");
+                }
+            }
+            else source = "flag";
+            desired ??= defaultFromCode;
+            var assigned = PickAvailable(desired ?? DeterministicFor(app.Id));
+            services[appIdx] = app with { Ports = new List<(int,int)> { (assigned, containerPort) } };
+            // Track for UX reporting
+            LastPortAssignments[app.Id] = (assigned, containerPort, source);
+            if (persist)
+            {
+                try
+                {
+                    lm ??= new LaunchManifest.Model();
+                    lm.App.Id ??= app.Id;
+                    lm.App.Name ??= new DirectoryInfo(cwd).Name;
+                    lm.App.DefaultPublicPort ??= defaultFromCode;
+                    lm.App.AssignedPublicPort ??= assigned; // keep top-level legacy assignment
+                    if (lm.Allocations is null) lm.Allocations = new(StringComparer.OrdinalIgnoreCase);
+                    if (!lm.Allocations.TryGetValue(app.Id, out var alloc))
+                        lm.Allocations[app.Id] = alloc = new LaunchManifest.Model.Allocation();
+                    alloc.AssignedPublicPort = assigned;
+                    LaunchManifest.Save(cwd, lm);
+                }
+                catch { }
+            }
+        }
+        int PickAvailable(int desired)
+        {
+            if (!IsBusy(desired)) return desired;
+            for (var i = desired + 1; i <= 50000; i++) if (!IsBusy(i)) return i;
+            for (var i = 30000; i < desired; i++) if (!IsBusy(i)) return i;
+            // last resort: random
+            var rnd = new Random();
+            for (int i = 0; i < 1000; i++) { var p = rnd.Next(30000, 50001); if (!IsBusy(p)) return p; }
+            return desired; // give up
+        }
+        bool IsBusy(int port)
+        {
+            try { using var l = new TcpListener(IPAddress.Loopback, port); l.Start(); l.Stop(); return false; } catch { return true; }
+        }
+        int DeterministicFor(string serviceId)
+        {
+            var key = cwd + ":" + serviceId;
+            var seed = Fnv1a32(key);
+            var basePort = 30000 + (int)(seed % 20001);
+            return PickAvailable(basePort);
+        }
+
+        // For non-app services, if not exposing internals, drop host publish but keep container port reference for env formatting logic (map X:X -> X:X is fine for now)
+        if (!exposeInternals)
+        {
+            for (int i = 0; i < services.Count; i++)
+            {
+                if (appCandidates.Any(c => c.idx == i)) continue;
+                var s = services[i];
+                if (s.Ports.Count > 0)
+                {
+                    // convert to container-only (0:container) — compose exporter will skip publishing host when host==0
+                    var newPorts = s.Ports.Select(p => (0, p.Container)).ToList();
+                    services[i] = s with { Ports = newPorts };
+                }
+            }
+        }
+
+        return new Plan(plan.Profile, services);
+    }
+
+    internal static uint Fnv1a32(string s)
+    {
+        unchecked
+        {
+            uint hash = 2166136261;
+            foreach (var ch in s)
+            {
+                hash ^= ch;
+                hash *= 16777619;
+            }
+            return hash;
+        }
     }
 
     static bool TryLoadDescriptor(Profile profile, out Plan? plan)

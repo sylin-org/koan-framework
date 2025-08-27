@@ -26,7 +26,13 @@ public sealed class ComposeExporter : IArtifactExporter
     // Discover adapter-declared image prefixes and host mount container paths
     var mountMap = DiscoverHostMounts();
 
-        yaml.AppendLine("services:");
+    // Define networks first
+    yaml.AppendLine("networks:");
+    yaml.AppendLine($"  {OrchestrationConstants.InternalNetwork}:");
+    yaml.AppendLine("    internal: true");
+    yaml.AppendLine($"  {OrchestrationConstants.ExternalNetwork}: {{}}");
+    yaml.AppendLine();
+    yaml.AppendLine("services:");
         // Pre-compute which services have HTTP healthchecks
         var healthyIds = new HashSet<string>(plan.Services
             .Where(s => s.Health is not null && !string.IsNullOrWhiteSpace(s.Health.HttpEndpoint))
@@ -253,10 +259,20 @@ public sealed class ComposeExporter : IArtifactExporter
 
         if (svc.Ports.Count > 0)
         {
-            yaml.Append(pad).AppendLine("  ports:");
+            var any = false;
+            var tmp = new StringBuilder();
             foreach (var (host, container) in svc.Ports)
             {
-                yaml.Append(pad).Append("    - \"").Append(host).Append(':').Append(container).AppendLine("\"");
+                if (host > 0)
+                {
+                    any = true;
+                    tmp.Append(pad).Append("    - \"").Append(host).Append(':').Append(container).AppendLine("\"");
+                }
+            }
+            if (any)
+            {
+                yaml.Append(pad).AppendLine("  ports:");
+                yaml.Append(tmp);
             }
         }
 
@@ -270,7 +286,7 @@ public sealed class ComposeExporter : IArtifactExporter
             }
         }
 
-        if (svc.Health is not null && !string.IsNullOrWhiteSpace(svc.Health.HttpEndpoint))
+    if (svc.Health is not null && !string.IsNullOrWhiteSpace(svc.Health.HttpEndpoint))
         {
             yaml.Append(pad).AppendLine("  healthcheck:");
             // Try curl first; if not installed, fall back to wget; finally try bash /dev/tcp to probe the port
@@ -296,6 +312,18 @@ public sealed class ComposeExporter : IArtifactExporter
         var cond = healthyServiceIds.Contains(dep) ? "service_healthy" : "service_started";
                 yaml.Append(pad).Append("      condition: ").AppendLine(cond);
             }
+        }
+
+        // Networks: app on both internal/external; adapters only on internal
+        yaml.Append(pad).AppendLine("  networks:");
+        if (string.Equals(svc.Id, "api", StringComparison.OrdinalIgnoreCase))
+        {
+            yaml.Append(pad).Append("    - ").AppendLine(OrchestrationConstants.InternalNetwork);
+            yaml.Append(pad).Append("    - ").AppendLine(OrchestrationConstants.ExternalNetwork);
+        }
+        else
+        {
+            yaml.Append(pad).Append("    - ").AppendLine(OrchestrationConstants.InternalNetwork);
         }
     }
 

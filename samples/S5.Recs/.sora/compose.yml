@@ -1,3 +1,8 @@
+networks:
+  sora_internal:
+    internal: true
+  sora_external: {}
+
 services:
   api:
     image: "sora-s5.recs:dev"
@@ -7,23 +12,32 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
       ASPNETCORE_URLS: "http://+:8080"
-      Sora__Data__Mongo__ConnectionString: "mongodb://localhost:27017"
+      Sora__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
       Sora__Data__Mongo__Database: "sora"
       Sora__Ai__AutoDiscoveryEnabled: "true"
       Sora__Ai__AllowDiscoveryInNonDev: "true"
       SORA_AI_OLLAMA_URLS: "http://ollama:11434"
       Sora__Data__Weaviate__Endpoint: "http://weaviate:8080"
     ports:
-      - "8080:8080"
+      - "40082:8080"
     depends_on:
+      mongo:
+        condition: service_started
       ollama:
         condition: service_healthy
       weaviate:
         condition: service_healthy
+    networks:
+      - sora_internal
+      - sora_external
+  mongo:
+    image: "mongo:7"
+    volumes:
+      - ./Data/mongo:/data/db
+    networks:
+      - sora_internal
   ollama:
     image: "ollama/ollama:latest"
-    ports:
-      - "11434:11434"
     volumes:
       - ./Data/ollama:/root/.ollama
     healthcheck:
@@ -31,6 +45,8 @@ services:
       interval: 5s
       timeout: 2s
       retries: 12
+    networks:
+      - sora_internal
   weaviate:
     image: "semitechnologies/weaviate:1.25.6"
     environment:
@@ -40,8 +56,6 @@ services:
       DEFAULT_VECTORIZER_MODULE: "none"
       CLUSTER_HOSTNAME: "node1"
       RAFT_BOOTSTRAP_EXPECT: "1"
-    ports:
-      - "8080:8080"
     volumes:
       - ./Data/weaviate:/var/lib/weaviate
     healthcheck:
@@ -49,3 +63,5 @@ services:
       interval: 5s
       timeout: 2s
       retries: 12
+    networks:
+      - sora_internal

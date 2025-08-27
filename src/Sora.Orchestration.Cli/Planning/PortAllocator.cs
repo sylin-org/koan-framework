@@ -34,6 +34,12 @@ internal static class PortAllocator
                 foreach (var (host, container) in s.Ports)
                 {
                     var p = host;
+                    if (p <= 0)
+                    {
+                        // container-only mapping; keep as-is and do not reserve 0 in assigned
+                        newPorts.Add((0, container));
+                        continue;
+                    }
                     var tries = 0;
                     while (!Available(p) && tries++ < maxProbe)
                         p++;

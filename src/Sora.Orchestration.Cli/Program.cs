@@ -133,9 +133,17 @@ static async Task<int> ExportAsync(string[] args)
     var profile = ResolveProfile(FindArg(args, "--profile"));
     var basePortVal = FindArg(args, "--base-port");
     var basePort = int.TryParse(basePortVal, out var bp) && bp >= 0 ? bp : (int?)null;
+    var portOverrideVal = FindArg(args, "--port");
+    var portOverride = int.TryParse(portOverrideVal, out var pov) && pov > 0 ? pov : (int?)null;
+    var exposeInternals = HasFlag(args, "--expose-internals");
+    var noPersist = HasFlag(args, "--no-launch-manifest");
     var plan = Planner.Build(profile);
     if (basePort is { }) plan = ApplyBasePort(plan, basePort.Value);
-    if (profile != Profile.Prod) plan = PortAllocator.AutoAvoidPorts(plan);
+    if (profile != Profile.Prod)
+    {
+        plan = Planner.AssignAppPublicPort(plan, portOverride, exposeInternals, persist: !noPersist);
+        plan = PortAllocator.AutoAvoidPorts(plan);
+    }
 
     if (format is "compose")
     {
@@ -185,11 +193,19 @@ static async Task<int> UpAsync(string[] args)
     var timeout = int.TryParse(timeoutSeconds, out var ts) && ts > 0 ? TimeSpan.FromSeconds(ts) : TimeSpan.FromSeconds(60);
     var basePortVal = FindArg(args, "--base-port");
     var basePort = int.TryParse(basePortVal, out var bp) && bp >= 0 ? bp : (int?)null;
+    var portOverrideVal = FindArg(args, "--port");
+    var portOverride = int.TryParse(portOverrideVal, out var pov) && pov > 0 ? pov : (int?)null;
+    var exposeInternals = HasFlag(args, "--expose-internals");
+    var noPersist = HasFlag(args, "--no-launch-manifest");
     var conflictsArg = FindArg(args, "--conflicts")?.ToLowerInvariant(); // non-prod only: warn|fail
     var conflictsMode = conflictsArg is "fail" ? "fail" : conflictsArg is "warn" ? "warn" : null;
 
     var plan = Planner.Build(profile);
     if (basePort is { }) plan = ApplyBasePort(plan, basePort.Value);
+    if (profile != Profile.Prod)
+    {
+        plan = Planner.AssignAppPublicPort(plan, portOverride, exposeInternals, persist: !noPersist);
+    }
     if (profile == Profile.Staging || profile == Profile.Prod)
     {
         Console.Error.WriteLine($"up is disabled for profile '{profile.ToString().ToLowerInvariant()}'; use 'sora export compose' to generate artifacts for this environment.");
@@ -222,6 +238,16 @@ static async Task<int> UpAsync(string[] args)
         Console.WriteLine($"provider: {provider.Id} | engine: {ei.Name} {ei.Version} | file: {outPath}");
         Console.WriteLine($"services: {plan.Services.Count}");
     Console.WriteLine($"profile: {profile} | timeout: {timeout.TotalSeconds:n0}s{(basePort is { } ? $" | base-port: {basePort}" : string.Empty)}{(conflictsMode is { } ? $" | conflicts: {conflictsMode}" : string.Empty)}");
+    Console.WriteLine($"networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
+    var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
+    if (appSvc is not null && appSvc.Ports.Count > 0)
+    {
+        var appPorts = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
+        var src = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(appSvc.Id, out var a)
+            ? a.Source
+            : "unknown";
+        Console.WriteLine($"app: {appSvc.Id} @ {appPorts} (source: {src})");
+    }
     if (conflicts.Count > 0) Console.WriteLine($"ports in use: {string.Join(", ", conflicts)}");
     if (skipped.Count > 0) Console.WriteLine($"skipped services: {string.Join(", ", skipped)}");
     }
@@ -279,7 +305,11 @@ static async Task<int> StatusAsync(string[] args)
     var profile = ResolveProfile(FindArg(args, "--profile"));
     var basePortVal = FindArg(args, "--base-port");
     var basePort = int.TryParse(basePortVal, out var bp) && bp >= 0 ? bp : (int?)null;
+    var portOverrideVal = FindArg(args, "--port");
+    var portOverride = int.TryParse(portOverrideVal, out var pov) && pov > 0 ? pov : (int?)null;
+    var exposeInternals = HasFlag(args, "--expose-internals");
     var provider = await SelectProviderAsync(engineArg);
+    var noPersist = HasFlag(args, "--no-launch-manifest");
     var status = await provider.Status(new StatusOptions(Service: null));
     if (json)
     {
@@ -307,9 +337,23 @@ static async Task<int> StatusAsync(string[] args)
         // Endpoint hints (plan-derived, provider-agnostic): scheme://host:port for each service with mapped ports
     var plan = Planner.Build(profile);
     if (basePort is { }) plan = ApplyBasePort(plan, basePort.Value);
-    if (profile != Profile.Prod) plan = PortAllocator.AutoAvoidPorts(plan);
+    if (profile != Profile.Prod)
+    {
+        plan = Planner.AssignAppPublicPort(plan, portOverride, exposeInternals, persist: !noPersist);
+        plan = PortAllocator.AutoAvoidPorts(plan);
+    }
         if (plan.Services.Count > 0)
         {
+            Console.WriteLine($"networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
+            var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
+            if (appSvc is not null && appSvc.Ports.Count > 0)
+            {
+                var appPorts = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
+                var src = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(appSvc.Id, out var a)
+                    ? a.Source
+                    : "unknown";
+                Console.WriteLine($"app: {appSvc.Id} @ {appPorts} (source: {src})");
+            }
             Console.WriteLine("endpoints (hints):");
             foreach (var svc in plan.Services)
             {
@@ -333,6 +377,9 @@ static async Task<int> InspectAsync(string[] args)
     var profile = ResolveProfile(FindArg(args, "--profile"));
     var basePortVal = FindArg(args, "--base-port");
     var basePort = int.TryParse(basePortVal, out var bp) && bp >= 0 ? bp : (int?)null;
+    var portOverrideVal = FindArg(args, "--port");
+    var portOverride = int.TryParse(portOverrideVal, out var pov) && pov > 0 ? pov : (int?)null;
+    var exposeInternals = HasFlag(args, "--expose-internals");
 
     // First line: help hint (always)
     Console.WriteLine("Use -h for help");
@@ -374,7 +421,11 @@ static async Task<int> InspectAsync(string[] args)
     // Build plan-derived hints
     var plan = Planner.Build(profile);
     if (basePort is { }) plan = ApplyBasePort(plan, basePort.Value);
-    if (profile != Profile.Prod) plan = PortAllocator.AutoAvoidPorts(plan);
+    if (profile != Profile.Prod)
+    {
+        plan = Planner.AssignAppPublicPort(plan, portOverride, exposeInternals);
+        plan = PortAllocator.AutoAvoidPorts(plan);
+    }
     var conflicts = Planner.FindConflictingPorts(plan.Services.SelectMany(s => s.Ports.Select(p => p.Host)));
 
     // Project metadata
@@ -392,11 +443,28 @@ static async Task<int> InspectAsync(string[] args)
 
     if (json)
     {
+        // Identify app service(s) to surface chosen app port(s)
+        var appIds = plan.Services
+            .Where(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase))
+            .Select(s => s.Id)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var appPorts = plan.Services
+            .Where(s => appIds.Contains(s.Id, StringComparer.OrdinalIgnoreCase))
+            .SelectMany(s => s.Ports.Select(p => new {
+                service = s.Id,
+                host = p.Host,
+                container = p.Container,
+                source = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(s.Id, out var a) ? a.Source : null
+            }))
+            .ToArray();
         var payload = new
         {
             detected = true,
             cwd,
             project = new { name = projectName, profile = profile.ToString(), compose = Constants.DefaultComposePath },
+            networks = new { internalName = OrchestrationConstants.InternalNetwork, externalName = OrchestrationConstants.ExternalNetwork },
+            app = new { ids = appIds, ports = appPorts },
             providers = availability,
             services = plan.Services.Select(s => new
             {
@@ -427,6 +495,17 @@ static async Task<int> InspectAsync(string[] args)
         var engName = (string?)eng.GetType().GetProperty("Name")!.GetValue(eng) ?? string.Empty;
         var engVer = (string?)eng.GetType().GetProperty("Version")!.GetValue(eng) ?? string.Empty;
         Console.WriteLine($"- {id}: {(available ? "OK" : "NOT AVAILABLE")} {(string.IsNullOrWhiteSpace(engVer) ? string.Empty : $"- {engName} {engVer}")}");
+    }
+    Console.WriteLine($"Networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
+    // App port(s)
+    var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
+    if (appSvc is not null && appSvc.Ports.Count > 0)
+    {
+        var appPorts = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
+        var src = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(appSvc.Id, out var a)
+            ? a.Source
+            : "unknown";
+        Console.WriteLine($"App: {appSvc.Id} @ {appPorts} (source: {src})");
     }
     Console.WriteLine($"Services: {plan.Services.Count}");
     foreach (var s in plan.Services)
