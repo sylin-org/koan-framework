@@ -54,49 +54,43 @@ public sealed class ComposeExporter : IArtifactExporter
 
     static Dictionary<string, List<string>> DiscoverHostMounts()
     {
-        var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        try
         {
-            Type[] types;
-            try { types = asm.GetTypes(); }
-            catch (ReflectionTypeLoadException rtle) { types = rtle.Types.Where(t => t is not null).Cast<Type>().ToArray(); }
-            catch { continue; }
-            foreach (var t in types)
+            var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+                .Where(a =>
+                {
+                    try { var n = a.GetName().Name; return n is not null && n.StartsWith("Sora.", StringComparison.OrdinalIgnoreCase); }
+                    catch { return false; }
+                })
+                .ToArray();
+            foreach (var asm in assemblies)
             {
-                if (t is null) continue;
-                var mounts = t.GetCustomAttributes(typeof(HostMountAttribute), inherit: false).Cast<HostMountAttribute>().ToArray();
-                if (mounts.Length == 0) continue;
-
-                // Prefer ContainerDefaultsAttribute.Image as the image prefix source
-                var containerDefaults = t.GetCustomAttributes(typeof(Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute), inherit: false)
-                    .Cast<Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute>()
-                    .FirstOrDefault();
-
-                if (containerDefaults is not null && !string.IsNullOrWhiteSpace(containerDefaults.Image))
+                Type[] types;
+                try { types = asm.GetTypes(); }
+                catch (ReflectionTypeLoadException rtle) { types = rtle.Types.Where(t => t is not null).Cast<Type>().ToArray(); }
+                catch { continue; }
+                foreach (var t in types)
                 {
-                    var prefix = containerDefaults.Image;
-                    if (!map.TryGetValue(prefix, out var list))
-                    {
-                        list = new List<string>();
-                        map[prefix] = list;
-                    }
-                    foreach (var m in mounts)
-                    {
-                        if (!list.Contains(m.ContainerPath, StringComparer.OrdinalIgnoreCase))
-                            list.Add(m.ContainerPath);
-                    }
-                    continue;
-                }
+                    if (t is null) continue;
+                    HostMountAttribute[] mounts;
+                    try { mounts = t.GetCustomAttributes(typeof(HostMountAttribute), inherit: false).Cast<HostMountAttribute>().ToArray(); }
+                    catch { continue; }
+                    if (mounts.Length == 0) continue;
 
-                // Back-compat: use DefaultEndpointAttribute.ImagePrefixes if present
-                var endpoints = t.GetCustomAttributes(typeof(DefaultEndpointAttribute), inherit: false).Cast<DefaultEndpointAttribute>().ToArray();
-                if (endpoints.Length == 0) continue;
-                foreach (var ep in endpoints)
-                {
-                    if (ep.ImagePrefixes is null || ep.ImagePrefixes.Length == 0) continue;
-                    foreach (var prefix in ep.ImagePrefixes)
+                    // Prefer ContainerDefaultsAttribute.Image as the image prefix source
+                    Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute? containerDefaults = null;
+                    try
                     {
-                        if (string.IsNullOrWhiteSpace(prefix)) continue;
+                        containerDefaults = t.GetCustomAttributes(typeof(Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute), inherit: false)
+                            .Cast<Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute>()
+                            .FirstOrDefault();
+                    }
+                    catch { }
+
+                    if (containerDefaults is not null && !string.IsNullOrWhiteSpace(containerDefaults.Image))
+                    {
+                        var prefix = containerDefaults.Image;
                         if (!map.TryGetValue(prefix, out var list))
                         {
                             list = new List<string>();
@@ -107,11 +101,41 @@ public sealed class ComposeExporter : IArtifactExporter
                             if (!list.Contains(m.ContainerPath, StringComparer.OrdinalIgnoreCase))
                                 list.Add(m.ContainerPath);
                         }
+                        continue;
+                    }
+
+                    // Back-compat: use DefaultEndpointAttribute.ImagePrefixes if present
+                    DefaultEndpointAttribute[] endpoints;
+                    try { endpoints = t.GetCustomAttributes(typeof(DefaultEndpointAttribute), inherit: false).Cast<DefaultEndpointAttribute>().ToArray(); }
+                    catch { continue; }
+                    if (endpoints.Length == 0) continue;
+                    foreach (var ep in endpoints)
+                    {
+                        if (ep.ImagePrefixes is null || ep.ImagePrefixes.Length == 0) continue;
+                        foreach (var prefix in ep.ImagePrefixes)
+                        {
+                            if (string.IsNullOrWhiteSpace(prefix)) continue;
+                            if (!map.TryGetValue(prefix, out var list))
+                            {
+                                list = new List<string>();
+                                map[prefix] = list;
+                            }
+                            foreach (var m in mounts)
+                            {
+                                if (!list.Contains(m.ContainerPath, StringComparer.OrdinalIgnoreCase))
+                                    list.Add(m.ContainerPath);
+                            }
+                        }
                     }
                 }
             }
+            return map;
         }
-        return map;
+        catch
+        {
+            // Discovery is best-effort. If runtime reflection encounters missing dependencies, fall back to heuristics.
+            return new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        }
     }
 
     static ServiceSpec EnsureHostMounts(ServiceSpec svc, Dictionary<string, List<string>> mountMap, Profile profile)
@@ -186,6 +210,28 @@ public sealed class ComposeExporter : IArtifactExporter
         var pad = new string(' ', indent);
         yaml.Append(pad).Append(svc.Id).AppendLine(":");
         yaml.Append(pad).Append("  image: ").AppendLine(EscapeScalar(svc.Image));
+
+        // If this is the app service (convention id == "api") and we're in a project folder, emit a build block
+        if (string.Equals(svc.Id, "api", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var cwd = Directory.GetCurrentDirectory();
+                var hasProject = Directory.EnumerateFiles(cwd, "*.csproj", SearchOption.TopDirectoryOnly).Any();
+                if (hasProject)
+                {
+                    yaml.Append(pad).AppendLine("  build:");
+                    yaml.Append(pad).Append("    context: ").AppendLine(EscapeScalar("."));
+                    // Prefer a Dockerfile if present
+                    var dockerfile = Directory.EnumerateFiles(cwd, "Dockerfile", SearchOption.TopDirectoryOnly).FirstOrDefault();
+                    if (!string.IsNullOrEmpty(dockerfile))
+                    {
+                        yaml.Append(pad).Append("    dockerfile: ").AppendLine(EscapeScalar(Path.GetFileName(dockerfile)));
+                    }
+                }
+            }
+            catch { /* best-effort */ }
+        }
 
     if (svc.Env.Count > 0)
         {
