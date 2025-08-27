@@ -1,4 +1,4 @@
-﻿namespace Sora.Orchestration.Cli;
+﻿namespace Sora.Orchestration.Cli.Infrastructure;
 
 internal static class Constants
 {

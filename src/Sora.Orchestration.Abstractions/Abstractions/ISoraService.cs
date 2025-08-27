@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Abstractions;
 
 /// <summary>
 /// Minimal runtime-facing shape for a declared service adapter.
@@ -21,8 +21,3 @@ public interface ISoraService
     string? ContainerImage { get; }
     string? DefaultTag { get; }
 }
-
-/// <summary>
-/// Marker for service adapter types; [SoraService] should be applied only to these.
-/// </summary>
-public interface IServiceAdapter : ISoraService { }

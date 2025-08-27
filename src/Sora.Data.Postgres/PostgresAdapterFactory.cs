@@ -2,8 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
-using Sora.Orchestration;
-using Sora.Orchestration.Abstractions.Attributes;
+using Sora.Orchestration.Attributes;
 
 namespace Sora.Data.Postgres;
 

@@ -1,6 +1,10 @@
+using Sora.Orchestration;
 using System.Reflection;
 using System.Text;
-using Sora.Orchestration;
+using Sora.Orchestration.Abstractions;
+using Sora.Orchestration.Attributes;
+using Sora.Orchestration.Infrastructure;
+using Sora.Orchestration.Models;
 
 namespace Sora.Orchestration.Renderers.Compose;
 
@@ -15,24 +19,24 @@ public sealed class ComposeExporter : IArtifactExporter
         ArgumentNullException.ThrowIfNull(plan);
         if (string.IsNullOrWhiteSpace(outPath)) throw new ArgumentException("Output path required", nameof(outPath));
 
-    var dir = Path.GetDirectoryName(outPath);
-    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-    var composeDir = string.IsNullOrEmpty(dir) ? Directory.GetCurrentDirectory() : dir;
+        var dir = Path.GetDirectoryName(outPath);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        var composeDir = string.IsNullOrEmpty(dir) ? Directory.GetCurrentDirectory() : dir;
 
-    var yaml = new StringBuilder();
+        var yaml = new StringBuilder();
         // Compose v2+ typically omits the top-level version field.
         var namedVolumes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-    // Discover adapter-declared image prefixes and host mount container paths
-    var mountMap = DiscoverHostMounts();
+        // Discover adapter-declared image prefixes and host mount container paths
+        var mountMap = DiscoverHostMounts();
 
-    // Define networks first
-    yaml.AppendLine("networks:");
-    yaml.AppendLine($"  {OrchestrationConstants.InternalNetwork}:");
-    yaml.AppendLine("    internal: true");
-    yaml.AppendLine($"  {OrchestrationConstants.ExternalNetwork}: {{}}");
-    yaml.AppendLine();
-    yaml.AppendLine("services:");
+        // Define networks first
+        yaml.AppendLine("networks:");
+        yaml.AppendLine($"  {OrchestrationConstants.InternalNetwork}:");
+        yaml.AppendLine("    internal: true");
+        yaml.AppendLine($"  {OrchestrationConstants.ExternalNetwork}: {{}}");
+        yaml.AppendLine();
+        yaml.AppendLine("services:");
         // Pre-compute which services have HTTP healthchecks
         var healthyIds = new HashSet<string>(plan.Services
             .Where(s => s.Health is not null && !string.IsNullOrWhiteSpace(s.Health.HttpEndpoint))
@@ -86,11 +90,11 @@ public sealed class ComposeExporter : IArtifactExporter
                     if (mounts.Length == 0) continue;
 
                     // Prefer ContainerDefaultsAttribute.Image as the image prefix source
-                    Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute? containerDefaults = null;
+                    ContainerDefaultsAttribute? containerDefaults = null;
                     try
                     {
-                        containerDefaults = t.GetCustomAttributes(typeof(Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute), inherit: false)
-                            .Cast<Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute>()
+                        containerDefaults = t.GetCustomAttributes(typeof(ContainerDefaultsAttribute), inherit: false)
+                            .Cast<ContainerDefaultsAttribute>()
                             .FirstOrDefault();
                     }
                     catch { }
@@ -246,14 +250,14 @@ public sealed class ComposeExporter : IArtifactExporter
             catch { /* best-effort */ }
         }
 
-    if (svc.Env.Count > 0)
+        if (svc.Env.Count > 0)
         {
             yaml.Append(pad).AppendLine("  environment:");
             foreach (var kvp in svc.Env)
             {
                 if (kvp.Value is null) continue; // omit null entries
-        // Preserve ${VAR} style references unquoted so compose resolves from env/.env; otherwise quote to avoid YAML coercion.
-        yaml.Append(pad).Append("    ").Append(kvp.Key).Append(": ").AppendLine(ToEnvYamlValue(kvp.Value));
+                                                 // Preserve ${VAR} style references unquoted so compose resolves from env/.env; otherwise quote to avoid YAML coercion.
+                yaml.Append(pad).Append("    ").Append(kvp.Key).Append(": ").AppendLine(ToEnvYamlValue(kvp.Value));
             }
         }
 
@@ -286,7 +290,7 @@ public sealed class ComposeExporter : IArtifactExporter
             }
         }
 
-    if (svc.Health is not null && !string.IsNullOrWhiteSpace(svc.Health.HttpEndpoint))
+        if (svc.Health is not null && !string.IsNullOrWhiteSpace(svc.Health.HttpEndpoint))
         {
             yaml.Append(pad).AppendLine("  healthcheck:");
             // Try curl first; if not installed, fall back to wget; finally try bash /dev/tcp to probe the port
@@ -302,14 +306,14 @@ public sealed class ComposeExporter : IArtifactExporter
                 yaml.Append(pad).Append("    retries: ").AppendLine(svc.Health.Retries.Value.ToString());
         }
 
-    if (svc.DependsOn.Count > 0)
+        if (svc.DependsOn.Count > 0)
         {
             yaml.Append(pad).AppendLine("  depends_on:");
             foreach (var dep in svc.DependsOn)
             {
                 yaml.Append(pad).Append("    ").Append(dep).AppendLine(":");
-        // If the dependency service has no health, use service_started to avoid waiting on a nonexistent check.
-        var cond = healthyServiceIds.Contains(dep) ? "service_healthy" : "service_started";
+                // If the dependency service has no health, use service_started to avoid waiting on a nonexistent check.
+                var cond = healthyServiceIds.Contains(dep) ? "service_healthy" : "service_started";
                 yaml.Append(pad).Append("      condition: ").AppendLine(cond);
             }
         }

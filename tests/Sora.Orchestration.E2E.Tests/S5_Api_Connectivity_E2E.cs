@@ -1,10 +1,10 @@
-﻿using System.Diagnostics;
-using System.Net.Http;
+﻿using FluentAssertions;
+using System.Diagnostics;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using FluentAssertions;
 using Xunit;
 
 namespace Sora.Orchestration.E2E.Tests;
@@ -30,64 +30,64 @@ public class S5_Api_Connectivity_E2E
         if (composeTool == null)
             return; // skip only when both Docker and Podman are missing
 
-    var repoRoot = GetRepoRootFromSource();
-    var composeFile = Path.Combine(repoRoot, "samples", "S5.Recs", "docker", "compose.yml");
-    File.Exists(composeFile).Should().BeTrue($"compose file missing: {composeFile}");
+        var repoRoot = GetRepoRootFromSource();
+        var composeFile = Path.Combine(repoRoot, "samples", "S5.Recs", "docker", "compose.yml");
+        File.Exists(composeFile).Should().BeTrue($"compose file missing: {composeFile}");
 
-    var composeDir = Path.GetDirectoryName(composeFile)!;
-    var project = $"sorae2e-{Guid.NewGuid().ToString("N")[..8]}";
+        var composeDir = Path.GetDirectoryName(composeFile)!;
+        var project = $"sorae2e-{Guid.NewGuid().ToString("N")[..8]}";
 
-    // Initialization requirement: ensure previous runs are fully torn down (free ports 5081-5084)
-    // Try teardown with the default compose project name (directory basename) and our isolated name.
-    _ = RunShell(ComposeCmdDefaultProject(composeTool, composeDir, "down -v --remove-orphans"));
-    _ = RunShell(ComposeCmd(composeTool, composeDir, "down -v --remove-orphans", project));
+        // Initialization requirement: ensure previous runs are fully torn down (free ports 5081-5084)
+        // Try teardown with the default compose project name (directory basename) and our isolated name.
+        _ = RunShell(ComposeCmdDefaultProject(composeTool, composeDir, "down -v --remove-orphans"));
+        _ = RunShell(ComposeCmd(composeTool, composeDir, "down -v --remove-orphans", project));
 
-    // Additionally, free any lingering containers holding our known ports (from stray runs)
-    EnsureS5PortsAreFree(composeTool);
+        // Additionally, free any lingering containers holding our known ports (from stray runs)
+        EnsureS5PortsAreFree(composeTool);
 
-    // Preflight: validate YAML with `compose config` for clearer errors
-    Console.WriteLine($"compose tool: {composeTool}\nproject: {project}\ndir: {composeDir}");
-    var cfg = RunShell(ComposeCmd(composeTool, composeDir, "config", project));
-    Console.WriteLine("compose config (stdout):\n" + cfg.Stdout);
-    cfg.ExitCode.Should().Be(0, $"compose config failed ({composeTool}). stderr: {cfg.Stderr}");
+        // Preflight: validate YAML with `compose config` for clearer errors
+        Console.WriteLine($"compose tool: {composeTool}\nproject: {project}\ndir: {composeDir}");
+        var cfg = RunShell(ComposeCmd(composeTool, composeDir, "config", project));
+        Console.WriteLine("compose config (stdout):\n" + cfg.Stdout);
+        cfg.ExitCode.Should().Be(0, $"compose config failed ({composeTool}). stderr: {cfg.Stderr}");
 
-    // Up stack (build + detach)
-    var up = RunShell(ComposeCmd(composeTool, composeDir, "up -d --build", project));
-    up.ExitCode.Should().Be(0, $"compose up failed ({composeTool}). stderr: {up.Stderr}");
-    // Quick visibility into what ports are published right after up
-    var psAfterUp = RunShell(ComposeCmd(composeTool, composeDir, "ps --all", project));
-    Console.WriteLine("compose ps --all (after up):\n" + psAfterUp.Stdout);
-    // Wait until the api service is running per compose status to avoid probing too early
-    try
-    {
-        await WaitUntil(async () => IsServiceRunning(composeTool, composeDir, project, "api"), TimeSpan.FromSeconds(150));
-    }
-    catch (TimeoutException)
-    {
-        var psDiag = RunShell(ComposeCmd(composeTool, composeDir, "ps --all", project));
-        Console.WriteLine("compose ps --all (on api wait timeout):\n" + psDiag.Stdout);
-        var logsDiag = RunShell(ComposeCmd(composeTool, composeDir, "logs --no-color --tail=200", project));
-        Console.WriteLine("compose logs (tail on api wait timeout):\n" + logsDiag.Stdout);
-        throw;
-    }
-    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-    {
-        var netstat = RunShell("netstat -ano -p tcp | Select-String ':5084' | ForEach-Object { $_.Line }");
-        Console.WriteLine("netstat -ano -p tcp (filter :5084):\n" + netstat.Stdout);
-    }
+        // Up stack (build + detach)
+        var up = RunShell(ComposeCmd(composeTool, composeDir, "up -d --build", project));
+        up.ExitCode.Should().Be(0, $"compose up failed ({composeTool}). stderr: {up.Stderr}");
+        // Quick visibility into what ports are published right after up
+        var psAfterUp = RunShell(ComposeCmd(composeTool, composeDir, "ps --all", project));
+        Console.WriteLine("compose ps --all (after up):\n" + psAfterUp.Stdout);
+        // Wait until the api service is running per compose status to avoid probing too early
+        try
+        {
+            await WaitUntil(async () => IsServiceRunning(composeTool, composeDir, project, "api"), TimeSpan.FromSeconds(150));
+        }
+        catch (TimeoutException)
+        {
+            var psDiag = RunShell(ComposeCmd(composeTool, composeDir, "ps --all", project));
+            Console.WriteLine("compose ps --all (on api wait timeout):\n" + psDiag.Stdout);
+            var logsDiag = RunShell(ComposeCmd(composeTool, composeDir, "logs --no-color --tail=200", project));
+            Console.WriteLine("compose logs (tail on api wait timeout):\n" + logsDiag.Stdout);
+            throw;
+        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            var netstat = RunShell("netstat -ano -p tcp | Select-String ':5084' | ForEach-Object { $_.Line }");
+            Console.WriteLine("netstat -ano -p tcp (filter :5084):\n" + netstat.Stdout);
+        }
 
         try
         {
             var apiBase = new Uri($"http://127.0.0.1:{ApiPort}");
             using var http = CreateHttpClient(TimeSpan.FromSeconds(30));
 
-        // Wait for API to be reachable: use raw TCP only (HTTP probes can be flaky early in startup)
+            // Wait for API to be reachable: use raw TCP only (HTTP probes can be flaky early in startup)
             var tcpReady = false;
             try
             {
                 await WaitUntil(async () =>
                 {
-            return await CanConnectTcpAsync("127.0.0.1", ApiPort, TimeSpan.FromSeconds(2));
+                    return await CanConnectTcpAsync("127.0.0.1", ApiPort, TimeSpan.FromSeconds(2));
                 }, TimeSpan.FromSeconds(150));
                 tcpReady = true;
             }
@@ -123,10 +123,10 @@ public class S5_Api_Connectivity_E2E
             sReady.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable);
 
             var sCaps = await GetStatusCodeRawWithRetryAsync("127.0.0.1", ApiPort, "/.well-known/sora/observability", attempts: 20);
-            ((int)sCaps).Should().BeInRange(200,299, "observability should be reachable");
+            ((int)sCaps).Should().BeInRange(200, 299, "observability should be reachable");
 
             var sGenres = await GetStatusCodeRawWithRetryAsync("127.0.0.1", ApiPort, "/api/genres", attempts: 20);
-            ((int)sGenres).Should().BeInRange(200,299, "/api/genres should be reachable");
+            ((int)sGenres).Should().BeInRange(200, 299, "/api/genres should be reachable");
 
             // 2) Databases
             // - Mongo (TCP connect to 5081)
@@ -135,7 +135,7 @@ public class S5_Api_Connectivity_E2E
 
             // - Weaviate (HTTP 200 on /v1/)
             var sWeav = await GetStatusCodeRawWithRetryAsync("127.0.0.1", WeaviatePort, "/v1/", attempts: 20);
-            ((int)sWeav).Should().BeInRange(200,299, "Weaviate should be reachable on 5082");
+            ((int)sWeav).Should().BeInRange(200, 299, "Weaviate should be reachable on 5082");
         }
         finally
         {
@@ -373,7 +373,7 @@ public class S5_Api_Connectivity_E2E
 
     private static void EnsureS5PortsAreFree(string composeTool)
     {
-    var ports = new[] { MongoPort, WeaviatePort, OllamaPort, ApiPort };
+        var ports = new[] { MongoPort, WeaviatePort, OllamaPort, ApiPort };
         foreach (var port in ports)
         {
             if (!IsPortOpen(port)) continue;
@@ -394,7 +394,7 @@ public class S5_Api_Connectivity_E2E
     private static void DumpContainerPs(string composeTool)
     {
         var engine = composeTool.StartsWith("podman") ? "podman" : "docker";
-    var ps = RunShell($"{engine} ps --format '{{{{.ID}}}} {{{{.Image}}}} {{{{.Ports}}}} {{{{.Names}}}}'");
+        var ps = RunShell($"{engine} ps --format '{{{{.ID}}}} {{{{.Image}}}} {{{{.Ports}}}} {{{{.Names}}}}'");
         Console.WriteLine($"{engine} ps:\n" + ps.Stdout);
     }
 
@@ -413,13 +413,13 @@ public class S5_Api_Connectivity_E2E
     private static void TryStopContainersPublishingPort(string composeTool, int port)
     {
         var engine = composeTool.StartsWith("podman") ? "podman" : "docker";
-    var ps = RunShell($"{engine} ps --no-trunc --format '{{{{.ID}}}}|{{{{.Ports}}}}|{{{{.Names}}}}'");
+        var ps = RunShell($"{engine} ps --no-trunc --format '{{{{.ID}}}}|{{{{.Ports}}}}|{{{{.Names}}}}'");
         if (ps.ExitCode != 0)
         {
             Console.WriteLine($"{engine} ps failed: {ps.Stderr}");
             return;
         }
-    var lines = ps.Stdout.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        var lines = ps.Stdout.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         var matches = new List<string>();
         foreach (var line in lines)
         {

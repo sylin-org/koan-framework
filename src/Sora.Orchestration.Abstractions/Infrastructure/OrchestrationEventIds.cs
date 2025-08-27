@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Infrastructure;
 
 public static class OrchestrationEventIds
 {

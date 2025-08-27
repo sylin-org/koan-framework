@@ -1,5 +1,8 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using Sora.Orchestration.Cli.Infrastructure;
+using Sora.Orchestration.Models;
+using Sora.Orchestration.Planning;
 
 namespace Sora.Orchestration.Cli.Planning;
 
@@ -16,7 +19,7 @@ internal static class Planner
         {
             return fromFile!;
         }
-    // 2) Discovery-driven draft (CLI scans assemblies for manifests)
+        // 2) Discovery-driven draft (CLI scans assemblies for manifests)
         var draft = ProjectDependencyAnalyzer.DiscoverDraft(profile);
         if (draft is not null)
         {
@@ -110,7 +113,7 @@ internal static class Planner
     public static Plan AssignAppPublicPort(Plan plan, int? explicitPort = null, bool exposeInternals = false, bool persist = true)
     {
         if (plan.Services.Count == 0) return plan;
-    LastPortAssignments.Clear();
+        LastPortAssignments.Clear();
         var services = plan.Services.ToList();
         var cwd = Directory.GetCurrentDirectory();
         int? defaultFromCode = null;
@@ -160,7 +163,7 @@ internal static class Planner
             else source = "flag";
             desired ??= defaultFromCode;
             var assigned = PickAvailable(desired ?? DeterministicFor(app.Id));
-            services[appIdx] = app with { Ports = new List<(int,int)> { (assigned, containerPort) } };
+            services[appIdx] = app with { Ports = new List<(int, int)> { (assigned, containerPort) } };
             // Track for UX reporting
             LastPortAssignments[app.Id] = (assigned, containerPort, source);
             if (persist)
@@ -339,11 +342,11 @@ internal static class Planner
         public sealed class Service
         {
             public string? Image { get; set; }
-            public Dictionary<string,string?>? Env { get; set; }
+            public Dictionary<string, string?>? Env { get; set; }
             public List<string>? Volumes { get; set; }
         }
 
-    public static Overrides? Load()
+        public static Overrides? Load()
         {
             try
             {
@@ -360,7 +363,7 @@ internal static class Planner
             return null;
         }
 
-    public static PlanDraft Apply(PlanDraft draft, Overrides ov)
+        public static PlanDraft Apply(PlanDraft draft, Overrides ov)
         {
             var list = new List<ServiceRequirement>(draft.Services.Count);
             foreach (var s in draft.Services)
@@ -369,7 +372,7 @@ internal static class Planner
                 Overrides.Service? svc = null;
                 if (ov.Services is not null) ov.Services.TryGetValue(id, out svc);
                 var img = svc is not null && !string.IsNullOrWhiteSpace(svc.Image) ? svc.Image! : s.Image;
-                var env = new Dictionary<string,string?>(s.Env);
+                var env = new Dictionary<string, string?>(s.Env);
                 if (svc is not null && svc.Env is not null)
                 {
                     foreach (var kv in svc.Env) env[kv.Key] = kv.Value;
@@ -542,7 +545,7 @@ internal static class Planner
         foreach (var r in draft.Services)
         {
             var ports = r.ContainerPorts.Select(p => (p, p)).ToList();
-            var vols = new List<(string,string,bool)>();
+            var vols = new List<(string, string, bool)>();
             foreach (var v in r.Volumes)
             {
                 var parsed = ParseVolume(v);
@@ -582,7 +585,7 @@ internal static class Planner
                 }
             }
 
-            services.Add(new ServiceSpec(r.Id, r.Image, new Dictionary<string,string?>(r.Env), ports, vols, health, r.Type, depends.ToArray()));
+            services.Add(new ServiceSpec(r.Id, r.Image, new Dictionary<string, string?>(r.Env), ports, vols, health, r.Type, depends.ToArray()));
         }
 
         // Optionally include app service with env derived from manifests
@@ -592,7 +595,7 @@ internal static class Planner
             var appName = new DirectoryInfo(cwd).Name.ToLowerInvariant();
             var image = $"sora-{appName}:dev";
             var depIds = services.Select(s => s.Id).ToArray();
-            var appEnv = new Dictionary<string,string?>
+            var appEnv = new Dictionary<string, string?>
             {
                 ["ASPNETCORE_ENVIRONMENT"] = profile == Profile.Local ? "Development" : null,
                 ["ASPNETCORE_URLS"] = $"http://+:{draft.AppHttpPort}"
@@ -621,8 +624,8 @@ internal static class Planner
                 Id: "api",
                 Image: image,
                 Env: appEnv,
-                Ports: new List<(int,int)> { (draft.AppHttpPort, draft.AppHttpPort) },
-                Volumes: new List<(string,string,bool)>(),
+                Ports: new List<(int, int)> { (draft.AppHttpPort, draft.AppHttpPort) },
+                Volumes: new List<(string, string, bool)>(),
                 Health: null,
                 Type: ServiceType.App,
                 DependsOn: depIds

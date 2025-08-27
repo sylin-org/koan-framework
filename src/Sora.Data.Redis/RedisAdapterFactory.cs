@@ -2,9 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
+using Sora.Orchestration.Attributes;
 using StackExchange.Redis;
-using Sora.Orchestration;
-using Sora.Orchestration.Abstractions.Attributes;
 
 namespace Sora.Data.Redis;
 

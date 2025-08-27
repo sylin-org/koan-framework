@@ -1,12 +1,10 @@
 ﻿using FluentAssertions;
 using Sora.Orchestration;
+using Sora.Orchestration.Models;
 using Sora.Orchestration.Renderers.Compose;
 using Xunit;
 
 // Test-only adapter marker for mapping
-[DefaultEndpoint("postgres", "localhost", 5432, "tcp", new[] { "test/ci-postgres" })]
-[HostMount("/var/lib/postgresql/data")]
-internal sealed class TestCiPostgresAdapterMarker { }
 
 public class ComposeExporterProfileMountsTests
 {

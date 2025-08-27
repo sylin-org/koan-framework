@@ -16,8 +16,8 @@ public sealed class UserInfoController(DevTokenStore store, IHostEnvironment env
         var auth = Request.Headers.Authorization.ToString();
         if (string.IsNullOrWhiteSpace(auth) || !auth.StartsWith("Bearer ", StringComparison.Ordinal)) return Unauthorized();
         var token = auth.Substring("Bearer ".Length).Trim();
-    if (!store.TryGetProfile(token, out var profile)) { logger.LogDebug("TestProvider userinfo: invalid token"); return Unauthorized(); }
-    logger.LogDebug("TestProvider userinfo: returning profile for {Email}", profile.Email);
-    return Ok(new { id = profile.Email, username = profile.Username, email = profile.Email });
+        if (!store.TryGetProfile(token, out var profile)) { logger.LogDebug("TestProvider userinfo: invalid token"); return Unauthorized(); }
+        logger.LogDebug("TestProvider userinfo: returning profile for {Email}", profile.Email);
+        return Ok(new { id = profile.Email, username = profile.Username, email = profile.Email });
     }
 }

@@ -1,12 +1,10 @@
 ﻿using FluentAssertions;
 using Sora.Orchestration;
+using Sora.Orchestration.Models;
 using Sora.Orchestration.Renderers.Compose;
 using Xunit;
 
 // Define a test-only adapter marker with attributes so ComposeExporter can discover mount mappings
-[DefaultEndpoint("postgres", "localhost", 5432, "tcp", new[] { "test/postgres" })]
-[HostMount("/var/lib/postgresql/data")]
-internal sealed class TestPostgresAdapterMarker { }
 
 public class ComposeExporterMountTests
 {

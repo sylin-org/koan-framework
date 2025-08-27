@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Models;
 
 public sealed record Plan(
     Profile Profile,

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sora.Orchestration.Abstractions.Attributes;
+namespace Sora.Orchestration.Attributes;
 
 /// <summary>
 /// Declares default HTTP health probe settings for a service. Intended for container mode.

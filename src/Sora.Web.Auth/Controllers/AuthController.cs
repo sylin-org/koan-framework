@@ -32,11 +32,11 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         var state = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
         // Use Secure only when the request is HTTPS to support HTTP in dev/container scenarios
         var secure = HttpContext.Request.IsHttps;
-    Response.Cookies.Append("sora.auth.state", state, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/", Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
+        Response.Cookies.Append("sora.auth.state", state, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/", Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
         var allowed = authOptions.Value.ReturnUrl.AllowList ?? Array.Empty<string>();
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
         var ru = SanitizeReturnUrl(returnUrl, allowed, def);
-    Response.Cookies.Append("sora.auth.return", ru, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/", Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
+        Response.Cookies.Append("sora.auth.return", ru, new CookieOptions { HttpOnly = true, Secure = secure, IsEssential = true, SameSite = SameSiteMode.Lax, Path = "/", Expires = DateTimeOffset.UtcNow.AddMinutes(5) });
 
         // Optional pass-through hints (e.g., prompt=login) for providers that support it
         var prompt = HttpContext.Request.Query.TryGetValue("prompt", out var p) ? p.ToString() : null;
@@ -62,7 +62,7 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         if (string.IsNullOrWhiteSpace(authority)) return Problem(detail: "Authority not configured.", statusCode: 500);
         var client = cfg.ClientId ?? string.Empty;
         var scopeOidc = cfg.Scopes != null && cfg.Scopes.Length > 0 ? string.Join(' ', cfg.Scopes) : "openid profile email";
-    var cb = BuildAbsoluteBrowser(callback);
+        var cb = BuildAbsoluteBrowser(callback);
         logger.LogDebug("OIDC challenge: provider={Provider} callback={Callback} redirectUri={RedirectUri}", provider, callback, cb);
         var authorizeUrl = $"{authority.TrimEnd('/')}/authorize?response_type=code&client_id={Uri.EscapeDataString(client)}&redirect_uri={Uri.EscapeDataString(cb)}&scope={Uri.EscapeDataString(scopeOidc)}&state={Uri.EscapeDataString(state)}";
         if (!string.IsNullOrWhiteSpace(prompt)) authorizeUrl += $"&prompt={Uri.EscapeDataString(prompt)}";
@@ -79,7 +79,7 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         var type = (cfg.Type ?? AuthConstants.Protocols.Oidc).ToLowerInvariant();
 
         // Validate state
-    var expectedState = Request.Cookies["sora.auth.state"]; Response.Cookies.Delete("sora.auth.state", new CookieOptions { Path = "/" });
+        var expectedState = Request.Cookies["sora.auth.state"]; Response.Cookies.Delete("sora.auth.state", new CookieOptions { Path = "/" });
         if (string.IsNullOrWhiteSpace(state) || string.IsNullOrWhiteSpace(expectedState) || !string.Equals(state, expectedState, StringComparison.Ordinal))
             return Problem(detail: "Invalid state.", statusCode: 400);
 
@@ -155,8 +155,8 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         if (!string.IsNullOrWhiteSpace(name)) claims.Add(new Claim(ClaimTypes.Name, name));
         if (!string.IsNullOrWhiteSpace(picture)) claims.Add(new Claim("picture", picture));
         var identity = new ClaimsIdentity(claims, AuthenticationExtensions.CookieScheme);
-    await HttpContext.SignInAsync(AuthenticationExtensions.CookieScheme, new ClaimsPrincipal(identity));
-    logger.LogDebug("Auth sign-in succeeded for provider={Provider} userId={UserId} host={Host}", provider, sub ?? "(unknown)", HttpContext.Request.Host.Value);
+        await HttpContext.SignInAsync(AuthenticationExtensions.CookieScheme, new ClaimsPrincipal(identity));
+        logger.LogDebug("Auth sign-in succeeded for provider={Provider} userId={UserId} host={Host}", provider, sub ?? "(unknown)", HttpContext.Request.Host.Value);
 
         // Persist external identity link (best-effort)
         try
@@ -173,8 +173,8 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         }
         catch { /* ignore */ }
 
-    var ru = Request.Cookies["sora.auth.return"] ?? authOptions.Value.ReturnUrl.DefaultPath ?? "/";
-    Response.Cookies.Delete("sora.auth.return", new CookieOptions { Path = "/" });
+        var ru = Request.Cookies["sora.auth.return"] ?? authOptions.Value.ReturnUrl.DefaultPath ?? "/";
+        Response.Cookies.Delete("sora.auth.return", new CookieOptions { Path = "/" });
         return LocalRedirect(ru);
     }
 

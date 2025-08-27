@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Sora.Orchestration.Models;
 
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Abstractions;
 
 public interface IDevServiceDescriptor
 {

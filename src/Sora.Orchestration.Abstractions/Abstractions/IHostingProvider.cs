@@ -1,4 +1,4 @@
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Abstractions;
 
 public interface IHostingProvider
 {
@@ -17,12 +17,3 @@ public interface IHostingProvider
 
     EngineInfo EngineInfo();
 }
-
-public sealed record RunOptions(bool Detach, TimeSpan? ReadinessTimeout);
-public sealed record StopOptions(bool RemoveVolumes);
-public sealed record LogsOptions(string? Service, bool Follow, int? Tail, string? Since = null);
-public sealed record StatusOptions(string? Service);
-public sealed record ProviderStatus(string Provider, string EngineVersion, IReadOnlyList<(string Service, string State, string? Health)> Services);
-public sealed record EngineInfo(string Name, string Version, string Endpoint);
-
-public sealed record PortBinding(string Service, int Host, int Container, string Protocol = "tcp", string? Address = null);

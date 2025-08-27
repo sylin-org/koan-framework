@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Sora.Orchestration;
+using Sora.Orchestration.Abstractions;
 using Xunit;
 
 namespace Sora.Orchestration.Renderers.Compose.Tests;
@@ -17,7 +18,7 @@ public class EndpointFormatterTests
     public void Formats_live_endpoint(string? addr, int host, int container, string expected)
     {
         var p = new PortBinding("svc", host, container, "tcp", addr);
-        var s = Sora.Orchestration.Cli.Formatting.EndpointFormatter.FormatLiveEndpoint(p);
+        var s = Cli.Formatting.EndpointFormatter.FormatLiveEndpoint(p);
         s.Should().Be(expected);
     }
 

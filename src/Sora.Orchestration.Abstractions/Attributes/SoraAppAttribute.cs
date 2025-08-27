@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Attributes;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public sealed class SoraAppAttribute : Attribute

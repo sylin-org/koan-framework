@@ -1,16 +1,21 @@
-﻿using System.Text.Json;
-using System.Text.RegularExpressions;
-using static Sora.Orchestration.Redaction;
-using Sora.Orchestration;
-using Sora.Orchestration.Renderers.Compose;
+﻿using Sora.Orchestration;
+using Sora.Orchestration.Cli;
+using Sora.Orchestration.Cli.Formatting;
+using Sora.Orchestration.Cli.Planning;
 using Sora.Orchestration.Provider.Docker;
 using Sora.Orchestration.Provider.Podman;
-using Sora.Orchestration.Cli;
-using Sora.Orchestration.Cli.Planning;
-using Sora.Orchestration.Cli.Formatting;
-using System.Reflection;
+using Sora.Orchestration.Renderers.Compose;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using Sora.Orchestration.Abstractions;
+using Sora.Orchestration.Attributes;
+using Sora.Orchestration.Cli.Infrastructure;
+using Sora.Orchestration.Infrastructure;
+using Sora.Orchestration.Models;
+using static Sora.Orchestration.Redaction;
 
 // Minimal DX-first CLI: export, doctor, up, down, status, logs, inspect
 // Flags: -v/-vv, --json (for explain/status/inspect), --dry-run, --explain
@@ -488,10 +493,10 @@ static async Task<int> InspectAsync(string[] args)
                 health = s.Health is not null,
                 type = s.Type switch
                 {
-                    Sora.Orchestration.ServiceType.App => "app",
-                    Sora.Orchestration.ServiceType.Database => "database",
-                    Sora.Orchestration.ServiceType.Vector => "vector",
-                    Sora.Orchestration.ServiceType.Ai => "ai",
+                    ServiceType.App => "app",
+                    ServiceType.Database => "database",
+                    ServiceType.Vector => "vector",
+                    ServiceType.Ai => "ai",
                     _ => "service"
                 }
             }),
@@ -549,10 +554,10 @@ static async Task<int> InspectAsync(string[] args)
         var health = s.Health is null ? "-" : "✓";
         var type = s.Type switch
         {
-            Sora.Orchestration.ServiceType.App => "app",
-            Sora.Orchestration.ServiceType.Database => "database",
-            Sora.Orchestration.ServiceType.Vector => "vector",
-            Sora.Orchestration.ServiceType.Ai => "ai",
+            ServiceType.App => "app",
+            ServiceType.Database => "database",
+            ServiceType.Vector => "vector",
+            ServiceType.Ai => "ai",
             _ => "service"
         };
         Console.WriteLine($"{s.Id,-13} {ports,-13} {health,-9} {type}");
@@ -623,9 +628,9 @@ static Dictionary<string, string>? ComputeDependenciesFromPlan(Plan plan)
         => plan.Services
             .FirstOrDefault(s => kind switch
             {
-                "database" => s.Type == Sora.Orchestration.ServiceType.Database,
-                "vector" => s.Type == Sora.Orchestration.ServiceType.Vector,
-                "ai" => s.Type == Sora.Orchestration.ServiceType.Ai,
+                "database" => s.Type == ServiceType.Database,
+                "vector" => s.Type == ServiceType.Vector,
+                "ai" => s.Type == ServiceType.Ai,
                 _ => false
             })?.Id;
 

@@ -1,13 +1,10 @@
 ﻿using FluentAssertions;
 using Sora.Orchestration;
+using Sora.Orchestration.Models;
 using Sora.Orchestration.Renderers.Compose;
 using Xunit;
 
 // Test-only adapter marker with multiple HostMounts
-[DefaultEndpoint("http", "localhost", 8080, "tcp", new[] { "test/multi" })]
-[HostMount("/var/lib/serviceA")]
-[HostMount("/var/lib/serviceB")]
-internal sealed class TestMultiMountAdapterMarker { }
 
 public class ComposeExporterMultiMountTests
 {

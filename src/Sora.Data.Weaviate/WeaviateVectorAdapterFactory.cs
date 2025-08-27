@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Vector.Abstractions;
-using Sora.Orchestration;
+using Sora.Orchestration.Attributes;
 
 namespace Sora.Data.Weaviate;
 

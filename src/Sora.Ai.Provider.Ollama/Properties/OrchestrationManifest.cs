@@ -1,4 +1,4 @@
-﻿using Sora.Orchestration;
+﻿using Sora.Orchestration.Attributes;
 
 [assembly: OrchestrationServiceManifest(
     id: "ollama",

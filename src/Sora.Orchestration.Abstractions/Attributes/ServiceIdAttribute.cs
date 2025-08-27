@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sora.Orchestration.Abstractions.Attributes;
+namespace Sora.Orchestration.Attributes;
 
 /// <summary>
 /// Declares a stable logical identifier for a service (e.g., "mongo").

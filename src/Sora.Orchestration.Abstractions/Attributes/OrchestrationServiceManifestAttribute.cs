@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using Sora.Orchestration.Models;
 
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Attributes;
 
 /// <summary>
 /// Declarative manifest describing the dev-time container shape for an adapter/provider.

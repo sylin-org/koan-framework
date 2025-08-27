@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Attributes;
 
 /// <summary>
 /// Unified declaration of a service adapter's identity and defaults.

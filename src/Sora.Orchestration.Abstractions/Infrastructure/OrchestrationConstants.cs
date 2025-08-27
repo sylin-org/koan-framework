@@ -1,4 +1,4 @@
-﻿namespace Sora.Orchestration;
+﻿namespace Sora.Orchestration.Infrastructure;
 
 public static class OrchestrationConstants
 {

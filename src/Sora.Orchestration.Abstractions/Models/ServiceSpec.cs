@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Models;
 
 public sealed record ServiceSpec(
     string Id,
@@ -12,11 +12,4 @@ public sealed record ServiceSpec(
     HealthSpec? Health,
     ServiceType? Type,
     IReadOnlyList<string> DependsOn
-);
-
-public sealed record HealthSpec(
-    string? HttpEndpoint,
-    TimeSpan? Interval,
-    TimeSpan? Timeout,
-    int? Retries
 );

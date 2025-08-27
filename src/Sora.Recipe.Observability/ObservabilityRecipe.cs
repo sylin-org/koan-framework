@@ -1,9 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Http.Resilience;
-using Sora.Recipe;
+using Sora.Recipe.Abstractions;
 
 [assembly: SoraRecipe(typeof(Sora.Recipe.Observability.ObservabilityRecipe))]
 
@@ -29,6 +27,6 @@ public sealed class ObservabilityRecipe : ISoraRecipe
         services.AddHttpClient("sora-observability")
             .AddStandardResilienceHandler(); // .NET 9 built-in resilience handler
 
-    // Future: add OTEL via existing Sora diagnostics extension when available
+        // Future: add OTEL via existing Sora diagnostics extension when available
     }
 }

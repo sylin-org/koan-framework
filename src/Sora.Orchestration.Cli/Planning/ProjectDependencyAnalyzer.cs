@@ -2,6 +2,9 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using Sora.Orchestration.Attributes;
+using Sora.Orchestration.Models;
+using Sora.Orchestration.Planning;
 
 namespace Sora.Orchestration.Cli.Planning;
 
@@ -303,10 +306,10 @@ internal static class ProjectDependencyAnalyzer
         catch { return Array.Empty<string>(); }
     }
 
-    private static void AddKv(Dictionary<string,string?> target, string kv)
+    private static void AddKv(Dictionary<string, string?> target, string kv)
     {
         var idx = kv.IndexOf('=');
-        if (idx > 0) target[kv[..idx]] = kv[(idx+1)..];
+        if (idx > 0) target[kv[..idx]] = kv[(idx + 1)..];
     }
 
     private static bool TryAddFromAssemblyAttributes(Assembly asm, List<ServiceRequirement> reqs)
@@ -323,8 +326,8 @@ internal static class ProjectDependencyAnalyzer
                 var ports = ExtractIntArray(cad.ConstructorArguments.Count > 2 ? cad.ConstructorArguments[2] : default);
                 if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(image)) continue;
 
-                var env = new Dictionary<string,string?>();
-                var appEnv = new Dictionary<string,string?>();
+                var env = new Dictionary<string, string?>();
+                var appEnv = new Dictionary<string, string?>();
                 var volumes = Array.Empty<string>();
                 ServiceType? type = null;
                 string? healthPath = null; int? healthInterval = null; int? healthTimeout = null; int? healthRetries = null;
@@ -375,8 +378,8 @@ internal static class ProjectDependencyAnalyzer
             {
                 if (!type.IsClass || type.IsAbstract) continue;
                 string? sid = null; string? image = null; int[] ports = Array.Empty<int>();
-                var env = new Dictionary<string,string?>();
-                var appEnv = new Dictionary<string,string?>();
+                var env = new Dictionary<string, string?>();
+                var appEnv = new Dictionary<string, string?>();
                 var volumes = new List<string>();
                 string? endpointScheme = null; string? endpointHost = null; string? endpointPattern = null;
                 string? localScheme = null; string? localHost = null; int? localPort = null; string? localPattern = null;

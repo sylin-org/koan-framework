@@ -1,9 +1,9 @@
-﻿using System.Diagnostics;
+﻿using FluentAssertions;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using FluentAssertions;
 using Xunit;
 
 namespace Sora.Orchestration.E2E.Tests;
@@ -64,7 +64,7 @@ public class S5_Orchestration_E2E
         var repoRoot = GetRepoRootFromSource();
         var composeOut = Path.Combine(repoRoot, ".sora", "compose.yml");
         if (File.Exists(composeOut)) File.Delete(composeOut);
-    var json = """
+        var json = """
         {
             "services": [
                 { "id": "mongo", "image": "mongo:7", "ports": ["5081:27017"] },
@@ -89,17 +89,17 @@ public class S5_Orchestration_E2E
         }
 
         // Start detached with a short readiness timeout to avoid long hangs
-    var (codeUp, _, stderrUp) = RunCli(repoRoot, "up --profile Local --timeout 300");
-    // Treat readiness timeout (4) as acceptable: we'll probe ports ourselves below
-    codeUp.Should().BeOneOf(new[] { 0, 4 }, $"up should start stack or time out waiting on readiness. stderr: {stderrUp}");
+        var (codeUp, _, stderrUp) = RunCli(repoRoot, "up --profile Local --timeout 300");
+        // Treat readiness timeout (4) as acceptable: we'll probe ports ourselves below
+        codeUp.Should().BeOneOf(new[] { 0, 4 }, $"up should start stack or time out waiting on readiness. stderr: {stderrUp}");
 
-    // Wait for DBs to be reachable; API may not be part of infra descriptor here
-    await WaitUntil(() => CanConnectTcpAsync("127.0.0.1", 5081, TimeSpan.FromSeconds(2)), TimeSpan.FromSeconds(150)); // Mongo
-    await WaitUntil(() => CanConnectTcpAsync("127.0.0.1", 5082, TimeSpan.FromSeconds(2)), TimeSpan.FromSeconds(150)); // Weaviate
+        // Wait for DBs to be reachable; API may not be part of infra descriptor here
+        await WaitUntil(() => CanConnectTcpAsync("127.0.0.1", 5081, TimeSpan.FromSeconds(2)), TimeSpan.FromSeconds(150)); // Mongo
+        await WaitUntil(() => CanConnectTcpAsync("127.0.0.1", 5082, TimeSpan.FromSeconds(2)), TimeSpan.FromSeconds(150)); // Weaviate
 
-    // Weaviate minimal HTTP check
-    var codeWeaviate = await GetStatusCodeRawWithRetryAsync("127.0.0.1", 5082, "/v1/", attempts: 20);
-    ((int)codeWeaviate).Should().BeInRange(200, 399, "weaviate should respond on /v1/");
+        // Weaviate minimal HTTP check
+        var codeWeaviate = await GetStatusCodeRawWithRetryAsync("127.0.0.1", 5082, "/v1/", attempts: 20);
+        ((int)codeWeaviate).Should().BeInRange(200, 399, "weaviate should respond on /v1/");
 
         // Query status to ensure provider responds
         var (codeStatus, statusOut, _) = RunCli(repoRoot, "status");
@@ -107,7 +107,7 @@ public class S5_Orchestration_E2E
         statusOut.Should().Contain("provider:");
 
         // Tear down and prune data to leave a clean machine
-    var (codeDown, _, stderrDown) = RunCli(repoRoot, "down --prune-data");
+        var (codeDown, _, stderrDown) = RunCli(repoRoot, "down --prune-data");
         codeDown.Should().Be(0, $"down should prune data. stderr: {stderrDown}");
     }
 

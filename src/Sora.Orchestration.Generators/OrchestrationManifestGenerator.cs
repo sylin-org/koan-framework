@@ -1,10 +1,10 @@
-﻿using System;
+﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Sora.Orchestration.Generators;
 
@@ -83,7 +83,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                 var root = tree.GetRoot(context.CancellationToken);
                 foreach (var decl in root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax>())
                 {
-                    var sym = sm.GetDeclaredSymbol(decl, context.CancellationToken) as INamedTypeSymbol;
+                    var sym = sm.GetDeclaredSymbol(decl, context.CancellationToken);
                     if (sym is null || sym.IsAbstract) continue;
 
                     string? sid = null; string? image = null; string? tag = null;
@@ -312,7 +312,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             // Generate a manifest if we have any useful data: services, app metadata, or auth providers
             if (candidates.Count == 0 && authProviders.Count == 0 && app is null) return;
 
-        var json = BuildJson(candidates, app, authProviders);
+            var json = BuildJson(candidates, app, authProviders);
             var src = "namespace Sora.Orchestration { public static class __SoraOrchestrationManifest { public const string Json = \"" + Escape(json) + "\"; } }";
             context.AddSource("__SoraOrchestrationManifest.g.cs", SourceText.From(src, Encoding.UTF8));
         }
@@ -337,24 +337,24 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             if (sb.Length > before && sb[sb.Length - 1] == ',') sb.Length -= 1; // trim trailing comma
             sb.Append("},");
         }
-                if (providers is { Count: > 0 })
-                {
-                        sb.Append("\"authProviders\": [");
-                        for (int i = 0; i < providers.Count; i++)
-                        {
-                                var p = providers[i];
-                                if (i > 0) sb.Append(',');
-                                sb.Append('{')
-                                    .Append(Prop("id", p.Id)).Append(',')
-                                    .Append(Prop("name", p.Name)).Append(',')
-                                    .Append(Prop("protocol", p.Protocol));
-                                if (!string.IsNullOrEmpty(p.Icon)) sb.Append(',').Append(Prop("icon", p.Icon!));
-                                sb.Append('}');
-                        }
-                        sb.Append("],");
-                }
+        if (providers is { Count: > 0 })
+        {
+            sb.Append("\"authProviders\": [");
+            for (int i = 0; i < providers.Count; i++)
+            {
+                var p = providers[i];
+                if (i > 0) sb.Append(',');
+                sb.Append('{')
+                    .Append(Prop("id", p.Id)).Append(',')
+                    .Append(Prop("name", p.Name)).Append(',')
+                    .Append(Prop("protocol", p.Protocol));
+                if (!string.IsNullOrEmpty(p.Icon)) sb.Append(',').Append(Prop("icon", p.Icon!));
+                sb.Append('}');
+            }
+            sb.Append("],");
+        }
 
-                sb.Append("\"services\": [");
+        sb.Append("\"services\": [");
         for (int i = 0; i < items.Count; i++)
         {
             var s = items[i];
@@ -398,12 +398,12 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
     private static string Prop(string name, string[] values) => "\"" + name + "\": [" + string.Join(",", values.Select(v => "\"" + Escape(v) + "\"")) + "]";
     private static string Prop(string name, Dictionary<string, string?> map) => "\"" + name + "\": " + FormatMap(map);
 
-    private static string FormatMap(Dictionary<string,string?> map)
+    private static string FormatMap(Dictionary<string, string?> map)
         => "{" + string.Join(",", map.Select(kv => "\"" + Escape(kv.Key) + "\": \"" + Escape(kv.Value ?? string.Empty) + "\"")) + "}";
 
     private static string Escape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
-    private static void AddKv(Dictionary<string,string?> target, string? kv)
+    private static void AddKv(Dictionary<string, string?> target, string? kv)
     {
         if (string.IsNullOrWhiteSpace(kv)) return;
         var idx = kv.IndexOf('=');
@@ -435,24 +435,24 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         public Dictionary<string, string?> AppEnv { get; }
         public string? Scheme { get; }
         public string? Host { get; }
-    public int? EndpointPort { get; }
-    public string? UriPattern { get; }
-    public string? LocalScheme { get; }
-    public string? LocalHost { get; }
-    public int? LocalPort { get; }
-    public string? LocalPattern { get; }
-    public string? HealthPath { get; }
-    public int? HealthInterval { get; }
-    public int? HealthTimeout { get; }
-    public int? HealthRetries { get; }
-    public int? Type { get; }
-    public string? Name { get; }
-    public string? QualifiedCode { get; }
-    public string? Subtype { get; }
-    public int? Deployment { get; }
-    public string? Description { get; }
-    public string[]? Provides { get; }
-    public string[]? Consumes { get; }
+        public int? EndpointPort { get; }
+        public string? UriPattern { get; }
+        public string? LocalScheme { get; }
+        public string? LocalHost { get; }
+        public int? LocalPort { get; }
+        public string? LocalPattern { get; }
+        public string? HealthPath { get; }
+        public int? HealthInterval { get; }
+        public int? HealthTimeout { get; }
+        public int? HealthRetries { get; }
+        public int? Type { get; }
+        public string? Name { get; }
+        public string? QualifiedCode { get; }
+        public string? Subtype { get; }
+        public int? Deployment { get; }
+        public string? Description { get; }
+        public string[]? Provides { get; }
+        public string[]? Consumes { get; }
 
         public ServiceCandidate(
             string id,

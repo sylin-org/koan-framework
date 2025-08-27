@@ -1,4 +1,6 @@
-namespace Sora.Orchestration;
+using Sora.Orchestration.Models;
+
+namespace Sora.Orchestration.Abstractions;
 
 public interface IArtifactExporter
 {
@@ -7,5 +9,3 @@ public interface IArtifactExporter
     Task GenerateAsync(Plan plan, Profile profile, string outPath, CancellationToken ct = default);
     ExporterCapabilities Capabilities { get; }
 }
-
-public sealed record ExporterCapabilities(bool SecretsRefOnly, bool ReadinessProbes, bool TlsHints);

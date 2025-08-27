@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Sora.Orchestration;
+using Sora.Orchestration.Models;
 using Sora.Orchestration.Renderers.Compose;
 using Xunit;
 

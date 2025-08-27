@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Sora.Orchestration;
+namespace Sora.Orchestration.Attributes;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class DefaultEndpointAttribute : Attribute

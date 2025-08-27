@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Sora.Orchestration.Abstractions;
 
 namespace Sora.Orchestration.Provider.Podman;
 
@@ -162,7 +163,7 @@ public sealed class PodmanProvider : IHostingProvider
         var sbOut = new System.Text.StringBuilder();
         var sbErr = new System.Text.StringBuilder();
         p.OutputDataReceived += (_, e) => { if (e.Data is not null) sbOut.AppendLine(e.Data); };
-        p.ErrorDataReceived +=  (_, e) => { if (e.Data is not null) sbErr.AppendLine(e.Data); };
+        p.ErrorDataReceived += (_, e) => { if (e.Data is not null) sbErr.AppendLine(e.Data); };
         p.Start();
         p.BeginOutputReadLine();
         p.BeginErrorReadLine();

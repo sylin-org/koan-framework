@@ -1,4 +1,4 @@
-﻿namespace Sora.Orchestration;
+﻿namespace Sora.Orchestration.Models;
 
 /// <summary>
 /// Canonical service types for orchestration-aware tooling.

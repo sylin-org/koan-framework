@@ -42,7 +42,7 @@ internal sealed class OllamaAdapter : IAiAdapter
             bodyObj["think"] = thinkFlag;
         var body = bodyObj;
         _logger?.LogDebug("Ollama: POST {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);
-    using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.GeneratePath, body, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull }, ct).ConfigureAwait(false);
+        using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.GeneratePath, body, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull }, ct).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -74,7 +74,7 @@ internal sealed class OllamaAdapter : IAiAdapter
         };
         if (request.Options?.Think is bool thinkFlag2)
             streamBody["think"] = thinkFlag2;
-    var body = JsonSerializer.Serialize(streamBody, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+        var body = JsonSerializer.Serialize(streamBody, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
         using var httpReq = new HttpRequestMessage(HttpMethod.Post, Infrastructure.Constants.Api.GeneratePath)
         { Content = new StringContent(body, Encoding.UTF8, "application/json") };
         _logger?.LogDebug("Ollama: STREAM {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);

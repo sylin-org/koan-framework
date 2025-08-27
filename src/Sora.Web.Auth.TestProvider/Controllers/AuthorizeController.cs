@@ -117,7 +117,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
         var q = System.Web.HttpUtility.ParseQueryString(uri.Query);
         q["code"] = code; if (!string.IsNullOrWhiteSpace(state)) q["state"] = state;
         uri.Query = q.ToString()!;
-  logger.LogDebug("TestProvider authorize: issuing code and redirecting to {Redirect}", uri.ToString());
-  return Redirect(uri.ToString());
+        logger.LogDebug("TestProvider authorize: issuing code and redirecting to {Redirect}", uri.ToString());
+        return Redirect(uri.ToString());
     }
 }
