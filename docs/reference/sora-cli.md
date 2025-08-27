@@ -56,6 +56,8 @@ Sora
 # - Providers (Docker/Podman availability)
 # - Project and key files (compose, csproj)
 # - Services (planned ports/health)
+# - App port selection with source (flag | launch-alloc | launch-app | code-default | deterministic)
+# - Networks (external + internal); adapters on internal; app on both
 # - Compose services (discovered from compose.yml)
 # - Dependencies (database, vector, AI, auth)
 # - Suggested one-liners
@@ -71,6 +73,11 @@ Inspect JSON (contract — selected fields)
 - providers: [{ name, ok, version }]
 - project: { name, path, files: [] }
 - services: [{ id, image, ports: ["HOST:CONTAINER"], health: true|false }]
+- app: {
+    ids: ["api", ...],
+    ports: [{ id: "api", host: 5084, container: 8080, source: "flag|launch-alloc|launch-app|code-default|deterministic|unknown" }],
+    networks: { external: "sora_external", internal: "sora_internal" }
+  }
 - composeServices: ["api", "db", ...]
 - dependencies: { database?: "mongodb|postgres|redis|sqlite|none", vector?: "weaviate|qdrant|pinecone|none", ai?: "ollama|openai|none", auth?: "enabled|disabled" }
 
@@ -86,11 +93,21 @@ Sora doctor --json
 Export Compose (v2)
 ```pwsh
 Sora export compose
+# Options:
+#   --profile Local|CI|Staging|Prod
+#   --base-port <n>
+#   --port <n>                 # force app public port (overrides persisted/default)
+#   --expose-internals         # publish internal services on host ports too
+#   --no-launch-manifest       # don’t read/write .sora/manifest.json
 ```
 
 Start app (Local profile)
 ```pwsh
 Sora up --profile Local
+# Optional overrides
+#   --port 5084               # force app public port for this run
+#   --expose-internals        # publish non-app services on host
+#   --no-launch-manifest      # don’t persist/read allocations for this command
 ```
 
 If startup is pulling large images on first run, consider raising the timeout:
@@ -129,6 +146,27 @@ JSON output (where supported)
 Sora doctor --json
 Sora inspect --json
 ```
+
+## Launch Manifest (.sora/manifest.json)
+
+Sora persists safe, dev-time choices (like the app’s public port) in `.sora/manifest.json`.
+- Purpose: Keep your chosen app port stable across runs without hardcoding it in code.
+- Precedence for app public port:
+  1) CLI `--port <n>`
+  2) LaunchManifest.Allocations[serviceId]
+  3) LaunchManifest.App.AssignedPublicPort
+  4) App default (from code or attribute)
+  5) Deterministic fallback (seeded into 30000–50000)
+- Source is surfaced in Context Card, Status, Up (explain), and Inspect (human + JSON).
+- Backup-on-change: updates create a timestamped backup under `.sora/`.
+- Opt out anytime with `--no-launch-manifest` (applies to export/up/status/inspect).
+
+## Networks and exposure
+
+- Two networks are always defined: `sora_internal` and `sora_external`.
+- Adapters (e.g., databases, vector, AI providers) attach to the internal network only by default.
+- The app attaches to both networks; ports are published on the host only when the selected host port > 0.
+- Use `--expose-internals` to also publish internal services on host ports during local runs.
 
 ## Deeper walkthrough: start S5.Recs locally
 

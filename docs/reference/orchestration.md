@@ -21,14 +21,14 @@ Set SORA_ENV to choose profile: local (default), ci, staging, prod.
 
 ## CLI usage
 
-- sora up [--engine docker|podman] [--profile local|ci|staging|prod] [--timeout <seconds>] [--base-port <n>] [--conflicts warn|fail] [-v|-vv|--trace|--quiet] [--explain|--dry-run]
+- sora up [--engine docker|podman] [--profile local|ci|staging|prod] [--timeout <seconds>] [--base-port <n>] [--port <n>] [--expose-internals] [--no-launch-manifest] [--conflicts warn|fail] [-v|-vv|--trace|--quiet] [--explain|--dry-run]
 - sora down [--engine docker|podman] [--volumes|--prune-data]
-- sora status [--engine docker|podman] [--json] [--profile local|ci|staging|prod] [--base-port <n>]
+- sora status [--engine docker|podman] [--json] [--profile local|ci|staging|prod] [--base-port <n>] [--no-launch-manifest]
 - sora logs [--engine docker|podman] [--service <name>] [--since 10m] [--follow] [--tail <n>]
 - sora doctor [--engine docker|podman] [--json]
-- sora export compose [--profile local|ci|staging|prod]  # Helm/ACA vNext
+- sora export compose [--profile local|ci|staging|prod] [--base-port <n>] [--port <n>] [--expose-internals] [--no-launch-manifest]  # Helm/ACA vNext
 
-Notes
+ Notes
 - Writes `.sora/compose.yml` by default; safe for Git ignore.
 - Profile resolution precedence: `--profile` > `SORA_ENV` environment variable > `local`.
 - Heavy AI (e.g., Ollama) is opt-in via profile/flag/config; SQLite is not containerized.
@@ -36,6 +36,9 @@ Notes
 - Ports auto-avoid conflicts in non-prod; `--base-port` offsets host ports by a fixed amount. `sora status` prints endpoint hints and flags conflicting ports when detected.
  - Port conflicts policy: `prod` always fails fast on conflicts; non-prod defaults to warn but can be forced to fail with `--conflicts fail`.
  - Auto-avoid tuning: set `SORA_PORT_PROBE_MAX` to control the max number of upward port probes (default: 200).
+ - App public port precedence: `--port` > LaunchManifest.Allocations[serviceId] > LaunchManifest.App.AssignedPublicPort > app default (attribute/code) > deterministic fallback (30000–50000). The chosen source is surfaced in Context Card, Up (explain), Status, and Inspect.
+ - Launch Manifest: `.sora/manifest.json` persists dev-time choices with backup-on-change. Disable reads/writes with `--no-launch-manifest`.
+ - Networks: compose defines `sora_internal` and `sora_external`. Adapters run on internal only; the app joins both. Ports are published only when host > 0. Use `--expose-internals` to publish adapter ports too.
 
 ### Readiness semantics and timeouts
 
