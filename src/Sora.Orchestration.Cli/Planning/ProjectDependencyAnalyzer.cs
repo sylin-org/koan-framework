@@ -19,7 +19,17 @@ internal static class ProjectDependencyAnalyzer
             // Build a MetadataLoadContext over the app/bin + repo src outputs + core libs
             var coreDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
             var appBin = FindAppBinDir(cwd);
-            var repoRoot = Directory.GetParent(cwd)?.Parent?.FullName;
+            // Try to locate repo root by walking up until we find a 'src' folder
+            string? repoRoot = null;
+            var probe = new DirectoryInfo(cwd);
+            for (int i = 0; i < 5 && probe is not null; i++, probe = probe.Parent)
+            {
+                if (probe.GetDirectories("src", SearchOption.TopDirectoryOnly).Any())
+                {
+                    repoRoot = probe.FullName;
+                    break;
+                }
+            }
             var probePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             probePaths.Add(coreDir);
             if (appBin is { }) probePaths.Add(appBin);
@@ -28,8 +38,10 @@ internal static class ProjectDependencyAnalyzer
                 var srcDir = Path.Combine(repoRoot!, "src");
                 if (Directory.Exists(srcDir))
                 {
+                    // include both Debug and Release bin tfm directories
                     foreach (var d in Directory.EnumerateDirectories(srcDir, "*", SearchOption.AllDirectories)
-                        .Where(p => p.Contains(Path.Combine("bin", "Debug"), StringComparison.OrdinalIgnoreCase)))
+                        .Where(p => p.IndexOf(Path.Combine("bin", "Debug"), StringComparison.OrdinalIgnoreCase) >= 0
+                                 || p.IndexOf(Path.Combine("bin", "Release"), StringComparison.OrdinalIgnoreCase) >= 0))
                     {
                         probePaths.Add(d);
                     }
@@ -37,7 +49,7 @@ internal static class ProjectDependencyAnalyzer
             }
 
             var dlls = probePaths.Where(Directory.Exists)
-                .SelectMany(p => Directory.EnumerateFiles(p, "*.dll", SearchOption.TopDirectoryOnly))
+                .SelectMany(p => Directory.EnumerateFiles(p, "*.dll", SearchOption.AllDirectories))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 

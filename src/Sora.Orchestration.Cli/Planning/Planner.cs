@@ -14,33 +14,18 @@ internal static class Planner
         }
     // 2) Discovery-driven draft (CLI scans assemblies for manifests)
         var draft = ProjectDependencyAnalyzer.DiscoverDraft(profile);
-        if (draft is not null && draft.Services.Count > 0)
+        if (draft is not null)
         {
             var overrides = Overrides.Load();
             if (overrides is not null)
                 draft = Overrides.Apply(draft, overrides);
             return FromDraft(profile, draft);
         }
-        // Fallback to demo plan
-        return Demo(profile);
+        // No back-compat fallback: return an empty plan when nothing discovered
+        return new Plan(profile, new List<ServiceSpec>());
     }
 
-    static Plan Demo(Profile profile)
-        => new(
-            profile,
-            new[]
-            {
-                new ServiceSpec(
-                    Id: "db",
-                    Image: "postgres:16",
-                    Env: new Dictionary<string,string?>{ ["POSTGRES_PASSWORD"] = "pw" },
-                    Ports: new List<(int,int)>{ (5432,5432) },
-                    Volumes: new List<(string,string,bool)>{ ("pgdata", "/var/lib/postgresql/data", true) },
-                    Health: new HealthSpec("http://localhost:5432/", TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(1), 5),
-                    DependsOn: Array.Empty<string>()
-                )
-            }
-        );
+    // Demo plan removed (no back-compat). If nothing is discovered, Build() returns an empty plan.
 
     public static IReadOnlyList<int> FindConflictingPorts(IEnumerable<int> ports)
     {

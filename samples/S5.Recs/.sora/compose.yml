@@ -1,16 +1,52 @@
 services:
-  db:
+  api:
+    image: "sora-s5.recs:dev"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:8080"
+      Sora__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
+      Sora__Data__Mongo__Database: "sora"
+      Sora__Data__Postgres__ConnectionString: "postgres://postgres:5432"
+      Sora__Data__Postgres__Database: "sora"
+      Sora__Data__Redis__Endpoint: "redis://redis:6379"
+      Sora__Data__SqlServer__ConnectionString: "mssql://mssql:1433"
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongo:
+        condition: service_started
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      mssql:
+        condition: service_started
+  mongo:
+    image: "mongo:7"
+    ports:
+      - "27018:27017"
+    volumes:
+      - ./Data/mongo:/data/db
+  postgres:
     image: "postgres:16"
     environment:
-      POSTGRES_PASSWORD: "pw"
+      POSTGRES_USER: "postgres"
+      POSTGRES_DB: "sora"
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:5432/ || exit 1"]
-      interval: 2s
-      timeout: 1s
-      retries: 5
-volumes:
-  pgdata: {}
+      - ./Data/postgres:/var/lib/postgresql/data
+  redis:
+    image: "redis:7"
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./Data/redis:/data
+  mssql:
+    image: "mcr.microsoft.com/mssql/server:2022-latest"
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    volumes:
+      - ./Data/mssql:/var/opt/mssql
