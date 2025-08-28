@@ -26,7 +26,6 @@ var (cmd, rest) = args.Length == 0
 
 // Discover adapter-declared default endpoints and register a scheme resolver
 RegisterSchemeResolver();
-
 return cmd switch
 {
     "export" => await ExportAsync(rest),
@@ -117,13 +116,8 @@ static string EndpointSchemeFallback(string serviceIdOrImage, int containerPort)
 {
     // Duplicate minimal behavior: return empty to signal fallback; but EndpointFormatter expects a scheme.
     // We replicate the same heuristic here to keep deterministic behavior when no attribute match is found.
-    var s = (serviceIdOrImage ?? string.Empty).ToLowerInvariant();
-    if (s.Contains("postgres")) return "postgres";
-    if (s.Contains("redis")) return "redis";
-    if (s.Contains("mongo")) return "mongodb";
-    if (s.Contains("elastic") || s.Contains("opensearch")) return containerPort == 443 ? "https" : "http";
-    if (containerPort == 443) return "https";
-    return containerPort is 80 or 8080 or 3000 or 5000 or 5050 or 4200 or 9200 ? "http" : "tcp";
+    // Heuristics removed (ARCH-0049). Without a resolver, default to tcp.
+    return "tcp";
 }
 
 static async Task<int> ExportAsync(string[] args)
@@ -244,7 +238,7 @@ static async Task<int> UpAsync(string[] args)
         Console.WriteLine($"services: {plan.Services.Count}");
         Console.WriteLine($"profile: {profile} | timeout: {timeout.TotalSeconds:n0}s{(basePort is { } ? $" | base-port: {basePort}" : string.Empty)}{(conflictsMode is { } ? $" | conflicts: {conflictsMode}" : string.Empty)}");
         Console.WriteLine($"networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
-        var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
+        var appSvc = plan.Services.FirstOrDefault(s => s.Type == ServiceType.App);
         if (appSvc is not null && appSvc.Ports.Count > 0)
         {
             var appPorts = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
@@ -291,11 +285,9 @@ static async Task<int> UpAsync(string[] args)
         return 4;
     }
 }
-
 static async Task<int> DownAsync(string[] args)
 {
     var outPath = FindArg(args, "--file") ?? Constants.DefaultComposePath;
-    // Support --volumes (primary) and --prune-data (alias)
     var removeVolumes = HasFlag(args, "--volumes") || HasFlag(args, "--prune-data");
     var engineArg = FindArg(args, "--engine");
     var provider = await SelectProviderAsync(engineArg);
@@ -350,7 +342,7 @@ static async Task<int> StatusAsync(string[] args)
         if (plan.Services.Count > 0)
         {
             Console.WriteLine($"networks: internal={OrchestrationConstants.InternalNetwork}, external={OrchestrationConstants.ExternalNetwork}");
-            var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
+            var appSvc = plan.Services.FirstOrDefault(s => s.Type == ServiceType.App);
             if (appSvc is not null && appSvc.Ports.Count > 0)
             {
                 var appPorts = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
@@ -445,6 +437,11 @@ static async Task<int> InspectAsync(string[] args)
     // Dependencies (declarative, no heuristics): derive from plan ServiceType
     var deps = ComputeDependenciesFromPlan(plan);
 
+    // Declared services via generated manifest (preferred over assembly reference scan)
+    var referenced = Sora.Orchestration.Cli.Planning.ProjectDependencyAnalyzer.DiscoverServicesFromManifest();
+    var manifestIdDups = Sora.Orchestration.Cli.Planning.ProjectDependencyAnalyzer.ManifestIdDuplicates;
+    var manifestDetails = Sora.Orchestration.Cli.Planning.ProjectDependencyAnalyzer.DiscoverManifestServiceDetails();
+
     // Discover configured auth providers from appsettings.* (non-inferential)
     var authProviders = DiscoverAuthProviders(cwd);
 
@@ -468,37 +465,76 @@ static async Task<int> InspectAsync(string[] args)
         catch { }
     }
 
-    // App summary (ids/ports) for JSON payload
-    var appSvcForJson = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
+    // App summary (ids/ports) for JSON payload + manifest-derived metadata (fallback by Kind/Type=App)
+    var appSvcForJson = plan.Services.FirstOrDefault(s => s.Type == ServiceType.App);
     var appIds = appSvcForJson is not null ? new[] { appSvcForJson.Id } : Array.Empty<string>();
     var appPorts = appSvcForJson is not null
         ? appSvcForJson.Ports.Select(p => new { host = p.Host, container = p.Container }).ToArray()
         : Array.Empty<object>();
+    var appMdForJson = appSvcForJson is null
+        ? null
+        : (manifestDetails?.FirstOrDefault(m => m.Id.Equals(appSvcForJson.Id, StringComparison.OrdinalIgnoreCase))
+           ?? manifestDetails?.FirstOrDefault(m => (m.Kind is int k && k == 0) || (m.Type is not null && m.Type == ServiceType.App)));
 
     if (json)
     {
         var payload = new
         {
             detected = true,
-            cwd,
             project = new { name = projectName, profile = profile.ToString(), compose = Constants.DefaultComposePath },
             networks = new { internalName = OrchestrationConstants.InternalNetwork, externalName = OrchestrationConstants.ExternalNetwork },
-            app = new { ids = appIds, ports = appPorts },
-            providers = availability,
-            services = plan.Services.Select(s => new
+            app = new
             {
-                id = s.Id,
-                image = s.Image,
-                ports = s.Ports.Select(p => new { host = p.Host, container = p.Container }),
-                health = s.Health is not null,
-                type = s.Type switch
+                ids = appIds,
+                ports = appPorts,
+                manifestId = appMdForJson?.Id,
+                name = appMdForJson?.Name,
+                capabilities = appMdForJson?.Capabilities
+            },
+            providers = availability,
+            duplicates = manifestIdDups,
+            services = plan.Services.Select(s =>
+            {
+                var md = manifestDetails?.FirstOrDefault(m => m.Id.Equals(s.Id, StringComparison.OrdinalIgnoreCase));
+                // If app id differs between plan and manifest, provide Kind/Type=App fallback for app service metadata
+                if (md is null && s.Type == ServiceType.App)
                 {
-                    ServiceType.App => "app",
-                    ServiceType.Database => "database",
-                    ServiceType.Vector => "vector",
-                    ServiceType.Ai => "ai",
-                    _ => "service"
+                    md = manifestDetails?.FirstOrDefault(m => (m.Kind is int k && k == 0) || (m.Type is not null && m.Type == ServiceType.App));
                 }
+                return new
+                {
+                    id = s.Id,
+                    image = s.Image,
+                    ports = s.Ports.Select(p => new { host = p.Host, container = p.Container }),
+                    health = s.Health is not null,
+                    type = s.Type switch
+                    {
+                        ServiceType.App => "app",
+                        ServiceType.Database => "database",
+                        ServiceType.Vector => "vector",
+                        ServiceType.Ai => "ai",
+                        _ => "service"
+                    },
+                    name = md?.Name,
+                    // Unified manifest fields (when present on referenced list)
+                    kind = referenced?.FirstOrDefault(r => r.Id.Equals(s.Id, StringComparison.OrdinalIgnoreCase)).Type switch
+                    {
+                        ServiceType.App => "App",
+                        ServiceType.Database => "Database",
+                        ServiceType.Vector => "Vector",
+                        ServiceType.Ai => "Ai",
+                        ServiceType.Service => "Other",
+                        _ => (string?)null
+                    },
+                    qualifiedCode = md?.QualifiedCode,
+                    containerImage = md?.ContainerImage,
+                    defaultTag = md?.DefaultTag,
+                    defaultPorts = md?.DefaultPorts,
+                    healthEndpoint = md?.HealthEndpoint,
+                    provides = md?.Provides,
+                    consumes = md?.Consumes,
+                    capabilities = md?.Capabilities ?? (md?.Provides is { Count: > 0 } ? md.Provides.ToDictionary(k => k, v => (string?)string.Empty) : null)
+                };
             }),
             auth = authProviders is null && authCapabilities is null ? null : new
             {
@@ -508,7 +544,20 @@ static async Task<int> InspectAsync(string[] args)
             },
             files,
             conflicts,
-            dependencies = deps
+            dependencies = deps,
+            referenced = referenced?.Select(r => new
+            {
+                id = r.Id,
+                name = r.Name,
+                type = r.Type switch
+                {
+                    ServiceType.App => "app",
+                    ServiceType.Database => "database",
+                    ServiceType.Vector => "vector",
+                    ServiceType.Ai => "ai",
+                    _ => r.Type?.ToString()?.ToLowerInvariant() ?? "service"
+                }
+            })
         };
         Console.WriteLine(JsonSerializer.Serialize(payload));
         return 0;
@@ -533,22 +582,57 @@ static async Task<int> InspectAsync(string[] args)
     Console.WriteLine();
 
     // Application section
-    var appSvc = plan.Services.FirstOrDefault(s => s.Env.ContainsKey("ASPNETCORE_URLS") || s.Id.Equals("api", StringComparison.OrdinalIgnoreCase));
+    var appSvc = plan.Services.FirstOrDefault(s => s.Type == ServiceType.App);
     if (appSvc is not null && appSvc.Ports.Count > 0)
     {
         var appPortsText = string.Join(", ", appSvc.Ports.Select(p => $"{p.Host}:{p.Container}"));
         var src = Sora.Orchestration.Cli.Planning.Planner.LastPortAssignments.TryGetValue(appSvc.Id, out var a)
             ? a.Source
             : "unknown";
+        // Resolve manifest details for DX-meaningful extras
+        // Match by service id first; if ids differ (e.g., manifest shortCode vs. plan 'api'), fall back to Kind/Type == App
+        var appMd = manifestDetails?.FirstOrDefault(m => m.Id.Equals(appSvc.Id, StringComparison.OrdinalIgnoreCase))
+               ?? manifestDetails?.FirstOrDefault(m => (m.Kind is int k && k == 0) || (m.Type is not null && m.Type == ServiceType.App));
         Console.WriteLine("APPLICATION   PORT          SOURCE        NETWORKS");
         Console.WriteLine($"{appSvc.Id,-13} {appPortsText,-13} {src,-13} {OrchestrationConstants.InternalNetwork} + {OrchestrationConstants.ExternalNetwork}");
+
+        // Optional: show friendly name and qualified code if present
+        if (!string.IsNullOrWhiteSpace(appMd?.Name) && !appMd!.Name!.Equals(appSvc.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"{"",-13} {"NAME",-13} {appMd!.Name}");
+        }
+        if (!string.IsNullOrWhiteSpace(appMd?.QualifiedCode))
+        {
+            Console.WriteLine($"{"",-13} {"CODE",-13} {appMd!.QualifiedCode}");
+        }
+
+        // Capabilities: render compact list key[=value], capped with +N more for readability
+        var appCaps = appMd?.Capabilities is { Count: > 0 } ? appMd.Capabilities : (appMd?.Provides is { Count: > 0 } ? appMd.Provides.ToDictionary(k => k, v => (string?)string.Empty) : null);
+        if (appCaps is { Count: > 0 })
+        {
+            IEnumerable<string> Items()
+            {
+                foreach (var kv in appCaps!)
+                {
+                    var key = kv.Key;
+                    var val = string.IsNullOrWhiteSpace(kv.Value) ? null : kv.Value;
+                    yield return val is null ? key : ($"{key}={val}");
+                }
+            }
+            var list = Items().ToList();
+            const int max = 6;
+            var shown = list.Take(max).ToList();
+            var suffix = list.Count > max ? $"  +{list.Count - max} more" : string.Empty;
+            Console.WriteLine($"{"",-13} {"CAPABILITIES",-13} {string.Join(", ", shown)}{suffix}");
+        }
         Console.WriteLine();
     }
 
     // Services section
-    Console.WriteLine("SERVICES      PORTS         HEALTH    TYPE");
+    Console.WriteLine("SERVICES      PORTS         HEALTH    TYPE        IMAGE:TAG");
     foreach (var s in plan.Services)
     {
+        var md = manifestDetails?.FirstOrDefault(m => m.Id.Equals(s.Id, StringComparison.OrdinalIgnoreCase));
         var ports = s.Ports is null || s.Ports.Count == 0 ? "internal" :
                     s.Ports.Any(p => p.Host > 0) ? string.Join(", ", s.Ports.Where(p => p.Host > 0).Select(p => p.Host.ToString())) : "internal";
         var health = s.Health is null ? "-" : "✓";
@@ -560,7 +644,32 @@ static async Task<int> InspectAsync(string[] args)
             ServiceType.Ai => "ai",
             _ => "service"
         };
-        Console.WriteLine($"{s.Id,-13} {ports,-13} {health,-9} {type}");
+        var imageTag = s.Image ?? ((md?.ContainerImage, md?.DefaultTag) is (string img, string tag) && !string.IsNullOrWhiteSpace(img)
+            ? (string.IsNullOrWhiteSpace(tag) ? img : (img + ":" + tag)) : string.Empty);
+        Console.WriteLine($"{s.Id,-13} {ports,-13} {health,-9} {type,-11} {imageTag}");
+        // Optional detail lines: show NAME and CAPABILITIES when present
+        if (!string.IsNullOrWhiteSpace(md?.Name) && !md!.Name!.Equals(s.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"{"",-13} {"NAME",-13} {md!.Name}");
+        }
+        var svcCaps = md?.Capabilities is { Count: > 0 } ? md.Capabilities : (md?.Provides is { Count: > 0 } ? md.Provides.ToDictionary(k => k, v => (string?)string.Empty) : null);
+        if (svcCaps is { Count: > 0 })
+        {
+            IEnumerable<string> CapItems()
+            {
+                foreach (var kv in svcCaps!)
+                {
+                    var key = kv.Key;
+                    var val = string.IsNullOrWhiteSpace(kv.Value) ? null : kv.Value;
+                    yield return val is null ? key : ($"{key}={val}");
+                }
+            }
+            var caps = CapItems().ToList();
+            const int maxCaps = 6;
+            var shownCaps = caps.Take(maxCaps).ToList();
+            var suffixCaps = caps.Count > maxCaps ? $"  +{caps.Count - maxCaps} more" : string.Empty;
+            Console.WriteLine($"{"",-13} {"CAPABILITIES",-13} {string.Join(", ", shownCaps)}{suffixCaps}");
+        }
     }
     Console.WriteLine();
 
@@ -600,10 +709,40 @@ static async Task<int> InspectAsync(string[] args)
             Console.WriteLine($"DEPENDENCIES  {string.Join(" | ", depItems)}");
         }
     }
+    if (manifestIdDups is { Count: > 0 })
+    {
+        Console.WriteLine();
+        Console.WriteLine("DUPLICATE IDS");
+        Console.WriteLine(string.Join(", ", manifestIdDups));
+    }
 
     if (conflicts.Count > 0)
     {
         Console.WriteLine($"CONFLICTS     {string.Join(", ", conflicts)}");
+    }
+    if (referenced is { Count: > 0 })
+    {
+        Console.WriteLine();
+        Console.WriteLine("DECLARED SERVICES (from manifest)");
+        foreach (var s in referenced)
+        {
+            var type = s.Type switch
+            {
+                ServiceType.App => "app",
+                ServiceType.Database => "database",
+                ServiceType.Vector => "vector",
+                ServiceType.Ai => "ai",
+                _ => s.Type?.ToString()?.ToLowerInvariant() ?? "service"
+            };
+            var md = manifestDetails?.FirstOrDefault(m => m.Id.Equals(s.Id, StringComparison.OrdinalIgnoreCase));
+            var name = string.IsNullOrWhiteSpace(s.Name) ? (md?.Name ?? s.Id) : s.Name!;
+            var extra = new List<string>();
+            if (!string.IsNullOrWhiteSpace(md?.QualifiedCode)) extra.Add(md!.QualifiedCode!);
+            if (!string.IsNullOrWhiteSpace(md?.ContainerImage)) extra.Add(md!.ContainerImage + (string.IsNullOrWhiteSpace(md!.DefaultTag) ? string.Empty : ":" + md!.DefaultTag));
+            if (md?.DefaultPorts is { Length: > 0 }) extra.Add("ports:" + string.Join(',', md!.DefaultPorts!));
+            if (!string.IsNullOrWhiteSpace(md?.HealthEndpoint)) extra.Add("health:" + md!.HealthEndpoint);
+            Console.WriteLine($"{s.Id}  ({type}) - {name}{(extra.Count > 0 ? " | " + string.Join(" | ", extra) : string.Empty)}");
+        }
     }
     Console.WriteLine();
 

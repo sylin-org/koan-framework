@@ -158,7 +158,8 @@ Schema (partial):
 		"mongo": {
 			"Image": "mongo:7",
 			"Env": { "MONGO_INITDB_ROOT_USERNAME": "root" },
-			"Volumes": [ "./Data/mongo:/data/db" ]
+			"Volumes": [ "./Data/mongo:/data/db" ],
+			"Ports": [ 27018 ]
 		}
 	}
 }
@@ -166,7 +167,7 @@ Schema (partial):
 
 Behavior:
 - Mode: when set to Local, token substitution in AppEnv uses Local endpoint defaults (scheme/host/port) if provided by the adapter; otherwise falls back to Container values.
-- Services: per-service `Env` is merged (overrides existing keys), `Volumes` are appended, and `Image` replaces the discovered image/tag when provided.
+- Services: per-service `Env` is merged (overrides existing keys), `Volumes` are appended, and `Image` replaces the discovered image/tag when provided. When `Ports` is present and non-empty, it replaces the service's container ports (e.g., `[27018]` → host mapping will follow exporter/profile rules).
 - Overrides apply after discovery and before rendering/export.
 
 Examples:

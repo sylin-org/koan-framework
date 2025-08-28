@@ -30,8 +30,8 @@ public sealed class SoraServiceAttribute : Attribute
     public int[]? DefaultPorts { get; init; }
     public string? HealthEndpoint { get; init; }
 
-    // Free-form capability bag; prefer known keys per Kind.
-    public (string Key, string Value)[]? Capabilities { get; init; }
+    // Free-form capability bag; prefer known keys per Kind. Use "key=value" entries.
+    public string[]? Capabilities { get; init; }
     public string[]? Provides { get; init; }
     public string[]? Consumes { get; init; }
 

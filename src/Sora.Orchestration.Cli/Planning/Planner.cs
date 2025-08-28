@@ -19,8 +19,8 @@ internal static class Planner
         {
             return fromFile!;
         }
-        // 2) Discovery-driven draft (CLI scans assemblies for manifests)
-        var draft = ProjectDependencyAnalyzer.DiscoverDraft(profile);
+    // 2) Discovery-driven draft (manifest-only)
+    var draft = ProjectDependencyAnalyzer.DiscoverDraft(profile);
         if (draft is not null)
         {
             var overrides = Overrides.Load();
@@ -129,10 +129,10 @@ internal static class Planner
 
         var lm = LaunchManifest.Load(cwd);
 
-        // Select primary app(s): heuristic — service with ASPNETCORE_URLS or id=="api"
+        // Select primary app(s): declared kind only (Type == App); no env/id heuristics
         var appCandidates = services
             .Select((s, idx) => (s, idx))
-            .Where(t => t.s.Env.ContainsKey("ASPNETCORE_URLS") || string.Equals(t.s.Id, "api", StringComparison.OrdinalIgnoreCase))
+            .Where(t => t.s.Type == ServiceType.App)
             .ToList();
         if (appCandidates.Count == 0)
         {
@@ -344,6 +344,8 @@ internal static class Planner
             public string? Image { get; set; }
             public Dictionary<string, string?>? Env { get; set; }
             public List<string>? Volumes { get; set; }
+            // Optional container port overrides; replaces ServiceRequirement.ContainerPorts when provided
+            public List<int>? Ports { get; set; }
         }
 
         public static Overrides? Load()
@@ -382,11 +384,14 @@ internal static class Planner
                 {
                     foreach (var v in svc.Volumes) if (!string.IsNullOrWhiteSpace(v)) volumes.Add(v);
                 }
+                var containerPorts = (svc is not null && svc.Ports is not null && svc.Ports.Count > 0)
+                    ? (IReadOnlyList<int>)svc.Ports
+                    : s.ContainerPorts;
                 list.Add(new ServiceRequirement(
                     id,
                     img,
                     env,
-                    s.ContainerPorts,
+                    containerPorts,
                     volumes,
                     s.AppEnv,
                     s.Type,

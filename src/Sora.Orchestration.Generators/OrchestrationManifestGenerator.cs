@@ -17,9 +17,67 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
     private const string AppEnvDefaultsAttr = "Sora.Orchestration.Abstractions.Attributes.AppEnvDefaultsAttribute";
     private const string HealthDefaultsAttr = "Sora.Orchestration.Abstractions.Attributes.HealthEndpointDefaultsAttribute";
     private const string OrchestrationServiceManifestAttr = "Sora.Orchestration.OrchestrationServiceManifestAttribute";
-    private const string SoraServiceAttr = "Sora.Orchestration.SoraServiceAttribute";
+    // Correct FQN for the unified service attribute
+    private const string SoraServiceAttr = "Sora.Orchestration.Attributes.SoraServiceAttribute";
 
     public void Initialize(GeneratorInitializationContext context) { }
+
+    // Diagnostics (ARCH-0049 enforcement)
+    private static readonly DiagnosticDescriptor DxSvcOnClassOnly = new(
+        id: "SORA0049A",
+        title: "[SoraService] must be applied to a class that implements IServiceAdapter",
+        messageFormat: "Type '{{0}}' must implement Sora.Orchestration.Abstractions.IServiceAdapter to use [SoraService]",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor DxShortCodeInvalid = new(
+        id: "SORA0049B",
+        title: "Invalid shortCode for [SoraService]",
+        messageFormat: "shortCode '{{0}}' must be 2-32 chars, lowercase [a-z0-9-], start with a letter, and not end with '-'",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor DxShortCodeReserved = new(
+        id: "SORA0049C",
+        title: "Reserved shortCode",
+        messageFormat: "shortCode '{0}' is reserved; choose a different identifier",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor DxQualifiedCodeFormat = new(
+        id: "SORA0049D",
+        title: "qualifiedCode should be dot-separated lowercase identifiers",
+        messageFormat: "qualifiedCode '{{0}}' should look like 'sora.db.relational.postgres'",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor DxContainerImageMissing = new(
+        id: "SORA0049E",
+        title: "ContainerImage should be provided when DeploymentKind=Container",
+        messageFormat: "[SoraService shortCode={0}] declares DeploymentKind=Container but no container image was provided (ContainerDefaults or ContainerImage)",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor DxLatestTag = new(
+        id: "SORA0049F",
+        title: "Avoid using 'latest' as default tag",
+        messageFormat: "Service '{{0}}' uses 'latest' tag; prefer a stable version for reproducible dev",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor DxShortCodeDuplicate = new(
+        id: "SORA0049G",
+        title: "Duplicate shortCode within assembly",
+        messageFormat: "shortCode '{0}' is declared more than once in this compilation",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 
     public void Execute(GeneratorExecutionContext context)
     {
@@ -77,6 +135,8 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             }
             catch { }
             AppCandidate? app = null;
+            bool appServiceEmitted = false;
+            var seenShortCodes = new HashSet<string>(StringComparer.Ordinal);
             foreach (var tree in context.Compilation.SyntaxTrees)
             {
                 var sm = context.Compilation.GetSemanticModel(tree, ignoreAccessibility: true);
@@ -92,21 +152,26 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                     var appEnv = new Dictionary<string, string?>();
                     var volumes = new List<string>();
                     string? scheme = null; string? host = null; int? endpointPort = null; string? uriPattern = null;
-                    int? declaredType = null;
+                    int? declaredType = null; // legacy ServiceType
+                    int? svcKind = null;      // ARCH-0049 ServiceKind
                     string? localScheme = null; string? localHost = null; int? localPort = null; string? localPattern = null;
                     string? healthPath = null; int? healthInterval = null; int? healthTimeout = null; int? healthRetries = null;
+                    string? containerImageOverride = null; string? defaultTagOverride = null; int? versionOverride = null;
                     // Unified metadata (optional)
                     string? svcName = null; string? qualifiedCode = null; string? subtype = null; int? deployment = null; string? svcDescription = null;
                     var provides = new List<string>(); var consumes = new List<string>();
+                    var capabilities = new Dictionary<string, string?>(StringComparer.Ordinal);
 
                     // Capture app metadata when class implements ISoraManifest or has SoraAppAttribute
                     try
                     {
                         var implementsManifest = sym.AllInterfaces.Any(i => i.ToDisplayString() == "Sora.Orchestration.ISoraManifest");
-                        var appAttr = sym.GetAttributes().FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == "Sora.Orchestration.SoraAppAttribute");
+                        // Correct namespace for SoraAppAttribute lives under Sora.Orchestration.Attributes
+                        var appAttr = sym.GetAttributes().FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == "Sora.Orchestration.Attributes.SoraAppAttribute");
                         if (implementsManifest || appAttr is not null)
                         {
                             string? code = null, name = null, description = null; int? port = null;
+                            var appCaps = new Dictionary<string, string?>(StringComparer.Ordinal);
                             if (appAttr is not null)
                             {
                                 foreach (var na in appAttr.NamedArguments)
@@ -117,10 +182,46 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                         case "AppCode": code = na.Value.Value?.ToString(); break;
                                         case "AppName": name = na.Value.Value?.ToString(); break;
                                         case "Description": svcDescription = na.Value.Value?.ToString(); break;
+                                        case "Capabilities":
+                                            if (na.Value.Values is { Length: > 0 })
+                                            {
+                                                foreach (var v in na.Value.Values)
+                                                {
+                                                    var kv = v.Value?.ToString() ?? string.Empty;
+                                                    var idx = kv.IndexOf('=');
+                                                    if (idx > 0)
+                                                    {
+                                                        var key = kv.Substring(0, idx);
+                                                        var val = kv.Substring(idx + 1);
+                                                        if (!string.IsNullOrWhiteSpace(key)) appCaps[key] = val;
+                                                    }
+                                                    else if (!string.IsNullOrWhiteSpace(kv))
+                                                    {
+                                                        appCaps[kv] = string.Empty;
+                                                    }
+                                                }
+                                            }
+                                            break;
                                     }
                                 }
                             }
                             app ??= new AppCandidate(code, name, description, port);
+                            // Emit an App service entry with minimal fields so Planner can treat it as declared
+                            if (!appServiceEmitted)
+                            {
+                                var appId = (code ?? "api").ToLowerInvariant();
+                                var appName = name ?? "App";
+                                var appPorts = port is int p && p > 0 ? new[] { p } : Array.Empty<int>();
+                                // Container image left empty; planners/exporters can inject app image separately if needed.
+                                candidates.Add(new ServiceCandidate(appId, string.Empty, appPorts, new(), Array.Empty<string>(), new(), appCaps.Count > 0 ? appCaps : null,
+                                    scheme: null, host: null, endpointPort: null, uriPattern: null,
+                                    localScheme: null, localHost: null, localPort: null, localPattern: null,
+                                    healthPath: null, healthInterval: null, healthTimeout: null, healthRetries: null,
+                                    kind: 0, type: 1,
+                                    name: appName, qualifiedCode: null, subtype: null, deployment: 0, description: description,
+                                    provides: Array.Empty<string>(), consumes: Array.Empty<string>(), containerImage: null, defaultTag: null, version: 1));
+                                appServiceEmitted = true;
+                            }
                         }
                     }
                     catch { }
@@ -146,6 +247,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                     catch { }
                                     if (kindInt is int k)
                                     {
+                                        svcKind = k;
                                         declaredType = k switch
                                         {
                                             0 => 1, // App
@@ -158,12 +260,22 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                     sid ??= a.ConstructorArguments[1].Value?.ToString();
                                     svcName ??= a.ConstructorArguments[2].Value?.ToString();
                                 }
+                                // Validate [SoraService] placement: class must implement IServiceAdapter
+                                try
+                                {
+                                    var implementsAdapter = sym.AllInterfaces.Any(i => i.ToDisplayString() == "Sora.Orchestration.Abstractions.IServiceAdapter");
+                                    if (!implementsAdapter)
+                                    {
+                                        context.ReportDiagnostic(Diagnostic.Create(DxSvcOnClassOnly, decl.Identifier.GetLocation(), sym.Name));
+                                    }
+                                }
+                                catch { }
                                 foreach (var na in a.NamedArguments)
                                 {
                                     switch (na.Key)
                                     {
-                                        case "ContainerImage": image ??= na.Value.Value?.ToString(); break;
-                                        case "DefaultTag": tag ??= na.Value.Value?.ToString(); break;
+                                        case "ContainerImage": containerImageOverride ??= na.Value.Value?.ToString(); break;
+                                        case "DefaultTag": defaultTagOverride ??= na.Value.Value?.ToString(); tag ??= defaultTagOverride; break;
                                         case "DefaultPorts":
                                             if (na.Value.Values is { Length: > 0 })
                                                 ports.AddRange(na.Value.Values.Select(v => (int)(v.Value ?? 0)));
@@ -188,8 +300,49 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                             if (na.Value.Values is { Length: > 0 })
                                                 consumes.AddRange(na.Value.Values.Select(v => v.Value?.ToString()).Where(s => !string.IsNullOrEmpty(s))!);
                                             break;
+                                        case "Capabilities":
+                                            if (na.Value.Values is { Length: > 0 })
+                                            {
+                                                foreach (var v in na.Value.Values)
+                                                {
+                                                    var kv = v.Value?.ToString() ?? string.Empty;
+                                                    var idx = kv.IndexOf('=');
+                                                    if (idx > 0)
+                                                    {
+                                                        var key = kv.Substring(0, idx);
+                                                        var val = kv.Substring(idx + 1);
+                                                        if (!string.IsNullOrWhiteSpace(key)) capabilities[key] = val;
+                                                    }
+                                                }
+                                            }
+                                            break;
+                                        case "Version":
+                                            try { versionOverride = (int?)na.Value.Value; } catch { }
+                                            break;
                                     }
                                 }
+                                // shortCode validations
+                                try
+                                {
+                                    if (!string.IsNullOrWhiteSpace(sid))
+                                    {
+                                        var ok = ValidateShortCode(sid!);
+                                        if (!ok)
+                                            context.ReportDiagnostic(Diagnostic.Create(DxShortCodeInvalid, decl.Identifier.GetLocation(), sid));
+                                        if (IsReservedShortCode(sid!))
+                                            context.ReportDiagnostic(Diagnostic.Create(DxShortCodeReserved, decl.Identifier.GetLocation(), sid));
+                                        else if (!seenShortCodes.Add(sid!))
+                                            context.ReportDiagnostic(Diagnostic.Create(DxShortCodeDuplicate, decl.Identifier.GetLocation(), sid));
+                                    }
+                                }
+                                catch { }
+                                // qualifiedCode format
+                                try
+                                {
+                                    if (!string.IsNullOrWhiteSpace(qualifiedCode) && !ValidateQualifiedCode(qualifiedCode!))
+                                        context.ReportDiagnostic(Diagnostic.Create(DxQualifiedCodeFormat, decl.Identifier.GetLocation(), qualifiedCode));
+                                }
+                                catch { }
                             }
                             catch { }
                         }
@@ -296,15 +449,53 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                         declaredType = mt;
                     }
 
+                    // Allow SoraService without ContainerDefaults: fallback to containerImage from SoraService
+                    if (string.IsNullOrWhiteSpace(image) && !string.IsNullOrWhiteSpace(containerImageOverride)) image = containerImageOverride;
+
+                    // Diagnostics for missing image when container deployment (even if candidate isn't emitted)
+                    try
+                    {
+                        if (!string.IsNullOrWhiteSpace(sid) && (deployment ?? 0) == 0)
+                        {
+                            var effectiveBase = containerImageOverride ?? (image?.Split(':').FirstOrDefault() ?? string.Empty);
+                            if (string.IsNullOrWhiteSpace(effectiveBase))
+                                context.ReportDiagnostic(Diagnostic.Create(DxContainerImageMissing, decl.Identifier.GetLocation(), sid));
+                        }
+                    }
+                    catch { }
+
                     if (!string.IsNullOrWhiteSpace(sid) && !string.IsNullOrWhiteSpace(image))
                     {
                         if (!string.IsNullOrEmpty(tag)) image = image + ":" + tag;
                         // If endpoint port from EndpointDefaults not provided, fall back to first container port
                         if (endpointPort is null && ports.Count > 0) endpointPort = ports[0];
-                        candidates.Add(new ServiceCandidate(sid!, image!, ports.ToArray(), env, volumes.ToArray(), appEnv,
+                        // Warn if DeploymentKind=Container but image is effectively missing
+                        try
+                        {
+                            if ((deployment ?? 0) == 0)
+                            {
+                                var safeImage = image ?? string.Empty;
+                                var baseImage = containerImageOverride ?? safeImage.Split(':')[0];
+                                if (string.IsNullOrWhiteSpace(baseImage))
+                                    context.ReportDiagnostic(Diagnostic.Create(DxContainerImageMissing, decl.Identifier.GetLocation(), sid));
+                            }
+                        }
+                        catch { }
+                        // Info if defaultTag is 'latest'
+                        try
+                        {
+                            var safeImage = image ?? string.Empty;
+                            var effectiveTag = defaultTagOverride ?? (safeImage.Contains(":") ? safeImage.Split(':')[1] : null);
+                            if (string.Equals(effectiveTag, "latest", StringComparison.OrdinalIgnoreCase))
+                                context.ReportDiagnostic(Diagnostic.Create(DxLatestTag, decl.Identifier.GetLocation(), svcName ?? sid));
+                        }
+                        catch { }
+                        candidates.Add(new ServiceCandidate(sid!, image!, ports.ToArray(), env, volumes.ToArray(), appEnv, capabilities,
                             scheme, host, endpointPort, uriPattern, localScheme, localHost, localPort, localPattern,
-                            healthPath, healthInterval, healthTimeout, healthRetries, declaredType,
-                            svcName, qualifiedCode, subtype, deployment, svcDescription, provides.ToArray(), consumes.ToArray()));
+                            healthPath, healthInterval, healthTimeout, healthRetries,
+                            svcKind, declaredType,
+                            svcName, qualifiedCode, subtype, deployment, svcDescription, provides.ToArray(), consumes.ToArray(),
+                            containerImageOverride, defaultTagOverride, versionOverride));
                     }
                 }
             }
@@ -326,13 +517,15 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
     {
         var sb = new StringBuilder();
         sb.Append('{');
+        // ARCH-0049 manifest header
+        sb.Append("\"schemaVersion\": 1,");
         if (app is not null)
         {
             sb.Append("\"app\": {");
             var before = sb.Length;
-            if (!string.IsNullOrEmpty(app.Code)) sb.Append(Prop("code", app.Code)).Append(',');
-            if (!string.IsNullOrEmpty(app.Name)) sb.Append(Prop("name", app.Name)).Append(',');
-            if (!string.IsNullOrEmpty(app.Description)) sb.Append(Prop("description", app.Description)).Append(',');
+            if (!string.IsNullOrEmpty(app.Code)) sb.Append(Prop("code", app.Code!)).Append(',');
+            if (!string.IsNullOrEmpty(app.Name)) sb.Append(Prop("name", app.Name!)).Append(',');
+            if (!string.IsNullOrEmpty(app.Description)) sb.Append(Prop("description", app.Description!)).Append(',');
             if (app.DefaultPublicPort is int dp) sb.Append(Prop("defaultPublicPort", dp)).Append(',');
             if (sb.Length > before && sb[sb.Length - 1] == ',') sb.Length -= 1; // trim trailing comma
             sb.Append("},");
@@ -360,53 +553,114 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             var s = items[i];
             if (i > 0) sb.Append(',');
             sb.Append('{')
+                // Back-compat fields
                 .Append(Prop("id", s.Id)).Append(',')
                 .Append(Prop("image", s.Image)).Append(',')
-                .Append(Prop("ports", s.Ports))
-                .Append(',').Append(Prop("env", s.Env))
-                .Append(',').Append(Prop("volumes", s.Volumes))
-                .Append(',').Append(Prop("appEnv", s.AppEnv));
+                .Append(Prop("ports", s.Ports)).Append(',')
+                .Append(Prop("env", s.Env)).Append(',')
+                .Append(Prop("volumes", s.Volumes)).Append(',')
+                .Append(Prop("appEnv", s.AppEnv))
+                // ARCH-0049 unified fields
+                .Append(',').Append(Prop("shortCode", s.Id))
+                .Append(',').Append(Prop("containerImage", (s.ContainerImage ?? (s.Image?.Split(':')?.FirstOrDefault() ?? string.Empty)) ?? string.Empty))
+                .Append(',').Append(Prop("defaultTag", (s.DefaultTag ?? ((s.Image != null && s.Image.Contains(":")) ? s.Image.Split(':')[1] : string.Empty)) ?? string.Empty))
+                .Append(',').Append(Prop("defaultPorts", s.Ports))
+                ;
+            if (s.Kind is int kind) sb.Append(',').Append(Prop("kind", kind));
             if (!string.IsNullOrEmpty(s.Name)) sb.Append(',').Append(Prop("name", s.Name!));
             if (!string.IsNullOrEmpty(s.QualifiedCode)) sb.Append(',').Append(Prop("qualifiedCode", s.QualifiedCode!));
             if (!string.IsNullOrEmpty(s.Subtype)) sb.Append(',').Append(Prop("subtype", s.Subtype!));
             if (!string.IsNullOrEmpty(s.Description)) sb.Append(',').Append(Prop("description", s.Description!));
-            if (!string.IsNullOrEmpty(s.Scheme)) sb.Append(',').Append(Prop("scheme", s.Scheme!));
-            if (!string.IsNullOrEmpty(s.Host)) sb.Append(',').Append(Prop("host", s.Host!));
-            if (s.EndpointPort is int ep) sb.Append(',').Append(Prop("endpointPort", ep));
-            if (!string.IsNullOrEmpty(s.UriPattern)) sb.Append(',').Append(Prop("uriPattern", s.UriPattern!));
+            if (!string.IsNullOrEmpty(s.Scheme)) sb.Append(',').Append(Prop("scheme", s.Scheme!)); // legacy
+            if (!string.IsNullOrEmpty(s.Host)) sb.Append(',').Append(Prop("host", s.Host!)); // legacy
+            if (s.EndpointPort is int ep) sb.Append(',').Append(Prop("endpointPort", ep)); // legacy
+            if (!string.IsNullOrEmpty(s.UriPattern)) sb.Append(',').Append(Prop("uriPattern", s.UriPattern!)); // legacy
             if (!string.IsNullOrEmpty(s.LocalScheme)) sb.Append(',').Append(Prop("localScheme", s.LocalScheme!));
             if (!string.IsNullOrEmpty(s.LocalHost)) sb.Append(',').Append(Prop("localHost", s.LocalHost!));
             if (s.LocalPort is int lp) sb.Append(',').Append(Prop("localPort", lp));
             if (!string.IsNullOrEmpty(s.LocalPattern)) sb.Append(',').Append(Prop("localPattern", s.LocalPattern!));
-            if (!string.IsNullOrEmpty(s.HealthPath)) sb.Append(',').Append(Prop("healthPath", s.HealthPath!));
+            if (!string.IsNullOrEmpty(s.HealthPath)) sb.Append(',').Append(Prop("healthPath", s.HealthPath!)); // legacy
+            if (!string.IsNullOrEmpty(s.HealthPath)) sb.Append(',').Append(Prop("healthEndpoint", s.HealthPath!));
             if (s.HealthInterval is int hi) sb.Append(',').Append(Prop("healthInterval", hi));
             if (s.HealthTimeout is int ht) sb.Append(',').Append(Prop("healthTimeout", ht));
             if (s.HealthRetries is int hr) sb.Append(',').Append(Prop("healthRetries", hr));
-            if (s.Type is int t) sb.Append(',').Append(Prop("type", t));
-            if (s.Deployment is int dk) sb.Append(',').Append(Prop("deployment", dk));
+            if (s.Type is int t) sb.Append(',').Append(Prop("type", t)); // legacy ServiceType
+            if (s.Deployment is int dk) sb.Append(',').Append(Prop("deployment", dk)); // legacy
+            if (s.Deployment is int dk2) sb.Append(',').Append(Prop("deploymentKind", dk2));
             if (s.Provides is { Length: > 0 }) sb.Append(',').Append(Prop("provides", s.Provides));
             if (s.Consumes is { Length: > 0 }) sb.Append(',').Append(Prop("consumes", s.Consumes));
+            if (s.Version is int ver) sb.Append(',').Append(Prop("version", ver));
+            if (s.Capabilities is { Count: > 0 }) sb.Append(',').Append(Prop("capabilities", s.Capabilities!));
             sb.Append('}');
         }
         sb.Append("]}");
         return sb.ToString();
     }
 
-    private static string Prop(string name, string value) => "\"" + name + "\": \"" + Escape(value) + "\"";
+    private static string Prop(string name, string value) => "\"" + name + "\": \"" + Escape(value ?? string.Empty) + "\"";
     private static string Prop(string name, int value) => "\"" + name + "\": " + value;
     private static string Prop(string name, int[] values) => "\"" + name + "\": [" + string.Join(",", values) + "]";
-    private static string Prop(string name, string[] values) => "\"" + name + "\": [" + string.Join(",", values.Select(v => "\"" + Escape(v) + "\"")) + "]";
+    private static string Prop(string name, string[] values) => "\"" + name + "\": [" + string.Join(",", values.Select(v => "\"" + Escape(v ?? string.Empty) + "\"")) + "]";
     private static string Prop(string name, Dictionary<string, string?> map) => "\"" + name + "\": " + FormatMap(map);
 
     private static string FormatMap(Dictionary<string, string?> map)
-        => "{" + string.Join(",", map.Select(kv => "\"" + Escape(kv.Key) + "\": \"" + Escape(kv.Value ?? string.Empty) + "\"")) + "}";
+    => "{" + string.Join(",", (map ?? new Dictionary<string, string?>()).Select(kv => "\"" + Escape(kv.Key ?? string.Empty) + "\": \"" + Escape(kv.Value ?? string.Empty) + "\"")) + "}";
 
     private static string Escape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+    private static bool ValidateShortCode(string code)
+    {
+        if (code.Length < 2 || code.Length > 32) return false;
+        if (!(code[0] >= 'a' && code[0] <= 'z')) return false;
+    if (code.Length > 0 && code[code.Length - 1] == '-') return false;
+        foreach (var ch in code)
+        {
+            var ok = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-';
+            if (!ok) return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateQualifiedCode(string qc)
+    {
+        // dot-separated, each part matches shortCode rules but allows shorter segments
+        var parts = qc.Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2) return false;
+        foreach (var p in parts)
+        {
+            if (p.Length == 0) return false;
+            if (p[0] == '-') return false;
+            if (p.Length > 0 && p[p.Length - 1] == '-') return false;
+            for (int i = 0; i < p.Length; i++)
+            {
+                var ch = p[i];
+                var ok = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-';
+                if (!ok) return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool IsReservedShortCode(string code)
+    {
+        // Small built-in set; can grow via docs/ADR. Keep lowercase.
+        switch (code)
+        {
+            case "api":
+            case "web":
+            case "app":
+            case "sora":
+            case "core":
+                return true;
+            default:
+                return false;
+        }
+    }
 
     private static void AddKv(Dictionary<string, string?> target, string? kv)
     {
         if (string.IsNullOrWhiteSpace(kv)) return;
-        var idx = kv.IndexOf('=');
+        var idx = kv!.IndexOf('=');
         if (idx > 0)
         {
             var key = kv.Substring(0, idx);
@@ -431,8 +685,9 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         public string Image { get; }
         public int[] Ports { get; }
         public Dictionary<string, string?> Env { get; }
-        public string[] Volumes { get; }
-        public Dictionary<string, string?> AppEnv { get; }
+    public string[] Volumes { get; }
+    public Dictionary<string, string?> AppEnv { get; }
+    public Dictionary<string, string?>? Capabilities { get; }
         public string? Scheme { get; }
         public string? Host { get; }
         public int? EndpointPort { get; }
@@ -445,6 +700,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         public int? HealthInterval { get; }
         public int? HealthTimeout { get; }
         public int? HealthRetries { get; }
+        public int? Kind { get; }
         public int? Type { get; }
         public string? Name { get; }
         public string? QualifiedCode { get; }
@@ -453,6 +709,9 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         public string? Description { get; }
         public string[]? Provides { get; }
         public string[]? Consumes { get; }
+        public string? ContainerImage { get; }
+        public string? DefaultTag { get; }
+        public int? Version { get; }
 
         public ServiceCandidate(
             string id,
@@ -461,6 +720,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             Dictionary<string, string?> env,
             string[] volumes,
             Dictionary<string, string?> appEnv,
+            Dictionary<string, string?>? capabilities,
             string? scheme,
             string? host,
             int? endpointPort,
@@ -473,6 +733,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             int? healthInterval,
             int? healthTimeout,
             int? healthRetries,
+            int? kind,
             int? type,
             string? name,
             string? qualifiedCode,
@@ -480,7 +741,10 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             int? deployment,
             string? description,
             string[]? provides,
-            string[]? consumes)
+            string[]? consumes,
+            string? containerImage,
+            string? defaultTag,
+            int? version)
         {
             Id = id;
             Image = image;
@@ -488,6 +752,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             Env = env;
             Volumes = volumes;
             AppEnv = appEnv;
+            Capabilities = capabilities;
             Scheme = scheme;
             Host = host;
             EndpointPort = endpointPort;
@@ -500,6 +765,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             HealthInterval = healthInterval;
             HealthTimeout = healthTimeout;
             HealthRetries = healthRetries;
+            Kind = kind;
             Type = type;
             Name = name;
             QualifiedCode = qualifiedCode;
@@ -508,6 +774,9 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
             Description = description;
             Provides = provides;
             Consumes = consumes;
+            ContainerImage = containerImage;
+            DefaultTag = defaultTag;
+            Version = version;
         }
     }
 

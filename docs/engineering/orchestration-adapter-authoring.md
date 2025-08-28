@@ -1,9 +1,11 @@
 ﻿---
-title: Orchestration adapter authoring — endpoints and persistence mounts
-description: How to declare adapter endpoint hints (schemes and URI patterns) and persistence mount paths used by the CLI and Compose exporter.
+title: Orchestration adapter authoring — deprecated (see ARCH-0049 unified attributes)
+description: This legacy guidance predates ARCH-0049. Use SoraService/SoraApp and the manifest-first model. Endpoint/mount hints remain as optional extras for exporters.
 ---
 
-# Orchestration adapter authoring — endpoints and persistence mounts
+> Deprecated: This page documents the pre-ARCH-0049 authoring model. The CLI no longer relies on image-name heuristics or reflection-based defaults. Prefer the unified attributes: [SoraService] for services and [SoraApp] for the app anchor. See: engineering/orchestration-manifest-generator.md
+
+# Orchestration adapter authoring — endpoints and persistence mounts (legacy)
 
 Contract (at a glance)
 - Inputs: adapter factory/type annotated with attributes.
@@ -23,8 +25,8 @@ HostMountAttribute
 - Signature: `HostMountAttribute(string containerPath)`; can be repeated to declare multiple paths.
 
 Discovery
-- The CLI and Compose exporter reflect across loaded assemblies and match by `ImagePrefixes` (prefix match on the service image name).
-- Multiple `HostMountAttribute`s per type are supported; each target is injected once if not already declared in the plan.
+- Manifest-first: planners and CLI consume `__SoraOrchestrationManifest.Json` exclusively.
+- Exporters may still use these hints (when present) to improve UX (endpoints) and add persistence mounts safely.
 
 ## Minimal examples
 
@@ -59,6 +61,7 @@ public sealed class WeaviateAdapterFactory { /* ... */ }
 
 ## See also
 
-- Reference — Orchestration: ../reference/orchestration.md
+- Engineering — Orchestration manifest generator (unified): ./orchestration-manifest-generator.md
+- Decision — ARCH-0049 unified service metadata and discovery: ../decisions/ARCH-0049-unified-service-metadata-and-discovery.md
 - Decision — ARCH-0048 Endpoint resolution and persistence mounts: ../decisions/ARCH-0048-endpoint-resolution-and-persistence-mounts.md
-- Engineering — Front door: ./index.md
+- Reference — Orchestration: ../reference/orchestration.md

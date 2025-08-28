@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FluentAssertions;
 using Sora.Orchestration;
 using Sora.Orchestration.Cli.Planning;
+using Sora.Orchestration.Models;
 using Xunit;
 
 namespace Sora.Orchestration.Cli.Tests;
@@ -15,8 +16,8 @@ public class PortAllocatorTests
         // Arrange: two services both ask for 5432; probe says 5432 and 5433 are taken, 5434+ are free
         var plan = new Plan(Profile.Local, new[]
         {
-            new ServiceSpec("db1", "postgres", new Dictionary<string,string?>(), new List<(int,int)>{ (5432, 5432) }, new List<(string,string,bool)>(), null, Array.Empty<string>()),
-            new ServiceSpec("db2", "postgres", new Dictionary<string,string?>(), new List<(int,int)>{ (5432, 5432) }, new List<(string,string,bool)>(), null, Array.Empty<string>())
+            new ServiceSpec("db1", "postgres", new Dictionary<string,string?>(), new List<(int Host,int Container)>{ (5432, 5432) }, new List<(string Source,string Target,bool Named)>(), null, null, Array.Empty<string>()),
+            new ServiceSpec("db2", "postgres", new Dictionary<string,string?>(), new List<(int Host,int Container)>{ (5432, 5432) }, new List<(string Source,string Target,bool Named)>(), null, null, Array.Empty<string>())
         });
 
         bool Probe(int port) => port >= 5434; // 5432 and 5433 unavailable
@@ -35,7 +36,7 @@ public class PortAllocatorTests
         // Arrange: any port is unavailable; guard = 2 means we accept host+2
         var plan = new Plan(Profile.Local, new[]
         {
-            new ServiceSpec("svc", "image", new Dictionary<string,string?>(), new List<(int,int)>{ (1000, 80) }, new List<(string,string,bool)>(), null, Array.Empty<string>())
+            new ServiceSpec("svc", "image", new Dictionary<string,string?>(), new List<(int Host,int Container)>{ (1000, 80) }, new List<(string Source,string Target,bool Named)>(), null, null, Array.Empty<string>())
         });
 
         bool Probe(int _) => false; // nothing available
@@ -53,8 +54,8 @@ public class PortAllocatorTests
         // Arrange: two services, each with two ports starting at the same base; first four ports unavailable, then free
         var plan = new Plan(Profile.Local, new[]
         {
-            new ServiceSpec("svc1", "image", new Dictionary<string,string?>(), new List<(int,int)>{ (5000, 80), (5001, 443) }, new List<(string,string,bool)>(), null, Array.Empty<string>()),
-            new ServiceSpec("svc2", "image", new Dictionary<string,string?>(), new List<(int,int)>{ (5000, 80), (5001, 443) }, new List<(string,string,bool)>(), null, Array.Empty<string>())
+            new ServiceSpec("svc1", "image", new Dictionary<string,string?>(), new List<(int Host,int Container)>{ (5000, 80), (5001, 443) }, new List<(string Source,string Target,bool Named)>(), null, null, Array.Empty<string>()),
+            new ServiceSpec("svc2", "image", new Dictionary<string,string?>(), new List<(int Host,int Container)>{ (5000, 80), (5001, 443) }, new List<(string Source,string Target,bool Named)>(), null, null, Array.Empty<string>())
         });
 
         var unavailable = new HashSet<int> { 5000, 5001, 5002, 5003 };

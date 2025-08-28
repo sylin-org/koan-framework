@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using FluentAssertions;
 using Sora.Orchestration;
+using Sora.Orchestration.Planning;
 using Sora.Orchestration.Cli.Planning;
 using Xunit;
 
@@ -60,6 +61,62 @@ public class PlannerOverridesTests
             Directory.SetCurrentDirectory(orig);
             try { Directory.Delete(temp, true); } catch { }
         }
+    }
+
+    [Fact]
+    public void Overrides_Ports_replace_container_ports_in_plan()
+    {
+        // Arrange: draft with a service exposing a default container port
+        var draft = new PlanDraft(new[]
+        {
+            new ServiceRequirement(
+                Id: "redis",
+                Image: "redis:7",
+                Env: new Dictionary<string,string?>(),
+                ContainerPorts: new[] { 6379 },
+                Volumes: Array.Empty<string>(),
+                AppEnv: new Dictionary<string,string?>(),
+                EndpointScheme: "redis",
+                EndpointHost: "redis",
+                EndpointUriPattern: null,
+                LocalScheme: "redis",
+                LocalHost: "localhost",
+                LocalPort: 6379,
+                LocalUriPattern: null
+            )
+        }, IncludeApp: false, AppHttpPort: 8080);
+
+        // Build an Overrides object with Ports override and apply to draft
+        var pov = new PrivateOverrides
+        {
+            Services = new Dictionary<string, PrivateOverrides.Service>
+            {
+                ["redis"] = new PrivateOverrides.Service
+                {
+                    // No image/env/volumes, just Ports override
+                }
+            }
+        };
+        // Manually extend the Planner overrides shape to include Ports via reflection-friendly mapper
+        var ov = new PrivateToPlannerOverridesMapper(pov).ToPlannerOverrides();
+        // Set Ports on the inner Service (use reflection to set List<int> Ports)
+        var overridesType = typeof(Planner).GetNestedType("Overrides", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public)!;
+        var svcType = overridesType.GetNestedType("Service", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public)!;
+        var servicesProp = overridesType.GetProperty("Services")!;
+        var dict = (System.Collections.IDictionary)servicesProp.GetValue(ov)!;
+        var svc = dict["redis"];
+        svcType.GetProperty("Ports")!.SetValue(svc, new List<int> { 16379 });
+
+        var apply = overridesType.GetMethod("Apply", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
+        draft = (PlanDraft)apply.Invoke(null, new object?[] { draft, ov })!;
+
+        // Act: build a plan from the overridden draft
+        var plan = Planner.FromDraft(Profile.Local, draft);
+
+        // Assert: container ports were replaced and mapped host:container as p:p
+        var svcRedis = plan.Services.First(s => s.Id == "redis");
+        svcRedis.Ports.Should().ContainSingle();
+        svcRedis.Ports[0].Should().Be((16379, 16379));
     }
 
     [Fact]

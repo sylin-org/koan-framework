@@ -6,7 +6,7 @@ description: How to use Sora's DevHost CLI to bring up local dependencies and ex
 # Orchestration — DevHost, hosting providers, and exporters
 
 Contract (at a glance)
-- Inputs: referenced Sora modules, Sora:* config, optional Recipes, profile (SORA_ENV).
+- Inputs: generated orchestration manifest from referenced assemblies, optional descriptor overrides, profile (SORA_ENV).
 - Outputs: a Plan of services (containers) and generated artifacts (Compose v2 now; Helm/ACA later).
 - Error modes: no engine available, port conflicts, invalid config, readiness timeout → non-zero exit with guidance.
 - Success: `sora up` brings deps to ready state; `sora status` healthy; artifacts generated predictably.
@@ -36,7 +36,7 @@ Set SORA_ENV to choose profile: local (default), ci, staging, prod.
 - Ports auto-avoid conflicts in non-prod; `--base-port` offsets host ports by a fixed amount. `sora status` prints endpoint hints and flags conflicting ports when detected.
  - Port conflicts policy: `prod` always fails fast on conflicts; non-prod defaults to warn but can be forced to fail with `--conflicts fail`.
  - Auto-avoid tuning: set `SORA_PORT_PROBE_MAX` to control the max number of upward port probes (default: 200).
- - App public port precedence: `--port` > LaunchManifest.Allocations[serviceId] > LaunchManifest.App.AssignedPublicPort > app default (attribute/code) > deterministic fallback (30000–50000). The chosen source is surfaced in Context Card, Up (explain), Status, and Inspect.
+ - App public port precedence: `--port` > LaunchManifest.Allocations[serviceId] > LaunchManifest.App.AssignedPublicPort > app default (SoraApp.DefaultPublicPort) > deterministic fallback (30000–50000). The chosen source is surfaced in Context Card, Up (explain), Status, and Inspect.
  - Launch Manifest: `.sora/manifest.json` persists dev-time choices with backup-on-change. Disable reads/writes with `--no-launch-manifest`.
  - Networks: compose defines `sora_internal` and `sora_external`. Adapters run on internal only; the app joins both. Ports are published only when host > 0. Use `--expose-internals` to publish adapter ports too.
 
@@ -79,12 +79,16 @@ Authoring adapters
 Secrets
 - Exporters reference external secrets by name; they do not create or embed secrets.
 
-## Discovery rules (predictable and safe)
+## Discovery rules (manifest-first)
 
-- Descriptor first: if `sora.orchestration.yml`|`yaml`|`json` exists at the repo root, it defines the plan (services, env, ports, volumes, dependsOn, optional health). Simple shapes only; values are passed through to exporters.
-- Explicit config enables a dep (e.g., `Sora:Data:Provider=postgres`) when no descriptor is present.
-- Active recipes with configured deps enable orchestration for those deps.
-- Package presence alone is a hint — requires minimal config before containers are started.
+- Manifest-only: the CLI and planners load `Sora.Orchestration.__SoraOrchestrationManifest.Json` from built assemblies and build plans from its unified fields (kind, codes, image/tag, ports, provides/consumes, capabilities). No compose/csproj/image-name scraping.
+- Descriptor first: if `sora.orchestration.yml`|`yaml`|`json` exists at the repo root, it defines the plan or applies overrides (image/tag/ports) with simple pass-through shapes.
+- Recipes: when active and configured, contribute explicit services; still flow through the manifest/plan pipeline.
+- Packages alone do not trigger deps. Adapters must declare `[SoraService]` to appear in the manifest.
+
+Inspect
+- `sora inspect` reports app ids/ports when an app block is present in the manifest.
+- Duplicate service ids across manifests are surfaced in JSON (`duplicates`) and summarized in human output.
 
 ## Verbosity and safety
 

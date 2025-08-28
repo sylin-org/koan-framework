@@ -147,6 +147,37 @@ Sora doctor --json
 Sora inspect --json
 ```
 
+## Overrides (.sora/overrides.json)
+
+You can customize images, env, volumes, and container ports per service without changing code.
+
+- File candidates (first match wins):
+  - `.sora/overrides.json`
+  - `overrides.sora.json` (repo root)
+
+Schema (subset)
+```json
+{
+  "Mode": "Local", // or "Container" (default)
+  "Services": {
+    "mongo": {
+      "Image": "mongo:7",
+      "Env": { "MONGO_INITDB_ROOT_USERNAME": "root" },
+      "Volumes": [ "./Data/mongo:/data/db" ],
+      "Ports": [ 27018 ]
+    }
+  }
+}
+```
+
+Behavior
+- Mode: When `Local`, token substitution for app env prefers local endpoint hints from adapters (scheme/host/port). Otherwise, container endpoints are used.
+- Services:
+  - `Image` replaces the discovered image/tag when provided.
+  - `Env` is merged, overriding existing keys.
+  - `Volumes` are appended (profile policy controls bind vs named vs none).
+  - `Ports` replaces the service’s container ports. Exporters map host:container as `p:p` per profile/flags; app/internal publishing still follows exposure rules (use `--expose-internals` to publish non‑app services).
+
 ## Launch Manifest (.sora/manifest.json)
 
 Sora persists safe, dev-time choices (like the app’s public port) in `.sora/manifest.json`.
