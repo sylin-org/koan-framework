@@ -1,19 +1,29 @@
-﻿using Sora.Orchestration.Attributes;
+﻿using Sora.Orchestration;
+using Sora.Orchestration.Attributes;
 
-[assembly: OrchestrationServiceManifest(
-    id: "ollama",
-    image: "ollama/ollama:latest",
-    containerPorts: new[] { 11434 },
-    Environment = new string[] { },
+namespace Sora.Ai.Provider.Ollama;
+
+// Marker type to host the unified [SoraService] declaration for Ollama
+// Implements IServiceAdapter per ARCH-0049 analyzer.
+[SoraService(ServiceKind.Ai, shortCode: "ollama", name: "Ollama",
+    ContainerImage = "ollama/ollama",
+    DefaultTag = "latest",
+    DefaultPorts = new[] { 11434 },
+    Capabilities = new[] { "protocol=http", "embeddings=true" },
     Volumes = new[] { "./Data/ollama:/root/.ollama" },
-    AppEnvironment = new[]
+    AppEnv = new[]
     {
         "Sora__Ai__AutoDiscoveryEnabled=true",
         "Sora__Ai__AllowDiscoveryInNonDev=true",
         "SORA_AI_OLLAMA_URLS=http://{serviceId}:{port}"
     },
-    HealthPath = "/api/tags",
+    HealthEndpoint = "/api/tags",
     HealthIntervalSeconds = 5,
     HealthTimeoutSeconds = 2,
-    HealthRetries = 12
-)]
+    HealthRetries = 12,
+    Scheme = "http", Host = "ollama", EndpointPort = 11434, UriPattern = "http://{host}:{port}",
+    LocalScheme = "http", LocalHost = "localhost", LocalPort = 11434, LocalPattern = "http://{host}:{port}")]
+internal sealed class OllamaServiceDescriptor
+{
+    // No runtime behavior; discovery-only marker.
+}

@@ -12,30 +12,24 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
       ASPNETCORE_URLS: "http://+:8080"
-      Sora__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
-      Sora__Data__Mongo__Database: "sora"
       Sora__Ai__AutoDiscoveryEnabled: "true"
       Sora__Ai__AllowDiscoveryInNonDev: "true"
       SORA_AI_OLLAMA_URLS: "http://ollama:11434"
+      Sora__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
+      Sora__Data__Mongo__Database: "sora"
       Sora__Data__Weaviate__Endpoint: "http://weaviate:8080"
     ports:
       - "40082:8080"
     depends_on:
-      mongo:
-        condition: service_started
       ollama:
         condition: service_healthy
+      mongo:
+        condition: service_started
       weaviate:
         condition: service_healthy
     networks:
       - sora_internal
       - sora_external
-  mongo:
-    image: "mongo:7"
-    volumes:
-      - ./Data/mongo:/data/db
-    networks:
-      - sora_internal
   ollama:
     image: "ollama/ollama:latest"
     volumes:
@@ -45,6 +39,12 @@ services:
       interval: 5s
       timeout: 2s
       retries: 12
+    networks:
+      - sora_internal
+  mongo:
+    image: "mongo:7"
+    volumes:
+      - ./Data/mongo:/data/db
     networks:
       - sora_internal
   weaviate:

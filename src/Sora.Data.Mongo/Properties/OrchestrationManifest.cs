@@ -1,15 +1,1 @@
-﻿using Sora.Orchestration;
-using Sora.Orchestration.Attributes;
-
-[assembly: OrchestrationServiceManifest(
-    id: "mongo",
-    image: "mongo:7",
-    containerPorts: new[] { 27017 },
-    Environment = new string[] { },
-    Volumes = new[] { "./Data/mongo:/data/db" },
-    AppEnvironment = new[]
-    {
-        "Sora__Data__Mongo__ConnectionString=mongodb://{serviceId}:{port}",
-        "Sora__Data__Mongo__Database=sora"
-    }
-)]
+﻿// Legacy OrchestrationServiceManifest removed in favor of [SoraService] on MongoAdapterFactory (ARCH-0049).

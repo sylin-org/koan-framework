@@ -28,7 +28,7 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
         title: "[SoraService] must be applied to a class that implements IServiceAdapter",
         messageFormat: "Type '{{0}}' must implement Sora.Orchestration.Abstractions.IServiceAdapter to use [SoraService]",
         category: "Usage",
-        defaultSeverity: DiagnosticSeverity.Error,
+    defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true);
 
     private static readonly DiagnosticDescriptor DxShortCodeInvalid = new(
@@ -281,6 +281,9 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                                 ports.AddRange(na.Value.Values.Select(v => (int)(v.Value ?? 0)));
                                             break;
                                         case "HealthEndpoint": healthPath = na.Value.Value?.ToString(); break;
+                                        case "HealthIntervalSeconds": try { healthInterval = (int)na.Value.Value!; } catch { } break;
+                                        case "HealthTimeoutSeconds": try { healthTimeout = (int)na.Value.Value!; } catch { } break;
+                                        case "HealthRetries": try { healthRetries = (int)na.Value.Value!; } catch { } break;
                                         case "QualifiedCode": qualifiedCode = na.Value.Value?.ToString(); break;
                                         case "Subtype": subtype = na.Value.Value?.ToString(); break;
                                         case "Description": svcDescription = na.Value.Value?.ToString(); break;
@@ -316,6 +319,26 @@ public sealed class OrchestrationManifestGenerator : ISourceGenerator
                                                 }
                                             }
                                             break;
+                                        case "Env":
+                                            if (na.Value.Values is { Length: > 0 })
+                                                foreach (var v in na.Value.Values) AddKv(env, v.Value?.ToString());
+                                            break;
+                                        case "Volumes":
+                                            if (na.Value.Values is { Length: > 0 })
+                                                volumes.AddRange(na.Value.Values.Select(v => v.Value?.ToString()).Where(v => !string.IsNullOrEmpty(v))!);
+                                            break;
+                                        case "AppEnv":
+                                            if (na.Value.Values is { Length: > 0 })
+                                                foreach (var v in na.Value.Values) AddKv(appEnv, v.Value?.ToString());
+                                            break;
+                                        case "Scheme": scheme = na.Value.Value?.ToString(); break;
+                                        case "Host": host = na.Value.Value?.ToString(); break;
+                                        case "EndpointPort": try { endpointPort = (int)na.Value.Value!; } catch { } break;
+                                        case "UriPattern": uriPattern = na.Value.Value?.ToString(); break;
+                                        case "LocalScheme": localScheme = na.Value.Value?.ToString(); break;
+                                        case "LocalHost": localHost = na.Value.Value?.ToString(); break;
+                                        case "LocalPort": try { localPort = (int)na.Value.Value!; } catch { } break;
+                                        case "LocalPattern": localPattern = na.Value.Value?.ToString(); break;
                                         case "Version":
                                             try { versionOverride = (int?)na.Value.Value; } catch { }
                                             break;

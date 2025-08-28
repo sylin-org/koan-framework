@@ -502,34 +502,7 @@ internal static class ProjectDependencyAnalyzer
                 catch { }
             }
 
-            // Legacy attribute-based fallback (for adapters not yet migrated to ARCH-0049)
-            if (reqs.Count == 0)
-            {
-                foreach (var path in scanDlls)
-                {
-                    var added = false;
-                    try
-                    {
-                        var asm = mlc.LoadFromAssemblyPath(path);
-                        added |= TryAddFromAssemblyAttributes(asm, reqs);
-                        added |= TryAddFromTypeAttributes(asm, reqs);
-                    }
-                    catch { }
-
-                    // Fallback to runtime load of just assembly-level attributes if MLC failed or found nothing
-                    if (!added)
-                    {
-                        try
-                        {
-                            var alc = new TempAlc(Path.GetDirectoryName(path)!);
-                            var asmRt = alc.LoadFromAssemblyPath(path);
-                            TryAddFromAssemblyAttributes(asmRt, reqs);
-                            alc.Unload();
-                        }
-                        catch { }
-                    }
-                }
-            }
+            // Legacy attribute-based fallback removed (ARCH-0049): manifests are the single source of truth.
 
             // De-dup by id, keep first occurrence (manifest wins over attributes by ordering above)
             var distinct = reqs

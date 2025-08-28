@@ -2,25 +2,22 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
+using Sora.Orchestration;
 using Sora.Orchestration.Attributes;
 
 namespace Sora.Data.Postgres;
 
 [ProviderPriority(14)]
-[ServiceId("postgres")]
-[ContainerDefaults(
-    image: "postgres",
-    Tag = "16",
-    Ports = new[] { 5432 },
+[SoraService(ServiceKind.Database, shortCode: "postgres", name: "PostgreSQL",
+    ContainerImage = "postgres",
+    DefaultTag = "16",
+    DefaultPorts = new[] { 5432 },
+    Capabilities = new[] { "protocol=postgres" },
+    Env = new[] { "POSTGRES_USER=postgres", "POSTGRES_PASSWORD", "POSTGRES_DB=sora" },
     Volumes = new[] { "./Data/postgres:/var/lib/postgresql/data" },
-    Env = new[] { "POSTGRES_USER=postgres", "POSTGRES_PASSWORD", "POSTGRES_DB=sora" }
-)]
-[EndpointDefaults(EndpointMode.Container, scheme: "postgres", host: "postgres", port: 5432, UriPattern = "postgres://{host}:{port}")]
-[EndpointDefaults(EndpointMode.Local, scheme: "postgres", host: "localhost", port: 5432, UriPattern = "postgres://{host}:{port}")]
-[AppEnvDefaults(
-    "Sora__Data__Postgres__ConnectionString={scheme}://{host}:{port}",
-    "Sora__Data__Postgres__Database=sora"
-)]
+    AppEnv = new[] { "Sora__Data__Postgres__ConnectionString={scheme}://{host}:{port}", "Sora__Data__Postgres__Database=sora" },
+    Scheme = "postgres", Host = "postgres", EndpointPort = 5432, UriPattern = "postgres://{host}:{port}",
+    LocalScheme = "postgres", LocalHost = "localhost", LocalPort = 5432, LocalPattern = "postgres://{host}:{port}")]
 public sealed class PostgresAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider)
