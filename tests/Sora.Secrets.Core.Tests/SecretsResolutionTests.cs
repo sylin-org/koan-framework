@@ -79,17 +79,17 @@ public class SecretsResolutionTests
         baseCfg["Secrets:db:main"] = null; // ensure not found in bootstrap config provider
 
         // Track reloads
-    var reloaded = false;
-    ChangeToken.OnChange(() => cfg.GetReloadToken(), () => reloaded = true);
+        var reloaded = false;
+        ChangeToken.OnChange(() => cfg.GetReloadToken(), () => reloaded = true);
 
         // Build DI with DictProvider-backed resolver
         var dict = new ConcurrentDictionary<string, string>(StringComparer.Ordinal)
         {
             [SecretId.Parse("secret://db/main").ToString()] = "from-di"
         };
-    var services = new ServiceCollection();
-    services.AddSingleton<IConfiguration>(baseCfg);
-    services.AddSoraSecrets();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(baseCfg);
+        services.AddSoraSecrets();
         services.AddSingleton<ISecretProvider>(_ => new DictProvider(dict));
         var sp = services.BuildServiceProvider();
 

@@ -11,7 +11,7 @@ title: Secrets management — provider chain, configuration resolution, and orch
 
 Sora needs a first-class, zero-config secrets capability that works consistently across modules (Data, Messaging, Web) and orchestration. The goals are:
 
-- Reference = intent: referencing Sora.Secrets.* packages enables secrets behavior without extra wiring.
+- Reference = intent: referencing Sora.Secrets.\* packages enables secrets behavior without extra wiring.
 - Safe-by-default: no secret values baked into artifacts or logs; redaction everywhere; rotation-friendly.
 - Simple DX: explicit secret references in configuration and a small DI surface for late-bound resolution.
 - Orchestration alignment: exporters prefer references over values (secretsRefOnly) and can map to platform-native secret primitives.
@@ -22,28 +22,34 @@ We must resolve “boot order” concerns (configuration before DI), preserve ro
 
 We will introduce a secrets module with a provider chain and a configuration-resolution layer that expands secret references on read, not on file load. Key decisions:
 
-1) Configuration resolution (lazy, rotation-aware)
+1. Configuration resolution (lazy, rotation-aware)
+
 - Add a SecretResolvingConfigurationSource/Provider that wraps IConfiguration at the end of the provider chain. It detects explicit secret references/placeholders and resolves them on read via a resolver.
 - Do not materialize resolved values back into the configuration tree. Use change tokens to propagate updates (OptionsMonitor).
 
-2) Two-stage resolver to solve boot order
+2. Two-stage resolver to solve boot order
+
 - Bootstrap resolver (env-first) is used before DI is fully built: Env → .NET User Secrets (Development) → optional OS keychain → provider hints from environment (e.g., VAULT_ADDR).
 - After the ServiceProvider is built, upgrade to the DI-backed ISecretResolver composed from referenced adapters. Trigger a configuration reload to update bound options.
 
-3) Provider chain and Reference = Intent
+3. Provider chain and Reference = Intent
+
 - Referencing Sora.Secrets.Core registers the resolver and default chain. Referencing provider packages (e.g., Sora.Secrets.HashiCorpVault) registers those providers into the chain via SoraAutoRegistrar.
 - Default precedence is stable and configurable. Adapters can be forced via explicit scheme (secret+vault://…).
 
-4) Explicit reference syntax (no magic keys)
+4. Explicit reference syntax (no magic keys)
+
 - Whole-value reference: secret://<scope>/<name>[?version=…]
 - Inline placeholder: ${secret://<scope>/<name>[?version=…]}
 - Provider-forced schemes: secret+vault://..., secret+k8s://..., secret+sops://...
 
-5) Orchestration exporters prefer references
-- When any Sora.Secrets.* provider is present, exporters set capabilities.secretsRefOnly = true and emit references (envRef) rather than values. Renderers map to platform mechanisms (Kubernetes secretKeyRef/ESO; Compose secrets; optional Vault Agent).
+5. Orchestration exporters prefer references
+
+- When any Sora.Secrets.\* provider is present, exporters set capabilities.secretsRefOnly = true and emit references (envRef) rather than values. Renderers map to platform mechanisms (Kubernetes secretKeyRef/ESO; Compose secrets; optional Vault Agent).
 - Sidecars/agents or file-sinks are enabled only under minimal, explicit signals (e.g., Sora:Secrets:Provider=Vault or VAULT_ADDR present), keeping Reference = Intent predictable without surprising topology changes.
 
-6) Safety, health, and observability
+6. Safety, health, and observability
+
 - Redaction is enforced centrally. Secret values never appear in logs, traces, exceptions, or OpenAPI examples.
 - TTL-aware cache with optional background renewal; grace window during outages. Health checks per provider aggregate into readiness.
 - Optional required secrets list can gate readiness at startup (resolve with timeout).
@@ -51,22 +57,26 @@ We will introduce a secrets module with a provider chain and a configuration-res
 ## Scope
 
 In scope
+
 - Secrets abstractions and resolver chain; configuration source for on-read expansion.
 - DI wiring via SoraAutoRegistrar; explicit reference syntax and parsing rules.
 - Orchestration exporter behavior (secretsRefOnly), envRef contract, and sidecar hints policy.
 
 Out of scope (this ADR)
+
 - Provider-specific details beyond minimal options (Vault/Kubernetes/SOPS follow their own docs if needed).
 - Cloud managers (AKV/ASM/GSN) — optional, separate packages.
 
 ## Consequences
 
 Positive
+
 - Zero-config in dev; deterministic and safe in prod. Rotation-safe because values are resolved on read and cached by SecretId TTL.
 - Consistent DX across modules: same references work for configuration, Options binding, and on-demand API calls.
 - Orchestration artifacts are portable and value-free by default.
 
 Tradeoffs / Risks
+
 - Boot-order complexity is addressed by bootstrap→upgrade, but requires careful implementation and tests.
 - Slight overhead on read; mitigated via TTL cache and short-lived expansion cache.
 - Mixed inline JSON is constrained (JSON secrets must be whole-value references).
@@ -74,6 +84,7 @@ Tradeoffs / Risks
 ## Implementation notes
 
 Contracts (Abstractions)
+
 - ISecretProvider: GetAsync(SecretId id, CancellationToken) → SecretValue; optional TryGet/List/Watch.
 - ISecretResolver: GetAsync(SecretId), ResolveAsync(string template) for placeholder expansion.
 - SecretId: scope/name with optional version/provider; parse from secret:// URIs.
@@ -81,23 +92,28 @@ Contracts (Abstractions)
 - Exceptions: NotFound, Unauthorized, LeaseExpired, ProviderUnavailable (never include payloads).
 
 Configuration
+
 - AddSecretsReferenceConfiguration() registers SecretResolvingConfigurationSource using the bootstrap resolver.
 - After DI build, the source upgrades to the DI-backed resolver and raises a reload token.
 
 DI surface
-- services.AddSoraSecrets(o => { /* options */ }).UseDefaultChain().AddProvider<T>()
+
+- services.AddSoraSecrets(o => { /_ options _/ }).UseDefaultChain().AddProvider<T>()
 - Providers auto-register via SoraAutoRegistrar; order is deterministic and user-overridable.
 
 Parsing and placeholders
+
 - Expand only well-formed tokens: secret://… and ${secret://…}. For deterministic routing, use secret+provider://…
 - Inline expansion supports compound values (e.g., connection strings). JSON secrets should be whole-value references.
 
 Orchestration exporters (capabilities)
+
 - Capabilities.secretsRefOnly=true when any secrets provider is present.
 - Emit envRef entries with fields: { name, ref, provider?, version?, mode(env|file)?, path?, required?, reload? }.
 - Vault Agent/file-sink hints are opt-in via minimal config/env.
 
 Safety
+
 - Central redaction; SecretValue.ToString throws; identifiers only in logs.
 - Metrics and tracing via ActivitySource; counters for cache hit/miss/latency/renewals.
 
@@ -113,4 +129,4 @@ Safety
 - ARCH-0047 — Orchestration hosting/providers/exporters as adapters
 - ARCH-0048 — Endpoint resolution and persistence mounts
 - ARCH-0040 — Config and constants naming
-*** End Patch
+  \*\*\* End Patch

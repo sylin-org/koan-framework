@@ -23,7 +23,7 @@ public sealed class ChainSecretResolver : ISecretResolver
     public async Task<SecretValue> GetAsync(SecretId id, CancellationToken ct = default)
     {
         var cacheKey = ($"{id}");
-    if (_cache.TryGetValue<SecretValue>(cacheKey, out var cached) && cached is not null) return cached;
+        if (_cache.TryGetValue<SecretValue>(cacheKey, out var cached) && cached is not null) return cached;
 
         foreach (var p in _providers)
         {
@@ -59,7 +59,7 @@ public sealed class ChainSecretResolver : ISecretResolver
             var v = await GetAsync(id, ct).ConfigureAwait(false);
             map[token] = v.AsString();
         }
-    var s = template;
+        var s = template;
         foreach (var kv in map)
         {
             s = s.Replace("${" + kv.Key + "}", kv.Value, StringComparison.Ordinal);
