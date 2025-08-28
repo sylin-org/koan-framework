@@ -30,6 +30,8 @@
       href: ARCH-0050-secrets-management-and-configuration-resolution.md
     - name: Secrets — dev alignment and provider-swap guardrails
       href: ARCH-0051-secrets-dev-alignment-and-provider-swap-guardrails.md
+    - name: Core IDs (ShortId + ULID) and JSON merge policy
+      href: ARCH-0052-core-ids-and-json-merge-policy.md
 - name: Data (DATA)
   items:
     - name: Data access semantics (All/Query; streaming; pager)
