@@ -1,4 +1,5 @@
-using System.Text.Json;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Sora.Web.GraphQl.Infrastructure;
 
@@ -11,35 +12,25 @@ internal static class VariableNormalizer
         if (vars is IDictionary<string, object?> d2) return new Dictionary<string, object?>(d2);
         try
         {
-            if (vars is JsonElement je)
+            if (vars is JObject jobj)
             {
-                if (je.ValueKind != JsonValueKind.Object) return null;
-                return FilterNulls((Dictionary<string, object?>)FromJsonElement(je)!);
+                var obj = FromJToken(jobj) as Dictionary<string, object?>;
+                return obj is null ? null : FilterNulls(obj);
             }
-            if (vars is JsonDocument jd)
-            {
-                if (jd.RootElement.ValueKind != JsonValueKind.Object) return null;
-                return FilterNulls((Dictionary<string, object?>)FromJsonElement(jd.RootElement)!);
-            }
-            if (vars is System.Text.Json.Nodes.JsonObject jobj)
-            {
-                using var jdoc = JsonDocument.Parse(jobj.ToJsonString());
-                if (jdoc.RootElement.ValueKind != JsonValueKind.Object) return null;
-                return FilterNulls((Dictionary<string, object?>)FromJsonElement(jdoc.RootElement)!);
-            }
-            if (vars is IDictionary<string, JsonElement> dje)
+            if (vars is IDictionary<string, JToken> djt)
             {
                 var tmp = new Dictionary<string, object?>();
-                foreach (var kv in dje)
+                foreach (var kv in djt)
                 {
-                    tmp[kv.Key] = FromJsonElement(kv.Value);
+                    tmp[kv.Key] = FromJToken(kv.Value);
                 }
                 return FilterNulls(tmp);
             }
-            var json = JsonSerializer.Serialize(vars);
-            using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.ValueKind != JsonValueKind.Object) return null;
-            return FilterNulls((Dictionary<string, object?>)FromJsonElement(doc.RootElement)!);
+            // Fallback: serialize with Newtonsoft and parse as JObject
+            var json = JsonConvert.SerializeObject(vars);
+            var parsed = JObject.Parse(json);
+            var dict = FromJToken(parsed) as Dictionary<string, object?>;
+            return dict is null ? null : FilterNulls(dict);
         }
         catch { return null; }
     }
@@ -61,35 +52,50 @@ internal static class VariableNormalizer
         return filtered;
     }
 
-    private static object? FromJsonElement(JsonElement el)
+    private static object? FromJToken(JToken token)
     {
-        switch (el.ValueKind)
+        switch (token.Type)
         {
-            case JsonValueKind.Null:
-            case JsonValueKind.Undefined:
+            case JTokenType.Null:
+            case JTokenType.Undefined:
                 return null;
-            case JsonValueKind.String:
-                return el.GetString();
-            case JsonValueKind.Number:
-                if (el.TryGetInt32(out var i)) return i;
-                if (el.TryGetInt64(out var l)) return l;
-                if (el.TryGetDouble(out var d)) return d;
-                return el.GetDecimal();
-            case JsonValueKind.True:
-            case JsonValueKind.False:
-                return el.GetBoolean();
-            case JsonValueKind.Array:
-                var list = new List<object?>();
-                foreach (var item in el.EnumerateArray()) list.Add(FromJsonElement(item));
-                if (list.Count == 0) return null;
-                if (list.Count == 1) return list[0];
-                return list;
-            case JsonValueKind.Object:
-                var dict = new Dictionary<string, object?>();
-                foreach (var prop in el.EnumerateObject()) dict[prop.Name] = FromJsonElement(prop.Value);
-                return dict;
+            case JTokenType.String:
+                return token.Value<string>();
+            case JTokenType.Integer:
+                {
+                    // Prefer smallest fitting integer type
+                    var l = token.Value<long>();
+                    if (l <= int.MaxValue && l >= int.MinValue) return (int)l;
+                    return l;
+                }
+            case JTokenType.Float:
+                {
+                    var d = token.Value<double>();
+                    // If it can be represented as decimal, prefer decimal for precision
+                    return (decimal)d == (decimal)d ? (object)(decimal)d : d;
+                }
+            case JTokenType.Boolean:
+                return token.Value<bool>();
+            case JTokenType.Array:
+                {
+                    var list = new List<object?>();
+                    foreach (var item in (JArray)token) list.Add(FromJToken(item));
+                    if (list.Count == 0) return null;
+                    if (list.Count == 1) return list[0];
+                    return list;
+                }
+            case JTokenType.Object:
+                {
+                    var obj = (JObject)token;
+                    var dict = new Dictionary<string, object?>();
+                    foreach (var prop in obj.Properties())
+                    {
+                        dict[prop.Name] = FromJToken(prop.Value);
+                    }
+                    return dict;
+                }
             default:
-                return null;
+                return token.ToString();
         }
     }
 }

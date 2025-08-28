@@ -2,8 +2,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace S2.Api.IntegrationTests;
@@ -45,9 +44,8 @@ public class SeedAndClearTests : IClassFixture<MongoFixture>
 
         var list5 = await client.GetAsync("/api/items?page=1&size=200");
         list5.StatusCode.Should().Be(HttpStatusCode.OK);
-        var items5 = await list5.Content.ReadFromJsonAsync<List<JsonElement>>();
-        items5.Should().NotBeNull();
-        items5!.Count.Should().Be(5);
+    var items5 = JArray.Parse(await list5.Content.ReadAsStringAsync());
+    items5.Count.Should().Be(5);
         list5.Headers.TryGetValues("X-Total-Count", out var tc5).Should().BeTrue();
         tc5!.Should().ContainSingle().Which.Should().Be("5");
 
@@ -56,9 +54,8 @@ public class SeedAndClearTests : IClassFixture<MongoFixture>
         s3.EnsureSuccessStatusCode();
 
         var list3 = await client.GetAsync("/api/items?page=1&size=200");
-        var items3 = await list3.Content.ReadFromJsonAsync<List<JsonElement>>();
-        items3.Should().NotBeNull();
-        items3!.Count.Should().Be(3);
+    var items3 = JArray.Parse(await list3.Content.ReadAsStringAsync());
+    items3.Count.Should().Be(3);
         list3.Headers.TryGetValues("X-Total-Count", out var tc3).Should().BeTrue();
         tc3!.Should().ContainSingle().Which.Should().Be("3");
 
@@ -67,8 +64,8 @@ public class SeedAndClearTests : IClassFixture<MongoFixture>
         clr.EnsureSuccessStatusCode();
 
         var list0 = await client.GetAsync("/api/items?page=1&size=200");
-        var items0 = await list0.Content.ReadFromJsonAsync<List<JsonElement>>();
-        (items0?.Count ?? -1).Should().Be(0);
+    var items0 = JArray.Parse(await list0.Content.ReadAsStringAsync());
+    items0.Count.Should().Be(0);
         list0.Headers.TryGetValues("X-Total-Count", out var tc0).Should().BeTrue();
         tc0!.Should().ContainSingle().Which.Should().Be("0");
     }

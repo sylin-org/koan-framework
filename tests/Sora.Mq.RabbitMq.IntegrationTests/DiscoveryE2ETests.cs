@@ -11,7 +11,8 @@ using Sora.Data.Core;
 using Sora.Messaging;
 using Sora.Messaging.Inbox.Http;
 using Sora.Testing;
-using System.Text.Json;
+using Newtonsoft.Json;
+using System.Text;
 using Xunit;
 
 namespace Sora.Mq.RabbitMq.IntegrationTests;
@@ -75,7 +76,7 @@ public class DiscoveryE2ETests : IAsyncLifetime
             var corr = ea.BasicProperties?.CorrelationId;
             if (!string.IsNullOrWhiteSpace(replyTo))
             {
-                var body = JsonSerializer.SerializeToUtf8Bytes(new { endpoint = "http://localhost:19090" });
+                var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { endpoint = "http://localhost:19090" }));
                 var props = channel.CreateBasicProperties();
                 props.CorrelationId = corr;
                 props.ContentType = "application/json";

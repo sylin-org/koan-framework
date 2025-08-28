@@ -104,3 +104,16 @@ adapters:
       defaultPageSize: 50
       maxPageSize: 200
     notes: "Dev/local adapter; LINQ in-memory; best-effort batch; not for large datasets."
+
+  - name: Vault
+    storage: Secrets
+    transactions: n/a
+    batching: n/a
+    pagingPushdown: n/a
+    filterPushdown: n/a
+    schemaTools: n/a
+    instructionApi: n/a
+    vector: none
+    guardrails:
+      defaultTtl: 5m
+    notes: "HashiCorp Vault KV v2 provider. Uses secret+vault:// URIs; integrates with health checks."

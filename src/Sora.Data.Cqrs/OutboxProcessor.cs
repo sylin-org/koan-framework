@@ -2,8 +2,8 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Sora.Data.Core;
-using System.Text.Json;
 
 namespace Sora.Data.Cqrs;
 
@@ -88,7 +88,7 @@ internal sealed class OutboxProcessor : BackgroundService
 
         if (string.Equals(entry.Operation, "Upsert", StringComparison.OrdinalIgnoreCase))
         {
-            var model = JsonSerializer.Deserialize(entry.PayloadJson, entityType, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var model = JsonConvert.DeserializeObject(entry.PayloadJson, entityType);
             if (model is null) return;
             var upsertAsync = repo.GetType().GetMethod("UpsertAsync");
             await (Task)upsertAsync!.Invoke(repo, new object?[] { model, ct })!;

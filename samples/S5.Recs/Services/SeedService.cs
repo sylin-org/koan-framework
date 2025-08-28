@@ -10,8 +10,8 @@ using Sora.Data.Core;
 using Sora.Data.Vector;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text.Json;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
 
 namespace S5.Recs.Services;
 
@@ -53,7 +53,7 @@ internal sealed class SeedService : ISeedService
                 try { await CatalogGenresAsync(data, ct); } catch (Exception ex) { _logger?.LogWarning(ex, "Genre cataloging failed: {Message}", ex.Message); }
                 _progress[jobId] = (data.Count, data.Count, embedded, imported, true, null);
                 _logger?.LogInformation("Seeding job {JobId}: imported {Imported} docs into Mongo", jobId, imported);
-                await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest.json"), JsonSerializer.Serialize(new { jobId, count = data.Count, at = DateTimeOffset.UtcNow }), ct);
+                await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest.json"), JsonConvert.SerializeObject(new { jobId, count = data.Count, at = DateTimeOffset.UtcNow }), ct);
                 _logger?.LogInformation("Seeding job {JobId} completed. Manifest written.", jobId);
             }
             catch (Exception ex)
@@ -82,7 +82,7 @@ internal sealed class SeedService : ISeedService
                 var embedded = await UpsertVectorsAsync(items ?? [], ct);
                 _progress[jobId] = (count, count, embedded, 0, true, null);
                 _logger?.LogInformation("Vector-only job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
-                await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest-vectors.json"), JsonSerializer.Serialize(new { jobId, count = count, at = DateTimeOffset.UtcNow }), ct);
+                await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest-vectors.json"), JsonConvert.SerializeObject(new { jobId, count = count, at = DateTimeOffset.UtcNow }), ct);
             }
             catch (Exception ex)
             {

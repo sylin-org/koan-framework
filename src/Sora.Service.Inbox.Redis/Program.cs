@@ -1,7 +1,7 @@
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using StackExchange.Redis;
-using System.Text.Json;
+using Newtonsoft.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,7 +57,8 @@ void TryStartAnnouncer()
                 var corr = ea.BasicProperties?.CorrelationId;
                 if (!string.IsNullOrWhiteSpace(replyTo))
                 {
-                    var payload = JsonSerializer.SerializeToUtf8Bytes(new { endpoint = ResolveEndpoint(), kind = "inbox", name = "redis", version = "v1" });
+                    var payloadJson = JsonConvert.SerializeObject(new { endpoint = ResolveEndpoint(), kind = "inbox", name = "redis", version = "v1" });
+                    var payload = System.Text.Encoding.UTF8.GetBytes(payloadJson);
                     var props = channel.CreateBasicProperties();
                     props.CorrelationId = corr;
                     props.ContentType = "application/json";

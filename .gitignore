@@ -66,3 +66,4 @@ node_modules/
  
 # Docker runtime status artifacts (avoid committing transient ps outputs)
 /samples/**/ps.json
+/.sora

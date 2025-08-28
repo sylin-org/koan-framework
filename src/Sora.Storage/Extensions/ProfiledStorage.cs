@@ -1,5 +1,5 @@
 ﻿using Sora.Storage.Abstractions;
-using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace Sora.Storage.Extensions;
 
@@ -20,7 +20,7 @@ public readonly struct ProfiledStorage
     public Task<StorageObject> CreateTextFile(string key, string content, string? contentType = "text/plain; charset=utf-8", CancellationToken ct = default)
         => _svc.CreateTextFile(key, content, contentType, Profile, Container, ct);
 
-    public Task<StorageObject> CreateJson<T>(string key, T value, JsonSerializerOptions? options = null, string contentType = "application/json; charset=utf-8", CancellationToken ct = default)
+    public Task<StorageObject> CreateJson<T>(string key, T value, JsonSerializerSettings? options = null, string contentType = "application/json; charset=utf-8", CancellationToken ct = default)
         => _svc.CreateJson(key, value, options, Profile, Container, contentType, ct);
 
     public Task<StorageObject> CreateJson(string key, string json, CancellationToken ct = default)

@@ -9,6 +9,7 @@ using Sora.Core;
 using System.Net;
 using System.Net.Http.Headers;
 using Xunit;
+using Newtonsoft.Json.Linq;
 
 namespace S6.SocialCreator.IntegrationTests;
 
@@ -56,7 +57,7 @@ public sealed class ImageSanityTests
         mp.Add(file, "file", "one.png");
         var upload = await client.PostAsync("/api/upload", mp);
         upload.EnsureSuccessStatusCode();
-        var key = System.Text.Json.JsonDocument.Parse(await upload.Content.ReadAsStringAsync()).RootElement.GetProperty("key").GetString();
+    var key = JToken.Parse(await upload.Content.ReadAsStringAsync())["key"]!.Value<string>();
 
         var get = await client.GetAsync($"/api/media/{key}");
         get.StatusCode.Should().Be(HttpStatusCode.OK);

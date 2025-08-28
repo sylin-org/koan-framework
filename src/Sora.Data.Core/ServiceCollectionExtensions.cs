@@ -63,14 +63,36 @@ public static class ServiceCollectionExtensions
         // Provide a default IConfiguration only if the host hasn't already registered one
         if (!services.Any(d => d.ServiceType == typeof(IConfiguration)))
         {
-            var cfg = new ConfigurationBuilder()
+            var cb = new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
-                .AddEnvironmentVariables()
-                .Build();
+                .AddEnvironmentVariables();
+            // If Sora.Secrets.Core is referenced, auto-add the secrets configuration wrapper
+            try
+            {
+                var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "Sora.Secrets.Core");
+                var ext = asm?.GetType("Sora.Secrets.Core.Configuration.SecretResolvingConfigurationExtensions");
+                var mi = ext?.GetMethod("AddSecretsReferenceConfiguration", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (mi is not null)
+                {
+                    _ = mi.Invoke(null, new object?[] { cb, null });
+                }
+            }
+            catch { /* optional */ }
+
+            var cfg = cb.Build();
             services.AddSingleton<IConfiguration>(cfg);
         }
         var sp = services.BuildServiceProvider();
         Sora.Core.Hosting.App.AppHost.Current = sp;
+        // If secrets configuration is present, upgrade from bootstrap to DI-backed resolver and emit reload
+        try
+        {
+            var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "Sora.Secrets.Core");
+            var ext = asm?.GetType("Sora.Secrets.Core.Configuration.SecretResolvingConfigurationExtensions");
+            var mi = ext?.GetMethod("UpgradeSecretsConfiguration", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            mi?.Invoke(null, new object?[] { sp });
+        }
+        catch { /* optional */ }
         try { SoraEnv.TryInitialize(sp); } catch { }
         var rt = sp.GetService<Sora.Core.Hosting.Runtime.IAppRuntime>();
         rt?.Discover();

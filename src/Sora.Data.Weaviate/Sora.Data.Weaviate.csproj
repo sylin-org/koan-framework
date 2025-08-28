@@ -14,7 +14,8 @@
   <ProjectReference Include="..\Sora.Data.Vector.Abstractions\Sora.Data.Vector.Abstractions.csproj" />
     <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
   <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
-    <PackageReference Include="System.Net.Http.Json" Version="9.0.0" />
+  <ProjectReference Include="..\Sora.Orchestration.Abstractions\Sora.Orchestration.Abstractions.csproj" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>

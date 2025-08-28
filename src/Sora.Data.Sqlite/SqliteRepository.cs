@@ -17,6 +17,7 @@ using Sora.Data.Relational.Orchestration;
 using System.Collections.Concurrent;
 using System.Data;
 using System.Linq.Expressions;
+using Newtonsoft.Json;
 
 namespace Sora.Data.Sqlite;
 
@@ -212,10 +213,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     // Basic serialization helpers
     private static TEntity FromRow((string Id, string Json) row)
-        => System.Text.Json.JsonSerializer.Deserialize<TEntity>(row.Json)!;
+        => JsonConvert.DeserializeObject<TEntity>(row.Json)!;
     private static (string Id, string Json) ToRow(TEntity e)
     {
-        var json = System.Text.Json.JsonSerializer.Serialize(e);
+        var json = JsonConvert.SerializeObject(e);
         var id = e.Id!.ToString()!;
         return (id, json);
     }
@@ -1121,7 +1122,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             // Prefer Json column if present
             if (dict.TryGetValue("Json", out var jsonVal) && jsonVal is string jsonStr && !string.IsNullOrWhiteSpace(jsonStr))
             {
-                var ent = System.Text.Json.JsonSerializer.Deserialize<TEntity>(jsonStr);
+                var ent = JsonConvert.DeserializeObject<TEntity>(jsonStr);
                 if (ent is not null) list.Add(ent);
                 continue;
             }
@@ -1145,7 +1146,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 {
                     if (mv is string ms && !string.IsNullOrWhiteSpace(ms) && ms.TrimStart().StartsWith("{"))
                     {
-                        var obj = System.Text.Json.JsonSerializer.Deserialize(ms, metaProp.PropertyType);
+                        var obj = JsonConvert.DeserializeObject(ms, metaProp.PropertyType);
                         if (obj is not null) metaProp.SetValue(ent2, obj);
                     }
                 }

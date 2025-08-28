@@ -9,6 +9,7 @@ using Sora.Core;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace S6.SocialCreator.IntegrationTests;
@@ -58,8 +59,7 @@ public sealed class MediaTransformTests
         mp.Add(file, "file", "one.png");
         var upload = await client.PostAsync("/api/upload", mp);
         upload.EnsureSuccessStatusCode();
-        var id = System.Text.Json.JsonDocument.Parse(await upload.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("id").GetGuid();
+    var id = JToken.Parse(await upload.Content.ReadAsStringAsync())["id"]!.Value<Guid>();
 
         // Request with transform query -> should 301 to canonical variant id
         var resp = await client.GetAsync($"/api/media/{id}/one.png?w=2&format=webp");

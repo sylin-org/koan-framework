@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="HotChocolate.AspNetCore" Version="13.8.1" />
     <PackageReference Include="HotChocolate.Execution" Version="13.8.1" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   <!-- Exclude the Banana Cake Pop UI middleware pulled transitively to keep runtime surface minimal and avoid test-time probe issues -->
   <PackageReference Include="BananaCakePop.Middleware" Version="13.0.0" ExcludeAssets="all" />
   </ItemGroup>

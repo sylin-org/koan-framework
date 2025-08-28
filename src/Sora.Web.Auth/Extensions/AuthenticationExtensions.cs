@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Web.Auth.Options;
+using Newtonsoft.Json.Linq;
 
 namespace Sora.Web.Auth.Extensions;
 
@@ -26,6 +27,9 @@ public static class AuthenticationExtensions
                 o.Cookie.HttpOnly = true;
                 // UseSameAsRequest supports HTTP in Dev/containers while remaining secure on HTTPS
                 o.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest;
+                o.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
+                o.Cookie.Path = "/";
+                o.Cookie.Name = ".AspNetCore.sora.cookie";
                 o.SlidingExpiration = true;
             });
 
@@ -82,8 +86,15 @@ public static class AuthenticationExtensions
                                 req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ctx.AccessToken);
                                 var resp = await ctx.Backchannel.SendAsync(req, ctx.HttpContext.RequestAborted);
                                 resp.EnsureSuccessStatusCode();
-                                using var user = System.Text.Json.JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
-                                ctx.RunClaimActions(user.RootElement);
+                                var json = await resp.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted);
+                                var user = JObject.Parse(json);
+                                // Map common claims manually for Newtonsoft JObject
+                                var sub = (string?)user["sub"] ?? (string?)user["id"];
+                                var name = (string?)user["name"] ?? (string?)user["username"];
+                                var avatar = (string?)user["avatar"] ?? (string?)user["picture"];
+                                if (!string.IsNullOrWhiteSpace(sub)) ctx.Identity!.AddClaim(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, sub));
+                                if (!string.IsNullOrWhiteSpace(name)) ctx.Identity!.AddClaim(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, name));
+                                if (!string.IsNullOrWhiteSpace(avatar)) ctx.Identity!.AddClaim(new System.Security.Claims.Claim("avatar", avatar));
                             }
                         }
                     };

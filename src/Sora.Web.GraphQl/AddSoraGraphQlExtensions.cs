@@ -18,6 +18,8 @@ using Sora.Web.Hooks;
 using Sora.Web.Infrastructure;
 using System.Diagnostics;
 using System.Reflection;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Sora.Web.GraphQl;
 
@@ -173,7 +175,7 @@ public static class AddSoraGraphQlExtensions
                     string? q = ctx.ArgumentValue<string?>("q");
                     string? fstr = ctx.ArgumentValue<string?>("filter");
                     object? fobj = ctx.ArgumentValue<object?>("filterObj");
-                    string? filter = fstr ?? (fobj is null ? null : System.Text.Json.JsonSerializer.Serialize(fobj));
+                    string? filter = fstr ?? (fobj is null ? null : JsonConvert.SerializeObject(fobj));
                     bool ignore = ctx.ArgumentValue<bool?>("ignoreCase") ?? false;
                     int page = ctx.ArgumentValue<int?>("page") ?? 1;
                     int size = ctx.ArgumentValue<int?>("size") ?? SoraWebConstants.Defaults.DefaultPageSize;
@@ -216,7 +218,7 @@ public static class AddSoraGraphQlExtensions
                         string? q = ctx.ArgumentValue<string?>("q");
                         string? fstr = ctx.ArgumentValue<string?>("filter");
                         object? fobj = ctx.ArgumentValue<object?>("filterObj");
-                        string? filter = fstr ?? (fobj is null ? null : System.Text.Json.JsonSerializer.Serialize(fobj));
+                        string? filter = fstr ?? (fobj is null ? null : JsonConvert.SerializeObject(fobj));
                         bool ignore = ctx.ArgumentValue<bool?>("ignoreCase") ?? false;
                         int page = ctx.ArgumentValue<int?>("page") ?? 1;
                         int size = ctx.ArgumentValue<int?>("size") ?? SoraWebConstants.Defaults.DefaultPageSize;
@@ -601,16 +603,16 @@ public static class AddSoraGraphQlExtensions
                 var hctx = new HookContext<TEntity> { Http = http, Services = http.RequestServices, Options = opts, Capabilities = caps, Ct = ctx.RequestAborted };
                 var runner = GetRunner(http);
 
-                var doc = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(input));
+                var jobj = JObject.Parse(JsonConvert.SerializeObject(input));
                 var model = Activator.CreateInstance<TEntity>()!;
                 foreach (var prop in typeof(TEntity).GetProperties(BindingFlags.Instance | BindingFlags.Public))
                 {
                     if (!prop.CanWrite) continue;
                     if (string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase)) continue;
                     if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string)) continue;
-                    if (doc.RootElement.TryGetProperty(prop.Name, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String)
+                    if (jobj.TryGetValue(prop.Name, StringComparison.OrdinalIgnoreCase, out var v) && v.Type == JTokenType.String)
                     {
-                        prop.SetValue(model, v.GetString());
+                        prop.SetValue(model, v.Value<string>());
                     }
                 }
 

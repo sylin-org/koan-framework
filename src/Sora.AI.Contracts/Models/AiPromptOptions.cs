@@ -1,5 +1,5 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Sora.AI.Contracts.Models;
 
@@ -23,5 +23,5 @@ public record AiPromptOptions
     /// Example (Ollama): { "mirostat": 2, "repeat_penalty": 1.1 }.
     /// </summary>
     [JsonExtensionData]
-    public IDictionary<string, JsonElement>? VendorOptions { get; init; }
+    public IDictionary<string, JToken>? VendorOptions { get; init; }
 }

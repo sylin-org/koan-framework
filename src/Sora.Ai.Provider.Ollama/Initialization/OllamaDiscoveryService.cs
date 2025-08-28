@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json.Linq;
 using Sora.Ai.Provider.Ollama.Options;
 using Sora.AI.Contracts.Routing;
 
@@ -112,11 +113,12 @@ internal sealed class OllamaDiscoveryService : IHostedService
         // Accept either exact name or prefix before ':' tag (e.g., "all-minilm" matches "all-minilm:latest")
         try
         {
-            using var doc = System.Text.Json.JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("models", out var models)) return false;
-            foreach (var m in models.EnumerateArray())
+            var doc = JToken.Parse(json);
+            var models = doc["models"] as JArray;
+            if (models is null) return false;
+            foreach (var m in models)
             {
-                var name = m.TryGetProperty("name", out var n) ? n.GetString() : null;
+                var name = m?["name"]?.ToString();
                 if (string.IsNullOrEmpty(name)) continue;
                 var baseName = name.Split(':')[0];
                 if (string.Equals(name, required, StringComparison.OrdinalIgnoreCase) ||

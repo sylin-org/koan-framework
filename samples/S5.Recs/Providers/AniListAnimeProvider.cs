@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using S5.Recs.Models;
 using System.Net.Http.Headers;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace S5.Recs.Providers;
@@ -37,7 +38,7 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
                 using var req = new HttpRequestMessage(HttpMethod.Post, AniListEndpoint);
                 req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 var payload = new { query, variables = new { page = pageNum, perPage } };
-                req.Content = new StringContent(JsonSerializer.Serialize(payload));
+                req.Content = new StringContent(JsonConvert.SerializeObject(payload));
                 req.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
                 using var res = await client.SendAsync(req, ct);
@@ -70,62 +71,67 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
                 // Reset retries after a success
                 rateLimitRetries = 0; transientRetries = 0;
 
-                using var s = await res.Content.ReadAsStreamAsync(ct);
-                using var doc = await JsonDocument.ParseAsync(s, cancellationToken: ct);
-                if (!doc.RootElement.TryGetProperty("data", out var dataEl) || !dataEl.TryGetProperty("Page", out var pageEl))
+                var txt = await res.Content.ReadAsStringAsync(ct);
+                var doc = JToken.Parse(txt);
+                var dataEl = doc["data"];
+                var pageEl = dataEl?["Page"];
+                if (pageEl is null)
                 {
                     logger?.LogWarning("AniList: missing data.Page on page {Page}. Preserving {Count} items and stopping.", pageNum, list.Count);
                     break;
                 }
 
-                if (pageEl.TryGetProperty("pageInfo", out var pi))
+                var pi = pageEl["pageInfo"];
+                if (pi is not null)
                 {
-                    hasNext = pi.TryGetProperty("hasNextPage", out var hnp) && hnp.ValueKind == JsonValueKind.True;
+                    hasNext = (bool?)(pi["hasNextPage"]?.Value<bool>()) == true;
                 }
                 else { hasNext = false; }
 
-                if (pageEl.TryGetProperty("media", out var media) && media.ValueKind == JsonValueKind.Array)
+                var media = pageEl["media"] as JArray;
+                if (media is not null)
                 {
-                    foreach (var m in media.EnumerateArray())
+                    foreach (var m in media)
                     {
-                        var id = m.GetProperty("id").GetInt32().ToString();
-                        var title = m.GetProperty("title").GetProperty("english").GetString()
-                                    ?? m.GetProperty("title").GetProperty("romaji").GetString()
-                                    ?? m.GetProperty("title").GetProperty("native").GetString()
+                        var id = m["id"]?.Value<int>().ToString() ?? "";
+                        var title = m["title"]?["english"]?.Value<string>()
+                                    ?? m["title"]?["romaji"]?.Value<string>()
+                                    ?? m["title"]?["native"]?.Value<string>()
                                     ?? $"AniList {id}";
-                        var episodes = m.TryGetProperty("episodes", out var ep) && ep.ValueKind == JsonValueKind.Number ? ep.GetInt32() : (int?)null;
-                        var genres = m.TryGetProperty("genres", out var g) && g.ValueKind == JsonValueKind.Array ? g.EnumerateArray().Select(x => x.GetString() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() : Array.Empty<string>();
-                        var desc = m.TryGetProperty("description", out var d) ? d.GetString() : null;
+                        var episodes = m["episodes"]?.Value<int?>();
+                        var genres = m["genres"] is JArray gArr ? gArr.Select(x => x?.Value<string>() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() : Array.Empty<string>();
+                        var desc = m["description"]?.Value<string>();
                         var synopsis = string.IsNullOrWhiteSpace(desc) ? null : Regex.Replace(desc!, "<.*?>", string.Empty).Replace("\n", " ").Trim();
 
                         // Optional titles and synonyms
-                        string? tEn = null, tRo = null, tNa = null;
-                        try { var te = m.GetProperty("title"); tEn = te.GetProperty("english").GetString(); tRo = te.GetProperty("romaji").GetString(); tNa = te.GetProperty("native").GetString(); } catch { }
-                        var synonyms = m.TryGetProperty("synonyms", out var syn) && syn.ValueKind == JsonValueKind.Array
-                            ? syn.EnumerateArray().Select(x => x.GetString() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+                        string? tEn = m["title"]?["english"]?.Value<string>();
+                        string? tRo = m["title"]?["romaji"]?.Value<string>();
+                        string? tNa = m["title"]?["native"]?.Value<string>();
+                        var synonyms = m["synonyms"] is JArray syn
+                            ? syn.Select(x => x?.Value<string>() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
                             : Array.Empty<string>();
                         // Tags
-                        var tags = m.TryGetProperty("tags", out var tg) && tg.ValueKind == JsonValueKind.Array
-                            ? tg.EnumerateArray().Select(x => x.TryGetProperty("name", out var nm) ? nm.GetString() ?? string.Empty : string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+                        var tags = m["tags"] is JArray tg
+                            ? tg.Select(x => x?["name"]?.Value<string>() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
                             : Array.Empty<string>();
 
                         // Images
                         string? cover = null, banner = null, color = null;
-                        if (m.TryGetProperty("coverImage", out var ci) && ci.ValueKind == JsonValueKind.Object)
+                        if (m["coverImage"] is JObject ci)
                         {
-                            cover = ci.TryGetProperty("large", out var l) ? l.GetString() : (ci.TryGetProperty("extraLarge", out var xl) ? xl.GetString() : (ci.TryGetProperty("medium", out var md) ? md.GetString() : null));
-                            color = ci.TryGetProperty("color", out var cc) ? cc.GetString() : null;
+                            cover = ci["large"]?.Value<string>() ?? (ci["extraLarge"]?.Value<string>() ?? (ci["medium"]?.Value<string>()));
+                            color = ci["color"]?.Value<string>();
                         }
-                        banner = m.TryGetProperty("bannerImage", out var bi) ? bi.GetString() : null;
+                        banner = m["bannerImage"]?.Value<string>();
 
                         double popularity = 0.0;
-                        if (m.TryGetProperty("averageScore", out var avg) && avg.ValueKind == JsonValueKind.Number)
+                        if (m["averageScore"] != null)
                         {
-                            popularity = Math.Clamp(avg.GetInt32() / 100.0, 0.0, 1.0);
+                            popularity = Math.Clamp((m["averageScore"]!.Value<int>()) / 100.0, 0.0, 1.0);
                         }
-                        else if (m.TryGetProperty("popularity", out var pop) && pop.ValueKind == JsonValueKind.Number)
+                        else if (m["popularity"] != null)
                         {
-                            var p = pop.GetInt32();
+                            var p = m["popularity"]!.Value<int>();
                             popularity = Math.Clamp(Math.Log10(Math.Max(1, p)) / 5.0, 0.0, 1.0);
                         }
 

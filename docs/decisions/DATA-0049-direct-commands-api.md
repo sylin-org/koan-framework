@@ -102,6 +102,6 @@ Notes:
 
 ## Alternatives considered
 
-- System.Text.Json for mapping: lighter but less forgiving for this use-case.
+- Newtonsoft.Json for mapping: more flexible and consistent across Sora.
 - Sync/async dual API: rejected to keep the surface terse and consistent.
 - Transactions hidden inside each call: rejected for lack of control; explicit Begin/Commit preferred.

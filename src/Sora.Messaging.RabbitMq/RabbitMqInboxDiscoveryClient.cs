@@ -4,7 +4,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Sora.Core;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Sora.Messaging.RabbitMq;
 
@@ -86,7 +86,8 @@ internal sealed class RabbitMqInboxDiscoveryClient : IInboxDiscoveryClient
         props.ReplyTo = q;
         props.Expiration = "2000"; // ms
         props.ContentType = "application/json";
-        var payload = JsonSerializer.SerializeToUtf8Bytes(new { kind = "inbox", name = "sora-client", version = "v1" });
+    var payloadJson = Newtonsoft.Json.JsonConvert.SerializeObject(new { kind = "inbox", name = "sora-client", version = "v1" });
+    var payload = Encoding.UTF8.GetBytes(payloadJson);
         channel.BasicPublish(exchange: exchange, routingKey: rk, mandatory: false, basicProperties: props, body: payload);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -128,14 +129,11 @@ internal sealed class RabbitMqInboxDiscoveryClient : IInboxDiscoveryClient
     {
         try
         {
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            if (root.TryGetProperty("endpoint", out var ep))
-            {
-                if (ep.ValueKind == JsonValueKind.String) return ep.GetString();
-                if (ep.ValueKind == JsonValueKind.Object && ep.TryGetProperty("url", out var url) && url.ValueKind == JsonValueKind.String)
-                    return url.GetString();
-            }
+            var root = JToken.Parse(json);
+            var ep = root["endpoint"];
+            if (ep is JValue v && v.Type == JTokenType.String) return v.Value<string>();
+            if (ep is JObject o && o.TryGetValue("url", out var url) && url.Type == JTokenType.String)
+                return url.Value<string>();
         }
         catch { }
         return null;

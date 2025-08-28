@@ -1,5 +1,5 @@
-﻿using Sora.Data.Abstractions;
-using System.Text.Json;
+﻿using Newtonsoft.Json;
+using Sora.Data.Abstractions;
 
 namespace Sora.Data.Cqrs;
 
@@ -82,7 +82,7 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     {
         if (_outbox is null) return;
         var entityId = id is not null ? id!.ToString()! : model is not null ? model.Id?.ToString() ?? string.Empty : string.Empty;
-        var payload = model is not null ? JsonSerializer.Serialize(model, new JsonSerializerOptions(JsonSerializerDefaults.Web)) : "{}";
+    var payload = model is not null ? JsonConvert.SerializeObject(model) : "{}";
         var entry = new OutboxEntry(Guid.NewGuid().ToString("n"), DateTimeOffset.UtcNow, typeof(TEntity).AssemblyQualifiedName!, op, entityId, payload);
         await _outbox.AppendAsync(entry, ct);
     }

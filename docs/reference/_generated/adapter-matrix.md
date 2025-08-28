@@ -9,3 +9,4 @@
 | Redis | KeyValue | No | partial | none | none | n/a | limited | none |  | In-memory filtering and client-side paging; ensure/clear instructions. |
 | Weaviate | Vector | No | partial | n/a | true | native | direct | native |  | GraphQL nearVector with where filter; cursor continuation. See DATA-0054; primary store hydration recommended. |
 | Json | Filesystem | No | partial | none | none | n/a | limited | none |  | Dev/local adapter; LINQ in-memory; best-effort batch; not for large datasets. |
+| Vault | Secrets | n/a | n/a | n/a | n/a | n/a | n/a | none |  | HashiCorp Vault KV v2 provider. Uses secret+vault:// URIs; integrates with health checks. |

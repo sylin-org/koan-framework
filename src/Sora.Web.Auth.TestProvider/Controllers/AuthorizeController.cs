@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Web.Auth.TestProvider.Infrastructure;
 using Sora.Web.Auth.TestProvider.Options;
@@ -7,7 +8,7 @@ using Sora.Web.Auth.TestProvider.Options;
 namespace Sora.Web.Auth.TestProvider.Controllers;
 
 [ApiController]
-public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, IHostEnvironment env) : ControllerBase
+public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, IHostEnvironment env, ILogger<AuthorizeController> logger) : ControllerBase
 {
     [HttpGet]
     [Route(".testoauth/authorize")]
@@ -116,6 +117,7 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
         var q = System.Web.HttpUtility.ParseQueryString(uri.Query);
         q["code"] = code; if (!string.IsNullOrWhiteSpace(state)) q["state"] = state;
         uri.Query = q.ToString()!;
+        logger.LogDebug("TestProvider authorize: issuing code and redirecting to {Redirect}", uri.ToString());
         return Redirect(uri.ToString());
     }
 }

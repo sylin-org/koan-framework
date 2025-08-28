@@ -10,6 +10,8 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - Adapter-agnostic persistence (relational/NoSQL/JSON), pushdown-first, Direct escape hatch, CQRS/outbox, vector module.
 - Storage
   - Profile-based storage orchestrator with thin providers; local filesystem provider; DX helpers and model-centric API.
+- Media
+  - First-class media objects, HTTP bytes/HEAD endpoints with range/conditional support, cache-control, variants/derivatives, and transform pipelines integrated with Storage profiles.
 - Web
   - Controllers-only HTTP (REST/GraphQL), startup pipeline wiring, Swagger by default in dev, payload transformers.
 - Scheduling
@@ -22,14 +24,19 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - Tiny templates, auto-registration across modules, decision docs (ADRs), container-smart defaults.
 - Recipes
   - Intention-driven bootstrap bundles (health checks, telemetry, reliability, workers) that layer predictable defaults on top of referenced modules; activate via package, config, or code with dry-run and capability gating.
+- Orchestration
+  - DevHost CLI and adapters to bring up local dependencies (Docker/Podman) and export deterministic artifacts (Compose v2 today). Profile-aware behavior (local/ci run; staging/prod export-only), scoped readiness waits, port-conflict policy, endpoint hints, and single-binary distribution (dist/bin/Sora.exe) with publish/install scripts.
 
 References
 - Data: docs/reference/data-access.md
 - Storage: docs/reference/storage.md
+- Media: docs/reference/media.md
 - Web: docs/reference/web.md
 - Messaging: docs/reference/messaging.md
 - AI: docs/reference/ai.md
 - Recipes: docs/reference/recipes.md
+- Orchestration: docs/reference/orchestration.md
+- Sora CLI: docs/reference/sora-cli.md
 
 ## Pillars → outcomes
 
@@ -81,9 +88,23 @@ References
   - Turnkey inference (streaming chat, embeddings) with minimal config; Redis-first vector + cache; RAG defaults; observability and budgets; optional sidecar/central proxy; one-call AddSoraAI() and auto-boot discovery.
   - Ollama provider integration for local AI models with streaming support and health monitoring.
   - Weaviate vector database adapter with GraphQL query translation and KNN search capabilities.
+- Media
+  - MediaObject<T> static API: Upload, Get, Open, Url, Ensure, Derivatives, Ancestors/Descendants, RunTask/StreamTask.
+  - HTTP endpoints (Sora.Media.Web): GET/HEAD bytes with conditional and range requests; proper Accept-Ranges, Content-Range, ETag/Last-Modified, and Cache-Control.
+  - Derivatives/variants: idempotent by DerivationKey, linked via SourceMediaId + RelationshipType; variant routing and canonical signatures per ADR MEDIA-0003.
+  - Transform pipeline (Sora.Media.Core): operator registry (resize, rotate, type-convert), strictness and placement options, predictable signatures.
+  - Storage integration: profile-based placement (hot/cold), presigned URLs when supported, CDN-friendly headers, and safe key handling via Storage.
+- Orchestration
+  - DevHost CLI: export, up, down, status, logs with Docker-first then Podman fallback; JSON/verbose modes for tooling.
+  - Deterministic export: emits `.sora/compose.yml` with profile-aware mounts and safe quoting; descriptor-first planning.
+  - Readiness semantics: services must be Running; if a healthcheck exists it must be Healthy. Timeout maps to exit code 4 with clear guidance.
+  - Engine hygiene: pre-run `compose down -v --remove-orphans`, per-run project isolation (COMPOSE_PROJECT_NAME), `compose config` preflight.
+  - Ports: conflict auto-avoid in non‑prod with optional `--base-port`; prod fails fast; status surfaces live endpoints and conflicts.
+  - Distribution: single-file CLI published to `dist/bin` with a friendly alias `Sora.exe` and helper scripts to publish/install/verify.
 - Services & DX
   - Fast onboarding (Tiny\* templates, meta packages), reliable test ops (Docker/AI probes), decision clarity (normalized ADRs).
   - Auto-registration across modules reduces boilerplate; templates and samples rely on controllers-only routing (no inline endpoints).
+  - DevHost CLI streamlines local runs and CI exports; Windows-first scripts help publish/install/verify a single-file `Sora` binary.
   - Container-smart defaults and discovery lists for adapters and AI providers; see Guides → "Container-smart defaults" and ADR OPS-0051.
   
 ## Recipes
@@ -108,6 +129,7 @@ References
 - Modern UI backends: REST + GraphQL from the same model with consistent naming and filter semantics.
 - AI assist & RAG: `/ai/chat` with SSE, `/ai/embed`, and `/ai/rag/query` with citations; Redis vector and cache by default; Weaviate and pgvector support.
 - Vector operations: Multi-provider vector search (Redis HNSW, Weaviate GraphQL, planned pgvector) with unified query interface.
+- Local dev orchestration: use `sora up` to start Postgres/Redis/etc., with health-gated readiness and clear endpoint hints; `sora export compose` for CI/staging.
 - Data bridge: snapshot export/import (JSONL/CSV/Parquet), CDC via Debezium/Kafka, virtualization (composed reads), scheduled materialization.
 - First-run bootstrap: schedule startup tasks to seed local data and vectors, with readiness gating disabled by default (opt-in when needed).
 - File/object storage:
@@ -134,6 +156,7 @@ References
 - AI cost/leakage → token/time budgets, prompt hashing, redaction-by-default, model allow-lists.
 - Vector posture → Redis guardrails (memory/persistence/HA); pgvector parity tests; migration utilities.
 - Storage posture → path traversal prevention, atomic writes, startup validation for profiles/defaults, explicit errors when presign is unsupported; range validation with clear 416-style semantics at the web edge.
+- Orchestration posture → explicit profiles; no auto-mounts in prod; port-conflict fail-fast in prod; redact secrets in human-readable output; descriptor-first resolution.
 
 ## Coming soon (on-ramp and near-term)
 
@@ -199,3 +222,4 @@ References
 ---
 
 See also: `docs/decisions/index.md` for architectural decisions and `docs/guides/*` for topic guides.
+

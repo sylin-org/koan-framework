@@ -11,22 +11,25 @@
     <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
     <ProjectReference Include="..\..\src\Sora.Web.Swagger\Sora.Web.Swagger.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Data.Vector.Abstractions\Sora.Data.Vector.Abstractions.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Data.Vector\Sora.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Data.Vector.Abstractions\Sora.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Data.Vector\Sora.Data.Vector.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
     <ProjectReference Include="..\..\src\Sora.Data.Weaviate\Sora.Data.Weaviate.csproj" />
     <ProjectReference Include="..\..\src\Sora.AI\Sora.AI.csproj" />
     <ProjectReference Include="..\..\src\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Sora.Ai.Provider.Ollama\Sora.Ai.Provider.Ollama.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Scheduling\Sora.Scheduling.csproj" />
-  <!-- Auth core and dev TestProvider for Development login/testing -->
-  <ProjectReference Include="..\..\src\Sora.Web.Auth\Sora.Web.Auth.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Web.Auth.TestProvider\Sora.Web.Auth.TestProvider.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Scheduling\Sora.Scheduling.csproj" />
+    <!-- Auth core and dev TestProvider for Development login/testing -->
+    <ProjectReference Include="..\..\src\Sora.Web.Auth\Sora.Web.Auth.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Web.Auth.TestProvider\Sora.Web.Auth.TestProvider.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="wwwroot\\**\\*" CopyToPublishDirectory="PreserveNewest" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>

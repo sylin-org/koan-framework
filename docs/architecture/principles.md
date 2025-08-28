@@ -26,6 +26,16 @@ References: DATA-0061 (semantics), DATA-0044 (paging guardrails), DATA-0029/0031
 
 References: WEB-0035 (EntityController transformers), ARCH-0011 (headers layering).
 
+## Orchestration (DevHost)
+
+- Provider adapters drive hosting (Docker → Podman precedence on Windows); selection can be forced per run.
+- Exporters generate deterministic artifacts (Compose v2 today; Helm/ACA planned) with safe env substitution and profile-aware persistence mounts.
+- Profiles: local/ci can run; staging/prod are export-only by default. Non-prod auto-avoids port conflicts; prod fails fast on conflicts.
+- Readiness: wait for running/healthy containers with timeouts; surface endpoint hints consistently.
+- Discovery: prefer explicit descriptor (sora.orchestration.{yml|json}) and minimal config over broad scans; keep trimming/AOT-friendly.
+
+References: ARCH-0047 (hosting providers/exporters), ARCH-0048 (endpoint resolution and mounts), Reference → Orchestration (`../reference/orchestration.md`).
+
 ## Messaging
 
 - IBus with first-class IMessageBatch; emulate provider gaps predictably.

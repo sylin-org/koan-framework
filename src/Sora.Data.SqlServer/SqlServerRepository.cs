@@ -14,8 +14,7 @@ using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
 using Sora.Data.Relational.Orchestration;
 using System.Linq.Expressions;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
 namespace Sora.Data.SqlServer;
 
@@ -45,7 +44,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private readonly int _defaultPageSize;
     private readonly int _maxPageSize;
     private readonly ILogger _logger;
-    private readonly JsonSerializerOptions _json;
+    private readonly JsonSerializerSettings _json;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
     public SqlServerRepository(IServiceProvider sp, SqlServerOptions options, IStorageNameResolver resolver)
@@ -61,15 +60,15 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
         _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
-        _json = new JsonSerializerOptions
+        _json = new JsonSerializerSettings
         {
-            PropertyNameCaseInsensitive = options.JsonCaseInsensitive,
-            WriteIndented = options.JsonWriteIndented
+            ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
+            {
+                NamingStrategy = new Newtonsoft.Json.Serialization.CamelCaseNamingStrategy()
+            },
+            Formatting = options.JsonWriteIndented ? Formatting.Indented : Formatting.None,
+            NullValueHandling = options.JsonIgnoreNullValues ? NullValueHandling.Ignore : NullValueHandling.Include
         };
-        if (options.JsonIgnoreNullValues)
-        {
-            _json.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-        }
     }
 
     private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
@@ -199,10 +198,10 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
     }
 
     private TEntity FromRow((string Id, string Json) row)
-        => JsonSerializer.Deserialize<TEntity>(row.Json, _json)!;
+        => JsonConvert.DeserializeObject<TEntity>(row.Json, _json)!;
     private (string Id, string Json) ToRow(TEntity e)
     {
-        var json = JsonSerializer.Serialize(e, _json);
+    var json = JsonConvert.SerializeObject(e, _json);
         var id = e.Id!.ToString()!;
         return (id, json);
     }
@@ -769,7 +768,7 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
             var dict = (IDictionary<string, object?>)row;
             if (dict.TryGetValue("Json", out var jsonVal) && jsonVal is string jsonStr && !string.IsNullOrWhiteSpace(jsonStr))
             {
-                var ent = JsonSerializer.Deserialize<TEntity>(jsonStr, _json);
+                var ent = JsonConvert.DeserializeObject<TEntity>(jsonStr, _json);
                 if (ent is not null) list.Add(ent);
                 continue;
             }

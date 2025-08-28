@@ -154,7 +154,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         while (!ct.IsCancellationRequested)
         {
             var status = await seeder.GetStatusAsync(jobId, ct);
-            await HttpContext.Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(status)}\n\n", ct);
+            await HttpContext.Response.WriteAsync($"data: {Newtonsoft.Json.JsonConvert.SerializeObject(status)}\n\n", ct);
             await HttpContext.Response.Body.FlushAsync(ct);
             await Task.Delay(1000, ct);
         }
