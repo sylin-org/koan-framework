@@ -60,7 +60,7 @@ public class S5_Api_Connectivity_E2E
         // Wait until the api service is running per compose status to avoid probing too early
         try
         {
-            await WaitUntil(async () => IsServiceRunning(composeTool, composeDir, project, "api"), TimeSpan.FromSeconds(150));
+            await WaitUntil(() => Task.FromResult(IsServiceRunning(composeTool, composeDir, project, "api")), TimeSpan.FromSeconds(150));
         }
         catch (TimeoutException)
         {

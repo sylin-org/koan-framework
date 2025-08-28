@@ -26,5 +26,6 @@
   <PropertyGroup>
     <!-- Mark this assembly as an analyzer for consumers -->
     <IsRoslynComponent>true</IsRoslynComponent>
+  <NoWarn>$(NoWarn);RS2007</NoWarn>
   </PropertyGroup>
 </Project>
