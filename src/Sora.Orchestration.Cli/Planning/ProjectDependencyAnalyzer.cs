@@ -502,7 +502,34 @@ internal static class ProjectDependencyAnalyzer
                 catch { }
             }
 
-            // Attribute-based fallback removed (ARCH-0049): manifest-only discovery.
+            // Legacy attribute-based fallback (for adapters not yet migrated to ARCH-0049)
+            if (reqs.Count == 0)
+            {
+                foreach (var path in scanDlls)
+                {
+                    var added = false;
+                    try
+                    {
+                        var asm = mlc.LoadFromAssemblyPath(path);
+                        added |= TryAddFromAssemblyAttributes(asm, reqs);
+                        added |= TryAddFromTypeAttributes(asm, reqs);
+                    }
+                    catch { }
+
+                    // Fallback to runtime load of just assembly-level attributes if MLC failed or found nothing
+                    if (!added)
+                    {
+                        try
+                        {
+                            var alc = new TempAlc(Path.GetDirectoryName(path)!);
+                            var asmRt = alc.LoadFromAssemblyPath(path);
+                            TryAddFromAssemblyAttributes(asmRt, reqs);
+                            alc.Unload();
+                        }
+                        catch { }
+                    }
+                }
+            }
 
             // De-dup by id, keep first occurrence (manifest wins over attributes by ordering above)
             var distinct = reqs
@@ -678,9 +705,179 @@ internal static class ProjectDependencyAnalyzer
         if (idx > 0) target[kv[..idx]] = kv[(idx + 1)..];
     }
 
-    // Attribute fallback removed (ARCH-0049)
+    private static bool TryAddFromAssemblyAttributes(Assembly asm, List<ServiceRequirement> reqs)
+    {
+        var added = false;
+        try
+        {
+            foreach (var cad in asm.GetCustomAttributesData())
+            {
+                if (!string.Equals(cad.AttributeType.FullName, "Sora.Orchestration.OrchestrationServiceManifestAttribute", StringComparison.Ordinal))
+                    continue;
+                var id = cad.ConstructorArguments.Count > 0 ? cad.ConstructorArguments[0].Value as string : null;
+                var image = cad.ConstructorArguments.Count > 1 ? cad.ConstructorArguments[1].Value as string : null;
+                var ports = ExtractIntArray(cad.ConstructorArguments.Count > 2 ? cad.ConstructorArguments[2] : default);
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(image)) continue;
 
-    // Attribute fallback removed (ARCH-0049)
+                var env = new Dictionary<string, string?>();
+                var appEnv = new Dictionary<string, string?>();
+                var volumes = Array.Empty<string>();
+                ServiceType? type = null;
+                string? healthPath = null; int? healthInterval = null; int? healthTimeout = null; int? healthRetries = null;
+                foreach (var na in cad.NamedArguments)
+                {
+                    switch (na.MemberName)
+                    {
+                        case nameof(OrchestrationServiceManifestAttribute.Environment):
+                            foreach (var s in ExtractStringArray(na.TypedValue)) AddKv(env, s);
+                            break;
+                        case nameof(OrchestrationServiceManifestAttribute.AppEnvironment):
+                            foreach (var s in ExtractStringArray(na.TypedValue)) AddKv(appEnv, s);
+                            break;
+                        case nameof(OrchestrationServiceManifestAttribute.Volumes):
+                            volumes = ExtractStringArray(na.TypedValue);
+                            break;
+                        case nameof(OrchestrationServiceManifestAttribute.Type):
+                            if (na.TypedValue.Value is int et) type = (ServiceType)et;
+                            break;
+                        case "HealthPath":
+                            healthPath = na.TypedValue.Value?.ToString();
+                            break;
+                        case "HealthIntervalSeconds":
+                            healthInterval = (int?)na.TypedValue.Value;
+                            break;
+                        case "HealthTimeoutSeconds":
+                            healthTimeout = (int?)na.TypedValue.Value;
+                            break;
+                        case "HealthRetries":
+                            healthRetries = (int?)na.TypedValue.Value;
+                            break;
+                    }
+                }
+                reqs.Add(new ServiceRequirement(id!, image!, env, ports, volumes, appEnv, type, null, null, null, null, null, null, null, healthPath, healthInterval, healthTimeout, healthRetries));
+                added = true;
+            }
+        }
+        catch { }
+        return added;
+    }
+
+    private static bool TryAddFromTypeAttributes(Assembly asm, List<ServiceRequirement> reqs)
+    {
+        var added = false;
+        try
+        {
+            foreach (var type in asm.GetTypes())
+            {
+                if (!type.IsClass || type.IsAbstract) continue;
+                string? sid = null; string? image = null; int[] ports = Array.Empty<int>();
+                var env = new Dictionary<string, string?>();
+                var appEnv = new Dictionary<string, string?>();
+                var volumes = new List<string>();
+                string? endpointScheme = null; string? endpointHost = null; string? endpointPattern = null;
+                string? localScheme = null; string? localHost = null; int? localPort = null; string? localPattern = null;
+                string? healthPath = null; int? healthInterval = null; int? healthTimeout = null; int? healthRetries = null;
+                ServiceType? svcType = null;
+
+                foreach (var cad in type.GetCustomAttributesData())
+                {
+                    var full = cad.AttributeType.FullName;
+                    if (string.Equals(full, "Sora.Orchestration.Abstractions.Attributes.ServiceIdAttribute", StringComparison.Ordinal))
+                    {
+                        sid = cad.ConstructorArguments.Count > 0 ? cad.ConstructorArguments[0].Value as string : sid;
+                    }
+                    else if (string.Equals(full, "Sora.Orchestration.Abstractions.Attributes.ContainerDefaultsAttribute", StringComparison.Ordinal))
+                    {
+                        image = cad.ConstructorArguments.Count > 0 ? cad.ConstructorArguments[0].Value as string : image;
+                        foreach (var na in cad.NamedArguments)
+                        {
+                            switch (na.MemberName)
+                            {
+                                case "Tag":
+                                    var tag = na.TypedValue.Value?.ToString();
+                                    if (!string.IsNullOrEmpty(tag) && !string.IsNullOrEmpty(image)) image = image + ":" + tag;
+                                    break;
+                                case "Ports":
+                                    ports = ExtractIntArray(na.TypedValue);
+                                    break;
+                                case "Env":
+                                    foreach (var s in ExtractStringArray(na.TypedValue)) AddKv(env, s);
+                                    break;
+                                case "Volumes":
+                                    foreach (var s in ExtractStringArray(na.TypedValue)) volumes.Add(s);
+                                    break;
+                            }
+                        }
+                    }
+                    else if (string.Equals(full, "Sora.Orchestration.Abstractions.Attributes.EndpointDefaultsAttribute", StringComparison.Ordinal))
+                    {
+                        if (cad.ConstructorArguments.Count >= 4)
+                        {
+                            var modeArg = cad.ConstructorArguments[0];
+                            bool isContainer = false;
+                            try
+                            {
+                                if (modeArg.Value is int i) isContainer = i == 0; else isContainer = (modeArg.Value?.ToString() ?? string.Empty).IndexOf("Container", StringComparison.OrdinalIgnoreCase) >= 0;
+                            }
+                            catch { }
+                            if (isContainer)
+                            {
+                                endpointScheme = cad.ConstructorArguments[1].Value?.ToString();
+                                endpointHost = cad.ConstructorArguments[2].Value?.ToString();
+                                foreach (var na in cad.NamedArguments)
+                                    if (na.MemberName == "UriPattern") endpointPattern = na.TypedValue.Value?.ToString();
+                            }
+                            else
+                            {
+                                localScheme = cad.ConstructorArguments[1].Value?.ToString();
+                                localHost = cad.ConstructorArguments[2].Value?.ToString();
+                                localPort = cad.ConstructorArguments.Count >= 4 ? (int?)cad.ConstructorArguments[3].Value : null;
+                                foreach (var na in cad.NamedArguments)
+                                    if (na.MemberName == "UriPattern") localPattern = na.TypedValue.Value?.ToString();
+                            }
+                        }
+                    }
+                    else if (string.Equals(full, "Sora.Orchestration.Abstractions.Attributes.AppEnvDefaultsAttribute", StringComparison.Ordinal))
+                    {
+                        if (cad.ConstructorArguments.Count > 0)
+                            foreach (var kv in ExtractStringArray(cad.ConstructorArguments[0])) AddKv(appEnv, kv);
+                    }
+                    else if (string.Equals(full, "Sora.Orchestration.Abstractions.Attributes.HealthEndpointDefaultsAttribute", StringComparison.Ordinal))
+                    {
+                        if (cad.ConstructorArguments.Count > 0) healthPath = cad.ConstructorArguments[0].Value?.ToString();
+                        foreach (var na in cad.NamedArguments)
+                        {
+                            switch (na.MemberName)
+                            {
+                                case "IntervalSeconds": healthInterval = (int?)na.TypedValue.Value; break;
+                                case "TimeoutSeconds": healthTimeout = (int?)na.TypedValue.Value; break;
+                                case "Retries": healthRetries = (int?)na.TypedValue.Value; break;
+                            }
+                        }
+                    }
+                    else if (string.Equals(full, "Sora.Orchestration.OrchestrationServiceManifestAttribute", StringComparison.Ordinal))
+                    {
+                        foreach (var na in cad.NamedArguments)
+                        {
+                            if (na.MemberName == nameof(OrchestrationServiceManifestAttribute.Type) && na.TypedValue.Value is int et)
+                                svcType = (ServiceType)et;
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(sid) && !string.IsNullOrWhiteSpace(image))
+                {
+                    reqs.Add(new ServiceRequirement(sid!, image!, env, ports, volumes.ToArray(), appEnv,
+                        svcType,
+                        endpointScheme, endpointHost, endpointPattern, localScheme, localHost, localPort, localPattern,
+                        healthPath, healthInterval, healthTimeout, healthRetries));
+                    added = true;
+                }
+            }
+        }
+        catch { }
+        return added;
+    }
 
     private sealed class TempAlc : AssemblyLoadContext
     {
