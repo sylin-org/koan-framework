@@ -23,6 +23,16 @@ public static class ShortId
             .Replace('/', '_');
     }
 
+    /// <summary>Encodes a 16-byte GUID buffer to ShortId.</summary>
+    public static string FromBytes(ReadOnlySpan<byte> guidBytes)
+    {
+        if (guidBytes.Length != 16) throw new ArgumentException("Expected 16 bytes", nameof(guidBytes));
+        return Convert.ToBase64String(guidBytes.ToArray())
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
     /// <summary>Decodes a 22/24-char base64/base64url Guid string.</summary>
     public static Guid ToGuid(string shortId)
     {
@@ -53,5 +63,26 @@ public static class ShortId
         {
             return false;
         }
+    }
+
+    /// <summary>Decodes a ShortId to the 16-byte Guid buffer. Returns false if invalid.</summary>
+    public static bool TryToBytes(string? shortId, out byte[] bytes)
+    {
+        bytes = Array.Empty<byte>();
+        if (string.IsNullOrWhiteSpace(shortId)) return false;
+        var s = shortId.Replace('-', '+').Replace('_', '/');
+        switch (s.Length % 4)
+        {
+            case 2: s += "=="; break;
+            case 3: s += "="; break;
+        }
+        try
+        {
+            var b = Convert.FromBase64String(s);
+            if (b.Length != 16) return false;
+            bytes = b;
+            return true;
+        }
+        catch { return false; }
     }
 }

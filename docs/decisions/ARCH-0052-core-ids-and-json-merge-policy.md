@@ -30,6 +30,7 @@ Sora standardizes on Newtonsoft.Json for JSON handling and is introducing a smal
   - Union (default)
   - Replace (strongest entire array replaces weaker arrays)
   - Concat (append weaker arrays after stronger arrays)
+  - Union-by-key (advanced): when configured with a key and both arrays are objects holding that key, merge by key — preserve order from the stronger array, keep stronger values on conflicts, and append unseen keys from weaker arrays.
 
 ## Scope
 
@@ -53,7 +54,7 @@ Sora standardizes on Newtonsoft.Json for JSON handling and is introducing a smal
 - MergeJson
   - Layers: params string[] or IEnumerable<string>.
   - Earlier index = stronger precedence.
-  - Arrays: default Union-by-index; control via enum option (Union|Replace|Concat).
+  - Arrays: default Union-by-index; control via enum option (Union|Replace|Concat) and optional ArrayObjectKey for Union-by-key when arrays are objects with that key.
   - Mixed-type conflicts: earlier layer wins at that node.
 - IDs
   - ShortId: base64url Guid without padding (“-”, “_”), 22 chars; round-trip Guid conversion.

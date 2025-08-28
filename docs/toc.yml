@@ -45,6 +45,8 @@
       href: reference/orchestration.md
     - name: Secrets
       href: reference/secrets.md
+    - name: JSON
+      href: reference/json.md
     - name: Working with Secrets
       href: reference/working-with-secrets.md
     - name: Config & Constants

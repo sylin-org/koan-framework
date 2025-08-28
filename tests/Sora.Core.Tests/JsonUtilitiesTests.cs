@@ -33,6 +33,10 @@ public class JsonUtilitiesTests
         Assert.DoesNotContain("skip", json);
         var back = json.FromJson<dynamic>();
         Assert.NotNull(back);
+
+    Assert.True(json.TryFromJson(out back));
+    var bad = "{";
+    Assert.False(bad.TryFromJson(out back));
     }
 
     [Fact]
@@ -73,5 +77,29 @@ public class JsonUtilitiesTests
         Assert.Contains("a.b\\u002ec", flat.Keys);
         var back = JsonPathMapper.Expand(flat);
         Assert.Equal(token.ToString(Newtonsoft.Json.Formatting.None), back.ToString(Newtonsoft.Json.Formatting.None));
+    }
+
+    [Fact]
+    public void CanonicalJson_Sorts_Object_Properties()
+    {
+        var json = "{\"b\":2,\"a\":1,\"c\":{\"y\":2,\"x\":1},\"arr\":[{\"k\":2,\"a\":1},{\"k\":1}] }";
+        var canon = json.ToCanonicalJson();
+        // Basic check: canonical of canonical is stable
+        Assert.Equal(canon, canon.ToCanonicalJson());
+        // Properties should be ordered by name
+        Assert.Matches("^\\{\\\"a\\\":1,\\\"b\\\":2,\\\"c\\\":\\{\\\"x\\\":1,\\\"y\\\":2},\\\"arr\\\":\\[", canon);
+    }
+
+    [Fact]
+    public void MergeJson_Array_By_Key()
+    {
+        var strong = "{\"items\":[{\"id\":\"a\",\"v\":1},{\"id\":\"b\",\"v\":2}]}";
+        var weak   = "{\"items\":[{\"id\":\"b\",\"v\":9,\"extra\":1},{\"id\":\"c\",\"v\":3}]}";
+        var merged = JsonMerge.Merge(new JsonMerge.JsonMergeOptions { ArrayStrategy = ArrayMergeStrategy.Union, ArrayObjectKey = "id" }, strong, weak);
+        var arr = (JArray)merged["items"]!;
+        // Order preserved from strong; 'b' merged with weak; 'c' appended
+        Assert.Equal(new[] { "a", "b", "c" }, arr.Select(o => (string)o!["id"]!));
+        Assert.Equal(2, (int)arr[1]!["v"]!); // strong wins on conflict
+        Assert.Equal(1, (int)arr[1]!["extra"]!); // merged in from weak
     }
 }

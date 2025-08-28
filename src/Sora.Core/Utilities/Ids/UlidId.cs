@@ -22,6 +22,44 @@ public static class UlidId
         return ToBase32(ulid);
     }
 
+    /// <summary>Try to parse a ULID string into its 16-byte representation.</summary>
+    public static bool TryParse(string? value, out byte[] bytes)
+    {
+        bytes = Array.Empty<byte>();
+        if (string.IsNullOrWhiteSpace(value) || value.Length != 26) return false;
+        try
+        {
+            var b = FromBase32(value);
+            if (b.Length != 16) return false;
+            bytes = b;
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Parse a ULID string; throws if invalid.</summary>
+    public static byte[] Parse(string value)
+    {
+        if (!TryParse(value, out var b)) throw new FormatException("Invalid ULID.");
+        return b;
+    }
+
+    /// <summary>Extract timestamp (ms since epoch) from ULID.</summary>
+    public static long GetTimestampMillis(string ulid)
+    {
+        var b = Parse(ulid);
+        return ((long)b[0] << 40) | ((long)b[1] << 32) | ((long)b[2] << 24) | ((long)b[3] << 16) | ((long)b[4] << 8) | b[5];
+    }
+
+    /// <summary>Get randomness (10 bytes) from ULID.</summary>
+    public static byte[] GetEntropy(string ulid)
+    {
+        var b = Parse(ulid);
+        var r = new byte[10];
+        Array.Copy(b, 6, r, 0, 10);
+        return r;
+    }
+
     private static void FillUlidBytes(Span<byte> bytes)
     {
         // 48-bit time (ms since Unix epoch) + 80-bit randomness
@@ -133,9 +171,9 @@ public static class UlidId
         ulong v22 = (r1 >> 5)  & 0x1F;
         ulong v23 = r1 & 0x1F;
 
-        // Remaining 2 bits (to reach 130) are zero per spec; encode as zero value.
-        ulong v24 = 0;
-        ulong v25 = 0;
+    // the last two characters encode the final 10 bits of randomness
+    ulong v24 = (r1 >> 0) & 0x1F;
+    ulong v25 = 0; // ULID uses only 128 bits; top 2 bits of last char are zero
 
         chars[0]  = _crockford[(int)v0];
         chars[1]  = _crockford[(int)v1];
@@ -165,5 +203,60 @@ public static class UlidId
         chars[25] = _crockford[(int)v25];
 
         return new string(chars);
+    }
+
+    private static byte[] FromBase32(string input)
+    {
+        Span<int> map = stackalloc int[128];
+        for (int i = 0; i < map.Length; i++) map[i] = -1;
+        for (int i = 0; i < _crockford.Length; i++) map[_crockford[i]] = i;
+        // allow lowercase
+        for (int i = 0; i < _crockford.Length; i++) map[char.ToLowerInvariant(_crockford[i])] = i;
+
+        Span<int> vals = stackalloc int[26];
+        for (int i = 0; i < 26; i++)
+        {
+            int ch = input[i] < 128 ? map[input[i]] : -1;
+            if (ch < 0) throw new FormatException("Invalid ULID base32 character.");
+            vals[i] = ch;
+        }
+
+        // Reassemble 48-bit time and 80-bit randomness
+        ulong timeU =
+            ((ulong)(uint)vals[0] << 35) | ((ulong)(uint)vals[1] << 30) | ((ulong)(uint)vals[2] << 25) | ((ulong)(uint)vals[3] << 20) |
+            ((ulong)(uint)vals[4] << 15) | ((ulong)(uint)vals[5] << 10) | ((ulong)(uint)vals[6] << 5) | (ulong)(uint)vals[7];
+        long time = (long)timeU;
+
+        ulong r0 =
+            ((ulong)(uint)vals[8] << 35) | ((ulong)(uint)vals[9] << 30) | ((ulong)(uint)vals[10] << 25) | ((ulong)(uint)vals[11] << 20) |
+            ((ulong)(uint)vals[12] << 15) | ((ulong)(uint)vals[13] << 10) | ((ulong)(uint)vals[14] << 5) | (ulong)(uint)vals[15];
+
+        ulong r1 =
+            ((ulong)(uint)vals[16] << 35) | ((ulong)(uint)vals[17] << 30) | ((ulong)(uint)vals[18] << 25) | ((ulong)(uint)vals[19] << 20) |
+            ((ulong)(uint)vals[20] << 15) | ((ulong)(uint)vals[21] << 10) | ((ulong)(uint)vals[22] << 5) | (ulong)(uint)vals[23];
+
+        // vals[24] carries the low 5 bits; vals[25] carries top 2 bits (unused)
+    r1 = (r1 << 5) | (ulong)(uint)vals[24];
+
+        byte[] bytes = new byte[16];
+        bytes[0] = (byte)((time >> 40) & 0xFF);
+        bytes[1] = (byte)((time >> 32) & 0xFF);
+        bytes[2] = (byte)((time >> 24) & 0xFF);
+        bytes[3] = (byte)((time >> 16) & 0xFF);
+        bytes[4] = (byte)((time >> 8) & 0xFF);
+        bytes[5] = (byte)(time & 0xFF);
+
+        bytes[6] = (byte)((r0 >> 32) & 0xFF);
+        bytes[7] = (byte)((r0 >> 24) & 0xFF);
+        bytes[8] = (byte)((r0 >> 16) & 0xFF);
+        bytes[9] = (byte)((r0 >> 8) & 0xFF);
+        bytes[10] = (byte)(r0 & 0xFF);
+
+        bytes[11] = (byte)((r1 >> 32) & 0xFF);
+        bytes[12] = (byte)((r1 >> 24) & 0xFF);
+        bytes[13] = (byte)((r1 >> 16) & 0xFF);
+        bytes[14] = (byte)((r1 >> 8) & 0xFF);
+        bytes[15] = (byte)(r1 & 0xFF);
+        return bytes;
     }
 }
