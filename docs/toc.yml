@@ -45,6 +45,8 @@
       href: reference/orchestration.md
     - name: Secrets
       href: reference/secrets.md
+    - name: Working with Secrets
+      href: reference/working-with-secrets.md
     - name: Config & Constants
       href: reference/config-and-constants.md
     - name: Adapter Matrix
