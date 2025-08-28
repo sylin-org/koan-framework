@@ -16,6 +16,8 @@
       href: engineering/orchestration-adapter-authoring.md
     - name: Orchestration manifest generator
       href: engineering/orchestration-manifest-generator.md
+    - name: SoraService authoring (DX quick guide)
+      href: engineering/sora-service-authoring.md
 - name: Architecture Principles
   href: architecture/principles.md
 - name: Reference
@@ -41,6 +43,8 @@
       href: reference/ai.md
     - name: Orchestration
       href: reference/orchestration.md
+    - name: Secrets
+      href: reference/secrets.md
     - name: Config & Constants
       href: reference/config-and-constants.md
     - name: Adapter Matrix

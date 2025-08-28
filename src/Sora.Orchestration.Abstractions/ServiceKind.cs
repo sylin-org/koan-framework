@@ -14,5 +14,6 @@ public enum ServiceKind
     Storage = 6,
     Cache = 7,
     Search = 8,
-    Other = 9
+    Other = 9,
+    SecretsVault = 10
 }

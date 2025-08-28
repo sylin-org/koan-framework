@@ -26,6 +26,8 @@
       href: ARCH-0048-endpoint-resolution-and-persistence-mounts.md
     - name: Unified service metadata and discovery
       href: ARCH-0049-unified-service-metadata-and-discovery.md
+    - name: Secrets management — provider chain and configuration resolution
+      href: ARCH-0050-secrets-management-and-configuration-resolution.md
 - name: Data (DATA)
   items:
     - name: Data access semantics (All/Query; streaming; pager)
