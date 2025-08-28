@@ -28,6 +28,8 @@
       href: ARCH-0049-unified-service-metadata-and-discovery.md
     - name: Secrets management — provider chain and configuration resolution
       href: ARCH-0050-secrets-management-and-configuration-resolution.md
+    - name: Secrets — dev alignment and provider-swap guardrails
+      href: ARCH-0051-secrets-dev-alignment-and-provider-swap-guardrails.md
 - name: Data (DATA)
   items:
     - name: Data access semantics (All/Query; streaming; pager)
