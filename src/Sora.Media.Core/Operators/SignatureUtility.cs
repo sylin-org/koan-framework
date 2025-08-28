@@ -1,18 +1,20 @@
-﻿using Sora.Storage.Abstractions;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using Sora.Storage.Abstractions;
 
 namespace Sora.Media.Core.Operators;
 
 using Sora.Storage;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 
 public static class SignatureUtility
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private static readonly JsonSerializerSettings JsonOptions = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
+        ContractResolver = new CamelCasePropertyNamesContractResolver(),
+        Formatting = Formatting.None,
+        NullValueHandling = NullValueHandling.Ignore
     };
 
     public static (string Hash, string Json) BuildSignature(string srcId, ObjectStat stat, IReadOnlyList<(IMediaOperator Op, IReadOnlyDictionary<string, string> Params)> ops)
@@ -42,7 +44,7 @@ public static class SignatureUtility
         }
         payload["ops"] = steps;
 
-        var json = JsonSerializer.Serialize(payload, JsonOptions);
+    var json = JsonConvert.SerializeObject(payload, JsonOptions);
         using var sha = SHA256.Create();
         var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(json));
         var base64 = Convert.ToBase64String(hash)

@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using System.Net;
-using System.Net.Http.Json;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace S1.Web.IntegrationTests;
@@ -27,8 +27,9 @@ public sealed class S1SmokeTests
         var client = app.CreateClient();
 
         // health
-        using var healthDoc = await client.GetFromJsonAsync<System.Text.Json.JsonDocument>("/api/health");
-        healthDoc!.RootElement.GetProperty("status").GetString().Should().Be("ok");
+    var healthStr = await client.GetStringAsync("/api/health");
+    var healthDoc = JToken.Parse(healthStr);
+    healthDoc["status"]!.Value<string>().Should().Be("ok");
 
         // clear just in case
         await client.DeleteAsync("/api/todo/clear");
@@ -40,9 +41,9 @@ public sealed class S1SmokeTests
         // list
         var listResp = await client.GetAsync("/api/todo?page=1&size=10");
         listResp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await listResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        body.ValueKind.Should().Be(System.Text.Json.JsonValueKind.Array);
-        body.GetArrayLength().Should().BeGreaterOrEqualTo(1);
+    var body = JToken.Parse(await listResp.Content.ReadAsStringAsync());
+    body.Type.Should().Be(JTokenType.Array);
+    ((JArray)body).Count.Should().BeGreaterOrEqualTo(1);
     }
 
     [Fact]

@@ -194,7 +194,7 @@ public sealed class UsesDb(IOptionsMonitor<DbOptions> opts, ILogger<UsesDb> log)
 var json = builder.Configuration["ApiKeys:ServiceX"]; // resolved raw JSON string
 if (!string.IsNullOrEmpty(json))
 {
-  var model = System.Text.Json.JsonSerializer.Deserialize<ServiceXKey>(json);
+  var model = Newtonsoft.Json.JsonConvert.DeserializeObject<ServiceXKey>(json);
   // ...use model
 }
 

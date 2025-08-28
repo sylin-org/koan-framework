@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Newtonsoft.Json.Linq;
 using Sora.Orchestration.Abstractions;
 
 namespace Sora.Orchestration.Provider.Docker;
@@ -212,12 +213,13 @@ public sealed partial class DockerProvider : IHostingProvider
             var trimmed = stdout.TrimStart();
             if (trimmed.StartsWith("["))
             {
-                using var doc = System.Text.Json.JsonDocument.Parse(stdout);
-                foreach (var el in doc.RootElement.EnumerateArray())
+                var arr = JArray.Parse(stdout);
+                foreach (var token in arr)
                 {
-                    var name = el.TryGetProperty("Name", out var np) ? np.GetString() : null;
-                    var state = el.TryGetProperty("State", out var sp) ? sp.GetString() : null;
-                    var health = el.TryGetProperty("Health", out var hp) ? hp.GetString() : null;
+                    if (token is not JObject o) continue;
+                    var name = o["Name"]?.Value<string>();
+                    var state = o["State"]?.Value<string>();
+                    var health = o["Health"]?.Value<string>();
                     if (string.IsNullOrWhiteSpace(health)) health = null; // normalize empty to null (no healthcheck)
                     if (!string.IsNullOrEmpty(name))
                         result.Add((name!, state ?? string.Empty, health));
@@ -233,12 +235,12 @@ public sealed partial class DockerProvider : IHostingProvider
                     if (!l.StartsWith("{")) continue;
                     try
                     {
-                        using var doc = System.Text.Json.JsonDocument.Parse(l);
-                        var el = doc.RootElement;
-                        var name = el.TryGetProperty("Name", out var np) ? np.GetString() : null;
-                        var state = el.TryGetProperty("State", out var sp) ? sp.GetString() : null;
-                        var health = el.TryGetProperty("Health", out var hp) ? hp.GetString() : null;
-                        if (string.IsNullOrWhiteSpace(health)) health = null; // normalize empty to null
+                        var o = JToken.Parse(l) as JObject;
+                        if (o is null) continue;
+                        var name = o["Name"]?.Value<string>();
+                        var state = o["State"]?.Value<string>();
+                        var health = o["Health"]?.Value<string>();
+                        if (string.IsNullOrWhiteSpace(health)) health = null;
                         if (!string.IsNullOrEmpty(name))
                             result.Add((name!, state ?? string.Empty, health));
                     }
@@ -262,8 +264,8 @@ public sealed partial class DockerProvider : IHostingProvider
             var trimmed = stdout.TrimStart();
             if (trimmed.StartsWith("["))
             {
-                using var doc = System.Text.Json.JsonDocument.Parse(stdout);
-                ExtractPortsFromJsonArray(doc.RootElement, list);
+                var arr = JArray.Parse(stdout);
+                ExtractPortsFromJsonArray(arr, list);
             }
             else
             {
@@ -274,8 +276,9 @@ public sealed partial class DockerProvider : IHostingProvider
                     if (!l.StartsWith("{")) continue;
                     try
                     {
-                        using var doc = System.Text.Json.JsonDocument.Parse(l);
-                        ExtractPortsFromJsonArray(new System.Text.Json.JsonElement[] { doc.RootElement }.ToJsonArrayElement(), list);
+                        var o = JToken.Parse(l) as JObject;
+                        if (o is null) continue;
+                        ExtractPortsFromJsonArray(new JArray(o), list);
                     }
                     catch { }
                 }
@@ -289,24 +292,25 @@ public sealed partial class DockerProvider : IHostingProvider
 
 public sealed partial class DockerProvider
 {
-    private static void ExtractPortsFromJsonArray(System.Text.Json.JsonElement root, List<PortBinding> list)
+    private static void ExtractPortsFromJsonArray(JArray root, List<PortBinding> list)
     {
-        foreach (var el in root.EnumerateArray())
+        foreach (var token in root)
         {
-            var name = el.TryGetProperty("Name", out var np) ? np.GetString() : null;
+            if (token is not JObject el) continue;
+            var name = el["Name"]?.Value<string>();
             if (string.IsNullOrEmpty(name)) continue;
-            if (!el.TryGetProperty("Ports", out var portsEl)) continue;
+            var portsTok = el["Ports"];
             // Docker compose ps --format json uses strings like "0.0.0.0:8080->80/tcp, :::8080->80/tcp"
-            if (portsEl.ValueKind == System.Text.Json.JsonValueKind.String)
+            if (portsTok is JValue v && v.Type == JTokenType.String)
             {
-                foreach (var binding in ParsePortsString(portsEl.GetString()!, name!)) list.Add(binding);
+                foreach (var binding in ParsePortsString(v.Value<string>()!, name!)) list.Add(binding);
             }
-            else if (portsEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+            else if (portsTok is JArray arr)
             {
-                foreach (var item in portsEl.EnumerateArray())
+                foreach (var item in arr)
                 {
-                    if (item.ValueKind == System.Text.Json.JsonValueKind.String)
-                        foreach (var b in ParsePortsString(item.GetString()!, name!)) list.Add(b);
+                    if (item is JValue sv && sv.Type == JTokenType.String)
+                        foreach (var b in ParsePortsString(sv.Value<string>()!, name!)) list.Add(b);
                 }
             }
         }

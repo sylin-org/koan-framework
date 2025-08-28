@@ -1,6 +1,5 @@
 using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Secrets.Abstractions;
@@ -48,17 +47,21 @@ public sealed class VaultSecretProvider : ISecretProvider
             resp.EnsureSuccessStatusCode();
 
             using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
+            using var reader = new StreamReader(stream);
+            var json = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+            var rootToken = JToken.Parse(json);
             if (_options.UseKvV2)
             {
                 // Expect { data: { data: { ... }, metadata: { version, created_time } } }
-                if (!doc.RootElement.TryGetProperty("data", out var rootData) || !rootData.TryGetProperty("data", out var data))
+                var rootData = rootToken["data"] as JObject;
+                var data = rootData?["data"];
+                if (rootData is null || data is null)
                     throw new SecretProviderUnavailableException("vault", "Unexpected KV v2 response");
                 var meta = new SecretMetadata
                 {
-                    Version = rootData.TryGetProperty("metadata", out var md) && md.TryGetProperty("version", out var ver) ? ver.GetInt32().ToString() : id.Version,
+                    Version = rootData.TryGetValue("metadata", out var md) && md? ["version"] is JValue ver ? ver.Value<int>().ToString() : id.Version,
                     Provider = "vault",
-                    Created = rootData.TryGetProperty("metadata", out var md2) && md2.TryGetProperty("created_time", out var ctok) && ctok.GetString() is { } s && DateTimeOffset.TryParse(s, out var dto) ? dto : null,
+                    Created = rootData.TryGetValue("metadata", out var md2) && md2? ["created_time"]?.Value<string>() is { } s && DateTimeOffset.TryParse(s, out var dto) ? dto : null,
                     Ttl = _options.DefaultTtl,
                 };
                 return MaterializeValue(data, meta);
@@ -67,7 +70,7 @@ public sealed class VaultSecretProvider : ISecretProvider
             {
                 // KV v1: arbitrary JSON payload
                 var meta = new SecretMetadata { Provider = "vault", Version = id.Version, Ttl = _options.DefaultTtl };
-                return MaterializeValue(doc.RootElement, meta);
+                return MaterializeValue(rootToken, meta);
             }
         }
         catch (HttpRequestException ex)
@@ -87,33 +90,35 @@ public sealed class VaultSecretProvider : ISecretProvider
         return basePath;
     }
 
-    private static SecretValue MaterializeValue(JsonElement payload, SecretMetadata meta)
+    private static SecretValue MaterializeValue(JToken payload, SecretMetadata meta)
     {
         // Prefer a 'value' property if present and is string
-        if (payload.ValueKind == JsonValueKind.Object)
+        if (payload.Type == JTokenType.Object)
         {
-            if (payload.TryGetProperty("value", out var v) && v.ValueKind == JsonValueKind.String)
+            if (payload["value"] is JValue v && v.Type == JTokenType.String)
             {
-                return new SecretValue(System.Text.Encoding.UTF8.GetBytes(v.GetString()!), SecretContentType.Text, meta);
+                return new SecretValue(System.Text.Encoding.UTF8.GetBytes(v.Value<string>()!), SecretContentType.Text, meta);
             }
             // If single string field, use it
-            var props = payload.EnumerateObject().ToArray();
-            if (props.Length == 1 && props[0].Value.ValueKind == JsonValueKind.String)
+            if (payload is JObject obj)
             {
-                return new SecretValue(System.Text.Encoding.UTF8.GetBytes(props[0].Value.GetString()!), SecretContentType.Text, meta);
+                if (obj.Properties().Count() == 1 && obj.Properties().First().Value is JValue sv && sv.Type == JTokenType.String)
+                {
+                    return new SecretValue(System.Text.Encoding.UTF8.GetBytes(sv.Value<string>()!), SecretContentType.Text, meta);
+                }
             }
             // If 'bytes' exists and is base64
-            if (payload.TryGetProperty("bytes", out var b) && b.ValueKind == JsonValueKind.String)
+            if (payload["bytes"] is JValue b && b.Type == JTokenType.String)
             {
-                var raw = Convert.FromBase64String(b.GetString()!);
+                var raw = Convert.FromBase64String(b.Value<string>()!);
                 return new SecretValue(raw, SecretContentType.Bytes, meta);
             }
             // Fallback: return JSON as-is
-            var json = payload.GetRawText();
+            var json = payload.ToString(Newtonsoft.Json.Formatting.None);
             return new SecretValue(System.Text.Encoding.UTF8.GetBytes(json), SecretContentType.Json, meta);
         }
         // Non-object: return raw text
-        var text = payload.GetRawText();
+        var text = payload.ToString(Newtonsoft.Json.Formatting.None);
         return new SecretValue(System.Text.Encoding.UTF8.GetBytes(text), SecretContentType.Text, meta);
     }
 }

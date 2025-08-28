@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Sora.Data.Abstractions;
 using StackExchange.Redis;
 using System.Linq.Expressions;
+using Newtonsoft.Json;
 
 namespace Sora.Data.Redis;
 
@@ -45,7 +46,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
         var key = $"{Keyspace()}:{id}";
         var v = await Db().StringGetAsync(key);
         if (v.IsNullOrEmpty) return null;
-        return System.Text.Json.JsonSerializer.Deserialize<TEntity>(v!);
+    return JsonConvert.DeserializeObject<TEntity>(v!);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
@@ -103,7 +104,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         var key = $"{Keyspace()}:{model.Id}";
-        var json = System.Text.Json.JsonSerializer.Serialize(model);
+    var json = JsonConvert.SerializeObject(model);
         await Db().StringSetAsync(key, json);
         return model;
     }
@@ -118,8 +119,8 @@ internal sealed class RedisRepository<TEntity, TKey> :
     public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var arr = models as TEntity[] ?? models.ToArray();
-        var entries = arr.Select(e => new KeyValuePair<RedisKey, RedisValue>($"{Keyspace()}:{e.Id}", System.Text.Json.JsonSerializer.Serialize(e))).ToArray();
+    var arr = models as TEntity[] ?? models.ToArray();
+    var entries = arr.Select(e => new KeyValuePair<RedisKey, RedisValue>($"{Keyspace()}:{e.Id}", Newtonsoft.Json.JsonConvert.SerializeObject(e))).ToArray();
         await Db().StringSetAsync(entries);
         return arr.Length;
     }
@@ -180,7 +181,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
             foreach (var v in vals)
             {
                 if (v.IsNull) continue;
-                var e = System.Text.Json.JsonSerializer.Deserialize<TEntity>(v!);
+                var e = JsonConvert.DeserializeObject<TEntity>(v!);
                 if (e is not null) list.Add(e);
             }
             return (list, keys.Count);
@@ -195,7 +196,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
             foreach (var v in vals)
             {
                 if (v.IsNull) continue;
-                var e = System.Text.Json.JsonSerializer.Deserialize<TEntity>(v!);
+                var e = JsonConvert.DeserializeObject<TEntity>(v!);
                 if (e is not null) list.Add(e);
             }
             return (list, allKeys.Length);

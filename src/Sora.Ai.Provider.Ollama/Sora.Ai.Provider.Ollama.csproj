@@ -9,6 +9,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
     <ProjectReference Include="..\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
-  <ProjectReference Include="..\Sora.Orchestration.Abstractions\Sora.Orchestration.Abstractions.csproj" />
+    <ProjectReference Include="..\Sora.Orchestration.Abstractions\Sora.Orchestration.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>

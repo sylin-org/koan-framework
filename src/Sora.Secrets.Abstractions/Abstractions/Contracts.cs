@@ -1,4 +1,5 @@
-﻿namespace Sora.Secrets.Abstractions;
+﻿using Newtonsoft.Json;
+namespace Sora.Secrets.Abstractions;
 
 public interface ISecretProvider
 {
@@ -79,7 +80,7 @@ public sealed class SecretValue
     };
 
     public T AsJson<T>() => Type == SecretContentType.Json
-        ? System.Text.Json.JsonSerializer.Deserialize<T>(_data)!
+        ? JsonConvert.DeserializeObject<T>(System.Text.Encoding.UTF8.GetString(_data))!
         : throw new InvalidOperationException("Secret is not JSON");
 
     public override string ToString() => "***"; // never expose

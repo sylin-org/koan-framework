@@ -1,7 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Http;
-using System.Text.Json;
+using Newtonsoft.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -42,7 +42,7 @@ public class VaultProviderTests
                     metadata = new { version = 2, created_time = "2024-01-01T00:00:00Z" }
                 }
             };
-            var json = JsonSerializer.Serialize(payload);
+            var json = JsonConvert.SerializeObject(payload);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) };
         });
         var client = new HttpClient(handler) { BaseAddress = new Uri("https://vault:8200/") };

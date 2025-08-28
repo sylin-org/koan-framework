@@ -1,4 +1,5 @@
-using System.Text.Json;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Sora.Data.Abstractions.Vector.Filtering;
 
@@ -9,42 +10,53 @@ public static class VectorFilterJson
         filter = null;
         if (input is null) return false;
         if (input is VectorFilter vf) { filter = vf; return true; }
-        JsonElement el;
-        try { el = JsonSerializer.SerializeToElement(input); }
+        try
+        {
+            JToken token = input switch
+            {
+                JToken jt => jt,
+                string s => JToken.Parse(s),
+                _ => JToken.FromObject(input)
+            };
+            filter = Parse(token);
+            return filter is not null;
+        }
         catch { return false; }
-        filter = Parse(el);
-        return filter is not null;
     }
 
-    public static VectorFilter? Parse(JsonElement el)
+    public static VectorFilter? Parse(JToken token)
     {
-        if (el.ValueKind == JsonValueKind.Object)
+        if (token is JObject obj)
         {
-            if (el.TryGetProperty("operator", out var opEl))
+            var opToken = obj["operator"];
+            if (opToken is not null)
             {
-                var opStr = opEl.GetString() ?? string.Empty;
+                var opStr = (opToken.Type == JTokenType.String ? opToken.Value<string>() : opToken.ToString()) ?? string.Empty;
                 if (string.Equals(opStr, "And", StringComparison.OrdinalIgnoreCase) || string.Equals(opStr, "Or", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!el.TryGetProperty("operands", out var opsEl) || opsEl.ValueKind != JsonValueKind.Array) return null;
-                    var children = opsEl.EnumerateArray().Select(Parse).Where(c => c is not null)!.Cast<VectorFilter>().ToArray();
+                    var opsEl = obj["operands"] as JArray;
+                    if (opsEl is null) return null;
+                    var children = opsEl.Select(Parse).Where(c => c is not null)!.Cast<VectorFilter>().ToArray();
                     return string.Equals(opStr, "And", StringComparison.OrdinalIgnoreCase) ? new VectorFilterAnd(children) : new VectorFilterOr(children);
                 }
                 if (string.Equals(opStr, "Not", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!el.TryGetProperty("operands", out var opsEl) || opsEl.ValueKind != JsonValueKind.Array) return null;
-                    var first = opsEl.EnumerateArray().Select(Parse).FirstOrDefault();
+                    var opsEl = obj["operands"] as JArray;
+                    if (opsEl is null) return null;
+                    var first = opsEl.Select(Parse).FirstOrDefault();
                     return first is null ? null : new VectorFilterNot(first);
                 }
-                var path = ReadPath(el);
+                var path = ReadPath(obj);
                 if (path is null) return null;
-                if (!el.TryGetProperty("value", out var valEl)) return null;
+                var valEl = obj["value"];
+                if (valEl is null) return null;
                 var (value, _) = ReadValue(valEl);
                 var op = NormalizeCompare(opStr);
                 return new VectorFilterCompare(path, op, value);
             }
             // equality-map shorthand
             var parts = new List<VectorFilter>();
-            foreach (var prop in el.EnumerateObject())
+            foreach (var prop in obj.Properties())
             {
                 var (value, ok) = ReadValue(prop.Value);
                 if (!ok) continue;
@@ -55,12 +67,6 @@ public static class VectorFilterJson
             return new VectorFilterAnd(parts);
         }
         return null;
-    }
-
-    public static JsonElement Write(VectorFilter filter)
-    {
-        using var doc = JsonDocument.Parse(WriteToString(filter));
-        return doc.RootElement.Clone();
     }
 
     public static string WriteToString(VectorFilter filter)
@@ -85,27 +91,34 @@ public static class VectorFilterJson
 
     private static string Escape(string? s) => (s ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
 
-    private static (object? value, bool ok) ReadValue(JsonElement value)
+    private static (object? value, bool ok) ReadValue(JToken value)
     {
-        switch (value.ValueKind)
+        switch (value.Type)
         {
-            case JsonValueKind.String: return (value.GetString(), true);
-            case JsonValueKind.True:
-            case JsonValueKind.False: return (value.GetBoolean(), true);
-            case JsonValueKind.Number:
-                if (value.TryGetInt64(out var i)) return (i, true);
-                if (value.TryGetDouble(out var d)) return (d, true);
-                return (null, false);
-            case JsonValueKind.Null: return (null, true);
+            case JTokenType.String: return (value.Value<string>(), true);
+            case JTokenType.Boolean: return (value.Value<bool>(), true);
+            case JTokenType.Integer:
+                {
+                    var l = value.Value<long>();
+                    return (l, true);
+                }
+            case JTokenType.Float:
+                {
+                    var d = value.Value<double>();
+                    return (d, true);
+                }
+            case JTokenType.Null:
+            case JTokenType.Undefined:
+                return (null, true);
             default: return (null, false);
         }
     }
 
-    private static string[]? ReadPath(JsonElement el)
+    private static string[]? ReadPath(JObject el)
     {
-        if (!el.TryGetProperty("path", out var p)) return null;
-        if (p.ValueKind == JsonValueKind.String) return new[] { p.GetString()! };
-        if (p.ValueKind == JsonValueKind.Array) return p.EnumerateArray().Select(x => x.GetString() ?? string.Empty).ToArray();
+        if (!el.TryGetValue("path", out var p)) return null;
+        if (p.Type == JTokenType.String) return new[] { p.Value<string>()! };
+        if (p.Type == JTokenType.Array) return p.Values<string>().Select(x => x ?? string.Empty).ToArray();
         return null;
     }
 

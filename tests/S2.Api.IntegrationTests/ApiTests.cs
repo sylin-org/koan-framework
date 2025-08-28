@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using System.Net.Http.Json;
+using Newtonsoft.Json;
 using Xunit;
 
 namespace S2.Api.IntegrationTests;
@@ -36,11 +36,12 @@ public class ApiTests : IClassFixture<MongoFixture>
         var health = await client.GetStringAsync("/api/health");
         health.Should().Contain("ok");
 
-        var res = await client.PostAsJsonAsync("/api/items", new { name = "Hello" });
+    var res = await client.PostAsync("/api/items", new StringContent(JsonConvert.SerializeObject(new { name = "Hello" }), System.Text.Encoding.UTF8, "application/json"));
         res.EnsureSuccessStatusCode();
 
-        var list = await client.GetFromJsonAsync<List<dynamic>>("/api/items");
-        list.Should().NotBeNull();
-        list!.Count.Should().BeGreaterThan(0);
+    var listJson = await client.GetStringAsync("/api/items");
+    var list = JsonConvert.DeserializeObject<List<dynamic>>(listJson);
+    list.Should().NotBeNull();
+    list!.Count.Should().BeGreaterThan(0);
     }
 }

@@ -14,5 +14,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>

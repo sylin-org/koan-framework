@@ -271,10 +271,7 @@ internal static class Planner
     {
         if (ext.Equals(".json", StringComparison.OrdinalIgnoreCase))
         {
-            return System.Text.Json.JsonSerializer.Deserialize<DescriptorModel>(content, new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            try { return Newtonsoft.Json.JsonConvert.DeserializeObject<DescriptorModel>(content); } catch { return null; }
         }
         // Minimal YAML support: very small dependency-free parser for our simple structure.
         if (ext.Equals(".yml", StringComparison.OrdinalIgnoreCase) || ext.Equals(".yaml", StringComparison.OrdinalIgnoreCase))
@@ -358,7 +355,7 @@ internal static class Planner
                     var path = Path.Combine(cwd, rel.Replace('/', Path.DirectorySeparatorChar));
                     if (!File.Exists(path)) continue;
                     var json = File.ReadAllText(path);
-                    return System.Text.Json.JsonSerializer.Deserialize<Overrides>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    try { return Newtonsoft.Json.JsonConvert.DeserializeObject<Overrides>(json); } catch { return null; }
                 }
             }
             catch { }

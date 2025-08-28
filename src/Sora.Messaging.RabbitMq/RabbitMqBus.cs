@@ -1,7 +1,8 @@
 using RabbitMQ.Client;
 using Sora.Messaging.Infrastructure;
 using System.Reflection;
-using System.Text.Json;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Sora.Messaging.RabbitMq;
 
@@ -13,13 +14,13 @@ internal sealed class RabbitMqBus : IMessageBus, IDisposable
     private readonly RabbitMqOptions _opts;
     private readonly IMessagingCapabilities _caps;
     private readonly EffectiveMessagingPlan _plan;
-    private readonly JsonSerializerOptions _json;
+    private readonly JsonSerializerSettings _json;
     private readonly ITypeAliasRegistry? _aliases;
 
     public RabbitMqBus(string busCode, IConnection conn, IModel channel, RabbitMqOptions opts, IMessagingCapabilities caps, EffectiveMessagingPlan plan, ITypeAliasRegistry? aliases)
     {
         _busCode = busCode; _conn = conn; _channel = channel; _opts = opts; _caps = caps; _plan = plan; _aliases = aliases;
-        _json = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = false };
+    _json = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver(), Formatting = Formatting.None };
         if (_opts.PublisherConfirms)
         {
             _channel.ConfirmSelect();
@@ -40,7 +41,8 @@ internal sealed class RabbitMqBus : IMessageBus, IDisposable
             var alias = _aliases?.GetAlias(type) ?? type.FullName ?? type.Name;
             var partitionSuffix = MessageMeta.ResolvePartitionSuffix(type, m);
             var routingKey = (alias + partitionSuffix).Replace(' ', '.');
-            var body = JsonSerializer.SerializeToUtf8Bytes(m, type, _json);
+            var json = JsonConvert.SerializeObject(m, _json);
+            var body = System.Text.Encoding.UTF8.GetBytes(json);
 
             if (_opts.MaxMessageSizeKB is int maxKb && body.Length > maxKb * 1024)
                 throw new InvalidOperationException($"Message exceeds MaxMessageSizeKB ({_opts.MaxMessageSizeKB} KB).");

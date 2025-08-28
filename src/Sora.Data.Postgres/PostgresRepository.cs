@@ -13,6 +13,7 @@ using Sora.Data.Core;
 using Sora.Data.Relational.Linq;
 using Sora.Data.Relational.Orchestration;
 using System.Linq.Expressions;
+using Newtonsoft.Json;
 
 namespace Sora.Data.Postgres;
 
@@ -155,10 +156,10 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     }
 
     private static TEntity FromRow((string Id, string Json) row)
-        => System.Text.Json.JsonSerializer.Deserialize<TEntity>(row.Json)!;
+        => JsonConvert.DeserializeObject<TEntity>(row.Json)!;
     private static (string Id, string Json) ToRow(TEntity e)
     {
-        var json = System.Text.Json.JsonSerializer.Serialize(e);
+        var json = JsonConvert.SerializeObject(e);
         var id = e.Id!.ToString()!;
         return (id, json);
     }
@@ -789,9 +790,16 @@ internal sealed class PostgresRepository<TEntity, TKey> :
                 var jsonStr = jsonVal?.ToString();
                 if (!string.IsNullOrWhiteSpace(jsonStr))
                 {
-                    var ent = System.Text.Json.JsonSerializer.Deserialize<TEntity>(jsonStr);
-                    if (ent is not null) list.Add(ent);
-                    continue;
+                    try
+                    {
+                        var ent = Newtonsoft.Json.JsonConvert.DeserializeObject<TEntity>(jsonStr!);
+                        if (ent is not null) list.Add(ent);
+                        continue;
+                    }
+                    catch
+                    {
+                        // fall through to default instance
+                    }
                 }
             }
             var ent2 = Activator.CreateInstance<TEntity>();

@@ -1,5 +1,5 @@
+using Newtonsoft.Json;
 using Sora.Messaging.Infrastructure;
-using System.Net.Http.Json;
 
 namespace Sora.Messaging.Inbox.Http;
 
@@ -16,7 +16,8 @@ public sealed class HttpInboxStore : IInboxStore
             var resp = await _http.GetAsync(route, ct).ConfigureAwait(false);
             if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return false;
             resp.EnsureSuccessStatusCode();
-            var doc = await resp.Content.ReadFromJsonAsync<InboxStatus>(cancellationToken: ct).ConfigureAwait(false);
+            var txt = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var doc = JsonConvert.DeserializeObject<InboxStatus>(txt);
             return string.Equals(doc?.Status, Constants.Configuration.Inbox.Values.Processed, StringComparison.OrdinalIgnoreCase);
         }
         catch
@@ -27,7 +28,8 @@ public sealed class HttpInboxStore : IInboxStore
 
     public async Task MarkProcessedAsync(string key, CancellationToken ct)
     {
-        var resp = await _http.PostAsJsonAsync(Constants.Configuration.Inbox.Routes.MarkProcessed, new { key }, ct).ConfigureAwait(false);
+    var payload = JsonConvert.SerializeObject(new { key });
+    var resp = await _http.PostAsync(Constants.Configuration.Inbox.Routes.MarkProcessed, new StringContent(payload, System.Text.Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
     }
 

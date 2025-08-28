@@ -4,9 +4,9 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Json;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -28,8 +28,8 @@ public sealed class S4GraphQlTests : IClassFixture<WebApplicationFactory<Program
 
     private static StringContent Gql(string query, object? variables = null)
     {
-        var payload = new { query, variables };
-        var json = JsonSerializer.Serialize(payload);
+    var payload = new { query, variables };
+    var json = JsonConvert.SerializeObject(payload);
         return new StringContent(json, Encoding.UTF8, "application/json");
     }
 
@@ -48,21 +48,20 @@ public sealed class S4GraphQlTests : IClassFixture<WebApplicationFactory<Program
         var mBody = Gql(m, new { input = new { name = "alpha" } });
         var mResp = await client.PostAsync("/graphql", mBody);
         mResp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var mDoc = await mResp.Content.ReadFromJsonAsync<JsonDocument>();
-        mDoc!.RootElement.TryGetProperty("errors", out var _).Should().BeFalse();
+    var mDoc = JToken.Parse(await mResp.Content.ReadAsStringAsync());
+    mDoc["errors"].Should().BeNull();
 
         // list via GraphQL
         var q = "query($page:Int,$size:Int){ items(page:$page,size:$size){ totalCount items{ id name display } } }";
         var qBody = Gql(q, new { page = 1, size = 10 });
         var qResp = await client.PostAsync("/graphql", qBody);
         qResp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var qDoc = await qResp.Content.ReadFromJsonAsync<JsonDocument>();
-        qDoc!.RootElement.TryGetProperty("errors", out var _e).Should().BeFalse();
-        var total = qDoc.RootElement.GetProperty("data").GetProperty("items").GetProperty("totalCount").GetInt32();
+    var qDoc = JToken.Parse(await qResp.Content.ReadAsStringAsync());
+    qDoc["errors"].Should().BeNull();
+    var total = (int)qDoc["data"]!["items"]!["totalCount"]!;
         total.Should().BeGreaterOrEqualTo(1);
-        var arr = qDoc.RootElement.GetProperty("data").GetProperty("items").GetProperty("items");
-        arr.ValueKind.Should().Be(JsonValueKind.Array);
-        arr.GetArrayLength().Should().BeGreaterOrEqualTo(1);
+    var arr = (JArray)qDoc["data"]!["items"]!["items"]!;
+    arr.Count.Should().BeGreaterOrEqualTo(1);
     }
 
     [Fact]
@@ -81,12 +80,11 @@ public sealed class S4GraphQlTests : IClassFixture<WebApplicationFactory<Program
         var body = Gql(q, new { filter });
         var resp = await client.PostAsync("/graphql", body);
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>();
-        doc!.RootElement.TryGetProperty("errors", out var _).Should().BeFalse();
-        var data = doc.RootElement.GetProperty("data").GetProperty("items");
-        data.GetProperty("totalCount").GetInt32().Should().BeGreaterOrEqualTo(1);
-        var arr = data.GetProperty("items");
-        arr.ValueKind.Should().Be(JsonValueKind.Array);
-        arr.EnumerateArray().All(e => e.GetProperty("name").GetString()!.Contains('1')).Should().BeTrue();
+    var doc = JToken.Parse(await resp.Content.ReadAsStringAsync());
+    doc["errors"].Should().BeNull();
+    var data = doc["data"]!["items"]!;
+    ((int)data["totalCount"]!).Should().BeGreaterOrEqualTo(1);
+    var arr = (JArray)data["items"]!;
+    arr.All(e => e!["name"]!.Value<string>()!.Contains("1")).Should().BeTrue();
     }
 }

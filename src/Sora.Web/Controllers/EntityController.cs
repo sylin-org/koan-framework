@@ -274,14 +274,15 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         string? set = null;
         try
         {
-            var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(body));
-            if (json.RootElement.TryGetProperty("filter", out var f)) filterJson = f.GetRawText();
-            if (json.RootElement.TryGetProperty("page", out var p) && p.TryGetInt32(out var pi)) opts.Page = pi;
-            if (json.RootElement.TryGetProperty("size", out var s) && s.TryGetInt32(out var si)) opts.PageSize = si;
-            if (json.RootElement.TryGetProperty("set", out var st) && st.ValueKind == System.Text.Json.JsonValueKind.String) set = st.GetString();
-            if (json.RootElement.TryGetProperty("$options", out var opt) && opt.ValueKind == System.Text.Json.JsonValueKind.Object)
+            var jobj = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(body));
+            if (jobj.TryGetValue("filter", out var f)) filterJson = f.ToString(Newtonsoft.Json.Formatting.None);
+            if (jobj.TryGetValue("page", out var p) && (p.Type == Newtonsoft.Json.Linq.JTokenType.Integer || p.Type == Newtonsoft.Json.Linq.JTokenType.String)) opts.Page = (int)p;
+            if (jobj.TryGetValue("size", out var s) && (s.Type == Newtonsoft.Json.Linq.JTokenType.Integer || s.Type == Newtonsoft.Json.Linq.JTokenType.String)) opts.PageSize = (int)s;
+            if (jobj.TryGetValue("set", out var st) && st.Type == Newtonsoft.Json.Linq.JTokenType.String) set = (string?)st;
+            if (jobj.TryGetValue("$options", out var opt) && opt.Type == Newtonsoft.Json.Linq.JTokenType.Object)
             {
-                if (opt.TryGetProperty("ignoreCase", out var ic) && ic.ValueKind == System.Text.Json.JsonValueKind.True) ignoreCase = true;
+                var o = (Newtonsoft.Json.Linq.JObject)opt;
+                if (o.TryGetValue("ignoreCase", out var ic) && ic.Type == Newtonsoft.Json.Linq.JTokenType.Boolean && (bool)ic) ignoreCase = true;
             }
         }
         catch { }

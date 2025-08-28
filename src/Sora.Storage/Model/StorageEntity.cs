@@ -8,7 +8,7 @@ using Sora.Core;
 using Sora.Data.Core.Model;
 using Sora.Storage.Infrastructure;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json;
 
 // CRTP base for storage-backed entities with static creation helpers
 public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
@@ -48,7 +48,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         return From(obj);
     }
 
-    public static async Task<TEntity> Create<TDoc>(string name, TDoc value, JsonSerializerOptions? options = null, string contentType = "application/json; charset=utf-8", CancellationToken ct = default)
+    public static async Task<TEntity> Create<TDoc>(string name, TDoc value, JsonSerializerSettings? options = null, string contentType = "application/json; charset=utf-8", CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
         var obj = await Storage().CreateJson(name, value, options, profile, container, contentType, ct).ConfigureAwait(false);

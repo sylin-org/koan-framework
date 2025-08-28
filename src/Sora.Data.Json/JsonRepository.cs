@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Sora.Data.Abstractions;
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
-using System.Text.Json;
 
 namespace Sora.Data.Json;
 
@@ -23,7 +23,12 @@ internal sealed class JsonRepository<TEntity, TKey> :
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
+    private readonly JsonSerializerSettings _json = new()
+    {
+        ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver(),
+        Formatting = Formatting.None,
+        NullValueHandling = NullValueHandling.Include
+    };
     private readonly string _baseDir;
     // Maintain per-physical-name stores and file paths so different sets are isolated
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<TKey, TEntity>> _stores = new();
@@ -199,7 +204,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
         try
         {
             var json = File.ReadAllText(path);
-            var list = JsonSerializer.Deserialize<List<TEntity>>(json, _json) ?? [];
+            var list = JsonConvert.DeserializeObject<List<TEntity>>(json, _json) ?? [];
             foreach (var item in list) store[item.Id] = item;
         }
         catch { /* ignore corrupted files in early dev */ }
@@ -209,7 +214,7 @@ internal sealed class JsonRepository<TEntity, TKey> :
     {
         var path = _files.GetOrAdd(physicalName, n => Path.Combine(_baseDir, SanitizeFileName(n) + ".json"));
         var list = store.Values.ToList();
-        var json = JsonSerializer.Serialize(list, _json);
+    var json = JsonConvert.SerializeObject(list, _json);
         File.WriteAllText(path, json);
     }
 

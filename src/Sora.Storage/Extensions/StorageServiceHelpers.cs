@@ -9,7 +9,7 @@ using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
+// using System.Text.Json; // replaced by Newtonsoft.Json per framework policy
 
 public static class StorageServiceHelpers
 {
@@ -31,10 +31,10 @@ public static class StorageServiceHelpers
         return svc.Create(key, bytes, contentType, profile, container, ct);
     }
 
-    public static Task<StorageObject> CreateJson<T>(this IStorageService svc, string key, T value, JsonSerializerOptions? options = null, string profile = "", string container = "", string contentType = "application/json; charset=utf-8", CancellationToken ct = default)
+    public static Task<StorageObject> CreateJson<T>(this IStorageService svc, string key, T value, JsonSerializerSettings? options = null, string profile = "", string container = "", string contentType = "application/json; charset=utf-8", CancellationToken ct = default)
     {
-        // Serialize any value (object, array, primitive) using System.Text.Json for broad compatibility
-        var json = System.Text.Json.JsonSerializer.Serialize(value, options ?? new JsonSerializerOptions());
+        // Serialize any value (object, array, primitive) using Newtonsoft.Json for broad compatibility
+        var json = JsonConvert.SerializeObject(value, options ?? new JsonSerializerSettings());
         return svc.CreateJson(key, json, profile, container, contentType, ct);
     }
 

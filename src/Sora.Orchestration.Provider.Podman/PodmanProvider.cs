@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Newtonsoft.Json.Linq;
 using Sora.Orchestration.Abstractions;
 
 namespace Sora.Orchestration.Provider.Podman;
@@ -132,11 +133,11 @@ public sealed class PodmanProvider : IHostingProvider
         {
             var (code, outText, _) = Run("podman", "version --format json", CancellationToken.None).GetAwaiter().GetResult();
             if (code != 0 || string.IsNullOrWhiteSpace(outText)) return string.Empty;
-            using var doc = System.Text.Json.JsonDocument.Parse(outText);
-            if (doc.RootElement.TryGetProperty("Version", out var verProp))
-                return verProp.GetString() ?? string.Empty;
-            if (doc.RootElement.TryGetProperty("Client", out var client) && client.TryGetProperty("Version", out var cv))
-                return cv.GetString() ?? string.Empty;
+            var root = JToken.Parse(outText);
+            var ver = root["Version"]?.Value<string>();
+            if (!string.IsNullOrEmpty(ver)) return ver!;
+            var clientVer = root["Client"]?["Version"]?.Value<string>();
+            if (!string.IsNullOrEmpty(clientVer)) return clientVer!;
             return string.Empty;
         }
         catch { return string.Empty; }
@@ -203,12 +204,13 @@ public sealed class PodmanProvider : IHostingProvider
         var result = new List<(string Service, string State, string? Health)>();
         try
         {
-            using var doc = System.Text.Json.JsonDocument.Parse(stdout);
-            foreach (var el in doc.RootElement.EnumerateArray())
+            var arr = JArray.Parse(stdout);
+            foreach (var token in arr)
             {
-                var name = el.TryGetProperty("Name", out var np) ? np.GetString() : null;
-                var state = el.TryGetProperty("State", out var sp) ? sp.GetString() : null;
-                var health = el.TryGetProperty("Health", out var hp) ? hp.GetString() : null;
+                if (token is not JObject o) continue;
+                var name = o["Name"]?.Value<string>();
+                var state = o["State"]?.Value<string>();
+                var health = o["Health"]?.Value<string>();
                 if (!string.IsNullOrEmpty(name))
                     result.Add((name!, state ?? string.Empty, health));
             }
@@ -222,22 +224,23 @@ public sealed class PodmanProvider : IHostingProvider
         var list = new List<PortBinding>();
         try
         {
-            using var doc = System.Text.Json.JsonDocument.Parse(stdout);
-            foreach (var el in doc.RootElement.EnumerateArray())
+            var arr = JArray.Parse(stdout);
+            foreach (var token in arr)
             {
-                var name = el.TryGetProperty("Name", out var np) ? np.GetString() : null;
+                if (token is not JObject o) continue;
+                var name = o["Name"]?.Value<string>();
                 if (string.IsNullOrEmpty(name)) continue;
-                if (!el.TryGetProperty("Ports", out var portsEl)) continue;
-                if (portsEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                var portsTok = o["Ports"];
+                if (portsTok is JValue v && v.Type == JTokenType.String)
                 {
-                    foreach (var binding in ParsePortsString(portsEl.GetString()!, name!)) list.Add(binding);
+                    foreach (var binding in ParsePortsString(v.Value<string>()!, name!)) list.Add(binding);
                 }
-                else if (portsEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                else if (portsTok is JArray parr)
                 {
-                    foreach (var item in portsEl.EnumerateArray())
+                    foreach (var item in parr)
                     {
-                        if (item.ValueKind == System.Text.Json.JsonValueKind.String)
-                            foreach (var b in ParsePortsString(item.GetString()!, name!)) list.Add(b);
+                        if (item is JValue sv && sv.Type == JTokenType.String)
+                            foreach (var b in ParsePortsString(sv.Value<string>()!, name!)) list.Add(b);
                     }
                 }
             }

@@ -10,8 +10,7 @@ using Sora.Web.Auth.Infrastructure;
 using Sora.Web.Auth.Options;
 using Sora.Web.Auth.Providers;
 using System.Security.Claims;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
 namespace Sora.Web.Auth.Controllers;
 
@@ -115,8 +114,9 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
             catch { /* ignore */ }
             using var tokenResp = await httpClient.PostAsync(tokenEndpoint, new FormUrlEncodedContent(form), HttpContext.RequestAborted);
             if (!tokenResp.IsSuccessStatusCode) return Problem(detail: $"Token exchange failed: {(int)tokenResp.StatusCode}", statusCode: 502);
-            using var tokenDoc = JsonDocument.Parse(await tokenResp.Content.ReadAsStringAsync(HttpContext.RequestAborted));
-            var accessToken = tokenDoc.RootElement.TryGetProperty("access_token", out var at) ? at.GetString() : null;
+        var tokenJson = await tokenResp.Content.ReadAsStringAsync(HttpContext.RequestAborted);
+        var tokenObj = Newtonsoft.Json.Linq.JObject.Parse(tokenJson);
+        var accessToken = tokenObj.Value<string>("access_token");
             if (string.IsNullOrWhiteSpace(accessToken)) return Problem(detail: "Token response missing access_token.", statusCode: 502);
 
             // Fetch user info
@@ -131,10 +131,12 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
             if (!uiResp.IsSuccessStatusCode) return Problem(detail: $"UserInfo failed: {(int)uiResp.StatusCode}", statusCode: 502);
             var json = await uiResp.Content.ReadAsStringAsync(HttpContext.RequestAborted);
             claimsJson = json;
-            using var userDoc = JsonDocument.Parse(json);
-            sub = userDoc.RootElement.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
-            name = userDoc.RootElement.TryGetProperty("username", out var unEl) ? unEl.GetString() : null;
-            picture = userDoc.RootElement.TryGetProperty("avatar", out var avEl) ? avEl.GetString() : null;
+            var userObj = Newtonsoft.Json.Linq.JObject.Parse(json);
+            sub = userObj.Value<string>("sub") ?? userObj.Value<string>("id");
+            var email = userObj.Value<string>("email");
+            var displayName = userObj.Value<string>("name") ?? userObj.Value<string>("username");
+            if (!string.IsNullOrWhiteSpace(displayName)) name = displayName;
+            picture = userObj.Value<string>("picture") ?? userObj.Value<string>("avatar");
             if (string.IsNullOrWhiteSpace(sub)) sub = name ?? "user";
         }
         else if (type == AuthConstants.Protocols.Oidc)

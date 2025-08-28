@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sora.AI.Contracts.Adapters;
 using Sora.AI.Contracts.Models;
-using System.Net.Http.Json;
 using System.Text;
-using System.Text.Json;
 
 namespace Sora.Ai.Provider.Ollama;
 
@@ -42,15 +42,17 @@ internal sealed class OllamaAdapter : IAiAdapter
             bodyObj["think"] = thinkFlag;
         var body = bodyObj;
         _logger?.LogDebug("Ollama: POST {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);
-        using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.GeneratePath, body, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull }, ct).ConfigureAwait(false);
+    var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+    using var resp = await _http.PostAsync(Infrastructure.Constants.Api.GeneratePath, new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             _logger?.LogWarning("Ollama: generate failed ({Status}) body={Body}", (int)resp.StatusCode, text);
         }
-        resp.EnsureSuccessStatusCode();
-        var doc = await resp.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken: ct).ConfigureAwait(false)
-                  ?? throw new InvalidOperationException("Empty response from Ollama.");
+    resp.EnsureSuccessStatusCode();
+    var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+    var doc = JsonConvert.DeserializeObject<OllamaGenerateResponse>(json)
+          ?? throw new InvalidOperationException("Empty response from Ollama.");
         return new AiChatResponse
         {
             Text = doc.response ?? string.Empty,
@@ -65,7 +67,7 @@ internal sealed class OllamaAdapter : IAiAdapter
         if (string.IsNullOrWhiteSpace(model))
             throw new InvalidOperationException("Ollama adapter requires a model name.");
         var prompt = BuildPrompt(request);
-        var streamBody = new Dictionary<string, object?>
+    var streamBody = new Dictionary<string, object?>
         {
             ["model"] = model,
             ["prompt"] = prompt,
@@ -74,7 +76,7 @@ internal sealed class OllamaAdapter : IAiAdapter
         };
         if (request.Options?.Think is bool thinkFlag2)
             streamBody["think"] = thinkFlag2;
-        var body = JsonSerializer.Serialize(streamBody, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+    var body = JsonConvert.SerializeObject(streamBody, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
         using var httpReq = new HttpRequestMessage(HttpMethod.Post, Infrastructure.Constants.Api.GeneratePath)
         { Content = new StringContent(body, Encoding.UTF8, "application/json") };
         _logger?.LogDebug("Ollama: STREAM {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);
@@ -102,14 +104,16 @@ internal sealed class OllamaAdapter : IAiAdapter
             // Ollama embeddings API expects 'prompt' as the input field
             var body = new { model, prompt = input };
             _logger?.LogDebug("Ollama: POST {Path} model={Model} input.len={Len}", Infrastructure.Constants.Api.EmbeddingsPath, model, input?.Length ?? 0);
-            using var resp = await _http.PostAsJsonAsync(Infrastructure.Constants.Api.EmbeddingsPath, body, ct).ConfigureAwait(false);
+            var payload = JsonConvert.SerializeObject(body);
+            using var resp = await _http.PostAsync(Infrastructure.Constants.Api.EmbeddingsPath, new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode)
             {
                 var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                 _logger?.LogWarning("Ollama: embeddings failed ({Status}) body={Body}", (int)resp.StatusCode, text);
             }
             resp.EnsureSuccessStatusCode();
-            var doc = await resp.Content.ReadFromJsonAsync<OllamaEmbeddingsResponse>(cancellationToken: ct).ConfigureAwait(false)
+            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var doc = JsonConvert.DeserializeObject<OllamaEmbeddingsResponse>(json)
                       ?? throw new InvalidOperationException("Empty response from Ollama.");
             vectors.Add(doc.embedding ?? Array.Empty<float>());
         }
@@ -120,9 +124,10 @@ internal sealed class OllamaAdapter : IAiAdapter
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
     {
-        using var resp = await _http.GetAsync(Infrastructure.Constants.Discovery.TagsPath, ct).ConfigureAwait(false);
-        resp.EnsureSuccessStatusCode();
-        var doc = await resp.Content.ReadFromJsonAsync<OllamaTagsResponse>(cancellationToken: ct).ConfigureAwait(false);
+    using var resp = await _http.GetAsync(Infrastructure.Constants.Discovery.TagsPath, ct).ConfigureAwait(false);
+    resp.EnsureSuccessStatusCode();
+    var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+    var doc = JsonConvert.DeserializeObject<OllamaTagsResponse>(json);
         var models = new List<AiModelDescriptor>();
         foreach (var m in doc?.models ?? Enumerable.Empty<OllamaTag>())
         {
@@ -181,14 +186,14 @@ internal sealed class OllamaAdapter : IAiAdapter
             {
                 var normKey = NormalizeOllamaOptionKey(kv.Key);
                 // Promote JsonElement to raw boxed value when possible
-                dict[normKey] = kv.Value.ValueKind switch
+                dict[normKey] = kv.Value.Type switch
                 {
-                    JsonValueKind.String => kv.Value.GetString(),
-                    JsonValueKind.Number => TryGetNumber(kv.Value),
-                    JsonValueKind.True => true,
-                    JsonValueKind.False => false,
-                    JsonValueKind.Array => kv.Value, // keep as JsonElement for serializer
-                    JsonValueKind.Object => kv.Value,
+                    JTokenType.String => kv.Value.Value<string>(),
+                    JTokenType.Integer => kv.Value.Value<long>(),
+                    JTokenType.Float => kv.Value.Value<double>(),
+                    JTokenType.Boolean => kv.Value.Value<bool>(),
+                    JTokenType.Array => kv.Value, // pass-through
+                    JTokenType.Object => kv.Value,
                     _ => null
                 };
             }
@@ -196,8 +201,8 @@ internal sealed class OllamaAdapter : IAiAdapter
         return dict;
     }
 
-    private static object? TryGetNumber(JsonElement el)
-        => el.TryGetInt64(out var l) ? l : (el.TryGetDouble(out var d) ? d : null);
+    private static object? TryGetNumber(JToken tok)
+        => tok.Type == JTokenType.Integer ? tok.Value<long>() : (tok.Type == JTokenType.Float ? tok.Value<double>() : null);
 
     private static string NormalizeOllamaOptionKey(string key)
     {
@@ -226,7 +231,7 @@ internal sealed class OllamaAdapter : IAiAdapter
             var line = await reader.ReadLineAsync().ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(line)) continue;
             T? obj;
-            try { obj = JsonSerializer.Deserialize<T>(line); }
+            try { obj = JsonConvert.DeserializeObject<T>(line); }
             catch { continue; }
             yield return obj;
         }

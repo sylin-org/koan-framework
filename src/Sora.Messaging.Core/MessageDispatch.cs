@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using System.Text;
 
 namespace Sora.Messaging;
 
@@ -13,7 +15,7 @@ public static class MessageDispatch
         string? messageId,
         string? correlationId,
         bool redelivered,
-        JsonSerializerOptions? jsonOptions = null,
+        JsonSerializerSettings? jsonSettings = null,
         CancellationToken ct = default)
     {
         var attempt = 1;
@@ -34,7 +36,8 @@ public static class MessageDispatch
         object? message = null;
         try
         {
-            message = JsonSerializer.Deserialize(body.Span, targetType, jsonOptions ?? new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            var json = Encoding.UTF8.GetString(body.Span);
+            message = JsonConvert.DeserializeObject(json, targetType, jsonSettings ?? new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() });
         }
         catch
         {

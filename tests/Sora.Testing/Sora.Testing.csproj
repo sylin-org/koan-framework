@@ -7,6 +7,7 @@
   <ItemGroup>
     <PackageReference Include="Docker.DotNet" Version="3.125.5" />
     <PackageReference Include="DotNet.Testcontainers" Version="1.7.0-beta.2269" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
   <PackageReference Include="xunit" Version="2.9.2" />
   <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />

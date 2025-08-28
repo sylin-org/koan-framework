@@ -9,6 +9,7 @@ using Sora.Storage;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace S6.SocialCreator.IntegrationTests;
@@ -59,7 +60,7 @@ public sealed class S6SmokeTests
         // Extract key from JSON
         var body = await upload.Content.ReadAsStringAsync();
         body.Should().NotBeNullOrWhiteSpace();
-        var key = System.Text.Json.JsonDocument.Parse(body).RootElement.GetProperty("key").GetString();
+    var key = JToken.Parse(body)["key"]!.Value<string>();
         key.Should().NotBeNull();
 
         // HEAD
@@ -117,7 +118,7 @@ public sealed class S6SmokeTests
         content.Add(fileContent, "file", "hi.txt");
         var upload = await client.PostAsync("/api/upload", content);
         upload.EnsureSuccessStatusCode();
-        var key = System.Text.Json.JsonDocument.Parse(await upload.Content.ReadAsStringAsync()).RootElement.GetProperty("key").GetString();
+    var key = Newtonsoft.Json.Linq.JToken.Parse(await upload.Content.ReadAsStringAsync())["key"]?.ToString();
         key.Should().NotBeNull();
 
         // Initial GET to capture Last-Modified

@@ -8,7 +8,8 @@ using Sora.Orchestration.Renderers.Compose;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using System.Text.Json;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 using Sora.Orchestration.Abstractions;
 using Sora.Orchestration.Attributes;
@@ -169,7 +170,7 @@ static async Task<int> DoctorAsync(string[] args)
     if (json)
     {
         var payload = new { provider = provider.Id, available = avail.Ok, reason = avail.Reason, engine = engine, order = effectiveOrder };
-        Console.WriteLine(JsonSerializer.Serialize(payload));
+        Console.WriteLine(JsonConvert.SerializeObject(payload));
         return avail.Ok ? 0 : 3;
     }
     Console.WriteLine("Doctor checks:");
@@ -310,7 +311,7 @@ static async Task<int> StatusAsync(string[] args)
     var status = await provider.Status(new StatusOptions(Service: null));
     if (json)
     {
-        Console.WriteLine(JsonSerializer.Serialize(status));
+        Console.WriteLine(JsonConvert.SerializeObject(status));
     }
     else
     {
@@ -396,7 +397,7 @@ static async Task<int> InspectAsync(string[] args)
         if (json)
         {
             var detectedPayload = new { detected = false, cwd };
-            Console.WriteLine(JsonSerializer.Serialize(detectedPayload));
+            Console.WriteLine(JsonConvert.SerializeObject(detectedPayload));
         }
         else
         {
@@ -559,7 +560,7 @@ static async Task<int> InspectAsync(string[] args)
                 }
             })
         };
-        Console.WriteLine(JsonSerializer.Serialize(payload));
+    Console.WriteLine(JsonConvert.SerializeObject(payload));
         return 0;
     }
 
@@ -799,19 +800,15 @@ static List<(string Id, string Name, string Protocol)>? DiscoverAuthProviders(st
         var map = new Dictionary<string, (string? Name, string? Type)>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in files)
         {
-            using var doc = JsonDocument.Parse(File.ReadAllText(path));
-            if (!TryGet(doc.RootElement, "Sora", out var sora)) continue;
-            if (!TryGet(sora, "Web", out var web)) continue;
-            if (!TryGet(web, "Auth", out var auth)) continue;
-            if (!TryGet(auth, "Providers", out var providers) || providers.ValueKind != JsonValueKind.Object) continue;
-            foreach (var prop in providers.EnumerateObject())
+            var root = JToken.Parse(File.ReadAllText(path));
+            var providers = root?["Sora"]?["Web"]?["Auth"]?["Providers"] as JObject;
+            if (providers is null) continue;
+            foreach (var prop in providers.Properties())
             {
                 var id = prop.Name;
-                var obj = prop.Value;
-                string? name = null; string? type = null;
-                if (TryGet(obj, "DisplayName", out var dn) && dn.ValueKind == JsonValueKind.String) name = dn.GetString();
-                if (TryGet(obj, "Type", out var tp) && tp.ValueKind == JsonValueKind.String) type = tp.GetString();
-                // override
+                var obj = prop.Value as JObject;
+                string? name = obj?["DisplayName"]?.Type == JTokenType.String ? (string?)obj?["DisplayName"] : null;
+                string? type = obj?["Type"]?.Type == JTokenType.String ? (string?)obj?["Type"] : null;
                 if (map.TryGetValue(id, out var existing))
                     map[id] = (name ?? existing.Name, type ?? existing.Type);
                 else
@@ -830,20 +827,6 @@ static List<(string Id, string Name, string Protocol)>? DiscoverAuthProviders(st
         return list.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
     catch { return null; }
-}
-
-static bool TryGet(JsonElement element, string name, out JsonElement result)
-{
-    foreach (var p in element.EnumerateObject())
-    {
-        if (p.NameEquals(name) || p.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-        {
-            result = p.Value;
-            return true;
-        }
-    }
-    result = default;
-    return false;
 }
 
 static string PrettyProtocol(string? type)

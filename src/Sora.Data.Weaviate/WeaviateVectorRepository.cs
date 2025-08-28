@@ -4,9 +4,9 @@ using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Instructions;
 using Sora.Data.Vector.Abstractions;
 using System.Net;
-using System.Net.Http.Json;
+using Newtonsoft.Json;
 using System.Security.Cryptography;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Sora.Data.Weaviate;
 
@@ -61,14 +61,14 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             }
         };
         _logger?.LogDebug("Weaviate: POST /v1/schema/classes for class {Class}", cls);
-        var create = await _http.PostAsJsonAsync("/v1/schema/classes", body, ct);
+    var create = await _http.PostAsync("/v1/schema/classes", new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json"), ct);
         if (!create.IsSuccessStatusCode)
         {
             // Fallback for older Weaviate versions that require POST /v1/schema
             if (create.StatusCode == HttpStatusCode.MethodNotAllowed)
             {
                 _logger?.LogDebug("Weaviate: POST /v1/schema/classes returned 405; retrying legacy endpoint /v1/schema for class {Class}", cls);
-                var legacy = await _http.PostAsJsonAsync("/v1/schema", body, ct);
+                var legacy = await _http.PostAsync("/v1/schema", new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json"), ct);
                 if (!legacy.IsSuccessStatusCode)
                 {
                     var ltxt = await legacy.Content.ReadAsStringAsync(ct);
@@ -104,7 +104,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         };
         var putUrl = $"/v1/objects/{Uri.EscapeDataString(uuid.ToString())}";
         _logger?.LogDebug("Weaviate: PUT {Url} class={Class} id={Id} uuid={Uuid} vecDim={Dim}", putUrl, ClassName, id, uuid, embedding.Length);
-        var resp = await _http.PutAsJsonAsync(putUrl, obj, ct);
+    var resp = await _http.PutAsync(putUrl, new StringContent(JsonConvert.SerializeObject(obj), System.Text.Encoding.UTF8, "application/json"), ct);
         if (!resp.IsSuccessStatusCode)
         {
             var body = await resp.Content.ReadAsStringAsync(ct);
@@ -115,7 +115,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             if (missingOnPut)
             {
                 _logger?.LogDebug("Weaviate: PUT failed ({Status}); retrying POST /v1/objects", (int)resp.StatusCode);
-                var post = await _http.PostAsJsonAsync("/v1/objects", obj, ct);
+                var post = await _http.PostAsync("/v1/objects", new StringContent(JsonConvert.SerializeObject(obj), System.Text.Encoding.UTF8, "application/json"), ct);
                 if (!post.IsSuccessStatusCode)
                 {
                     var ptxt = await post.Content.ReadAsStringAsync(ct);
@@ -123,7 +123,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                     if ((int)post.StatusCode == 422 && ptxt.Contains("already exists", StringComparison.OrdinalIgnoreCase))
                     {
                         _logger?.LogDebug("Weaviate: POST reported existing object; retrying final PUT to update {Url}", putUrl);
-                        var put2 = await _http.PutAsJsonAsync(putUrl, obj, ct);
+                        var put2 = await _http.PutAsync(putUrl, new StringContent(JsonConvert.SerializeObject(obj), System.Text.Encoding.UTF8, "application/json"), ct);
                         if (!put2.IsSuccessStatusCode)
                         {
                             var p2txt = await put2.Content.ReadAsStringAsync(ct);
@@ -191,8 +191,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             // Request docId alongside _additional so we can map back to original ids
             query = $"query {{ Get {{ {ClassName} {args} {{ docId _additional {{ id distance }} }} }} }}"
         };
-        var req = JsonContent.Create(gql);
-        var resp = await _http.PostAsync("/v1/graphql", req, ct);
+    var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
+    var resp = await _http.PostAsync("/v1/graphql", req, ct);
         if (!resp.IsSuccessStatusCode)
         {
             var body = await resp.Content.ReadAsStringAsync(ct);
@@ -224,7 +224,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                     await EnsureSchemaAsync(ct);
                     var cls = ClassName;
                     var gql = new { query = $"query {{ Aggregate {{ {cls} {{ meta {{ count }} }} }} }}" };
-                    var req = JsonContent.Create(gql);
+                    var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
                     var resp = await _http.PostAsync("/v1/graphql", req, ct);
                     if (!resp.IsSuccessStatusCode)
                     {
@@ -248,7 +248,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                         @class = ClassName,
                         where = new { @operator = "IsNotNull", path = new[] { "id" } }
                     };
-                    var req = JsonContent.Create(body);
+                    var req = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json");
                     var resp = await _http.PostAsync("/v1/batch/objects/delete", req, ct);
                     if (!resp.IsSuccessStatusCode)
                     {
@@ -266,38 +266,38 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
     private static int ParseAggregateCount(string json)
     {
-        using var doc = JsonDocument.Parse(json);
-        var data = doc.RootElement.GetProperty("data").GetProperty("Aggregate");
-        foreach (var cls in data.EnumerateObject())
+        var root = JToken.Parse(json);
+        var aggregate = root["data"]?["Aggregate"] as JObject;
+        if (aggregate is null) return 0;
+        foreach (var prop in aggregate.Properties())
         {
-            var arr = cls.Value.EnumerateArray();
-            if (arr.MoveNext())
-            {
-                var meta = arr.Current.GetProperty("meta");
-                if (meta.TryGetProperty("count", out var countEl))
-                    return countEl.GetInt32();
-            }
+            var arr = prop.Value as JArray;
+            var first = arr?.First as JObject;
+            var meta = first?["meta"] as JObject;
+            var count = meta?["count"]?.Value<int?>();
+            if (count.HasValue) return count.Value;
         }
         return 0;
     }
 
     private static IReadOnlyList<VectorMatch<TKey>> ParseGraphQlIds(string json)
     {
-        using var doc = JsonDocument.Parse(json);
+        var root = JToken.Parse(json);
         var list = new List<VectorMatch<TKey>>();
-        var data = doc.RootElement.GetProperty("data").GetProperty("Get");
-        foreach (var prop in data.EnumerateObject())
+        var get = root["data"]?["Get"] as JObject;
+        if (get is null) return list;
+        foreach (var prop in get.Properties())
         {
-            foreach (var item in prop.Value.EnumerateArray())
+            if (prop.Value is not JArray arr) continue;
+            foreach (var itemTok in arr)
             {
-                var add = item.GetProperty("_additional");
-                var idStr = item.TryGetProperty("docId", out var docIdEl) && docIdEl.ValueKind == JsonValueKind.String
-                    ? docIdEl.GetString()
-                    : add.GetProperty("id").GetString();
-                var distance = add.TryGetProperty("distance", out var distEl) ? distEl.GetDouble() : 0.0;
+                var item = itemTok as JObject;
+                if (item is null) continue;
+                var add = item["_additional"] as JObject;
+                var idStr = item["docId"]?.Value<string>() ?? add?["id"]?.Value<string>();
+                var distance = add?["distance"]?.Value<double?>() ?? 0.0;
                 if (idStr is null) continue;
                 TKey id = (TKey)Convert.ChangeType(idStr, typeof(TKey));
-                // Weaviate distance: smaller is closer for cosine/l2; map to Score as inverse
                 var score = 1.0 - distance;
                 list.Add(new VectorMatch<TKey>(id, score, null));
             }

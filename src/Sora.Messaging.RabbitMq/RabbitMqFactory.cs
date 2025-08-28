@@ -10,7 +10,6 @@ using Sora.Messaging.Infrastructure;
 using Sora.Messaging.Provisioning;
 using Sora.Messaging.RabbitMq.Provisioning;
 using System.Text;
-using System.Text.Json;
 
 namespace Sora.Messaging.RabbitMq;
 

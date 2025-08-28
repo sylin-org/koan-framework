@@ -1,6 +1,5 @@
 ﻿using Sora.Orchestration;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 using Sora.Orchestration.Infrastructure;
 
 namespace Sora.Orchestration.Cli.Planning;
@@ -9,25 +8,25 @@ internal static class LaunchManifest
 {
     internal sealed class Model
     {
-        [JsonPropertyName("version")] public int Version { get; set; } = 1;
-        [JsonPropertyName("app")] public AppInfo App { get; set; } = new();
-        [JsonPropertyName("options")] public Options Opt { get; set; } = new();
-        [JsonPropertyName("allocations")] public Dictionary<string, Allocation> Allocations { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        [JsonProperty("version")] public int Version { get; set; } = 1;
+        [JsonProperty("app")] public AppInfo App { get; set; } = new();
+        [JsonProperty("options")] public Options Opt { get; set; } = new();
+        [JsonProperty("allocations")] public Dictionary<string, Allocation> Allocations { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public sealed class AppInfo
         {
-            [JsonPropertyName("id")] public string? Id { get; set; }
-            [JsonPropertyName("name")] public string? Name { get; set; }
-            [JsonPropertyName("code")] public string? Code { get; set; }
-            [JsonPropertyName("defaultPublicPort")] public int? DefaultPublicPort { get; set; }
-            [JsonPropertyName("assignedPublicPort")] public int? AssignedPublicPort { get; set; }
+            [JsonProperty("id")] public string? Id { get; set; }
+            [JsonProperty("name")] public string? Name { get; set; }
+            [JsonProperty("code")] public string? Code { get; set; }
+            [JsonProperty("defaultPublicPort")] public int? DefaultPublicPort { get; set; }
+            [JsonProperty("assignedPublicPort")] public int? AssignedPublicPort { get; set; }
         }
         public sealed class Options
         {
-            [JsonPropertyName("exposeInternals")] public bool ExposeInternals { get; set; }
-            [JsonPropertyName("provider")] public string? Provider { get; set; }
-            [JsonPropertyName("lastProfile")] public string? LastProfile { get; set; }
+            [JsonProperty("exposeInternals")] public bool ExposeInternals { get; set; }
+            [JsonProperty("provider")] public string? Provider { get; set; }
+            [JsonProperty("lastProfile")] public string? LastProfile { get; set; }
         }
-        public sealed class Allocation { [JsonPropertyName("assignedPublicPort")] public int? AssignedPublicPort { get; set; } }
+        public sealed class Allocation { [JsonProperty("assignedPublicPort")] public int? AssignedPublicPort { get; set; } }
     }
 
     public static Model? Load(string cwd)
@@ -37,7 +36,7 @@ internal static class LaunchManifest
             var path = Path.Combine(cwd, OrchestrationConstants.LaunchManifestPath.Replace('/', Path.DirectorySeparatorChar));
             if (!File.Exists(path)) return null;
             var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<Model>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return JsonConvert.DeserializeObject<Model>(json, new JsonSerializerSettings { MissingMemberHandling = MissingMemberHandling.Ignore, NullValueHandling = NullValueHandling.Include });
         }
         catch { return null; }
     }
@@ -49,7 +48,7 @@ internal static class LaunchManifest
             var path = Path.Combine(cwd, OrchestrationConstants.LaunchManifestPath.Replace('/', Path.DirectorySeparatorChar));
             var dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            var json = JsonSerializer.Serialize(model, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonConvert.SerializeObject(model, Newtonsoft.Json.Formatting.Indented);
             try
             {
                 if (File.Exists(path))

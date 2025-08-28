@@ -1,9 +1,9 @@
-﻿using RabbitMQ.Client;
+﻿using Newtonsoft.Json;
+using RabbitMQ.Client;
 using Sora.Messaging.Provisioning;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text.Json;
 
 namespace Sora.Messaging.RabbitMq.Provisioning;
 
@@ -151,9 +151,9 @@ internal sealed class RabbitMqProvisioner : ITopologyPlanner, ITopologyInspector
             var qJson = responses[1].Content.ReadAsStringAsync().GetAwaiter().GetResult();
             var bJson = responses[2].Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
-            var exDocs = JsonSerializer.Deserialize<List<RmqExchangeDto>>(exJson) ?? new();
-            var qDocs = JsonSerializer.Deserialize<List<RmqQueueDto>>(qJson) ?? new();
-            var bDocs = JsonSerializer.Deserialize<List<RmqBindingDto>>(bJson) ?? new();
+            var exDocs = JsonConvert.DeserializeObject<List<RmqExchangeDto>>(exJson) ?? new();
+            var qDocs = JsonConvert.DeserializeObject<List<RmqQueueDto>>(qJson) ?? new();
+            var bDocs = JsonConvert.DeserializeObject<List<RmqBindingDto>>(bJson) ?? new();
 
             // Map to CurrentTopology (skip amq.* system exchanges; focus on our primary exchange and retry/dlx)
             var exchanges = exDocs

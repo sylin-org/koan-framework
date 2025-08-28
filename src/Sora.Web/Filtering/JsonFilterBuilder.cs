@@ -1,5 +1,5 @@
 using System.Linq.Expressions;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Sora.Web.Filtering;
 
@@ -30,15 +30,15 @@ public static class JsonFilterBuilder
             return true;
         }
         // Tolerate single-quoted JSON from querystrings
-        var normalized = NormalizeJson(json!);
-        JsonDocument doc;
-        try { doc = JsonDocument.Parse(normalized); }
-        catch (Exception ex) { error = $"Invalid filter JSON: {ex.Message}"; return false; }
+    var normalized = NormalizeJson(json!);
+    JObject doc;
+    try { doc = JObject.Parse(normalized); }
+    catch (Exception ex) { error = $"Invalid filter JSON: {ex.Message}"; return false; }
 
         try
         {
             var param = Expression.Parameter(typeof(TEntity), "e");
-            var body = BuildNode<TEntity>(doc.RootElement, param, options ?? new());
+            var body = BuildNode<TEntity>(doc, param, options ?? new());
             predicate = Expression.Lambda<Func<TEntity, bool>>(body, param);
             return true;
         }
@@ -64,52 +64,51 @@ public static class JsonFilterBuilder
         return s;
     }
 
-    private static Expression BuildNode<TEntity>(JsonElement node, ParameterExpression param, BuildOptions opts)
+    private static Expression BuildNode<TEntity>(JToken node, ParameterExpression param, BuildOptions opts)
     {
-        return node.ValueKind switch
+        return node.Type switch
         {
-            JsonValueKind.Object => BuildObject<TEntity>(node, param, opts),
-            JsonValueKind.True => Expression.Constant(true),
-            JsonValueKind.False => Expression.Constant(false),
+            JTokenType.Object => BuildObject<TEntity>((JObject)node, param, opts),
+            JTokenType.Boolean => Expression.Constant(node.Value<bool>()),
             _ => throw new InvalidOperationException("Filter root must be an object")
         };
     }
 
-    private static Expression BuildObject<TEntity>(JsonElement obj, ParameterExpression param, BuildOptions opts)
+    private static Expression BuildObject<TEntity>(JObject obj, ParameterExpression param, BuildOptions opts)
     {
         // Merge any local $options with parent options
         opts = MergeOptions(obj, opts);
 
         // Logical operators take precedence
-        if (obj.TryGetProperty("$and", out var andNode) && andNode.ValueKind == JsonValueKind.Array)
+        if (obj.TryGetValue("$and", out var andNode) && andNode.Type == JTokenType.Array)
         {
             Expression? acc = null;
-            foreach (var child in andNode.EnumerateArray())
+            foreach (var child in (JArray)andNode)
             {
-                var e = BuildObject<TEntity>(child, param, opts);
+                var e = BuildObject<TEntity>((JObject)child, param, opts);
                 acc = acc == null ? e : Expression.AndAlso(acc, e);
             }
             return acc ?? Expression.Constant(true);
         }
-        if (obj.TryGetProperty("$or", out var orNode) && orNode.ValueKind == JsonValueKind.Array)
+        if (obj.TryGetValue("$or", out var orNode) && orNode.Type == JTokenType.Array)
         {
             Expression? acc = null;
-            foreach (var child in orNode.EnumerateArray())
+            foreach (var child in (JArray)orNode)
             {
-                var e = BuildObject<TEntity>(child, param, opts);
+                var e = BuildObject<TEntity>((JObject)child, param, opts);
                 acc = acc == null ? e : Expression.OrElse(acc, e);
             }
             return acc ?? Expression.Constant(false);
         }
-        if (obj.TryGetProperty("$not", out var notNode) && notNode.ValueKind is JsonValueKind.Object)
+        if (obj.TryGetValue("$not", out var notNode) && notNode.Type is JTokenType.Object)
         {
-            var inner = BuildObject<TEntity>(notNode, param, opts);
+            var inner = BuildObject<TEntity>((JObject)notNode, param, opts);
             return Expression.Not(inner);
         }
 
         // Field comparisons (top-level only)
         Expression? result = null;
-        foreach (var prop in obj.EnumerateObject())
+        foreach (var prop in obj.Properties())
         {
             if (prop.Name.StartsWith("$")) continue; // skip operators incl. $options
             var member = Expression.PropertyOrField(param, prop.Name);
@@ -119,17 +118,17 @@ public static class JsonFilterBuilder
         return result ?? Expression.Constant(true);
     }
 
-    private static Expression BuildComparison(MemberExpression member, JsonElement value, BuildOptions opts)
+    private static Expression BuildComparison(MemberExpression member, JToken value, BuildOptions opts)
     {
         // Support: literal, wildcard string, or operator object
-        if (value.ValueKind != JsonValueKind.Object)
+        if (value.Type != JTokenType.Object)
         {
             return BuildEquality(member, value, opts);
         }
         // Operator object
-        opts = MergeOptions(value, opts);
+        opts = MergeOptions((JObject)value, opts);
         Expression? acc = null;
-        foreach (var op in value.EnumerateObject())
+        foreach (var op in ((JObject)value).Properties())
         {
             if (op.Name == "$options") continue;
             Expression piece = op.Name switch
@@ -143,25 +142,24 @@ public static class JsonFilterBuilder
         return acc ?? Expression.Constant(true);
     }
 
-    private static Expression BuildExists(MemberExpression member, JsonElement value)
+    private static Expression BuildExists(MemberExpression member, JToken value)
     {
-        var desired = value.ValueKind == JsonValueKind.True;
+        var desired = value.Type == JTokenType.Boolean && value.Value<bool>();
         var notNull = Expression.NotEqual(member, Expression.Constant(null, member.Type));
         return desired ? notNull : Expression.Not(notNull);
     }
 
-    private static Expression BuildIn(MemberExpression member, JsonElement arrayNode, BuildOptions opts)
+    private static Expression BuildIn(MemberExpression member, JToken arrayNode, BuildOptions opts)
     {
-        if (arrayNode.ValueKind != JsonValueKind.Array)
+        if (arrayNode.Type != JTokenType.Array)
             throw new InvalidOperationException("$in expects an array");
 
         // Handle strings and primitives; coerce to member type when possible
         if (member.Type == typeof(string))
         {
             // Coerce to non-null strings to avoid List<string?> nullability mismatch
-            var items = arrayNode
-                .EnumerateArray()
-                .Select(e => e.ValueKind == JsonValueKind.String ? (e.GetString() ?? string.Empty) : (e.ToString() ?? string.Empty))
+            var items = ((JArray)arrayNode)
+                .Select(e => e.Type == JTokenType.String ? (e.Value<string>() ?? string.Empty) : (e.ToString() ?? string.Empty))
                 .ToList();
             if (opts.IgnoreCase)
             {
@@ -186,7 +184,7 @@ public static class JsonFilterBuilder
         }
         else
         {
-            var list = arrayNode.EnumerateArray().Select(e => JsonToObject(e, member.Type)).ToList();
+            var list = ((JArray)arrayNode).Select(e => JsonToObject(e, member.Type)).ToList();
             var constExpr = Expression.Constant(list);
             var contains = typeof(Enumerable)
                 .GetMethods()
@@ -196,11 +194,11 @@ public static class JsonFilterBuilder
         }
     }
 
-    private static Expression BuildEquality(MemberExpression member, JsonElement value, BuildOptions opts)
+    private static Expression BuildEquality(MemberExpression member, JToken value, BuildOptions opts)
     {
         if (member.Type == typeof(string))
         {
-            var str = value.ValueKind == JsonValueKind.String ? value.GetString() : value.ToString();
+            var str = value.Type == JTokenType.String ? value.Value<string>() : value.ToString();
             var (pattern, mode) = ClassifyPattern(str ?? string.Empty);
             // Receivers for string methods; coalesce only when invoking methods
             Expression receiverSensitive = member; // preserve null semantics for equality
@@ -244,39 +242,38 @@ public static class JsonFilterBuilder
         return (input, MatchMode.Equals);
     }
 
-    private static object? JsonToObject(JsonElement value, Type targetType)
+    private static object? JsonToObject(JToken value, Type targetType)
     {
         try
         {
-            if (targetType == typeof(string)) return value.ValueKind == JsonValueKind.String ? value.GetString() : value.ToString();
-            if (targetType == typeof(int) || targetType == typeof(int?)) return value.ValueKind switch { JsonValueKind.Number => value.GetInt32(), JsonValueKind.String => int.Parse(value.GetString()!), _ => 0 };
-            if (targetType == typeof(long) || targetType == typeof(long?)) return value.ValueKind switch { JsonValueKind.Number => value.GetInt64(), JsonValueKind.String => long.Parse(value.GetString()!), _ => 0L };
-            if (targetType == typeof(bool) || targetType == typeof(bool?)) return value.ValueKind switch { JsonValueKind.True => true, JsonValueKind.False => false, JsonValueKind.String => bool.Parse(value.GetString()!), _ => false };
-            if (targetType == typeof(double) || targetType == typeof(double?)) return value.ValueKind switch { JsonValueKind.Number => value.GetDouble(), JsonValueKind.String => double.Parse(value.GetString()!), _ => 0d };
+            if (targetType == typeof(string)) return value.Type == JTokenType.String ? value.Value<string>() : value.ToString();
+            if (targetType == typeof(int) || targetType == typeof(int?)) return value.Type switch { JTokenType.Integer => value.Value<int>(), JTokenType.String => int.Parse(value.Value<string>()!), _ => 0 };
+            if (targetType == typeof(long) || targetType == typeof(long?)) return value.Type switch { JTokenType.Integer => value.Value<long>(), JTokenType.String => long.Parse(value.Value<string>()!), _ => 0L };
+            if (targetType == typeof(bool) || targetType == typeof(bool?)) return value.Type switch { JTokenType.Boolean => value.Value<bool>(), JTokenType.String => bool.Parse(value.Value<string>()!), _ => false };
+            if (targetType == typeof(double) || targetType == typeof(double?)) return value.Type switch { JTokenType.Float => value.Value<double>(), JTokenType.String => double.Parse(value.Value<string>()!), _ => 0d };
 
-            // Fallback: use System.Text.Json to convert
-            var raw = value.GetRawText();
-            return JsonSerializer.Deserialize(raw, targetType);
+            // Fallback: use Newtonsoft to convert
+            return value.ToObject(targetType);
         }
         catch
         {
             // Relaxed coercion: best-effort
-            var s = value.ToString();
+            var s = value?.ToString();
             return Convert.ChangeType(s, Nullable.GetUnderlyingType(targetType) ?? targetType);
         }
     }
 
-    private static BuildOptions MergeOptions(JsonElement node, BuildOptions parent)
+    private static BuildOptions MergeOptions(JToken node, BuildOptions parent)
     {
         try
         {
-            if (node.ValueKind == JsonValueKind.Object && node.TryGetProperty("$options", out var optsNode) && optsNode.ValueKind == JsonValueKind.Object)
+            if (node.Type == JTokenType.Object && ((JObject)node).TryGetValue("$options", out var optsNode) && optsNode.Type == JTokenType.Object)
             {
                 bool ignoreCase = parent.IgnoreCase;
-                if (optsNode.TryGetProperty("ignoreCase", out var ic))
+                if (((JObject)optsNode).TryGetValue("ignoreCase", out var ic))
                 {
-                    if (ic.ValueKind == JsonValueKind.True) ignoreCase = true;
-                    else if (ic.ValueKind == JsonValueKind.False) { /* keep current */ }
+                    if (ic.Type == JTokenType.Boolean && ic.Value<bool>()) ignoreCase = true;
+                    else { /* keep current */ }
                 }
                 if (ignoreCase != parent.IgnoreCase)
                 {

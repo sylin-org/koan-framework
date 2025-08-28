@@ -9,7 +9,8 @@ using Sora.Core;
 using Sora.Data.Core;
 using Sora.Messaging;
 using Sora.Testing;
-using System.Text.Json;
+using Newtonsoft.Json;
+using System.Text;
 using Xunit;
 
 namespace Sora.Mq.RabbitMq.IntegrationTests;
@@ -72,7 +73,7 @@ public class DiscoveryCachingTests : IAsyncLifetime
             var replyTo = ea.BasicProperties?.ReplyTo; var corr = ea.BasicProperties?.CorrelationId;
             if (!string.IsNullOrWhiteSpace(replyTo))
             {
-                var body = JsonSerializer.SerializeToUtf8Bytes(new { endpoint = "http://localhost:19091" });
+                var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { endpoint = "http://localhost:19091" }));
                 var props = channel.CreateBasicProperties(); props.CorrelationId = corr; props.ContentType = "application/json";
                 channel.BasicPublish(exchange, replyTo!, false, props, body);
             }
