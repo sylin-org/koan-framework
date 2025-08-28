@@ -110,6 +110,148 @@ References: ARCH-0050, ARCH-0051; see also reference/secrets.md for module detai
 - Environment variable equivalent (Windows PowerShell)
   $env:Secrets__db__main = "p@ssw0rd-dev"
 
+## More examples (progressively harder)
+
+1) Program wiring (ASP.NET Core)
+
+```csharp
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
+
+// Load dev-only .NET User Secrets (kept outside the repo)
+if (builder.Environment.IsDevelopment())
+{
+  builder.Configuration.AddUserSecrets<Program>(optional: true);
+}
+
+// Register Sora secrets and the resolve-on-read configuration wrapper
+builder.Services.AddSoraSecrets();
+builder.Configuration.AddSecretsReferenceConfiguration();
+
+var app = builder.Build();
+app.Run();
+```
+
+2) Strongly-typed options with secret references
+
+```json
+// appsettings.json
+{
+  "Db": {
+  "Password": "secret://db/main",
+  "ConnectionString": "Host=pg;Password=${secret://db/main};Database=app"
+  }
+}
+```
+
+```csharp
+// DbOptions.cs
+public sealed class DbOptions
+{
+  public string? Password { get; set; }
+  public string? ConnectionString { get; set; }
+}
+
+// Program.cs (registration excerpt)
+builder.Services.Configure<DbOptions>(builder.Configuration.GetSection("Db"));
+
+// Any service or controller
+public sealed class UsesDb(IOptionsMonitor<DbOptions> opts, ILogger<UsesDb> log)
+{
+  public void Dump()
+  {
+    // Values are materialized by the configuration wrapper; never log raw secrets
+    var cs = opts.CurrentValue.ConnectionString;
+    log.LogInformation("DB connection template resolved (length only): {Len}", cs?.Length ?? 0);
+  }
+}
+```
+
+3) Whole-value secret (JSON payload) and parsing via IConfiguration
+
+```json
+// appsettings.json
+{
+  "ApiKeys": {
+  "ServiceX": "secret://api/servicex" // value is JSON in the secret store
+  }
+}
+```
+
+```csharp
+// Anywhere you have IConfiguration (after AddSecretsReferenceConfiguration())
+var json = builder.Configuration["ApiKeys:ServiceX"]; // resolved raw JSON string
+if (!string.IsNullOrEmpty(json))
+{
+  var model = System.Text.Json.JsonSerializer.Deserialize<ServiceXKey>(json);
+  // ...use model
+}
+
+public sealed record ServiceXKey(string KeyId, string Secret);
+```
+
+4) Forcing a specific backend and handling errors
+
+```csharp
+// Force Vault; NotFound will not fall back
+var id = Sora.Secrets.Abstractions.SecretId.Parse("secret+vault://db/main");
+try
+{
+  var resolver = app.Services.GetRequiredService<Sora.Secrets.Abstractions.ISecretResolver>();
+  var value = await resolver.GetAsync(id, default);
+  // use value (do not log)
+}
+catch (Exception ex)
+{
+  // Keep logs redacted and actionable
+  app.Logger.LogError(ex, "Failed to resolve required secret {Secret}", id);
+  throw; // fail closed for required secrets
+}
+```
+
+5) Gating startup on required secrets with a timeout
+
+```csharp
+var ids = new[]
+{
+  Sora.Secrets.Abstractions.SecretId.Parse("secret://db/main"),
+  Sora.Secrets.Abstractions.SecretId.Parse("secret://api/servicex")
+};
+
+var resolver = app.Services.GetRequiredService<Sora.Secrets.Abstractions.ISecretResolver>();
+using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+foreach (var sid in ids)
+{
+  try { await resolver.GetAsync(sid, cts.Token); }
+  catch (Exception ex)
+  {
+    app.Logger.LogError(ex, "Startup blocked by missing/unauthorized secret {Secret}", sid);
+    throw; // stop boot to avoid running misconfigured
+  }
+}
+```
+
+6) Reacting to secret-driven config changes (OptionsMonitor)
+
+```csharp
+// Secrets that change in the backend will trigger config reload; observe via IOptionsMonitor
+var listener = app.Services.GetRequiredService<IOptionsMonitor<DbOptions>>();
+listener.OnChange(o => app.Logger.LogInformation("Db options updated (ConnString length): {Len}", o.ConnectionString?.Length ?? 0));
+```
+
+7) Environment variable forms (Windows and Linux)
+
+```powershell
+# Windows PowerShell
+$env:Secrets__db__main = "p@ssw0rd-dev"
+```
+
+```bash
+# Linux/macOS Bash
+export Secrets__db__main='p@ssw0rd-dev'
+```
+
 ## Orchestration compatibility (envRef)
 
 - Exporters prefer references (secretsRefOnly) and emit envRef entries (e.g., APP_DB_PASSWORD → secret://db/main)
