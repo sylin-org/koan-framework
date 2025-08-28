@@ -3,6 +3,7 @@
 HashiCorp Vault secret provider for Sora Secrets. Production-safe, simple to adopt, and wired automatically via Sora’s auto-registrar.
 
 What you get
+
 - KV v1 and v2 support (configurable via `UseKvV2`).
 - Provider-forced URIs: `secret+vault://<scope>/<name>` to ensure Vault routing.
 - Options binding from configuration (`Sora:Secrets:Vault`).
@@ -10,20 +11,24 @@ What you get
 - Auto-registration (no manual DI when using StartSora).
 
 ## Contract (short)
+
 - Input: `SecretId` with `secret+vault://scope/name` (optionally `?version=` ignored by Vault KV).
 - Output: `SecretValue` with type Text/Json/Bytes and `SecretMetadata` (Provider, TTL when available or configured).
 - Errors: `SecretNotFoundException`, `SecretUnauthorizedException`, `SecretProviderUnavailableException`.
 - Success: Read secret from KV v2 (`/<mount>/data/<scope>/<name>`) or KV v1 (`/<mount>/<scope>/<name>`).
 
 Edge cases
+
 - Namespace auth: missing/incorrect `X-Vault-Namespace` → unauthorized.
 - Mount mismatch: wrong `Mount` or v1/v2 mismatch → not found.
 - Provider forcing: use `secret+vault://…` when you must bypass other providers in the chain.
 
 ## Configure
+
 Configuration path: `Sora:Secrets:Vault`
 
 Options
+
 - `Enabled` (bool, default true)
 - `Address` (string, e.g., `http://localhost:8200`)
 - `Token` (string; use a reference or env var indirection)
@@ -54,10 +59,12 @@ Example appsettings.json
 ```
 
 Notes
+
 - Token should not be in plain text; prefer indirection like `${secret://env/VAULT_TOKEN}`.
 - KV v2 path format is handled internally (`/v1/<mount>/data/...`).
 
 ## DI and wiring
+
 - Using StartSora: auto-detected via `ISoraAutoRegistrar` and registered automatically. No manual calls needed.
 - Manual DI (advanced):
   - Call `services.AddSoraSecrets();` (core).
@@ -84,11 +91,13 @@ services.AddSingleton<ISecretProvider, VaultSecretProvider>();
 ```
 
 ## Health checks
+
 - Registered automatically by the auto-registrar when `Enabled`.
 - Tag: `secrets`.
 - Probe: `v1/sys/health` against `Address` with headers from options.
 
 ## Usage snippets
+
 Resolve placeholder in config
 
 ```json
@@ -106,6 +115,7 @@ var pw = secret.AsString();
 ```
 
 ## Troubleshooting
+
 - 404 from Vault → check `Mount`, `UseKvV2`, and path casing.
 - 403/permission issues → check `Token` policies and `Namespace`.
 - Slow or timeouts → increase `Timeout`; verify network routes.

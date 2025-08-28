@@ -17,47 +17,58 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 
 ## Top directives (short)
 
-1) Prefer first-class static model methods for data access
+1. Prefer first-class static model methods for data access
+
 - MyModel.All(ct), Query(...), AllStream(...), QueryStream(...), FirstPage(...), Page(...)
 - Generic facades (Data<TEntity,TKey>) are second-class; use only when a model static isn’t available.
 - All/Query without paging must fully materialize the result; for large sets, use streaming or explicit paging.
 
-2) Controllers, not inline endpoints
+2. Controllers, not inline endpoints
+
 - Attribute-routed MVC controllers only. No MapGet/MapPost in startup or module initializers.
 
-3) No stubs, no placeholders, no scattered literals
+3. No stubs, no placeholders, no scattered literals
+
 - Remove empty artifacts. Hoist stable values into a project-scoped Constants class. Use typed Options for tunables.
 
-4) Simple composition, explicit options, deterministic behavior
+4. Simple composition, explicit options, deterministic behavior
+
 - DI-first extension methods (AddXyz/UseXyz). Discovery is opt-in and Dev-only. Explicit config always wins.
 
-5) Service lifetimes and scope
+5. Service lifetimes and scope
+
 - Prefer Singleton for clients/factories; Transient for small stateless helpers; Scoped only when truly required.
 
-6) Observability and safety
+6. Observability and safety
+
 - CancellationToken on I/O, structured logs, metrics, ProblemDetails for errors. Guardrails on paging and streaming.
 
 ## Quick-reference by area
 
 - Data
+
   - Semantics: All/Query materialize; use Stream or Pager for large sets.
   - Adapters: lean defaults (Dapper/ADO.NET for relational; Mongo/Redis SDKs; EF optional).
   - See: ../guides/data/index.md, ../guides/data/all-query-streaming-and-pager.md
 
 - Web
+
   - Controllers only, secure headers defaults, transformers for entity payload shaping.
   - See: ../guides/web/index.md, decisions/WEB-0035-entitycontroller-transformers.md
   - Auth: centralized challenge/callback/logout and provider discovery — see: ../reference/web-auth.md and ../api/web-http-api.md (challenge supports `return` and optional `prompt=login`; Dev TestProvider cookie cleared by central logout)
 
 - Messaging
+
   - IBus + IMessageBatch; explicit idempotency/retry options.
   - See: ../guides/messaging/index.md, decisions/MESS-0021-messaging-capabilities-and-negotiation.md
 
 - AI
+
   - AddAiDefaults + MapAgentEndpoints; local-first providers; safety filters on in Dev.
   - See: ../guides/ai/index.md and src/Sora.Ai.Provider.Ollama/README.md
 
 - Orchestration
+
   - DX-first DevHost with hosting providers (Docker/Podman) and exporters (Compose now; Helm/ACA later).
   - CLI: `sora up|down|status|logs|doctor|export` with profiles (SORA_ENV) and verbosity flags.
   - See: ../reference/orchestration.md and decisions/ARCH-0047-orchestration-hosting-and-exporters-as-pluggable-adapters.md
@@ -77,4 +88,5 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 - Logs/metrics present for important operations; no secrets/PII in logs.
 
 ## Docs style & checklist
+
 - See: ./docs-style-and-checklist.md

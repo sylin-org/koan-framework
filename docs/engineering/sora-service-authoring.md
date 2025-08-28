@@ -6,22 +6,25 @@ description: Minimal, targeted steps to declare a service adapter with [SoraServ
 # SoraService authoring — DX quick guide
 
 Contract (at a glance)
+
 - Inputs: one class per service annotated with `[SoraService]` in a project that references `Sora.Orchestration.Abstractions`.
 - Outputs: a unified orchestration manifest (`__SoraOrchestrationManifest.Json`) consumed by CLI/planners. Your service shows up in `sora inspect`, `sora up`, `sora export compose`.
 - Error modes: invalid short code, missing container image when `DeploymentKind=Container`, duplicate ids → reported as build diagnostics.
 - Success criteria: service appears with correct kind, image, tag, ports, env/volumes; `sora status` shows endpoints and health.
 
 Prerequisites
+
 - Reference `Sora.Orchestration.Abstractions` from your project.
 - Choose a stable `shortCode` (unique within your app’s dependency set).
 
 Authoring checklist
-1) Create a small, dedicated type and apply `[SoraService]`.
-2) Set `Kind`, `shortCode`, `name`, `ContainerImage`, `DefaultTag`, `DefaultPorts`.
-3) Add `HealthEndpoint` for HTTP-based readiness (optional but recommended).
-4) Declare `Volumes` for persistence, and `AppEnv` to surface configuration into your app.
-5) Add `Provides`/`Consumes` and `Capabilities` as "key=value" entries to help planners.
-6) Build and run `sora inspect` to validate.
+
+1. Create a small, dedicated type and apply `[SoraService]`.
+2. Set `Kind`, `shortCode`, `name`, `ContainerImage`, `DefaultTag`, `DefaultPorts`.
+3. Add `HealthEndpoint` for HTTP-based readiness (optional but recommended).
+4. Declare `Volumes` for persistence, and `AppEnv` to surface configuration into your app.
+5. Add `Provides`/`Consumes` and `Capabilities` as "key=value" entries to help planners.
+6. Build and run `sora inspect` to validate.
 
 Minimal example
 
@@ -65,6 +68,7 @@ internal sealed class VaultService { }
 ```
 
 Known adapters in this repo (discovery snapshot)
+
 - SecretsVault: `vault` — HashiCorp Vault (`src/Sora.Secrets.Vault/VaultService.cs`).
 - Database: `postgres` — PostgreSQL (`src/Sora.Data.Postgres/PostgresAdapterFactory.cs`).
 - Database: `mssql` — SQL Server (`src/Sora.Data.SqlServer/SqlServerAdapterFactory.cs`).
@@ -76,6 +80,7 @@ Known adapters in this repo (discovery snapshot)
 Adapter patterns by kind (one-stop reference)
 
 Data — relational databases (ServiceKind.Database)
+
 - Purpose: Postgres, SQL Server, MySQL; expose stable scheme/port; add planner hints via Capabilities.
 - DI: register your adapter factory and options under Sora:Data:<Provider>.
 - Example (already in repo): see `Sora.Data.Postgres.PostgresAdapterFactory` and `[SoraService(ServiceKind.Database, shortCode: "postgres")]`.
@@ -100,6 +105,7 @@ internal sealed class SqlServerService { }
 ```
 
 Data — non-relational (Mongo, Redis, etc.)
+
 - Use Database or Cache kind depending on semantics.
 - Example signature:
 
@@ -114,6 +120,7 @@ internal sealed class MongoService { }
 ```
 
 AI providers (ServiceKind.Ai)
+
 - Purpose: model servers like Ollama; surface HTTP endpoints, health, and AppEnv hints.
 - Use Capabilities to declare supported features (embeddings=true, chat=true, etc.).
 - Example: `src/Sora.Ai.Provider.Ollama/Properties/OrchestrationManifest.cs`.
@@ -129,6 +136,7 @@ internal sealed class OllamaService { }
 ```
 
 Messaging (ServiceKind.Messaging)
+
 - Purpose: brokers (e.g., RabbitMQ, NATS). Prefer HTTP-based HealthEndpoint; otherwise rely on container health.
 - Example pattern:
 
@@ -143,6 +151,7 @@ internal sealed class RabbitMqService { }
 ```
 
 Cache and Search (ServiceKind.Cache / ServiceKind.Search)
+
 - Cache example (Redis):
 
 ```csharp
@@ -166,10 +175,12 @@ internal sealed class OpenSearchService { }
 ```
 
 Vector databases (ServiceKind.Vector)
+
 - Example available in repo: `Sora.Data.Weaviate` uses `[SoraService(ServiceKind.Vector, shortCode: "weaviate")]`.
 - Keep ports and HTTP health endpoints explicit; declare Capabilities such as `protocol=http`, `vectors=true`.
 
 Object storage (ServiceKind.Storage)
+
 - Purpose: S3-compatible, MinIO, local blob stores.
 - Example (MinIO):
 
@@ -186,6 +197,7 @@ internal sealed class MinioService { }
 ```
 
 Identity providers (ServiceKind.Auth)
+
 - Purpose: external IdPs (Keycloak, Authentik). Use HTTP health and surface issuer/base URL via AppEnv.
 
 ```csharp
@@ -200,13 +212,15 @@ internal sealed class KeycloakService { }
 ```
 
 Conventions and guardrails
+
 - Use controllers over inline endpoints (if your adapter exposes an HTTP API for dev tooling).
 - Centralize constants (route names, env keys) in an Infrastructure/Constants class.
 - No magic values: derive AppEnv keys from options classes and ADRs.
-- Always declare Scheme/Host/EndpointPort and Local* variants so planners can compose URIs.
+- Always declare Scheme/Host/EndpointPort and Local\* variants so planners can compose URIs.
 - Prefer stable volumes under `./Data/<service>`.
 
 Validation flow
+
 - Build your solution (the generator emits the manifest and validates attributes).
 - Run:
 
@@ -217,12 +231,14 @@ sora status --json
 ```
 
 Edge cases
+
 - Health checks only support HTTP endpoints; for TCP-only services, rely on container health or simple Running state.
 - `DefaultPorts` control container-exposed ports; host ports are assigned by planners/profiles and surfaced in status.
 - Use `Provides`/`Consumes` to express dependencies; avoid hard-coding container names across services.
 - Keep `shortCode` lowercase, alphanumeric-plus-dash; avoid collisions.
 
 See also
+
 - Unified attributes and manifest-first discovery: ./orchestration-manifest-generator.md
 - Orchestration reference: ../reference/orchestration.md
 - Engineering front door: ./index.md

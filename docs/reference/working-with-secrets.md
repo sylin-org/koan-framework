@@ -29,49 +29,57 @@ References: ARCH-0050, ARCH-0051; see also reference/secrets.md for module detai
 
 ## Scenarios (from simplest to more advanced)
 
-1) Environment variables only (no files)
+1. Environment variables only (no files)
+
 - Set an environment variable per secret and reference it via configuration mapping if needed
 - With Sora’s config-backed provider, you can also map canonical keys directly (see Scenario 2)
 
-2) Development using .NET User Secrets (preferred, no extra provider)
+2. Development using .NET User Secrets (preferred, no extra provider)
+
 - Add User Secrets to IConfiguration in Development
 - Store secrets under the canonical key space Secrets:scope:name
 - Example user-secrets store (user profile, not in repo):
   {
-    "Secrets": {
-      "db": {
-        "main": "p@ssw0rd-dev"
-      }
-    }
+  "Secrets": {
+  "db": {
+  "main": "p@ssw0rd-dev"
+  }
+  }
   }
 - In appsettings.json, reference the secret:
   - Db:Password: "secret://db/main"
   - ConnectionStrings:Default: "Host=pg;Password=${secret://db/main};Database=app"
 - Result: ConfigurationSecretProvider resolves the reference from IConfiguration; no new adapter required
 
-3) .env or environment fallbacks (optional)
-- If your host includes .env or additional config sources, map to the same canonical key
-- Env var naming: Secrets__db__main (double underscores)
+3. .env or environment fallbacks (optional)
 
-4) Inline placeholders in composite values
+- If your host includes .env or additional config sources, map to the same canonical key
+- Env var naming: Secrets**db**main (double underscores)
+
+4. Inline placeholders in composite values
+
 - Use ${secret://…} inside connection strings or URLs
 - Example: "Host=pg;User Id=app;Password=${secret://db/main};Database=app"
 
-5) Whole-value references (JSON/opaque payloads)
+5. Whole-value references (JSON/opaque payloads)
+
 - For JSON or binary secrets, use the whole value form, then parse in code if needed
 - Example appsettings: ApiKeys:ServiceX: "secret://api/servicex"
 - Code: var key = await resolver.GetAsync(SecretId.Parse("secret://api/servicex"), ct); // parse JSON as needed
 
-6) Forcing a specific backend (when required)
+6. Forcing a specific backend (when required)
+
 - Use secret+vault://scope/name to route to Vault; this never falls back on NotFound
 - Prefer secret://… for portability; only force when backend-specific features must be guaranteed
 
-7) Recipes swap providers without config edits
+7. Recipes swap providers without config edits
+
 - Chain order is stable across envs: [Vault (if present), Configuration (User Secrets/.env/appsettings), Environment]
 - In Development, Vault is typically absent → config/env serve values; in Prod, Vault takes precedence
 - Keep references provider-agnostic to avoid edits when moving between envs
 
-8) Code-based resolution for ad-hoc needs
+8. Code-based resolution for ad-hoc needs
+
 - Inject ISecretResolver and resolve on demand
 - Examples
   - var id = SecretId.Parse("secret://db/main");
@@ -79,11 +87,13 @@ References: ARCH-0050, ARCH-0051; see also reference/secrets.md for module detai
   - var composed = await resolver.ResolveAsync(configuration["Some:Template"], ct);
 - Notes: values are cached by TTL; ToString on SecretValue is redacted
 
-9) Rotation and reload basics
+9. Rotation and reload basics
+
 - Providers may advertise TTL; the resolver honors provider TTL else falls back to a configured default
 - The resolve-on-read configuration wrapper swaps change tokens on upgrade and reload; OptionsMonitor observes updates
 
-10) Gating startup on required secrets (optional)
+10. Gating startup on required secrets (optional)
+
 - During startup, you may attempt to resolve critical secrets with a timeout and fail closed if missing/unauthorized
 - Keep the list minimal and scoped to app readiness (not build-time)
 
@@ -99,20 +109,21 @@ References: ARCH-0050, ARCH-0051; see also reference/secrets.md for module detai
 ## Minimal examples (copy/paste)
 
 - appsettings.json
+
   - Db:Password: "secret://db/main"
   - ConnectionStrings:Default: "Host=pg;Password=${secret://db/main};Database=app"
 
 - Development user-secrets JSON (conceptual)
   {
-    "Secrets": { "db": { "main": "p@ssw0rd-dev" } }
+  "Secrets": { "db": { "main": "p@ssw0rd-dev" } }
   }
 
 - Environment variable equivalent (Windows PowerShell)
-  $env:Secrets__db__main = "p@ssw0rd-dev"
+  $env:Secrets**db**main = "p@ssw0rd-dev"
 
 ## More examples (progressively harder)
 
-1) Program wiring (ASP.NET Core)
+1. Program wiring (ASP.NET Core)
 
 ```csharp
 // Program.cs
@@ -132,14 +143,14 @@ var app = builder.Build();
 app.Run();
 ```
 
-2) Strongly-typed options with secret references
+2. Strongly-typed options with secret references
 
 ```json
 // appsettings.json
 {
   "Db": {
-  "Password": "secret://db/main",
-  "ConnectionString": "Host=pg;Password=${secret://db/main};Database=app"
+    "Password": "secret://db/main",
+    "ConnectionString": "Host=pg;Password=${secret://db/main};Database=app"
   }
 }
 ```
@@ -167,13 +178,13 @@ public sealed class UsesDb(IOptionsMonitor<DbOptions> opts, ILogger<UsesDb> log)
 }
 ```
 
-3) Whole-value secret (JSON payload) and parsing via IConfiguration
+3. Whole-value secret (JSON payload) and parsing via IConfiguration
 
 ```json
 // appsettings.json
 {
   "ApiKeys": {
-  "ServiceX": "secret://api/servicex" // value is JSON in the secret store
+    "ServiceX": "secret://api/servicex" // value is JSON in the secret store
   }
 }
 ```
@@ -190,7 +201,7 @@ if (!string.IsNullOrEmpty(json))
 public sealed record ServiceXKey(string KeyId, string Secret);
 ```
 
-4) Forcing a specific backend and handling errors
+4. Forcing a specific backend and handling errors
 
 ```csharp
 // Force Vault; NotFound will not fall back
@@ -209,7 +220,7 @@ catch (Exception ex)
 }
 ```
 
-5) Gating startup on required secrets with a timeout
+5. Gating startup on required secrets with a timeout
 
 ```csharp
 var ids = new[]
@@ -232,7 +243,7 @@ foreach (var sid in ids)
 }
 ```
 
-6) Reacting to secret-driven config changes (OptionsMonitor)
+6. Reacting to secret-driven config changes (OptionsMonitor)
 
 ```csharp
 // Secrets that change in the backend will trigger config reload; observe via IOptionsMonitor
@@ -240,7 +251,7 @@ var listener = app.Services.GetRequiredService<IOptionsMonitor<DbOptions>>();
 listener.OnChange(o => app.Logger.LogInformation("Db options updated (ConnString length): {Len}", o.ConnectionString?.Length ?? 0));
 ```
 
-7) Environment variable forms (Windows and Linux)
+7. Environment variable forms (Windows and Linux)
 
 ```powershell
 # Windows PowerShell

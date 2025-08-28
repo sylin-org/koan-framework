@@ -12,14 +12,17 @@ description: How to use secret references (secret://) in configuration and code;
 ## Usage
 
 Registration (DI)
+
 - services.AddSoraSecrets(); // env + config providers
 - configuration.AddSecretsReferenceConfiguration(); // resolve on read
 
 appsettings.json
+
 - Db:Password: "secret://db/main"
 - ConnectionStrings:Default: "Host=pg;Password=${secret://db/main};Database=app"
 
 Code
+
 - var pw = await resolver.GetAsync(SecretId.Parse("secret://db/main"), ct);
 - var conn = await resolver.ResolveAsync(configuration.GetConnectionString("Default"), ct);
 
@@ -32,8 +35,9 @@ Code
 - TTL and reload: provider TTL is honored when present; otherwise the resolver uses a configured default. Options binding sees a consistent reload behavior.
 
 Recommended Development wiring
+
 - Host configuration: add .NET User Secrets (dev-only). The chain then reads values for secret://scope/name from config keys (Secrets:scope:name).
-- Do not store raw secrets in appsettings.*; keep secrets outside the repo (User Secrets, .env, env vars).
+- Do not store raw secrets in appsettings.\*; keep secrets outside the repo (User Secrets, .env, env vars).
 
 ## Notes
 
@@ -45,14 +49,15 @@ Recommended Development wiring
 
 - Package: Sora.Secrets.Vault (auto-registered via SoraAutoRegistrar).
 - Configure under Sora:Secrets:Vault:
-	- Enabled: true
-	- Address: "https://vault:8200"
-	- Token: "${env://VAULT_TOKEN}" (use env, not literal)
-	- Namespace: optional
-	- Mount: "secret" (KV engine mount)
-	- UseKvV2: true
+  - Enabled: true
+  - Address: "https://vault:8200"
+  - Token: "${env://VAULT_TOKEN}" (use env, not literal)
+  - Namespace: optional
+  - Mount: "secret" (KV engine mount)
+  - UseKvV2: true
 
 Examples
+
 - Force provider in a reference: secret+vault://db/main
 - Whole value: "secret+vault://db/main?version=2"
 - Placeholder: "Password=${secret+vault://db/main}"
