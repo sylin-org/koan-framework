@@ -1,0 +1,58 @@
+services:
+  web:
+    build:
+      context: ../../..
+      dockerfile: samples/S7.TechDocs/Dockerfile
+    image: sora-s7-techdocs:dev
+    ports:
+      - "5087:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:8080"
+      Sora__Web__ExposeObservabilitySnapshot: "true"
+      # Mongo (primary DB)
+      Sora__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
+      Sora__Data__Mongo__Database: "s7"
+      # Vector DB (Weaviate)
+      Sora__Data__Weaviate__Endpoint: "http://weaviate:8080"
+      # AI (Ollama)
+      Sora__Ai__AutoDiscoveryEnabled: "true"
+      Sora__Ai__AllowDiscoveryInNonDev: "true"
+      SORA_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
+      # Explicit Ollama service (disabled in dev; toggle to true for prod-style wiring)
+      Sora__Ai__Services__Ollama__0__Id: "ollama"
+      Sora__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Sora__Ai__Services__Ollama__0__DefaultModel: "all-minilm"
+      Sora__Ai__Services__Ollama__0__Enabled: "false"
+      Sora__Ai__Ollama__RequiredModels__0: "all-minilm"
+    volumes:
+      - ../wwwroot:/app/wwwroot
+    depends_on:
+      - mongo
+      - weaviate
+  mongo:
+    image: mongo:7
+    ports:
+      - "5091:27017"
+    volumes:
+      - ../data/mongo:/data/db
+  weaviate:
+    image: semitechnologies/weaviate:1.25.6
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      CLUSTER_HOSTNAME: "node1"
+      RAFT_BOOTSTRAP_EXPECT: "1"
+    ports:
+      - "5092:8080"
+    volumes:
+      - ../data/weaviate:/var/lib/weaviate
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "5093:11434"
+    volumes:
+      - ../data/ollama-models:/root/.ollama
+volumes: {}

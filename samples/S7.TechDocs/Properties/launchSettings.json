@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "S7.TechDocs": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:49359;http://localhost:49360"
+    }
+  }
+}

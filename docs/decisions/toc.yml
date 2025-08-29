@@ -106,6 +106,8 @@
       href: WEB-0042-graphql-naming-and-discovery.md
     - name: EntityController transformers
       href: WEB-0035-entitycontroller-transformers.md
+    - name: Entity moderation controller — standard flow and hooks
+      href: WEB-0048-entity-moderation-controller-standard-flow.md
     - name: Multi-protocol authentication (OIDC/OAuth2/SAML)
       href: WEB-0043-auth-multi-protocol-oauth-oidc-saml.md
     - name: Web auth discovery and health

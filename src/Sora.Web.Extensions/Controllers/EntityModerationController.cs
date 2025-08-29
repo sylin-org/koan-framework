@@ -10,12 +10,15 @@ using Sora.Web.Infrastructure;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using Sora.Web.Extensions.Moderation;
+
 namespace Sora.Web.Extensions.Controllers;
 
 [ApiController]
-public abstract class EntityModerationController<TEntity, TKey> : ControllerBase
+public abstract class EntityModerationController<TEntity, TKey, TFlow> : ControllerBase
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
+    where TFlow : IModerationFlow<TEntity>, IModerationValidator<TEntity>
 {
     protected virtual string DraftSet => SoraWebConstants.Sets.Moderation.Draft;
     protected virtual string SubmittedSet => SoraWebConstants.Sets.Moderation.Submitted;
@@ -134,7 +137,17 @@ public abstract class EntityModerationController<TEntity, TKey> : ControllerBase
     [HttpPost("{id}/moderation/submit")]
     public virtual async Task<IActionResult> Submit([FromRoute] TKey id, [FromBody] DraftSubmit? body, CancellationToken ct)
     {
+        var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
+        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        using var _s = Data<TEntity, TKey>.WithSet(SubmittedSet);
+        var submitted = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = submitted, User = User, Services = HttpContext.RequestServices, Options = body };
+        var v = await flow.ValidateSubmit(ctx, ct);
+        if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
+        var b = await flow.BeforeSubmit(ctx, ct);
+        if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
         _ = await Data<TEntity, TKey>.MoveSet(DraftSet, SubmittedSet, e => Equals(e.Id, id), null, 500, ct);
+        await flow.AfterSubmitted(ctx, ct);
         return NoContent();
     }
 
@@ -155,7 +168,17 @@ public abstract class EntityModerationController<TEntity, TKey> : ControllerBase
     [HttpPost("{id}/moderation/withdraw")]
     public virtual async Task<IActionResult> Withdraw([FromRoute] TKey id, [FromBody] DraftWithdraw? body, CancellationToken ct)
     {
+        var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
+        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        using var _s = Data<TEntity, TKey>.WithSet(SubmittedSet);
+        var submitted = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = submitted, User = User, Services = HttpContext.RequestServices, Options = body };
+        var v = await flow.ValidateWithdraw(ctx, ct);
+        if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
+        var b = await flow.BeforeWithdraw(ctx, ct);
+        if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
         _ = await Data<TEntity, TKey>.MoveSet(SubmittedSet, DraftSet, e => Equals(e.Id, id), null, 500, ct);
+        await flow.AfterWithdrawn(ctx, ct);
         return NoContent();
     }
 
@@ -208,28 +231,33 @@ public abstract class EntityModerationController<TEntity, TKey> : ControllerBase
     [HttpPost("{id}/moderation/approve")]
     public virtual async Task<IActionResult> Approve([FromRoute] TKey id, [FromBody] ApproveOptions? options, CancellationToken ct)
     {
-        using (var _from = Data<TEntity, TKey>.WithSet(SubmittedSet))
+        var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
+        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        using var _from = Data<TEntity, TKey>.WithSet(SubmittedSet);
+        var draft = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = draft, User = User, Services = HttpContext.RequestServices, Options = options };
+        var v = await flow.ValidateApprove(ctx, ct);
+        if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
+        var b = await flow.BeforeApprove(ctx, ct);
+        if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
+        // Optional transform via ApproveOptions.Transform stays supported by default behavior
+        if (options?.Transform is not null && ctx.SubmittedSnapshot is not null)
         {
-            var draft = await Data<TEntity, TKey>.GetAsync(id!, ct);
-            if (draft is null) return NoContent();
-            // Apply optional transform patch onto the draft before approval
-            if (options?.Transform is not null)
-            {
-                draft = ApplyTransform(draft, options.Transform);
-                // Ensure the identity remains stable after transform
-                try { typeof(TEntity).GetProperty("Id")?.SetValue(draft, id); } catch { }
-            }
-            if (!string.IsNullOrWhiteSpace(options?.TargetSet))
-            {
-                using var _t = Data<TEntity, TKey>.WithSet(options.TargetSet);
-                await Data<TEntity, TKey>.UpsertAsync(draft, ct);
-            }
-            else
-            {
-                await Data<TEntity, TKey>.UpsertAsync(draft, ct);
-            }
+            ctx.SubmittedSnapshot = ApplyTransform(ctx.SubmittedSnapshot, options.Transform);
+            try { typeof(TEntity).GetProperty("Id")?.SetValue(ctx.SubmittedSnapshot, id); } catch { }
+        }
+        var toSet = !string.IsNullOrWhiteSpace(options?.TargetSet) ? options!.TargetSet! : null;
+        if (!string.IsNullOrWhiteSpace(toSet))
+        {
+            using var _t = Data<TEntity, TKey>.WithSet(toSet!);
+            await Data<TEntity, TKey>.UpsertAsync(ctx.SubmittedSnapshot!, ct);
+        }
+        else
+        {
+            await Data<TEntity, TKey>.UpsertAsync(ctx.SubmittedSnapshot!, ct);
         }
         _ = await Data<TEntity, TKey>.MoveSet(SubmittedSet, ApprovedSet, e => Equals(e.Id, id), null, 500, ct);
+        await flow.AfterApproved(ctx, ct);
         return NoContent();
     }
 
@@ -293,7 +321,17 @@ public abstract class EntityModerationController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> Reject([FromRoute] TKey id, [FromBody] RejectOptions body, CancellationToken ct)
     {
         if (body is null || string.IsNullOrWhiteSpace(body.Reason)) return BadRequest(new { error = "reason is required" });
+        var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
+        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        using var _s = Data<TEntity, TKey>.WithSet(SubmittedSet);
+        var submitted = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = submitted, User = User, Services = HttpContext.RequestServices, Options = body };
+        var v = await flow.ValidateReject(ctx, ct);
+        if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
+        var b = await flow.BeforeReject(ctx, ct);
+        if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
         _ = await Data<TEntity, TKey>.MoveSet(SubmittedSet, DeniedSet, e => Equals(e.Id, id), null, 500, ct);
+        await flow.AfterRejected(ctx, ct);
         return NoContent();
     }
 
@@ -316,11 +354,26 @@ public abstract class EntityModerationController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> Return([FromRoute] TKey id, [FromBody] RejectOptions body, CancellationToken ct)
     {
         if (body is null || string.IsNullOrWhiteSpace(body.Reason)) return BadRequest(new { error = "reason is required" });
+        var flow = ActivatorUtilities.CreateInstance<TFlow>(HttpContext.RequestServices);
+        var current = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        using var _s = Data<TEntity, TKey>.WithSet(SubmittedSet);
+        var submitted = await Data<TEntity, TKey>.GetAsync(id!, ct);
+        var ctx = new TransitionContext<TEntity> { Id = id!, Current = current, SubmittedSnapshot = submitted, User = User, Services = HttpContext.RequestServices, Options = body };
+        var v = await flow.ValidateReturn(ctx, ct);
+        if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
+        var b = await flow.BeforeReturn(ctx, ct);
+        if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
         _ = await Data<TEntity, TKey>.MoveSet(SubmittedSet, DraftSet, e => Equals(e.Id, id), null, 500, ct);
+        await flow.AfterReturned(ctx, ct);
         return NoContent();
     }
 }
 
-public abstract class EntityModerationController<TEntity> : EntityModerationController<TEntity, string>
+public abstract class EntityModerationController<TEntity, TKey> : EntityModerationController<TEntity, TKey, StandardModerationFlow<TEntity>>
+    where TEntity : class, IEntity<TKey>
+    where TKey : notnull
+{ }
+
+public abstract class EntityModerationController<TEntity> : EntityModerationController<TEntity, string, StandardModerationFlow<TEntity>>
     where TEntity : class, IEntity<string>
 { }

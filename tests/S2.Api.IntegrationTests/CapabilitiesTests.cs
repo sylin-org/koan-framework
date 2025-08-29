@@ -53,7 +53,7 @@ public sealed class CapabilitiesTests
         submit.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Reviewer queue and approve with transform
-        var queue = await client.GetAsync("/api/items/moderation/review-queue?page=1&size=10");
+    var queue = await client.GetAsync("/api/items/moderation/queue?page=1&size=10");
         queue.StatusCode.Should().Be(HttpStatusCode.OK);
         var approve = await client.PostAsJsonAsync($"/api/items/{id}/moderate/approve", new { transform = new { name = "Published" } });
         approve.StatusCode.Should().Be(HttpStatusCode.NoContent);

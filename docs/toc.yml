@@ -28,6 +28,8 @@
       href: reference/web.md
     - name: Web Capabilities (Moderation/Soft-delete/Audit)
       href: reference/web-capabilities.md
+    - name: TechDocs (proposal)
+      href: reference/techdocs-proposal.md
     - name: Storage
       href: reference/storage.md
     - name: Modules
@@ -37,8 +39,8 @@
     - name: Sora CLI
       href: reference/sora-cli.md
     - name: Web Authentication
-  href: reference/web-auth.md
-  homepage: reference/web-auth.md
+      href: reference/web-auth.md
+      homepage: reference/web-auth.md
     - name: Messaging
       href: reference/messaging.md
     - name: AI

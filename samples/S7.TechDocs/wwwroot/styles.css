@@ -1,0 +1,386 @@
+/* S7 TechDocs Custom Styles */
+
+/* Mode Navigation */
+.mode-nav-item {
+  @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-transparent;
+}
+
+.mode-nav-item:hover {
+  @apply bg-slate-800 border-slate-700;
+}
+
+.mode-nav-item.active {
+  @apply bg-purple-600 border-purple-500 text-white;
+}
+
+/* Mode Content */
+.mode-content {
+  @apply hidden;
+}
+
+.mode-content.active {
+  @apply block;
+}
+
+/* Role-based visibility */
+.author-only, .moderator-only, .admin-only {
+  @apply hidden;
+}
+
+.role-author .author-only,
+.role-moderator .author-only,
+.role-moderator .moderator-only,
+.role-admin .author-only,
+.role-admin .moderator-only,
+.role-admin .admin-only {
+  @apply block;
+}
+
+/* Document Cards */
+.document-card {
+  @apply bg-slate-900 border border-slate-800 rounded-lg p-6 hover:border-slate-700 hover:bg-slate-800 transition-all duration-200 cursor-pointer;
+}
+
+.document-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Status Badges */
+.status-draft {
+  @apply bg-amber-500/20 text-amber-400 border border-amber-500/30;
+}
+
+.status-review {
+  @apply bg-orange-500/20 text-orange-400 border border-orange-500/30;
+}
+
+.status-published {
+  @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30;
+}
+
+.status-archived {
+  @apply bg-gray-500/20 text-gray-400 border border-gray-500/30;
+}
+
+/* Rating Stars */
+.rating-stars {
+  @apply flex items-center text-yellow-400;
+}
+
+.rating-star {
+  @apply text-sm;
+}
+
+.rating-star.filled {
+  @apply text-yellow-400;
+}
+
+.rating-star.empty {
+  @apply text-gray-600;
+}
+
+/* AI Features */
+.ai-suggestion {
+  @apply bg-emerald-600/10 border border-emerald-600/20 rounded-lg p-3 text-sm;
+}
+
+.ai-suggestion:hover {
+  @apply bg-emerald-600/20 border-emerald-600/30;
+}
+
+/* Moderation Items */
+.moderation-item {
+  @apply bg-slate-800 border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors;
+}
+
+.moderation-item.selected {
+  @apply border-purple-500 bg-purple-600/10;
+}
+
+/* View Mode Enhancements */
+.prose {
+  line-height: 1.7;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  @apply text-white scroll-mt-20;
+}
+
+.prose h1 {
+  @apply text-2xl font-bold mt-8 mb-4 first:mt-0;
+}
+
+.prose h2 {
+  @apply text-xl font-semibold mt-6 mb-3 first:mt-0;
+}
+
+.prose h3 {
+  @apply text-lg font-medium mt-4 mb-2 first:mt-0;
+}
+
+.prose p {
+  @apply text-gray-300 mb-4;
+}
+
+.prose strong {
+  @apply text-white font-semibold;
+}
+
+.prose em {
+  @apply text-gray-200 italic;
+}
+
+.prose code {
+  @apply bg-slate-800 text-emerald-400 px-2 py-1 rounded text-sm font-mono;
+}
+
+.prose pre {
+  @apply bg-slate-800 border border-slate-700 rounded-lg p-4 overflow-x-auto mb-4;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0 text-gray-200;
+}
+
+.prose ul, .prose ol {
+  @apply mb-4 pl-6;
+}
+
+.prose li {
+  @apply text-gray-300 mb-1;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-purple-500 pl-4 italic text-gray-300 my-4;
+}
+
+/* Table of Contents */
+#view-toc a {
+  @apply transition-all duration-200;
+}
+
+#view-toc a:hover {
+  @apply text-purple-400 translate-x-1;
+}
+
+#view-toc a.active {
+  @apply text-purple-400 font-medium;
+}
+
+/* Article Metrics */
+.article-metric {
+  @apply flex items-center space-x-2 text-sm;
+}
+
+.article-metric .icon {
+  @apply text-gray-500;
+}
+
+.article-metric .value {
+  @apply text-gray-300 font-medium;
+}
+
+/* Related Articles */
+.related-article {
+  @apply bg-slate-800 rounded-lg p-4 hover:bg-slate-700 transition-all duration-200 cursor-pointer;
+}
+
+.related-article:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Breadcrumbs */
+.breadcrumb-item {
+  @apply text-gray-400 hover:text-white transition-colors cursor-pointer;
+}
+
+.breadcrumb-item.current {
+  @apply text-white font-medium;
+}
+
+/* Tags */
+.tag {
+  @apply bg-slate-700 text-gray-300 px-3 py-1 rounded-full text-sm hover:bg-slate-600 cursor-pointer transition-colors;
+}
+
+.tag:hover {
+  @apply text-white bg-purple-600;
+}
+
+/* Bookmark and Share Buttons */
+.action-btn {
+  @apply transition-all duration-200;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.action-btn.bookmarked {
+  @apply bg-emerald-600 hover:bg-emerald-700;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Line clamping for text truncation */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* User Cards */
+.user-card {
+  @apply bg-slate-800 border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors;
+}
+
+/* Role Tags */
+.role-tag {
+  @apply inline-block px-2 py-1 rounded text-xs font-medium;
+}
+
+.role-tag.reader {
+  @apply bg-blue-500/20 text-blue-400 border border-blue-500/30;
+}
+
+.role-tag.author {
+  @apply bg-purple-500/20 text-purple-400 border border-purple-500/30;
+}
+
+.role-tag.moderator {
+  @apply bg-orange-500/20 text-orange-400 border border-orange-500/30;
+}
+
+.role-tag.admin {
+  @apply bg-red-500/20 text-red-400 border border-red-500/30;
+}
+
+/* Collection Icons */
+.collection-icon {
+  @apply w-8 h-8 flex items-center justify-center rounded-lg text-lg;
+}
+
+.collection-getting-started {
+  @apply bg-gradient-to-r from-emerald-500 to-teal-500;
+}
+
+.collection-guides {
+  @apply bg-gradient-to-r from-purple-500 to-pink-500;
+}
+
+.collection-api-reference {
+  @apply bg-gradient-to-r from-blue-500 to-cyan-500;
+}
+
+.collection-faq {
+  @apply bg-gradient-to-r from-amber-500 to-orange-500;
+}
+
+.collection-troubleshooting {
+  @apply bg-gradient-to-r from-red-500 to-rose-500;
+}
+
+/* Markdown Preview Styles */
+.prose h1 {
+  @apply text-2xl font-bold text-white border-b border-slate-700 pb-2 mb-4;
+}
+
+.prose h2 {
+  @apply text-xl font-semibold text-white mt-6 mb-3;
+}
+
+.prose h3 {
+  @apply text-lg font-medium text-white mt-4 mb-2;
+}
+
+.prose p {
+  @apply text-gray-300 mb-3 leading-relaxed;
+}
+
+.prose code {
+  @apply bg-slate-800 text-purple-400 px-1 py-0.5 rounded text-sm;
+}
+
+.prose pre {
+  @apply bg-slate-800 border border-slate-700 rounded-lg p-4 overflow-x-auto mb-4;
+}
+
+.prose pre code {
+  @apply bg-transparent text-gray-300 p-0;
+}
+
+.prose ul, .prose ol {
+  @apply text-gray-300 mb-3 pl-6;
+}
+
+.prose li {
+  @apply mb-1;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-purple-500 pl-4 text-gray-400 italic mb-4;
+}
+
+/* Loading States */
+.loading {
+  @apply animate-pulse;
+}
+
+.loading-skeleton {
+  @apply bg-slate-800 rounded;
+}
+
+/* Transitions */
+.transition-mode {
+  @apply transition-all duration-300 ease-in-out;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-900;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-600 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-500;
+}
+
+/* Focus States */
+input:focus, textarea:focus, select:focus {
+  @apply outline-none ring-2 ring-purple-500;
+}
+
+button:focus {
+  @apply outline-none ring-2 ring-purple-500 ring-offset-2 ring-offset-slate-950;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .mode-nav-item {
+    @apply px-2 py-1 text-xs;
+  }
+  
+  .mode-nav-item i {
+    @apply hidden;
+  }
+}

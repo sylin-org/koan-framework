@@ -5,6 +5,16 @@ namespace Sora.Web.Infrastructure;
 /// </summary>
 public static class SoraWebConstants
 {
+    public static class Codes
+    {
+        public static class Moderation
+        {
+            // Stable error codes for moderation flows
+            public const string NotFound = "moderation.notFound";
+            public const string ReasonRequired = "moderation.reasonRequired";
+        }
+    }
+
     public static class Headers
     {
         public const string XContentTypeOptions = "X-Content-Type-Options";

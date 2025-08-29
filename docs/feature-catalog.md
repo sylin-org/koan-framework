@@ -13,7 +13,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 - Media
   - First-class media objects, HTTP bytes/HEAD endpoints with range/conditional support, cache-control, variants/derivatives, and transform pipelines integrated with Storage profiles.
 - Web
-  - Controllers-only HTTP (REST/GraphQL), startup pipeline wiring, Swagger by default in dev, payload transformers.
+  - Controllers-only HTTP (REST/GraphQL), startup pipeline wiring, Swagger by default in dev, payload transformers, capability controllers (Moderation/SoftDelete/Audit) with canonical routes and set-based scoping.
 - Scheduling
   - Background job orchestrator with OnStartup tasks, timeouts, health facts, and readiness gating.
 - Messaging
@@ -29,6 +29,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
 
 References
 - Data: docs/reference/data-access.md
+- Web Capabilities: docs/reference/web-capabilities.md
 - Storage: docs/reference/storage.md
 - Media: docs/reference/media.md
 - Web: docs/reference/web.md
@@ -67,6 +68,9 @@ References
   - Startup filter auto-wires the pipeline: UseDefaultFiles/UseStaticFiles (opt-in), routing, and MapControllers; well-known health endpoints (/health, /health/live, /health/ready).
   - Built-in Swagger/OpenAPI auto-registered (dev-on by default; prod opt-in). Idempotent Add wiring; no explicit Add/Use calls required when the module is referenced.
   - HTTP payload transformers for flexible request/response shaping with auto-discovery.
+  - Web capabilities (reference controllers): Moderation, SoftDelete, and Audit exposed via generic controllers with canonical, DX-friendly routes that align with `EntityController<T>` shapes. No bespoke controllers required; discovered via ApplicationPart with route prefix configuration.
+  - Set-based scoping: capability routes and entity REST endpoints accept `?set=` to scope operations consistently with Data `WithSet(...)` semantics (defaults apply per controller). See ADR WEB-0046.
+  - Capability authorization: layered resolution for each capability action — Entity override → Global Defaults → DefaultBehavior (Allow/Deny). Named policy helpers (SoraWebPolicyNames) and an enforcement attribute (RequireCapability) integrate with ASP.NET Authorization. See ADR WEB-0047.
   - GraphQL endpoints auto-generated from IEntity<> types with HotChocolate integration.
   - Centralized Web Authentication with pluggable IdP adapters and safe flows:
     - Provider discovery: GET /.well-known/auth/providers
@@ -186,6 +190,7 @@ References
 
 - Web & capabilities
   - Capability Matrix endpoint: GET /.well-known/sora/capabilities to report registered aggregates, providers, and flags (informational; protect or disable in prod).
+  - Authorization posture presets: Allow-by-default or Deny-by-default with per-entity overrides and Defaults mapping to named policies; sample wiring in S7.ContentPlatform.
 
 - Storage
   - Cloud providers: S3/Azure Blob/GCS adapters with presigned URLs, multi-part/resumable uploads, and lifecycle policies.
