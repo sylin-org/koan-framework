@@ -42,8 +42,3 @@ public class UsersController : ControllerBase
         return Ok(updated);
     }
 }
-
-public class UpdateRolesRequest
-{
-    public List<string> Roles { get; set; } = new();
-}

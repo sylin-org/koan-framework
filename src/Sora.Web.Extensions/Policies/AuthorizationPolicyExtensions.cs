@@ -1,19 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 
 namespace Sora.Web.Extensions.Policies;
-
-/// <summary>
-/// Canonical policy names for capability controllers. Apps should bind these to roles/claims.
-/// </summary>
-public static class SoraWebPolicyNames
-{
-    public const string ModerationAuthor = "moderation.author";
-    public const string ModerationReviewer = "moderation.reviewer";
-    public const string ModerationPublisher = "moderation.publisher";
-    public const string SoftDeleteActor = "softdelete.actor";
-    public const string AuditActor = "audit.actor";
-}
 
 /// <summary>
 /// Optional helper to register basic capability policies mapped to roles. Opt-in only.

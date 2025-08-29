@@ -53,24 +53,3 @@ public sealed class Author : Entity<Author>
     /// </summary>
     public AuthorRole Role { get; set; } = AuthorRole.Writer;
 }
-
-/// <summary>
-/// Author role in the content platform.
-/// </summary>
-public enum AuthorRole
-{
-    /// <summary>
-    /// Can create and edit their own articles.
-    /// </summary>
-    Writer = 0,
-    
-    /// <summary>
-    /// Can review and approve/reject articles from writers.
-    /// </summary>
-    Editor = 1,
-    
-    /// <summary>
-    /// Full administrative access.
-    /// </summary>
-    Admin = 2
-}
