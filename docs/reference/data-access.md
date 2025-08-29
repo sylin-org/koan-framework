@@ -45,12 +45,71 @@ while (!pager.End)
 }
 ```
 
+### Sets (parallel logical stores)
+
+Contract
+- Use first-class model statics with a set parameter for reads/writes against parallel stores.
+- Instance Save("set") is first-class for string-keyed entities; bulk saves support set as well.
+- Ambient scoping via `DataSetContext.With(set)` also works, but prefer explicit set parameters in samples.
+
+Examples
+
+```csharp
+// Read by set
+var one = await MyModel.Get(id, set: "backup", ct);
+var list = await MyModel.All(set: "archive", ct);
+var matched = await MyModel.Query("Status:active", set: "staging", ct);
+
+// Counts
+var nAll = await MyModel.CountAll(set: "backup", ct);
+var nFiltered = await MyModel.Count("Status:active", set: "backup", ct);
+
+// Write to a set (string-keyed)
+await model.Save(set: "Audit");
+// Bulk
+await models.Save(set: "Moderation");
+```
+
+Notes
+- Non-root sets are routed to physical storage names suffixed with `#<set>` (DATA-0030). The conceptual root omits the suffix.
+- For large sets, combine set scoping with streaming or cursor/pager APIs.
+
 HTTP pagination and filters:
 
 ```
 GET /api/movies?filter={"Genres":"*Drama*"}&page=1&size=20
 // Headers: X-Total-Count, X-Page, X-Page-Size, X-Total-Pages
 ```
+
+### Sets via REST (?set=)
+
+EntityController honors a `set` query parameter on standard endpoints; `POST /query` accepts `set` in the JSON body.
+
+Examples
+
+```
+# Read collections and singletons in a set
+GET    /api/things?set=backup
+GET    /api/things/{id}?set=backup
+
+# Upsert (single and bulk) into a set
+POST   /api/things?set=backup            // body: { ...thing }
+POST   /api/things/bulk?set=backup       // body: [ { ... }, { ... } ]
+
+# Patch/Delete targeting a set
+PATCH  /api/things/{id}?set=backup
+DELETE /api/things/{id}?set=backup
+DELETE /api/things/bulk?set=backup       // body: [ "id1", "id2" ]
+DELETE /api/things/all?set=backup
+DELETE /api/things?q=Status:inactive&set=backup
+
+# Query via POST with set in body
+POST   /api/things/query                 // body: { filter: { ... }, set: "backup" }
+```
+
+Notes
+- Omitting `set` targets the root collection.
+- Semantics (filters, pagination, transformers) are unchanged by set routing.
 
 ## Edge cases
 - Empty/null filter: treat as All; ensure auth/tenant scopes still apply.
@@ -67,6 +126,8 @@ GET /api/movies?filter={"Genres":"*Drama*"}&page=1&size=20
 ## References
 - guides/data/all-query-streaming-and-pager.md
 - decisions/DATA-0061-data-access-pagination-and-streaming.md
+- decisions/DATA-0030-entity-sets-routing-and-storage-suffixing.md
+- decisions/DATA-0062-instance-save-set-first-class.md
 - decisions/DATA-0029-json-filter-language-and-endpoint.md
 - decisions/DATA-0031-filter-ignore-case-option.md
 - decisions/DATA-0032-paging-pushdown-and-in-memory-fallback.md

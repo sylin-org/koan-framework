@@ -22,6 +22,7 @@
     <!-- Auth core and dev TestProvider for Development login/testing -->
     <ProjectReference Include="..\..\src\Sora.Web.Auth\Sora.Web.Auth.csproj" />
     <ProjectReference Include="..\..\src\Sora.Web.Auth.TestProvider\Sora.Web.Auth.TestProvider.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Extensions\Sora.Web.Extensions.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>

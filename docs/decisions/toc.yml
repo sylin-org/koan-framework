@@ -34,6 +34,8 @@
       href: ARCH-0052-core-ids-and-json-merge-policy.md
 - name: Data (DATA)
   items:
+    - name: Instance Save(set) is first-class
+      href: DATA-0062-instance-save-set-first-class.md
     - name: Data access semantics (All/Query; streaming; pager)
       href: DATA-0061-data-access-pagination-and-streaming.md
     - name: Vector module split and clean separation
@@ -110,6 +112,10 @@
       href: WEB-0044-web-auth-discovery-and-health.md
     - name: Auth provider adapters as separate modules
       href: WEB-0045-auth-provider-adapters-separate-projects.md
+    - name: Entity capabilities — short endpoints and set routing
+      href: WEB-0046-entity-capabilities-short-endpoints-and-set-routing.md
+    - name: Capability authorization — fallback and defaults
+      href: WEB-0047-capability-authorization-fallback-and-defaults.md
 - name: Messaging (MESS)
   items:
     - name: Messaging capabilities and negotiation

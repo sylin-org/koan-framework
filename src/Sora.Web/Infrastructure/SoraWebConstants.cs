@@ -44,4 +44,21 @@ public static class SoraWebConstants
         public const int DefaultPageSize = 50;
         public const int MaxPageSize = 200;
     }
+
+    public static class Sets
+    {
+        // Well-known, stable set names for cross-cutting capabilities
+        public const string Deleted = "deleted";
+
+        public static class Moderation
+        {
+            public const string Draft = "moderation.draft";
+            public const string Submitted = "moderation.submitted";
+            public const string Approved = "moderation.approved";
+            public const string Denied = "moderation.denied";
+            public const string Audit = "moderation.audit"; // optional
+        }
+
+        public const string Audit = "audit"; // global audit snapshots (when enabled)
+    }
 }

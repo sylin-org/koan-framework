@@ -34,6 +34,28 @@ public static class AggregateExtensions
         where TKey : notnull
         => model.Upsert<TEntity, TKey>(ct);
 
+    // Instance-level convenience: model.Upsert("set") (generic key)
+    /// <summary>
+    /// Insert or update a model into a specific logical set for the aggregate using its configured repository.
+    /// Routes storage to BaseName#&lt;set&gt; via DataSetContext and StorageNameRegistry.
+    /// </summary>
+    public static Task<TEntity> Upsert<TEntity, TKey>(this TEntity model, string set, CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        using var _ = Data<TEntity, TKey>.WithSet(set);
+        return DataService().GetRepository<TEntity, TKey>().UpsertAsync(model, ct);
+    }
+
+    // Alias: model.Save("set") -> Upsert("set") (generic key)
+    /// <summary>
+    /// Alias for Upsert into a specific set for generic-key entities.
+    /// </summary>
+    public static Task<TEntity> Save<TEntity, TKey>(this TEntity model, string set, CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => model.Upsert<TEntity, TKey>(set, ct);
+
     // Non-generic convenience for the common string key case
     /// <summary>
     /// Upsert for string-keyed entities without specifying TKey.
@@ -49,6 +71,25 @@ public static class AggregateExtensions
     public static Task<TEntity> Save<TEntity>(this TEntity model, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
         => model.Upsert(ct);
+
+    // Non-generic convenience: model.Upsert("set") (string key)
+    /// <summary>
+    /// Upsert a string-keyed entity into a specific logical set.
+    /// </summary>
+    public static Task<TEntity> Upsert<TEntity>(this TEntity model, string set, CancellationToken ct = default)
+        where TEntity : class, IEntity<string>
+    {
+        using var _ = Data<TEntity, string>.WithSet(set);
+        return DataService().GetRepository<TEntity, string>().UpsertAsync(model, ct);
+    }
+
+    // Alias: model.Save("set") -> Upsert("set") (string key)
+    /// <summary>
+    /// Save alias for string-keyed entities into a specific set.
+    /// </summary>
+    public static Task<TEntity> Save<TEntity>(this TEntity model, string set, CancellationToken ct = default)
+        where TEntity : class, IEntity<string>
+        => model.Upsert(set, ct);
 
     // Return only the identifier after upsert (generic)
     /// <summary>
@@ -149,6 +190,23 @@ public static class AggregateExtensions
     public static Task<int> Save<TEntity>(this IEnumerable<TEntity> models, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
         => Data<TEntity, string>.UpsertManyAsync(models, ct);
+
+    // Bulk upsert into a specific set (generic key)
+    /// <summary>
+    /// Bulk upsert into a specific logical set for the aggregate (generic key).
+    /// </summary>
+    public static Task<int> Save<TEntity, TKey>(this IEnumerable<TEntity> models, string set, CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => Data<TEntity, TKey>.UpsertManyAsync(models, set, ct);
+
+    // Bulk upsert into a specific set (string key convenience)
+    /// <summary>
+    /// Bulk upsert into a specific logical set (string key convenience).
+    /// </summary>
+    public static Task<int> Save<TEntity>(this IEnumerable<TEntity> models, string set, CancellationToken ct = default)
+        where TEntity : class, IEntity<string>
+        => Data<TEntity, string>.UpsertManyAsync(models, set, ct);
 
     // Bulk remove (delete many) by models collection
     /// <summary>
