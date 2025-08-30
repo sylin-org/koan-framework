@@ -41,7 +41,46 @@ public static class ServiceCollectionExtensions
                 o.Cookie.Path = "/";
                 o.Cookie.Name = ".AspNetCore.sora.cookie";
                 o.SlidingExpiration = true;
+
+                // Avoid HTML redirects for XHR/API callers (send proper 401/403)
+                o.Events = new CookieAuthenticationEvents
+                {
+                    OnRedirectToLogin = ctx =>
+                    {
+                        if (AuthenticationExtensions_WantsJson(ctx.Request))
+                        {
+                            ctx.Response.StatusCode = Microsoft.AspNetCore.Http.StatusCodes.Status401Unauthorized;
+                            return Task.CompletedTask;
+                        }
+                        ctx.Response.Redirect(ctx.RedirectUri);
+                        return Task.CompletedTask;
+                    },
+                    OnRedirectToAccessDenied = ctx =>
+                    {
+                        if (AuthenticationExtensions_WantsJson(ctx.Request))
+                        {
+                            ctx.Response.StatusCode = Microsoft.AspNetCore.Http.StatusCodes.Status403Forbidden;
+                            return Task.CompletedTask;
+                        }
+                        ctx.Response.Redirect(ctx.RedirectUri);
+                        return Task.CompletedTask;
+                    }
+                };
             });
         return services;
+    }
+
+    // Minimal copy of the WantsJson heuristic (kept internal to avoid API surfacing)
+    private static bool AuthenticationExtensions_WantsJson(Microsoft.AspNetCore.Http.HttpRequest req)
+    {
+        var accept = req.Headers["Accept"].ToString();
+        if (!string.IsNullOrWhiteSpace(accept) && accept.IndexOf("application/json", StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+        var apiPath = req.Path.HasValue && (req.Path.StartsWithSegments("/api") || req.Path.StartsWithSegments("/.well-known") || string.Equals(req.Path.Value, "/me", StringComparison.OrdinalIgnoreCase));
+        if (apiPath) return true;
+        var xhr = req.Headers["X-Requested-With"].ToString();
+        if (!string.IsNullOrWhiteSpace(xhr) && string.Equals(xhr, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
     }
 }

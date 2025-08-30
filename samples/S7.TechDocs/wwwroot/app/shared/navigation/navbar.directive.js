@@ -9,12 +9,11 @@
     })
     .controller('NavbarController', function($scope, $window, AuthService){
       var vm = this;
-      vm.isAuthenticated = AuthService.isAuthenticated;
-      vm.user = AuthService.user;
+      // Bind live state reference to avoid stale snapshot booleans
+      vm.state = AuthService.state;
 
       $scope.$on('auth:changed', function(_, evt){
-        vm.isAuthenticated = evt.isAuthenticated;
-        vm.user = evt.user;
+        // Ensure a digest runs after async broadcast
         try { $scope.$applyAsync(); } catch(_){}
       });
 

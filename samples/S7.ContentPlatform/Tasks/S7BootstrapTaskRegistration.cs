@@ -1,4 +1,4 @@
-using Sora.Core;
+﻿using Sora.Core;
 using Sora.Scheduling;
 
 namespace S7.ContentPlatform.Tasks;

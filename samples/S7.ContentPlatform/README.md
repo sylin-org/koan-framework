@@ -1,4 +1,4 @@
-# S7.ContentPlatform - Content Management Sample
+﻿# S7.ContentPlatform - Content Management Sample
 
 This sample demonstrates a **Content Management Platform** for blog/publishing workflows, showcasing Sora's **moderation** and **soft-delete** capabilities in a real-world scenario.
 

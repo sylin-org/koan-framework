@@ -32,13 +32,13 @@
         </a>
       </div>
 
-      <div class="flex items-center space-x-4" ng-controller="NavbarController as nb">
-        <div class="text-sm" ng-if="nb.isAuthenticated">
-          <div class="font-medium" title="{{nb.user.id}}">{{nb.user.displayName || 'User'}}</div>
+      <div class="flex items-center space-x-4" ng-controller="NavbarController as nb" ng-cloak>
+        <div class="text-sm" ng-if="nb.state.isAuthenticated">
+          <div class="font-medium" title="{{nb.state.user.id}}">{{nb.state.user.displayName || 'User'}}</div>
           <div class="text-gray-400 text-xs">Signed in</div>
         </div>
-        <button class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm" ng-if="!nb.isAuthenticated" ng-click="nb.login()">Login</button>
-        <button class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm" ng-if="nb.isAuthenticated" ng-click="nb.logout()">Logout</button>
+        <button class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm" ng-if="!nb.state.isAuthenticated" ng-click="nb.login()">Login</button>
+        <button class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm" ng-if="nb.state.isAuthenticated" ng-click="nb.logout()">Logout</button>
       </div>
     </div>
   </div>

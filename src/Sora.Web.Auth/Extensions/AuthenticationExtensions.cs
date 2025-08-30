@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Web.Auth.Options;
@@ -31,6 +32,31 @@ public static class AuthenticationExtensions
                 o.Cookie.Path = "/";
                 o.Cookie.Name = ".AspNetCore.sora.cookie";
                 o.SlidingExpiration = true;
+
+                // Avoid HTML redirects for XHR/API callers (send proper 401/403)
+                o.Events = new CookieAuthenticationEvents
+                {
+                    OnRedirectToLogin = ctx =>
+                    {
+                        if (WantsJson(ctx.Request))
+                        {
+                            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                            return Task.CompletedTask;
+                        }
+                        ctx.Response.Redirect(ctx.RedirectUri);
+                        return Task.CompletedTask;
+                    },
+                    OnRedirectToAccessDenied = ctx =>
+                    {
+                        if (WantsJson(ctx.Request))
+                        {
+                            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                            return Task.CompletedTask;
+                        }
+                        ctx.Response.Redirect(ctx.RedirectUri);
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
         foreach (var (id, p) in bound.Providers)
@@ -103,5 +129,19 @@ public static class AuthenticationExtensions
         }
 
         return builder;
+    }
+
+    private static bool WantsJson(Microsoft.AspNetCore.Http.HttpRequest req)
+    {
+        // Heuristics: JSON Accept header, API path, or AJAX header
+        var accept = req.Headers["Accept"].ToString();
+        if (!string.IsNullOrWhiteSpace(accept) && accept.IndexOf("application/json", StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+        var apiPath = req.Path.HasValue && (req.Path.StartsWithSegments("/api") || req.Path.StartsWithSegments("/.well-known"));
+        if (apiPath) return true;
+        var xhr = req.Headers["X-Requested-With"].ToString();
+        if (!string.IsNullOrWhiteSpace(xhr) && string.Equals(xhr, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
     }
 }

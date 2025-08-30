@@ -1,4 +1,4 @@
-using Sora.Data.Core.Model;
+﻿using Sora.Data.Core.Model;
 
 namespace S7.ContentPlatform.Models;
 

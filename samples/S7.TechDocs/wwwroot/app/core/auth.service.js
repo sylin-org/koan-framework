@@ -22,11 +22,18 @@
 
       async function loadMe() {
         try {
-          var r = await $http.get('/me', { withCredentials: true });
-          state.user = r && r.data ? r.data : null;
-          state.isAuthenticated = !!state.user;
-        } catch (_) {
-          state.user = null; state.isAuthenticated = false;
+          var r = await $http.get('/me', { withCredentials: true, headers: { 'Accept': 'application/json' } });
+          if (r && r.status === 200 && r.data && typeof r.data === 'object') {
+            state.user = r.data;
+            state.isAuthenticated = true;
+          } else {
+            state.user = null;
+            state.isAuthenticated = false;
+          }
+        } catch (e) {
+          // Treat 401/403 as not authenticated; anything else also falls back to guest
+          state.user = null;
+          state.isAuthenticated = false;
         }
         broadcast();
       }
