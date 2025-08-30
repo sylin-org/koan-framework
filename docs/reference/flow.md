@@ -30,6 +30,7 @@ Options (Sora:Flow)
 - PurgeEnabled=true; PurgeInterval=6h (background TTL purge of stage records, tasks, and rejections)
 - DeadLetterEnabled=true
 - DefaultViewName="canonical"
+ - Projection worker: a background poller materializes ProjectionView<T> from ProjectionTask; tuned via BatchSize.
 
 Messaging
 - Default delivery is MQ (resilient), using Sora.Messaging.* — do not implement bespoke MQ adapters in Flow code.

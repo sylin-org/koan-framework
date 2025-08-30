@@ -24,8 +24,11 @@ public static class ServiceCollectionExtensions
         // Bootstrap (indexes/TTLs) via initializer; no-ops by default; providers can extend.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ISoraInitializer>(new FlowBootstrapInitializer()));
 
-        // Ensure schemas exist at startup (idempotent). Providers that don't support instructions will no-op.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowSchemaEnsureHostedService>());
+    // Ensure schemas exist at startup (idempotent). Providers that don't support instructions will no-op.
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowSchemaEnsureHostedService>());
+
+    // Background projection worker (materializes ProjectionView from ProjectionTask)
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ProjectionWorkerHostedService>());
 
     // Background TTL purge
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowPurgeHostedService>());
@@ -125,6 +128,75 @@ public static class ServiceCollectionExtensions
                 }
 
                 try { await Task.Delay(_opts.CurrentValue.PurgeInterval, stoppingToken); }
+                catch (TaskCanceledException) { }
+            }
+        }
+    }
+
+    internal sealed class ProjectionWorkerHostedService : BackgroundService
+    {
+        private readonly IServiceProvider _sp;
+        private readonly IOptionsMonitor<FlowOptions> _opts;
+        private readonly ILogger<ProjectionWorkerHostedService> _log;
+
+        public ProjectionWorkerHostedService(IServiceProvider sp, IOptionsMonitor<FlowOptions> opts, ILogger<ProjectionWorkerHostedService> log)
+        { _sp = sp; _opts = opts; _log = log; }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            // Simple polling loop; provider-agnostic. No bespoke queues.
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    var batch = Math.Max(1, _opts.CurrentValue.BatchSize);
+                    var defaultView = _opts.CurrentValue.DefaultViewName;
+
+                    int pageNum = 1;
+                    int processed = 0;
+                    while (!stoppingToken.IsCancellationRequested)
+                    {
+                        var tasks = await ProjectionTask.Page(pageNum, batch, stoppingToken);
+                        if (tasks.Count == 0) break;
+
+                        foreach (var task in tasks)
+                        {
+                            var refItem = await ReferenceItem.Get(task.ReferenceId, stoppingToken);
+                            if (refItem is null) continue;
+
+                            var viewName = string.IsNullOrWhiteSpace(task.ViewName) ? defaultView : task.ViewName;
+                            var doc = new ProjectionView<object>
+                            {
+                                Id = $"{viewName}::{task.ReferenceId}",
+                                ReferenceId = task.ReferenceId,
+                                ViewName = viewName,
+                                View = new { referenceId = task.ReferenceId, version = task.Version }
+                            };
+
+                            await doc.Save(viewName, stoppingToken);
+
+                            if (refItem.RequiresProjection)
+                            {
+                                refItem.RequiresProjection = false;
+                                await refItem.Save(stoppingToken);
+                            }
+
+                            await task.Delete(stoppingToken);
+                            processed++;
+                        }
+
+                        pageNum++;
+                    }
+
+                    if (processed > 0)
+                        _log.LogDebug("ProjectionWorker processed {Count} tasks", processed);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogDebug(ex, "ProjectionWorker iteration failed (will retry)");
+                }
+
+                try { await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken); }
                 catch (TaskCanceledException) { }
             }
         }
