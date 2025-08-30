@@ -45,6 +45,8 @@
       href: reference/messaging.md
     - name: AI
       href: reference/ai.md
+    - name: Flow
+      href: reference/flow.md
     - name: Orchestration
       href: reference/orchestration.md
     - name: Secrets
