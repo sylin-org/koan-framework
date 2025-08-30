@@ -3,7 +3,7 @@
 public sealed class TestProviderOptions
 {
     public const string SectionPath = "Sora:Web:Auth:TestProvider";
-    public bool Enabled { get; init; } = false;
+    public bool Enabled { get; init; } = false; // Auto-registrar treats Development as enabled even if false
     public string RouteBase { get; init; } = "/.testoauth";
     public string ClientId { get; init; } = "test-client";
     public string ClientSecret { get; init; } = "test-secret";

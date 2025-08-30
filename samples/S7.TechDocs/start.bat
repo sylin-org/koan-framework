@@ -54,7 +54,7 @@ goto :probe_auth
 echo Probing TestProvider login at %TESTPROVIDER_LOGIN% ...
 where curl >nul 2>nul && set HAS_CURL2=1
 if defined HAS_CURL2 (
-  curl -s -o NUL "%TESTPROVIDER_LOGIN%" || echo (info) TestProvider login not reachable yet (expected until you click Login).
+  curl -s -o NUL "%TESTPROVIDER_LOGIN%" || echo ^(info^) TestProvider login not reachable yet ^(expected until you click Login^).
 ) else (
   powershell -NoProfile -Command "try { Invoke-WebRequest -Uri '%TESTPROVIDER_LOGIN%' -UseBasicParsing -TimeoutSec 2 ^| Out-Null } catch { }" >nul 2>&1
 )

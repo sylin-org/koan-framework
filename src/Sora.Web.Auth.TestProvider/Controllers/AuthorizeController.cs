@@ -69,10 +69,23 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
         {
           if (string.Equals(redirect.AbsoluteUri, allowedAbs.AbsoluteUri, StringComparison.Ordinal)) { isAllowed = true; break; }
         }
-                else if (u.StartsWith("/", StringComparison.Ordinal))
+        else if (u.StartsWith("/", StringComparison.Ordinal))
         {
           if (string.Equals(redirect.AbsolutePath, u, StringComparison.Ordinal)) { isAllowed = true; break; }
         }
+      }
+    }
+    else
+    {
+      // Sane defaults (DX): if no explicit whitelist is configured, allow the standard callback used by the built-in Test provider.
+      // This enables zero-config dev flows while still constraining to the expected callback shape.
+      // Accepted when AllowedRedirectUris is empty:
+      // - Any absolute URL whose path is exactly "/auth/test/callback" (host/port agnostic)
+      // - The relative path "/auth/test/callback"
+      var path = redirect.AbsolutePath;
+      if (string.Equals(path, "/auth/test/callback", StringComparison.Ordinal))
+      {
+        isAllowed = true;
       }
     }
     if (!isAllowed)
