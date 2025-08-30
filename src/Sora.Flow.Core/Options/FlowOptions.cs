@@ -28,6 +28,10 @@ public sealed class FlowOptions
 
     public string DefaultViewName { get; set; } = Infrastructure.Constants.Views.Canonical;
 
+    // Domain-agnostic aggregation tags (keys) used to derive ReferenceId from normalized dictionaries
+    // Example: ["person:employee:id", "person:employee:contact:email", "person:lastSsn"]
+    public string[] AggregationTags { get; set; } = Array.Empty<string>();
+
     // vNext multi-tenancy switch (unused in v1 but reserved)
     public bool MultiTenancyEnabled { get; set; } = false;
     public string? TenantFieldName { get; set; }

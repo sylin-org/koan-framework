@@ -15,6 +15,13 @@ public static class Constants
     public const string Lineage = "lineage";
     }
 
+    public static class Rejections
+    {
+        public const string NoKeys = "NO_KEYS";
+        public const string MultiOwnerCollision = "MULTI_OWNER_COLLISION";
+        public const string KeyOwnerMismatch = "KEY_OWNER_MISMATCH";
+    }
+
     public static class Routes
     {
         public const string IntakeRecords = "/intake/records";

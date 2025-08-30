@@ -1,21 +1,48 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Core.Modules;
+using Sora.Data.Abstractions.Instructions;
+using Sora.Data.Core;
+using Sora.Flow.Infrastructure;
+using Sora.Flow.Model;
 using Sora.Flow.Options;
 using Sora.Flow.Runtime;
-using Microsoft.Extensions.Hosting;
-using Sora.Data.Core;
-using Sora.Data.Abstractions.Instructions;
-using Sora.Flow.Model;
-using Sora.Flow.Infrastructure;
-using Microsoft.Extensions.Logging;
 
 namespace Sora.Flow;
 
 public static class ServiceCollectionExtensions
 {
+    // Shared helper: normalize a dynamic payload (Dictionary or JObject) into a dictionary
+    private static IDictionary<string, object>? ExtractDict(object? payload)
+    {
+        if (payload is null) return null;
+        if (payload is IDictionary<string, object> d) return d;
+        if (payload is Newtonsoft.Json.Linq.JObject jo)
+        {
+            var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            foreach (var prop in jo.Properties())
+            {
+                var val = prop.Value;
+                if (val is Newtonsoft.Json.Linq.JArray ja)
+                    dict[prop.Name] = ja.ToList<object>();
+                else if (val is Newtonsoft.Json.Linq.JValue jv)
+                    dict[prop.Name] = jv.ToObject<object?>() ?? string.Empty;
+                else
+                    dict[prop.Name] = val.ToString();
+            }
+            return dict;
+        }
+        return null;
+    }
     public static IServiceCollection AddSoraFlow(this IServiceCollection services)
     {
         services.AddSoraOptions<FlowOptions>("Sora:Flow");
@@ -24,26 +51,23 @@ public static class ServiceCollectionExtensions
         // Bootstrap (indexes/TTLs) via initializer; no-ops by default; providers can extend.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ISoraInitializer>(new FlowBootstrapInitializer()));
 
-    // Ensure schemas exist at startup (idempotent). Providers that don't support instructions will no-op.
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowSchemaEnsureHostedService>());
+        // Ensure schemas exist at startup (idempotent). Providers that don't support instructions will no-op.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowSchemaEnsureHostedService>());
 
-    // Background projection worker (materializes ProjectionView from ProjectionTask)
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ProjectionWorkerHostedService>());
+        // Background projection worker (materializes ProjectionView from ProjectionTask)
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ProjectionWorkerHostedService>());
 
-    // Background association/keying worker (derives ReferenceId, updates indexes)
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AssociationWorkerHostedService>());
+        // Background association/keying worker (derives ReferenceId, updates indexes)
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AssociationWorkerHostedService>());
 
-    // Background TTL purge
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowPurgeHostedService>());
+        // TTL purge
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowPurgeHostedService>());
         return services;
     }
 
     private sealed class FlowBootstrapInitializer : ISoraInitializer
     {
-        public void Initialize(IServiceCollection services)
-        {
-            // Intentionally minimal; real providers can hook data initialization elsewhere.
-        }
+        public void Initialize(IServiceCollection services) { }
     }
 
     internal sealed class FlowSchemaEnsureHostedService : IHostedService
@@ -55,22 +79,18 @@ public static class ServiceCollectionExtensions
         {
             using var scope = _sp.CreateScope();
             var data = scope.ServiceProvider.GetService<IDataService>();
-            if (data is null) return; // No data layer configured
+            if (data is null) return;
 
-            // Helper to ensure created for entity and optional set context
             static async Task EnsureAsync<TEntity>(IDataService d, string? set, CancellationToken ct) where TEntity : class
             {
-                using var _set = Sora.Data.Core.DataSetContext.With(set);
+                using var _set = DataSetContext.With(set);
                 try { await d.Execute<TEntity, bool>(new Instruction(DataInstructions.EnsureCreated), ct); }
-                catch { /* best effort; unsupported adapters may throw */ }
+                catch { }
             }
 
-            // Core stage sets
             await EnsureAsync<Record>(data, Constants.Sets.Intake, cancellationToken);
             await EnsureAsync<Record>(data, Constants.Sets.Standardized, cancellationToken);
             await EnsureAsync<Record>(data, Constants.Sets.Keyed, cancellationToken);
-
-            // Associations and tasks (default set)
             await EnsureAsync<KeyIndex>(data, null, cancellationToken);
             await EnsureAsync<ReferenceItem>(data, null, cancellationToken);
             await EnsureAsync<ProjectionTask>(data, null, cancellationToken);
@@ -109,19 +129,15 @@ public static class ServiceCollectionExtensions
                     var cutoffTask = now - opts.ProjectionTaskTtl;
                     var cutoffReject = now - opts.RejectionReportTtl;
 
-                    // Purge Records by OccurredAt per stage set
-                    using (DataSetContext.With(Infrastructure.Constants.Sets.Intake))
-                        await Data.Core.Data<Record, string>.Delete(r => r.OccurredAt < cutoffIntake, Infrastructure.Constants.Sets.Intake, stoppingToken);
-                    using (DataSetContext.With(Infrastructure.Constants.Sets.Standardized))
-                        await Data.Core.Data<Record, string>.Delete(r => r.OccurredAt < cutoffStd, Infrastructure.Constants.Sets.Standardized, stoppingToken);
-                    using (DataSetContext.With(Infrastructure.Constants.Sets.Keyed))
-                        await Data.Core.Data<Record, string>.Delete(r => r.OccurredAt < cutoffKeyed, Infrastructure.Constants.Sets.Keyed, stoppingToken);
+                    using (DataSetContext.With(Constants.Sets.Intake))
+                        await Data<Record, string>.Delete(r => r.OccurredAt < cutoffIntake, Constants.Sets.Intake, stoppingToken);
+                    using (DataSetContext.With(Constants.Sets.Standardized))
+                        await Data<Record, string>.Delete(r => r.OccurredAt < cutoffStd, Constants.Sets.Standardized, stoppingToken);
+                    using (DataSetContext.With(Constants.Sets.Keyed))
+                        await Data<Record, string>.Delete(r => r.OccurredAt < cutoffKeyed, Constants.Sets.Keyed, stoppingToken);
 
-                    // Purge ProjectionTask by CreatedAt
-                    await Data.Core.Data<ProjectionTask, string>.Delete(t => t.CreatedAt < cutoffTask, set: null!, stoppingToken);
-
-                    // Purge RejectionReport by CreatedAt
-                    await Data.Core.Data<RejectionReport, string>.Delete(r => r.CreatedAt < cutoffReject, set: null!, stoppingToken);
+                    await Data<ProjectionTask, string>.Delete(t => t.CreatedAt < cutoffTask, set: null!, stoppingToken);
+                    await Data<RejectionReport, string>.Delete(r => r.CreatedAt < cutoffReject, set: null!, stoppingToken);
 
                     _log.LogDebug("Sora.Flow purge completed");
                 }
@@ -147,16 +163,14 @@ public static class ServiceCollectionExtensions
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Simple polling loop; provider-agnostic. No bespoke queues.
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
                     var batch = Math.Max(1, _opts.CurrentValue.BatchSize);
-                    var defaultView = _opts.CurrentValue.DefaultViewName;
-
                     int pageNum = 1;
                     int processed = 0;
+
                     while (!stoppingToken.IsCancellationRequested)
                     {
                         var tasks = await ProjectionTask.Page(pageNum, batch, stoppingToken);
@@ -167,24 +181,24 @@ public static class ServiceCollectionExtensions
                             var refItem = await ReferenceItem.Get(task.ReferenceId, stoppingToken);
                             if (refItem is null) continue;
 
-                            var viewName = string.IsNullOrWhiteSpace(task.ViewName) ? defaultView : task.ViewName;
-                            // Reduce all keyed records for this ReferenceId into canonical and lineage shapes
-                            var keyed = await Record.Query($"CorrelationId == '{task.ReferenceId}'", Constants.Sets.Keyed, stoppingToken);
+                            // JSON adapter doesn't support string queries; materialize and filter in-memory
+                            var allKeyed = await Record.All(Constants.Sets.Keyed, stoppingToken);
+                            var keyed = allKeyed.Where(r => string.Equals(r.CorrelationId, task.ReferenceId, StringComparison.Ordinal)).ToList();
                             var canonical = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
                             var lineage = new Dictionary<string, Dictionary<string, HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
 
                             foreach (var r in keyed)
                             {
                                 var src = r.SourceId ?? "unknown";
-                                if (r.StagePayload is not IDictionary<string, object> dict) continue;
-                                foreach (var (tag, raw) in dict)
+                                var dict = ExtractDict(r.StagePayload);
+                                if (dict is null) continue;
+                                foreach (var kv in dict)
                                 {
-                                    var values = ToValues(raw);
+                                    var tag = kv.Key;
+                                    var values = ToValues(kv.Value);
                                     if (values.Count == 0) continue;
-                                    // canonical accumulate
                                     if (!canonical.TryGetValue(tag, out var set)) { set = new HashSet<string>(StringComparer.OrdinalIgnoreCase); canonical[tag] = set; }
                                     foreach (var v in values) set.Add(v);
-                                    // lineage accumulate
                                     if (!lineage.TryGetValue(tag, out var m)) { m = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase); lineage[tag] = m; }
                                     foreach (var v in values)
                                     {
@@ -194,37 +208,16 @@ public static class ServiceCollectionExtensions
                                 }
                             }
 
-                            var canonicalView = new Dictionary<string, object>();
-                            foreach (var (tag, set) in canonical)
-                                canonicalView[tag] = set.ToArray();
+                            var canonicalView = canonical.ToDictionary(kv => kv.Key, kv => (object)kv.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
+                            var lineageView = lineage.ToDictionary(kv => kv.Key, kv => (object)kv.Value.ToDictionary(x => x.Key, x => (IEnumerable<string>)x.Value.ToArray(), StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
 
-                            var lineageView = new Dictionary<string, object>();
-                            foreach (var (tag, m) in lineage)
-                                lineageView[tag] = m.ToDictionary(kv => kv.Key, kv => (IEnumerable<string>)kv.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
-
-                            var canonicalDoc = new ProjectionView<object>
-                            {
-                                Id = $"{Infrastructure.Constants.Views.Canonical}::{task.ReferenceId}",
-                                ReferenceId = task.ReferenceId,
-                                ViewName = Infrastructure.Constants.Views.Canonical,
-                                View = canonicalView
-                            };
+                            var canonicalDoc = new ProjectionView<object> { Id = $"{Infrastructure.Constants.Views.Canonical}::{task.ReferenceId}", ReferenceId = task.ReferenceId, ViewName = Infrastructure.Constants.Views.Canonical, View = canonicalView };
                             await canonicalDoc.Save(Infrastructure.Constants.Views.Canonical, stoppingToken);
 
-                            var lineageDoc = new ProjectionView<object>
-                            {
-                                Id = $"{Infrastructure.Constants.Views.Lineage}::{task.ReferenceId}",
-                                ReferenceId = task.ReferenceId,
-                                ViewName = Infrastructure.Constants.Views.Lineage,
-                                View = lineageView
-                            };
+                            var lineageDoc = new ProjectionView<object> { Id = $"{Infrastructure.Constants.Views.Lineage}::{task.ReferenceId}", ReferenceId = task.ReferenceId, ViewName = Infrastructure.Constants.Views.Lineage, View = lineageView };
                             await lineageDoc.Save(Infrastructure.Constants.Views.Lineage, stoppingToken);
 
-                            if (refItem.RequiresProjection)
-                            {
-                                refItem.RequiresProjection = false;
-                                await refItem.Save(stoppingToken);
-                            }
+                            if (refItem.RequiresProjection) { refItem.RequiresProjection = false; await refItem.Save(stoppingToken); }
 
                             await task.Delete(stoppingToken);
                             processed++;
@@ -233,8 +226,7 @@ public static class ServiceCollectionExtensions
                         pageNum++;
                     }
 
-                    if (processed > 0)
-                        _log.LogDebug("ProjectionWorker processed {Count} tasks", processed);
+                    if (processed > 0) _log.LogDebug("ProjectionWorker processed {Count} tasks", processed);
                 }
                 catch (Exception ex)
                 {
@@ -252,12 +244,18 @@ public static class ServiceCollectionExtensions
             {
                 case null: return new List<string>();
                 case string s when !string.IsNullOrWhiteSpace(s): return new List<string> { s };
+                case Newtonsoft.Json.Linq.JValue jv:
+                    var sv = jv.ToObject<object?>()?.ToString();
+                    return string.IsNullOrWhiteSpace(sv) ? new List<string>() : new List<string> { sv! };
+                case Newtonsoft.Json.Linq.JArray ja:
+                    return ja.Select(x => x?.ToString()).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToList();
                 case IEnumerable<object> arr:
                     return arr.Select(x => x?.ToString()).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToList();
                 default:
                     return new List<string> { raw.ToString() ?? string.Empty };
             }
         }
+
     }
 
     internal sealed class AssociationWorkerHostedService : BackgroundService
@@ -276,52 +274,100 @@ public static class ServiceCollectionExtensions
                 try
                 {
                     var batch = Math.Max(1, _opts.CurrentValue.BatchSize);
-
+                    // Read a page from intake set only; avoid leaking the set into root-scoped entities
+                    IReadOnlyList<Record> page;
                     using (DataSetContext.With(Constants.Sets.Intake))
                     {
-                        var page = await Record.Page(1, batch, stoppingToken);
-                        if (page.Count == 0)
+                        page = await Record.Page(1, batch, stoppingToken);
+                    }
+                    if (page.Count == 0)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                        continue;
+                    }
+
+                    foreach (var rec in page)
+                    {
+                        // Root scope for indexes, reference items, tasks, and rejections
+                        using var _root = DataSetContext.With(null);
+
+                        var dict = ExtractDict(rec.StagePayload);
+                        var tags = _opts.CurrentValue.AggregationTags ?? Array.Empty<string>();
+                        if (dict is null || tags.Length == 0)
                         {
-                            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                            await SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = dict is null ? "no-payload" : "no-config-tags", tags }, rec, stoppingToken);
                             continue;
                         }
 
-                        foreach (var rec in page)
+                        var candidates = new List<(string tag, string value)>();
+                        foreach (var tag in tags)
                         {
-                            // Expect normalized dictionary payload with tags; extract keyTag from policy or default tag
-                            var referenceId = rec.CorrelationId ?? rec.RecordId; // placeholder keying; to be replaced by tag-based
+                            if (!dict.TryGetValue(tag, out var raw)) continue;
+                            foreach (var v in ToValues(raw))
+                            {
+                                if (!string.IsNullOrWhiteSpace(v)) candidates.Add((tag, v));
+                            }
+                        }
 
-                            // Update KeyIndex single-owner map (AggregationKey → ReferenceId)
-                            // For now, use SourceId + RecordId as a stand-in aggregation key
-                            var aggKey = $"{rec.SourceId}:{rec.RecordId}";
-                            var ki = await KeyIndex.Get(aggKey, stoppingToken);
+                        if (candidates.Count == 0)
+                        {
+                            await SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "no-values", tags }, rec, stoppingToken);
+                            continue;
+                        }
+
+                        var owners = new HashSet<string>(StringComparer.Ordinal);
+                        foreach (var candidate in candidates)
+                        {
+                            var val = candidate.value;
+                            var ki = await KeyIndex.Get(val, stoppingToken);
+                            if (ki != null && !string.IsNullOrWhiteSpace(ki.ReferenceId)) owners.Add(ki.ReferenceId);
+                        }
+
+                        string referenceId;
+                        if (owners.Count > 1)
+                        {
+                            await SaveRejectAndDrop(Constants.Rejections.MultiOwnerCollision, new { owners = owners.ToArray(), keys = candidates }, rec, stoppingToken);
+                            // Do not move to keyed on collision
+                            goto NextRecord;
+                        }
+                        else if (owners.Count == 1)
+                        {
+                            referenceId = owners.First();
+                        }
+                        else
+                        {
+                            referenceId = rec.CorrelationId ?? candidates[0].value;
+                        }
+
+                        foreach (var candidate in candidates)
+                        {
+                            var val = candidate.value;
+                            var ki = await KeyIndex.Get(val, stoppingToken);
                             if (ki is null)
                             {
-                                ki = new KeyIndex { AggregationKey = aggKey, ReferenceId = referenceId };
-                                await ki.Save(stoppingToken);
+                                await new KeyIndex { AggregationKey = val, ReferenceId = referenceId }.Save(stoppingToken);
                             }
-
-                            // Update/insert ReferenceItem and mark projection needed
-                            var ri = await ReferenceItem.Get(referenceId, stoppingToken) ?? new ReferenceItem { ReferenceId = referenceId };
-                            ri.Version += 1; // simplistic version bump
-                            ri.RequiresProjection = true;
-                            await ri.Save(stoppingToken);
-
-                            // Enqueue a projection task for canonical view
-                            var task = new ProjectionTask
+                            else if (!string.Equals(ki.ReferenceId, referenceId, StringComparison.Ordinal))
                             {
-                                Id = $"{referenceId}::{ri.Version}::{Infrastructure.Constants.Views.Canonical}",
-                                ReferenceId = referenceId,
-                                Version = ri.Version,
-                                ViewName = Infrastructure.Constants.Views.Canonical,
-                                CreatedAt = DateTimeOffset.UtcNow
-                            };
-                            await task.Save(stoppingToken);
-
-                            // Move record to keyed set for traceability
-                            await rec.Save(Constants.Sets.Keyed, stoppingToken);
-                            await rec.Delete(stoppingToken); // delete from intake (current set)
+                                await SaveRejectAndDrop(Constants.Rejections.KeyOwnerMismatch, new { key = val, existing = ki.ReferenceId, incoming = referenceId }, rec, stoppingToken);
+                                goto NextRecord;
+                            }
                         }
+
+                        var ri = await ReferenceItem.Get(referenceId, stoppingToken) ?? new ReferenceItem { ReferenceId = referenceId };
+                        ri.Version += 1;
+                        ri.RequiresProjection = true;
+                        await ri.Save(stoppingToken);
+
+                        var t = new ProjectionTask { Id = $"{referenceId}::{ri.Version}::{Infrastructure.Constants.Views.Canonical}", ReferenceId = referenceId, Version = ri.Version, ViewName = Infrastructure.Constants.Views.Canonical, CreatedAt = DateTimeOffset.UtcNow };
+                        await t.Save(stoppingToken);
+
+                        rec.CorrelationId = referenceId;
+                        await rec.Save(Constants.Sets.Keyed, stoppingToken);
+                        // Explicitly delete from intake set
+                        await Data<Record, string>.DeleteAsync(rec.Id, Constants.Sets.Intake, stoppingToken);
+
+                    NextRecord:;
                     }
                 }
                 catch (Exception ex)
@@ -332,6 +378,27 @@ public static class ServiceCollectionExtensions
                 try { await Task.Delay(TimeSpan.FromMilliseconds(500), stoppingToken); }
                 catch (TaskCanceledException) { }
             }
+        }
+
+        private static List<string> ToValues(object raw)
+        {
+            switch (raw)
+            {
+                case null: return new List<string>();
+                case string s when !string.IsNullOrWhiteSpace(s): return new List<string> { s };
+                case IEnumerable<object> arr:
+                    return arr.Select(x => x?.ToString()).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToList();
+                default:
+                    return new List<string> { raw.ToString() ?? string.Empty };
+            }
+        }
+
+        private static async Task SaveRejectAndDrop(string code, object evidence, Record rec, CancellationToken ct)
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(evidence);
+            await new RejectionReport { Id = Guid.NewGuid().ToString("n"), ReasonCode = code, EvidenceJson = json, PolicyVersion = rec.PolicyVersion }.Save(ct);
+            // Delete the intake record explicitly from intake set
+            await Data<Record, string>.DeleteAsync(rec.Id, Constants.Sets.Intake, ct);
         }
     }
 }

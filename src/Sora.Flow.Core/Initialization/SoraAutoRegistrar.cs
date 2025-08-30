@@ -20,7 +20,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     {
         var opts = cfg.GetSection("Sora:Flow").Get<FlowOptions>() ?? new FlowOptions();
     report.AddModule(ModuleName, ModuleVersion);
-    report.AddSetting("provider", "InMemory");
+    report.AddSetting("runtime", "InMemory");
     report.AddSetting("batch", opts.BatchSize.ToString());
     report.AddSetting("concurrency.Standardize", opts.StandardizeConcurrency.ToString());
     report.AddSetting("concurrency.Key", opts.KeyConcurrency.ToString());
@@ -35,5 +35,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     report.AddSetting("purge.Interval", opts.PurgeInterval.ToString());
     report.AddSetting("dlq", opts.DeadLetterEnabled.ToString().ToLowerInvariant());
     report.AddSetting("defaultView", opts.DefaultViewName);
+    if (opts.AggregationTags?.Length > 0)
+        report.AddSetting("aggregation.tags", string.Join(",", opts.AggregationTags));
     }
 }
