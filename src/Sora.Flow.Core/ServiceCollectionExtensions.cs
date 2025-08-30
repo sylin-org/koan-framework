@@ -30,6 +30,9 @@ public static class ServiceCollectionExtensions
     // Background projection worker (materializes ProjectionView from ProjectionTask)
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ProjectionWorkerHostedService>());
 
+    // Background association/keying worker (derives ReferenceId, updates indexes)
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AssociationWorkerHostedService>());
+
     // Background TTL purge
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowPurgeHostedService>());
         return services;
@@ -165,15 +168,57 @@ public static class ServiceCollectionExtensions
                             if (refItem is null) continue;
 
                             var viewName = string.IsNullOrWhiteSpace(task.ViewName) ? defaultView : task.ViewName;
-                            var doc = new ProjectionView<object>
-                            {
-                                Id = $"{viewName}::{task.ReferenceId}",
-                                ReferenceId = task.ReferenceId,
-                                ViewName = viewName,
-                                View = new { referenceId = task.ReferenceId, version = task.Version }
-                            };
+                            // Reduce all keyed records for this ReferenceId into canonical and lineage shapes
+                            var keyed = await Record.Query($"CorrelationId == '{task.ReferenceId}'", Constants.Sets.Keyed, stoppingToken);
+                            var canonical = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+                            var lineage = new Dictionary<string, Dictionary<string, HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
 
-                            await doc.Save(viewName, stoppingToken);
+                            foreach (var r in keyed)
+                            {
+                                var src = r.SourceId ?? "unknown";
+                                if (r.StagePayload is not IDictionary<string, object> dict) continue;
+                                foreach (var (tag, raw) in dict)
+                                {
+                                    var values = ToValues(raw);
+                                    if (values.Count == 0) continue;
+                                    // canonical accumulate
+                                    if (!canonical.TryGetValue(tag, out var set)) { set = new HashSet<string>(StringComparer.OrdinalIgnoreCase); canonical[tag] = set; }
+                                    foreach (var v in values) set.Add(v);
+                                    // lineage accumulate
+                                    if (!lineage.TryGetValue(tag, out var m)) { m = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase); lineage[tag] = m; }
+                                    foreach (var v in values)
+                                    {
+                                        if (!m.TryGetValue(v, out var sources)) { sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase); m[v] = sources; }
+                                        sources.Add(src);
+                                    }
+                                }
+                            }
+
+                            var canonicalView = new Dictionary<string, object>();
+                            foreach (var (tag, set) in canonical)
+                                canonicalView[tag] = set.ToArray();
+
+                            var lineageView = new Dictionary<string, object>();
+                            foreach (var (tag, m) in lineage)
+                                lineageView[tag] = m.ToDictionary(kv => kv.Key, kv => (IEnumerable<string>)kv.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
+
+                            var canonicalDoc = new ProjectionView<object>
+                            {
+                                Id = $"{Infrastructure.Constants.Views.Canonical}::{task.ReferenceId}",
+                                ReferenceId = task.ReferenceId,
+                                ViewName = Infrastructure.Constants.Views.Canonical,
+                                View = canonicalView
+                            };
+                            await canonicalDoc.Save(Infrastructure.Constants.Views.Canonical, stoppingToken);
+
+                            var lineageDoc = new ProjectionView<object>
+                            {
+                                Id = $"{Infrastructure.Constants.Views.Lineage}::{task.ReferenceId}",
+                                ReferenceId = task.ReferenceId,
+                                ViewName = Infrastructure.Constants.Views.Lineage,
+                                View = lineageView
+                            };
+                            await lineageDoc.Save(Infrastructure.Constants.Views.Lineage, stoppingToken);
 
                             if (refItem.RequiresProjection)
                             {
@@ -197,6 +242,94 @@ public static class ServiceCollectionExtensions
                 }
 
                 try { await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken); }
+                catch (TaskCanceledException) { }
+            }
+        }
+
+        private static List<string> ToValues(object raw)
+        {
+            switch (raw)
+            {
+                case null: return new List<string>();
+                case string s when !string.IsNullOrWhiteSpace(s): return new List<string> { s };
+                case IEnumerable<object> arr:
+                    return arr.Select(x => x?.ToString()).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToList();
+                default:
+                    return new List<string> { raw.ToString() ?? string.Empty };
+            }
+        }
+    }
+
+    internal sealed class AssociationWorkerHostedService : BackgroundService
+    {
+        private readonly IServiceProvider _sp;
+        private readonly IOptionsMonitor<FlowOptions> _opts;
+        private readonly ILogger<AssociationWorkerHostedService> _log;
+
+        public AssociationWorkerHostedService(IServiceProvider sp, IOptionsMonitor<FlowOptions> opts, ILogger<AssociationWorkerHostedService> log)
+        { _sp = sp; _opts = opts; _log = log; }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    var batch = Math.Max(1, _opts.CurrentValue.BatchSize);
+
+                    using (DataSetContext.With(Constants.Sets.Intake))
+                    {
+                        var page = await Record.Page(1, batch, stoppingToken);
+                        if (page.Count == 0)
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                            continue;
+                        }
+
+                        foreach (var rec in page)
+                        {
+                            // Expect normalized dictionary payload with tags; extract keyTag from policy or default tag
+                            var referenceId = rec.CorrelationId ?? rec.RecordId; // placeholder keying; to be replaced by tag-based
+
+                            // Update KeyIndex single-owner map (AggregationKey → ReferenceId)
+                            // For now, use SourceId + RecordId as a stand-in aggregation key
+                            var aggKey = $"{rec.SourceId}:{rec.RecordId}";
+                            var ki = await KeyIndex.Get(aggKey, stoppingToken);
+                            if (ki is null)
+                            {
+                                ki = new KeyIndex { AggregationKey = aggKey, ReferenceId = referenceId };
+                                await ki.Save(stoppingToken);
+                            }
+
+                            // Update/insert ReferenceItem and mark projection needed
+                            var ri = await ReferenceItem.Get(referenceId, stoppingToken) ?? new ReferenceItem { ReferenceId = referenceId };
+                            ri.Version += 1; // simplistic version bump
+                            ri.RequiresProjection = true;
+                            await ri.Save(stoppingToken);
+
+                            // Enqueue a projection task for canonical view
+                            var task = new ProjectionTask
+                            {
+                                Id = $"{referenceId}::{ri.Version}::{Infrastructure.Constants.Views.Canonical}",
+                                ReferenceId = referenceId,
+                                Version = ri.Version,
+                                ViewName = Infrastructure.Constants.Views.Canonical,
+                                CreatedAt = DateTimeOffset.UtcNow
+                            };
+                            await task.Save(stoppingToken);
+
+                            // Move record to keyed set for traceability
+                            await rec.Save(Constants.Sets.Keyed, stoppingToken);
+                            await rec.Delete(stoppingToken); // delete from intake (current set)
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.LogDebug(ex, "AssociationWorker iteration failed");
+                }
+
+                try { await Task.Delay(TimeSpan.FromMilliseconds(500), stoppingToken); }
                 catch (TaskCanceledException) { }
             }
         }
