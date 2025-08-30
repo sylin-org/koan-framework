@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,8 +22,15 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
         if (string.IsNullOrWhiteSpace(client_id) || string.IsNullOrWhiteSpace(redirect_uri)) return BadRequest("client_id and redirect_uri are required");
         if (!string.Equals(client_id, o.ClientId, StringComparison.Ordinal)) return Unauthorized();
 
-        // Render simple HTML form when no user cookie (prompt=login just ensures the prompt appears in that case).
-        if (!Request.Cookies.TryGetValue("_tp_user", out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
+    // If prompt requests a fresh login/selection, ignore any existing cookie and show the login UI.
+    var forceLogin = !string.IsNullOrWhiteSpace(prompt) && (string.Equals(prompt, "login", StringComparison.OrdinalIgnoreCase) || string.Equals(prompt, "select_account", StringComparison.OrdinalIgnoreCase));
+    if (forceLogin)
+    {
+      try { Response.Cookies.Append("_tp_user", string.Empty, new CookieOptions { Expires = DateTimeOffset.UnixEpoch, Path = "/", SameSite = SameSiteMode.Lax, HttpOnly = false, Secure = Request.IsHttps }); } catch { /* ignore */ }
+    }
+
+    // Render simple HTML form when no user cookie or when forced via prompt.
+    if (forceLogin || !Request.Cookies.TryGetValue("_tp_user", out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
         {
       // Serve a dedicated static HTML to keep SoC clean
             var url = o.RouteBase.TrimEnd('/') + "/login.html";

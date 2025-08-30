@@ -11,6 +11,7 @@ using Sora.Web.Auth.Options;
 using Sora.Web.Auth.Providers;
 using System.Security.Claims;
 using Newtonsoft.Json;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 
 namespace Sora.Web.Auth.Controllers;
 
@@ -227,7 +228,7 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         // Sign out of cookie auth
         await HttpContext.SignOutAsync(AuthenticationExtensions.CookieScheme);
         // Best-effort: also clear the local dev TestProvider cookie to avoid silent re-login loops
-        try { Response.Cookies.Delete("_tp_user", new CookieOptions { Path = "/" }); } catch { /* ignore */ }
+    try { Response.Cookies.Append("_tp_user", string.Empty, new CookieOptions { Expires = DateTimeOffset.UnixEpoch, Path = "/", SameSite = SameSiteMode.Lax, HttpOnly = false, Secure = Request.IsHttps }); } catch { /* ignore */ }
         var allowed = authOptions.Value.ReturnUrl.AllowList ?? Array.Empty<string>();
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
         var ru = SanitizeReturnUrl(returnUrl, allowed, def);
@@ -265,7 +266,9 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
                 bool matchesExternal = !string.IsNullOrWhiteSpace(reqHost) && string.Equals(abs.Host, reqHost, StringComparison.OrdinalIgnoreCase) && (!reqPort.HasValue || abs.Port == reqPort.Value);
                 if (isLoopback || matchesExternal)
                 {
-                    var baseRewritten = BuildBaseFromAspNetCoreUrls(abs.Scheme);
+                    var baseRewritten = BuildBaseFromAspNetCoreUrls(abs.Scheme)
+                        ?? BuildBaseFromServerAddresses(abs.Scheme)
+                        ?? BuildBaseFromConnectionLocalPort();
                     if (baseRewritten is not null)
                     {
                         var rebuilt = new Uri(new Uri(baseRewritten), abs.PathAndQuery + abs.Fragment);
@@ -280,15 +283,39 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
 
         if (!string.IsNullOrEmpty(relative) && !relative.StartsWith('/')) relative = "/" + relative;
 
+        // Prefer ASPNETCORE_URLS env
         var pick = BuildBaseFromAspNetCoreUrls();
         if (pick is not null)
             return pick.TrimEnd('/') + relative;
 
-        // Fallback: try to use request scheme but with localhost and a safe default container port
+        // Try ServerAddressesFeature
+        var srv = HttpContext.Features.Get<IServerAddressesFeature>();
+        var addr = srv?.Addresses?.FirstOrDefault(a => a.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || a.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(addr) && Uri.TryCreate(addr, UriKind.Absolute, out var baseAddr))
+        {
+            var scheme2 = string.Equals(baseAddr.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
+            var host2 = string.IsNullOrWhiteSpace(baseAddr.Host) || baseAddr.Host == "0.0.0.0" || baseAddr.Host == "+" || baseAddr.Host == "*" ? "localhost" : baseAddr.Host;
+            var port2 = baseAddr.IsDefaultPort ? (scheme2 == Uri.UriSchemeHttps ? 443 : 80) : baseAddr.Port;
+            return $"{scheme2}://{host2}:{port2}{relative}";
+        }
+
+        // Next best: use Kestrel's local bound port (inside the container)
+        try
+        {
+            var localPort = HttpContext.Connection.LocalPort;
+            if (localPort > 0)
+            {
+                var sch2 = string.Equals(HttpContext.Request.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
+                return $"{sch2}://localhost:{localPort}{relative}";
+            }
+        }
+        catch { /* ignore */ }
+
+        // Fallback: Use request scheme and host port with localhost
         var req = HttpContext.Request;
         var sch = string.Equals(req.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
-        var defaultPort = sch == Uri.UriSchemeHttps ? 443 : 8080; // prefer 8080 for http container default
-        return $"{sch}://localhost:{defaultPort}{relative}";
+        var port = req.Host.HasValue && req.Host.Port.HasValue ? req.Host.Port.Value : (sch == Uri.UriSchemeHttps ? 443 : 80);
+        return $"{sch}://localhost:{port}{relative}";
     }
 
     private static string? BuildBaseFromAspNetCoreUrls(string? forceScheme = null)
@@ -305,6 +332,35 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         if (string.IsNullOrWhiteSpace(host) || host == "0.0.0.0" || host == "+" || host == "*") host = "localhost";
         var port = baseUri.IsDefaultPort ? (scheme == Uri.UriSchemeHttps ? 443 : 80) : baseUri.Port;
         return $"{scheme}://{host}:{port}";
+    }
+
+    private string? BuildBaseFromServerAddresses(string? forceScheme = null)
+    {
+        var srv = HttpContext.Features.Get<IServerAddressesFeature>();
+        var addr = srv?.Addresses?.FirstOrDefault(a => a.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || a.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(addr) && Uri.TryCreate(addr, UriKind.Absolute, out var baseAddr))
+        {
+            var scheme2 = forceScheme ?? (string.Equals(baseAddr.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ? Uri.UriSchemeHttps : Uri.UriSchemeHttp);
+            var host2 = string.IsNullOrWhiteSpace(baseAddr.Host) || baseAddr.Host == "0.0.0.0" || baseAddr.Host == "+" || baseAddr.Host == "*" ? "localhost" : baseAddr.Host;
+            var port2 = baseAddr.IsDefaultPort ? (scheme2 == Uri.UriSchemeHttps ? 443 : 80) : baseAddr.Port;
+            return $"{scheme2}://{host2}:{port2}";
+        }
+        return null;
+    }
+
+    private string? BuildBaseFromConnectionLocalPort()
+    {
+        try
+        {
+            var localPort = HttpContext.Connection.LocalPort;
+            if (localPort > 0)
+            {
+                var sch2 = string.Equals(HttpContext.Request.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
+                return $"{sch2}://localhost:{localPort}";
+            }
+        }
+        catch { /* ignore */ }
+        return null;
     }
 
     private string BuildAbsolute(string relative)

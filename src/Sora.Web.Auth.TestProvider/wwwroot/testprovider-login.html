@@ -200,12 +200,16 @@
         localStorage.setItem('tp_claims', JSON.stringify(data.claims||[]));
       }
       document.cookie = `_tp_user=${encodeURIComponent(data.name||'')}|${encodeURIComponent(data.email||'')}; path=/`;
-      const base = '.testoauth/authorize';
+  const base = '/.testoauth/authorize';
       const p = new URLSearchParams(location.search);
-      const params = new URLSearchParams();
+  const params = new URLSearchParams();
       params.set('response_type', 'code');
       params.set('client_id', p.get('client_id')||'');
       params.set('redirect_uri', p.get('redirect_uri')||'');
+  const st = p.get('state'); if (st) params.set('state', st);
+  const sc = p.get('scope'); if (sc) params.set('scope', sc);
+  const cc = p.get('code_challenge'); if (cc) params.set('code_challenge', cc);
+  const ccm = p.get('code_challenge_method'); if (ccm) params.set('code_challenge_method', ccm);
       if (data.roles && data.roles.length) params.set('roles', data.roles.join(','));
       if (data.permissions && data.permissions.length) params.set('perms', data.permissions.join(','));
       for (const kv of data.claims||[]) params.append(`claim.${kv.key}`, kv.value);

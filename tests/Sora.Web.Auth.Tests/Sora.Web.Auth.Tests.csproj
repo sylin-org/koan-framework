@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sora.Web.Auth\Sora.Web.Auth.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Auth.TestProvider\Sora.Web.Auth.TestProvider.csproj" />
   </ItemGroup>
 </Project>

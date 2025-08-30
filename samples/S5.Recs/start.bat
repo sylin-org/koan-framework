@@ -7,6 +7,7 @@ pushd "%SCRIPT_DIR%"
 
 REM Build the API image and bring up the stack detached, then wait and launch the app.
 set COMPOSE_FILE=docker\compose.yml
+set PROJECT_NAME=sora-s5-recs
 set API_URL=http://localhost:5084/swagger/index.html
 set OPEN_URL=http://localhost:5084
 
@@ -20,13 +21,13 @@ REM Use modern "docker compose" if available, else fallback to legacy "docker-co
 for /f "tokens=*" %%i in ('docker compose version 2^>nul') do set HAS_DOCKER_COMPOSE_CLI=1
 if defined HAS_DOCKER_COMPOSE_CLI (
   echo Using "docker compose" CLI
-  docker compose -f %COMPOSE_FILE% build --no-cache || goto :error
-  docker compose -f %COMPOSE_FILE% up -d || goto :error
+  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build --no-cache || goto :error
+  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
 ) else (
   where docker-compose >nul 2>nul || goto :nolegacy
   echo Using legacy "docker-compose" CLI
-  docker-compose -f %COMPOSE_FILE% build --no-cache || goto :error
-  docker-compose -f %COMPOSE_FILE% up -d || goto :error
+  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build --no-cache || goto :error
+  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
 )
 
 echo Waiting for API to be ready at %API_URL% ...

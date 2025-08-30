@@ -1,3 +1,4 @@
+name: sora-s7-techdocs
 services:
   web:
     build:
