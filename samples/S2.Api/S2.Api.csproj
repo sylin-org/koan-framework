@@ -14,5 +14,6 @@
   <ProjectReference Include="..\..\src\Sora.Web.Transformers\Sora.Web.Transformers.csproj" />
   <ProjectReference Include="..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
   <ProjectReference Include="..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Extensions\Sora.Web.Extensions.csproj" />
   </ItemGroup>
 </Project>

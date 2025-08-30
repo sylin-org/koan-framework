@@ -2,13 +2,6 @@
 
 namespace Sora.Core.Json;
 
-public enum ArrayMergeStrategy
-{
-    Union,
-    Replace,
-    Concat
-}
-
 public static class JsonMerge
 {
     public sealed class JsonMergeOptions

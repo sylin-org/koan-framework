@@ -34,6 +34,8 @@
       href: ARCH-0052-core-ids-and-json-merge-policy.md
 - name: Data (DATA)
   items:
+    - name: Instance Save(set) is first-class
+      href: DATA-0062-instance-save-set-first-class.md
     - name: Data access semantics (All/Query; streaming; pager)
       href: DATA-0061-data-access-pagination-and-streaming.md
     - name: Vector module split and clean separation
@@ -104,12 +106,20 @@
       href: WEB-0042-graphql-naming-and-discovery.md
     - name: EntityController transformers
       href: WEB-0035-entitycontroller-transformers.md
+    - name: Entity moderation controller — standard flow and hooks
+      href: WEB-0048-entity-moderation-controller-standard-flow.md
     - name: Multi-protocol authentication (OIDC/OAuth2/SAML)
       href: WEB-0043-auth-multi-protocol-oauth-oidc-saml.md
     - name: Web auth discovery and health
       href: WEB-0044-web-auth-discovery-and-health.md
     - name: Auth provider adapters as separate modules
       href: WEB-0045-auth-provider-adapters-separate-projects.md
+    - name: Entity capabilities — short endpoints and set routing
+      href: WEB-0046-entity-capabilities-short-endpoints-and-set-routing.md
+    - name: Capability authorization — fallback and defaults
+      href: WEB-0047-capability-authorization-fallback-and-defaults.md
+    - name: Role attribution layer — claims transformation
+      href: WEB-0049-role-attribution-layer-and-claims-transformation.md
 - name: Messaging (MESS)
   items:
     - name: Messaging capabilities and negotiation

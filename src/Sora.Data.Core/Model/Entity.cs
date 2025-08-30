@@ -13,11 +13,18 @@ public abstract class Entity<TEntity, TKey> : IEntity<TKey>
     // Static conveniences forward to the data facade without exposing its namespace in domain types
     public static Task<TEntity?> Get(TKey id, CancellationToken ct = default)
         => Data<TEntity, TKey>.GetAsync(id, ct);
+    // Set-aware variants
+    public static Task<TEntity?> Get(TKey id, string set, CancellationToken ct = default)
+        => Data<TEntity, TKey>.GetAsync(id, set, ct);
 
     public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
         => Data<TEntity, TKey>.All(ct);
+    public static Task<IReadOnlyList<TEntity>> All(string set, CancellationToken ct = default)
+        => Data<TEntity, TKey>.All(set, ct);
     public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
         => Data<TEntity, TKey>.Query(query, ct);
+    public static Task<IReadOnlyList<TEntity>> Query(string query, string set, CancellationToken ct = default)
+        => Data<TEntity, TKey>.Query(query, set, ct);
 
     // Streaming (IAsyncEnumerable)
     public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
@@ -36,6 +43,10 @@ public abstract class Entity<TEntity, TKey> : IEntity<TKey>
         => Data<TEntity, TKey>.CountAllAsync(ct);
     public static Task<int> Count(string query, CancellationToken ct = default)
         => Data<TEntity, TKey>.CountAsync(query, ct);
+    public static Task<int> CountAll(string set, CancellationToken ct = default)
+        => Data<TEntity, TKey>.CountAllAsync(set, ct);
+    public static Task<int> Count(string query, string set, CancellationToken ct = default)
+        => Data<TEntity, TKey>.CountAsync(query, set, ct);
 
     public static IBatchSet<TEntity, TKey> Batch() => Data<TEntity, TKey>.Batch();
 
@@ -49,11 +60,25 @@ public abstract class Entity<TEntity, TKey> : IEntity<TKey>
     public static Task<int> Remove(IEnumerable<TKey> ids, CancellationToken ct = default)
         => Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
 
+    // Set-aware removal helpers
+    public static Task<bool> Remove(TKey id, string set, CancellationToken ct = default)
+        => Data<TEntity, TKey>.DeleteAsync(id, set, ct);
+
+    public static Task<int> Remove(IEnumerable<TKey> ids, string set, CancellationToken ct = default)
+        => Data<TEntity, TKey>.DeleteManyAsync(ids, set, ct);
+
     public static async Task<int> Remove(string query, CancellationToken ct = default)
     {
         var items = await Data<TEntity, TKey>.Query(query, ct);
         var ids = Enumerable.Select<TEntity, TKey>(items, e => e.Id);
         return await Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
+    }
+
+    public static async Task<int> Remove(string query, string set, CancellationToken ct = default)
+    {
+        var items = await Data<TEntity, TKey>.Query(query, set, ct);
+        var ids = Enumerable.Select<TEntity, TKey>(items, e => e.Id);
+        return await Data<TEntity, TKey>.DeleteManyAsync(ids, set, ct);
     }
 
     public static Task<int> RemoveAll(CancellationToken ct = default)

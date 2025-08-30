@@ -366,10 +366,14 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var ctx = new HookContext<TEntity> { Http = HttpContext, Services = HttpContext.RequestServices, Options = opts, Capabilities = caps, Ct = ct };
         var runner = GetRunner();
 
+    // Optional set routing via querystring (?set=)
+    var set = HttpContext.Request.Query.TryGetValue("set", out var sVal) ? sVal.ToString() : null;
+
         var idStr = id?.ToString() ?? string.Empty;
         if (!await runner.BeforeModelFetchAsync(ctx, idStr)) return ctx.ShortCircuitResult!;
 
-        var model = await Data<TEntity, TKey>.GetAsync(id!, ct);
+    using var _set = Sora.Data.Core.DataSetContext.With(string.IsNullOrWhiteSpace(set) ? null : set);
+    var model = await Data<TEntity, TKey>.GetAsync(id!, ct);
         await runner.AfterModelFetchAsync(ctx, model);
         if (model == null) return NotFound();
 
@@ -394,8 +398,19 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var ctx = new HookContext<TEntity> { Http = HttpContext, Services = HttpContext.RequestServices, Options = opts, Capabilities = caps, Ct = ct };
         var runner = GetRunner();
 
+        // Optional set routing via querystring (?set=)
+        var set = HttpContext.Request.Query.TryGetValue("set", out var sVal) ? sVal.ToString() : null;
+
         await runner.BeforeSaveAsync(ctx, model);
-        var saved = await model.Upsert<TEntity, TKey>(ct);
+        TEntity saved;
+        if (!string.IsNullOrWhiteSpace(set))
+        {
+            saved = await model.Upsert<TEntity, TKey>(set!, ct);
+        }
+        else
+        {
+            saved = await model.Upsert<TEntity, TKey>(ct);
+        }
         await runner.AfterSaveAsync(ctx, saved);
 
         // Accept/view header
@@ -421,13 +436,25 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var ctx = new HookContext<TEntity> { Http = HttpContext, Services = HttpContext.RequestServices, Options = opts, Capabilities = caps, Ct = ct };
         var runner = GetRunner();
 
+        // Optional set routing via querystring (?set=)
+        var set = HttpContext.Request.Query.TryGetValue("set", out var sVal) ? sVal.ToString() : null;
+
         // Run per-model BeforeSave hooks and ensure IDs via facade
         var list = models.ToList();
         if (list.Count == 0) return BadRequest(new { error = "At least one item is required" });
         if (list.Any(m => m is null)) return BadRequest(new { error = "Null items are not allowed" });
         foreach (var m in list) await runner.BeforeSaveAsync(ctx, m);
 
-        var count = await Data<TEntity, TKey>.UpsertManyAsync(list, ct);
+        int count;
+        if (!string.IsNullOrWhiteSpace(set))
+        {
+            using var _set = Sora.Data.Core.DataSetContext.With(set);
+            count = await Data<TEntity, TKey>.UpsertManyAsync(list, ct);
+        }
+        else
+        {
+            count = await Data<TEntity, TKey>.UpsertManyAsync(list, ct);
+        }
         foreach (var m in list) await runner.AfterSaveAsync(ctx, m);
 
         Response.Headers["Sora-Write-Capabilities"] = writes.Writes.ToString();
@@ -444,7 +471,11 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var ctx = new HookContext<TEntity> { Http = HttpContext, Services = HttpContext.RequestServices, Options = opts, Capabilities = caps, Ct = ct };
         var runner = GetRunner();
 
-        var model = await Data<TEntity, TKey>.GetAsync(id, ct);
+    // Optional set routing via querystring (?set=)
+    var set = HttpContext.Request.Query.TryGetValue("set", out var sVal) ? sVal.ToString() : null;
+    using var _set = Sora.Data.Core.DataSetContext.With(string.IsNullOrWhiteSpace(set) ? null : set);
+
+    var model = await Data<TEntity, TKey>.GetAsync(id, ct);
         if (model == null) return NotFound();
         await runner.BeforeDeleteAsync(ctx, model);
         var ok = await Data<TEntity, TKey>.DeleteAsync(id, ct);
@@ -463,7 +494,18 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         if (!CanRemove) return Forbid();
         var repo = HttpContext.RequestServices.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>();
         var writes = WriteCaps(repo);
-        var deleted = await Data<TEntity, TKey>.DeleteManyAsync(ids ?? Array.Empty<TKey>(), ct);
+        // Optional set routing via querystring (?set=)
+        var set = HttpContext.Request.Query.TryGetValue("set", out var sVal) ? sVal.ToString() : null;
+        int deleted;
+        if (!string.IsNullOrWhiteSpace(set))
+        {
+            using var _set = Sora.Data.Core.DataSetContext.With(set);
+            deleted = await Data<TEntity, TKey>.DeleteManyAsync(ids ?? Array.Empty<TKey>(), ct);
+        }
+        else
+        {
+            deleted = await Data<TEntity, TKey>.DeleteManyAsync(ids ?? Array.Empty<TKey>(), ct);
+        }
         Response.Headers["Sora-Write-Capabilities"] = writes.Writes.ToString();
         return Ok(new { deleted });
     }
@@ -474,6 +516,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     {
         if (!CanRemove) return Forbid();
         if (string.IsNullOrWhiteSpace(q)) return BadRequest();
+        // Optional set routing via querystring (?set=)
+        var set = HttpContext.Request.Query.TryGetValue("set", out var sVal) ? sVal.ToString() : null;
         // Use static helper; will throw if string queries unsupported
         try
         {
@@ -485,8 +529,17 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             // Fallback implementation using repository directly
         }
 
-        // Implement via domain static helper
-        var removed = await Entity<TEntity, TKey>.Remove(q!, ct);
+        // Implement via domain static helper (set-aware via ambient context)
+        int removed;
+        if (!string.IsNullOrWhiteSpace(set))
+        {
+            using var _set = Sora.Data.Core.DataSetContext.With(set);
+            removed = await Entity<TEntity, TKey>.Remove(q!, ct);
+        }
+        else
+        {
+            removed = await Entity<TEntity, TKey>.Remove(q!, ct);
+        }
         return Ok(new { deleted = removed });
     }
 
@@ -495,7 +548,18 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> DeleteAll(CancellationToken ct)
     {
         if (!CanRemove) return Forbid();
-        var deleted = await Entity<TEntity, TKey>.RemoveAll(ct);
+        // Optional set routing via querystring (?set=)
+        var set = HttpContext.Request.Query.TryGetValue("set", out var sVal) ? sVal.ToString() : null;
+        int deleted;
+        if (!string.IsNullOrWhiteSpace(set))
+        {
+            using var _set = Sora.Data.Core.DataSetContext.With(set);
+            deleted = await Entity<TEntity, TKey>.RemoveAll(ct);
+        }
+        else
+        {
+            deleted = await Entity<TEntity, TKey>.RemoveAll(ct);
+        }
         return Ok(new { deleted });
     }
 
@@ -509,9 +573,13 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var ctx = new HookContext<TEntity> { Http = HttpContext, Services = HttpContext.RequestServices, Options = opts, Capabilities = caps, Ct = ct };
         var runner = GetRunner();
 
+    // Optional set routing via querystring (?set=)
+    var set = HttpContext.Request.Query.TryGetValue("set", out var sVal) ? sVal.ToString() : null;
+
         await runner.BeforePatchAsync(ctx, id?.ToString() ?? string.Empty, patch);
 
-        var original = await Data<TEntity, TKey>.GetAsync(id!, ct);
+    using var _set = Sora.Data.Core.DataSetContext.With(string.IsNullOrWhiteSpace(set) ? null : set);
+    var original = await Data<TEntity, TKey>.GetAsync(id!, ct);
         if (original == null) return NotFound();
         var working = await Data<TEntity, TKey>.GetAsync(id!, ct);
         patch.ApplyTo(working!);
@@ -523,7 +591,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             if (newId is not null && !Equals(newId, id)) return Conflict();
         }
         await runner.BeforeSaveAsync(ctx, working!);
-        var saved = await working!.Upsert<TEntity, TKey>(ct);
+    var saved = await working!.Upsert<TEntity, TKey>(ct);
         await runner.AfterPatchAsync(ctx, saved);
 
         // Accept/view header

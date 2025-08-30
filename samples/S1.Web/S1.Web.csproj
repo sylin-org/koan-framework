@@ -12,6 +12,7 @@
   <ProjectReference Include="..\..\src\Sora.Data.Sqlite\Sora.Data.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
   <ProjectReference Include="..\..\src\Sora.Data.Json\Sora.Data.Json.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Extensions\Sora.Web.Extensions.csproj" />
 
   </ItemGroup>
 </Project>

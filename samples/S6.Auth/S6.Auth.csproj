@@ -13,6 +13,7 @@
   <ProjectReference Include="..\..\src\Sora.Web.Auth.Discord\Sora.Web.Auth.Discord.csproj" />
   <ProjectReference Include="..\..\src\Sora.Web.Auth.Oidc\Sora.Web.Auth.Oidc.csproj" />
   <ProjectReference Include="..\..\src\Sora.Web.Auth.TestProvider\Sora.Web.Auth.TestProvider.csproj" />
+  <ProjectReference Include="..\..\src\Sora.Web.Extensions\Sora.Web.Extensions.csproj" />
   </ItemGroup>
 </Project>
 

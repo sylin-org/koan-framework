@@ -111,6 +111,35 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task Instance_Save_With_Set_Routes_To_Set()
+    {
+        var dir = TempDir();
+        var sp = BuildServices(dir);
+        // Ensure AppHost.Current is set so DataService() in AggregateExtensions can resolve
+        Sora.Core.Hosting.App.AppHost.Current = sp;
+
+        var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
+
+        // Save same id to root and to a named set via instance Save("set")
+        var id = "same";
+        await repo.UpsertAsync(new Todo { Id = id, Title = "root" });
+
+        var t = new Todo { Id = id, Title = "backup" };
+        await t.Save("backup");
+
+        // Root should remain "root"
+        var root = await repo.GetAsync(id);
+        root!.Title.Should().Be("root");
+
+        // Backup set should hold the alternate value
+        using (DataSetContext.With("backup"))
+        {
+            var backup = await repo.GetAsync(id);
+            backup!.Title.Should().Be("backup");
+        }
+    }
+
+    [Fact]
     public async Task Crud_Works()
     {
         var dir = TempDir();

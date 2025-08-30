@@ -5,6 +5,16 @@ namespace Sora.Web.Infrastructure;
 /// </summary>
 public static class SoraWebConstants
 {
+    public static class Codes
+    {
+        public static class Moderation
+        {
+            // Stable error codes for moderation flows
+            public const string NotFound = "moderation.notFound";
+            public const string ReasonRequired = "moderation.reasonRequired";
+        }
+    }
+
     public static class Headers
     {
         public const string XContentTypeOptions = "X-Content-Type-Options";
@@ -43,5 +53,22 @@ public static class SoraWebConstants
         // Pagination defaults
         public const int DefaultPageSize = 50;
         public const int MaxPageSize = 200;
+    }
+
+    public static class Sets
+    {
+        // Well-known, stable set names for cross-cutting capabilities
+        public const string Deleted = "deleted";
+
+        public static class Moderation
+        {
+            public const string Draft = "moderation.draft";
+            public const string Submitted = "moderation.submitted";
+            public const string Approved = "moderation.approved";
+            public const string Denied = "moderation.denied";
+            public const string Audit = "moderation.audit"; // optional
+        }
+
+        public const string Audit = "audit"; // global audit snapshots (when enabled)
     }
 }

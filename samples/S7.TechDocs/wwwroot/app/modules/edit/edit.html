@@ -1,0 +1,26 @@
+﻿<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-bold">{{vm.doc.id ? 'Edit Document' : 'Create New Document'}}</h2>
+    <button class="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-sm font-medium" ng-click="vm.save()" ng-disabled="vm.saving">
+      <i class="fas fa-save mr-2"></i> Save
+    </button>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm mb-2">Title</label>
+      <input type="text" class="w-full bg-slate-800 text-white rounded px-3 py-2" ng-model="vm.doc.title"/>
+    </div>
+    <div>
+      <label class="block text-sm mb-2">Collection</label>
+      <input type="text" class="w-full bg-slate-800 text-white rounded px-3 py-2" ng-model="vm.doc.collectionId"/>
+    </div>
+  </div>
+  <div class="mt-4">
+    <label class="block text-sm mb-2">Summary</label>
+    <input type="text" class="w-full bg-slate-800 text-white rounded px-3 py-2" ng-model="vm.doc.summary"/>
+  </div>
+  <div class="mt-4">
+    <label class="block text-sm mb-2">Content (Markdown)</label>
+    <textarea class="w-full h-64 bg-slate-800 text-white rounded px-3 py-2" ng-model="vm.doc.content"></textarea>
+  </div>
+</div>

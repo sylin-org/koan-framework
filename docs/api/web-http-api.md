@@ -22,6 +22,19 @@ Headers
 - `Sora-Trace-Id`: correlation id of the current request’s trace (when tracing enabled).
 - `Sora-InMemory-Paging`: `true` when in-memory pagination fallback happened.
 
+Capability endpoints (semantics)
+- Capabilities expand the baseline collection (`/api/{entity}`) with short, action-like routes.
+- Sets remain routing via `?set=`; endpoints must not encode sets in the path.
+- Examples (see WEB-0046):
+	- Moderation: `GET /api/{entity}/moderation/pending`, `POST /api/{entity}/{id}/moderate/approve|reject`
+	- Soft delete: `GET /api/{entity}/deleted`, `DELETE /api/{entity}/{id}/soft`, `POST /api/{entity}/{id}/restore`
+	- Audit: `GET /api/{entity}/{id}/audit`, `GET /api/{entity}/{id}/audit/{version}`, `POST /api/{entity}/{id}/audit/revert`
+
+Moderation views (visibility overlays)
+- Authorized callers may request content overlays via `view=` without changing the baseline published output for others:
+	- `view=published` (default), `view=draft` (author’s own), `view=proposed` (submitted for review).
+- Unauthorized `view` requests fall back to published.
+
 Well-known endpoints
 - See well-known-endpoints.md for `/.well-known/sora/*` routes.
 - Authentication routes (Sora.Web.Auth)

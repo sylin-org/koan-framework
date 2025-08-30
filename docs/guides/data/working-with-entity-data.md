@@ -13,6 +13,7 @@ Audience: Developers building with Sora’s domain model and generic EntityContr
 - Query (string filter): `var list = await Item.Query("Name:*milk*");`
 - Count: `var n = await Item.Count();` or `await Item.Count("Name:*milk*");`
 - Save (string-keyed): `await item.Save();`
+- Save to a set (string-keyed): `await item.Save("backup");`
 - Remove: `await Item.Remove(id);` or `await item.Remove();`
 - Choose a set (ambient): `using (DataSetContext.With("backup")) { await Item.All(); }`
 - HTTP filter: `GET /api/items?filter={"Name":"*milk*"}&page=1&size=10`
@@ -65,6 +66,7 @@ If your key is not a string or you need explicit type control, see “Raw model.
 Sora supports logical data “sets” so you can keep multiple parallel collections of the same entity (e.g., root, backup, archive). The physical storage name is resolved per adapter; non-root sets are suffixed internally (e.g., "Todo#backup").
 
 Ways to choose a set:
+- Preferred: pass `set` to first-class statics and instance Save("set").
 - HTTP: pass `set` in querystring for GET or inside the POST /query body.
 - Code: wrap operations in DataSetContext.With("backup"). Root is null/empty.
 
@@ -79,8 +81,13 @@ Example (code):
 
 ```csharp
 // Non-ambient (explicit set):
-var count = await Item.Count("Name:*milk*");
-var countInBackup = await Data<Item, string>.CountAllAsync("backup");
+var one = await Item.Get(id, set: "backup");
+var countInBackup = await Item.CountAll(set: "backup");
+var activeInStaging = await Item.Query("Status:active", set: "staging");
+
+// Save instances to a specific set (string-keyed)
+await item.Save("backup");
+await moreItems.Save("archive");
 
 // Alternative: ambient set scope
 using (DataSetContext.With("backup"))
@@ -90,6 +97,40 @@ using (DataSetContext.With("backup"))
 ```
 
 All Entity static methods respect the ambient set. See ADR 0030 for naming and isolation rules.
+
+---
+
+### Sets via REST (?set=)
+
+All standard EntityController endpoints accept a `set` query parameter. Use it to route CRUD operations to a parallel store (backup, archive, staging, etc.). The `POST /query` endpoint continues to accept `set` inside its JSON body.
+
+Typical calls:
+
+```text
+# Collection
+GET    /api/items?set=backup
+
+# By id
+GET    /api/items/{id}?set=backup
+PATCH  /api/items/{id}?set=backup
+DELETE /api/items/{id}?set=backup
+
+# Upsert
+POST   /api/items?set=backup               // body: { ...item }
+POST   /api/items/bulk?set=backup          // body: [ { ... }, { ... } ]
+
+# Delete (bulk/all/query)
+DELETE /api/items/bulk?set=backup          // body: [ "id1", "id2" ]
+DELETE /api/items/all?set=backup
+DELETE /api/items?q=Status:inactive&set=backup
+
+# Query via POST keeps set in body
+POST   /api/items/query                    // body: { filter: { ... }, set: "backup" }
+```
+
+Notes:
+- When `set` is omitted, operations target the root collection.
+- Pagination and filter semantics are unchanged; only routing differs.
 
 ---
 
