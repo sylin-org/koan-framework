@@ -20,6 +20,9 @@ dotnet add package Sylin.Sora.Web.Auth
 - Configure providers via typed Options; avoid inline endpoints.
 - Use MVC controllers with attribute routing for auth callbacks.
 
+Dev/testing tip
+- When using Sora.Web.Auth.TestProvider in Development, its userinfo may include `roles[]`, `permissions[]`, and `claims{}`. These are mapped into the cookie principal (roles → ClaimTypes.Role, permissions → `sora.permission`, claims{} → 1:1) so you can exercise authorization flows end-to-end.
+
 Sign-out (controller)
 
 ```csharp
