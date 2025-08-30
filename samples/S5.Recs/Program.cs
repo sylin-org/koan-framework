@@ -3,7 +3,6 @@ using Sora.Core.Modules;
 using Sora.Core.Observability;
 using Sora.Data.Core;
 using Sora.Web.Extensions;
-using Sora.Web.Auth.TestProvider.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,9 +12,6 @@ builder.Services.AddSora()
     .WithRateLimit();
 
 builder.Services.AddSoraObservability();
-// MVC + include TestProvider controllers
-builder.Services.AddControllers()
-    .AddApplicationPart(typeof(Sora.Web.Auth.TestProvider.Controllers.StaticController).Assembly);
 // Ensure local data folders exist for offline/bootstrap flows
 Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.OfflineData))!);
 Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.SeedCache));
@@ -52,8 +48,7 @@ var app = builder.Build();
 
 // Sora.Web startup filter auto-wires static files, controller routing, and Swagger
 
-// Map TestProvider endpoints (honors RouteBase)
-app.MapSoraTestProviderEndpoints();
+// TestProvider endpoints are auto-mapped by its auto-registrar in Development.
 
 app.Run();
 

@@ -8,7 +8,6 @@ using Sora.Web.Auth.Extensions;
 using Microsoft.AspNetCore.Authentication;
 using Sora.Web.Extensions.Authorization;
 using Sora.Data.Mongo;
-using Sora.Web.Auth.TestProvider.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,9 +23,8 @@ builder.Services.AddSoraSwagger(builder.Configuration);
 // Options auto-bind from configuration; defaults safe for Development
 builder.Services.AddMongoAdapter();
 
-// Controllers; include TestProvider controllers for dev auth flows
-builder.Services.AddControllers()
-    .AddApplicationPart(typeof(Sora.Web.Auth.TestProvider.Controllers.StaticController).Assembly);
+// Controllers; Sora auto-registrars wire authentication; TestProvider will attach itself in Development
+builder.Services.AddControllers();
 
 // Authorization with role-based policies
 builder.Services.AddAuthorization(options =>
@@ -74,8 +72,7 @@ app.UseAuthorization();
 app.UseStaticFiles();
 app.MapControllers();
 
-// Map TestProvider endpoints (honors RouteBase; default /.testoauth)
-app.MapSoraTestProviderEndpoints();
+// TestProvider endpoints are auto-mapped by its auto-registrar when enabled.
 
 // SPA fallback for client-side routing
 app.MapFallbackToFile("index.html");
