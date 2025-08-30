@@ -118,6 +118,8 @@
       href: WEB-0046-entity-capabilities-short-endpoints-and-set-routing.md
     - name: Capability authorization — fallback and defaults
       href: WEB-0047-capability-authorization-fallback-and-defaults.md
+    - name: Role attribution layer — claims transformation
+      href: WEB-0049-role-attribution-layer-and-claims-transformation.md
 - name: Messaging (MESS)
   items:
     - name: Messaging capabilities and negotiation
