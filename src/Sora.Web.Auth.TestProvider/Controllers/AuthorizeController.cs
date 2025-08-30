@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Web.Auth.TestProvider.Infrastructure;
 using Sora.Web.Auth.TestProvider.Options;
+using System.Web;
 
 namespace Sora.Web.Auth.TestProvider.Controllers;
 
@@ -23,96 +24,26 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
         // Render simple HTML form when no user cookie (prompt=login just ensures the prompt appears in that case).
         if (!Request.Cookies.TryGetValue("_tp_user", out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
         {
-            var html = $$"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sora TestProvider — Sign in</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <link href="/styles.css" rel="stylesheet">
-  <script>tailwind.config = { theme: { extend: { colors: { slate: { 950: '#020617' } } } } };</script>
-  <style>
-    .card { background: linear-gradient(180deg, rgba(15,23,42,1) 0%, rgba(2,6,23,1) 100%); }
-  </style>
-  </head>
-<body class="bg-slate-950 text-white min-h-screen flex flex-col">
-  <header class="bg-slate-900 border-b border-slate-800">
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
-        <a href="/" class="flex items-center space-x-3" title="Home">
-          <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-            <i class="fas fa-satellite-dish text-white text-sm"></i>
-          </div>
-          <h1 class="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Sora — Sign in</h1>
-        </a>
-      </div>
-    </div>
-  </header>
-
-  <main class="flex-1 flex items-center justify-center px-4 py-10">
-    <div class="w-full max-w-md card rounded-2xl border border-slate-800 shadow-2xl p-6">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-          <i class="fa-regular fa-user text-white"></i>
-        </div>
-        <div>
-          <div class="text-xl font-semibold">Sign in</div>
-          <div class="text-sm text-gray-400">Development Test Provider</div>
-        </div>
-      </div>
-
-      <form id="f" class="space-y-4">
-        <div>
-          <label for="u" class="block text-sm text-gray-300 mb-1">Name</label>
-          <input id="u" class="w-full bg-slate-900 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Jane Doe" />
-        </div>
-        <div>
-          <label for="e" class="block text-sm text-gray-300 mb-1">Email</label>
-          <input id="e" type="email" class="w-full bg-slate-900 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="jane@example.com" />
-        </div>
-        <button type="submit" class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium">Continue</button>
-      </form>
-
-      <p class="text-xs text-gray-500 mt-4">Local-only auth for development. Do not enable in production.</p>
-    </div>
-  </main>
-
-  <footer class="border-t border-slate-800 py-6 text-center text-sm text-gray-500">
-    Powered by Sora · TestProvider
-  </footer>
-
-  <script>
-    const u = document.getElementById('u');
-    const e = document.getElementById('e');
-    // Prefill from previous values
-    u.value = localStorage.getItem('tp_u')||'';
-    e.value = localStorage.getItem('tp_e')||'';
-    document.getElementById('f').addEventListener('submit', ev => {
-      ev.preventDefault();
-      // Persist for convenience
-      localStorage.setItem('tp_u', u.value);
-      localStorage.setItem('tp_e', e.value);
-      // Issue simple cookie consumed by TestProvider on reload
-      document.cookie = `_tp_user=${encodeURIComponent(u.value)}|${encodeURIComponent(e.value)}; path=/`;
-      // Reload to complete authorize flow (server will redirect when cookie is present)
-      location.reload();
-    });
-  </script>
-  <noscript>Enable JavaScript.</noscript>
-</body>
-</html>
-""";
-            return new ContentResult { ContentType = "text/html", Content = html };
+      // Serve a dedicated static HTML to keep SoC clean
+            var url = o.RouteBase.TrimEnd('/') + "/login.html";
+            var qlogin = HttpUtility.ParseQueryString(string.Empty);
+            qlogin["client_id"] = client_id;
+            qlogin["redirect_uri"] = redirect_uri;
+            if (!string.IsNullOrWhiteSpace(scope)) qlogin["scope"] = scope;
+            if (!string.IsNullOrWhiteSpace(state)) qlogin["state"] = state;
+            if (!string.IsNullOrWhiteSpace(code_challenge)) qlogin["code_challenge"] = code_challenge;
+            if (!string.IsNullOrWhiteSpace(code_challenge_method)) qlogin["code_challenge_method"] = code_challenge_method;
+            var sep = url.Contains('?') ? "&" : "?";
+            return Redirect(url + sep + qlogin.ToString());
         }
 
         // At this point userCookie is present and non-empty.
         var decoded = Uri.UnescapeDataString(userCookie ?? string.Empty);
         var parts = decoded.Split('|');
         var profile = new UserProfile(parts.ElementAtOrDefault(0) ?? "dev", parts.ElementAtOrDefault(1) ?? "dev@example.com", null);
-        var code = store.IssueCode(profile, TimeSpan.FromMinutes(5), code_challenge);
+    // Parse roles/perms/claims from query
+    var (roles, perms, extraClaims) = ParseExtras(o);
+    var code = store.IssueCode(profile, TimeSpan.FromMinutes(5), code_challenge, roles, perms, extraClaims);
         var uri = new UriBuilder(redirect_uri);
         var q = System.Web.HttpUtility.ParseQueryString(uri.Query);
         q["code"] = code; if (!string.IsNullOrWhiteSpace(state)) q["state"] = state;
@@ -120,4 +51,47 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
         logger.LogDebug("TestProvider authorize: issuing code and redirecting to {Redirect}", uri.ToString());
         return Redirect(uri.ToString());
     }
+
+  private (ISet<string> Roles, ISet<string> Permissions, IDictionary<string, string[]> Claims) ParseExtras(TestProviderOptions o)
+  {
+    var roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var perms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var claims = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+    var query = HttpUtility.ParseQueryString(Request.QueryString.Value ?? string.Empty);
+    void takeCsv(string? csv, ISet<string> set, int cap)
+    {
+      if (string.IsNullOrWhiteSpace(csv)) return;
+      foreach (var raw in csv.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+      {
+        if (set.Count >= cap) break;
+        set.Add(raw);
+      }
+    }
+
+    takeCsv(query.Get("roles") ?? query.Get("sora.roles"), roles, o.MaxRoles);
+    takeCsv(query.Get("perms") ?? query.Get("permissions") ?? query.Get("sora.permissions"), perms, o.MaxPermissions);
+
+    foreach (var key in query.AllKeys ?? Array.Empty<string>())
+    {
+      if (string.IsNullOrWhiteSpace(key)) continue;
+      if (!key.StartsWith("claim.", StringComparison.OrdinalIgnoreCase)) continue;
+      var type = key.Substring("claim.".Length);
+      if (string.IsNullOrWhiteSpace(type)) continue;
+      if (!claims.TryGetValue(type, out var list)) { if (claims.Count >= o.MaxCustomClaimTypes) break; claims[type] = list = new List<string>(); }
+      var vals = query.GetValues(key) ?? Array.Empty<string>();
+      foreach (var v in vals)
+      {
+        if (string.IsNullOrWhiteSpace(v)) continue;
+        foreach (var iv in v.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+          if (list.Count >= o.MaxValuesPerClaimType) break;
+          if (!list.Contains(iv)) list.Add(iv);
+        }
+      }
+    }
+
+    var normalized = claims.ToDictionary(k => k.Key, v => v.Value.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), StringComparer.OrdinalIgnoreCase);
+    return (roles, perms, normalized);
+  }
 }

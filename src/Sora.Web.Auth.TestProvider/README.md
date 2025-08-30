@@ -10,6 +10,8 @@ dotnet add package Sylin.Sora.Web.Auth.TestProvider
 
 ## Notes
 - Issues a deterministic ClaimsPrincipal for testing flows.
+- Dev login UI at `/.testoauth/login.html` lets you set roles, permissions, and arbitrary claims; persists to LocalStorage (persona export/import supported).
+- You can also pass extras via query: `roles=admin,author&perms=content:write&claim.department=ENG&claim.scope=read&claim.scope=write`.
 - Use only in non-production environments.
 
 See [`TECHNICAL.md`](TECHNICAL.md) for details.

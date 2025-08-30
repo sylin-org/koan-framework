@@ -84,7 +84,10 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
 
         if (string.IsNullOrWhiteSpace(code)) return Problem(detail: "Missing code.", statusCode: 400);
 
-        string? sub = null; string? name = null; string? picture = null; string claimsJson = "{}";
+    string? sub = null; string? name = null; string? picture = null; string claimsJson = "{}";
+    string[] mappedRoles = Array.Empty<string>();
+    string[] mappedPerms = Array.Empty<string>();
+    List<KeyValuePair<string, string>> mappedExtras = new();
         if (type == AuthConstants.Protocols.OAuth2)
         {
             // Exchange code for token
@@ -138,6 +141,30 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
             if (!string.IsNullOrWhiteSpace(displayName)) name = displayName;
             picture = userObj.Value<string>("picture") ?? userObj.Value<string>("avatar");
             if (string.IsNullOrWhiteSpace(sub)) sub = name ?? "user";
+
+            // Optional roles/permissions/claims from userinfo (dev providers)
+            var rolesArr = userObj["roles"] as Newtonsoft.Json.Linq.JArray;
+            if (rolesArr != null) mappedRoles = rolesArr.Select(t => t?.ToString() ?? string.Empty).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            var permsArr = userObj["permissions"] as Newtonsoft.Json.Linq.JArray;
+            if (permsArr != null) mappedPerms = permsArr.Select(t => t?.ToString() ?? string.Empty).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            var extra = userObj["claims"] as Newtonsoft.Json.Linq.JObject;
+            if (extra != null)
+            {
+                foreach (var prop in extra.Properties())
+                {
+                    if (prop.Value is Newtonsoft.Json.Linq.JArray arr)
+                    {
+                        foreach (var v in arr)
+                        {
+                            var s = v?.ToString(); if (!string.IsNullOrWhiteSpace(s)) mappedExtras.Add(new(prop.Name, s));
+                        }
+                    }
+                    else
+                    {
+                        var s = prop.Value?.ToString(); if (!string.IsNullOrWhiteSpace(s)) mappedExtras.Add(new(prop.Name, s));
+                    }
+                }
+            }
         }
         else if (type == AuthConstants.Protocols.Oidc)
         {
@@ -156,6 +183,19 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
         };
         if (!string.IsNullOrWhiteSpace(name)) claims.Add(new Claim(ClaimTypes.Name, name));
         if (!string.IsNullOrWhiteSpace(picture)) claims.Add(new Claim("picture", picture));
+        // Map roles/permissions/extra claims
+        if (mappedRoles.Length > 0)
+        {
+            foreach (var r in mappedRoles) claims.Add(new Claim(ClaimTypes.Role, r));
+        }
+        if (mappedPerms.Length > 0)
+        {
+            foreach (var p in mappedPerms) claims.Add(new Claim("sora.permission", p));
+        }
+        if (mappedExtras.Count > 0)
+        {
+            foreach (var kv in mappedExtras) claims.Add(new Claim(kv.Key, kv.Value));
+        }
         var identity = new ClaimsIdentity(claims, AuthenticationExtensions.CookieScheme);
         await HttpContext.SignInAsync(AuthenticationExtensions.CookieScheme, new ClaimsPrincipal(identity));
         logger.LogDebug("Auth sign-in succeeded for provider={Provider} userId={UserId} host={Host}", provider, sub ?? "(unknown)", HttpContext.Request.Host.Value);
