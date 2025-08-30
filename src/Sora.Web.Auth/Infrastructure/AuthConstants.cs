@@ -30,4 +30,11 @@ public static class AuthConstants
         public const string OAuth2 = "oauth2";
         public const string Saml = "saml";
     }
+
+    // Development helpers used by first-party samples/providers
+    public static class Dev
+    {
+        // Name of the lightweight persona cookie used by the TestProvider during development
+        public const string TestProviderCookieUser = "_tp_user";
+    }
 }

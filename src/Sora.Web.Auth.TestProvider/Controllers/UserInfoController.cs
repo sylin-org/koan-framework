@@ -5,11 +5,9 @@ using Sora.Web.Auth.TestProvider.Infrastructure;
 
 namespace Sora.Web.Auth.TestProvider.Controllers;
 
-[ApiController]
 public sealed class UserInfoController(DevTokenStore store, IHostEnvironment env, ILogger<UserInfoController> logger) : ControllerBase
 {
     [HttpGet]
-    [Route(".testoauth/userinfo")]
     public IActionResult UserInfo()
     {
         if (!env.IsDevelopment()) return NotFound(); // extra guard

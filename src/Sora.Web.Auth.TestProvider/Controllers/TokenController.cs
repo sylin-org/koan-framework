@@ -7,13 +7,11 @@ using Sora.Web.Auth.TestProvider.Options;
 
 namespace Sora.Web.Auth.TestProvider.Controllers;
 
-[ApiController]
 public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, IHostEnvironment env, ILogger<TokenController> logger) : ControllerBase
 {
     public sealed record TokenRequest(string grant_type, string code, string redirect_uri, string client_id, string? client_secret, string? code_verifier);
 
     [HttpPost]
-    [Route(".testoauth/token")]
     public IActionResult Token([FromForm] TokenRequest req)
     {
         var o = opts.Value;

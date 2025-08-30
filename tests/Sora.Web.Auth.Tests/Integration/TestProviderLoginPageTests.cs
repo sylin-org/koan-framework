@@ -1,11 +1,12 @@
 using System.Net;
-using System.Net.Http;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using System.Threading.Tasks;
 using Xunit;
+using Sora.Web.Auth.TestProvider.Extensions;
 
 namespace Sora.Web.Auth.Tests.Integration;
 
@@ -15,6 +16,7 @@ public class TestProviderLoginPageTests
     public async Task LoginHtml_IsReachable_And_HasTitle()
     {
         var builder = new WebHostBuilder()
+            .UseEnvironment("Development")
             .UseTestServer()
             .ConfigureServices(s =>
             {
@@ -25,11 +27,11 @@ public class TestProviderLoginPageTests
             .Configure(app =>
             {
                 app.UseRouting();
-                app.UseEndpoints(e => e.MapControllers());
+                app.UseEndpoints(e => e.MapSoraTestProviderEndpoints());
             });
 
-        using var host = await new TestServer(builder).Host.StartAsync();
-        var client = host.GetTestClient();
+    using var server = new TestServer(builder);
+    var client = server.CreateClient();
         var resp = await client.GetAsync("/.testoauth/login.html");
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         Assert.StartsWith("text/html", resp.Content.Headers.ContentType?.MediaType);

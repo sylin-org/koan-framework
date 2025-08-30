@@ -215,10 +215,14 @@ Challenge query parameters
 
 ### Development TestProvider specifics
 
-- Endpoints (internal exchange): `/.testoauth/authorize`, `/.testoauth/token`, `/.testoauth/userinfo`.
+- Endpoints (internal exchange): `{RouteBase}/authorize`, `{RouteBase}/token`, `{RouteBase}/userinfo` (default RouteBase is `/.testoauth`).
 - "Remembered user" cookie: the TestProvider stores a lightweight `_tp_user` cookie to streamline subsequent logins during development.
 - Logout integration: the central logout endpoint also deletes `_tp_user` so a subsequent login does not silently auto-sign-in. This keeps Dev behavior predictable for demos and tests.
 - UI guidance (samples): sample UIs may add `&prompt=login` to challenge URLs to encourage an explicit form the first time after logout; providers may still choose to bypass the form when a remembered session exists.
+
+Redirect whitelist and PKCE
+- Configure `Sora:Web:Auth:TestProvider:AllowedRedirectUris` to allow redirects. Absolute entries must match exactly; relative entries must start with `/` and match the redirect path exactly.
+- When `code_challenge_method` is provided to authorize, only `S256` is accepted.
 
 ## Examples: Discovery and profile payloads
 

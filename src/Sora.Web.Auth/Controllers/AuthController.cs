@@ -144,28 +144,8 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
             if (string.IsNullOrWhiteSpace(sub)) sub = name ?? "user";
 
             // Optional roles/permissions/claims from userinfo (dev providers)
-            var rolesArr = userObj["roles"] as Newtonsoft.Json.Linq.JArray;
-            if (rolesArr != null) mappedRoles = rolesArr.Select(t => t?.ToString() ?? string.Empty).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            var permsArr = userObj["permissions"] as Newtonsoft.Json.Linq.JArray;
-            if (permsArr != null) mappedPerms = permsArr.Select(t => t?.ToString() ?? string.Empty).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            var extra = userObj["claims"] as Newtonsoft.Json.Linq.JObject;
-            if (extra != null)
-            {
-                foreach (var prop in extra.Properties())
-                {
-                    if (prop.Value is Newtonsoft.Json.Linq.JArray arr)
-                    {
-                        foreach (var v in arr)
-                        {
-                            var s = v?.ToString(); if (!string.IsNullOrWhiteSpace(s)) mappedExtras.Add(new(prop.Name, s));
-                        }
-                    }
-                    else
-                    {
-                        var s = prop.Value?.ToString(); if (!string.IsNullOrWhiteSpace(s)) mappedExtras.Add(new(prop.Name, s));
-                    }
-                }
-            }
+            var (r, p, ex) = Infrastructure.UserInfoMapper.Map(userObj);
+            mappedRoles = r; mappedPerms = p; mappedExtras = ex;
         }
         else if (type == AuthConstants.Protocols.Oidc)
         {
@@ -227,8 +207,8 @@ public sealed class AuthController(IProviderRegistry registry, IHttpClientFactor
     {
         // Sign out of cookie auth
         await HttpContext.SignOutAsync(AuthenticationExtensions.CookieScheme);
-        // Best-effort: also clear the local dev TestProvider cookie to avoid silent re-login loops
-    try { Response.Cookies.Append("_tp_user", string.Empty, new CookieOptions { Expires = DateTimeOffset.UnixEpoch, Path = "/", SameSite = SameSiteMode.Lax, HttpOnly = false, Secure = Request.IsHttps }); } catch { /* ignore */ }
+    // Best-effort: also clear the local dev TestProvider cookie to avoid silent re-login loops
+    try { Response.Cookies.Append(Infrastructure.AuthConstants.Dev.TestProviderCookieUser, string.Empty, new CookieOptions { Expires = DateTimeOffset.UnixEpoch, Path = "/", SameSite = SameSiteMode.Lax, HttpOnly = false, Secure = Request.IsHttps }); } catch { /* ignore */ }
         var allowed = authOptions.Value.ReturnUrl.AllowList ?? Array.Empty<string>();
         var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
         var ru = SanitizeReturnUrl(returnUrl, allowed, def);

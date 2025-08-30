@@ -8,6 +8,7 @@ public sealed class TestProviderOptions
     public string ClientId { get; init; } = "test-client";
     public string ClientSecret { get; init; } = "test-secret";
     public bool ExposeInDiscoveryOutsideDevelopment { get; init; } = false;
+    public string[] AllowedRedirectUris { get; init; } = Array.Empty<string>();
 
     // Caps and DX knobs
     public int MaxRoles { get; init; } = 256; // align with Sora.Web.Auth.Roles default

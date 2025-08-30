@@ -6,11 +6,9 @@ using System.Reflection;
 
 namespace Sora.Web.Auth.TestProvider.Controllers;
 
-[ApiController]
 public sealed class StaticController(IHostEnvironment env, IOptionsSnapshot<TestProviderOptions> opts) : ControllerBase
 {
     [HttpGet]
-    [Route(".testoauth/login.html")]
     public IActionResult LoginPage()
     {
         var o = opts.Value;
