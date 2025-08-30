@@ -49,3 +49,24 @@ Examples (snippets)
 
 See also
 - Decisions: ARCH-0053, DATA-0061, DATA-0030, ARCH-0040, DX-0038
+
+## Dapr runtime provider
+
+When you add a reference to `Sora.Flow.Runtime.Dapr`, the DI container prefers the Dapr-backed runtime over the in-memory default. No additional wiring is required.
+
+Minimal configuration hints (subject to change as the runtime evolves):
+- DAPR_HTTP_PORT / DAPR_GRPC_PORT: provide when running sidecar.
+- State components and workflow configuration are owned by the app; Flow does not create them.
+- Flow uses standard Entity statics for data. The runtime enqueues ProjectionTask entities as needed.
+
+## Minimal E2E sample
+
+1) Post an intake record
+  - POST /intake/records with JSON: { "sourceId": "crm", "occurredAt": "2025-08-30T12:00:00Z", "payload": { "id": "u1" } }
+2) Trigger a replay (enqueue projection tasks for references that need projection)
+  - POST /admin/replay
+3) Query a view page
+  - GET /views/canonical?page=1&size=50
+
+Notes
+- View data shape is domain-specific; examples use `object` for simplicity. Use `ProjectionView<T>` with per-view sets for typed projections.
