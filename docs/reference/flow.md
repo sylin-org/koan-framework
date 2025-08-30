@@ -18,7 +18,7 @@ Key entities and first-class statics
 Routes (controllers only)
 - POST /intake/records
 - GET /views/{view}/{referenceId}
-- GET /views/{view}?q=...
+- GET /views/{view}?q=...&page=1&size=50 → returns { page, size, total?, hasNext, items }
 - GET /lineage/{referenceId}
 - GET/PUT /policies
 - POST /admin/replay, /admin/reproject
@@ -50,6 +50,11 @@ Examples (snippets)
 
 See also
 - Decisions: ARCH-0053, DATA-0061, DATA-0030, ARCH-0040, DX-0038
+
+## Running with Dapr (notes)
+- Add a reference to `Sora.Flow.Runtime.Dapr` to prefer the Dapr runtime.
+- Start your app with a Dapr sidecar (set DAPR_HTTP_PORT/GRPC). Flow doesn’t create components; use your existing state/workflow components.
+- Replay will enqueue ProjectionTask for references that require projection; the ProjectionWorker will materialize views.
 
 ## Dapr runtime provider
 

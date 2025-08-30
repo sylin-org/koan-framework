@@ -26,26 +26,19 @@ public sealed class ViewsController : ControllerBase
         {
             // Filter within the per-view set
             var results = await ProjectionView<object>.Query(q!, view, ct);
-            // naive in-memory paging for filtered queries
             var total = results.Count;
             var skip = (p - 1) * s;
             var pageItems = results.Skip(skip).Take(s).ToList();
-            return Ok(new { page = p, size = s, total, items = pageItems });
+            var hasNext = skip + pageItems.Count < total;
+            return Ok(new { page = p, size = s, total, hasNext, items = pageItems });
         }
 
-        // Unfiltered: page within the per-view set if supported. Fall back to Query + slice
-        try
+        // Unfiltered: page within the per-view set.
+        using (Sora.Data.Core.DataSetContext.With(view))
         {
-            var paged = await ProjectionView<object>.Page(p, s, ct);
-            return Ok(paged);
-        }
-        catch
-        {
-            var results = await ProjectionView<object>.Query("true", view, ct);
-            var total = results.Count;
-            var skip = (p - 1) * s;
-            var pageItems = results.Skip(skip).Take(s).ToList();
-            return Ok(new { page = p, size = s, total, items = pageItems });
+            var items = await ProjectionView<object>.Page(p, s, ct);
+            var hasNext = items.Count == s; // heuristic
+            return Ok(new { page = p, size = s, hasNext, items });
         }
     }
 }
