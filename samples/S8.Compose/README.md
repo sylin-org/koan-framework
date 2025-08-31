@@ -10,12 +10,12 @@ docke compose up --build
 ```
 
 Services:
-- MongoDB: localhost:27017
-- RabbitMQ: AMQP at localhost:5672; Management UI at http://localhost:15672 (guest/guest)
-- S8 Flow API: http://localhost:5108
+- MongoDB: localhost:4900 -> container 27017
+- RabbitMQ: AMQP at localhost:4901 -> 5672; Management UI at http://localhost:4902 -> 15672 (guest/guest)
+- S8 Flow API: http://localhost:4903
   - Health: GET /api/health
   - Views: GET /views/canonical, /views/lineage (from Sora.Flow.Web)
-  - Static monitor: http://localhost:5108/
+  - Static monitor: http://localhost:4903/
 
 Notes:
 - API uses Sora.Data.Mongo in containers (no filesystem JSON store).

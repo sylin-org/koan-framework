@@ -9,7 +9,7 @@ services:
       timeout: 5s
       retries: 10
     ports:
-      - "27017:27017"
+      - "4900:27017"
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -18,8 +18,8 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5672:5672"   # AMQP
-      - "15672:15672" # Mgmt UI
+      - "4901:5672"    # AMQP
+      - "4902:15672"   # Mgmt UI
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -31,13 +31,13 @@ services:
       context: ../..
       dockerfile: samples/S8.Flow.Api/Dockerfile
     environment:
-      ASPNETCORE_URLS: http://+:5108
+      ASPNETCORE_URLS: http://+:4903
       # Use Mongo in containers
       ConnectionStrings__Default: mongodb://mongo:27017
       Sora__Data__Mongo__Database: s8
       # Messaging via rabbit (defaults handle provisioning/subscription)
       Sora__Messaging__DefaultGroup: flow
-      ConnectionStrings__rabbitmq: amqp://guest:guest@rabbitmq:5672
+  ConnectionStrings__rabbitmq: amqp://guest:guest@rabbitmq:5672
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_ENVIRONMENT: Development
     depends_on:
@@ -46,7 +46,7 @@ services:
       rabbitmq:
         condition: service_healthy
     ports:
-      - "5108:5108"
+      - "4903:4903"
     command: ["dotnet", "S8.Flow.Api.dll"]
 
   adapter-bms:
