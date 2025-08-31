@@ -22,12 +22,23 @@ internal sealed class MessageBusSelector : IMessageBusSelector
 
     public IMessageBus Resolve(IServiceProvider sp, string busCode)
     {
-        var selected = _factories
+        // Pick factory by looking for a matching provider-specific section under the bus
+        // Example: Sora:Messaging:Buses:{code}:RabbitMq exists -> use RabbitMq factory
+        var sectionPath = $"{Constants.Configuration.Buses}:{busCode}";
+        var busSection = _cfg.GetSection(sectionPath);
+        IMessageBusFactory? selected = null;
+        if (busSection.GetSection("RabbitMq").Exists())
+        {
+            selected = _factories.FirstOrDefault(f => string.Equals(f.ProviderName, "RabbitMq", StringComparison.OrdinalIgnoreCase));
+        }
+        // Fallback: prefer RabbitMq if available for better OOTB experience
+        selected ??= _factories.FirstOrDefault(f => string.Equals(f.ProviderName, "RabbitMq", StringComparison.OrdinalIgnoreCase));
+        // Finally: highest priority
+        selected ??= _factories
             .OrderByDescending(f => f.ProviderPriority)
             .ThenBy(f => f.ProviderName)
             .FirstOrDefault();
         if (selected is null) throw new InvalidOperationException("No messaging providers registered.");
-        var sectionPath = $"{Constants.Configuration.Buses}:{busCode}";
         var (bus, caps) = selected.Create(_sp, busCode, _cfg.GetSection(sectionPath));
         // Diagnostics are registered by providers when creating the bus
         return bus;

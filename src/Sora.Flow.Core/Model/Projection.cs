@@ -13,7 +13,7 @@ public sealed class ProjectionTask : Entity<ProjectionTask>
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
-public sealed class ProjectionView<TView> : Entity<ProjectionView<TView>>
+public class ProjectionView<TView> : Entity<ProjectionView<TView>>
 {
     [Index]
     public string ReferenceId { get; set; } = default!;
@@ -27,3 +27,10 @@ public sealed class ProjectionView<TView> : Entity<ProjectionView<TView>>
         public static string Of(string viewName) => viewName;
     }
 }
+
+// Strongly-typed view documents to ensure Mongo can serialize view payloads
+// Canonical view: tag -> [values]
+public sealed class CanonicalProjectionView : ProjectionView<Dictionary<string, string[]>> { }
+
+// Lineage view: tag -> value -> [sources]
+public sealed class LineageProjectionView : ProjectionView<Dictionary<string, Dictionary<string, string[]>>> { }

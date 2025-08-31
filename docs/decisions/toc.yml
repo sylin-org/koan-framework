@@ -98,6 +98,8 @@
       href: DATA-0004-index-anchoring-and-json-mapping.md
 - name: Web (WEB)
   items:
+    - name: S8 Flow IoT sample and SSE monitor
+      href: WEB-0050-s8-flow-iot-sample-and-sse-monitor.md
     - name: Web templates and rate limiters
       href: WEB-0012-web-templates-and-rate-limiters.md
     - name: GraphQL module and controller

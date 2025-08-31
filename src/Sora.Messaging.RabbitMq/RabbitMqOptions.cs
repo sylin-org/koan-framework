@@ -14,6 +14,7 @@ internal sealed class RabbitMqOptions
     public int Prefetch { get; set; } = 50;
     public DlqOptions Dlq { get; set; } = new();
     public RetryOptions Retry { get; set; } = new();
+    // When true, provision exchanges/queues/bindings at startup. Default is false, but factory will enable safe defaults in dev if unspecified.
     public bool ProvisionOnStart { get; set; } = false;
     public ProvisioningMode? ProvisionMode { get; set; }
     public List<SubscriptionOption> Subscriptions { get; set; } = new();

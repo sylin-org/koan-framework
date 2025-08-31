@@ -1,0 +1,77 @@
+﻿version: '3.9'
+services:
+  mongo:
+    image: mongo:7
+    container_name: s8-mongo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "27017:27017"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: s8-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Mgmt UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../..
+      dockerfile: samples/S8.Flow.Api/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:5108
+      # Use Mongo in containers
+      ConnectionStrings__Default: mongodb://mongo:27017
+      Sora__Data__Mongo__Database: s8
+      # Messaging via rabbit (defaults handle provisioning/subscription)
+      Sora__Messaging__DefaultGroup: flow
+      ConnectionStrings__rabbitmq: amqp://guest:guest@rabbitmq:5672
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_ENVIRONMENT: Development
+      # Enable Swagger/static with proxy-friendly settings if applicable
+      Sora__Web__IsProxiedApi: "true"
+      Sora__Web__Swagger__Enabled: "true"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "5108:5108"
+    command: ["dotnet", "S8.Flow.Api.dll"]
+
+  adapter-bms:
+    build:
+      context: ../..
+      dockerfile: samples/S8.Flow.Adapters.Bms/Dockerfile
+    environment:
+      ConnectionStrings__rabbitmq: amqp://guest:guest@rabbitmq:5672
+      DOTNET_ENVIRONMENT: Development
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    command: ["dotnet", "S8.Flow.Adapters.Bms.dll"]
+
+  adapter-oem:
+    build:
+      context: ../..
+      dockerfile: samples/S8.Flow.Adapters.Oem/Dockerfile
+    environment:
+      ConnectionStrings__rabbitmq: amqp://guest:guest@rabbitmq:5672
+      DOTNET_ENVIRONMENT: Development
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    command: ["dotnet", "S8.Flow.Adapters.Oem.dll"]

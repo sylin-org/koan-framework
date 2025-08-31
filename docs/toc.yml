@@ -61,6 +61,10 @@
       href: reference/config-and-constants.md
     - name: Adapter Matrix
       href: reference/adapter-matrix.md
+ - name: Modules
+   items:
+     - name: S8.Flow — IoT Monitor
+       href: modules/s8-flow-iot-monitor.md
 - name: Feature Catalog
   href: feature-catalog.md
 - name: Guides

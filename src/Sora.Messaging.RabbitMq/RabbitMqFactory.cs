@@ -56,11 +56,25 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         // Keep existing list if already populated by other means
         if (opts.Subscriptions.Count == 0)
         {
-            var rkCsv = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:RoutingKeys", null);
-            var name = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Name", null);
-            var queue = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Queue", null);
+            // Prefer nested under RabbitMq:Subscriptions
+            var rkCsv = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:RoutingKeys", null)
+                      ?? Configuration.Read<string?>(cfg, "Subscriptions:0:RoutingKeys", null);
+            var name = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Name", null)
+                     ?? Configuration.Read<string?>(cfg, "Subscriptions:0:Name", null);
+            var queue = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Queue", null)
+                      ?? Configuration.Read<string?>(cfg, "Subscriptions:0:Queue", null);
             var dlq = Configuration.Read(cfg, "RabbitMq:Subscriptions:0:Dlq", true);
+            if (dlq == true && string.IsNullOrWhiteSpace(Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Dlq", null)))
+            {
+                // fallback from bus-level too
+                dlq = Configuration.Read(cfg, "Subscriptions:0:Dlq", true);
+            }
             var concurrency = Math.Max(1, Configuration.Read(cfg, "RabbitMq:Subscriptions:0:Concurrency", 1));
+            if (concurrency == 1 && string.IsNullOrWhiteSpace(Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Concurrency", null)))
+            {
+                concurrency = Math.Max(1, Configuration.Read(cfg, "Subscriptions:0:Concurrency", 1));
+            }
+
             if (!string.IsNullOrWhiteSpace(rkCsv) || !string.IsNullOrWhiteSpace(name) || !string.IsNullOrWhiteSpace(queue))
             {
                 opts.Subscriptions.Add(new SubscriptionOption
@@ -81,8 +95,9 @@ public sealed class RabbitMqFactory : IMessageBusFactory
             ?? opts.ConnectionString;
         if (string.IsNullOrWhiteSpace(connStr) && !string.IsNullOrWhiteSpace(opts.ConnectionStringName))
             connStr = configRoot?["ConnectionStrings:" + opts.ConnectionStringName];
+        // Dev-friendly fallback: assume local broker if not specified
         if (string.IsNullOrWhiteSpace(connStr))
-            throw new InvalidOperationException($"RabbitMq bus '{busCode}' requires ConnectionString or ConnectionStringName.");
+            connStr = "amqp://guest:guest@localhost:5672/";
         // keep on options for inspector parsing
         opts.ConnectionString = connStr;
 
@@ -127,6 +142,12 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         var msgOptsAccessor = sp.GetService(typeof(IOptions<MessagingOptions>)) as IOptions<MessagingOptions>;
         var msgOpts = msgOptsAccessor?.Value ?? new MessagingOptions();
         var provisioner = new RabbitMqProvisioner();
+        // Default subscription if none configured and provisioning is on; subscribe catch-all to DefaultGroup
+        if (opts.Subscriptions.Count == 0 && mode != ProvisioningMode.Off)
+        {
+            var effectiveGroup = string.IsNullOrWhiteSpace(msgOpts.DefaultGroup) ? "workers" : msgOpts.DefaultGroup;
+            opts.Subscriptions.Add(new SubscriptionOption { Name = effectiveGroup, RoutingKeys = new[] { "#" }, Dlq = true, Concurrency = 1 });
+        }
         var desired = provisioner.Plan(busCode, msgOpts.DefaultGroup, opts, new RabbitMqCapabilities(), sp.GetService(typeof(ITypeAliasRegistry)) as ITypeAliasRegistry);
         CurrentTopology current = new(Array.Empty<ExchangeSpec>(), Array.Empty<QueueSpec>(), Array.Empty<BindingSpec>());
         if (mode != ProvisioningMode.Off && mode != ProvisioningMode.CreateIfMissing)

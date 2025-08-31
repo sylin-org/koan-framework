@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,11 @@ namespace Sora.Flow;
 
 public static class ServiceCollectionExtensions
 {
+    // Serialize writes for JSON adapter to avoid file sharing collisions
+    private static readonly SemaphoreSlim s_refItemLock = new(1, 1);
+    private static readonly SemaphoreSlim s_projTaskLock = new(1, 1);
+    private static readonly SemaphoreSlim s_keyIndexLock = new(1, 1);
+
     // Shared helper: normalize a dynamic payload (Dictionary or JObject) into a dictionary
     private static IDictionary<string, object>? ExtractDict(object? payload)
     {
@@ -42,6 +48,21 @@ public static class ServiceCollectionExtensions
             return dict;
         }
         return null;
+    }
+
+    // Shared tiny IO retry helper for transient file sharing errors (JSON dev adapter)
+    internal static async Task RetryIoAsync(Func<Task> action, CancellationToken ct)
+    {
+        var attempts = 0;
+        while (true)
+        {
+            try { await action(); return; }
+            catch (IOException) when (attempts < 3)
+            {
+                attempts++;
+                await Task.Delay(TimeSpan.FromMilliseconds(50 * attempts), ct);
+            }
+        }
     }
     public static IServiceCollection AddSoraFlow(this IServiceCollection services)
     {
@@ -208,18 +229,33 @@ public static class ServiceCollectionExtensions
                                 }
                             }
 
-                            var canonicalView = canonical.ToDictionary(kv => kv.Key, kv => (object)kv.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
-                            var lineageView = lineage.ToDictionary(kv => kv.Key, kv => (object)kv.Value.ToDictionary(x => x.Key, x => (IEnumerable<string>)x.Value.ToArray(), StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+                            var canonicalView = canonical.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
+                            var lineageView = lineage.ToDictionary(
+                                kv => kv.Key,
+                                kv => kv.Value.ToDictionary(x => x.Key, x => x.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
+                                StringComparer.OrdinalIgnoreCase);
 
-                            var canonicalDoc = new ProjectionView<object> { Id = $"{Infrastructure.Constants.Views.Canonical}::{task.ReferenceId}", ReferenceId = task.ReferenceId, ViewName = Infrastructure.Constants.Views.Canonical, View = canonicalView };
+                            var canonicalDoc = new CanonicalProjectionView { Id = $"{Infrastructure.Constants.Views.Canonical}::{task.ReferenceId}", ReferenceId = task.ReferenceId, ViewName = Infrastructure.Constants.Views.Canonical, View = canonicalView };
                             await canonicalDoc.Save(Infrastructure.Constants.Views.Canonical, stoppingToken);
 
-                            var lineageDoc = new ProjectionView<object> { Id = $"{Infrastructure.Constants.Views.Lineage}::{task.ReferenceId}", ReferenceId = task.ReferenceId, ViewName = Infrastructure.Constants.Views.Lineage, View = lineageView };
+                            var lineageDoc = new LineageProjectionView { Id = $"{Infrastructure.Constants.Views.Lineage}::{task.ReferenceId}", ReferenceId = task.ReferenceId, ViewName = Infrastructure.Constants.Views.Lineage, View = lineageView };
                             await lineageDoc.Save(Infrastructure.Constants.Views.Lineage, stoppingToken);
 
-                            if (refItem.RequiresProjection) { refItem.RequiresProjection = false; await refItem.Save(stoppingToken); }
+                            if (refItem.RequiresProjection)
+                            {
+                                refItem.RequiresProjection = false;
+                                await s_refItemLock.WaitAsync(stoppingToken);
+                                try { await refItem.Save(stoppingToken); }
+                                finally { s_refItemLock.Release(); }
+                            }
 
-                            await task.Delete(stoppingToken);
+                            // Delete projection task with retry to avoid JSON file share collisions
+                            await s_projTaskLock.WaitAsync(stoppingToken);
+                            try
+                            {
+                                await ServiceCollectionExtensions.RetryIoAsync(() => task.Delete(stoppingToken), stoppingToken);
+                            }
+                            finally { s_projTaskLock.Release(); }
                             processed++;
                         }
 
@@ -345,7 +381,9 @@ public static class ServiceCollectionExtensions
                             var ki = await KeyIndex.Get(val, stoppingToken);
                             if (ki is null)
                             {
-                                await new KeyIndex { AggregationKey = val, ReferenceId = referenceId }.Save(stoppingToken);
+                                await s_keyIndexLock.WaitAsync(stoppingToken);
+                                try { await new KeyIndex { AggregationKey = val, ReferenceId = referenceId }.Save(stoppingToken); }
+                                finally { s_keyIndexLock.Release(); }
                             }
                             else if (!string.Equals(ki.ReferenceId, referenceId, StringComparison.Ordinal))
                             {
@@ -357,10 +395,14 @@ public static class ServiceCollectionExtensions
                         var ri = await ReferenceItem.Get(referenceId, stoppingToken) ?? new ReferenceItem { ReferenceId = referenceId };
                         ri.Version += 1;
                         ri.RequiresProjection = true;
-                        await ri.Save(stoppingToken);
+                        await s_refItemLock.WaitAsync(stoppingToken);
+                        try { await ri.Save(stoppingToken); }
+                        finally { s_refItemLock.Release(); }
 
                         var t = new ProjectionTask { Id = $"{referenceId}::{ri.Version}::{Infrastructure.Constants.Views.Canonical}", ReferenceId = referenceId, Version = ri.Version, ViewName = Infrastructure.Constants.Views.Canonical, CreatedAt = DateTimeOffset.UtcNow };
-                        await t.Save(stoppingToken);
+                        await s_projTaskLock.WaitAsync(stoppingToken);
+                        try { await t.Save(stoppingToken); }
+                        finally { s_projTaskLock.Release(); }
 
                         rec.CorrelationId = referenceId;
                         await rec.Save(Constants.Sets.Keyed, stoppingToken);
@@ -400,5 +442,6 @@ public static class ServiceCollectionExtensions
             // Delete the intake record explicitly from intake set
             await Data<Record, string>.DeleteAsync(rec.Id, Constants.Sets.Intake, ct);
         }
+
     }
 }
