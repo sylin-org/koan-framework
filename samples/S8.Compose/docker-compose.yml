@@ -40,9 +40,6 @@ services:
       ConnectionStrings__rabbitmq: amqp://guest:guest@rabbitmq:5672
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_ENVIRONMENT: Development
-      # Enable Swagger/static with proxy-friendly settings if applicable
-      Sora__Web__IsProxiedApi: "true"
-      Sora__Web__Swagger__Enabled: "true"
     depends_on:
       mongo:
         condition: service_healthy
