@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Sora.Flow.Model;
 using Sora.Flow.Infrastructure;
 using Sora.Data.Mongo;
+using Sora.Messaging.RabbitMq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +30,10 @@ builder.Services.AddMongoAdapter(o =>
     // Prefer ConnectionStrings:Default; database comes from Sora:Data:Mongo:Database (env-provided)
     o.ConnectionString = builder.Configuration.GetConnectionString("Default") ?? o.ConnectionString;
 });
+// Messaging core is required so the bus selector exists and RabbitMQ consumers can start
+builder.Services.AddMessagingCore();
+// Ensure RabbitMQ provider is registered (factory + health + optional inbox discovery)
+builder.Services.AddRabbitMq();
 builder.Services.AddSoraFlow();
 
 builder.Services.Configure<FlowOptions>(o =>
@@ -37,7 +42,11 @@ builder.Services.Configure<FlowOptions>(o =>
     // Our Sensor model carries [AggregationTag(Keys.Sensor.Key)], so this isn't required,
     // but we keep a conservative default for other models.
     o.AggregationTags = new[] { Keys.Sensor.Key };
-    o.PurgeEnabled = false;
+    // Enable purge for VO-heavy workloads and keep keyed retention modest by default
+    o.PurgeEnabled = true;
+    o.KeyedTtl = TimeSpan.FromDays(14);
+    // Keep canonical clean: drop VO tags from canonical/lineage
+    o.CanonicalExcludeTagPrefixes = new[] { "reading.", "sensorreading." };
 });
 
 builder.Services.AddControllers();
@@ -65,12 +74,23 @@ builder.Services.OnMessages(h =>
         await typed.Save(FlowSets.StageShort(FlowSets.Intake));
 
         // Also co-ingest a minimal Device record so Device KeyIndex and projections stay current
+        // IMPORTANT: Only include device-specific fields to avoid polluting Device canonical with sensor/reading data
+        var devicePayload = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Keys.Device.Inventory] = msg.Inventory,
+            [Keys.Device.Serial] = msg.Serial
+        };
+        if (!string.IsNullOrWhiteSpace(msg.Manufacturer)) devicePayload[Keys.Device.Manufacturer] = msg.Manufacturer!;
+        if (!string.IsNullOrWhiteSpace(msg.Model)) devicePayload[Keys.Device.Model] = msg.Model!;
+        if (!string.IsNullOrWhiteSpace(msg.Kind)) devicePayload[Keys.Device.Kind] = msg.Kind!;
+        if (!string.IsNullOrWhiteSpace(msg.Code)) devicePayload[Keys.Device.Code] = msg.Code!;
+
         var deviceRecord = new StageRecord<Device>
         {
             Id = Guid.NewGuid().ToString("n"),
             SourceId = msg.Source,
             OccurredAt = msg.CapturedAt,
-            StagePayload = payload
+            StagePayload = devicePayload
         };
         await deviceRecord.Save(FlowSets.StageShort(FlowSets.Intake));
     });
@@ -93,6 +113,15 @@ try
 {
     var selector = app.Services.GetService<IMessageBusSelector>();
     _ = selector?.ResolveDefault(app.Services);
+}
+catch { /* ignore */ }
+
+// Pre-register known message aliases so the consumer resolves to the exact handler type
+try
+{
+    var aliases = app.Services.GetService<ITypeAliasRegistry>();
+    // Ensure alias mapping for TelemetryEvent points at the same runtime type as our registered handler
+    if (aliases is not null) _ = aliases.GetAlias(typeof(TelemetryEvent));
 }
 catch { /* ignore */ }
 
