@@ -37,7 +37,7 @@ services:
       Sora__Data__Mongo__Database: s8
       # Messaging via rabbit (defaults handle provisioning/subscription)
       Sora__Messaging__DefaultGroup: flow
-  ConnectionStrings__rabbitmq: amqp://guest:guest@rabbitmq:5672
+      ConnectionStrings__rabbitmq: amqp://guest:guest@rabbitmq:5672
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_ENVIRONMENT: Development
     depends_on:
