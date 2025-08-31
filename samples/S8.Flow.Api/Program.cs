@@ -8,10 +8,6 @@ using Sora.Flow.Options;
 using S8.Flow.Shared;
 using Sora.Messaging;
 using S8.Flow.Api.Adapters;
-using Microsoft.Extensions.Logging;
-using Sora.Flow.Model;
-using Sora.Flow.Infrastructure;
-using Sora.Data.Mongo;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,12 +19,6 @@ if (!Sora.Core.SoraEnv.InContainer)
 }
 
 builder.Services.AddSora(); // core + data + health + scheduling
-// Register Mongo data adapter so Data<> resolves 'mongo' provider inside containers
-builder.Services.AddMongoAdapter(o =>
-{
-    // Prefer ConnectionStrings:Default; database comes from Sora:Data:Mongo:Database (env-provided)
-    o.ConnectionString = builder.Configuration.GetConnectionString("Default") ?? o.ConnectionString;
-});
 builder.Services.AddSoraFlow();
 
 builder.Services.Configure<FlowOptions>(o =>
@@ -45,19 +35,15 @@ builder.Services.OnMessages(h =>
 {
     h.On<TelemetryEvent>(async (env, msg) =>
     {
-        var sp = Sora.Core.Hosting.App.AppHost.Current;
-        var log = sp?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
-        log?.CreateLogger("S8.Flow.Api.Handlers")?.LogInformation("TelemetryEvent received from {Source} at {At} (inventory={Inv}, serial={Serial})", msg.Source, msg.CapturedAt, msg.Inventory, msg.Serial);
         var payload = msg.ToPayloadDictionary();
-        // Enqueue into the per-model, typed intake for Device so model-aware workers can process it
-        var typed = new StageRecord<Device>
+        var rec = new Sora.Flow.Model.Record
         {
-            Id = Guid.NewGuid().ToString("n"),
+            RecordId = Guid.NewGuid().ToString("n"),
             SourceId = msg.Source,
             OccurredAt = msg.CapturedAt,
             StagePayload = payload
         };
-        await typed.Save(FlowSets.StageShort(FlowSets.Intake));
+        await rec.Save(Sora.Flow.Infrastructure.Constants.Sets.Intake);
     });
 });
 

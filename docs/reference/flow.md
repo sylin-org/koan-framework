@@ -1,78 +1,96 @@
-﻿# Sora.Flow — Entity-first pipeline (ingest → associate → project)
+﻿# Sora.Flow — Model-typed pipeline (ingest → standardize → key → associate → project)
 
 Contract (at a glance)
-- Inputs: Intake records over HTTP or MQ; options at Sora:Flow.
-- Outputs: Projection views (per-view sets), lineage via ReferenceItem, diagnostics.
-- Error modes: Reject with reason/evidence; DLQs; readiness via health endpoints.
-- Success: Records accepted at /intake/records; projection tasks created and views materialized; lineage and policies queryable.
+- Inputs: Normalized deltas (patch-like) per model over HTTP/MQ; options under Sora:Flow.
+- Outputs: Per-model canonical projections and lineage; processed hot-stage records; diagnostics.
+- Error modes: Rejections with reason/evidence; DLQs; readiness/health.
+- Success: Deltas accepted, keyed and associated; projection tasks drained; canonical and lineage are queryable.
 
-Key entities and first-class statics
-- Record (sets: intake|standardized|keyed): Save(set), All/Query/AllStream/FirstPage/Page
-- KeyIndex (AggregationKey → ReferenceId): Get/Save/TryAssignOwner
-- ReferenceItem (ReferenceId, Version, RequiresProjection): Get/Query/FirstPage/QueryStream
-- ProjectionTask: EnqueueIfAbsent/Query
-- ProjectionView<T>.Set(viewName): Save/Get/Query/AllStream/FirstPage/Page
-- RejectionReport: Save/Query
-- PolicyBundle: GetActive/Put
+Core types (first-class statics)
+- FlowEntity<TModel> : Entity<TModel> — TModel is the canonical shape (e.g., Device)
+- DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>> — normalized transport with Id + JObject Data
+- StageRecord<TModel> : intake | standardized | keyed | processed
+- KeyIndex<TModel> : AggregationKey → ReferenceId
+- ReferenceItem<TModel> : ReferenceId, Version, RequiresProjection
+- ProjectionTask<TModel>
+- ProjectionView<TModel, TView> with per-view sets; CanonicalProjection<TModel>, LineageProjection<TModel>
 
-Routes (controllers only)
-- POST /intake/records
-- GET /views/{view}/{referenceId}
-- GET /views/{view}?q=...&page=1&size=50 → returns { page, size, total?, hasNext, items }
-- GET /lineage/{referenceId}
-- GET/PUT /policies
-- POST /admin/replay, /admin/reproject
+Sets and naming (per model)
+- flow.{model}.intake | standardized | keyed | processed
+- flow.{model}.tasks
+- flow.{model}.views.{view} (e.g., canonical, lineage)
+- Helpers: FlowSets.Stage<TModel>(Stage.Intake), FlowSets.View<TModel>("canonical")
+
+Aggregation (keys)
+- Use attributes on the model to declare aggregation tag paths for association:
+  - [AggregationTag("person.identifier.username")]
+  - [AggregationTag("person.employee.email")]
+- Optionally override/extend via options. Values are extracted from DynamicFlowEntity<TModel>.Data (dotted path, case-insensitive), normalized, and used to update KeyIndex<TModel>.
+
+Normalized transport (patch deltas)
+- DynamicFlowEntity<TModel> carries Data as JObject (or JsonNode) with dotted-path properties from adapters. Deltas merge into TModel via deterministic policy (source priority, timestamp, or custom resolvers). Lineage tracks per-path provenance.
+
+Hot → processed
+- After successful projection, move records out of hot sets (intake/standardized/keyed) to processed (copy+delete) and/or apply TTLs. This reduces seek time on hot collections.
+
+Messaging (per-model isolation)
+- Exchanges/routing keys per model, e.g., sora.flow.device (or routing keys flow.device.intake). Queues are provisioned per group+model. DLQs per stage remain: flow.{stage}.dlq.{model}.
+
+Routes (controllers)
+- GET /models/{model}/views/{view}
+- GET /models/{model}/views/{view}/{referenceId}
+- Legacy /views/* may be absent in new apps. Controllers resolve {model} to the registered type and query CanonicalProjection<TModel>/LineageProjection<TModel> against FlowSets.View<TModel>(view).
 
 Options (Sora:Flow)
-- Concurrency (Standardize/Key/Associate/Project)
-- BatchSize (default 500)
-- TTLs: Intake/Standardized/Keyed=7d; ProjectionTask=7d; RejectionReport=30d
-- PurgeEnabled=true; PurgeInterval=6h (background TTL purge of stage records, tasks, and rejections)
+- Concurrency per stage; BatchSize (default 500)
+- TTLs: Hot=short; Processed=longer/archival
+- PurgeEnabled=true; PurgeInterval=6h (provider-neutral TTL purge)
 - DeadLetterEnabled=true
-- DefaultViewName="canonical"
- - Projection worker: a background poller materializes ProjectionView<T> from ProjectionTask; tuned via BatchSize.
+- Discovery: Auto-discover FlowEntity<T> models via reflection (no source generator). Allow [FlowModel("device")] rename and [FlowIgnore] opt-out; constrain scan scope via options.
 
-Messaging
-- Default delivery is MQ (resilient), using Sora.Messaging.* — do not implement bespoke MQ adapters in Flow code.
-- DLQ names: flow.intake.dlq, flow.standardized.dlq, flow.keyed.dlq, flow.association.dlq, flow.projection.dlq
- - Runtime provider: InMemory by default; when the Dapr runtime package (Sora.Flow.Runtime.Dapr) is referenced, it replaces the default provider automatically via AutoRegistrar.
+Indexing and search
+- KeyIndex<TModel> remains the source of truth for tag→owner lookups.
+- Optional denormalized search terms on Keyed<TModel> (e.g., AggregationTerms: ["person.identifier.username=jdoe"]) can accelerate ad-hoc filters (multikey index in Mongo). Provider adapters may opt-in to additional indexes.
 
-Bootstrap
-- On startup, Flow ensures schemas exist for key entities and sets via data.ensureCreated (idempotent). This covers stage sets (intake/standardized/keyed), associations, tasks, rejections, and policies.
-- Indexes are declared via [Index] attributes on commonly queried fields (SourceId, OccurredAt, CorrelationId, ReferenceId, ViewName, Version). Adapters apply them when supported.
-- TTLs are option-driven defaults and provider-conditional. Flow runs a lightweight, provider-neutral purge loop (configurable) that deletes expired items via Entity statics. For stores with native TTL, prefer configuring TTL at the store; for others, this loop provides a safe baseline.
+Edge cases
+- Missing aggregation values: skip; do not assign keys.
+- Conflicts across sources: resolve via policy; log provenance.
+- High fan-out of tags: cap per record and DLQ excess.
+- Trimming/AOT: reflection-based discovery requires linker hints or a config to limit scan scope.
 
 Examples (snippets)
-- Save an intake record
-  - await new Record { RecordId = Guid.NewGuid().ToString("n"), SourceId = "crm", OccurredAt = DateTimeOffset.UtcNow, StagePayload = payload }.Save("intake", ct)
-- Page projection views
-  - var page = await ProjectionView<UserCanonical>.FirstPage(50, ct); // use Set(viewName) for per-view set operations
+- Define a canonical model
+  - public sealed class Device : FlowEntity<Device> { [AggregationTag("inventory.serial")] public string Serial { get; set; } = default!; }
+- Ingest a normalized delta
+  - await new DynamicFlowEntity<Device> { Id = "dev:123", Data = fromAdapter }.Save(FlowSets.Stage<Device>("intake"), ct);
+- Page canonical view
+  - using (DataSetContext.With(FlowSets.View<Device>("canonical"))) { var page = await CanonicalProjection<Device>.FirstPage(50, ct); }
 
 See also
 - Decisions: ARCH-0053, DATA-0061, DATA-0030, ARCH-0040, DX-0038
 
 ## Running with Dapr (notes)
-- Add a reference to `Sora.Flow.Runtime.Dapr` to prefer the Dapr runtime.
-- Start your app with a Dapr sidecar (set DAPR_HTTP_PORT/GRPC). Flow doesn’t create components; use your existing state/workflow components.
-- Replay will enqueue ProjectionTask for references that require projection; the ProjectionWorker will materialize views.
+- Reference `Sora.Flow.Runtime.Dapr` to prefer the Dapr runtime.
+- Run with a Dapr sidecar (DAPR_HTTP_PORT/GRPC). Flow doesn’t create components.
+- Replay enqueues ProjectionTask<TModel> for references requiring projection.
 
 ## Dapr runtime provider
 
-When you add a reference to `Sora.Flow.Runtime.Dapr`, the DI container prefers the Dapr-backed runtime over the in-memory default. No additional wiring is required.
+When `Sora.Flow.Runtime.Dapr` is referenced, the Dapr-backed runtime replaces the default provider automatically via AutoRegistrar.
 
-Minimal configuration hints (subject to change as the runtime evolves):
-- DAPR_HTTP_PORT / DAPR_GRPC_PORT: provide when running sidecar.
-- State components and workflow configuration are owned by the app; Flow does not create them.
-- Flow uses standard Entity statics for data. The runtime enqueues ProjectionTask entities as needed.
+Minimal configuration hints
+- DAPR_HTTP_PORT / DAPR_GRPC_PORT
+- State components/workflows are provided by the app.
+- Flow uses Entity statics for data and enqueues ProjectionTask<TModel> as needed.
 
 ## Minimal E2E sample
 
-1) Post an intake record
-  - POST /intake/records with JSON: { "sourceId": "crm", "occurredAt": "2025-08-30T12:00:00Z", "payload": { "id": "u1" } }
-2) Trigger a replay (enqueue projection tasks for references that need projection)
+1) Post a normalized delta
+  - POST /models/device/intake with JSON: { "id": "dev-1", "data": { "inventory.serial": "INV-1001" } }
+2) Trigger replay
   - POST /admin/replay
-3) Query a view page
-  - GET /views/canonical?page=1&size=50
+3) Query canonical view
+  - GET /models/device/views/canonical?page=1&size=50
 
 Notes
-- View data shape is domain-specific; examples use `object` for simplicity. Use `ProjectionView<T>` with per-view sets for typed projections.
+- Prefer first-class model statics (All/Query/FirstPage/Page/Stream). Use per-model sets via FlowSets.

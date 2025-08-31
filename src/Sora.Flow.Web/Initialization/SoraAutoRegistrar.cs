@@ -19,12 +19,10 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
     report.AddModule(ModuleName, ModuleVersion);
-    report.AddSetting("routes[0]", "/intake/records");
-    report.AddSetting("routes[1]", "/admin/replay");
-    report.AddSetting("routes[2]", "/admin/reproject");
-    report.AddSetting("routes[3]", "/views/{view}/{referenceId}");
-    report.AddSetting("routes[4]", "/views/{view}");
-    report.AddSetting("routes[5]", "/lineage/{referenceId}");
-    report.AddSetting("routes[6]", "/policies");
+    report.AddSetting("routes[0]", "/admin/replay");
+    report.AddSetting("routes[1]", "/admin/reproject");
+    report.AddSetting("routes[2]", "/models/{model}/views/{view}/{referenceId}");
+    report.AddSetting("routes[3]", "/models/{model}/views/{view}");
+    report.AddSetting("routes[4]", "/policies");
     }
 }

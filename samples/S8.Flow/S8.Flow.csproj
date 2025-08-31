@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Sora.Core\Sora.Core.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Web.Swagger\Sora.Web.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Data.Json\Sora.Data.Json.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Flow.Core\Sora.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\src\Sora.Flow.Web\Sora.Flow.Web.csproj" />
+    <ProjectReference Include="..\..\tests\Sora.Testing\Sora.Testing.csproj" />
+  </ItemGroup>
+</Project>

@@ -5,15 +5,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Flow.Core\Sora.Flow.Core.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Flow.Web\Sora.Flow.Web.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
+  <ProjectReference Include="..\..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.Flow.Core\Sora.Flow.Core.csproj" />
+  <ProjectReference Include="..\..\..\src\Sora.Flow.Web\Sora.Flow.Web.csproj" />
     <ProjectReference Include="..\S8.Flow.Shared\S8.Flow.Shared.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Messaging.Abstractions\Sora.Messaging.Abstractions.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Messaging.Inbox.InMemory\Sora.Messaging.Inbox.InMemory.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
+  <ProjectReference Include="..\..\..\src\Sora.Messaging.Abstractions\Sora.Messaging.Abstractions.csproj" />
+  <ProjectReference Include="..\..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
+  <ProjectReference Include="..\..\..\src\Sora.Messaging.Inbox.InMemory\Sora.Messaging.Inbox.InMemory.csproj" />
+  <ProjectReference Include="..\..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">

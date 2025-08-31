@@ -1,12 +1,11 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Sora.Core;
 using Sora.Messaging;
-using Sora.Messaging.RabbitMq;
 using S8.Flow.Shared;
-using Sora.Core.Hosting.App;
+using Sora.Data.Core;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -20,18 +19,11 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Minimal boot for a publisher-only process: Core + Messaging (RabbitMQ). No Flow runtime.
-builder.Services.AddSoraCore();
-builder.Services.AddMessagingCore();
-// Minimal RabbitMQ wiring: register the bus factory only (no health contributor / inbox discovery)
-builder.Services.AddSingleton<IMessageBusFactory, RabbitMqFactory>();
+builder.Services.StartSora();
 
 builder.Services.AddHostedService<BmsPublisher>();
 
 var app = builder.Build();
-// Set ambient host so MessagingExtensions can resolve the bus
-AppHost.Current = app.Services;
-Sora.Core.SoraEnv.TryInitialize(app.Services);
 await app.RunAsync();
 
 public sealed class BmsPublisher : BackgroundService
@@ -62,7 +54,6 @@ public sealed class BmsPublisher : BackgroundService
                     source: "bms");
                 // Publish using Sora.Messaging extension
                 await evt.Send();
-                _log.LogInformation("BMS sent TelemetryEvent {Inv}/{Serial} {Sensor}={Value}{Unit} at {At}", d.Inventory, d.Serial, SensorCodes.TEMP, evt.Value, Units.C, evt.CapturedAt);
             }
             catch (Exception ex)
             {

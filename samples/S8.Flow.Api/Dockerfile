@@ -2,8 +2,8 @@
 WORKDIR /src
 COPY . .
 # Build whole repo (context at repo root) and publish target project
-RUN dotnet restore samples/S8.Flow/S8.Flow.Api/S8.Flow.Api.csproj
-RUN dotnet publish samples/S8.Flow/S8.Flow.Api/S8.Flow.Api.csproj -c Release -o /app/publish
+RUN dotnet restore samples/S8.Flow.Api/S8.Flow.Api.csproj
+RUN dotnet publish samples/S8.Flow.Api/S8.Flow.Api.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
