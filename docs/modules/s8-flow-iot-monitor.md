@@ -23,6 +23,13 @@ This sample demonstrates Sora Flow aggregating IoT telemetry from multiple adapt
 - First-class entity statics for data access (All/Query/Page/Save/Delete) with set scoping.
 - No magic values: keys/units/codes/routes centralized.
 
+## Partitioning and canonical bindings
+
+- Aggregates (Device, Sensor) are kept separate from value objects (SensorReading).
+- Adapters emit OEM/source IDs; Flow resolves canonical IDs via `KeyIndex<T>` using binding hints.
+- Readings are persisted with Sensor/Device canonical IDs and lineage; queries target canonical ids; retention via TTL.
+- See reference: [Bindings and canonical IDs](../reference/flow-bindings-and-canonical-ids.md).
+
 ## References
 
 - WEB-0050 — S8 Flow IoT sample and SSE monitor (ADR)

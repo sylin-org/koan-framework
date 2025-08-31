@@ -1,6 +1,6 @@
 ﻿# Sora.Flow — Model-typed pipeline (ingest → standardize → key → associate → project)
 
-Contract (at a glance)
+Contract (at a glance) — see also: [Bindings and canonical IDs](./flow-bindings-and-canonical-ids.md)
 - Inputs: Normalized deltas (patch-like) per model over HTTP/MQ; options under Sora:Flow.
 - Outputs: Per-model canonical projections and lineage; processed hot-stage records; diagnostics.
 - Error modes: Rejections with reason/evidence; DLQs; readiness/health.

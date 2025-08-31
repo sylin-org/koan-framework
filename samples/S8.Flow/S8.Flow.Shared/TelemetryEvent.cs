@@ -48,6 +48,7 @@ public sealed class TelemetryEvent
         {
             [Keys.Device.Inventory] = Inventory,
             [Keys.Device.Serial] = Serial,
+            [Keys.Sensor.Key] = $"{Inventory}::{Serial}::{SensorCode}",
             [Keys.Sensor.Code] = SensorCode,
             [Keys.Sensor.Unit] = Unit,
             [Keys.Reading.CapturedAt] = CapturedAt.ToString("O"),

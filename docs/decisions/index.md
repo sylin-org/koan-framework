@@ -3,21 +3,10 @@
 Canonical ADRs live in this folder. They’re grouped by domain below for quick navigation; files keep their historical numeric IDs. New ADRs should prefer PREFIX-####-short-title.md for filenames while remaining in this folder.
 
 High-signal ADRs (start here):
-- DATA-0061 — Data access semantics (All/Query; streaming; pager)
-- WEB-0035 — EntityController transformers
-- ARCH-0040 — Config and constants naming
-- ARCH-0011 — Logging (Core) and secure headers (Web) layering
 
 ## Architecture (ARCH)
 
-- 0001 — Rename generic TAggregate → TEntity — ARCH-0001-rename-generic-to-tentity.md
-- 0010 — Meta packages (Sora, Sora.App) — ARCH-0010-meta-packages.md
-- 0011 — Logging (Core) and secure headers (Web) layering — ARCH-0011-logging-and-headers-layering.md
-- 0013 — Health announcements and readiness — ARCH-0013-health-announcements-and-readiness.md
-- 0033 — OpenTelemetry integration — ARCH-0033-opentelemetry-integration.md
-- 0034 — DDD documentation and glossary — ARCH-0034-ddd-documentation-and-glossary.md
-- 0039 — SoraEnv static runtime — ARCH-0039-soraenv-static-runtime.md
-- 0040 — Config and constants naming — ARCH-0040-config-and-constants-naming.md
+ - FLOW-0101 — Flow bindings, canonical IDs, and value-object ingest: bindings, KeyIndex mapping, and separate VO ingest.
 
 ## Data (DATA)
 

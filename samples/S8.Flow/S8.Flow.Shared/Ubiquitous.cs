@@ -14,9 +14,10 @@ public static class Keys
 
     public static class Sensor
     {
-        public const string Code = "sensor.code";
-        public const string Unit = "sensor.unit";
-        public const string Reliability = "sensor.reliability";
+    public const string Key = "sensor.key";
+    public const string Code = "sensor.code";
+    public const string Unit = "sensor.unit";
+    public const string Reliability = "sensor.reliability";
     }
 
     public static class Reading
@@ -66,4 +67,13 @@ public static class SampleProfiles
         new DeviceProfile { Inventory = "INV-2002", Serial = "SN-CT-300-002", Manufacturer = "BrandC", Model = "CT-300", Kind = "CT", Code = "CT-300-2" },
         new DeviceProfile { Inventory = "INV-3001", Serial = "SN-CRYO-200-001", Manufacturer = "BrandA", Model = "CRYO-200", Kind = "CRYO", Code = "CRYO-200-1" },
     };
+}
+
+public sealed class SensorReading
+{
+    public required string SensorKey { get; init; }
+    public required double Value { get; init; }
+    public required string Unit { get; init; }
+    public DateTimeOffset CapturedAt { get; init; } = DateTimeOffset.UtcNow;
+    public string? Source { get; init; }
 }

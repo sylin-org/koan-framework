@@ -69,20 +69,60 @@ public class AnalyticsController : ControllerBase
     }
 
     /// <summary>
+    /// Get sensor 360 view showing all associated data for a sensor reference.
+    /// </summary>
+    [HttpGet("sensor-360/{referenceId}")]
+    public async Task<IActionResult> GetSensor360(string referenceId, CancellationToken ct = default)
+    {
+        CanonicalProjection<Sensor>? canonicalDoc;
+        LineageProjection<Sensor>? lineageDoc;
+        using (DataSetContext.With(FlowSets.ViewShort(Constants.Views.Canonical)))
+        { canonicalDoc = await Sora.Data.Core.Data<CanonicalProjection<Sensor>, string>.GetAsync($"{Constants.Views.Canonical}::{referenceId}", ct); }
+        using (DataSetContext.With(FlowSets.ViewShort(Constants.Views.Lineage)))
+        { lineageDoc = await Sora.Data.Core.Data<LineageProjection<Sensor>, string>.GetAsync($"{Constants.Views.Lineage}::{referenceId}", ct); }
+
+        var refItem = await Sora.Data.Core.Data<ReferenceItem<Sensor>, string>.GetAsync(referenceId, ct);
+        if (canonicalDoc is null && lineageDoc is null) return NotFound($"No data found for sensor {referenceId}");
+
+        var canonical = canonicalDoc?.View?.ToDictionary(kv => kv.Key, kv => (object)kv.Value) ?? new Dictionary<string, object>();
+        var lineage = lineageDoc?.View?.ToDictionary(kv => kv.Key, kv => (object)kv.Value) ?? new Dictionary<string, object>();
+
+        int totalSources = 0;
+        if (lineageDoc?.View is not null)
+        {
+            totalSources = lineageDoc.View
+                .SelectMany(kv => kv.Value.Values)
+                .SelectMany(arr => arr)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+        }
+
+        return Ok(new
+        {
+            referenceId,
+            version = refItem?.Version ?? 0,
+            lastUpdated = refItem?.LastUpdated,
+            canonical,
+            lineage,
+            summary = new { totalSources, dataPoints = canonical?.Count ?? 0 }
+        });
+    }
+
+    /// <summary>
     /// Get ingestion stats and pipeline health.
     /// </summary>
     [HttpGet("pipeline-stats")]
     public async Task<IActionResult> GetPipelineStats(CancellationToken ct = default)
     {
-    // Typed pipeline metrics for Device
-    List<StageRecord<Device>> intakeRecords;
-    List<StageRecord<Device>> keyedRecords;
+    // Typed pipeline metrics for Sensor
+    List<StageRecord<Sensor>> intakeRecords;
+    List<StageRecord<Sensor>> keyedRecords;
     using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
-    { intakeRecords = await StageRecord<Device>.All(ct); }
+    { intakeRecords = await StageRecord<Sensor>.All(ct); }
     using (DataSetContext.With(FlowSets.StageShort(FlowSets.Keyed)))
-    { keyedRecords = await StageRecord<Device>.All(ct); }
+    { keyedRecords = await StageRecord<Sensor>.All(ct); }
     var rejections = await RejectionReport.All(ct);
-    var pendingTasks = await Sora.Data.Core.Data<ProjectionTask<Device>, string>.All(ct);
+    var pendingTasks = await Sora.Data.Core.Data<ProjectionTask<Sensor>, string>.All(ct);
 
         var recentRejections = rejections
             .Where(r => r.CreatedAt > DateTimeOffset.UtcNow.AddHours(-1))

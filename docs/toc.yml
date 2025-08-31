@@ -49,6 +49,9 @@
       href: reference/ai.md
     - name: Flow
       href: reference/flow.md
+      items:
+      - name: Bindings and canonical IDs
+        href: reference/flow-bindings-and-canonical-ids.md
     - name: Orchestration
       href: reference/orchestration.md
     - name: Secrets

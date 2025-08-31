@@ -33,12 +33,17 @@ builder.Services.AddSoraFlow();
 
 builder.Services.Configure<FlowOptions>(o =>
 {
-    o.AggregationTags = new[] { Keys.Device.Inventory, Keys.Device.Serial };
+    // Default tags act as fallback when model has no AggregationTag attributes.
+    // Our Sensor model carries [AggregationTag(Keys.Sensor.Key)], so this isn't required,
+    // but we keep a conservative default for other models.
+    o.AggregationTags = new[] { Keys.Sensor.Key };
     o.PurgeEnabled = false;
 });
 
 builder.Services.AddControllers();
 builder.Services.AddRouting();
+builder.Services.AddHostedService<S8.Flow.Api.Hosting.LatestReadingProjector>();
+builder.Services.AddHostedService<S8.Flow.Api.Hosting.WindowReadingProjector>();
 
 // Message-driven adapters: handle TelemetryEvent and persist to Flow intake
 builder.Services.OnMessages(h =>
@@ -49,8 +54,8 @@ builder.Services.OnMessages(h =>
         var log = sp?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
         log?.CreateLogger("S8.Flow.Api.Handlers")?.LogInformation("TelemetryEvent received from {Source} at {At} (inventory={Inv}, serial={Serial})", msg.Source, msg.CapturedAt, msg.Inventory, msg.Serial);
         var payload = msg.ToPayloadDictionary();
-        // Enqueue into the per-model, typed intake for Device so model-aware workers can process it
-        var typed = new StageRecord<Device>
+    // Enqueue into the per-model, typed intake for Sensor so model-aware workers can process it
+    var typed = new StageRecord<Sensor>
         {
             Id = Guid.NewGuid().ToString("n"),
             SourceId = msg.Source,
@@ -58,6 +63,16 @@ builder.Services.OnMessages(h =>
             StagePayload = payload
         };
         await typed.Save(FlowSets.StageShort(FlowSets.Intake));
+
+        // Also co-ingest a minimal Device record so Device KeyIndex and projections stay current
+        var deviceRecord = new StageRecord<Device>
+        {
+            Id = Guid.NewGuid().ToString("n"),
+            SourceId = msg.Source,
+            OccurredAt = msg.CapturedAt,
+            StagePayload = payload
+        };
+        await deviceRecord.Save(FlowSets.StageShort(FlowSets.Intake));
     });
 });
 
@@ -89,5 +104,21 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+// Ensure the latest.reading view set exists (idempotent)
+try
+{
+    using (Sora.Data.Core.DataSetContext.With(Sora.Flow.Infrastructure.FlowSets.ViewShort(S8.Flow.Api.Hosting.LatestReadingProjector.ViewName)))
+    { await Sora.Data.Core.Data<S8.Flow.Shared.SensorLatestReading, string>.FirstPage(1); }
+}
+catch { }
+
+// Ensure the window.5m view set exists (idempotent)
+try
+{
+    using (Sora.Data.Core.DataSetContext.With(Sora.Flow.Infrastructure.FlowSets.ViewShort(S8.Flow.Api.Hosting.WindowReadingProjector.ViewName)))
+    { await Sora.Data.Core.Data<S8.Flow.Shared.SensorWindowReading, string>.FirstPage(1); }
+}
+catch { }
 
 app.Run();
