@@ -55,6 +55,25 @@ public static class ServiceCollectionExtensions
         return null;
     }
 
+    /// <summary>
+    /// Registers Sora Flow core services and background workers.
+    /// </summary>
+    public static IServiceCollection AddSoraFlow(this IServiceCollection services)
+    {
+        // Options
+        services.AddOptions<FlowOptions>();
+        services.AddOptions<FlowMaterializationOptions>();
+
+        // Materialization engine
+        services.TryAddSingleton<IFlowMaterializer, Materialization.FlowMaterializer>();
+
+        // Hosted workers
+        services.AddHostedService<ModelAssociationWorkerHostedService>();
+        services.AddHostedService<ModelProjectionWorkerHostedService>();
+
+        return services;
+    }
+
     // vNext model-aware projection worker
     internal sealed class ModelProjectionWorkerHostedService : BackgroundService
     {

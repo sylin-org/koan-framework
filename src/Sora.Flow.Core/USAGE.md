@@ -1685,7 +1685,7 @@ public class RuleBasedProcessor<TModel> : IFlowProcessor<TModel>
     }
 }
 
-## Identifier Policy: ULID and CanonicalId
+## Identifier Policy: ULID and CanonicalId {#identifier-policy-ulid-and-canonicalid}
 
 This guide adopts the approved identity model from FLOW-0104: a dual identifier per entity.
 

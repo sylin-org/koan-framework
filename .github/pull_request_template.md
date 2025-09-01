@@ -8,7 +8,6 @@ What changed
 
 Checklist (required)
 - [ ] Per-project docs updated per ARCH-0042 (README.md + TECHNICAL.md) for affected modules
-- [ ] Docs build passes in strict mode (Task: docs:build (clean)) and new links resolve
 - [ ] No inline endpoints; routes exposed via controllers only (WEB-0035)
 - [ ] Data samples use first-class model statics (All/Query/FirstPage/Page/Stream), not generic facades (DATA-0061)
 - [ ] No magic values: constants/options centralized (ARCH-0040)
@@ -21,7 +20,6 @@ Docs touchpoints (if applicable)
 
 Validation notes
 - Build: dotnet build
-- Docs: docs:build (clean)
 - Tests: scripts/test-*.ps1 or test tasks
 
 References

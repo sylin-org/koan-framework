@@ -78,7 +78,7 @@ Content rules (enforced by review)
 - No magic values: prefer typed Options or centralized constants.
 - Keep examples short and production-safe; link to `samples/` for depth.
 
-DocFX integration
+DocFX integration (historical)
 - Include `src/**/README.md` and `src/**/(TECHNICAL|ARCHITECTURE).md` in the site content.
 - Add an index page under Reference to link notable module READMEs.
 
@@ -88,7 +88,7 @@ PR hygiene
 
 ## Follow-ups
 
-1) Add DocFX content glob for `src/**/README.md` and `src/**/TECHNICAL.md` if not already present.
+1) Previously: Add DocFX content glob for `src/**/README.md` and `src/**/TECHNICAL.md`.
 2) Create skeletons for Sora.Data.Core and Sora.Web; wire links to relevant ADRs.
 3) Add “Modules index” page under docs/reference that links to key project READMEs.
 4) Update PR template to include a “docs updated” checkbox for README/TECHNICAL.
