@@ -10,5 +10,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
     <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
+  <ProjectReference Include="..\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
   </ItemGroup>
 </Project>

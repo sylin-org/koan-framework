@@ -24,7 +24,7 @@
         "guides/core/cqrs-for-humans.md"
       ] }
   ,
-  { "src": "../../src", "files": ["**/README.md", "**/TECHNICAL.md", "**/ARCHITECTURE.md"], "dest": "modules" }
+  { "src": "../../src", "files": ["**/README.md", "**/TECHNICAL.md", "**/ARCHITECTURE.md", "**/USAGE.md"], "dest": "modules" }
     ],
     "resource": [
       { "files": ["**/images/**"] },

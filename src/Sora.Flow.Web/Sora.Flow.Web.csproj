@@ -14,5 +14,6 @@
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
     <ProjectReference Include="..\Sora.Flow.Core\Sora.Flow.Core.csproj" />
     <ProjectReference Include="..\Sora.Web\Sora.Web.csproj" />
+  <ProjectReference Include="..\Sora.Web.Extensions\Sora.Web.Extensions.csproj" />
   </ItemGroup>
 </Project>

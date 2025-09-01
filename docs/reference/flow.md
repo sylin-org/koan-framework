@@ -78,3 +78,37 @@ Minimal configuration hints
 Notes
 - Prefer first-class model statics (All/Query/FirstPage/Page/Stream). Use per-model sets via FlowSets.
 
+## DX toolkit (controllers, monitor, adapter metadata, actions)
+
+Contract (at a glance)
+- Inputs: discovered `FlowEntity<T>` models; optional adapter metadata via `[FlowAdapter]`.
+- Outputs: generic HTTP controllers for roots and views; monitor hooks; action sender/receiver.
+- Defaults: auto-registered via SoraAutoRegistrar; route prefix `/api/flow`; verbs: seed/report/ping.
+
+Controllers
+- `FlowEntityController<TModel>` extends the base Entity controller for `DynamicFlowEntity<TModel>` and adds:
+  - GET `/api/flow/{model}` and `/{id}` (roots)
+  - GET `/api/flow/{model}/views/canonical/{id}`
+  - GET `/api/flow/{model}/views/lineage/{id}`
+  - POST `/api/flow/{model}/admin/reproject/{id}`
+  - GET `/api/flow/{model}/admin/parked` and `/admin/rejections`
+  - POST `/api/flow/{model}/actions/{verb}` (seed/report/ping)
+
+Monitor (business rules)
+- `AddFlowMonitor` exposes `OnProjected<TModel>(ctx)` with:
+  - `ctx.Model: IDictionary<string,object?>` (mutable)
+  - `ctx.Policies: IDictionary<string,string>` (mutable)
+- The framework commits the changes atomically to `DynamicFlowEntity<TModel>.Model` and `PolicyState<TModel>.Policies` before clearing projection flags.
+
+Adapter metadata
+- `[FlowAdapter(System, Adapter, DefaultSource, Policies[], Capabilities)]` decorates adapter hosts.
+- Auto-enriches intake payloads with `system`, `adapter`, and default `source`.
+
+Actions
+- `IFlowActions` to send; adapters reply with `FlowAck`/`FlowReport`.
+- Correlated by `CorrelationId`, model-qualified.
+
+Options
+- Toggle auto-registration: `Sora:Flow:AutoRegister`.
+- Override route prefix/paging; extend verbs.
+

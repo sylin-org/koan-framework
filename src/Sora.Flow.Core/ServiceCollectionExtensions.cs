@@ -25,6 +25,9 @@ using Sora.Core.Json;
 using Newtonsoft.Json.Linq;
 using System.Dynamic;
 using Sora.Core.Utilities.Ids;
+using Sora.Flow.Monitoring;
+using Sora.Messaging;
+using Sora.Flow.Actions;
 
 namespace Sora.Flow;
 
@@ -97,6 +100,27 @@ public static class ServiceCollectionExtensions
 
         // TTL purge
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowPurgeHostedService>());
+
+    // DX: default action sender and responder
+    // Sender (IFlowActions) for apps to publish actions easily
+    services.AddFlowActions();
+    // Responder to handle FlowAction (seed/report/ping) with generic defaults
+    services.TryAddSingleton<Sora.Messaging.IMessageHandler<Sora.Flow.Actions.FlowAction>, Sora.Flow.Actions.FlowActionHandler>();
+        return services;
+    }
+
+    // Registration helpers for monitor hooks
+    public static IServiceCollection AddFlowMonitor<TMonitor>(this IServiceCollection services)
+        where TMonitor : class, IFlowMonitor
+    {
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowMonitor, TMonitor>());
+        return services;
+    }
+
+    public static IServiceCollection AddFlowMonitor<TModel, TMonitor>(this IServiceCollection services)
+        where TMonitor : class, IFlowMonitor<TModel>
+    {
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowMonitor<TModel>, TMonitor>());
         return services;
     }
 
@@ -541,7 +565,7 @@ public static class ServiceCollectionExtensions
                                     await (Task)linData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { linType, typeof(string), typeof(CancellationToken) })!
                                         .Invoke(null, new object?[] { linDoc, FlowSets.ViewShort(Constants.Views.Lineage), stoppingToken })!;
 
-                                    // Materialized snapshot via policy engine → persist to root entity and separate policy store
+                                    // Materialized snapshot via policy engine → give monitors a chance to adjust before commit
                                     var materializer = _sp.GetRequiredService<IFlowMaterializer>();
                                     // preserve insertion order for paths
                                     var ordered = new Dictionary<string, IReadOnlyCollection<string?>>(StringComparer.OrdinalIgnoreCase);
@@ -551,9 +575,28 @@ public static class ServiceCollectionExtensions
                                     }
                                     var modelName = Infrastructure.FlowRegistry.GetModelName(modelType);
                                     var (materializedValues, materializedPolicies) = await materializer.MaterializeAsync(modelName, ordered, stoppingToken);
+                                    // Build a mutable model dictionary from materialized dotted values (flat) → expanded below to nested
+                                    var mutableModel = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                                    foreach (var kvp in materializedValues) mutableModel[kvp.Key] = kvp.Value;
+                                    var mutablePolicies = new Dictionary<string, string>(materializedPolicies, StringComparer.OrdinalIgnoreCase);
+                                    // Invoke typed monitors first, then untyped
+                                    var monitorsObj = _sp.GetServices(typeof(IFlowMonitor));
+                                    var typedMonitorType = typeof(IFlowMonitor<>).MakeGenericType(modelType);
+                                    var typedMonitors = _sp.GetServices(typedMonitorType);
+                                    var ctx = new Sora.Flow.Monitoring.FlowMonitorContext(modelName, refId, mutableModel, mutablePolicies);
+                                    foreach (var tm in typedMonitors)
+                                    {
+                                        var m = typedMonitorType.GetMethod("OnProjectedAsync")!;
+                                        var monitorTask = (Task)m.Invoke(tm, new object?[] { ctx, stoppingToken })!; await monitorTask.ConfigureAwait(false);
+                                    }
+                                    foreach (var um in monitorsObj)
+                                    {
+                                        var m = typeof(IFlowMonitor).GetMethod("OnProjectedAsync")!;
+                                        var monitorTask2 = (Task)m.Invoke(um, new object?[] { modelType, ctx, stoppingToken })!; await monitorTask2.ConfigureAwait(false);
+                                    }
                                     // Build nested JSON object from dotted paths
                                     var pathMap = new Dictionary<string, JToken?>(StringComparer.OrdinalIgnoreCase);
-                                    foreach (var kvp in materializedValues)
+                                    foreach (var kvp in mutableModel)
                                     {
                                         pathMap[kvp.Key] = kvp.Value is null ? JValue.CreateNull() : new JValue(kvp.Value);
                                     }
@@ -591,7 +634,7 @@ public static class ServiceCollectionExtensions
                                         var pol = Activator.CreateInstance(polType)!;
                                         polType.GetProperty("Id")!.SetValue(pol, refId);
                                         polType.GetProperty("ReferenceId")!.SetValue(pol, refId);
-                                        polType.GetProperty("Policies")!.SetValue(pol, new Dictionary<string, string>(materializedPolicies, StringComparer.OrdinalIgnoreCase));
+                                        polType.GetProperty("Policies")!.SetValue(pol, new Dictionary<string, string>(mutablePolicies, StringComparer.OrdinalIgnoreCase));
                                         var polData = typeof(Data<,>).MakeGenericType(polType, typeof(string));
                                         await (Task)polData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { polType, typeof(CancellationToken) })!
                                             .Invoke(null, new object?[] { pol, stoppingToken })!;

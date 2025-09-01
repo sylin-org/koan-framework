@@ -43,6 +43,19 @@ public static class GenericControllers
         return services;
     }
 
+    /// <summary>
+    /// Register any generic controller definition with a single entity type argument and a route prefix.
+    /// </summary>
+    public static IServiceCollection AddGenericController<TEntity>(this IServiceCollection services, Type genericControllerDefinition, string routePrefix)
+        where TEntity : class
+    {
+        if (genericControllerDefinition is null) throw new ArgumentNullException(nameof(genericControllerDefinition));
+        if (!genericControllerDefinition.IsGenericTypeDefinition)
+            throw new ArgumentException("Must be a generic type definition", nameof(genericControllerDefinition));
+        _registrations[Key(genericControllerDefinition, typeof(TEntity), null, routePrefix)] = new Registration(genericControllerDefinition, typeof(TEntity), null, routePrefix);
+        return services;
+    }
+
     internal static IEnumerable<Registration> Registrations => _registrations.Values;
 
     internal sealed record Registration(Type GenericDefinition, Type EntityType, Type? KeyType, string RoutePrefix);
