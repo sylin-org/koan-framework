@@ -34,6 +34,3 @@ public sealed class CanonicalProjectionView : ProjectionView<Dictionary<string, 
 
 // Lineage view: tag -> value -> [sources]
 public sealed class LineageProjectionView : ProjectionView<Dictionary<string, Dictionary<string, string[]>>> { }
-
-// Materialized view: single value per tag plus policy metadata
-public sealed class MaterializedProjectionView : ProjectionView<Sora.Flow.Model.MaterializedPayload> { }

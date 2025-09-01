@@ -55,30 +55,6 @@ public sealed class ViewsController : ControllerBase
             _logger.LogInformation("ViewsController.GetOne canonical view={View} ref={Ref} found={Found}", view, referenceId, doc is not null);
             return doc is null ? NotFound() : Ok(doc);
         }
-        if (string.Equals(view, Sora.Flow.Infrastructure.Constants.Views.Materialized, StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var modelType in DiscoverModels())
-            {
-                var matType = typeof(Sora.Flow.Model.MaterializedProjection<>).MakeGenericType(modelType);
-        var raw = await TryGetByIdAsync(matType, $"{Sora.Flow.Infrastructure.Constants.Views.Materialized}::{referenceId}", set, ct);
-        if (raw is not null)
-                {
-                    var viewDoc = new MaterializedProjectionView
-                    {
-            Id = (string)matType.GetProperty("Id")!.GetValue(raw)!,
-            ReferenceId = (string)matType.GetProperty("ReferenceId")!.GetValue(raw)!,
-            ViewName = (string)matType.GetProperty("ViewName")!.GetValue(raw)!,
-            View = (Sora.Flow.Model.MaterializedPayload)matType.GetProperty("View")!.GetValue(raw)!
-                    };
-                    _logger.LogInformation("ViewsController.GetOne materialized(view,id) view={View} ref={Ref} found=true", view, referenceId);
-                    return Ok(viewDoc);
-                }
-            }
-            var list = await QueryMaterializedAcrossModels($"ReferenceId == '{referenceId}'", set, ct);
-            var doc = list.FirstOrDefault();
-            _logger.LogInformation("ViewsController.GetOne materialized view={View} ref={Ref} found={Found}", view, referenceId, doc is not null);
-            return doc is null ? NotFound() : Ok(doc);
-        }
         if (string.Equals(view, Sora.Flow.Infrastructure.Constants.Views.Lineage, StringComparison.OrdinalIgnoreCase))
         {
             foreach (var modelType in DiscoverModels())
@@ -152,17 +128,6 @@ public sealed class ViewsController : ControllerBase
                 _logger.LogInformation("ViewsController.GetPage canonical view={View} q={Query} total={Total} page={Page} size={Size} returned={Returned}", view, q, total, p, s, pageItems.Count);
                 return Ok(new { page = p, size = s, total, hasNext, items = pageItems });
             }
-            if (string.Equals(view, Sora.Flow.Infrastructure.Constants.Views.Materialized, StringComparison.OrdinalIgnoreCase))
-            {
-                var results = refFilter is null ? await QueryMaterializedAcrossModels(q!, set, ct)
-                                                : (await QueryMaterializedAcrossModels(null, set, ct)).Where(x => string.Equals(x.ReferenceId, refFilter, StringComparison.OrdinalIgnoreCase)).ToList();
-                var total = results.Count;
-                var skip = (p - 1) * s;
-                var pageItems = results.Skip(skip).Take(s).ToList();
-                var hasNext = skip + pageItems.Count < total;
-                _logger.LogInformation("ViewsController.GetPage materialized view={View} q={Query} total={Total} page={Page} size={Size} returned={Returned}", view, q, total, p, s, pageItems.Count);
-                return Ok(new { page = p, size = s, total, hasNext, items = pageItems });
-            }
             if (string.Equals(view, Sora.Flow.Infrastructure.Constants.Views.Lineage, StringComparison.OrdinalIgnoreCase))
             {
                 var results = refFilter is null ? await QueryLineageAcrossModels(q!, set, ct)
@@ -194,16 +159,6 @@ public sealed class ViewsController : ControllerBase
             var pageItems = canonicalAll.Skip(skip).Take(s).ToList();
             var hasNext = skip + pageItems.Count < total;
             _logger.LogInformation("ViewsController.GetPage canonical(view,all) view={View} total={Total} page={Page} size={Size} returned={Returned}", view, total, p, s, pageItems.Count);
-            return Ok(new { page = p, size = s, total, hasNext, items = pageItems });
-        }
-        if (string.Equals(view, Sora.Flow.Infrastructure.Constants.Views.Materialized, StringComparison.OrdinalIgnoreCase))
-        {
-            var matAll = await QueryMaterializedAcrossModels(null, Sora.Flow.Infrastructure.FlowSets.ViewShort(view), ct);
-            var total = matAll.Count;
-            var skip = (p - 1) * s;
-            var pageItems = matAll.Skip(skip).Take(s).ToList();
-            var hasNext = skip + pageItems.Count < total;
-            _logger.LogInformation("ViewsController.GetPage materialized(view,all) view={View} total={Total} page={Page} size={Size} returned={Returned}", view, total, p, s, pageItems.Count);
             return Ok(new { page = p, size = s, total, hasNext, items = pageItems });
         }
         if (string.Equals(view, Sora.Flow.Infrastructure.Constants.Views.Lineage, StringComparison.OrdinalIgnoreCase))
@@ -322,41 +277,6 @@ public sealed class ViewsController : ControllerBase
         return acc;
     }
 
-    private static async Task<List<MaterializedProjectionView>> QueryMaterializedAcrossModels(string? q, string set, CancellationToken ct)
-    {
-        var acc = new List<MaterializedProjectionView>();
-        foreach (var modelType in DiscoverModels())
-        {
-            var matType = typeof(Sora.Flow.Model.MaterializedProjection<>).MakeGenericType(modelType);
-            var dataType = typeof(Sora.Data.Core.Data<,>).MakeGenericType(matType, typeof(string));
-            Task task;
-            if (!string.IsNullOrWhiteSpace(q))
-            {
-                var qM = dataType.GetMethod("Query", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
-                task = (Task)qM.Invoke(null, new object?[] { q!, set, ct })!;
-            }
-            else
-            {
-                var allM = dataType.GetMethod("All", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
-                task = (Task)allM.Invoke(null, new object?[] { set, ct })!;
-            }
-            await task.ConfigureAwait(false);
-            var result = (System.Collections.IEnumerable?)GetTaskResult(task);
-            if (result is null) continue;
-            foreach (var it in result)
-            {
-                var doc = new MaterializedProjectionView
-                {
-                    Id = (string)matType.GetProperty("Id")!.GetValue(it)!,
-                    ReferenceId = (string)matType.GetProperty("ReferenceId")!.GetValue(it)!,
-                    ViewName = (string)matType.GetProperty("ViewName")!.GetValue(it)!,
-                    View = (Sora.Flow.Model.MaterializedPayload)matType.GetProperty("View")!.GetValue(it)!
-                };
-                acc.Add(doc);
-            }
-        }
-        return acc;
-    }
 
     private static object? GetTaskResult(Task t)
     {

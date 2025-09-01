@@ -12,8 +12,7 @@ public static class Constants
     public static class Views
     {
         public const string Canonical = "canonical";
-    public const string Lineage = "lineage";
-    public const string Materialized = "materialized";
+        public const string Lineage = "lineage";
     }
 
     public static class Rejections

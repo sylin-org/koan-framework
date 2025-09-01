@@ -26,7 +26,7 @@ public sealed class FlowOptions
 
     public bool HooksEnabled { get; set; } = true;
 
-    public string DefaultViewName { get; set; } = Infrastructure.Constants.Views.Materialized;
+    public string DefaultViewName { get; set; } = Infrastructure.Constants.Views.Canonical;
 
     // Domain-agnostic aggregation tags (keys) used to derive ReferenceId from normalized dictionaries
     // Example: ["person:employee:id", "person:employee:contact:email", "person:lastSsn"]

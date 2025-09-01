@@ -21,6 +21,9 @@ using Sora.Flow.Runtime;
 using Sora.Data.Core.Naming;
 using System.Reflection;
 using Sora.Flow.Materialization;
+using Sora.Core.Json;
+using Newtonsoft.Json.Linq;
+using System.Dynamic;
 
 namespace Sora.Flow;
 
@@ -108,14 +111,17 @@ public static class ServiceCollectionExtensions
             return full.Replace('+', '.');
         }
 
-        // Stage records and views: keep base as the model name, sets supply the suffix
-    if (def == typeof(StageRecord<>) || def == typeof(CanonicalProjection<>) || def == typeof(LineageProjection<>) || def == typeof(MaterializedProjection<>))
+    // Stage records and views: keep base as the model name, sets supply the suffix
+    if (def == typeof(StageRecord<>) || def == typeof(CanonicalProjection<>) || def == typeof(LineageProjection<>))
             return ModelBaseName();
 
         // Root-scoped typed entities (no set provided): bake a type-specific suffix into the base
         if (def == typeof(KeyIndex<>)) return ModelBaseName() + "#flow.index";
         if (def == typeof(ReferenceItem<>)) return ModelBaseName() + "#flow.refs";
-        if (def == typeof(ProjectionTask<>)) return ModelBaseName() + "#flow.tasks";
+    if (def == typeof(ProjectionTask<>)) return ModelBaseName() + "#flow.tasks";
+    if (def == typeof(PolicyState<>)) return ModelBaseName() + "#flow.policies";
+        // Dynamic root entity should use the pure model name as the base (no suffix)
+        if (def == typeof(DynamicFlowEntity<>)) return ModelBaseName();
 
         return null;
     }
@@ -190,9 +196,13 @@ public static class ServiceCollectionExtensions
                         .MakeGenericMethod(typeof(LineageProjection<>).MakeGenericType(modelType))
                         .Invoke(null, new object?[] { data, FlowSets.ViewShort(Constants.Views.Lineage), cancellationToken })!;
 
+                    // Root entities: dynamic materialized snapshot and per-reference policy state
                     await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(MaterializedProjection<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, FlowSets.ViewShort(Constants.Views.Materialized), cancellationToken })!;
+                        .MakeGenericMethod(typeof(DynamicFlowEntity<>).MakeGenericType(modelType))
+                        .Invoke(null, new object?[] { data, null, cancellationToken })!;
+                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
+                        .MakeGenericMethod(typeof(PolicyState<>).MakeGenericType(modelType))
+                        .Invoke(null, new object?[] { data, null, cancellationToken })!;
             }
         }
 
@@ -438,7 +448,7 @@ public static class ServiceCollectionExtensions
                                     await (Task)linData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { linType, typeof(string), typeof(CancellationToken) })!
                                         .Invoke(null, new object?[] { linDoc, FlowSets.ViewShort(Constants.Views.Lineage), stoppingToken })!;
 
-                                    // Materialized via policy engine
+                                    // Materialized snapshot via policy engine → persist to root entity and separate policy store
                                     var materializer = _sp.GetRequiredService<IFlowMaterializer>();
                                     // preserve insertion order for paths
                                     var ordered = new Dictionary<string, IReadOnlyCollection<string?>>(StringComparer.OrdinalIgnoreCase);
@@ -448,21 +458,49 @@ public static class ServiceCollectionExtensions
                                     }
                                     var modelName = Infrastructure.FlowRegistry.GetModelName(modelType);
                                     var (materializedValues, materializedPolicies) = await materializer.MaterializeAsync(modelName, ordered, stoppingToken);
-                                    var matType = typeof(MaterializedProjection<>).MakeGenericType(modelType);
-                                    var matDoc = Activator.CreateInstance(matType)!;
-                                    matType.GetProperty("Id")!.SetValue(matDoc, $"{Constants.Views.Materialized}::{refId}");
-                                    matType.GetProperty("ReferenceId")!.SetValue(matDoc, refId);
-                                    matType.GetProperty("ViewName")!.SetValue(matDoc, Constants.Views.Materialized);
-                                    // Build payload instance
-                                    var matPayload = new Sora.Flow.Model.MaterializedPayload
+                                    // Build nested JSON object from dotted paths
+                                    var pathMap = new Dictionary<string, JToken?>(StringComparer.OrdinalIgnoreCase);
+                                    foreach (var kvp in materializedValues)
                                     {
-                                        Values = new Dictionary<string, string?>(materializedValues, StringComparer.OrdinalIgnoreCase),
-                                        Policies = new Dictionary<string, string>(materializedPolicies, StringComparer.OrdinalIgnoreCase)
-                                    };
-                                    matType.GetProperty("View")!.SetValue(matDoc, matPayload);
-                                    var matData = typeof(Data<,>).MakeGenericType(matType, typeof(string));
-                                    await (Task)matData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { matType, typeof(string), typeof(CancellationToken) })!
-                                        .Invoke(null, new object?[] { matDoc, FlowSets.ViewShort(Constants.Views.Materialized), stoppingToken })!;
+                                        pathMap[kvp.Key] = kvp.Value is null ? JValue.CreateNull() : new JValue(kvp.Value);
+                                    }
+                                    var nested = JsonPathMapper.Expand(pathMap);
+                                    // Convert JObject to plain dictionary recursively for provider-safe serialization
+                                    static object? ToPlain(object? token)
+                                    {
+                                        if (token is null) return null;
+                                        if (token is JValue jv) return jv.Value;
+                                        if (token is JArray ja) return ja.Select(t => ToPlain(t)).ToList();
+                                        if (token is JObject jo)
+                                        {
+                                            IDictionary<string, object?> exp = new ExpandoObject();
+                                            foreach (var p in jo.Properties()) exp[p.Name] = ToPlain(p.Value);
+                                            return (ExpandoObject)exp;
+                                        }
+                                        return token;
+                                    }
+                                    var plain = ToPlain(nested) as ExpandoObject;
+                                    // Upsert dynamic root entity and policy state in ROOT scope (no set)
+                                    using (DataSetContext.With(null))
+                                    {
+                                        var dynType = typeof(DynamicFlowEntity<>).MakeGenericType(modelType);
+                                        var dyn = Activator.CreateInstance(dynType)!;
+                                        dynType.GetProperty("Id")!.SetValue(dyn, refId);
+                                        dynType.GetProperty("ReferenceId")!.SetValue(dyn, refId);
+                                        dynType.GetProperty("Data")!.SetValue(dyn, plain);
+                                        var dynData = typeof(Data<,>).MakeGenericType(dynType, typeof(string));
+                                        await (Task)dynData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { dynType, typeof(CancellationToken) })!
+                                            .Invoke(null, new object?[] { dyn, stoppingToken })!;
+                                        // Upsert policy state
+                                        var polType = typeof(PolicyState<>).MakeGenericType(modelType);
+                                        var pol = Activator.CreateInstance(polType)!;
+                                        polType.GetProperty("Id")!.SetValue(pol, refId);
+                                        polType.GetProperty("ReferenceId")!.SetValue(pol, refId);
+                                        polType.GetProperty("Policies")!.SetValue(pol, new Dictionary<string, string>(materializedPolicies, StringComparer.OrdinalIgnoreCase));
+                                        var polData = typeof(Data<,>).MakeGenericType(polType, typeof(string));
+                                        await (Task)polData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { polType, typeof(CancellationToken) })!
+                                            .Invoke(null, new object?[] { pol, stoppingToken })!;
+                                    }
                                 }
 
                                 // clear RequiresProjection if set

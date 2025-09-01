@@ -239,7 +239,7 @@ namespace Zen.Web.Data.Controller
                     {
                         var mutator = Request.Query.ToMutator<T>();
 
-                        var serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings { Converters = { new StringEnumConverter() } });
+                        var serializer = JsonSerializer.CreateDefault(new JsonSerializerSettings { TypenameHandling = TypenameHandling.None, Converters = { new StringEnumConverter() } });
 
                         List<JObject> bufferCollection = collection.Select(i => (JObject)JToken.FromObject(i, serializer) ).ToList();
 

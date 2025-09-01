@@ -1,6 +1,7 @@
 ﻿using Sora.Data.Core.Model;
 using Sora.Data.Abstractions.Annotations;
 using System.Collections.Generic;
+using System.Dynamic;
 
 namespace Sora.Flow.Model;
 
@@ -12,7 +13,17 @@ public sealed class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>
 {
     [Index]
     public string? ReferenceId { get; set; }
-    public object? Data { get; set; }
+    // Nested JSON snapshot using ExpandoObject (document) + primitives/arrays for provider-friendly serialization
+    public ExpandoObject? Data { get; set; }
+}
+
+// Per-reference policy state persisted alongside root entity
+public sealed class PolicyState<TModel> : Entity<PolicyState<TModel>>
+{
+    [Index]
+    public string ReferenceId { get; set; } = default!;
+    // PolicyName -> SelectedTransformer
+    public Dictionary<string, string> Policies { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 // Stage records per model (hot→processed)
@@ -68,13 +79,8 @@ public class ProjectionView<TModel, TView> : Entity<ProjectionView<TModel, TView
 }
 
 // Materialized view payload: single value per tag plus policy metadata
-public sealed class MaterializedPayload
-{
-    public Dictionary<string, string?> Values { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-    public Dictionary<string, string> Policies { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-}
+// Materialized payload/view types removed in greenfield; materialized snapshot is persisted as the root entity
 
 // Strongly typed canonical and lineage views
 public sealed class CanonicalProjection<TModel> : ProjectionView<TModel, Dictionary<string, string[]>> { }
 public sealed class LineageProjection<TModel> : ProjectionView<TModel, Dictionary<string, Dictionary<string, string[]>>> { }
-public sealed class MaterializedProjection<TModel> : ProjectionView<TModel, MaterializedPayload> { }

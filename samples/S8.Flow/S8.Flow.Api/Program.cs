@@ -134,7 +134,7 @@ app.MapControllers();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// Ensure the latest.reading view set exists (idempotent)
+// Ensure the latest.reading view set exists (idempotent) — custom view
 try
 {
     using (Sora.Data.Core.DataSetContext.With(Sora.Flow.Infrastructure.FlowSets.ViewShort(S8.Flow.Api.Hosting.LatestReadingProjector.ViewName)))
@@ -142,7 +142,7 @@ try
 }
 catch { }
 
-// Ensure the window.5m view set exists (idempotent)
+// Ensure the window.5m view set exists (idempotent) — custom view
 try
 {
     using (Sora.Data.Core.DataSetContext.With(Sora.Flow.Infrastructure.FlowSets.ViewShort(S8.Flow.Api.Hosting.WindowReadingProjector.ViewName)))
