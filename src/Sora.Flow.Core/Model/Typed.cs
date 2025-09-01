@@ -67,6 +67,14 @@ public class ProjectionView<TModel, TView> : Entity<ProjectionView<TModel, TView
     public TView? View { get; set; }
 }
 
+// Materialized view payload: single value per tag plus policy metadata
+public sealed class MaterializedPayload
+{
+    public Dictionary<string, string?> Values { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> Policies { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
 // Strongly typed canonical and lineage views
 public sealed class CanonicalProjection<TModel> : ProjectionView<TModel, Dictionary<string, string[]>> { }
 public sealed class LineageProjection<TModel> : ProjectionView<TModel, Dictionary<string, Dictionary<string, string[]>>> { }
+public sealed class MaterializedProjection<TModel> : ProjectionView<TModel, MaterializedPayload> { }

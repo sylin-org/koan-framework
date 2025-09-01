@@ -20,6 +20,7 @@ using Sora.Flow.Options;
 using Sora.Flow.Runtime;
 using Sora.Data.Core.Naming;
 using System.Reflection;
+using Sora.Flow.Materialization;
 
 namespace Sora.Flow;
 
@@ -70,7 +71,9 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddSoraFlow(this IServiceCollection services)
     {
         services.AddSoraOptions<FlowOptions>("Sora:Flow");
+    services.AddSoraOptions<FlowMaterializationOptions>("Sora:Flow:Materialization");
         services.TryAddSingleton<IFlowRuntime, InMemoryFlowRuntime>();
+    services.TryAddSingleton<IFlowMaterializer, FlowMaterializer>();
 
     // Naming: prefer model-qualified base names for typed Flow collections (e.g., "S8.Flow.Shared.Device#flow.intake").
     // This avoids unwieldy generic type names like "Sora.Flow.Model.StageRecord`1[[...]]#...".
@@ -106,7 +109,7 @@ public static class ServiceCollectionExtensions
         }
 
         // Stage records and views: keep base as the model name, sets supply the suffix
-        if (def == typeof(StageRecord<>) || def == typeof(CanonicalProjection<>) || def == typeof(LineageProjection<>))
+    if (def == typeof(StageRecord<>) || def == typeof(CanonicalProjection<>) || def == typeof(LineageProjection<>) || def == typeof(MaterializedProjection<>))
             return ModelBaseName();
 
         // Root-scoped typed entities (no set provided): bake a type-specific suffix into the base
@@ -186,6 +189,10 @@ public static class ServiceCollectionExtensions
                     await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
                         .MakeGenericMethod(typeof(LineageProjection<>).MakeGenericType(modelType))
                         .Invoke(null, new object?[] { data, FlowSets.ViewShort(Constants.Views.Lineage), cancellationToken })!;
+
+                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
+                        .MakeGenericMethod(typeof(MaterializedProjection<>).MakeGenericType(modelType))
+                        .Invoke(null, new object?[] { data, FlowSets.ViewShort(Constants.Views.Materialized), cancellationToken })!;
             }
         }
 
@@ -369,8 +376,14 @@ public static class ServiceCollectionExtensions
                                         .Where(r => string.Equals((string?)r.GetType().GetProperty("CorrelationId")?.GetValue(r), refId, StringComparison.Ordinal))
                                         .ToList();
 
-                                    var canonical = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+                                    var canonical = new Dictionary<string, List<string?>>(StringComparer.OrdinalIgnoreCase);
                                     var lineage = new Dictionary<string, Dictionary<string, HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
+                                    // Optional: exclude tag prefixes from canonical/lineage (e.g., "reading.")
+                                    var exclude = (_opts.CurrentValue.CanonicalExcludeTagPrefixes ?? Array.Empty<string>())
+                                        .Where(p => !string.IsNullOrWhiteSpace(p))
+                                        .Select(p => p.Trim())
+                                        .ToArray();
+
                                     foreach (var r in all)
                                     {
                                         var src = (string)(r.GetType().GetProperty("SourceId")!.GetValue(r) ?? "unknown");
@@ -380,20 +393,26 @@ public static class ServiceCollectionExtensions
                                         foreach (var kv in dict)
                                         {
                                             var tag = kv.Key;
+                                            if (exclude.Length > 0 && exclude.Any(p => tag.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+                                                continue;
                                             var values = ToValuesFlexible(kv.Value);
                                             if (values.Count == 0) continue;
-                                            if (!canonical.TryGetValue(tag, out var set)) { set = new HashSet<string>(StringComparer.OrdinalIgnoreCase); canonical[tag] = set; }
-                                            foreach (var v in values) set.Add(v);
+                                            if (!canonical.TryGetValue(tag, out var list)) { list = new List<string?>(); canonical[tag] = list; }
+                                            foreach (var v in values) list.Add(v);
                                             if (!lineage.TryGetValue(tag, out var m)) { m = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase); lineage[tag] = m; }
                                             foreach (var v in values)
                                             {
+                                                if (v is null) continue;
                                                 if (!m.TryGetValue(v, out var sources)) { sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase); m[v] = sources; }
                                                 sources.Add(src);
                                             }
                                         }
                                     }
 
-                                    var canonicalView = canonical.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
+                                    var canonicalView = canonical.ToDictionary(
+                                        kv => kv.Key,
+                                        kv => kv.Value.Where(x => x is not null).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                                        StringComparer.OrdinalIgnoreCase);
                                     var lineageView = lineage.ToDictionary(
                                         kv => kv.Key,
                                         kv => kv.Value.ToDictionary(x => x.Key, x => x.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
@@ -418,6 +437,32 @@ public static class ServiceCollectionExtensions
                                     var linData = typeof(Data<,>).MakeGenericType(linType, typeof(string));
                                     await (Task)linData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { linType, typeof(string), typeof(CancellationToken) })!
                                         .Invoke(null, new object?[] { linDoc, FlowSets.ViewShort(Constants.Views.Lineage), stoppingToken })!;
+
+                                    // Materialized via policy engine
+                                    var materializer = _sp.GetRequiredService<IFlowMaterializer>();
+                                    // preserve insertion order for paths
+                                    var ordered = new Dictionary<string, IReadOnlyCollection<string?>>(StringComparer.OrdinalIgnoreCase);
+                                    foreach (var kv in canonical)
+                                    {
+                                        ordered[kv.Key] = kv.Value.AsReadOnly();
+                                    }
+                                    var modelName = Infrastructure.FlowRegistry.GetModelName(modelType);
+                                    var (materializedValues, materializedPolicies) = await materializer.MaterializeAsync(modelName, ordered, stoppingToken);
+                                    var matType = typeof(MaterializedProjection<>).MakeGenericType(modelType);
+                                    var matDoc = Activator.CreateInstance(matType)!;
+                                    matType.GetProperty("Id")!.SetValue(matDoc, $"{Constants.Views.Materialized}::{refId}");
+                                    matType.GetProperty("ReferenceId")!.SetValue(matDoc, refId);
+                                    matType.GetProperty("ViewName")!.SetValue(matDoc, Constants.Views.Materialized);
+                                    // Build payload instance
+                                    var matPayload = new Sora.Flow.Model.MaterializedPayload
+                                    {
+                                        Values = new Dictionary<string, string?>(materializedValues, StringComparer.OrdinalIgnoreCase),
+                                        Policies = new Dictionary<string, string>(materializedPolicies, StringComparer.OrdinalIgnoreCase)
+                                    };
+                                    matType.GetProperty("View")!.SetValue(matDoc, matPayload);
+                                    var matData = typeof(Data<,>).MakeGenericType(matType, typeof(string));
+                                    await (Task)matData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { matType, typeof(string), typeof(CancellationToken) })!
+                                        .Invoke(null, new object?[] { matDoc, FlowSets.ViewShort(Constants.Views.Materialized), stoppingToken })!;
                                 }
 
                                 // clear RequiresProjection if set

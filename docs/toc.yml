@@ -52,6 +52,8 @@
       items:
       - name: Bindings and canonical IDs
         href: reference/flow-bindings-and-canonical-ids.md
+      - name: Materialization (policies and transformers)
+        href: reference/flow-materialization.md
     - name: Orchestration
       href: reference/orchestration.md
     - name: Secrets

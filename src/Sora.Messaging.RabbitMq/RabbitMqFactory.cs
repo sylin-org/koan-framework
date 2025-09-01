@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Sora.Core;
@@ -110,7 +111,43 @@ public sealed class RabbitMqFactory : IMessageBusFactory
             ?? Configuration.Read<string?>(cfg, "ManagementPassword", opts.ManagementPassword);
 
         var factory = new ConnectionFactory { Uri = new Uri(connStr!), DispatchConsumersAsync = true, AutomaticRecoveryEnabled = true, TopologyRecoveryEnabled = true };
-        var connection = factory.CreateConnection($"sora-{busCode}");
+        // Resilient initial connect: tolerate broker not yet accepting connections (e.g., during container start)
+        var logger = sp.GetService(typeof(ILogger<RabbitMqFactory>)) as ILogger<RabbitMqFactory>;
+        IConnection? connection = null;
+        Exception? lastConnectError = null;
+        // Reuse retry options for initial connection attempts
+        var maxAttempts = Math.Max(3, opts.Retry.MaxAttempts);
+        var firstDelay = TimeSpan.FromSeconds(Math.Max(1, opts.Retry.FirstDelaySeconds));
+        var maxDelay = TimeSpan.FromSeconds(Math.Max(opts.Retry.FirstDelaySeconds, opts.Retry.MaxDelaySeconds));
+        TimeSpan NextDelay(int attempt)
+        {
+            // simple exponential backoff with cap
+            double factor = Math.Pow(2, Math.Max(0, attempt - 1));
+            var d = TimeSpan.FromSeconds(Math.Min(maxDelay.TotalSeconds, firstDelay.TotalSeconds * factor));
+            return d <= TimeSpan.Zero ? TimeSpan.FromSeconds(1) : d;
+        }
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                connection = factory.CreateConnection($"sora-{busCode}");
+                lastConnectError = null;
+                break;
+            }
+            catch (Exception ex)
+            {
+                lastConnectError = ex;
+                if (attempt >= maxAttempts) break;
+                var delay = NextDelay(attempt);
+                logger?.LogInformation(ex, "RabbitMQ broker not ready yet (attempt {Attempt}/{MaxAttempts}). Waiting {Delay}s. Uri={Uri}", attempt, maxAttempts, (int)delay.TotalSeconds, connStr);
+                try { System.Threading.Thread.Sleep(delay); } catch { /* ignore */ }
+            }
+        }
+        if (connection is null)
+        {
+            // surface the last error if unable to connect after retries
+            throw lastConnectError ?? new Exception("Failed to connect to RabbitMQ: unknown error");
+        }
         var channel = connection.CreateModel();
 
         if (opts.Prefetch > 0) channel.BasicQos(0, (ushort)Math.Min(ushort.MaxValue, opts.Prefetch), global: false);

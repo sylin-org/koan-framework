@@ -13,6 +13,7 @@ public static class Constants
     {
         public const string Canonical = "canonical";
     public const string Lineage = "lineage";
+    public const string Materialized = "materialized";
     }
 
     public static class Rejections
