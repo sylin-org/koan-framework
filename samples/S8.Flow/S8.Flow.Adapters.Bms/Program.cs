@@ -6,6 +6,7 @@ using Sora.Core;
 using Sora.Messaging;
 using Sora.Messaging.RabbitMq;
 using S8.Flow.Shared;
+using S8.Flow.Shared.Events;
 using Sora.Core.Hosting.App;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -43,22 +44,34 @@ public sealed class BmsPublisher : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var rng = new Random();
+        var lastAnnounce = DateTimeOffset.MinValue;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 var idx = rng.Next(0, SampleProfiles.Fleet.Length);
                 var d = SampleProfiles.Fleet[idx];
-                var evt = TelemetryEvent.Reading(
-                    system: "bms",
-                    adapter: "bms",
-                    sensorExternalId: $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}",
-                    unit: Units.C,
+                // Periodic independent announcements (devices + sensors)
+                if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromMinutes(5))
+                {
+                    var dev = DeviceAnnounceEvent.FromProfile(system: "bms", adapter: "bms", profile: d, source: "bms");
+                    await dev.Send();
+                    var sensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}";
+                    var sensor = SensorAnnounceEvent.Create(system: "bms", adapter: "bms", sensorKey: sensorKey, code: SensorCodes.TEMP, unit: Units.C, source: "bms");
+                    await sensor.Send();
+                    lastAnnounce = DateTimeOffset.UtcNow;
+                    _log.LogInformation("BMS announced Device {Inv}/{Serial} and Sensor {Sensor}", d.Inventory, d.Serial, sensorKey);
+                }
+
+                // Fast-tracked reading VO: only key + values
+                var key = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}";
+                var reading = ReadingEvent.Create(
+                    sensorKey: key,
                     value: Math.Round(20 + rng.NextDouble() * 10, 2),
+                    unit: Units.C,
                     source: "bms");
-                // Publish using Sora.Messaging extension
-                await evt.Send();
-                _log.LogInformation("BMS sent TelemetryEvent {Inv}/{Serial} {Sensor}={Value}{Unit} at {At}", d.Inventory, d.Serial, SensorCodes.TEMP, evt.Value, Units.C, evt.CapturedAt);
+                await reading.Send();
+                _log.LogInformation("BMS sent Reading {Key}={Value}{Unit} at {At}", key, reading.Value, Units.C, reading.CapturedAt);
             }
             catch (Exception ex)
             {

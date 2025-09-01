@@ -15,6 +15,7 @@ A comprehensive guide for building data processing pipelines with Sora.Flow, fro
 9. [Monitoring and Actions](#monitoring-and-actions)
 10. [Production Considerations](#production-considerations)
 11. [Troubleshooting](#troubleshooting)
+12. [Identifier Policy: ULID and CanonicalId](#identifier-policy-ulid-and-canonicalid)
 
 ## Introduction
 
@@ -65,6 +66,7 @@ Intake → Standardize → Key → Associate → Project → Materialize
 - **FlowEntity**: Your canonical data model (e.g., Customer, Device, Order)
 - **StageRecord**: A single piece of data as it moves through the pipeline
 - **ReferenceId**: Unique identifier for a logical entity across all sources
+    - In Flow, ReferenceId (CanonicalId) is the business key derived from aggregation tags. A separate ULID is minted for transport/storage as Id.
 - **Aggregation Tags**: Fields used to determine if records belong to the same entity
 - **Canonical View**: The current, merged state of an entity
 - **Lineage View**: Historical trail showing how the entity evolved
@@ -291,6 +293,8 @@ Sora.Flow follows strict rules when associating records:
 2. **Single Owner**: If all keys belong to the same existing entity → use that `ReferenceId`
 3. **Multi-Owner Collision**: If keys belong to different entities → reject with `MULTI_OWNER_COLLISION`
 4. **New Entity**: If no keys exist → create new `ReferenceId`
+
+When a new ReferenceId is created during Associate, Flow also mints a ULID that becomes the primary Id for the entity. Both are preserved across the stack.
 
 ### Example: Multi-Source Customer Data
 
@@ -1681,6 +1685,93 @@ public class RuleBasedProcessor<TModel> : IFlowProcessor<TModel>
     }
 }
 
+## Identifier Policy: ULID and CanonicalId
+
+This guide adopts the approved identity model from FLOW-0104: a dual identifier per entity.
+
+- Id (ULID): primary identifier for transport, URLs, and storage; outward-facing and URL-friendly
+- CanonicalId: stable business key derived from aggregation tags; drives association and domain joins
+
+When a new entity is created during Associate, Flow mints a ULID and preserves both values throughout the pipeline.
+
+### Minting and Propagation
+
+- Mint at Associate: the first time a CanonicalId is resolved to a new entity
+- Enforce uniqueness on CanonicalId in the canonical registry (unique index)
+- Propagate both identifiers across stages, keyed records, and projection views
+
+Envelope fields used across the pipeline:
+
+- CorrelationId: use for business correlation (often your CanonicalId)
+- ReferenceUlid (or EntityUlid): the minted ULID after Associate; attach for downstream consumers
+
+### API and Storage
+
+- Default routes should use ULID: /{model}/{id}
+- Provide a secondary business-key route: /{model}/by-cid/{canonicalId}
+- Store projections keyed by ULID; keep CanonicalId as a field for filtering/indexing
+
+### Example: Dual-route controller
+
+```csharp
+[ApiController]
+[Route("api/contacts")]
+public sealed class ContactsController : ControllerBase
+{
+    // GET api/contacts/{id}  (ULID)
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(string id)
+    {
+        using (DataSetContext.With(FlowSets.ViewShort(Constants.Views.Canonical)))
+        {
+            var view = await CanonicalProjection<Contact>.Get($"{Constants.Views.Canonical}::{id}");
+            return view?.Model is null ? NotFound() : Ok(view.Model);
+        }
+    }
+
+    // GET api/contacts/by-cid/{canonicalId} (business key)
+    [HttpGet("by-cid/{canonicalId}")]
+    public async Task<IActionResult> GetByCanonicalId(string canonicalId)
+    {
+        // Resolve ULID via identity map / reference index, then reuse GetById
+        var refItem = await ReferenceItem<Contact>.GetByCanonicalId(canonicalId);
+        if (refItem is null) return NotFound();
+        return await GetById(refItem.Id); // refItem.Id is ULID
+    }
+}
+```
+
+### Example: Enrich records after Associate
+
+```csharp
+// After Associate determines CanonicalId, enrich keyed record metadata
+var keyed = await StageRecord<Contact>.FirstPage(100);
+foreach (var r in keyed)
+{
+    // r.CorrelationId stays business-focused (often CanonicalId)
+    // r.Metadata["referenceUlid"] carries the ULID for downstream consumers
+    r.Metadata ??= new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+    if (!r.Metadata.ContainsKey("referenceUlid"))
+    {
+        var refItem = await ReferenceItem<Contact>.GetByCanonicalId(r.ReferenceId!);
+        if (refItem != null)
+        {
+            r.Metadata["referenceUlid"] = refItem.Id; // ULID
+            await r.Save();
+        }
+    }
+}
+```
+
+### Guidance
+
+- Prefer ULID in hyperlinks and external APIs; always include CanonicalId in payloads when relevant
+- Index CanonicalId where you commonly filter or join
+- For merges/splits, select a deterministic winner ULID and reproject views; maintain redirects/links for the losers
+
+See also: `docs/decisions/FLOW-0104-ulid-primary-id-and-canonical-id.md` and `docs/decisions/ARCH-0052-core-ids-and-json-merge-policy.md`.
+
+```csharp
 public record ProcessingResult<TModel>(
     bool Success,
     FlowEntity<TModel> Entity,
@@ -1693,7 +1784,6 @@ public record ProcessingResult<TModel>(
         => new(false, entity, error, metadata);
 }
 ```
-
 ### Conditional Routing Rules
 
 Implement rules that determine entity routing and processing paths:

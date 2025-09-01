@@ -21,11 +21,20 @@ public sealed class WindowReadingProjector : BackgroundService
         {
             try
             {
+                IReadOnlyList<StageRecord<SensorReadingVo>> page;
                 using (DataSetContext.With(FlowSets.StageShort(FlowSets.Keyed)))
                 {
-                    var page = await StageRecord<Sensor>.FirstPage(500, stoppingToken);
-                    if (page.Count > 0)
+                    page = await StageRecord<SensorReadingVo>.FirstPage(500, stoppingToken);
+                }
+                if (page.Count == 0)
+                {
+                    using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
                     {
+                        page = await StageRecord<SensorReadingVo>.FirstPage(500, stoppingToken);
+                    }
+                }
+                if (page.Count > 0)
+                {
                         var cutoff = DateTimeOffset.UtcNow - Window;
                         var groups = page
                             .Where(r => !string.IsNullOrWhiteSpace(r.CorrelationId))
@@ -55,16 +64,17 @@ public sealed class WindowReadingProjector : BackgroundService
                                 ["avg"] = readings.Average(x => x.Val),
                                 ["series"] = readings.Select(x => new object[]{ x.At.ToString("O"), x.Val }).ToArray(),
                             };
+                            var rulid = g.First().ReferenceUlid;
                             var doc = new SensorWindowReading
                             {
-                                Id = $"{ViewName}::{g.Key}",
-                                ReferenceId = g.Key,
+                                Id = $"{ViewName}::{(string.IsNullOrWhiteSpace(rulid) ? g.Key : rulid)}",
+                                CanonicalId = g.Key,
+                                ReferenceUlid = rulid,
                                 ViewName = ViewName,
                                 View = view
                             };
                             await Data<SensorWindowReading, string>.UpsertAsync(doc, set: FlowSets.ViewShort(ViewName), ct: stoppingToken);
                         }
-                    }
                 }
             }
             catch (Exception ex)

@@ -24,34 +24,45 @@ public sealed class LatestReadingProjector : BackgroundService
             try
             {
                 using var scope = _sp.CreateScope();
+                IReadOnlyList<StageRecord<SensorReadingVo>> page;
                 using (DataSetContext.With(FlowSets.StageShort(FlowSets.Keyed)))
                 {
-                    var page = await StageRecord<Sensor>.FirstPage(500, stoppingToken);
-                    if (page.Count > 0)
+                    page = await StageRecord<SensorReadingVo>.FirstPage(500, stoppingToken);
+                }
+                if (page.Count == 0)
+                {
+                    // Fallback to intake if keyed hasn't been populated yet
+                    using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
                     {
-                        var groups = page
-                            .Where(r => !string.IsNullOrWhiteSpace(r.CorrelationId))
-                            .GroupBy(r => r.CorrelationId!, StringComparer.Ordinal);
-                        foreach (var g in groups)
+                        page = await StageRecord<SensorReadingVo>.FirstPage(500, stoppingToken);
+                    }
+                }
+                if (page.Count > 0)
+                {
+                    var groups = page
+                        .Where(r => !string.IsNullOrWhiteSpace(r.CorrelationId))
+                        .GroupBy(r => r.CorrelationId!, StringComparer.Ordinal);
+                    foreach (var g in groups)
+                    {
+                        var latest = g.OrderByDescending(x => x.OccurredAt).First();
+                        var payload = Extract(latest.StagePayload);
+                        if (payload is null) continue;
+                        var rulid = latest.ReferenceUlid;
+                        var viewDoc = new SensorLatestReading
                         {
-                            var latest = g.OrderByDescending(x => x.OccurredAt).First();
-                            var payload = Extract(latest.StagePayload);
-                            if (payload is null) continue;
-                            var viewDoc = new SensorLatestReading
+                            Id = $"{ViewName}::{(string.IsNullOrWhiteSpace(rulid) ? g.Key : rulid)}",
+                            CanonicalId = g.Key,
+                            ReferenceUlid = rulid,
+                            ViewName = ViewName,
+                            View = new Dictionary<string, object>
                             {
-                                Id = $"{ViewName}::{g.Key}",
-                                ReferenceId = g.Key,
-                                ViewName = ViewName,
-                                View = new Dictionary<string, object>
-                                {
-                                    [Keys.Reading.CapturedAt] = payload.TryGetValue(Keys.Reading.CapturedAt, out var at) ? at : latest.OccurredAt.ToString("O"),
-                                    [Keys.Reading.Value] = payload.TryGetValue(Keys.Reading.Value, out var val) ? val : default!,
-                                    [Keys.Sensor.Unit] = payload.TryGetValue(Keys.Sensor.Unit, out var u) ? u : string.Empty,
-                                    [Keys.Sensor.Code] = payload.TryGetValue(Keys.Sensor.Code, out var code) ? code : string.Empty,
-                                }
-                            };
-                            await Data<SensorLatestReading, string>.UpsertAsync(viewDoc, set: FlowSets.ViewShort(ViewName), ct: stoppingToken);
-                        }
+                                [Keys.Reading.CapturedAt] = payload.TryGetValue(Keys.Reading.CapturedAt, out var at) ? at : latest.OccurredAt.ToString("O"),
+                                [Keys.Reading.Value] = payload.TryGetValue(Keys.Reading.Value, out var val) ? val : default!,
+                                [Keys.Sensor.Unit] = payload.TryGetValue(Keys.Sensor.Unit, out var u) ? u : string.Empty,
+                                [Keys.Sensor.Code] = payload.TryGetValue(Keys.Sensor.Code, out var code) ? code : string.Empty,
+                            }
+                        };
+                        await Data<SensorLatestReading, string>.UpsertAsync(viewDoc, set: FlowSets.ViewShort(ViewName), ct: stoppingToken);
                     }
                 }
             }

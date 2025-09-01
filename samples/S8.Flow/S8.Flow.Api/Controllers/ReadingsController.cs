@@ -7,7 +7,7 @@ using Sora.Data.Core;
 namespace S8.Flow.Api.Controllers;
 
 [ApiController]
-[Route("api/readings")] // VO-only ingest: posts a SensorReading and routes to Sensor model intake
+[Route("api/readings")] // VO-only ingest: posts a SensorReading and routes to VO StageRecord intake
 public sealed class ReadingsController : ControllerBase
 {
     [HttpPost]
@@ -24,16 +24,17 @@ public sealed class ReadingsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(reading.Unit)) payload[Keys.Sensor.Unit] = reading.Unit;
         if (!string.IsNullOrWhiteSpace(reading.Source)) payload[Keys.Reading.Source] = reading.Source!;
 
-        var typed = new StageRecord<Sensor>
+        var typed = new StageRecord<SensorReadingVo>
         {
             Id = Guid.NewGuid().ToString("n"),
             SourceId = reading.Source ?? "api",
             OccurredAt = reading.CapturedAt,
-            StagePayload = payload
+            StagePayload = payload,
+            CorrelationId = reading.SensorKey
         };
         using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
         {
-            await Data<StageRecord<Sensor>, string>.UpsertAsync(typed, ct);
+            await Data<StageRecord<SensorReadingVo>, string>.UpsertAsync(typed, ct);
         }
         return Accepted();
     }

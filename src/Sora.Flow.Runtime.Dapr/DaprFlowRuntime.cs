@@ -47,7 +47,8 @@ internal sealed class DaprFlowRuntime : IFlowRuntime
             foreach (var item in list)
             {
                 if (ct.IsCancellationRequested) break;
-                var refId = (string)item.GetType().GetProperty("ReferenceId")!.GetValue(item)!;
+                // Use ULID (Id) as the reference identifier
+                var refId = (string)item.GetType().GetProperty("Id")!.GetValue(item)!;
                 var ver = (ulong)item.GetType().GetProperty("Version")!.GetValue(item)!;
                 await EnqueueIfMissing(refId, ver, viewName, ct);
             }
@@ -58,7 +59,7 @@ internal sealed class DaprFlowRuntime : IFlowRuntime
     {
         if (string.IsNullOrWhiteSpace(referenceId)) return;
         var vn = string.IsNullOrWhiteSpace(viewName) ? _opts.CurrentValue.DefaultViewName : viewName!;
-        // Resolve latest version via typed ReferenceItem<T>
+    // Resolve latest version via typed ReferenceItem<T>
     foreach (var modelType in DiscoverModels())
         {
             var riType = typeof(ReferenceItem<>).MakeGenericType(modelType);
@@ -81,22 +82,23 @@ internal sealed class DaprFlowRuntime : IFlowRuntime
     {
         // Look for an existing task; if not found, create it.
         bool exists = false;
-    foreach (var modelType in DiscoverModels())
+        var taskId = TaskKey(referenceId, version, viewName);
+        foreach (var modelType in DiscoverModels())
         {
             var ptType = typeof(ProjectionTask<>).MakeGenericType(modelType);
-            var query = typeof(Sora.Data.Core.Data<,>).MakeGenericType(ptType, typeof(string)).GetMethod("Query", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
-            var t = (System.Threading.Tasks.Task)query.Invoke(null, new object?[] { $"ReferenceId == '{referenceId}' and Version == {version} and ViewName == '{viewName}'", ct })!; await t.ConfigureAwait(false);
-            var list = (System.Collections.IEnumerable)t.GetType().GetProperty("Result")!.GetValue(t)!;
-            if (list.GetEnumerator().MoveNext()) { exists = true; break; }
+            var get = typeof(Sora.Data.Core.Data<,>).MakeGenericType(ptType, typeof(string)).GetMethod("GetAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
+            var t = (System.Threading.Tasks.Task)get.Invoke(null, new object?[] { taskId, ct })!; await t.ConfigureAwait(false);
+            var found = t.GetType().GetProperty("Result")!.GetValue(t);
+            if (found is not null) { exists = true; break; }
         }
         if (exists) return;
         // create in all models (harmless; only correct model base will be used for naming)
-    foreach (var modelType in DiscoverModels())
+        foreach (var modelType in DiscoverModels())
         {
             var ptType = typeof(ProjectionTask<>).MakeGenericType(modelType);
             var entity = Activator.CreateInstance(ptType)!;
-            ptType.GetProperty("Id")!.SetValue(entity, TaskKey(referenceId, version, viewName));
-            ptType.GetProperty("ReferenceId")!.SetValue(entity, referenceId);
+            ptType.GetProperty("Id")!.SetValue(entity, taskId);
+            ptType.GetProperty("ReferenceUlid")?.SetValue(entity, referenceId);
             ptType.GetProperty("Version")!.SetValue(entity, version);
             ptType.GetProperty("ViewName")!.SetValue(entity, viewName);
             ptType.GetProperty("CreatedAt")!.SetValue(entity, DateTimeOffset.UtcNow);

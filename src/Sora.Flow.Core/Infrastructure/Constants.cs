@@ -25,8 +25,8 @@ public static class Constants
     public static class Routes
     {
         public const string IntakeRecords = "/intake/records";
-        public const string Views = "/views"; // /views/{view}/{referenceId}
-        public const string Lineage = "/lineage"; // /lineage/{referenceId}
+    public const string Views = "/views"; // /views/{view}/{referenceUlid}
+    public const string Lineage = "/lineage"; // /lineage/{referenceUlid}
         public const string Policies = "/policies";
         public const string Admin = "/admin"; // /admin/replay, /admin/reproject
         public const string Control = "/control"; // seed/pull-window/suspend/resume/throttle

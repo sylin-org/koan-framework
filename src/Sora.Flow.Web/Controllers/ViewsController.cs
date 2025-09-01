@@ -6,7 +6,7 @@ using System.Reflection;
 namespace Sora.Flow.Web.Controllers;
 
 [ApiController]
-[Route("views")] // /views/{view}/{referenceId}
+[Route("views")] // /views/{view}/{referenceUlid}
 public sealed class ViewsController : ControllerBase
 {
     private readonly ILogger<ViewsController> _logger;
@@ -42,7 +42,7 @@ public sealed class ViewsController : ControllerBase
             var viewDoc = new CanonicalProjectionView
                     {
             Id = (string)canType.GetProperty("Id")!.GetValue(raw)!,
-            ReferenceId = (string)canType.GetProperty("ReferenceId")!.GetValue(raw)!,
+            ReferenceUlid = (string?)(canType.GetProperty("ReferenceUlid")?.GetValue(raw)),
             ViewName = (string)canType.GetProperty("ViewName")!.GetValue(raw)!,
         Model = canType.GetProperty("Model")?.GetValue(raw) ?? canType.GetProperty("View")!.GetValue(raw)
                     };
@@ -50,7 +50,7 @@ public sealed class ViewsController : ControllerBase
                     return Ok(viewDoc);
                 }
             }
-            var list = await QueryCanonicalAcrossModels($"ReferenceId == '{referenceId}'", set, ct);
+            var list = await QueryCanonicalAcrossModels($"ReferenceUlid == '{referenceId}'", set, ct);
             var doc = list.FirstOrDefault();
             _logger.LogInformation("ViewsController.GetOne canonical view={View} ref={Ref} found={Found}", view, referenceId, doc is not null);
             return doc is null ? NotFound() : Ok(doc);
@@ -63,10 +63,10 @@ public sealed class ViewsController : ControllerBase
         var raw = await TryGetByIdAsync(linType, $"{Sora.Flow.Infrastructure.Constants.Views.Lineage}::{referenceId}", set, ct);
         if (raw is not null)
                 {
-                    var viewDoc = new LineageProjectionView
+            var viewDoc = new LineageProjectionView
                     {
             Id = (string)linType.GetProperty("Id")!.GetValue(raw)!,
-            ReferenceId = (string)linType.GetProperty("ReferenceId")!.GetValue(raw)!,
+            ReferenceUlid = (string?)(linType.GetProperty("ReferenceUlid")?.GetValue(raw)),
             ViewName = (string)linType.GetProperty("ViewName")!.GetValue(raw)!,
             View = (Dictionary<string, Dictionary<string, string[]>>)linType.GetProperty("View")!.GetValue(raw)!
                     };
@@ -74,14 +74,14 @@ public sealed class ViewsController : ControllerBase
                     return Ok(viewDoc);
                 }
             }
-            var list = await QueryLineageAcrossModels($"ReferenceId == '{referenceId}'", set, ct);
+            var list = await QueryLineageAcrossModels($"ReferenceUlid == '{referenceId}'", set, ct);
             var doc = list.FirstOrDefault();
             _logger.LogInformation("ViewsController.GetOne lineage view={View} ref={Ref} found={Found}", view, referenceId, doc is not null);
             return doc is null ? NotFound() : Ok(doc);
         }
 
     // Fallback generic: aggregate across all models for arbitrary views (e.g., latest.reading, window.5m)
-    var any = await QueryGenericAcrossModels(view, $"ReferenceId == '{referenceId}'", set, ct);
+    var any = await QueryGenericAcrossModels(view, $"ReferenceUlid == '{referenceId}'", set, ct);
     var gdoc = any.FirstOrDefault();
     _logger.LogInformation("ViewsController.GetOne generic(view,all) view={View} ref={Ref} found={Found}", view, referenceId, gdoc is not null);
     return gdoc is null ? NotFound() : Ok(gdoc);
@@ -96,13 +96,13 @@ public sealed class ViewsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(q))
         {
             var set = Sora.Flow.Infrastructure.FlowSets.ViewShort(view);
-            // Fast-path: support simple ReferenceId equality without relying on string query provider
+            // Fast-path: support simple ReferenceUlid equality without relying on string query provider
             string? refFilter = null;
             try
             {
-                // Accept forms like ReferenceId == 'INV-1002' or ReferenceId=="INV-1002" (very simple parser)
+                // Accept forms like ReferenceUlid == '01HF...' or ReferenceUlid=="01HF..." (very simple parser)
                 var normalized = q!.Trim();
-                if (normalized.StartsWith("ReferenceId", StringComparison.OrdinalIgnoreCase))
+                if (normalized.StartsWith("ReferenceUlid", StringComparison.OrdinalIgnoreCase))
                 {
                     var idx = normalized.IndexOf("==", StringComparison.Ordinal);
                     if (idx > 0)
@@ -120,7 +120,7 @@ public sealed class ViewsController : ControllerBase
             if (string.Equals(view, Sora.Flow.Infrastructure.Constants.Views.Canonical, StringComparison.OrdinalIgnoreCase))
             {
                 var results = refFilter is null ? await QueryCanonicalAcrossModels(q!, set, ct)
-                                                : (await QueryCanonicalAcrossModels(null, set, ct)).Where(x => string.Equals(x.ReferenceId, refFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+                                                : (await QueryCanonicalAcrossModels(null, set, ct)).Where(x => string.Equals(x.ReferenceUlid, refFilter, StringComparison.OrdinalIgnoreCase)).ToList();
                 var total = results.Count;
                 var skip = (p - 1) * s;
                 var pageItems = results.Skip(skip).Take(s).ToList();
@@ -131,7 +131,7 @@ public sealed class ViewsController : ControllerBase
             if (string.Equals(view, Sora.Flow.Infrastructure.Constants.Views.Lineage, StringComparison.OrdinalIgnoreCase))
             {
                 var results = refFilter is null ? await QueryLineageAcrossModels(q!, set, ct)
-                                                : (await QueryLineageAcrossModels(null, set, ct)).Where(x => string.Equals(x.ReferenceId, refFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+                                                : (await QueryLineageAcrossModels(null, set, ct)).Where(x => string.Equals(x.ReferenceUlid, refFilter, StringComparison.OrdinalIgnoreCase)).ToList();
                 var total = results.Count;
                 var skip = (p - 1) * s;
                 var pageItems = results.Skip(skip).Take(s).ToList();
@@ -231,7 +231,7 @@ public sealed class ViewsController : ControllerBase
                 var doc = new CanonicalProjectionView
                 {
                     Id = (string)canType.GetProperty("Id")!.GetValue(it)!,
-                    ReferenceId = (string)canType.GetProperty("ReferenceId")!.GetValue(it)!,
+                    ReferenceUlid = (string?)(canType.GetProperty("ReferenceUlid")?.GetValue(it)),
                     ViewName = (string)canType.GetProperty("ViewName")!.GetValue(it)!,
                     Model = canType.GetProperty("Model")?.GetValue(it) ?? canType.GetProperty("View")!.GetValue(it)
                 };
@@ -267,7 +267,7 @@ public sealed class ViewsController : ControllerBase
                 var doc = new LineageProjectionView
                 {
                     Id = (string)linType.GetProperty("Id")!.GetValue(it)!,
-                    ReferenceId = (string)linType.GetProperty("ReferenceId")!.GetValue(it)!,
+                    ReferenceUlid = (string?)(linType.GetProperty("ReferenceUlid")?.GetValue(it)),
                     ViewName = (string)linType.GetProperty("ViewName")!.GetValue(it)!,
                     View = (Dictionary<string, Dictionary<string, string[]>>)linType.GetProperty("View")!.GetValue(it)!
                 };
@@ -312,7 +312,7 @@ public sealed class ViewsController : ControllerBase
                 var doc = new Sora.Flow.Model.ProjectionView<object>
                 {
                     Id = (string)genViewType.GetProperty("Id")!.GetValue(it)!,
-                    ReferenceId = (string)genViewType.GetProperty("ReferenceId")!.GetValue(it)!,
+                    ReferenceUlid = (string?)(genViewType.GetProperty("ReferenceUlid")?.GetValue(it)),
                     ViewName = (string)genViewType.GetProperty("ViewName")!.GetValue(it)!,
                     View = (object?)genViewType.GetProperty("View")!.GetValue(it)
                 };

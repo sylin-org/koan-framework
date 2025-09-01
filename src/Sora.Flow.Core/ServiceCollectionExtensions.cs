@@ -136,8 +136,8 @@ public static class ServiceCollectionExtensions
             return full.Replace('+', '.');
         }
 
-    // Stage records and views: keep base as the model name, sets supply the suffix
-    if (def == typeof(StageRecord<>) || def == typeof(CanonicalProjection<>) || def == typeof(LineageProjection<>))
+    // Stage/parked records and views: keep base as the model name, sets supply the suffix
+    if (def == typeof(StageRecord<>) || def == typeof(ParkedRecord<>) || def == typeof(CanonicalProjection<>) || def == typeof(LineageProjection<>))
             return ModelBaseName();
 
         // Root-scoped typed entities (no set provided): bake a type-specific suffix into the base
@@ -466,7 +466,10 @@ public static class ServiceCollectionExtensions
 
                             foreach (var t in tasks)
                             {
-                                var refId = (string) t.GetType().GetProperty("ReferenceId")!.GetValue(t)!;
+                                var refUlid = t.GetType().GetProperty("ReferenceUlid")?.GetValue(t) as string;
+                                // ULID is the authoritative key for view/doc ids
+                                var refId = refUlid ?? string.Empty;
+                                var canonicalId = t.GetType().GetProperty("CanonicalId")?.GetValue(t) as string;
                                 // keyed stage for this model
                                 var keyedSet = FlowSets.StageShort(FlowSets.Keyed);
                                 var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
@@ -477,9 +480,15 @@ public static class ServiceCollectionExtensions
                                     var allTask = (Task)allMethod!.Invoke(null, new object?[] { stoppingToken })!;
                                     await allTask.ConfigureAwait(false);
                                     var allEnum = (System.Collections.IEnumerable)GetTaskResult(allTask)!;
-                                    var all = allEnum.Cast<object>()
-                                        .Where(r => string.Equals((string?)r.GetType().GetProperty("CorrelationId")?.GetValue(r), refId, StringComparison.Ordinal))
-                                        .ToList();
+                                    var all = new List<object>();
+                                    foreach (var r in allEnum.Cast<object>())
+                                    {
+                                        var rulid = r.GetType().GetProperty("ReferenceUlid")?.GetValue(r) as string;
+                                        bool match = !string.IsNullOrWhiteSpace(refUlid)
+                                            ? string.Equals(rulid, refUlid, StringComparison.Ordinal)
+                                            : false;
+                                        if (match) all.Add(r);
+                                    }
 
                                     // canonical (range structure) and lineage
                                     var canonical = new Dictionary<string, List<string?>>(StringComparer.OrdinalIgnoreCase);
@@ -546,7 +555,10 @@ public static class ServiceCollectionExtensions
                                     var canType = typeof(CanonicalProjection<>).MakeGenericType(modelType);
                                     var canDoc = Activator.CreateInstance(canType)!;
                                     canType.GetProperty("Id")!.SetValue(canDoc, $"{Constants.Views.Canonical}::{refId}");
-                                    canType.GetProperty("ReferenceId")!.SetValue(canDoc, refId);
+                                    // legacy ReferenceId removed; identifiers are CanonicalId and ReferenceUlid
+                                    // Populate identifier fields when available
+                                    if (!string.IsNullOrWhiteSpace(canonicalId)) canType.GetProperty("CanonicalId")?.SetValue(canDoc, canonicalId);
+                                    if (!string.IsNullOrWhiteSpace(refUlid)) canType.GetProperty("ReferenceUlid")?.SetValue(canDoc, refUlid);
                                     canType.GetProperty("ViewName")!.SetValue(canDoc, Constants.Views.Canonical);
                                     // Canonical now publishes nested ranges under Model
                                     var modelProp = canType.GetProperty("Model") ?? canType.GetProperty("View");
@@ -558,7 +570,9 @@ public static class ServiceCollectionExtensions
                                     var linType = typeof(LineageProjection<>).MakeGenericType(modelType);
                                     var linDoc = Activator.CreateInstance(linType)!;
                                     linType.GetProperty("Id")!.SetValue(linDoc, $"{Constants.Views.Lineage}::{refId}");
-                                    linType.GetProperty("ReferenceId")!.SetValue(linDoc, refId);
+                                    // legacy ReferenceId removed; identifiers are CanonicalId and ReferenceUlid
+                                    if (!string.IsNullOrWhiteSpace(canonicalId)) linType.GetProperty("CanonicalId")?.SetValue(linDoc, canonicalId);
+                                    if (!string.IsNullOrWhiteSpace(refUlid)) linType.GetProperty("ReferenceUlid")?.SetValue(linDoc, refUlid);
                                     linType.GetProperty("ViewName")!.SetValue(linDoc, Constants.Views.Lineage);
                                     linType.GetProperty("View")!.SetValue(linDoc, lineageView);
                                     var linData = typeof(Data<,>).MakeGenericType(linType, typeof(string));
@@ -622,7 +636,9 @@ public static class ServiceCollectionExtensions
                                         var dynType = typeof(DynamicFlowEntity<>).MakeGenericType(modelType);
                                         var dyn = Activator.CreateInstance(dynType)!;
                                         dynType.GetProperty("Id")!.SetValue(dyn, refId);
-                                        dynType.GetProperty("ReferenceId")!.SetValue(dyn, refId);
+                                        // no legacy ReferenceId on root; Id carries ULID. CanonicalId populated below.
+                                        if (!string.IsNullOrWhiteSpace(canonicalId)) dynType.GetProperty("CanonicalId")?.SetValue(dyn, canonicalId);
+                                        if (!string.IsNullOrWhiteSpace(refUlid)) dynType.GetProperty("ReferenceUlid")?.SetValue(dyn, refUlid);
                                         // Root materialized snapshot stored under Model (renamed from Data)
                                         var dynModelProp = dynType.GetProperty("Model") ?? dynType.GetProperty("Data");
                                         dynModelProp!.SetValue(dyn, plain);
@@ -633,7 +649,8 @@ public static class ServiceCollectionExtensions
                                         var polType = typeof(PolicyState<>).MakeGenericType(modelType);
                                         var pol = Activator.CreateInstance(polType)!;
                                         polType.GetProperty("Id")!.SetValue(pol, refId);
-                                        polType.GetProperty("ReferenceId")!.SetValue(pol, refId);
+                                        // Policy state now stores ReferenceUlid instead of legacy ReferenceId
+                                        polType.GetProperty("ReferenceUlid")!.SetValue(pol, refId);
                                         polType.GetProperty("Policies")!.SetValue(pol, new Dictionary<string, string>(mutablePolicies, StringComparer.OrdinalIgnoreCase));
                                         var polData = typeof(Data<,>).MakeGenericType(polType, typeof(string));
                                         await (Task)polData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { polType, typeof(CancellationToken) })!
@@ -723,12 +740,18 @@ public static class ServiceCollectionExtensions
                             }
 
                             var candidates = new List<(string tag, string value)>();
+                            string? canonicalId = null;
                             foreach (var tag in tags)
                             {
                                 if (!dict.TryGetValue(tag, out var raw)) continue;
                                 foreach (var v in ToValuesFlexible(raw))
                                 {
-                                    if (!string.IsNullOrWhiteSpace(v)) candidates.Add((tag, v));
+                                    if (!string.IsNullOrWhiteSpace(v))
+                                    {
+                                        candidates.Add((tag, v));
+                                        // Heuristic: prefer the first aggregation key as CanonicalId if none explicit
+                                        canonicalId ??= v;
+                                    }
                                 }
                             }
                             // Optional composite candidate: system|adapter|externalId for safer ownership, when present
@@ -765,25 +788,23 @@ public static class ServiceCollectionExtensions
                                 var kiTask = (Task)getKi.Invoke(null, new object?[] { c.value, stoppingToken })!;
                                 await kiTask.ConfigureAwait(false);
                                 var ki = GetTaskResult(kiTask);
-                                var rid = (string?)ki?.GetType().GetProperty("ReferenceId")?.GetValue(ki);
+                                var rid = (string?)ki?.GetType().GetProperty("ReferenceUlid")?.GetValue(ki);
                                 if (!string.IsNullOrWhiteSpace(rid)) owners.Add(rid!);
                             }
 
-                            string referenceId;
+                            string referenceUlid;
                             if (owners.Count > 1)
                             {
                                 await this.SaveRejectAndDrop(Constants.Rejections.MultiOwnerCollision, new { owners = owners.ToArray(), keys = candidates }, rec, modelType, intakeSet, stoppingToken);
                                 goto NextRecord;
                             }
                             else if (owners.Count == 1)
-                            { referenceId = owners.First(); }
+                            { referenceUlid = owners.First(); }
                             else
                             {
                                 // Try identity map first using envelope fields
                                 var refFromIdentity = await TryResolveIdentityAsync(modelType, dict, stoppingToken);
-                                referenceId = refFromIdentity
-                                    ?? (string?)rec.GetType().GetProperty("CorrelationId")?.GetValue(rec)
-                                    ?? candidates[0].value;
+                                referenceUlid = refFromIdentity ?? UlidId.New();
                             }
 
                             // Save/verify keys ownership
@@ -796,13 +817,16 @@ public static class ServiceCollectionExtensions
                                 {
                                     var newKi = Activator.CreateInstance(kiType)!;
                                     kiType.GetProperty("AggregationKey")!.SetValue(newKi, c.value);
-                                    kiType.GetProperty("ReferenceId")!.SetValue(newKi, referenceId);
+                                    kiType.GetProperty("ReferenceUlid")!.SetValue(newKi, referenceUlid);
+                                    // also record CanonicalId if known
+                                    if (!string.IsNullOrWhiteSpace(canonicalId))
+                                        kiType.GetProperty("CanonicalId")?.SetValue(newKi, canonicalId);
                                     await (Task)kiData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { kiType, typeof(CancellationToken) })!
                                         .Invoke(null, new object?[] { newKi, stoppingToken })!;
                                 }
-                                else if (!string.Equals((string)kiType.GetProperty("ReferenceId")!.GetValue(ki)!, referenceId, StringComparison.Ordinal))
+                                else if (!string.Equals((string)kiType.GetProperty("ReferenceUlid")!.GetValue(ki)!, referenceUlid, StringComparison.Ordinal))
                                 {
-                                    await this.SaveRejectAndDrop(Constants.Rejections.KeyOwnerMismatch, new { key = c.value, existing = kiType.GetProperty("ReferenceId")!.GetValue(ki), incoming = referenceId }, rec, modelType, intakeSet, stoppingToken);
+                                    await this.SaveRejectAndDrop(Constants.Rejections.KeyOwnerMismatch, new { key = c.value, existing = kiType.GetProperty("ReferenceUlid")!.GetValue(ki), incoming = referenceUlid }, rec, modelType, intakeSet, stoppingToken);
                                     goto NextRecord;
                                 }
                             }
@@ -810,10 +834,18 @@ public static class ServiceCollectionExtensions
                             var refType = typeof(ReferenceItem<>).MakeGenericType(modelType);
                             var refData = typeof(Data<,>).MakeGenericType(refType, typeof(string));
                             var getRef = refData.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
-                            var refTask = (Task)getRef.Invoke(null, new object?[] { referenceId, stoppingToken })!;
+                            var refTask = (Task)getRef.Invoke(null, new object?[] { referenceUlid, stoppingToken })!;
                             await refTask.ConfigureAwait(false);
                             var ri = GetTaskResult(refTask) ?? Activator.CreateInstance(refType)!;
-                            refType.GetProperty("ReferenceId")!.SetValue(ri, referenceId);
+                            // Mint a ULID for the reference if it's a new item (Id empty)
+                            var currId = (string?)refType.GetProperty("Id")!.GetValue(ri);
+                            if (string.IsNullOrWhiteSpace(currId))
+                            {
+                                refType.GetProperty("Id")!.SetValue(ri, referenceUlid);
+                            }
+                            // Set CanonicalId (business key)
+                            if (!string.IsNullOrWhiteSpace(canonicalId))
+                                refType.GetProperty("CanonicalId")?.SetValue(ri, canonicalId);
                             var nextVersion = (ulong)((refType.GetProperty("Version")!.GetValue(ri) as ulong?) ?? 0) + 1UL;
                             refType.GetProperty("Version")!.SetValue(ri, nextVersion);
                             refType.GetProperty("RequiresProjection")!.SetValue(ri, true);
@@ -822,8 +854,10 @@ public static class ServiceCollectionExtensions
 
                             var taskType = typeof(ProjectionTask<>).MakeGenericType(modelType);
                             var newTask = Activator.CreateInstance(taskType)!;
-                            taskType.GetProperty("Id")!.SetValue(newTask, $"{referenceId}::{nextVersion}::{Constants.Views.Canonical}");
-                            taskType.GetProperty("ReferenceId")!.SetValue(newTask, referenceId);
+                            var refUlid = (string)refType.GetProperty("Id")!.GetValue(ri)!;
+                            taskType.GetProperty("Id")!.SetValue(newTask, $"{refUlid}::{nextVersion}::{Constants.Views.Canonical}");
+                            taskType.GetProperty("ReferenceUlid")?.SetValue(newTask, refUlid);
+                            if (!string.IsNullOrWhiteSpace(canonicalId)) taskType.GetProperty("CanonicalId")?.SetValue(newTask, canonicalId);
                             taskType.GetProperty("Version")!.SetValue(newTask, nextVersion);
                             taskType.GetProperty("ViewName")!.SetValue(newTask, Constants.Views.Canonical);
                             taskType.GetProperty("CreatedAt")!.SetValue(newTask, DateTimeOffset.UtcNow);
@@ -833,7 +867,11 @@ public static class ServiceCollectionExtensions
 
                             // Move record to keyed set and drop from intake
                             var keyedSet = FlowSets.StageShort(FlowSets.Keyed);
-                            rec.GetType().GetProperty("CorrelationId")?.SetValue(rec, referenceId);
+                            // CorrelationId can carry business key (optional) for diagnostics; leave as-is if already present
+                            if (!string.IsNullOrWhiteSpace(canonicalId))
+                                rec.GetType().GetProperty("CorrelationId")?.SetValue(rec, canonicalId);
+                            // also propagate ULID on stage record for downstream consumers
+                            rec.GetType().GetProperty("ReferenceUlid")?.SetValue(rec, refUlid);
                             var recData = typeof(Data<,>).MakeGenericType(recordType, typeof(string));
                             await (Task)recData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { recordType, typeof(string), typeof(CancellationToken) })!
                                 .Invoke(null, new object?[] { rec, keyedSet, stoppingToken })!;
@@ -875,8 +913,8 @@ public static class ServiceCollectionExtensions
                     var link = GetTaskResult(task);
                     if (link is not null)
                     {
-                        var rid = idType.GetProperty("ReferenceId")!.GetValue(link) as string;
-                        if (!string.IsNullOrWhiteSpace(rid)) return rid!;
+                        var rulid = idType.GetProperty("ReferenceUlid")!.GetValue(link) as string;
+                        if (!string.IsNullOrWhiteSpace(rulid)) return rulid!;
                     }
                     else
                     {
@@ -887,7 +925,7 @@ public static class ServiceCollectionExtensions
                         idType.GetProperty("System")!.SetValue(provisional, sys);
                         idType.GetProperty("Adapter")!.SetValue(provisional, adp);
                         idType.GetProperty("ExternalId")!.SetValue(provisional, ext);
-            idType.GetProperty("ReferenceId")!.SetValue(provisional, ulid);
+            idType.GetProperty("ReferenceUlid")!.SetValue(provisional, ulid);
                         idType.GetProperty("Provisional")!.SetValue(provisional, true);
                         // TTL hint via ExpiresAt; reuse intake TTL window as soft expiry for provisional
                         idType.GetProperty("ExpiresAt")!.SetValue(provisional, DateTimeOffset.UtcNow.AddDays(2));

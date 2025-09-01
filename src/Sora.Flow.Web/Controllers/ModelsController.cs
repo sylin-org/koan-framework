@@ -25,7 +25,7 @@ public sealed class ModelsController : ControllerBase
         var queryMethod = entityType.GetMethod("Query", BindingFlags.Public | BindingFlags.Static, new Type[] { typeof(string), typeof(string), typeof(CancellationToken) });
         if (queryMethod is null) return Problem("View entity doesn't expose Query");
 
-        var expr = $"ReferenceId == '{referenceId}'";
+    var expr = $"ReferenceUlid == '{referenceId}'";
         var task = (Task)queryMethod.Invoke(null, new object?[] { expr, set, ct })!;
         await task.ConfigureAwait(false);
         var result = GetTaskResult(task);

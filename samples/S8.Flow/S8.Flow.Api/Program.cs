@@ -14,6 +14,8 @@ using Sora.Flow.Infrastructure;
 using Sora.Data.Mongo;
 using Sora.Messaging.RabbitMq;
 using System.Linq;
+using S8.Flow.Shared.Events;
+using Sora.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,42 +54,65 @@ builder.Services.Configure<FlowOptions>(o =>
 
 builder.Services.AddControllers();
 builder.Services.AddRouting();
+builder.Services.AddSoraSwagger(builder.Configuration);
 builder.Services.AddHostedService<S8.Flow.Api.Hosting.LatestReadingProjector>();
 builder.Services.AddHostedService<S8.Flow.Api.Hosting.WindowReadingProjector>();
 
-// Message-driven adapters: handle TelemetryEvent and persist to Flow intake
+// Message-driven adapters: handle events and persist to Flow intake
 builder.Services.OnMessages(h =>
 {
-    // Include CancellationToken in handler signature; align with minimal TelemetryEvent envelope
-    h.On<TelemetryEvent>(async (env, msg, ct) =>
+    // Device announcements -> canonicalize Device model
+    h.On<DeviceAnnounceEvent>(async (env, msg, ct) =>
     {
-        var sp = Sora.Core.Hosting.App.AppHost.Current;
-        var log = sp?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
-        log?.CreateLogger("S8.Flow.Api.Handlers")?.LogInformation(
-            "TelemetryEvent received {System}/{Adapter} sensor={SensorExternalId} from {Source} at {At}",
-            msg.System, msg.Adapter, msg.SensorExternalId, msg.Source, msg.CapturedAt);
-
-        // Coerce to nullable value dictionary to satisfy StagePayload's Dictionary<string, object?> type
-        Dictionary<string, object?> payload = msg
-            .ToPayloadDictionary()
-            .ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase);
-        // Provide the model's configured aggregation key so association can succeed
-        payload[Keys.Sensor.Key] = msg.SensorExternalId;
-
-        // Enqueue into the per-model, typed intake for Sensor so model-aware workers can process it
-        var typed = new StageRecord<Sensor>
+        // Write an intake record for Device; association/projection workers will canonicalize
+        var payload = msg.ToPayloadDictionary();
+        payload[Constants.Envelope.System] = msg.System;
+        payload[Constants.Envelope.Adapter] = msg.Adapter;
+        var rec = new StageRecord<Device>
         {
             Id = Guid.NewGuid().ToString("n"),
-            SourceId = msg.Source ?? msg.Adapter,
+            SourceId = msg.Source ?? $"{msg.System}.{msg.Adapter}",
+            OccurredAt = msg.OccurredAt,
+            StagePayload = payload.ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase)
+        };
+        await rec.Save(FlowSets.StageShort(FlowSets.Intake));
+    });
+
+    // Sensor announcements -> upsert Sensor with key; device FK will bind via later association.
+    h.On<SensorAnnounceEvent>(async (env, msg, ct) =>
+    {
+        var payload = msg.ToPayloadDictionary();
+        payload[Constants.Envelope.System] = msg.System;
+        payload[Constants.Envelope.Adapter] = msg.Adapter;
+        var rec = new StageRecord<Sensor>
+        {
+            Id = Guid.NewGuid().ToString("n"),
+            SourceId = msg.Source ?? $"{msg.System}.{msg.Adapter}",
+            OccurredAt = msg.OccurredAt,
+            StagePayload = payload.ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase)
+        };
+        await rec.Save(FlowSets.StageShort(FlowSets.Intake));
+    });
+
+    // Fast-tracked readings -> write StageRecord<SensorReadingVo> with only the key + values.
+    h.On<ReadingEvent>(async (env, msg, ct) =>
+    {
+        var payload = msg.ToPayloadDictionary();
+        var typed = new StageRecord<SensorReadingVo>
+        {
+            Id = Guid.NewGuid().ToString("n"),
+            SourceId = msg.Source ?? "events",
             OccurredAt = msg.CapturedAt,
-            StagePayload = payload
+            StagePayload = payload.ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase),
+            // Group/read views by the sensor key
+            CorrelationId = msg.SensorKey,
         };
         await typed.Save(FlowSets.StageShort(FlowSets.Intake));
     });
 });
 
-// Health registry stub (adapters now live out-of-process)
-builder.Services.AddSingleton<IAdapterHealthRegistry, NullAdapterHealthRegistry>();
+// Health snapshot based on recent Keyed stage records
+builder.Services.AddSingleton<IAdapterHealthRegistry, S8.Flow.Api.Adapters.KeyedAdapterHealthRegistry>();
 
 var app = builder.Build();
 
@@ -123,6 +148,7 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.UseSoraSwagger();
 
 // Ensure the latest.reading view set exists (idempotent) — custom view
 try

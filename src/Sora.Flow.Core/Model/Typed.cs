@@ -2,6 +2,9 @@
 using Sora.Data.Abstractions.Annotations;
 using System.Collections.Generic;
 using System.Dynamic;
+using System.Threading;
+using System.Threading.Tasks;
+using Sora.Data.Core;
 
 namespace Sora.Flow.Model;
 
@@ -11,8 +14,9 @@ public abstract class FlowEntity<TModel> : Entity<TModel> where TModel : FlowEnt
 // Normalized transport/delta for a model: Id + dynamic data (JObject or dictionary)
 public sealed class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>>
 {
+    // Canonical business key for the target entity
     [Index]
-    public string? ReferenceId { get; set; }
+    public string? CanonicalId { get; set; }
     // Nested JSON snapshot using ExpandoObject (document) + primitives/arrays for provider-friendly serialization
     public ExpandoObject? Model { get; set; }
 }
@@ -20,8 +24,9 @@ public sealed class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>
 // Per-reference policy state persisted alongside root entity
 public sealed class PolicyState<TModel> : Entity<PolicyState<TModel>>
 {
+    // ULID for the target entity (same as Id of ReferenceItem<TModel>)
     [Index]
-    public string ReferenceId { get; set; } = default!;
+    public string ReferenceUlid { get; set; } = default!;
     // PolicyName -> SelectedTransformer
     public Dictionary<string, string> Policies { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
@@ -36,6 +41,9 @@ public sealed class StageRecord<TModel> : Entity<StageRecord<TModel>>
     public string? PolicyVersion { get; set; }
     [Index]
     public string? CorrelationId { get; set; }
+    // ULID for the associated canonical entity (set post-Associate)
+    [Index]
+    public string? ReferenceUlid { get; set; }
     // Use dictionary payload to avoid Mongo discriminator wrappers (_t/_v) on object
     public Dictionary<string, object?>? StagePayload { get; set; }
     public object? Diagnostics { get; set; }
@@ -53,6 +61,9 @@ public sealed class ParkedRecord<TModel> : Entity<ParkedRecord<TModel>>
     public string? PolicyVersion { get; set; }
     [Index]
     public string? CorrelationId { get; set; }
+    // Optional ULID reference for diagnostics
+    [Index]
+    public string? ReferenceUlid { get; set; }
     public Dictionary<string, object?>? StagePayload { get; set; }
     public object? Evidence { get; set; }
 }
@@ -62,23 +73,54 @@ public sealed class KeyIndex<TModel> : Entity<KeyIndex<TModel>>
 {
     public string AggregationKey { get => Id; set => Id = value; }
     [Index]
-    public string ReferenceId { get; set; } = default!;
+    public string ReferenceUlid { get; set; } = default!;
+    // New: map aggregation key to CanonicalId (business key)
+    [Index]
+    public string? CanonicalId { get; set; }
 }
 
 // Reference version/projection state per model
 public sealed class ReferenceItem<TModel> : Entity<ReferenceItem<TModel>>
 {
-    public string ReferenceId { get => Id; set => Id = value; }
+    // ULID is stored in Id (from Entity<>)
+    // Canonical business key; unique across the model
+    [Index]
+    public string CanonicalId { get; set; } = default!;
     [Index]
     public ulong Version { get; set; }
     public bool RequiresProjection { get; set; }
+
+    // Lookup helpers
+    public static async Task<ReferenceItem<TModel>?> GetByCanonicalId(string canonicalId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(canonicalId)) return null;
+    await foreach (var item in Data<ReferenceItem<TModel>, string>.AllStream(null, ct))
+        {
+            if (string.Equals(item.CanonicalId, canonicalId, StringComparison.Ordinal))
+                return item;
+        }
+        return null;
+    }
+
+    public static async Task<ReferenceItem<TModel>?> ResolveAsync(string idOrCanonicalId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(idOrCanonicalId)) return null;
+        // Try by ULID (Id) first
+        var byId = await Data<ReferenceItem<TModel>, string>.GetAsync(idOrCanonicalId, ct);
+        if (byId is not null) return byId;
+        // Fallback to CanonicalId
+        return await GetByCanonicalId(idOrCanonicalId, ct);
+    }
 }
 
 // Projection task per model
 public sealed class ProjectionTask<TModel> : Entity<ProjectionTask<TModel>>
 {
+    // New fields to explicitly carry both identifiers
     [Index]
-    public string ReferenceId { get; set; } = default!;
+    public string? CanonicalId { get; set; }
+    [Index]
+    public string? ReferenceUlid { get; set; }
     public ulong Version { get; set; }
     [Index]
     public string ViewName { get; set; } = default!;
@@ -89,9 +131,12 @@ public sealed class ProjectionTask<TModel> : Entity<ProjectionTask<TModel>>
 public class ProjectionView<TModel, TView> : Entity<ProjectionView<TModel, TView>>
 {
     [Index]
-    public string ReferenceId { get; set; } = default!;
-    [Index]
     public string ViewName { get; set; } = default!;
+    // New: include both identifiers for filtering and joins
+    [Index]
+    public string? CanonicalId { get; set; }
+    [Index]
+    public string? ReferenceUlid { get; set; }
     public TView? View { get; set; }
 }
 
@@ -103,9 +148,12 @@ public class ProjectionView<TModel, TView> : Entity<ProjectionView<TModel, TView
 public sealed class CanonicalProjection<TModel> : Entity<CanonicalProjection<TModel>>
 {
     [Index]
-    public string ReferenceId { get; set; } = default!;
-    [Index]
     public string ViewName { get; set; } = default!;
+    // New: include both identifiers for filtering and joins
+    [Index]
+    public string? CanonicalId { get; set; }
+    [Index]
+    public string? ReferenceUlid { get; set; }
     public object? Model { get; set; }
 }
 public sealed class LineageProjection<TModel> : ProjectionView<TModel, Dictionary<string, Dictionary<string, string[]>>> { }

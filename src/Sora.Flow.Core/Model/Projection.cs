@@ -5,8 +5,7 @@ namespace Sora.Flow.Model;
 
 public sealed class ProjectionTask : Entity<ProjectionTask>
 {
-    [Index]
-    public string ReferenceId { get; set; } = default!;
+    // Deprecated in favor of typed ProjectionTask<TModel>
     public ulong Version { get; set; }
     [Index]
     public string ViewName { get; set; } = default!;
@@ -15,8 +14,11 @@ public sealed class ProjectionTask : Entity<ProjectionTask>
 
 public class ProjectionView<TView> : Entity<ProjectionView<TView>>
 {
+    // Deprecated in favor of typed ProjectionView<TModel, TView>
     [Index]
-    public string ReferenceId { get; set; } = default!;
+    public string? CanonicalId { get; set; }
+    [Index]
+    public string? ReferenceUlid { get; set; }
     [Index]
     public string ViewName { get; set; } = default!;
     public TView? View { get; set; }
@@ -32,8 +34,11 @@ public class ProjectionView<TView> : Entity<ProjectionView<TView>>
 // Canonical view: tag -> [values]
 public sealed class CanonicalProjectionView : Entity<CanonicalProjectionView>
 {
+    // ULID-first; include CanonicalId for business lookups
     [Index]
-    public string ReferenceId { get; set; } = default!;
+    public string? CanonicalId { get; set; }
+    [Index]
+    public string? ReferenceUlid { get; set; }
     [Index]
     public string ViewName { get; set; } = default!;
     public object? Model { get; set; }

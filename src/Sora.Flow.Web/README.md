@@ -7,7 +7,7 @@ Routes
 - POST /admin/replay
 - POST /admin/reproject
 - GET /views/canonical?page=1&size=20
-- GET /views/lineage?q=ReferenceId=="abc"&page=2&size=10
+- GET /views/lineage?q=ReferenceUlid=="01HF.."&page=2&size=10
 
 Notes
 - Controllers only (no inline endpoints).

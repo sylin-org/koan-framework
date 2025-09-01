@@ -13,7 +13,7 @@ public sealed class LineageController : ControllerBase
         var item = await ReferenceItem.Get(referenceId, ct);
         if (item is null) return NotFound();
         // Minimal lineage: reference item + keys pointing to it
-        var keys = await KeyIndex.Query($"ReferenceId == '{referenceId}'", ct);
+    var keys = await KeyIndex.Query($"ReferenceUlid == '{referenceId}'", ct);
         return Ok(new { reference = item, keys });
     }
 }

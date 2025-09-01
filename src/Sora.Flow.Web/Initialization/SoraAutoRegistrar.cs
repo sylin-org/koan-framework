@@ -44,7 +44,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     report.AddModule(ModuleName, ModuleVersion);
     report.AddSetting("routes[0]", "/admin/replay");
     report.AddSetting("routes[1]", "/admin/reproject");
-    report.AddSetting("routes[2]", "/models/{model}/views/{view}/{referenceId}");
+    report.AddSetting("routes[2]", "/models/{model}/views/{view}/{referenceUlid}");
     report.AddSetting("routes[3]", "/models/{model}/views/{view}");
     report.AddSetting("routes[4]", "/policies");
     report.AddSetting("routes[5]", $"{Sora.Flow.Web.Infrastructure.WebConstants.Routes.DefaultPrefix}/{{model}}");
