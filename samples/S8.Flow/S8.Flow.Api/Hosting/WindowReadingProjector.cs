@@ -78,7 +78,12 @@ public sealed class WindowReadingProjector : BackgroundService
     private static Dictionary<string, object>? Extract(object? payload)
     {
         if (payload is null) return null;
-        if (payload is IDictionary<string, object> m) return new Dictionary<string, object>(m, StringComparer.OrdinalIgnoreCase);
+        if (payload is IDictionary<string, object?> m)
+        {
+            var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in m) dict[kv.Key] = kv.Value!;
+            return dict;
+        }
         if (payload is Newtonsoft.Json.Linq.JObject jo)
         {
             var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);

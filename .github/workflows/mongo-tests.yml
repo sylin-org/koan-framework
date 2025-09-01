@@ -1,0 +1,51 @@
+﻿name: mongo-tests
+
+on:
+  pull_request:
+    branches: [ main, dev ]
+  push:
+    branches: [ dev ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mongo-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-mongo:
+    name: Run Mongo-backed tests (Testcontainers)
+    runs-on: ubuntu-latest
+    env:
+      # Be nice to CI/dev boxes: reduce Testcontainers friction
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore --nologo
+
+      - name: Build (no tests)
+        run: dotnet build --nologo --configuration Release --verbosity:minimal
+
+      - name: Run Sora.Data.Mongo tests
+        run: >-
+          dotnet test
+          tests/Sora.Data.Mongo.Tests/Sora.Data.Mongo.Tests.csproj
+          --nologo --configuration Release --verbosity:minimal

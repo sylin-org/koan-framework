@@ -15,7 +15,7 @@ public sealed class ReadingsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(reading.SensorKey)) return BadRequest("sensorKey is required");
 
-        var payload = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+    var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             [Keys.Sensor.Key] = reading.SensorKey,
             [Keys.Reading.Value] = reading.Value,

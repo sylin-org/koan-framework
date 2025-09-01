@@ -90,3 +90,9 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 ## Docs style & checklist
 
 - See: ./docs-style-and-checklist.md
+
+## CI Mongo coverage
+
+- Mongo-backed repository tests run in CI via Testcontainers. See `.github/workflows/mongo-tests.yml`.
+- Locally, these tests auto-skip when Docker isn’t available or misconfigured.
+- No credentials needed; ephemeral containers are used and Ryuk is disabled to reduce friction.

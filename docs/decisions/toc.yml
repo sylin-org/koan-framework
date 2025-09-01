@@ -144,6 +144,12 @@
       href: MESS-0028-mq-provisioning-plan-diff-apply-modes.md
     - name: Terse handler delegates and semantic aliases
       href: MESS-0029-terse-handler-delegates-and-aliases.md
+ - name: Flow (FLOW)
+   items:
+     - name: Flow bindings, canonical IDs, and value-object ingest
+       href: FLOW-0101-bindings-canonical-ids-and-vo-ingest.md
+     - name: Identity map, provisional mappings, aliasing (cap=1), and VO indexing
+       href: FLOW-0102-identity-map-provisional-and-aliasing.md
  - name: Storage (STOR)
    items:
      - name: Storage module and contracts

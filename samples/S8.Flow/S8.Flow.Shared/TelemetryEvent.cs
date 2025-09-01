@@ -1,66 +1,57 @@
-﻿namespace S8.Flow.Shared;
+﻿using Sora.Flow.Attributes;
+
+namespace S8.Flow.Shared;
 
 public sealed class TelemetryEvent
 {
-    public required string Inventory { get; init; }
-    public required string Serial { get; init; }
-    public string? Manufacturer { get; init; }
-    public string? Model { get; init; }
-    public string? Kind { get; init; }
-    public string? Code { get; init; }
+    // External identity of the Sensor; mapping uses envelope system/adapter.
+    [EntityLink(typeof(Sensor), LinkKind.ExternalId)]
+    public required string SensorExternalId { get; init; }
 
-    public required string SensorCode { get; init; }
     public required string Unit { get; init; }
     public required double Value { get; init; }
-    public required string Source { get; init; }
+
+    // Envelope metadata
+    public required string System { get; init; }
+    public required string Adapter { get; init; }
+    public string? Source { get; init; }
     public DateTimeOffset CapturedAt { get; init; } = DateTimeOffset.UtcNow;
 
     public static TelemetryEvent Reading(
-        string inventory,
-        string serial,
-        string manufacturer,
-        string model,
-        string kind,
-        string code,
-        string sensorCode,
+        string system,
+        string adapter,
+        string sensorExternalId,
         string unit,
         double value,
-        string source,
+        string? source = null,
         DateTimeOffset? capturedAt = null)
         => new()
         {
-            Inventory = inventory,
-            Serial = serial,
-            Manufacturer = manufacturer,
-            Model = model,
-            Kind = kind,
-            Code = code,
-            SensorCode = sensorCode,
+            System = system,
+            Adapter = adapter,
+            SensorExternalId = sensorExternalId,
             Unit = unit,
             Value = value,
             Source = source,
             CapturedAt = capturedAt ?? DateTimeOffset.UtcNow
         };
 
-    public Dictionary<string, object> ToPayloadDictionary()
+    public Dictionary<string, object?> ToPayloadDictionary()
     {
-        var payload = new Dictionary<string, object>
+        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
-            [Keys.Device.Inventory] = Inventory,
-            [Keys.Device.Serial] = Serial,
-            [Keys.Sensor.Key] = $"{Inventory}::{Serial}::{SensorCode}",
-            [Keys.Sensor.Code] = SensorCode,
+            // External reference for indexing and late joins when needed
+            ["system"] = System,
+            ["adapter"] = Adapter,
+            ["sensorExternalId"] = SensorExternalId,
+
+            // Reading core
             [Keys.Sensor.Unit] = Unit,
             [Keys.Reading.CapturedAt] = CapturedAt.ToString("O"),
             [Keys.Reading.Value] = Value,
-            [Keys.Reading.Source] = Source,
         };
 
-        if (!string.IsNullOrWhiteSpace(Manufacturer)) payload[Keys.Device.Manufacturer] = Manufacturer!;
-        if (!string.IsNullOrWhiteSpace(Model)) payload[Keys.Device.Model] = Model!;
-        if (!string.IsNullOrWhiteSpace(Kind)) payload[Keys.Device.Kind] = Kind!;
-        if (!string.IsNullOrWhiteSpace(Code)) payload[Keys.Device.Code] = Code!;
-
+        if (!string.IsNullOrWhiteSpace(Source)) payload[Keys.Reading.Source] = Source!;
         return payload;
     }
 }

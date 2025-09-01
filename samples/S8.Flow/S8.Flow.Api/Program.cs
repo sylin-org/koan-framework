@@ -13,6 +13,7 @@ using Sora.Flow.Model;
 using Sora.Flow.Infrastructure;
 using Sora.Data.Mongo;
 using Sora.Messaging.RabbitMq;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,42 +58,31 @@ builder.Services.AddHostedService<S8.Flow.Api.Hosting.WindowReadingProjector>();
 // Message-driven adapters: handle TelemetryEvent and persist to Flow intake
 builder.Services.OnMessages(h =>
 {
-    h.On<TelemetryEvent>(async (env, msg) =>
+    // Include CancellationToken in handler signature; align with minimal TelemetryEvent envelope
+    h.On<TelemetryEvent>(async (env, msg, ct) =>
     {
         var sp = Sora.Core.Hosting.App.AppHost.Current;
         var log = sp?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
-        log?.CreateLogger("S8.Flow.Api.Handlers")?.LogInformation("TelemetryEvent received from {Source} at {At} (inventory={Inv}, serial={Serial})", msg.Source, msg.CapturedAt, msg.Inventory, msg.Serial);
-        var payload = msg.ToPayloadDictionary();
-    // Enqueue into the per-model, typed intake for Sensor so model-aware workers can process it
-    var typed = new StageRecord<Sensor>
+        log?.CreateLogger("S8.Flow.Api.Handlers")?.LogInformation(
+            "TelemetryEvent received {System}/{Adapter} sensor={SensorExternalId} from {Source} at {At}",
+            msg.System, msg.Adapter, msg.SensorExternalId, msg.Source, msg.CapturedAt);
+
+        // Coerce to nullable value dictionary to satisfy StagePayload's Dictionary<string, object?> type
+        Dictionary<string, object?> payload = msg
+            .ToPayloadDictionary()
+            .ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase);
+        // Provide the model's configured aggregation key so association can succeed
+        payload[Keys.Sensor.Key] = msg.SensorExternalId;
+
+        // Enqueue into the per-model, typed intake for Sensor so model-aware workers can process it
+        var typed = new StageRecord<Sensor>
         {
             Id = Guid.NewGuid().ToString("n"),
-            SourceId = msg.Source,
+            SourceId = msg.Source ?? msg.Adapter,
             OccurredAt = msg.CapturedAt,
             StagePayload = payload
         };
         await typed.Save(FlowSets.StageShort(FlowSets.Intake));
-
-        // Also co-ingest a minimal Device record so Device KeyIndex and projections stay current
-        // IMPORTANT: Only include device-specific fields to avoid polluting Device canonical with sensor/reading data
-        var devicePayload = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
-        {
-            [Keys.Device.Inventory] = msg.Inventory,
-            [Keys.Device.Serial] = msg.Serial
-        };
-        if (!string.IsNullOrWhiteSpace(msg.Manufacturer)) devicePayload[Keys.Device.Manufacturer] = msg.Manufacturer!;
-        if (!string.IsNullOrWhiteSpace(msg.Model)) devicePayload[Keys.Device.Model] = msg.Model!;
-        if (!string.IsNullOrWhiteSpace(msg.Kind)) devicePayload[Keys.Device.Kind] = msg.Kind!;
-        if (!string.IsNullOrWhiteSpace(msg.Code)) devicePayload[Keys.Device.Code] = msg.Code!;
-
-        var deviceRecord = new StageRecord<Device>
-        {
-            Id = Guid.NewGuid().ToString("n"),
-            SourceId = msg.Source,
-            OccurredAt = msg.CapturedAt,
-            StagePayload = devicePayload
-        };
-        await deviceRecord.Save(FlowSets.StageShort(FlowSets.Intake));
     });
 });
 

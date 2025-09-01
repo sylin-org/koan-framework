@@ -39,12 +39,12 @@ public sealed class ViewsController : ControllerBase
         var raw = await TryGetByIdAsync(canType, $"{Sora.Flow.Infrastructure.Constants.Views.Canonical}::{referenceId}", set, ct);
         if (raw is not null)
                 {
-                    var viewDoc = new CanonicalProjectionView
+            var viewDoc = new CanonicalProjectionView
                     {
             Id = (string)canType.GetProperty("Id")!.GetValue(raw)!,
             ReferenceId = (string)canType.GetProperty("ReferenceId")!.GetValue(raw)!,
             ViewName = (string)canType.GetProperty("ViewName")!.GetValue(raw)!,
-            View = (Dictionary<string, string[]>)canType.GetProperty("View")!.GetValue(raw)!
+        Model = canType.GetProperty("Model")?.GetValue(raw) ?? canType.GetProperty("View")!.GetValue(raw)
                     };
                     _logger.LogInformation("ViewsController.GetOne canonical(view,id) view={View} ref={Ref} found=true", view, referenceId);
                     return Ok(viewDoc);
@@ -233,7 +233,7 @@ public sealed class ViewsController : ControllerBase
                     Id = (string)canType.GetProperty("Id")!.GetValue(it)!,
                     ReferenceId = (string)canType.GetProperty("ReferenceId")!.GetValue(it)!,
                     ViewName = (string)canType.GetProperty("ViewName")!.GetValue(it)!,
-                    View = (Dictionary<string, string[]>)canType.GetProperty("View")!.GetValue(it)!
+                    Model = canType.GetProperty("Model")?.GetValue(it) ?? canType.GetProperty("View")!.GetValue(it)
                 };
                 acc.Add(doc);
             }

@@ -24,6 +24,7 @@ using Sora.Flow.Materialization;
 using Sora.Core.Json;
 using Newtonsoft.Json.Linq;
 using System.Dynamic;
+using Sora.Core.Utilities.Ids;
 
 namespace Sora.Flow;
 
@@ -35,20 +36,20 @@ public static class ServiceCollectionExtensions
     private static readonly SemaphoreSlim s_keyIndexLock = new(1, 1);
 
     // Shared helper: normalize a dynamic payload (Dictionary or JObject) into a dictionary
-    private static IDictionary<string, object>? ExtractDict(object? payload)
+    private static IDictionary<string, object?>? ExtractDict(object? payload)
     {
         if (payload is null) return null;
-        if (payload is IDictionary<string, object> d) return d;
+        if (payload is IDictionary<string, object?> d) return d;
         if (payload is Newtonsoft.Json.Linq.JObject jo)
         {
-            var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
             foreach (var prop in jo.Properties())
             {
                 var val = prop.Value;
                 if (val is Newtonsoft.Json.Linq.JArray ja)
-                    dict[prop.Name] = ja.ToList<object>();
+                    dict[prop.Name] = ja.ToList<object?>();
                 else if (val is Newtonsoft.Json.Linq.JValue jv)
-                    dict[prop.Name] = jv.ToObject<object?>() ?? string.Empty;
+                    dict[prop.Name] = jv.ToObject<object?>();
                 else
                     dict[prop.Name] = val.ToString();
             }
@@ -116,10 +117,11 @@ public static class ServiceCollectionExtensions
             return ModelBaseName();
 
         // Root-scoped typed entities (no set provided): bake a type-specific suffix into the base
-        if (def == typeof(KeyIndex<>)) return ModelBaseName() + "#flow.index";
+    if (def == typeof(KeyIndex<>)) return ModelBaseName() + "#flow.index";
         if (def == typeof(ReferenceItem<>)) return ModelBaseName() + "#flow.refs";
     if (def == typeof(ProjectionTask<>)) return ModelBaseName() + "#flow.tasks";
     if (def == typeof(PolicyState<>)) return ModelBaseName() + "#flow.policies";
+    if (def == typeof(Sora.Flow.Model.IdentityLink<>)) return ModelBaseName() + "#flow.identity";
         // Dynamic root entity should use the pure model name as the base (no suffix)
         if (def == typeof(DynamicFlowEntity<>)) return ModelBaseName();
 
@@ -203,6 +205,15 @@ public static class ServiceCollectionExtensions
                     await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
                         .MakeGenericMethod(typeof(PolicyState<>).MakeGenericType(modelType))
                         .Invoke(null, new object?[] { data, null, cancellationToken })!;
+                    // Identity links
+                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
+                        .MakeGenericMethod(typeof(Sora.Flow.Model.IdentityLink<>).MakeGenericType(modelType))
+                        .Invoke(null, new object?[] { data, null, cancellationToken })!;
+
+                    // Parked records set
+                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
+                        .MakeGenericMethod(typeof(ParkedRecord<>).MakeGenericType(modelType))
+                        .Invoke(null, new object?[] { data, FlowSets.StageShort(FlowSets.Parked), cancellationToken })!;
             }
         }
 
@@ -245,6 +256,7 @@ public static class ServiceCollectionExtensions
                     var cutoffKeyed = now - opts.KeyedTtl;
                     var cutoffTask = now - opts.ProjectionTaskTtl;
                     var cutoffReject = now - opts.RejectionReportTtl;
+                    var cutoffParked = now - opts.ParkedTtl;
 
                     // Purge typed records and tasks for each discovered model
                     foreach (var modelType in DiscoverModels())
@@ -322,6 +334,65 @@ public static class ServiceCollectionExtensions
                     // Purge diagnostics
                     await Data<RejectionReport, string>.Delete(r => r.CreatedAt < cutoffReject, set: null!, stoppingToken);
 
+                    // Purge parked records for each model
+                    foreach (var modelType in DiscoverModels())
+                    {
+                        var parkedType = typeof(ParkedRecord<>).MakeGenericType(modelType);
+                        var parkedData = typeof(Data<,>).MakeGenericType(parkedType, typeof(string));
+                        var pageM = parkedData.GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) });
+                        var delM = parkedData.GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) });
+                        if (pageM is not null && delM is not null)
+                        {
+                            using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
+                            {
+                                var t = (Task)pageM.Invoke(null, new object?[] { 500, stoppingToken })!; await t.ConfigureAwait(false);
+                                var items = ((System.Collections.IEnumerable)GetTaskResult(t)!).Cast<object>().ToList();
+                                foreach (var it in items)
+                                {
+                                    var ts = (DateTimeOffset)it.GetType().GetProperty("OccurredAt")!.GetValue(it)!;
+                                    if (ts < cutoffParked)
+                                    {
+                                        await (Task)delM.Invoke(null, new object?[] { (string)it.GetType().GetProperty("Id")!.GetValue(it)!, FlowSets.StageShort(FlowSets.Parked), stoppingToken })!;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Purge expired provisional identity links for all models
+                    foreach (var modelType in DiscoverModels())
+                    {
+                        var idType = typeof(Sora.Flow.Model.IdentityLink<>).MakeGenericType(modelType);
+                        var idData = typeof(Data<,>).MakeGenericType(idType, typeof(string));
+                        var queryDel = idData.GetMethod("Delete", BindingFlags.Public | BindingFlags.Static, new[] { typeof(Func<,>).MakeGenericType(idType, typeof(bool)), typeof(string), typeof(CancellationToken) });
+                        if (queryDel is not null)
+                        {
+                            // Fallback: page and delete since static Delete with predicate may not be available for all adapters
+                        }
+                        // Safer generic: FirstPage then filter
+                        var pageM = idData.GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) });
+                        if (pageM is not null)
+                        {
+                            int fetched;
+                            do
+                            {
+                                var t = (Task)pageM.Invoke(null, new object?[] { 500, stoppingToken })!; await t.ConfigureAwait(false);
+                                var items = ((System.Collections.IEnumerable)GetTaskResult(t)!).Cast<object>().ToList();
+                                fetched = items.Count;
+                                foreach (var it in items)
+                                {
+                                    var prov = (bool)(it.GetType().GetProperty("Provisional")?.GetValue(it) ?? false);
+                                    var exp = (DateTimeOffset?)it.GetType().GetProperty("ExpiresAt")?.GetValue(it);
+                                    if (prov && exp is DateTimeOffset e && e < now)
+                                    {
+                                        var delM = idData.GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
+                                        await (Task)delM.Invoke(null, new object?[] { (string)it.GetType().GetProperty("Id")!.GetValue(it)!, stoppingToken })!;
+                                    }
+                                }
+                            } while (fetched == 500);
+                        }
+                    }
+
                     _log.LogDebug("Sora.Flow purge completed");
                 }
                 catch (Exception ex)
@@ -386,6 +457,7 @@ public static class ServiceCollectionExtensions
                                         .Where(r => string.Equals((string?)r.GetType().GetProperty("CorrelationId")?.GetValue(r), refId, StringComparison.Ordinal))
                                         .ToList();
 
+                                    // canonical (range structure) and lineage
                                     var canonical = new Dictionary<string, List<string?>>(StringComparer.OrdinalIgnoreCase);
                                     var lineage = new Dictionary<string, Dictionary<string, HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
                                     // Optional: exclude tag prefixes from canonical/lineage (e.g., "reading.")
@@ -419,10 +491,29 @@ public static class ServiceCollectionExtensions
                                         }
                                     }
 
-                                    var canonicalView = canonical.ToDictionary(
-                                        kv => kv.Key,
-                                        kv => kv.Value.Where(x => x is not null).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-                                        StringComparer.OrdinalIgnoreCase);
+                                    // Build nested canonical object with range arrays per dotted path
+                                    var ranges = new Dictionary<string, Newtonsoft.Json.Linq.JToken?>(StringComparer.OrdinalIgnoreCase);
+                                    foreach (var kv in canonical)
+                                    {
+                                        var dedup = kv.Value.Where(x => x is not null).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                                        ranges[kv.Key] = new JArray(dedup);
+                                    }
+                                    var canonicalExpanded = JsonPathMapper.Expand(ranges);
+                                    // Convert to provider-safe nested object (Expando/primitives/arrays)
+                                    static object? Plainify(object? token)
+                                    {
+                                        if (token is null) return null;
+                                        if (token is Newtonsoft.Json.Linq.JValue jv) return jv.Value;
+                                        if (token is Newtonsoft.Json.Linq.JArray ja) return ja.Select(t => Plainify(t)).ToList();
+                                        if (token is Newtonsoft.Json.Linq.JObject jo)
+                                        {
+                                            IDictionary<string, object?> exp = new ExpandoObject();
+                                            foreach (var p in jo.Properties()) exp[p.Name] = Plainify(p.Value);
+                                            return (ExpandoObject)exp;
+                                        }
+                                        return token;
+                                    }
+                                    var canonicalView = Plainify(canonicalExpanded);
                                     var lineageView = lineage.ToDictionary(
                                         kv => kv.Key,
                                         kv => kv.Value.ToDictionary(x => x.Key, x => x.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
@@ -433,7 +524,9 @@ public static class ServiceCollectionExtensions
                                     canType.GetProperty("Id")!.SetValue(canDoc, $"{Constants.Views.Canonical}::{refId}");
                                     canType.GetProperty("ReferenceId")!.SetValue(canDoc, refId);
                                     canType.GetProperty("ViewName")!.SetValue(canDoc, Constants.Views.Canonical);
-                                    canType.GetProperty("View")!.SetValue(canDoc, canonicalView);
+                                    // Canonical now publishes nested ranges under Model
+                                    var modelProp = canType.GetProperty("Model") ?? canType.GetProperty("View");
+                                    modelProp!.SetValue(canDoc, canonicalView);
                                     var canData = typeof(Data<,>).MakeGenericType(canType, typeof(string));
                                     var upsertSet = canData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { canType, typeof(string), typeof(CancellationToken) })!;
                                     await (Task)upsertSet.Invoke(null, new object?[] { canDoc, FlowSets.ViewShort(Constants.Views.Canonical), stoppingToken })!;
@@ -487,7 +580,9 @@ public static class ServiceCollectionExtensions
                                         var dyn = Activator.CreateInstance(dynType)!;
                                         dynType.GetProperty("Id")!.SetValue(dyn, refId);
                                         dynType.GetProperty("ReferenceId")!.SetValue(dyn, refId);
-                                        dynType.GetProperty("Data")!.SetValue(dyn, plain);
+                                        // Root materialized snapshot stored under Model (renamed from Data)
+                                        var dynModelProp = dynType.GetProperty("Model") ?? dynType.GetProperty("Data");
+                                        dynModelProp!.SetValue(dyn, plain);
                                         var dynData = typeof(Data<,>).MakeGenericType(dynType, typeof(string));
                                         await (Task)dynData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { dynType, typeof(CancellationToken) })!
                                             .Invoke(null, new object?[] { dyn, stoppingToken })!;
@@ -580,7 +675,7 @@ public static class ServiceCollectionExtensions
                             var dict = ExtractDict(rec.GetType().GetProperty("StagePayload")!.GetValue(rec));
                             if (dict is null || tags.Length == 0)
                             {
-                                await SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = dict is null ? "no-payload" : "no-config-tags", tags }, rec, modelType, intakeSet, stoppingToken);
+                                await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = dict is null ? "no-payload" : "no-config-tags", tags }, rec, modelType, intakeSet, stoppingToken);
                                 continue;
                             }
 
@@ -593,9 +688,28 @@ public static class ServiceCollectionExtensions
                                     if (!string.IsNullOrWhiteSpace(v)) candidates.Add((tag, v));
                                 }
                             }
+                            // Optional composite candidate: system|adapter|externalId for safer ownership, when present
+                            if (dict.TryGetValue(Constants.Envelope.System, out var sys) &&
+                                dict.TryGetValue(Constants.Envelope.Adapter, out var adp))
+                            {
+                                // Discover external-id field names from [EntityLink] metadata
+                                var extKeys = Infrastructure.FlowRegistry.GetExternalIdKeys(modelType);
+                                foreach (var extKey in extKeys)
+                                {
+                                    if (!dict.TryGetValue(extKey, out var extRaw)) continue;
+                                    var sysV = ToValuesFlexible(sys).FirstOrDefault();
+                                    var adpV = ToValuesFlexible(adp).FirstOrDefault();
+                                    foreach (var v in ToValuesFlexible(extRaw))
+                                    {
+                                        if (string.IsNullOrWhiteSpace(sysV) || string.IsNullOrWhiteSpace(adpV) || string.IsNullOrWhiteSpace(v)) continue;
+                                        var composite = string.Join('|', sysV, adpV, v);
+                                        candidates.Add(($"env.{Constants.Envelope.System}|{Constants.Envelope.Adapter}|{extKey}", composite));
+                                    }
+                                }
+                            }
                             if (candidates.Count == 0)
                             {
-                                await SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "no-values", tags }, rec, modelType, intakeSet, stoppingToken);
+                                await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "no-values", tags }, rec, modelType, intakeSet, stoppingToken);
                                 continue;
                             }
 
@@ -615,14 +729,18 @@ public static class ServiceCollectionExtensions
                             string referenceId;
                             if (owners.Count > 1)
                             {
-                                await SaveRejectAndDrop(Constants.Rejections.MultiOwnerCollision, new { owners = owners.ToArray(), keys = candidates }, rec, modelType, intakeSet, stoppingToken);
+                                await this.SaveRejectAndDrop(Constants.Rejections.MultiOwnerCollision, new { owners = owners.ToArray(), keys = candidates }, rec, modelType, intakeSet, stoppingToken);
                                 goto NextRecord;
                             }
                             else if (owners.Count == 1)
                             { referenceId = owners.First(); }
                             else
                             {
-                                referenceId = (string?)rec.GetType().GetProperty("CorrelationId")?.GetValue(rec) ?? candidates[0].value;
+                                // Try identity map first using envelope fields
+                                var refFromIdentity = await TryResolveIdentityAsync(modelType, dict, stoppingToken);
+                                referenceId = refFromIdentity
+                                    ?? (string?)rec.GetType().GetProperty("CorrelationId")?.GetValue(rec)
+                                    ?? candidates[0].value;
                             }
 
                             // Save/verify keys ownership
@@ -641,7 +759,7 @@ public static class ServiceCollectionExtensions
                                 }
                                 else if (!string.Equals((string)kiType.GetProperty("ReferenceId")!.GetValue(ki)!, referenceId, StringComparison.Ordinal))
                                 {
-                                    await SaveRejectAndDrop(Constants.Rejections.KeyOwnerMismatch, new { key = c.value, existing = kiType.GetProperty("ReferenceId")!.GetValue(ki), incoming = referenceId }, rec, modelType, intakeSet, stoppingToken);
+                                    await this.SaveRejectAndDrop(Constants.Rejections.KeyOwnerMismatch, new { key = c.value, existing = kiType.GetProperty("ReferenceId")!.GetValue(ki), incoming = referenceId }, rec, modelType, intakeSet, stoppingToken);
                                     goto NextRecord;
                                 }
                             }
@@ -692,10 +810,83 @@ public static class ServiceCollectionExtensions
             }
         }
 
-    private static async Task SaveRejectAndDrop(string code, object evidence, object rec, Type modelType, string intakeSet, CancellationToken ct)
+    private static async Task<string?> TryResolveIdentityAsync(Type modelType, IDictionary<string, object?> dict, CancellationToken ct)
+        {
+            if (!dict.TryGetValue(Constants.Envelope.System, out var sysRaw) || !dict.TryGetValue(Constants.Envelope.Adapter, out var adpRaw)) return null;
+            var sys = ToValuesFlexible(sysRaw).FirstOrDefault();
+            var adp = ToValuesFlexible(adpRaw).FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(sys) || string.IsNullOrWhiteSpace(adp)) return null;
+            var idType = typeof(Sora.Flow.Model.IdentityLink<>).MakeGenericType(modelType);
+            var idData = typeof(Data<,>).MakeGenericType(idType, typeof(string));
+            // Probe for externalId fields discovered via [EntityLink]
+            foreach (var extKey in Infrastructure.FlowRegistry.GetExternalIdKeys(modelType))
+            {
+                if (!dict.TryGetValue(extKey, out var extRaw)) continue;
+                foreach (var ext in ToValuesFlexible(extRaw))
+                {
+                    if (string.IsNullOrWhiteSpace(ext)) continue;
+                    var composite = string.Join('|', sys, adp, ext);
+                    var getM = idData.GetMethod("GetAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) });
+                    if (getM is null) continue;
+                    var task = (Task)getM.Invoke(null, new object?[] { composite, ct })!; await task.ConfigureAwait(false);
+                    var link = GetTaskResult(task);
+                    if (link is not null)
+                    {
+                        var rid = idType.GetProperty("ReferenceId")!.GetValue(link) as string;
+                        if (!string.IsNullOrWhiteSpace(rid)) return rid!;
+                    }
+                    else
+                    {
+            // Issue a canonical ULID immediately and create a provisional identity link to it
+            var ulid = UlidId.New();
+                        var provisional = Activator.CreateInstance(idType)!;
+                        idType.GetProperty("Id")!.SetValue(provisional, composite);
+                        idType.GetProperty("System")!.SetValue(provisional, sys);
+                        idType.GetProperty("Adapter")!.SetValue(provisional, adp);
+                        idType.GetProperty("ExternalId")!.SetValue(provisional, ext);
+            idType.GetProperty("ReferenceId")!.SetValue(provisional, ulid);
+                        idType.GetProperty("Provisional")!.SetValue(provisional, true);
+                        // TTL hint via ExpiresAt; reuse intake TTL window as soft expiry for provisional
+                        idType.GetProperty("ExpiresAt")!.SetValue(provisional, DateTimeOffset.UtcNow.AddDays(2));
+                        var upsertM = idData.GetMethod("UpsertAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { idType, typeof(CancellationToken) })!;
+                        await (Task)upsertM.Invoke(null, new object?[] { provisional, ct })!;
+            return ulid;
+                    }
+                }
+            }
+            return null;
+        }
+    private async Task SaveRejectAndDrop(string code, object evidence, object rec, Type modelType, string intakeSet, CancellationToken ct)
         {
             var json = System.Text.Json.JsonSerializer.Serialize(evidence);
             await new Sora.Flow.Diagnostics.RejectionReport { Id = Guid.NewGuid().ToString("n"), ReasonCode = code, EvidenceJson = json, PolicyVersion = (string?)rec.GetType().GetProperty("PolicyVersion")?.GetValue(rec) }.Save(ct);
+
+            var opts = _opts.CurrentValue;
+            if (opts.ParkAndSweepEnabled)
+            {
+                var modelTypeArg = modelType;
+                var parkedType = typeof(ParkedRecord<>).MakeGenericType(modelTypeArg);
+                var parked = Activator.CreateInstance(parkedType)!;
+                // Id carry-over for traceability
+                parkedType.GetProperty("Id")!.SetValue(parked, rec.GetType().GetProperty("Id")!.GetValue(rec));
+                parkedType.GetProperty("SourceId")!.SetValue(parked, rec.GetType().GetProperty("SourceId")!.GetValue(rec));
+                parkedType.GetProperty("OccurredAt")!.SetValue(parked, rec.GetType().GetProperty("OccurredAt")!.GetValue(rec));
+                parkedType.GetProperty("PolicyVersion")!.SetValue(parked, rec.GetType().GetProperty("PolicyVersion")!.GetValue(rec));
+                parkedType.GetProperty("CorrelationId")!.SetValue(parked, rec.GetType().GetProperty("CorrelationId")!.GetValue(rec));
+                parkedType.GetProperty("StagePayload")!.SetValue(parked, rec.GetType().GetProperty("StagePayload")!.GetValue(rec));
+                parkedType.GetProperty("ReasonCode")!.SetValue(parked, code);
+                // Store original evidence object (also persisted in diagnostics as JSON)
+                parkedType.GetProperty("Evidence")!.SetValue(parked, evidence);
+
+                var dataType = typeof(Data<,>).MakeGenericType(parkedType, typeof(string));
+                using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
+                {
+                    await (Task)dataType.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { parkedType, typeof(CancellationToken) })!
+                        .Invoke(null, new object?[] { parked, ct })!;
+                }
+            }
+
+            // Drop from intake
             var recordType = rec.GetType();
             var delGeneric = typeof(Data<,>).MakeGenericType(recordType, typeof(string))
                 .GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
@@ -735,7 +926,7 @@ public static class ServiceCollectionExtensions
         return null;
     }
 
-    private static List<string> ToValuesFlexible(object raw)
+    private static List<string> ToValuesFlexible(object? raw)
     {
         switch (raw)
         {

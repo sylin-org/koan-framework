@@ -32,3 +32,28 @@ public sealed class FlowModelAttribute : Attribute
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public sealed class FlowIgnoreAttribute : Attribute { }
+
+/// <summary>
+/// Marks a value-object property as a link to a Flow entity, enabling generic mapping and indexing.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
+public sealed class EntityLinkAttribute : Attribute
+{
+    public Type FlowEntityType { get; }
+    public LinkKind Kind { get; }
+
+    public EntityLinkAttribute(Type flowEntityType, LinkKind kind = LinkKind.CanonicalId)
+    {
+        FlowEntityType = flowEntityType ?? throw new ArgumentNullException(nameof(flowEntityType));
+        Kind = kind;
+    }
+}
+
+/// <summary>
+/// Declares whether an entity link property carries a canonical ULID or an external ID to be resolved.
+/// </summary>
+public enum LinkKind
+{
+    CanonicalId = 0,
+    ExternalId = 1,
+}

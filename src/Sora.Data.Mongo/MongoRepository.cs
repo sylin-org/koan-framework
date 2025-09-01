@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using Sora.Data.Abstractions;
 using Sora.Data.Abstractions.Naming;
+using Sora.Data.Core;
 using System.Linq.Expressions;
 
 namespace Sora.Data.Mongo;
@@ -79,6 +80,22 @@ internal sealed class MongoRepository<TEntity, TKey> :
         {
             var keys = Builders<TEntity>.IndexKeys.Ascending(x => x.Id);
             _collection.Indexes.CreateOne(new CreateIndexModel<TEntity>(keys, new CreateIndexOptions { Unique = true, Name = "_id_unique" }));
+            // Best-effort: create secondary indexes based on IndexMetadata
+            var indexSpecs = IndexMetadata.GetIndexes(typeof(TEntity));
+            foreach (var idx in indexSpecs)
+            {
+                if (idx.IsPrimaryKey || idx.Properties.Count == 0) continue;
+                IndexKeysDefinition<TEntity>? def = null;
+                foreach (var p in idx.Properties)
+                {
+                    var field = Builders<TEntity>.IndexKeys.Ascending(p.Name);
+                    def = def is null ? field : def.Ascending(p.Name);
+                }
+                if (def is null) continue;
+                var name = !string.IsNullOrWhiteSpace(idx.Name) ? idx.Name! : $"ix_{string.Join("_", idx.Properties.Select(pp => pp.Name))}";
+                var options = new CreateIndexOptions { Name = name, Unique = idx.Unique };
+                _collection.Indexes.CreateOne(new CreateIndexModel<TEntity>(def, options));
+            }
         }
         catch { /* best-effort */ }
     }

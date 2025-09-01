@@ -51,4 +51,11 @@ public static class Constants
         public const string DlqAssociation = "flow.association.dlq";
         public const string DlqProjection = "flow.projection.dlq";
     }
+
+    // Common envelope keys expected in stage payloads (case-insensitive lookups recommended at call sites)
+    public static class Envelope
+    {
+        public const string System = "system";
+        public const string Adapter = "adapter";
+    }
 }

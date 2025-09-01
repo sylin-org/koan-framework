@@ -50,13 +50,9 @@ public sealed class BmsPublisher : BackgroundService
                 var idx = rng.Next(0, SampleProfiles.Fleet.Length);
                 var d = SampleProfiles.Fleet[idx];
                 var evt = TelemetryEvent.Reading(
-                    inventory: d.Inventory,
-                    serial: d.Serial,
-                    manufacturer: d.Manufacturer,
-                    model: d.Model,
-                    kind: d.Kind,
-                    code: d.Code,
-                    sensorCode: SensorCodes.TEMP,
+                    system: "bms",
+                    adapter: "bms",
+                    sensorExternalId: $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}",
                     unit: Units.C,
                     value: Math.Round(20 + rng.NextDouble() * 10, 2),
                     source: "bms");

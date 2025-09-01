@@ -17,12 +17,14 @@ public sealed class FlowOptions
     public TimeSpan KeyedTtl { get; set; } = TimeSpan.FromDays(7);
     public TimeSpan ProjectionTaskTtl { get; set; } = TimeSpan.FromDays(7);
     public TimeSpan RejectionReportTtl { get; set; } = TimeSpan.FromDays(30);
+    public TimeSpan ParkedTtl { get; set; } = TimeSpan.FromDays(14);
 
     // Background purge
     public bool PurgeEnabled { get; set; } = true;
     public TimeSpan PurgeInterval { get; set; } = TimeSpan.FromHours(6);
 
     public bool DeadLetterEnabled { get; set; } = true;
+    public bool ParkAndSweepEnabled { get; set; } = true;
 
     public bool HooksEnabled { get; set; } = true;
 

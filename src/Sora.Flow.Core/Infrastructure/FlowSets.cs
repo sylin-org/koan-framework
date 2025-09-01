@@ -9,6 +9,7 @@ public static class FlowSets
     public const string Intake = "intake";
     public const string Standardized = "standardized";
     public const string Keyed = "keyed";
+    public const string Parked = "parked";
     public const string Processed = "processed";
     public const string Tasks = "tasks";
 

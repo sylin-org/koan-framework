@@ -14,7 +14,7 @@ public sealed class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>
     [Index]
     public string? ReferenceId { get; set; }
     // Nested JSON snapshot using ExpandoObject (document) + primitives/arrays for provider-friendly serialization
-    public ExpandoObject? Data { get; set; }
+    public ExpandoObject? Model { get; set; }
 }
 
 // Per-reference policy state persisted alongside root entity
@@ -36,8 +36,25 @@ public sealed class StageRecord<TModel> : Entity<StageRecord<TModel>>
     public string? PolicyVersion { get; set; }
     [Index]
     public string? CorrelationId { get; set; }
-    public object? StagePayload { get; set; }
+    // Use dictionary payload to avoid Mongo discriminator wrappers (_t/_v) on object
+    public Dictionary<string, object?>? StagePayload { get; set; }
     public object? Diagnostics { get; set; }
+}
+
+// Parked intake records (dead-letter with TTL) for later inspection/sweep
+public sealed class ParkedRecord<TModel> : Entity<ParkedRecord<TModel>>
+{
+    [Index]
+    public string SourceId { get; set; } = default!;
+    [Index]
+    public DateTimeOffset OccurredAt { get; set; }
+    [Index]
+    public string? ReasonCode { get; set; }
+    public string? PolicyVersion { get; set; }
+    [Index]
+    public string? CorrelationId { get; set; }
+    public Dictionary<string, object?>? StagePayload { get; set; }
+    public object? Evidence { get; set; }
 }
 
 // Aggregation key index per model
@@ -82,5 +99,13 @@ public class ProjectionView<TModel, TView> : Entity<ProjectionView<TModel, TView
 // Materialized payload/view types removed in greenfield; materialized snapshot is persisted as the root entity
 
 // Strongly typed canonical and lineage views
-public sealed class CanonicalProjection<TModel> : ProjectionView<TModel, Dictionary<string, string[]>> { }
+// Canonical projection now uses a Model property (nested range-value structure) aligned to root shape
+public sealed class CanonicalProjection<TModel> : Entity<CanonicalProjection<TModel>>
+{
+    [Index]
+    public string ReferenceId { get; set; } = default!;
+    [Index]
+    public string ViewName { get; set; } = default!;
+    public object? Model { get; set; }
+}
 public sealed class LineageProjection<TModel> : ProjectionView<TModel, Dictionary<string, Dictionary<string, string[]>>> { }

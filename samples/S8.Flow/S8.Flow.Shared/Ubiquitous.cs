@@ -4,27 +4,27 @@ public static class Keys
 {
     public static class Device
     {
-        public const string Inventory = "device.identifier.inventory";
-        public const string Serial = "device.identifier.serial";
-        public const string Manufacturer = "device.manufacturer";
-        public const string Model = "device.model";
-        public const string Kind = "device.kind";
-        public const string Code = "device.code";
+        public const string Inventory = "identifier.inventory";
+        public const string Serial = "identifier.serial";
+        public const string Manufacturer = "manufacturer";
+        public const string Model = "model";
+        public const string Kind = "kind";
+        public const string Code = "code";
     }
 
     public static class Sensor
     {
-    public const string Key = "sensor.key";
-    public const string Code = "sensor.code";
-    public const string Unit = "sensor.unit";
-    public const string Reliability = "sensor.reliability";
+        public const string Key = "key";
+        public const string Code = "code";
+        public const string Unit = "unit";
+        public const string Reliability = "reliability";
     }
 
     public static class Reading
     {
-        public const string CapturedAt = "reading.capturedAt";
-        public const string Value = "reading.value";
-        public const string Source = "reading.source";
+        public const string CapturedAt = "capturedAt";
+        public const string Value = "value";
+        public const string Source = "source";
     }
 }
 

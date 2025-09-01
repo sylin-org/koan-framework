@@ -13,6 +13,7 @@ public static class FlowRegistry
     private static readonly ConcurrentDictionary<Type, string> s_modelNames = new();
     private static readonly ConcurrentDictionary<Type, string[]> s_aggTags = new();
     private static readonly ConcurrentDictionary<string, Type> s_byName = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<Type, string[]> s_externalIdProps = new();
 
     public static string GetModelName(Type t)
     {
@@ -36,6 +37,44 @@ public static class FlowRegistry
                 tags.AddRange(attrs.Select(a => a.Path).Where(s => !string.IsNullOrWhiteSpace(s))!);
             }
             return tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        });
+    }
+
+    /// <summary>
+    /// Discover external-id property names from [EntityLink(typeof(TModel), LinkKind.ExternalId)]
+    /// across all loaded assemblies. Returned names are distinct and case-insensitive.
+    /// </summary>
+    public static string[] GetExternalIdKeys(Type modelType)
+    {
+        return s_externalIdProps.GetOrAdd(modelType, static mt =>
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            foreach (var asm in assemblies)
+            {
+                Type?[] types;
+                try { types = asm.GetTypes(); }
+                catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
+                catch { continue; }
+                foreach (var t in types)
+                {
+                    if (t is null || !t.IsClass || t.IsAbstract) continue;
+                    var props = t.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+                    foreach (var p in props)
+                    {
+                        var links = p.GetCustomAttributes<EntityLinkAttribute>(inherit: true);
+                        foreach (var link in links)
+                        {
+                            if (link is null) continue;
+                            if (link.Kind != LinkKind.ExternalId) continue;
+                            if (link.FlowEntityType != mt) continue;
+                            if (!string.IsNullOrWhiteSpace(p.Name)) names.Add(p.Name);
+                        }
+                    }
+                }
+            }
+            // Stable ordering for predictability
+            return names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToArray();
         });
     }
 

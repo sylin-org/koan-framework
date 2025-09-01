@@ -8,7 +8,7 @@ Usage
 
 Model-typed surface (greenfield)
 - FlowEntity<TModel>: canonical type marker
-- DynamicFlowEntity<TModel>, StageRecord<TModel>: normalized deltas and hot-stage storage
+- DynamicFlowEntity<TModel> (Model property), StageRecord<TModel>: normalized deltas and hot-stage storage
 - KeyIndex<TModel>, ReferenceItem<TModel>, ProjectionTask<TModel>
 - ProjectionView<TModel,TView>, CanonicalProjection<TModel>, LineageProjection<TModel>
 

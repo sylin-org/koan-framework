@@ -8,7 +8,7 @@ Contract (at a glance) — see also: [Bindings and canonical IDs](./flow-binding
 
 Core types (first-class statics)
 - FlowEntity<TModel> : Entity<TModel> — TModel is the canonical shape (e.g., Device)
-- DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>> — normalized transport with Id + JObject Data
+- DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>> — normalized transport with Id + Model (ExpandoObject: nested JSON, provider-neutral)
 - StageRecord<TModel> : intake | standardized | keyed | processed
 - KeyIndex<TModel> : AggregationKey → ReferenceId
 - ReferenceItem<TModel> : ReferenceId, Version, RequiresProjection
@@ -25,10 +25,10 @@ Aggregation (keys)
 - Use attributes on the model to declare aggregation tag paths for association:
   - [AggregationTag("person.identifier.username")]
   - [AggregationTag("person.employee.email")]
-- Optionally override/extend via options. Values are extracted from DynamicFlowEntity<TModel>.Data (dotted path, case-insensitive), normalized, and used to update KeyIndex<TModel>.
+- Optionally override/extend via options. Values are extracted from DynamicFlowEntity<TModel>.Model (dotted path, case-insensitive), normalized, and used to update KeyIndex<TModel>.
 
 Normalized transport (patch deltas)
-- DynamicFlowEntity<TModel> carries Data as JObject (or JsonNode) with dotted-path properties from adapters. Deltas merge into TModel via deterministic policy (source priority, timestamp, or custom resolvers). Lineage tracks per-path provenance.
+- DynamicFlowEntity<TModel> carries Model as a provider-neutral nested JSON shape (ExpandoObject/primitives/arrays). Adapters may send dotted-path properties; the projection worker expands them into nested objects before upserting the root snapshot. Deltas merge via deterministic policy (source priority, timestamp, or custom resolvers). Lineage tracks per-path provenance.
 
 Hot → processed
 - After successful projection, move records out of hot sets (intake/standardized/keyed) to processed (copy+delete) and/or apply TTLs. This reduces seek time on hot collections.
@@ -42,47 +42,30 @@ Routes (controllers)
 - Legacy /views/* may be absent in new apps. Controllers resolve {model} to the registered type and query CanonicalProjection<TModel>/LineageProjection<TModel> against FlowSets.View<TModel>(view).
 
 Options (Sora:Flow)
-- Concurrency per stage; BatchSize (default 500)
-- TTLs: Hot=short; Processed=longer/archival
-- PurgeEnabled=true; PurgeInterval=6h (provider-neutral TTL purge)
-- DeadLetterEnabled=true
-- Discovery: Auto-discover FlowEntity<T> models via reflection (no source generator). Allow [FlowModel("device")] rename and [FlowIgnore] opt-out; constrain scan scope via options.
 
 Indexing and search
-- KeyIndex<TModel> remains the source of truth for tag→owner lookups.
-- Optional denormalized search terms on Keyed<TModel> (e.g., AggregationTerms: ["person.identifier.username=jdoe"]) can accelerate ad-hoc filters (multikey index in Mongo). Provider adapters may opt-in to additional indexes.
 
 Edge cases
-- Missing aggregation values: skip; do not assign keys.
-- Conflicts across sources: resolve via policy; log provenance.
-- High fan-out of tags: cap per record and DLQ excess.
-- Trimming/AOT: reflection-based discovery requires linker hints or a config to limit scan scope.
 
 Examples (snippets)
-- Define a canonical model
   - public sealed class Device : FlowEntity<Device> { [AggregationTag("inventory.serial")] public string Serial { get; set; } = default!; }
-- Ingest a normalized delta
-  - await new DynamicFlowEntity<Device> { Id = "dev:123", Data = fromAdapter }.Save(FlowSets.Stage<Device>("intake"), ct);
-- Page canonical view
+  - await new DynamicFlowEntity<Device> { Id = "dev:123", Model = fromAdapter }.Save(FlowSets.Stage<Device>("intake"), ct);
   - using (DataSetContext.With(FlowSets.View<Device>("canonical"))) { var page = await CanonicalProjection<Device>.FirstPage(50, ct); }
 
 See also
-- Decisions: ARCH-0053, DATA-0061, DATA-0030, ARCH-0040, DX-0038
 
 ## Running with Dapr (notes)
-- Reference `Sora.Flow.Runtime.Dapr` to prefer the Dapr runtime.
-- Run with a Dapr sidecar (DAPR_HTTP_PORT/GRPC). Flow doesn’t create components.
-- Replay enqueues ProjectionTask<TModel> for references requiring projection.
 
+- Canonical: Nested range → values object aligned to root snapshot. Each leaf path expands from dotted tags into nested objects and stores value arrays preserving insertion order (diagnostics-first; not a materialized single value).
+- Lineage: tag → value → [sources] map; null values are skipped.
+
+- Reference `Sora.Flow.Runtime.Dapr` to prefer the Dapr runtime.
 ## Dapr runtime provider
 
 When `Sora.Flow.Runtime.Dapr` is referenced, the Dapr-backed runtime replaces the default provider automatically via AutoRegistrar.
 
 Minimal configuration hints
 - DAPR_HTTP_PORT / DAPR_GRPC_PORT
-- State components/workflows are provided by the app.
-- Flow uses Entity statics for data and enqueues ProjectionTask<TModel> as needed.
-
 ## Minimal E2E sample
 
 1) Post a normalized delta
@@ -94,3 +77,4 @@ Minimal configuration hints
 
 Notes
 - Prefer first-class model statics (All/Query/FirstPage/Page/Stream). Use per-model sets via FlowSets.
+

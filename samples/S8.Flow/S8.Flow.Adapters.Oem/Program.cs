@@ -52,13 +52,9 @@ public sealed class OemPublisher : BackgroundService
                 var unit = code == SensorCodes.PWR ? Units.Watt : Units.KPa;
                 var value = code == SensorCodes.PWR ? Math.Round(100 + rng.NextDouble() * 900, 2) : Math.Round(200 + rng.NextDouble() * 50, 2);
                 var evt = TelemetryEvent.Reading(
-                    inventory: d.Inventory,
-                    serial: d.Serial,
-                    manufacturer: d.Manufacturer,
-                    model: d.Model,
-                    kind: d.Kind,
-                    code: d.Code,
-                    sensorCode: code,
+                    system: "oem",
+                    adapter: "oem",
+                    sensorExternalId: $"{d.Inventory}::{d.Serial}::{code}",
                     unit: unit,
                     value: value,
                     source: "oem");

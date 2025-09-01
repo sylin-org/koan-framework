@@ -3,7 +3,7 @@
 
 Materialized snapshots are persisted as root dynamic entities:
 
-- GET /api/devices — pages `DynamicFlowEntity<Device>` (Id = ReferenceId, Data = nested JSON)
+- GET /api/devices — pages `DynamicFlowEntity<Device>` (Id = ReferenceId, Model = nested JSON)
 - GET /api/sensors — pages `DynamicFlowEntity<Sensor>`
 
 You can filter by set via `?set=` if needed; default set is the model-qualified base.

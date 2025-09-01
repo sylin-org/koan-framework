@@ -30,7 +30,14 @@ public class ProjectionView<TView> : Entity<ProjectionView<TView>>
 
 // Strongly-typed view documents to ensure Mongo can serialize view payloads
 // Canonical view: tag -> [values]
-public sealed class CanonicalProjectionView : ProjectionView<Dictionary<string, string[]>> { }
+public sealed class CanonicalProjectionView : Entity<CanonicalProjectionView>
+{
+    [Index]
+    public string ReferenceId { get; set; } = default!;
+    [Index]
+    public string ViewName { get; set; } = default!;
+    public object? Model { get; set; }
+}
 
 // Lineage view: tag -> value -> [sources]
 public sealed class LineageProjectionView : ProjectionView<Dictionary<string, Dictionary<string, string[]>>> { }

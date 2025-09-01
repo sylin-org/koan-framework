@@ -40,7 +40,7 @@ public class AnalyticsController : ControllerBase
             return NotFound($"No data found for reference {referenceId}");
         }
 
-        var canonical = canonicalDoc?.View?.ToDictionary(kv => kv.Key, kv => (object)kv.Value) ?? new Dictionary<string, object>();
+    var canonical = canonicalDoc?.Model as Dictionary<string, object> ?? new Dictionary<string, object>();
         var lineage = lineageDoc?.View?.ToDictionary(kv => kv.Key, kv => (object)kv.Value) ?? new Dictionary<string, object>();
 
         int totalSources = 0;
@@ -84,7 +84,7 @@ public class AnalyticsController : ControllerBase
         var refItem = await Sora.Data.Core.Data<ReferenceItem<Sensor>, string>.GetAsync(referenceId, ct);
         if (canonicalDoc is null && lineageDoc is null) return NotFound($"No data found for sensor {referenceId}");
 
-        var canonical = canonicalDoc?.View?.ToDictionary(kv => kv.Key, kv => (object)kv.Value) ?? new Dictionary<string, object>();
+    var canonical = canonicalDoc?.Model as Dictionary<string, object> ?? new Dictionary<string, object>();
         var lineage = lineageDoc?.View?.ToDictionary(kv => kv.Key, kv => (object)kv.Value) ?? new Dictionary<string, object>();
 
         int totalSources = 0;
