@@ -68,7 +68,7 @@ public sealed class OemPublisher : BackgroundService
 
                 // Slim reading VO
                 var key = $"{d.Inventory}::{d.Serial}::{code}";
-                var reading = ReadingEvent.Create(sensorKey: key, value: value, unit: unit, source: "oem");
+                var reading = new SensorReadingVo { SensorKey = key, Value = value, Unit = unit, Source = "oem", CapturedAt = DateTimeOffset.UtcNow };
                 await reading.Send();
                 _log.LogInformation("OEM sent Reading {Key}={Value}{Unit} at {At}", key, value, unit, reading.CapturedAt);
             }

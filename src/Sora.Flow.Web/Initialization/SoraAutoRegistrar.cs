@@ -36,6 +36,22 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
                 }
             }
         }
+        // Discover Flow value-objects and register standard EntityController<TVo> under /api/vo/{type}
+        foreach (var voType in DiscoverValueObjects())
+        {
+            var voName = FlowRegistry.GetModelName(voType);
+            var route = $"/api/vo/{voName}";
+            var gcType = Type.GetType("Sora.Web.Extensions.GenericControllers.GenericControllers, Sora.Web.Extensions");
+            if (gcType is not null)
+            {
+                var addGeneric = gcType.GetMethod("AddGenericController", BindingFlags.Public | BindingFlags.Static);
+                if (addGeneric is not null)
+                {
+                    var g = addGeneric.MakeGenericMethod(voType);
+                    _ = g.Invoke(null, new object?[] { services, typeof(Sora.Web.Controllers.EntityController<>), route });
+                }
+            }
+        }
         // Health/metrics are assumed to be added by host; controllers expose endpoints only.
     }
 
@@ -48,6 +64,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     report.AddSetting("routes[3]", "/models/{model}/views/{view}");
     report.AddSetting("routes[4]", "/policies");
     report.AddSetting("routes[5]", $"{Sora.Flow.Web.Infrastructure.WebConstants.Routes.DefaultPrefix}/{{model}}");
+    report.AddSetting("routes[6]", "/api/vo/{type}");
     }
 
     private static IEnumerable<Type> DiscoverModels()
@@ -66,6 +83,28 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
                 var bt = t.BaseType;
                 if (bt is null || !bt.IsGenericType) continue;
                 if (bt.GetGenericTypeDefinition() != typeof(Sora.Flow.Model.FlowEntity<>)) continue;
+                result.Add(t);
+            }
+        }
+        return result;
+    }
+
+    private static IEnumerable<Type> DiscoverValueObjects()
+    {
+        var result = new List<Type>();
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        foreach (var asm in assemblies)
+        {
+            Type?[] types;
+            try { types = asm.GetTypes(); }
+            catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
+            catch { continue; }
+            foreach (var t in types)
+            {
+                if (t is null || !t.IsClass || t.IsAbstract) continue;
+                var bt = t.BaseType;
+                if (bt is null || !bt.IsGenericType) continue;
+                if (bt.GetGenericTypeDefinition() != typeof(Sora.Flow.Model.FlowValueObject<>)) continue;
                 result.Add(t);
             }
         }

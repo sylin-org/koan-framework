@@ -65,11 +65,14 @@ public sealed class BmsPublisher : BackgroundService
 
                 // Fast-tracked reading VO: only key + values
                 var key = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}";
-                var reading = ReadingEvent.Create(
-                    sensorKey: key,
-                    value: Math.Round(20 + rng.NextDouble() * 10, 2),
-                    unit: Units.C,
-                    source: "bms");
+                var reading = new SensorReadingVo
+                {
+                    SensorKey = key,
+                    Value = Math.Round(20 + rng.NextDouble() * 10, 2),
+                    Unit = Units.C,
+                    Source = "bms",
+                    CapturedAt = DateTimeOffset.UtcNow
+                };
                 await reading.Send();
                 _log.LogInformation("BMS sent Reading {Key}={Value}{Unit} at {At}", key, reading.Value, Units.C, reading.CapturedAt);
             }

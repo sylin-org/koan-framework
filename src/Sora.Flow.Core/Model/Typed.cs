@@ -11,6 +11,12 @@ namespace Sora.Flow.Model;
 // Canonical model base marker; no behavior beyond Entity<T>
 public abstract class FlowEntity<TModel> : Entity<TModel> where TModel : FlowEntity<TModel>, new() { }
 
+// Value-object base marker; derives from Entity<T> so standard EntityController<> can be used.
+// Unlike FlowEntity<>, value-objects are not treated as canonical roots and should not participate
+// in ReferenceItem<> or canonical/lineage projections. They are typically used via StageRecord<TVo>
+// and projected into parent-scoped views (e.g., latest/window aggregates).
+public abstract class FlowValueObject<TVo> : Entity<TVo> where TVo : FlowValueObject<TVo>, new() { }
+
 // Normalized transport/delta for a model: Id + dynamic data (JObject or dictionary)
 public sealed class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>>
 {

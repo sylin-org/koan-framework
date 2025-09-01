@@ -43,391 +43,16 @@ public static class ServiceCollectionExtensions
     {
         if (payload is null) return null;
         if (payload is IDictionary<string, object?> d) return d;
-        if (payload is Newtonsoft.Json.Linq.JObject jo)
+        if (payload is JObject jo)
         {
             var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
             foreach (var prop in jo.Properties())
             {
-                var val = prop.Value;
-                if (val is Newtonsoft.Json.Linq.JArray ja)
-                    dict[prop.Name] = ja.ToList<object?>();
-                else if (val is Newtonsoft.Json.Linq.JValue jv)
-                    dict[prop.Name] = jv.ToObject<object?>();
-                else
-                    dict[prop.Name] = val.ToString();
+                dict[prop.Name] = prop.Value?.ToObject<object?>();
             }
             return dict;
         }
         return null;
-    }
-
-    // Shared tiny IO retry helper for transient file sharing errors (JSON dev adapter)
-    internal static async Task RetryIoAsync(Func<Task> action, CancellationToken ct)
-    {
-        var attempts = 0;
-        while (true)
-        {
-            try { await action(); return; }
-            catch (IOException) when (attempts < 3)
-            {
-                attempts++;
-                await Task.Delay(TimeSpan.FromMilliseconds(50 * attempts), ct);
-            }
-        }
-    }
-    public static IServiceCollection AddSoraFlow(this IServiceCollection services)
-    {
-        services.AddSoraOptions<FlowOptions>("Sora:Flow");
-    services.AddSoraOptions<FlowMaterializationOptions>("Sora:Flow:Materialization");
-        services.TryAddSingleton<IFlowRuntime, InMemoryFlowRuntime>();
-    services.TryAddSingleton<IFlowMaterializer, FlowMaterializer>();
-
-    // Naming: prefer model-qualified base names for typed Flow collections (e.g., "S8.Flow.Shared.Device#flow.intake").
-    // This avoids unwieldy generic type names like "Sora.Flow.Model.StageRecord`1[[...]]#...".
-    services.OverrideStorageNaming((entityType, defaults) => TryResolveFlowModelQualifiedName(entityType));
-
-        // Bootstrap (indexes/TTLs) via initializer; no-ops by default; providers can extend.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<ISoraInitializer>(new FlowBootstrapInitializer()));
-
-        // Ensure schemas exist at startup (idempotent). Providers that don't support instructions will no-op.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowSchemaEnsureHostedService>());
-
-    // Legacy workers removed in greenfield runtime
-
-    // vNext: per-model runtime (typed) — processes flow.{model}.** sets
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelProjectionWorkerHostedService>());
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelAssociationWorkerHostedService>());
-
-        // TTL purge
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FlowPurgeHostedService>());
-
-    // DX: default action sender and responder
-    // Sender (IFlowActions) for apps to publish actions easily
-    services.AddFlowActions();
-    // Responder to handle FlowAction (seed/report/ping) with generic defaults
-    services.TryAddSingleton<Sora.Messaging.IMessageHandler<Sora.Flow.Actions.FlowAction>, Sora.Flow.Actions.FlowActionHandler>();
-        return services;
-    }
-
-    // Registration helpers for monitor hooks
-    public static IServiceCollection AddFlowMonitor<TMonitor>(this IServiceCollection services)
-        where TMonitor : class, IFlowMonitor
-    {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowMonitor, TMonitor>());
-        return services;
-    }
-
-    public static IServiceCollection AddFlowMonitor<TModel, TMonitor>(this IServiceCollection services)
-        where TMonitor : class, IFlowMonitor<TModel>
-    {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IFlowMonitor<TModel>, TMonitor>());
-        return services;
-    }
-
-    private static string? TryResolveFlowModelQualifiedName(Type entityType)
-    {
-        if (!entityType.IsGenericType) return null;
-        var def = entityType.GetGenericTypeDefinition();
-        // Resolve the model type's full name (normalized) once
-        string ModelBaseName()
-        {
-            var model = entityType.GetGenericArguments()[0];
-            var full = model.FullName ?? model.Name;
-            return full.Replace('+', '.');
-        }
-
-    // Stage/parked records and views: keep base as the model name, sets supply the suffix
-    if (def == typeof(StageRecord<>) || def == typeof(ParkedRecord<>) || def == typeof(CanonicalProjection<>) || def == typeof(LineageProjection<>))
-            return ModelBaseName();
-
-        // Root-scoped typed entities (no set provided): bake a type-specific suffix into the base
-    if (def == typeof(KeyIndex<>)) return ModelBaseName() + "#flow.index";
-        if (def == typeof(ReferenceItem<>)) return ModelBaseName() + "#flow.refs";
-    if (def == typeof(ProjectionTask<>)) return ModelBaseName() + "#flow.tasks";
-    if (def == typeof(PolicyState<>)) return ModelBaseName() + "#flow.policies";
-    if (def == typeof(Sora.Flow.Model.IdentityLink<>)) return ModelBaseName() + "#flow.identity";
-        // Dynamic root entity should use the pure model name as the base (no suffix)
-        if (def == typeof(DynamicFlowEntity<>)) return ModelBaseName();
-
-        return null;
-    }
-
-    private sealed class FlowBootstrapInitializer : ISoraInitializer
-    {
-        public void Initialize(IServiceCollection services) { }
-    }
-
-    internal sealed class FlowSchemaEnsureHostedService : IHostedService
-    {
-        private readonly IServiceProvider _sp;
-        public FlowSchemaEnsureHostedService(IServiceProvider sp) => _sp = sp;
-
-        public async Task StartAsync(CancellationToken cancellationToken)
-        {
-            using var scope = _sp.CreateScope();
-            var data = scope.ServiceProvider.GetService<IDataService>();
-            if (data is null) return;
-
-            // no legacy ensures — typed ensures are handled below
-
-            // Greenfield: no legacy ensures
-
-            // vNext per-model sets and entities (discover models dynamically)
-            // ensure assembly is loaded (no-op) and discover models via reflection
-            var byName = new Dictionary<string, Type>();
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (var asm in assemblies)
-            {
-                Type?[] types;
-                try { types = asm.GetTypes(); }
-                catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
-                catch { continue; }
-                foreach (var t in types)
-                {
-                    if (t is null || !t.IsClass || t.IsAbstract) continue;
-                    var bt = t.BaseType;
-                    if (bt is null || !bt.IsGenericType) continue;
-                    if (bt.GetGenericTypeDefinition() != typeof(FlowEntity<>)) continue;
-                    var modelName = Infrastructure.FlowRegistry.GetModelName(t);
-                    byName[modelName] = t;
-                }
-            }
-
-            foreach (var kv in byName)
-            {
-                    var modelType = kv.Value;
-                    // Ensure stage sets
-                    foreach (var stage in new[] { FlowSets.Intake, FlowSets.Standardized, FlowSets.Keyed })
-                    {
-                        var set = FlowSets.StageShort(stage);
-                        var generic = typeof(StageRecord<>).MakeGenericType(modelType);
-                        var method = typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                            .MakeGenericMethod(generic);
-                        await (Task)method.Invoke(null, new object?[] { data, set, cancellationToken })!;
-                    }
-                    // Ensure typed indexes/entities
-                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(KeyIndex<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, null, cancellationToken })!;
-                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(ReferenceItem<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, null, cancellationToken })!;
-                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(ProjectionTask<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, null, cancellationToken })!;
-                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(CanonicalProjection<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, FlowSets.ViewShort(Constants.Views.Canonical), cancellationToken })!;
-                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(LineageProjection<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, FlowSets.ViewShort(Constants.Views.Lineage), cancellationToken })!;
-
-                    // Root entities: dynamic materialized snapshot and per-reference policy state
-                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(DynamicFlowEntity<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, null, cancellationToken })!;
-                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(PolicyState<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, null, cancellationToken })!;
-                    // Identity links
-                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(Sora.Flow.Model.IdentityLink<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, null, cancellationToken })!;
-
-                    // Parked records set
-                    await (Task)typeof(FlowSchemaEnsureHostedService).GetMethod(nameof(EnsureCreatedFor), BindingFlags.Static | BindingFlags.NonPublic)!
-                        .MakeGenericMethod(typeof(ParkedRecord<>).MakeGenericType(modelType))
-                        .Invoke(null, new object?[] { data, FlowSets.StageShort(FlowSets.Parked), cancellationToken })!;
-            }
-        }
-
-        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-        private static async Task EnsureCreatedFor<TEntity>(IDataService d, string? set, CancellationToken ct) where TEntity : class
-        {
-            using var _set = DataSetContext.With(set);
-            try { await d.Execute<TEntity, bool>(new Instruction(DataInstructions.EnsureCreated), ct); }
-            catch { }
-        }
-    }
-
-    
-
-    internal sealed class FlowPurgeHostedService : BackgroundService
-    {
-        private readonly IServiceProvider _sp;
-        private readonly IOptionsMonitor<FlowOptions> _opts;
-        private readonly ILogger<FlowPurgeHostedService> _log;
-        public FlowPurgeHostedService(IServiceProvider sp, IOptionsMonitor<FlowOptions> opts, ILogger<FlowPurgeHostedService> log)
-        { _sp = sp; _opts = opts; _log = log; }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                var opts = _opts.CurrentValue;
-                if (!opts.PurgeEnabled)
-                {
-                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
-                    continue;
-                }
-                try
-                {
-                    using var scope = _sp.CreateScope();
-                    var now = DateTimeOffset.UtcNow;
-                    var cutoffIntake = now - opts.IntakeTtl;
-                    var cutoffStd = now - opts.StandardizedTtl;
-                    var cutoffKeyed = now - opts.KeyedTtl;
-                    var cutoffTask = now - opts.ProjectionTaskTtl;
-                    var cutoffReject = now - opts.RejectionReportTtl;
-                    var cutoffParked = now - opts.ParkedTtl;
-
-                    // Purge typed records and tasks for each discovered model
-                    foreach (var modelType in DiscoverModels())
-                    {
-                        var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
-                        var projTaskType = typeof(ProjectionTask<>).MakeGenericType(modelType);
-
-                        // intake/standardized/keyed
-                        // Page through sets and delete older than TTLs (provider-agnostic)
-                        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
-                        {
-                            var pageM = typeof(Data<,>).MakeGenericType(recordType, typeof(string)).GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
-                            var delM = typeof(Data<,>).MakeGenericType(recordType, typeof(string)).GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
-                            var pageTask = (Task)pageM.Invoke(null, new object?[] { 500, stoppingToken })!; await pageTask.ConfigureAwait(false);
-                            var items = (System.Collections.IEnumerable)GetTaskResult(pageTask)!;
-                            foreach (var it in items)
-                            {
-                                var ts = (DateTimeOffset)it.GetType().GetProperty("OccurredAt")!.GetValue(it)!;
-                                if (ts < cutoffIntake)
-                                {
-                                    await (Task)delM.Invoke(null, new object?[] { (string)it.GetType().GetProperty("Id")!.GetValue(it)!, FlowSets.StageShort(FlowSets.Intake), stoppingToken })!;
-                                }
-                            }
-                        }
-                        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Standardized)))
-                        {
-                            var pageM = typeof(Data<,>).MakeGenericType(recordType, typeof(string)).GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
-                            var delM = typeof(Data<,>).MakeGenericType(recordType, typeof(string)).GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
-                            var pageTask = (Task)pageM.Invoke(null, new object?[] { 500, stoppingToken })!; await pageTask.ConfigureAwait(false);
-                            var items = (System.Collections.IEnumerable)GetTaskResult(pageTask)!;
-                            foreach (var it in items)
-                            {
-                                var ts = (DateTimeOffset)it.GetType().GetProperty("OccurredAt")!.GetValue(it)!;
-                                if (ts < cutoffStd)
-                                {
-                                    await (Task)delM.Invoke(null, new object?[] { (string)it.GetType().GetProperty("Id")!.GetValue(it)!, FlowSets.StageShort(FlowSets.Standardized), stoppingToken })!;
-                                }
-                            }
-                        }
-                        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Keyed)))
-                        {
-                            var pageM = typeof(Data<,>).MakeGenericType(recordType, typeof(string)).GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
-                            var delM = typeof(Data<,>).MakeGenericType(recordType, typeof(string)).GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
-                            var pageTask = (Task)pageM.Invoke(null, new object?[] { 500, stoppingToken })!; await pageTask.ConfigureAwait(false);
-                            var items = (System.Collections.IEnumerable)GetTaskResult(pageTask)!;
-                            foreach (var it in items)
-                            {
-                                var ts = (DateTimeOffset)it.GetType().GetProperty("OccurredAt")!.GetValue(it)!;
-                                if (ts < cutoffKeyed)
-                                {
-                                    await (Task)delM.Invoke(null, new object?[] { (string)it.GetType().GetProperty("Id")!.GetValue(it)!, FlowSets.StageShort(FlowSets.Keyed), stoppingToken })!;
-                                }
-                            }
-                        }
-
-                        // projection tasks TTL
-                        // Fallback: page then delete by CreatedAt
-                        var pageTasksM = typeof(Data<,>).MakeGenericType(projTaskType, typeof(string)).GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
-                        var delTaskM = typeof(Data<,>).MakeGenericType(projTaskType, typeof(string)).GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
-                        using (DataSetContext.With(null))
-                        {
-                            var pageTask2 = (Task)pageTasksM.Invoke(null, new object?[] { 500, stoppingToken })!; await pageTask2.ConfigureAwait(false);
-                            var titems = (System.Collections.IEnumerable)GetTaskResult(pageTask2)!;
-                            foreach (var it in titems)
-                            {
-                                var ts = (DateTimeOffset)it.GetType().GetProperty("CreatedAt")!.GetValue(it)!;
-                                if (ts < cutoffTask)
-                                {
-                                    await (Task)delTaskM.Invoke(null, new object?[] { (string)it.GetType().GetProperty("Id")!.GetValue(it)!, null!, stoppingToken })!;
-                                }
-                            }
-                        }
-                    }
-
-                    // Purge diagnostics
-                    await Data<RejectionReport, string>.Delete(r => r.CreatedAt < cutoffReject, set: null!, stoppingToken);
-
-                    // Purge parked records for each model
-                    foreach (var modelType in DiscoverModels())
-                    {
-                        var parkedType = typeof(ParkedRecord<>).MakeGenericType(modelType);
-                        var parkedData = typeof(Data<,>).MakeGenericType(parkedType, typeof(string));
-                        var pageM = parkedData.GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) });
-                        var delM = parkedData.GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) });
-                        if (pageM is not null && delM is not null)
-                        {
-                            using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
-                            {
-                                var t = (Task)pageM.Invoke(null, new object?[] { 500, stoppingToken })!; await t.ConfigureAwait(false);
-                                var items = ((System.Collections.IEnumerable)GetTaskResult(t)!).Cast<object>().ToList();
-                                foreach (var it in items)
-                                {
-                                    var ts = (DateTimeOffset)it.GetType().GetProperty("OccurredAt")!.GetValue(it)!;
-                                    if (ts < cutoffParked)
-                                    {
-                                        await (Task)delM.Invoke(null, new object?[] { (string)it.GetType().GetProperty("Id")!.GetValue(it)!, FlowSets.StageShort(FlowSets.Parked), stoppingToken })!;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Purge expired provisional identity links for all models
-                    foreach (var modelType in DiscoverModels())
-                    {
-                        var idType = typeof(Sora.Flow.Model.IdentityLink<>).MakeGenericType(modelType);
-                        var idData = typeof(Data<,>).MakeGenericType(idType, typeof(string));
-                        var queryDel = idData.GetMethod("Delete", BindingFlags.Public | BindingFlags.Static, new[] { typeof(Func<,>).MakeGenericType(idType, typeof(bool)), typeof(string), typeof(CancellationToken) });
-                        if (queryDel is not null)
-                        {
-                            // Fallback: page and delete since static Delete with predicate may not be available for all adapters
-                        }
-                        // Safer generic: FirstPage then filter
-                        var pageM = idData.GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) });
-                        if (pageM is not null)
-                        {
-                            int fetched;
-                            do
-                            {
-                                var t = (Task)pageM.Invoke(null, new object?[] { 500, stoppingToken })!; await t.ConfigureAwait(false);
-                                var items = ((System.Collections.IEnumerable)GetTaskResult(t)!).Cast<object>().ToList();
-                                fetched = items.Count;
-                                foreach (var it in items)
-                                {
-                                    var prov = (bool)(it.GetType().GetProperty("Provisional")?.GetValue(it) ?? false);
-                                    var exp = (DateTimeOffset?)it.GetType().GetProperty("ExpiresAt")?.GetValue(it);
-                                    if (prov && exp is DateTimeOffset e && e < now)
-                                    {
-                                        var delM = idData.GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
-                                        await (Task)delM.Invoke(null, new object?[] { (string)it.GetType().GetProperty("Id")!.GetValue(it)!, stoppingToken })!;
-                                    }
-                                }
-                            } while (fetched == 500);
-                        }
-                    }
-
-                    _log.LogDebug("Sora.Flow purge completed");
-                }
-                catch (Exception ex)
-                {
-                    _log.LogDebug(ex, "Sora.Flow purge run failed (will retry later)");
-                }
-
-                try { await Task.Delay(_opts.CurrentValue.PurgeInterval, stoppingToken); }
-                catch (TaskCanceledException) { }
-            }
-        }
     }
 
     // vNext model-aware projection worker
@@ -467,30 +92,38 @@ public static class ServiceCollectionExtensions
                             foreach (var t in tasks)
                             {
                                 var refUlid = t.GetType().GetProperty("ReferenceUlid")?.GetValue(t) as string;
-                                // ULID is the authoritative key for view/doc ids
                                 var refId = refUlid ?? string.Empty;
                                 var canonicalId = t.GetType().GetProperty("CanonicalId")?.GetValue(t) as string;
-                                // keyed stage for this model
+                                // Pull recent stage records for this reference from keyed, fallback to intake
                                 var keyedSet = FlowSets.StageShort(FlowSets.Keyed);
+                                var intakeSet = FlowSets.StageShort(FlowSets.Intake);
                                 var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
+                                var all = new List<object>();
                                 using (DataSetContext.With(keyedSet))
                                 {
-                                    var allMethod = typeof(Data<,>).MakeGenericType(recordType, typeof(string))
-                                        .GetMethod("All", BindingFlags.Public | BindingFlags.Static, new[] { typeof(CancellationToken) });
-                                    var allTask = (Task)allMethod!.Invoke(null, new object?[] { stoppingToken })!;
-                                    await allTask.ConfigureAwait(false);
-                                    var allEnum = (System.Collections.IEnumerable)GetTaskResult(allTask)!;
-                                    var all = new List<object>();
-                                    foreach (var r in allEnum.Cast<object>())
+                                    var firstPage = typeof(Data<,>).MakeGenericType(recordType, typeof(string))
+                                        .GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
+                                    var tpage = (Task)firstPage.Invoke(null, new object?[] { 500, stoppingToken })!; await tpage.ConfigureAwait(false);
+                                    var itemsEnumKeyed = (System.Collections.IEnumerable)GetTaskResult(tpage)!;
+                                    all = itemsEnumKeyed.Cast<object>()
+                                        .Where(r => string.Equals(r.GetType().GetProperty("ReferenceUlid")?.GetValue(r) as string, refId, StringComparison.Ordinal))
+                                        .ToList();
+                                }
+                                if (all.Count == 0)
+                                {
+                                    using (DataSetContext.With(intakeSet))
                                     {
-                                        var rulid = r.GetType().GetProperty("ReferenceUlid")?.GetValue(r) as string;
-                                        bool match = !string.IsNullOrWhiteSpace(refUlid)
-                                            ? string.Equals(rulid, refUlid, StringComparison.Ordinal)
-                                            : false;
-                                        if (match) all.Add(r);
+                                        var firstPage = typeof(Data<,>).MakeGenericType(recordType, typeof(string))
+                                            .GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
+                                        var tpage = (Task)firstPage.Invoke(null, new object?[] { 500, stoppingToken })!; await tpage.ConfigureAwait(false);
+                                        var itemsEnumIntake = (System.Collections.IEnumerable)GetTaskResult(tpage)!;
+                                        all = itemsEnumIntake.Cast<object>()
+                                            .Where(r => string.Equals(r.GetType().GetProperty("ReferenceUlid")?.GetValue(r) as string, refId, StringComparison.Ordinal))
+                                            .ToList();
                                     }
+                                }
 
-                                    // canonical (range structure) and lineage
+                                // canonical (range structure) and lineage
                                     var canonical = new Dictionary<string, List<string?>>(StringComparer.OrdinalIgnoreCase);
                                     var lineage = new Dictionary<string, Dictionary<string, HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
                                     // Optional: exclude tag prefixes from canonical/lineage (e.g., "reading.")
@@ -656,8 +289,6 @@ public static class ServiceCollectionExtensions
                                         await (Task)polData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { polType, typeof(CancellationToken) })!
                                             .Invoke(null, new object?[] { pol, stoppingToken })!;
                                     }
-                                }
-
                                 // clear RequiresProjection if set
                                 var refType = typeof(ReferenceItem<>).MakeGenericType(modelType);
                                 var refData = typeof(Data<,>).MakeGenericType(refType, typeof(string));
@@ -727,13 +358,15 @@ public static class ServiceCollectionExtensions
                         }
                         if (page.Count == 0) continue;
 
+                        var voParent = Infrastructure.FlowRegistry.GetValueObjectParent(modelType);
+                        var isVo = voParent is not null;
                         var tags = Infrastructure.FlowRegistry.GetAggregationTags(modelType);
-                        if (tags.Length == 0) tags = _opts.CurrentValue.AggregationTags ?? Array.Empty<string>();
+                        if (!isVo && tags.Length == 0) tags = _opts.CurrentValue.AggregationTags ?? Array.Empty<string>();
                         foreach (var rec in page)
                         {
                             using var _root = DataSetContext.With(null);
                             var dict = ExtractDict(rec.GetType().GetProperty("StagePayload")!.GetValue(rec));
-                            if (dict is null || tags.Length == 0)
+                            if (dict is null || (!isVo && tags.Length == 0))
                             {
                                 await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = dict is null ? "no-payload" : "no-config-tags", tags }, rec, modelType, intakeSet, stoppingToken);
                                 continue;
@@ -741,18 +374,39 @@ public static class ServiceCollectionExtensions
 
                             var candidates = new List<(string tag, string value)>();
                             string? canonicalId = null;
-                            foreach (var tag in tags)
+                            if (!isVo)
                             {
-                                if (!dict.TryGetValue(tag, out var raw)) continue;
-                                foreach (var v in ToValuesFlexible(raw))
+                                foreach (var tag in tags)
                                 {
-                                    if (!string.IsNullOrWhiteSpace(v))
+                                    if (!dict.TryGetValue(tag, out var raw)) continue;
+                                    foreach (var v in ToValuesFlexible(raw))
                                     {
-                                        candidates.Add((tag, v));
-                                        // Heuristic: prefer the first aggregation key as CanonicalId if none explicit
-                                        canonicalId ??= v;
+                                        if (!string.IsNullOrWhiteSpace(v))
+                                        {
+                                            candidates.Add((tag, v));
+                                            // Heuristic: prefer the first aggregation key as CanonicalId if none explicit
+                                            canonicalId ??= v;
+                                        }
                                     }
                                 }
+                            }
+                            else
+                            {
+                                // VO: parent association uses configured parent key path
+                                var parentKeyPath = voParent!.Value.ParentKeyPath;
+                                if (!dict.TryGetValue(parentKeyPath, out var raw))
+                                {
+                                    await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "vo-parent-key-missing", path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
+                                    continue;
+                                }
+                                var parentKey = ToValuesFlexible(raw).FirstOrDefault();
+                                if (string.IsNullOrWhiteSpace(parentKey))
+                                {
+                                    await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "vo-parent-key-empty", path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
+                                    continue;
+                                }
+                                canonicalId = parentKey;
+                                candidates.Add((parentKeyPath, parentKey));
                             }
                             // Optional composite candidate: system|adapter|externalId for safer ownership, when present
                             if (dict.TryGetValue(Constants.Envelope.System, out var sys) &&
@@ -779,7 +433,7 @@ public static class ServiceCollectionExtensions
                                 continue;
                             }
 
-                            var kiType = typeof(KeyIndex<>).MakeGenericType(modelType);
+                            var kiType = typeof(KeyIndex<>).MakeGenericType(isVo ? voParent!.Value.Parent : modelType);
                             var kiData = typeof(Data<,>).MakeGenericType(kiType, typeof(string));
                             var getKi = kiData.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
                             var owners = new HashSet<string>(StringComparer.Ordinal);
@@ -831,7 +485,7 @@ public static class ServiceCollectionExtensions
                                 }
                             }
 
-                            var refType = typeof(ReferenceItem<>).MakeGenericType(modelType);
+                            var refType = typeof(ReferenceItem<>).MakeGenericType(isVo ? voParent!.Value.Parent : modelType);
                             var refData = typeof(Data<,>).MakeGenericType(refType, typeof(string));
                             var getRef = refData.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
                             var refTask = (Task)getRef.Invoke(null, new object?[] { referenceUlid, stoppingToken })!;
@@ -852,18 +506,22 @@ public static class ServiceCollectionExtensions
                             await (Task)refData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { refType, typeof(CancellationToken) })!
                                 .Invoke(null, new object?[] { ri, stoppingToken })!;
 
-                            var taskType = typeof(ProjectionTask<>).MakeGenericType(modelType);
-                            var newTask = Activator.CreateInstance(taskType)!;
+                            // Create projection task for canonical roots only
                             var refUlid = (string)refType.GetProperty("Id")!.GetValue(ri)!;
-                            taskType.GetProperty("Id")!.SetValue(newTask, $"{refUlid}::{nextVersion}::{Constants.Views.Canonical}");
-                            taskType.GetProperty("ReferenceUlid")?.SetValue(newTask, refUlid);
-                            if (!string.IsNullOrWhiteSpace(canonicalId)) taskType.GetProperty("CanonicalId")?.SetValue(newTask, canonicalId);
-                            taskType.GetProperty("Version")!.SetValue(newTask, nextVersion);
-                            taskType.GetProperty("ViewName")!.SetValue(newTask, Constants.Views.Canonical);
-                            taskType.GetProperty("CreatedAt")!.SetValue(newTask, DateTimeOffset.UtcNow);
-                            var taskDataType = typeof(Data<,>).MakeGenericType(taskType, typeof(string));
-                            await (Task)taskDataType.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { taskType, typeof(CancellationToken) })!
-                                .Invoke(null, new object?[] { newTask, stoppingToken })!;
+                            if (!isVo)
+                            {
+                                var taskType = typeof(ProjectionTask<>).MakeGenericType(modelType);
+                                var newTask = Activator.CreateInstance(taskType)!;
+                                taskType.GetProperty("Id")!.SetValue(newTask, $"{refUlid}::{nextVersion}::{Constants.Views.Canonical}");
+                                taskType.GetProperty("ReferenceUlid")?.SetValue(newTask, refUlid);
+                                if (!string.IsNullOrWhiteSpace(canonicalId)) taskType.GetProperty("CanonicalId")?.SetValue(newTask, canonicalId);
+                                taskType.GetProperty("Version")!.SetValue(newTask, nextVersion);
+                                taskType.GetProperty("ViewName")!.SetValue(newTask, Constants.Views.Canonical);
+                                taskType.GetProperty("CreatedAt")!.SetValue(newTask, DateTimeOffset.UtcNow);
+                                var taskDataType = typeof(Data<,>).MakeGenericType(taskType, typeof(string));
+                                await (Task)taskDataType.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { taskType, typeof(CancellationToken) })!
+                                    .Invoke(null, new object?[] { newTask, stoppingToken })!;
+                            }
 
                             // Move record to keyed set and drop from intake
                             var keyedSet = FlowSets.StageShort(FlowSets.Keyed);

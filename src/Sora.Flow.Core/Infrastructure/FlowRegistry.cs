@@ -14,6 +14,7 @@ public static class FlowRegistry
     private static readonly ConcurrentDictionary<Type, string[]> s_aggTags = new();
     private static readonly ConcurrentDictionary<string, Type> s_byName = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<Type, string[]> s_externalIdProps = new();
+    private static readonly ConcurrentDictionary<Type, (Type Parent, string ParentKeyPath)?> s_voParent = new();
 
     public static string GetModelName(Type t)
     {
@@ -37,6 +38,43 @@ public static class FlowRegistry
                 tags.AddRange(attrs.Select(a => a.Path).Where(s => !string.IsNullOrWhiteSpace(s))!);
             }
             return tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        });
+    }
+
+    /// <summary>
+    /// If the provided type is a Flow value-object, returns its parent Flow entity type and the parent key path
+    /// used for association (extracted from either [ParentKey] attribute or matching property name in payload).
+    /// Returns null when the type is not recognized as a VO or metadata is missing.
+    /// </summary>
+    public static (Type Parent, string ParentKeyPath)? GetValueObjectParent(Type t)
+    {
+        return s_voParent.GetOrAdd(t, static type =>
+        {
+            var bt = type.BaseType;
+            if (bt is null || !bt.IsGenericType || bt.GetGenericTypeDefinition() != typeof(FlowValueObject<>)) return null;
+            var voAttr = type.GetCustomAttribute<FlowValueObjectAttribute>();
+            if (voAttr is null || voAttr.Parent is null) return null;
+            // Determine parent key path: first [ParentKey] payload path if present, else fall back to a property named like the attribute target
+            string? path = null;
+            PropertyInfo? targetProp = null;
+            foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            {
+                var pk = p.GetCustomAttribute<ParentKeyAttribute>(inherit: true);
+                if (pk is not null)
+                {
+                    targetProp = p;
+                    path = string.IsNullOrWhiteSpace(pk.PayloadPath) ? p.Name : pk.PayloadPath;
+                    break;
+                }
+            }
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                // Best-effort: look for a common property name
+                targetProp = type.GetProperty("SensorKey") ?? type.GetProperty("ParentKey") ?? type.GetProperty("Key");
+                path = targetProp?.Name;
+            }
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            return (voAttr.Parent, path!);
         });
     }
 
@@ -103,9 +141,17 @@ public static class FlowRegistry
                 // Accept sealed canonicals: FlowEntity<T> with T==type
                 var baseType = type.BaseType;
                 if (baseType is null || !baseType.IsGenericType) continue;
-                if (baseType.GetGenericTypeDefinition() != typeof(FlowEntity<>)) continue;
-                var modelName = GetModelName(type);
-                s_byName[modelName] = type;
+                if (baseType.GetGenericTypeDefinition() == typeof(FlowEntity<>))
+                {
+                    var modelName = GetModelName(type);
+                    s_byName[modelName] = type;
+                }
+                else if (baseType.GetGenericTypeDefinition() == typeof(FlowValueObject<>))
+                {
+                    // Register VO by name as well to enable routing and API discovery symmetry
+                    var modelName = GetModelName(type);
+                    s_byName[modelName] = type;
+                }
             }
         }
     }

@@ -57,3 +57,32 @@ public enum LinkKind
     CanonicalId = 0,
     ExternalId = 1,
 }
+
+/// <summary>
+/// Declares that a type is a Flow value-object and specifies its parent Flow entity type.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+public sealed class FlowValueObjectAttribute : Attribute
+{
+    public Type Parent { get; }
+    public FlowValueObjectAttribute(Type parent)
+    {
+        Parent = parent ?? throw new ArgumentNullException(nameof(parent));
+    }
+}
+
+/// <summary>
+/// Marks the property that contains the parent entity's canonical business key for association.
+/// Optionally provide a payload path used in StagePayload when the intake dictionary uses a different key.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+public sealed class ParentKeyAttribute : Attribute
+{
+    /// <summary>
+    /// Optional key name/path in the intake payload dictionary used to extract the parent key.
+    /// If null, the property name is used as the fallback.
+    /// </summary>
+    public string? PayloadPath { get; }
+    public ParentKeyAttribute(string? payloadPath = null)
+    { PayloadPath = string.IsNullOrWhiteSpace(payloadPath) ? null : payloadPath; }
+}

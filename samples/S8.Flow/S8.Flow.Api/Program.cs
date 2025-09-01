@@ -95,9 +95,16 @@ builder.Services.OnMessages(h =>
     });
 
     // Fast-tracked readings -> write StageRecord<SensorReadingVo> with only the key + values.
-    h.On<ReadingEvent>(async (env, msg, ct) =>
+    h.On<SensorReadingVo>(async (env, msg, ct) =>
     {
-        var payload = msg.ToPayloadDictionary();
+        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Keys.Sensor.Key] = msg.SensorKey,
+            [Keys.Reading.Value] = msg.Value,
+            [Keys.Reading.CapturedAt] = msg.CapturedAt.ToString("O"),
+        };
+        if (!string.IsNullOrWhiteSpace(msg.Unit)) payload[Keys.Sensor.Unit] = msg.Unit;
+        if (!string.IsNullOrWhiteSpace(msg.Source)) payload[Keys.Reading.Source] = msg.Source;
         var typed = new StageRecord<SensorReadingVo>
         {
             Id = Guid.NewGuid().ToString("n"),
