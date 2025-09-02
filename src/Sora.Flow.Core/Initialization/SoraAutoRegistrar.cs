@@ -13,7 +13,11 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddSoraFlow();
+        // Do not auto-start the Flow runtime in every process.
+        // Producer-only adapters reference Sora.Flow.Core for types/attributes but must not run background workers.
+        // Orchestrators/APIs should call services.AddSoraFlow() explicitly in Program.cs.
+        // Safe default here: install naming only so storage naming remains consistent if used.
+        services.AddSoraFlowNaming();
     }
 
     public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)

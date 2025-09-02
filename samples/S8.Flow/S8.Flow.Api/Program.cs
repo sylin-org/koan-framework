@@ -8,6 +8,7 @@ using Sora.Flow.Model;
 using Sora.Flow.Infrastructure;
 using Sora.Messaging.RabbitMq;
 using Sora.Web.Swagger;
+using Sora.Flow.Sending; // AddFlowSender
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,8 @@ builder.Services.AddMessagingCore();
 // Ensure RabbitMQ provider is registered (factory + health + optional inbox discovery)
 builder.Services.AddRabbitMq();
 builder.Services.AddSoraFlow();
+// Register FlowEvent consumer (handler is provided by AddFlowSender)
+builder.Services.AddFlowSender();
 
 builder.Services.Configure<FlowOptions>(o =>
 {

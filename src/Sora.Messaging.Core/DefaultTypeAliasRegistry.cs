@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace Sora.Messaging;
 
@@ -57,6 +58,54 @@ internal sealed class DefaultTypeAliasRegistry : ITypeAliasRegistry
             }
             return null;
         }
+
+        // Attempt to resolve by scanning for [Message] aliases across loaded assemblies
+        // Supports both base alias (e.g., "flow.event") and versioned (e.g., "flow.event@v1")
+        static (string Base, int? Version) ParseAlias(string a)
+        {
+            var idx = a.LastIndexOf("@v", StringComparison.OrdinalIgnoreCase);
+            if (idx > 0)
+            {
+                var basePart = a.Substring(0, idx);
+                var verPart = a.Substring(idx + 2);
+                if (int.TryParse(verPart, out var v)) return (basePart, v);
+                return (a, null);
+            }
+            return (a, null);
+        }
+        var (baseAlias, ver) = ParseAlias(alias);
+        try
+        {
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type?[] types;
+                try { types = asm.GetTypes(); }
+                catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
+                catch { continue; }
+                foreach (var type in types)
+                {
+                    if (type is null) continue;
+                    var attr = type.GetCustomAttributes(typeof(MessageAttribute), false).FirstOrDefault() as MessageAttribute;
+                    if (attr is null) continue;
+                    var declared = string.IsNullOrWhiteSpace(attr.Alias) ? (type.FullName ?? type.Name) : attr.Alias!;
+                    var versioned = $"{declared}@v{attr.Version}";
+                    if (string.Equals(alias, versioned, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(alias, declared, StringComparison.OrdinalIgnoreCase)
+                        || (ver.HasValue && string.Equals(baseAlias, declared, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        // Cache both ways for future lookups
+                        _from[declared] = type;
+                        _to[type] = declared;
+                        if (attr is not null)
+                        {
+                            _from[versioned] = type;
+                        }
+                        return type;
+                    }
+                }
+            }
+        }
+        catch { /* ignore scan errors and fall back */ }
 
         // Fallback: try to resolve by full name using loaded assemblies
         var byName = TryResolveByFullName(alias);

@@ -52,8 +52,8 @@ public sealed class BmsPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-    // Initial bulk seed on startup via MQ
-    await SeedAllAsync(ct);
+    // Initial bulk seed on startup via MQ (resilient to broker warm-up)
+    await SeedAllWithRetryAsync(ct);
 
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
@@ -155,6 +155,26 @@ public sealed class BmsPublisher : BackgroundService
                 sensorEvent.SourceId = "bms";
                 sensorEvent.CorrelationId = s.SensorKey;
                 await sensorEvent.Send(ct);
+            }
+        }
+    }
+
+    // Retry wrapper to avoid host crash if RabbitMQ isn’t ready yet
+    private async Task SeedAllWithRetryAsync(CancellationToken ct)
+    {
+        const int maxAttempts = 30;
+        for (int attempt = 1; attempt <= maxAttempts && !ct.IsCancellationRequested; attempt++)
+        {
+            try
+            {
+                await SeedAllAsync(ct);
+                _log.LogInformation("Initial seed completed on attempt {Attempt}", attempt);
+                return;
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "Initial seed attempt {Attempt} failed; retrying in 1s", attempt);
+                try { await Task.Delay(TimeSpan.FromSeconds(1), ct); } catch (TaskCanceledException) { break; }
             }
         }
     }
