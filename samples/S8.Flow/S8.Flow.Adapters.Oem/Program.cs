@@ -10,9 +10,8 @@ using Sora.Core.Hosting.App;
 using Sora.Flow.Actions;
 using Sora.Flow.Sending;
 using Sora.Flow.Attributes;
-using Sora.Data.Core;
-using Sora.Data.Mongo;
 using Sora.Flow;
+using Sora.Data.Core; // AddSora()
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -26,22 +25,15 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Minimal boot for a publisher-only process: Sora (Core + Data) + Messaging (RabbitMQ). No Flow runtime.
+// Minimal boot for a publisher-only process: Sora (Core) + Messaging (RabbitMQ). No Flow runtime, no DB.
 builder.Services.AddSora();
 builder.Services.AddMessagingCore();
 // Minimal RabbitMQ wiring: register the bus factory only (no health contributor / inbox discovery)
 builder.Services.AddSingleton<IMessageBusFactory, RabbitMqFactory>();
-// Register Mongo data adapter so StageRecord<> Upsert resolves centrally (shared DB in compose)
-builder.Services.AddMongoAdapter(o =>
-{
-    o.ConnectionString = builder.Configuration.GetConnectionString("Default") ?? o.ConnectionString;
-});
-// Install Flow naming policy so generic wrappers map to {ModelFullName}#flow.*
-builder.Services.AddSoraFlowNaming();
+// No storage naming needed; this producer publishes only messages
 
 builder.Services.AddHostedService<OemPublisher>();
-// Register Flow sender + identity stamper for entity/VO Send() with server-side stamping
-builder.Services.AddFlowSender();
+// Only identity stamper used to enrich FlowEvent payloads (optional)
 builder.Services.AddFlowIdentityStamper();
 
 var app = builder.Build();
@@ -58,9 +50,7 @@ public sealed class OemPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-    // Ensure data provider is reachable before initial seed
-    await WaitForDataAsync(stoppingToken);
-    // Initial bulk seed on startup
+    // Initial bulk seed on startup via MQ
     await SeedAllAsync(stoppingToken);
 
         var rng = new Random();
@@ -77,7 +67,7 @@ public sealed class OemPublisher : BackgroundService
                 // Periodic independent announcements
                 if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromMinutes(5))
                 {
-                    // Plain-bag seed: device
+                    // Seed Device via FlowEvent (pure MQ)
                     var oemDeviceId = $"{d.Inventory}:{d.Serial}";
                     var deviceBag = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                     {
@@ -90,29 +80,43 @@ public sealed class OemPublisher : BackgroundService
                         ["identifier.external.oem"] = oemDeviceId,
                         ["source"] = "oem",
                     };
-                    var devKey = $"device:seed:{oemDeviceId}";
-                    await new FlowAction(
-                        Model: "device",
-                        Verb: "seed",
-                        ReferenceId: oemDeviceId,
-                        Payload: deviceBag,
-                        IdempotencyKey: devKey,
-                        PartitionKey: "device",
-                        CorrelationId: oemDeviceId)
-                        .Send();
+                    var devEvent = FlowEvent.ForModel("device");
+                    devEvent.SourceId = "oem";
+                    devEvent.CorrelationId = oemDeviceId;
+                    foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
+                    await devEvent.Send(stoppingToken);
 
-                    // Seed sensors via entity Send(); DefaultSource inferred (oem)
+                    // Seed sensors via FlowEvent (pure MQ)
                     foreach (var s in SampleProfiles.SensorsForOem(d))
-                        await s.Send(stoppingToken);
+                    {
+                        var sensorEvent = FlowEvent.ForModel("sensor")
+                            .With(Keys.Sensor.Key, s.SensorKey)
+                            .With("DeviceId", s.DeviceId)
+                            .With(Keys.Sensor.Code, s.Code)
+                            .With(Keys.Sensor.Unit, s.Unit)
+                            .With("source", "oem");
+                        sensorEvent.SourceId = "oem";
+                        sensorEvent.CorrelationId = s.SensorKey;
+                        await sensorEvent.Send(stoppingToken);
+                    }
                     lastAnnounce = DateTimeOffset.UtcNow;
                     _log.LogInformation("OEM announced Device {Inv}/{Serial} and OEM sensors", d.Inventory, d.Serial);
                 }
 
                 // Slim reading VO
                 var key = $"{d.Inventory}::{d.Serial}::{code}";
-                var reading = new Reading { SensorKey = key, Value = value, Unit = unit, Source = "oem", CapturedAt = DateTimeOffset.UtcNow };
-                await reading.Send(stoppingToken);
-                _log.LogInformation("OEM sent Reading {Key}={Value}{Unit} at {At}", key, value, unit, reading.CapturedAt);
+                // Publish reading via FlowEvent
+                var at = DateTimeOffset.UtcNow;
+                var readingEvent = FlowEvent.ForModel("reading")
+                    .With(Keys.Sensor.Key, key)
+                    .With(Keys.Reading.Value, value)
+                    .With(Keys.Reading.CapturedAt, at.ToString("O"))
+                    .With(Keys.Sensor.Unit, unit)
+                    .With(Keys.Reading.Source, "oem");
+                readingEvent.SourceId = "oem";
+                readingEvent.CorrelationId = key;
+                await readingEvent.Send(stoppingToken);
+                _log.LogInformation("OEM sent Reading {Key}={Value}{Unit} at {At}", key, value, unit, at);
             }
             catch (Exception ex)
             {
@@ -122,40 +126,36 @@ public sealed class OemPublisher : BackgroundService
         }
     }
 
-    // Iterate device catalog and send normalized seeds. Keep sensors via FlowAction for explicit external refs.
+    // Iterate device catalog and publish normalized seeds via MQ
     private static async Task SeedAllAsync(CancellationToken ct)
     {
-    // occurredAt defaults to a single UtcNow captured per batch inside Send().
-    await SampleProfiles.Fleet.Send(ct: ct);
-
         foreach (var d in SampleProfiles.Fleet)
-            foreach (var s in SampleProfiles.SensorsForOem(d))
-                await s.Send(ct: ct);
-    }
-
-    // Probe the data provider by performing a tiny paged read; retry until success or cancellation
-    private static async Task WaitForDataAsync(CancellationToken ct)
-    {
-        var attempt = 0;
-        while (!ct.IsCancellationRequested)
         {
-            try
+            var oemDeviceId = $"{d.Inventory}:{d.Serial}";
+            var deviceEvent = FlowEvent.ForModel("device")
+                .With(Keys.Device.Inventory, d.Inventory)
+                .With(Keys.Device.Serial, d.Serial)
+                .With(Keys.Device.Manufacturer, d.Manufacturer)
+                .With(Keys.Device.Model, d.Model)
+                .With(Keys.Device.Kind, d.Kind)
+                .With(Keys.Device.Code, d.Code)
+                .With("identifier.external.oem", oemDeviceId)
+                .With("source", "oem");
+            deviceEvent.SourceId = "oem";
+            deviceEvent.CorrelationId = oemDeviceId;
+            await deviceEvent.Send(ct);
+
+            foreach (var s in SampleProfiles.SensorsForOem(d))
             {
-                var recType = typeof(Sora.Flow.Model.StageRecord<>).MakeGenericType(typeof(Device));
-                var dataType = typeof(Sora.Data.Core.Data<,>).MakeGenericType(recType, typeof(string));
-                var firstPage = dataType.GetMethod("FirstPage", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
-                using (Sora.Data.Core.DataSetContext.With(Sora.Flow.Infrastructure.FlowSets.StageShort(Sora.Flow.Infrastructure.FlowSets.Intake)))
-                {
-                    var t = (Task)firstPage.Invoke(null, new object?[] { 1, ct })!;
-                    await t.ConfigureAwait(false);
-                }
-                return;
-            }
-            catch
-            {
-                attempt++;
-                var delay = TimeSpan.FromSeconds(Math.Min(10, 0.5 + attempt * 0.5));
-                try { await Task.Delay(delay, ct); } catch (TaskCanceledException) { }
+                var sensorEvent = FlowEvent.ForModel("sensor")
+                    .With(Keys.Sensor.Key, s.SensorKey)
+                    .With("DeviceId", s.DeviceId)
+                    .With(Keys.Sensor.Code, s.Code)
+                    .With(Keys.Sensor.Unit, s.Unit)
+                    .With("source", "oem");
+                sensorEvent.SourceId = "oem";
+                sensorEvent.CorrelationId = s.SensorKey;
+                await sensorEvent.Send(ct);
             }
         }
     }

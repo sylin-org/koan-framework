@@ -13,13 +13,20 @@ namespace Sora.Flow.Sending;
 
 // Preferred name for normalized, contractless Flow ingestion payloads.
 // Values must be primitives/arrays/dictionaries.
+[Sora.Messaging.Message(Alias = "flow.event", Version = 1)]
 public class FlowEvent
 {
+    // Optional routing hint so the orchestrator can resolve the target model type
+    public string? Model { get; set; }
+    // Optional transport metadata
+    public string? SourceId { get; set; }
+    public DateTimeOffset? OccurredAt { get; set; }
+    public string? CorrelationId { get; set; }
     public Dictionary<string, object?> Bag { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     // Instructional factory for readability; may set model metadata in future.
     public static FlowEvent ForModel(string model)
-        => new FlowEvent();
+        => new FlowEvent { Model = model };
 
     public FlowEvent With(string path, object? value)
     { Bag[path] = value; return this; }
@@ -158,7 +165,9 @@ public static class FlowSenderRegistration
 {
     public static IServiceCollection AddFlowSender(this IServiceCollection services)
     {
-        services.TryAddSingleton<IFlowSender, FlowSender>();
+    services.TryAddSingleton<IFlowSender, FlowSender>();
+    // Also register the FlowEvent handler (only orchestrator processes will consume, producers won’t run consumers)
+    services.TryAddSingleton<Sora.Messaging.IMessageHandler<FlowEvent>, FlowEventHandler>();
         return services;
     }
 }
