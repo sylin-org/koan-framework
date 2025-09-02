@@ -25,3 +25,8 @@ Notes
 	- `reference.*` for parent references (e.g., `reference.device`)
 	- `model.*` for direct model fields
 	Clients don’t stamp identity; the API infers it from the envelope/host. See ADR FLOW-0105 and docs/guides/data/all-query-streaming-and-pager.md for conventions.
+
+	Additional tips
+
+	- Use `FlowEvent.For<T>()` as a single entry point for both Flow entities and value objects (e.g., `FlowEvent.For<Device>()`, `FlowEvent.For<Reading>()`).
+	- For adapter commands, define a small VO (e.g., `ControlCommand`) and handle it in the adapter host to react to verbs.

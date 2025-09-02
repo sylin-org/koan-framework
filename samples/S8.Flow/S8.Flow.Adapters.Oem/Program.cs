@@ -40,6 +40,9 @@ public sealed class OemPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+    // Example: react to simple control commands sent via VO
+    // In a real app, this would be wired via OnMessages in a host that runs consumers for OEM; here we just sketch the intent.
+    _ = stoppingToken; // placeholder to avoid warnings in sample
     // Initial bulk seed on startup via MQ (resilient to broker warm-up)
     await SeedAllWithRetryAsync(stoppingToken);
 
