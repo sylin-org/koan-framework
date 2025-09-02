@@ -25,21 +25,11 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Minimal boot for a publisher-only process: Sora (Core) + Messaging (RabbitMQ). No Flow runtime, no DB.
+// Minimal boot: Sora + auto-registrars provide Messaging Core, RabbitMQ, Flow identity stamper,
+// and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
-builder.Services.AddMessagingCore();
-// Minimal RabbitMQ wiring: register the bus factory only (no health contributor / inbox discovery)
-builder.Services.AddSingleton<IMessageBusFactory, RabbitMqFactory>();
-// No storage naming needed; this producer publishes only messages
-
-builder.Services.AddHostedService<OemPublisher>();
-// Only identity stamper used to enrich FlowEvent payloads (optional)
-builder.Services.AddFlowIdentityStamper();
 
 var app = builder.Build();
-// Set ambient host so MessagingExtensions can resolve the bus
-AppHost.Current = app.Services;
-Sora.Core.SoraEnv.TryInitialize(app.Services);
 await app.RunAsync();
 
 [FlowAdapter(system: "oem", adapter: "oem", DefaultSource = "oem")]

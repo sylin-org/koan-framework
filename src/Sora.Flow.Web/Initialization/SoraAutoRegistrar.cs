@@ -1,9 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using Sora.Flow.Infrastructure;
+using Sora.Flow;
+using Sora.Flow.Materialization;
 using System.Reflection;
 
 namespace Sora.Flow.Web.Initialization;
@@ -53,6 +56,35 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             }
         }
         // Health/metrics are assumed to be added by host; controllers expose endpoints only.
+
+        // Opt-out turnkey: auto-add Flow runtime in web hosts unless disabled via config.
+        // Gate: Sora:Flow:AutoRegister (default: true). Idempotent: skips if already added.
+        try
+        {
+            IConfiguration? cfg = null;
+            try
+            {
+                var existing = services.FirstOrDefault(d => d.ServiceType == typeof(IConfiguration));
+                cfg = existing?.ImplementationInstance as IConfiguration;
+            }
+            catch { }
+
+            var enabled = true; // default ON
+            if (cfg is not null)
+            {
+                // Prefer explicit boolean; treat missing as true
+                var val = cfg.GetValue<bool?>("Sora:Flow:AutoRegister");
+                if (val.HasValue) enabled = val.Value;
+            }
+
+            // Skip if Flow already wired (presence of IFlowMaterializer indicates AddSoraFlow ran)
+            var already = services.Any(d => d.ServiceType == typeof(IFlowMaterializer));
+            if (enabled && !already)
+            {
+                services.AddSoraFlow();
+            }
+        }
+        catch { }
     }
 
     public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
@@ -65,6 +97,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     report.AddSetting("routes[4]", "/policies");
     report.AddSetting("routes[5]", $"{Sora.Flow.Web.Infrastructure.WebConstants.Routes.DefaultPrefix}/{{model}}");
     report.AddSetting("routes[6]", "/api/vo/{type}");
+    var autoReg = cfg.GetValue<bool?>("Sora:Flow:AutoRegister") ?? true;
+    report.AddSetting("turnkey.autoRegister", autoReg.ToString().ToLowerInvariant());
     }
 
     private static IEnumerable<Type> DiscoverModels()

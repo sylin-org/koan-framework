@@ -6,6 +6,10 @@ Contract (at a glance) — see also: [Bindings and canonical IDs](./flow-binding
 - Error modes: Rejections with reason/evidence; DLQs; readiness/health.
 - Success: Deltas accepted, keyed and associated; projection tasks drained; canonical and lineage are queryable.
 
+Minimal boot and auto-registration
+- Generic hosts (adapters): `builder.Services.AddSora();` — the Core host binder sets `AppHost`/`SoraEnv` automatically and Flow auto-registers `[FlowAdapter]` `BackgroundService`s. See ADR [FLOW-0106](../decisions/FLOW-0106-adapter-auto-scan-and-minimal-boot.md).
+- Web hosts (APIs): Turnkey is ON by default — referencing `Sora.Flow.Web` auto-adds `AddSoraFlow()` unless disabled via `Sora:Flow:AutoRegister=false`. It's idempotent, so explicit calls are safe. Typical: `builder.Services.AddSora(); app.UseSora();`
+
 Core types (first-class statics)
 - FlowEntity<TModel> : Entity<TModel> — TModel is the canonical shape (e.g., Device)
 - DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>> — normalized transport with Id + Model (ExpandoObject: nested JSON, provider-neutral)
@@ -42,6 +46,25 @@ Routes (controllers)
 - Legacy /views/* may be absent in new apps. Controllers resolve {model} to the registered type and query CanonicalProjection<TModel>/LineageProjection<TModel> against FlowSets.View<TModel>(view).
 
 Options (Sora:Flow)
+
+Adapter auto-start configuration (Sora:Flow:Adapters)
+- AutoStart (bool): default true when running in containers; false otherwise.
+- Include (string[]): optional whitelist of adapters by `"system:adapter"`.
+- Exclude (string[]): optional blacklist of adapters by `"system:adapter"`.
+
+Example
+{
+  "Sora": { "Flow": { "Adapters": { "AutoStart": true, "Include": ["oem:publisher"], "Exclude": [] } } }
+}
+
+Turnkey Flow runtime (web) — opt-out gate
+- Key: `Sora:Flow:AutoRegister` (bool). Default: `true`.
+- Behavior: When true, `Sora.Flow.Web` auto-calls `AddSoraFlow()` during module registration if it hasn't already been added. When false, nothing is added; call `AddSoraFlow()` explicitly in `Program.cs`.
+
+Example (disable turnkey)
+{
+  "Sora": { "Flow": { "AutoRegister": false } }
+}
 
 Indexing and search
 

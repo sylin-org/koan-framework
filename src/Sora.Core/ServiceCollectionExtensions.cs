@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Sora.Core.Modules;
 using Sora.Core.Observability.Health;
@@ -43,6 +44,9 @@ public static class ServiceCollectionExtensions
         // Hosting runtime: apps depend on greenfield IAppRuntime
         if (!services.Any(d => d.ServiceType == typeof(Sora.Core.Hosting.Runtime.IAppRuntime)))
             services.AddSingleton<Sora.Core.Hosting.Runtime.IAppRuntime, Sora.Core.Hosting.Runtime.AppRuntime>();
+
+    // Ensure ambient host is set in generic hosts (web apps do this via startup filter)
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, Sora.Core.Hosting.App.AppHostBinderHostedService>());
         return services;
     }
 }

@@ -156,6 +156,8 @@
        href: FLOW-0104-ulid-primary-id-and-canonical-id.md
      - name: External ID translation, adapter identity, and normalized payload ingestion
        href: FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md
+       - name: Adapter auto-scan and minimal boot
+         href: FLOW-0106-adapter-auto-scan-and-minimal-boot.md
  - name: Storage (STOR)
    items:
      - name: Storage module and contracts

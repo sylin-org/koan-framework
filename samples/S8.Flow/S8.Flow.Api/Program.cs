@@ -19,14 +19,8 @@ if (!Sora.Core.SoraEnv.InContainer)
     return;
 }
 
-builder.Services.AddSora(); // core + data + health + scheduling (Mongo registers itself via SoraAutoRegistrar)
-// Messaging core is required so the bus selector exists and RabbitMQ consumers can start
-builder.Services.AddMessagingCore();
-// Ensure RabbitMQ provider is registered (factory + health + optional inbox discovery)
-builder.Services.AddRabbitMq();
-builder.Services.AddSoraFlow();
-// Register FlowEvent consumer (handler is provided by AddFlowSender)
-builder.Services.AddFlowSender();
+builder.Services.AddSora(); // core + data + health + scheduling; messaging and rabbit auto-register via SoraAutoRegistrar
+// Flow runtime is auto-registered by Sora.Flow.Web (turnkey ON by default). Set Sora:Flow:AutoRegister=false to opt out.
 
 builder.Services.Configure<FlowOptions>(o =>
 {
@@ -75,21 +69,6 @@ builder.Services.OnMessages(h =>
 builder.Services.AddSingleton<IAdapterHealthRegistry, S8.Flow.Api.Adapters.KeyedAdapterHealthRegistry>();
 
 var app = builder.Build();
-
-// Ensure ambient AppHost is set and runtime started before hosted services execute
-Sora.Core.Hosting.App.AppHost.Current = app.Services;
-try { Sora.Core.SoraEnv.TryInitialize(app.Services); } catch { }
-var rt = app.Services.GetService<Sora.Core.Hosting.Runtime.IAppRuntime>();
-rt?.Discover();
-rt?.Start();
-
-// Ensure the default message bus is created so subscriptions are provisioned and consumers start
-try
-{
-    var selector = app.Services.GetService<IMessageBusSelector>();
-    _ = selector?.ResolveDefault(app.Services);
-}
-catch { /* ignore */ }
 
 if (app.Environment.IsDevelopment())
 {

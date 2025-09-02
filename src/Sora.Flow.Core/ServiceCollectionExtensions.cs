@@ -30,9 +30,6 @@ using Sora.Messaging;
 using Sora.Flow.Actions;
 using Sora.Flow.Sending;
 using Microsoft.Extensions.Configuration;
-#if SORA_DATA_MONGO
-using Sora.Data.Mongo;
-#endif
 
 namespace Sora.Flow;
 
@@ -65,25 +62,25 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddSoraFlow(this IServiceCollection services)
     {
-    // Options
-    services.AddOptions<FlowOptions>();
-    services.AddOptions<FlowMaterializationOptions>();
-    // Install global naming policy for Flow entities
-    services.AddSoraFlowNaming();
+        // Options
+        services.AddOptions<FlowOptions>();
+        services.AddOptions<FlowMaterializationOptions>();
+        // Install global naming policy for Flow entities
+        services.AddSoraFlowNaming();
 
 
 
         // Materialization engine
         services.TryAddSingleton<IFlowMaterializer, Materialization.FlowMaterializer>();
 
-        // Hosted workers
-        services.AddHostedService<ModelAssociationWorkerHostedService>();
-        services.AddHostedService<ModelProjectionWorkerHostedService>();
+        // Hosted workers (idempotent)
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelAssociationWorkerHostedService>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelProjectionWorkerHostedService>());
 
-    // Sender DX (normalized payload + batch), identity stamping, and actions
-    services.AddFlowSender();
-    services.TryAddSingleton<Sora.Flow.Sending.IFlowIdentityStamper, Sora.Flow.Sending.FlowIdentityStamper>();
-    services.AddFlowActions();
+        // Sender DX (normalized payload + batch), identity stamping, and actions
+        services.AddFlowSender();
+        services.TryAddSingleton<Sora.Flow.Sending.IFlowIdentityStamper, Sora.Flow.Sending.FlowIdentityStamper>();
+        services.AddFlowActions();
 
         return services;
     }
@@ -134,8 +131,8 @@ public static class ServiceCollectionExtensions
         public ModelProjectionWorkerHostedService(IServiceProvider sp, IOptionsMonitor<FlowOptions> opts, ILogger<ModelProjectionWorkerHostedService> log)
         { _sp = sp; _opts = opts; _log = log; }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
@@ -193,171 +190,171 @@ public static class ServiceCollectionExtensions
                                 }
 
                                 // canonical (range structure) and lineage
-                                    var canonical = new Dictionary<string, List<string?>>(StringComparer.OrdinalIgnoreCase);
-                                    var lineage = new Dictionary<string, Dictionary<string, HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
-                                    // Optional: exclude tag prefixes from canonical/lineage (e.g., "reading.")
-                                    var exclude = (_opts.CurrentValue.CanonicalExcludeTagPrefixes ?? Array.Empty<string>())
-                                        .Where(p => !string.IsNullOrWhiteSpace(p))
-                                        .Select(p => p.Trim())
-                                        .ToArray();
+                                var canonical = new Dictionary<string, List<string?>>(StringComparer.OrdinalIgnoreCase);
+                                var lineage = new Dictionary<string, Dictionary<string, HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
+                                // Optional: exclude tag prefixes from canonical/lineage (e.g., "reading.")
+                                var exclude = (_opts.CurrentValue.CanonicalExcludeTagPrefixes ?? Array.Empty<string>())
+                                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                                    .Select(p => p.Trim())
+                                    .ToArray();
 
-                                    foreach (var r in all)
+                                foreach (var r in all)
+                                {
+                                    var src = (string)(r.GetType().GetProperty("SourceId")!.GetValue(r) ?? "unknown");
+                                    var payload = r.GetType().GetProperty("StagePayload")!.GetValue(r);
+                                    var dict = ExtractDict(payload);
+                                    if (dict is null) continue;
+                                    foreach (var kv in dict)
                                     {
-                                        var src = (string)(r.GetType().GetProperty("SourceId")!.GetValue(r) ?? "unknown");
-                                        var payload = r.GetType().GetProperty("StagePayload")!.GetValue(r);
-                                        var dict = ExtractDict(payload);
-                                        if (dict is null) continue;
-                                        foreach (var kv in dict)
+                                        var tag = kv.Key;
+                                        if (exclude.Length > 0 && exclude.Any(p => tag.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+                                            continue;
+                                        var values = ToValuesFlexible(kv.Value);
+                                        if (values.Count == 0) continue;
+                                        if (!canonical.TryGetValue(tag, out var list)) { list = new List<string?>(); canonical[tag] = list; }
+                                        foreach (var v in values) list.Add(v);
+                                        if (!lineage.TryGetValue(tag, out var m)) { m = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase); lineage[tag] = m; }
+                                        foreach (var v in values)
                                         {
-                                            var tag = kv.Key;
-                                            if (exclude.Length > 0 && exclude.Any(p => tag.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
-                                                continue;
-                                            var values = ToValuesFlexible(kv.Value);
-                                            if (values.Count == 0) continue;
-                                            if (!canonical.TryGetValue(tag, out var list)) { list = new List<string?>(); canonical[tag] = list; }
-                                            foreach (var v in values) list.Add(v);
-                                            if (!lineage.TryGetValue(tag, out var m)) { m = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase); lineage[tag] = m; }
-                                            foreach (var v in values)
-                                            {
-                                                if (v is null) continue;
-                                                if (!m.TryGetValue(v, out var sources)) { sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase); m[v] = sources; }
-                                                sources.Add(src);
-                                            }
+                                            if (v is null) continue;
+                                            if (!m.TryGetValue(v, out var sources)) { sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase); m[v] = sources; }
+                                            sources.Add(src);
                                         }
                                     }
+                                }
 
-                                    // Build nested canonical object with range arrays per dotted path
-                                    var ranges = new Dictionary<string, Newtonsoft.Json.Linq.JToken?>(StringComparer.OrdinalIgnoreCase);
-                                    foreach (var kv in canonical)
+                                // Build nested canonical object with range arrays per dotted path
+                                var ranges = new Dictionary<string, Newtonsoft.Json.Linq.JToken?>(StringComparer.OrdinalIgnoreCase);
+                                foreach (var kv in canonical)
+                                {
+                                    var dedup = kv.Value.Where(x => x is not null).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                                    ranges[kv.Key] = new JArray(dedup);
+                                }
+                                var canonicalExpanded = JsonPathMapper.Expand(ranges);
+                                // Convert to provider-safe nested object (Expando/primitives/arrays)
+                                static object? Plainify(object? token)
+                                {
+                                    if (token is null) return null;
+                                    if (token is Newtonsoft.Json.Linq.JValue jv) return jv.Value;
+                                    if (token is Newtonsoft.Json.Linq.JArray ja) return ja.Select(t => Plainify(t)).ToList();
+                                    if (token is Newtonsoft.Json.Linq.JObject jo)
                                     {
-                                        var dedup = kv.Value.Where(x => x is not null).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-                                        ranges[kv.Key] = new JArray(dedup);
+                                        IDictionary<string, object?> exp = new ExpandoObject();
+                                        foreach (var p in jo.Properties()) exp[p.Name] = Plainify(p.Value);
+                                        return (ExpandoObject)exp;
                                     }
-                                    var canonicalExpanded = JsonPathMapper.Expand(ranges);
-                                    // Convert to provider-safe nested object (Expando/primitives/arrays)
-                                    static object? Plainify(object? token)
-                                    {
-                                        if (token is null) return null;
-                                        if (token is Newtonsoft.Json.Linq.JValue jv) return jv.Value;
-                                        if (token is Newtonsoft.Json.Linq.JArray ja) return ja.Select(t => Plainify(t)).ToList();
-                                        if (token is Newtonsoft.Json.Linq.JObject jo)
-                                        {
-                                            IDictionary<string, object?> exp = new ExpandoObject();
-                                            foreach (var p in jo.Properties()) exp[p.Name] = Plainify(p.Value);
-                                            return (ExpandoObject)exp;
-                                        }
-                                        return token;
-                                    }
-                                    var canonicalView = Plainify(canonicalExpanded);
-                                    var lineageView = lineage.ToDictionary(
-                                        kv => kv.Key,
-                                        kv => kv.Value.ToDictionary(x => x.Key, x => x.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
-                                        StringComparer.OrdinalIgnoreCase);
+                                    return token;
+                                }
+                                var canonicalView = Plainify(canonicalExpanded);
+                                var lineageView = lineage.ToDictionary(
+                                    kv => kv.Key,
+                                    kv => kv.Value.ToDictionary(x => x.Key, x => x.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
+                                    StringComparer.OrdinalIgnoreCase);
 
-                                    var canType = typeof(CanonicalProjection<>).MakeGenericType(modelType);
-                                    var canDoc = Activator.CreateInstance(canType)!;
-                                    canType.GetProperty("Id")!.SetValue(canDoc, $"{Constants.Views.Canonical}::{refId}");
-                                    // legacy ReferenceId removed; identifiers are CanonicalId and ReferenceUlid
-                                    // Populate identifier fields when available
-                                    if (!string.IsNullOrWhiteSpace(canonicalId)) canType.GetProperty("CanonicalId")?.SetValue(canDoc, canonicalId);
-                                    if (!string.IsNullOrWhiteSpace(refUlid)) canType.GetProperty("ReferenceUlid")?.SetValue(canDoc, refUlid);
-                                    canType.GetProperty("ViewName")!.SetValue(canDoc, Constants.Views.Canonical);
-                                    // Canonical now publishes nested ranges under Model
-                                    var modelProp = canType.GetProperty("Model") ?? canType.GetProperty("View");
-                                    modelProp!.SetValue(canDoc, canonicalView);
-                                    var canData = typeof(Data<,>).MakeGenericType(canType, typeof(string));
-                                    var upsertSet = canData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { canType, typeof(string), typeof(CancellationToken) })!;
-                                    await (Task)upsertSet.Invoke(null, new object?[] { canDoc, FlowSets.ViewShort(Constants.Views.Canonical), stoppingToken })!;
+                                var canType = typeof(CanonicalProjection<>).MakeGenericType(modelType);
+                                var canDoc = Activator.CreateInstance(canType)!;
+                                canType.GetProperty("Id")!.SetValue(canDoc, $"{Constants.Views.Canonical}::{refId}");
+                                // legacy ReferenceId removed; identifiers are CanonicalId and ReferenceUlid
+                                // Populate identifier fields when available
+                                if (!string.IsNullOrWhiteSpace(canonicalId)) canType.GetProperty("CanonicalId")?.SetValue(canDoc, canonicalId);
+                                if (!string.IsNullOrWhiteSpace(refUlid)) canType.GetProperty("ReferenceUlid")?.SetValue(canDoc, refUlid);
+                                canType.GetProperty("ViewName")!.SetValue(canDoc, Constants.Views.Canonical);
+                                // Canonical now publishes nested ranges under Model
+                                var modelProp = canType.GetProperty("Model") ?? canType.GetProperty("View");
+                                modelProp!.SetValue(canDoc, canonicalView);
+                                var canData = typeof(Data<,>).MakeGenericType(canType, typeof(string));
+                                var upsertSet = canData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { canType, typeof(string), typeof(CancellationToken) })!;
+                                await (Task)upsertSet.Invoke(null, new object?[] { canDoc, FlowSets.ViewShort(Constants.Views.Canonical), stoppingToken })!;
 
-                                    var linType = typeof(LineageProjection<>).MakeGenericType(modelType);
-                                    var linDoc = Activator.CreateInstance(linType)!;
-                                    linType.GetProperty("Id")!.SetValue(linDoc, $"{Constants.Views.Lineage}::{refId}");
-                                    // legacy ReferenceId removed; identifiers are CanonicalId and ReferenceUlid
-                                    if (!string.IsNullOrWhiteSpace(canonicalId)) linType.GetProperty("CanonicalId")?.SetValue(linDoc, canonicalId);
-                                    if (!string.IsNullOrWhiteSpace(refUlid)) linType.GetProperty("ReferenceUlid")?.SetValue(linDoc, refUlid);
-                                    linType.GetProperty("ViewName")!.SetValue(linDoc, Constants.Views.Lineage);
-                                    linType.GetProperty("View")!.SetValue(linDoc, lineageView);
-                                    var linData = typeof(Data<,>).MakeGenericType(linType, typeof(string));
-                                    await (Task)linData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { linType, typeof(string), typeof(CancellationToken) })!
-                                        .Invoke(null, new object?[] { linDoc, FlowSets.ViewShort(Constants.Views.Lineage), stoppingToken })!;
+                                var linType = typeof(LineageProjection<>).MakeGenericType(modelType);
+                                var linDoc = Activator.CreateInstance(linType)!;
+                                linType.GetProperty("Id")!.SetValue(linDoc, $"{Constants.Views.Lineage}::{refId}");
+                                // legacy ReferenceId removed; identifiers are CanonicalId and ReferenceUlid
+                                if (!string.IsNullOrWhiteSpace(canonicalId)) linType.GetProperty("CanonicalId")?.SetValue(linDoc, canonicalId);
+                                if (!string.IsNullOrWhiteSpace(refUlid)) linType.GetProperty("ReferenceUlid")?.SetValue(linDoc, refUlid);
+                                linType.GetProperty("ViewName")!.SetValue(linDoc, Constants.Views.Lineage);
+                                linType.GetProperty("View")!.SetValue(linDoc, lineageView);
+                                var linData = typeof(Data<,>).MakeGenericType(linType, typeof(string));
+                                await (Task)linData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { linType, typeof(string), typeof(CancellationToken) })!
+                                    .Invoke(null, new object?[] { linDoc, FlowSets.ViewShort(Constants.Views.Lineage), stoppingToken })!;
 
-                                    // Materialized snapshot via policy engine → give monitors a chance to adjust before commit
-                                    var materializer = _sp.GetRequiredService<IFlowMaterializer>();
-                                    // preserve insertion order for paths
-                                    var ordered = new Dictionary<string, IReadOnlyCollection<string?>>(StringComparer.OrdinalIgnoreCase);
-                                    foreach (var kv in canonical)
+                                // Materialized snapshot via policy engine → give monitors a chance to adjust before commit
+                                var materializer = _sp.GetRequiredService<IFlowMaterializer>();
+                                // preserve insertion order for paths
+                                var ordered = new Dictionary<string, IReadOnlyCollection<string?>>(StringComparer.OrdinalIgnoreCase);
+                                foreach (var kv in canonical)
+                                {
+                                    ordered[kv.Key] = kv.Value.AsReadOnly();
+                                }
+                                var modelName = Infrastructure.FlowRegistry.GetModelName(modelType);
+                                var (materializedValues, materializedPolicies) = await materializer.MaterializeAsync(modelName, ordered, stoppingToken);
+                                // Build a mutable model dictionary from materialized dotted values (flat) → expanded below to nested
+                                var mutableModel = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                                foreach (var kvp in materializedValues) mutableModel[kvp.Key] = kvp.Value;
+                                var mutablePolicies = new Dictionary<string, string>(materializedPolicies, StringComparer.OrdinalIgnoreCase);
+                                // Invoke typed monitors first, then untyped
+                                var monitorsObj = _sp.GetServices(typeof(IFlowMonitor));
+                                var typedMonitorType = typeof(IFlowMonitor<>).MakeGenericType(modelType);
+                                var typedMonitors = _sp.GetServices(typedMonitorType);
+                                var ctx = new Sora.Flow.Monitoring.FlowMonitorContext(modelName, refId, mutableModel, mutablePolicies);
+                                foreach (var tm in typedMonitors)
+                                {
+                                    var m = typedMonitorType.GetMethod("OnProjectedAsync")!;
+                                    var monitorTask = (Task)m.Invoke(tm, new object?[] { ctx, stoppingToken })!; await monitorTask.ConfigureAwait(false);
+                                }
+                                foreach (var um in monitorsObj)
+                                {
+                                    var m = typeof(IFlowMonitor).GetMethod("OnProjectedAsync")!;
+                                    var monitorTask2 = (Task)m.Invoke(um, new object?[] { modelType, ctx, stoppingToken })!; await monitorTask2.ConfigureAwait(false);
+                                }
+                                // Build nested JSON object from dotted paths
+                                var pathMap = new Dictionary<string, JToken?>(StringComparer.OrdinalIgnoreCase);
+                                foreach (var kvp in mutableModel)
+                                {
+                                    pathMap[kvp.Key] = kvp.Value is null ? JValue.CreateNull() : new JValue(kvp.Value);
+                                }
+                                var nested = JsonPathMapper.Expand(pathMap);
+                                // Convert JObject to plain dictionary recursively for provider-safe serialization
+                                static object? ToPlain(object? token)
+                                {
+                                    if (token is null) return null;
+                                    if (token is JValue jv) return jv.Value;
+                                    if (token is JArray ja) return ja.Select(t => ToPlain(t)).ToList();
+                                    if (token is JObject jo)
                                     {
-                                        ordered[kv.Key] = kv.Value.AsReadOnly();
+                                        IDictionary<string, object?> exp = new ExpandoObject();
+                                        foreach (var p in jo.Properties()) exp[p.Name] = ToPlain(p.Value);
+                                        return (ExpandoObject)exp;
                                     }
-                                    var modelName = Infrastructure.FlowRegistry.GetModelName(modelType);
-                                    var (materializedValues, materializedPolicies) = await materializer.MaterializeAsync(modelName, ordered, stoppingToken);
-                                    // Build a mutable model dictionary from materialized dotted values (flat) → expanded below to nested
-                                    var mutableModel = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-                                    foreach (var kvp in materializedValues) mutableModel[kvp.Key] = kvp.Value;
-                                    var mutablePolicies = new Dictionary<string, string>(materializedPolicies, StringComparer.OrdinalIgnoreCase);
-                                    // Invoke typed monitors first, then untyped
-                                    var monitorsObj = _sp.GetServices(typeof(IFlowMonitor));
-                                    var typedMonitorType = typeof(IFlowMonitor<>).MakeGenericType(modelType);
-                                    var typedMonitors = _sp.GetServices(typedMonitorType);
-                                    var ctx = new Sora.Flow.Monitoring.FlowMonitorContext(modelName, refId, mutableModel, mutablePolicies);
-                                    foreach (var tm in typedMonitors)
-                                    {
-                                        var m = typedMonitorType.GetMethod("OnProjectedAsync")!;
-                                        var monitorTask = (Task)m.Invoke(tm, new object?[] { ctx, stoppingToken })!; await monitorTask.ConfigureAwait(false);
-                                    }
-                                    foreach (var um in monitorsObj)
-                                    {
-                                        var m = typeof(IFlowMonitor).GetMethod("OnProjectedAsync")!;
-                                        var monitorTask2 = (Task)m.Invoke(um, new object?[] { modelType, ctx, stoppingToken })!; await monitorTask2.ConfigureAwait(false);
-                                    }
-                                    // Build nested JSON object from dotted paths
-                                    var pathMap = new Dictionary<string, JToken?>(StringComparer.OrdinalIgnoreCase);
-                                    foreach (var kvp in mutableModel)
-                                    {
-                                        pathMap[kvp.Key] = kvp.Value is null ? JValue.CreateNull() : new JValue(kvp.Value);
-                                    }
-                                    var nested = JsonPathMapper.Expand(pathMap);
-                                    // Convert JObject to plain dictionary recursively for provider-safe serialization
-                                    static object? ToPlain(object? token)
-                                    {
-                                        if (token is null) return null;
-                                        if (token is JValue jv) return jv.Value;
-                                        if (token is JArray ja) return ja.Select(t => ToPlain(t)).ToList();
-                                        if (token is JObject jo)
-                                        {
-                                            IDictionary<string, object?> exp = new ExpandoObject();
-                                            foreach (var p in jo.Properties()) exp[p.Name] = ToPlain(p.Value);
-                                            return (ExpandoObject)exp;
-                                        }
-                                        return token;
-                                    }
-                                    var plain = ToPlain(nested) as ExpandoObject;
-                                    // Upsert dynamic root entity and policy state in ROOT scope (no set)
-                                    using (DataSetContext.With(null))
-                                    {
-                                        var dynType = typeof(DynamicFlowEntity<>).MakeGenericType(modelType);
-                                        var dyn = Activator.CreateInstance(dynType)!;
-                                        dynType.GetProperty("Id")!.SetValue(dyn, refId);
-                                        // no legacy ReferenceId on root; Id carries ULID. CanonicalId populated below.
-                                        if (!string.IsNullOrWhiteSpace(canonicalId)) dynType.GetProperty("CanonicalId")?.SetValue(dyn, canonicalId);
-                                        if (!string.IsNullOrWhiteSpace(refUlid)) dynType.GetProperty("ReferenceUlid")?.SetValue(dyn, refUlid);
-                                        // Root materialized snapshot stored under Model (renamed from Data)
-                                        var dynModelProp = dynType.GetProperty("Model") ?? dynType.GetProperty("Data");
-                                        dynModelProp!.SetValue(dyn, plain);
-                                        var dynData = typeof(Data<,>).MakeGenericType(dynType, typeof(string));
-                                        await (Task)dynData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { dynType, typeof(CancellationToken) })!
-                                            .Invoke(null, new object?[] { dyn, stoppingToken })!;
-                                        // Upsert policy state
-                                        var polType = typeof(PolicyState<>).MakeGenericType(modelType);
-                                        var pol = Activator.CreateInstance(polType)!;
-                                        polType.GetProperty("Id")!.SetValue(pol, refId);
-                                        // Policy state now stores ReferenceUlid instead of legacy ReferenceId
-                                        polType.GetProperty("ReferenceUlid")!.SetValue(pol, refId);
-                                        polType.GetProperty("Policies")!.SetValue(pol, new Dictionary<string, string>(mutablePolicies, StringComparer.OrdinalIgnoreCase));
-                                        var polData = typeof(Data<,>).MakeGenericType(polType, typeof(string));
-                                        await (Task)polData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { polType, typeof(CancellationToken) })!
-                                            .Invoke(null, new object?[] { pol, stoppingToken })!;
-                                    }
+                                    return token;
+                                }
+                                var plain = ToPlain(nested) as ExpandoObject;
+                                // Upsert dynamic root entity and policy state in ROOT scope (no set)
+                                using (DataSetContext.With(null))
+                                {
+                                    var dynType = typeof(DynamicFlowEntity<>).MakeGenericType(modelType);
+                                    var dyn = Activator.CreateInstance(dynType)!;
+                                    dynType.GetProperty("Id")!.SetValue(dyn, refId);
+                                    // no legacy ReferenceId on root; Id carries ULID. CanonicalId populated below.
+                                    if (!string.IsNullOrWhiteSpace(canonicalId)) dynType.GetProperty("CanonicalId")?.SetValue(dyn, canonicalId);
+                                    if (!string.IsNullOrWhiteSpace(refUlid)) dynType.GetProperty("ReferenceUlid")?.SetValue(dyn, refUlid);
+                                    // Root materialized snapshot stored under Model (renamed from Data)
+                                    var dynModelProp = dynType.GetProperty("Model") ?? dynType.GetProperty("Data");
+                                    dynModelProp!.SetValue(dyn, plain);
+                                    var dynData = typeof(Data<,>).MakeGenericType(dynType, typeof(string));
+                                    await (Task)dynData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { dynType, typeof(CancellationToken) })!
+                                        .Invoke(null, new object?[] { dyn, stoppingToken })!;
+                                    // Upsert policy state
+                                    var polType = typeof(PolicyState<>).MakeGenericType(modelType);
+                                    var pol = Activator.CreateInstance(polType)!;
+                                    polType.GetProperty("Id")!.SetValue(pol, refId);
+                                    // Policy state now stores ReferenceUlid instead of legacy ReferenceId
+                                    polType.GetProperty("ReferenceUlid")!.SetValue(pol, refId);
+                                    polType.GetProperty("Policies")!.SetValue(pol, new Dictionary<string, string>(mutablePolicies, StringComparer.OrdinalIgnoreCase));
+                                    var polData = typeof(Data<,>).MakeGenericType(polType, typeof(string));
+                                    await (Task)polData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { polType, typeof(CancellationToken) })!
+                                        .Invoke(null, new object?[] { pol, stoppingToken })!;
+                                }
                                 // clear RequiresProjection if set
                                 var refType = typeof(ReferenceItem<>).MakeGenericType(modelType);
                                 var refData = typeof(Data<,>).MakeGenericType(refType, typeof(string));
@@ -637,7 +634,7 @@ public static class ServiceCollectionExtensions
             }
         }
 
-    private static async Task<string?> TryResolveIdentityAsync(Type modelType, IDictionary<string, object?> dict, CancellationToken ct)
+        private static async Task<string?> TryResolveIdentityAsync(Type modelType, IDictionary<string, object?> dict, CancellationToken ct)
         {
             if (!dict.TryGetValue(Constants.Envelope.System, out var sysRaw) || !dict.TryGetValue(Constants.Envelope.Adapter, out var adpRaw)) return null;
             var sys = ToValuesFlexible(sysRaw).FirstOrDefault();
@@ -664,20 +661,20 @@ public static class ServiceCollectionExtensions
                     }
                     else
                     {
-            // Issue a canonical ULID immediately and create a provisional identity link to it
-            var ulid = UlidId.New();
+                        // Issue a canonical ULID immediately and create a provisional identity link to it
+                        var ulid = UlidId.New();
                         var provisional = Activator.CreateInstance(idType)!;
                         idType.GetProperty("Id")!.SetValue(provisional, composite);
                         idType.GetProperty("System")!.SetValue(provisional, sys);
                         idType.GetProperty("Adapter")!.SetValue(provisional, adp);
                         idType.GetProperty("ExternalId")!.SetValue(provisional, ext);
-            idType.GetProperty("ReferenceUlid")!.SetValue(provisional, ulid);
+                        idType.GetProperty("ReferenceUlid")!.SetValue(provisional, ulid);
                         idType.GetProperty("Provisional")!.SetValue(provisional, true);
                         // TTL hint via ExpiresAt; reuse intake TTL window as soft expiry for provisional
                         idType.GetProperty("ExpiresAt")!.SetValue(provisional, DateTimeOffset.UtcNow.AddDays(2));
                         var upsertM = idData.GetMethod("UpsertAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { idType, typeof(CancellationToken) })!;
                         await (Task)upsertM.Invoke(null, new object?[] { provisional, ct })!;
-            return ulid;
+                        return ulid;
                     }
                 }
             }
@@ -717,7 +714,7 @@ public static class ServiceCollectionExtensions
             }
             return null;
         }
-    private async Task SaveRejectAndDrop(string code, object evidence, object rec, Type modelType, string intakeSet, CancellationToken ct)
+        private async Task SaveRejectAndDrop(string code, object evidence, object rec, Type modelType, string intakeSet, CancellationToken ct)
         {
             var json = System.Text.Json.JsonSerializer.Serialize(evidence);
             await new Sora.Flow.Diagnostics.RejectionReport { Id = Guid.NewGuid().ToString("n"), ReasonCode = code, EvidenceJson = json, PolicyVersion = (string?)rec.GetType().GetProperty("PolicyVersion")?.GetValue(rec) }.Save(ct);

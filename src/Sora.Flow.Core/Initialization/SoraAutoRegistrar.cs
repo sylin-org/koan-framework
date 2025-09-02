@@ -1,8 +1,14 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System;
+using System.Linq;
+using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using Sora.Flow.Options;
+using Sora.Flow.Sending;
+using Sora.Flow.Attributes;
 
 namespace Sora.Flow.Initialization;
 
@@ -18,6 +24,81 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         // Orchestrators/APIs should call services.AddSoraFlow() explicitly in Program.cs.
         // Safe default here: install naming only so storage naming remains consistent if used.
         services.AddSoraFlowNaming();
+
+        // Provide identity stamper for server-side stamping (safe in producers)
+        services.TryAddSingleton<IFlowIdentityStamper, FlowIdentityStamper>();
+
+        // Auto-register adapter publishers: BackgroundService types annotated with [FlowAdapter]
+        // Config gates: Sora:Flow:Adapters:AutoStart (bool), Include (string[] "system:adapter"), Exclude (string[])
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ISoraInitializer>(sp => new AdapterScannerInitializer()));
+    }
+
+    private sealed class AdapterScannerInitializer : ISoraInitializer
+    {
+        public void Initialize(IServiceCollection services)
+        {
+            // Resolve configuration if available via existing DI registrations during StartSora/AddSora pipelines
+            IConfiguration? cfg = null;
+            try
+            {
+                var existing = services.FirstOrDefault(d => d.ServiceType == typeof(IConfiguration));
+                cfg = existing?.ImplementationInstance as IConfiguration;
+            }
+            catch { }
+
+            bool inContainer = SoraEnv.InContainer;
+            bool autoStart = inContainer; // default: on in containers, off elsewhere
+            string[] include = Array.Empty<string>();
+            string[] exclude = Array.Empty<string>();
+            try
+            {
+                if (cfg is not null)
+                {
+                    autoStart = cfg.GetValue<bool?>("Sora:Flow:Adapters:AutoStart") ?? autoStart;
+                    include = cfg.GetSection("Sora:Flow:Adapters:Include").Get<string[]>() ?? include;
+                    exclude = cfg.GetSection("Sora:Flow:Adapters:Exclude").Get<string[]>() ?? exclude;
+                }
+            }
+            catch { }
+
+            if (!autoStart) return;
+
+            bool Matches(string sys, string adp)
+            {
+                var code = $"{sys}:{adp}";
+                if (exclude.Any(x => string.Equals(x, code, StringComparison.OrdinalIgnoreCase))) return false;
+                if (include.Length == 0) return true;
+                return include.Any(x => string.Equals(x, code, StringComparison.OrdinalIgnoreCase));
+            }
+
+            foreach (var (t, attr) in DiscoverAdapterHostedServices())
+            {
+                if (!Matches(attr.System, attr.Adapter)) continue;
+                services.AddSingleton(typeof(IHostedService), t);
+            }
+        }
+
+        private static IEnumerable<(Type Type, FlowAdapterAttribute Attr)> DiscoverAdapterHostedServices()
+        {
+            var results = new List<(Type, FlowAdapterAttribute)>();
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            foreach (var asm in assemblies)
+            {
+                Type?[] types;
+                try { types = asm.GetTypes(); }
+                catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
+                catch { continue; }
+                foreach (var t in types)
+                {
+                    if (t is null || t.IsAbstract) continue;
+                    if (!typeof(BackgroundService).IsAssignableFrom(t)) continue;
+                    var attr = t.GetCustomAttribute<FlowAdapterAttribute>(inherit: true);
+                    if (attr is null) continue;
+                    results.Add((t, attr));
+                }
+            }
+            return results;
+        }
     }
 
     public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
