@@ -1,3 +1,4 @@
+using S8.Flow.Shared;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -5,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Sora.Core;
 using Sora.Messaging;
 using Sora.Messaging.RabbitMq;
-using S8.Flow.Shared;
+using Sora.Flow.Model;
 using Sora.Core.Hosting.App;
 using Sora.Flow.Actions;
 using Sora.Flow.Sending;
@@ -65,81 +66,70 @@ public sealed class OemPublisher : BackgroundService
     private readonly ILogger<OemPublisher> _log;
     public OemPublisher(ILogger<OemPublisher> log) { _log = log; }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override Task ExecuteAsync(CancellationToken ct)
     {
-    // Initial bulk seed on startup via MQ (resilient to broker warm-up)
-    await SeedAllWithRetryAsync(stoppingToken);
+        // No-op: all work is event/message driven
+        return Task.CompletedTask;
+    }
 
-        var rng = new Random();
-        var lastAnnounce = DateTimeOffset.MinValue;
-        while (!stoppingToken.IsCancellationRequested)
+    // Handle ControlCommand messages (seed, etc)
+    public async Task HandleAsync(Sora.Flow.Model.ControlCommand cmd, CancellationToken ct)
+    {
+        if (cmd.Verb?.Equals(OemAdapterConstants.Cap.Seed, StringComparison.OrdinalIgnoreCase) == true)
         {
-            try
-            {
-                var idx = rng.Next(0, SampleProfiles.Fleet.Length);
-                var d = SampleProfiles.Fleet[idx];
-                var code = rng.Next(0, 2) == 0 ? SensorCodes.PWR : SensorCodes.COOLANT_PRESSURE;
-                var unit = code == SensorCodes.PWR ? Units.Watt : Units.KPa;
-                var value = code == SensorCodes.PWR ? Math.Round(100 + rng.NextDouble() * 900, 2) : Math.Round(200 + rng.NextDouble() * 50, 2);
-                // Periodic independent announcements
-                if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromMinutes(5))
-                {
-                    // Seed Device via FlowEvent (pure MQ)
-                    var oemDeviceId = $"{d.Inventory}:{d.Serial}";
-                    var deviceBag = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        [Keys.Device.Inventory] = d.Inventory,
-                        [Keys.Device.Serial] = d.Serial,
-                        [Keys.Device.Manufacturer] = d.Manufacturer,
-                        [Keys.Device.Model] = d.Model,
-                        [Keys.Device.Kind] = d.Kind,
-                        [Keys.Device.Code] = d.Code,
-                        [OemAdapterConstants.ExternalIds.Device] = oemDeviceId,
-                        [OemAdapterConstants.SourceKey] = OemAdapterConstants.Source,
-                    };
-                    var devEvent = FlowEvent.ForModel("device");
-                    devEvent.SourceId = OemAdapterConstants.Source;
-                    devEvent.CorrelationId = oemDeviceId;
-                    foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
-                    await devEvent.Send(stoppingToken);
+            int total = 1000;
+            if (cmd.Parameters != null && cmd.Parameters.TryGetValue("count", out var countElem) && countElem.TryGetInt32(out var parsed))
+                total = parsed;
+            await SeedProceduralAsync(total, ct);
+            _log.LogInformation("OEM adapter completed procedural seed for {Total} devices", total);
+        }
+    }
 
-                    // Seed sensors via FlowEvent (pure MQ)
-                    foreach (var s in SampleProfiles.SensorsForOem(d))
-                    {
-                        var sensorEvent = FlowEvent.ForModel("sensor")
-                            .With(Keys.Sensor.Key, s.SensorKey)
-                            .With("DeviceId", s.DeviceId)
-                            .With(Keys.Sensor.Code, s.Code)
-                            .With(Keys.Sensor.Unit, s.Unit)
-                            .With(OemAdapterConstants.SourceKey, OemAdapterConstants.Source);
-                        sensorEvent.SourceId = OemAdapterConstants.Source;
-                        sensorEvent.CorrelationId = s.SensorKey;
-                        await sensorEvent.Send(stoppingToken);
-                    }
-                    lastAnnounce = DateTimeOffset.UtcNow;
-                    _log.LogInformation("OEM announced Device {Inv}/{Serial} and OEM sensors", d.Inventory, d.Serial);
-                }
+    // Procedural seed: emits both SampleProfiles and generated fakes, batching by 100
+    private async Task SeedProceduralAsync(int total, CancellationToken ct)
+    {
+        var batchSize = 100;
+        // 1. Emit all SampleProfiles
+        foreach (var d in SampleProfiles.Fleet)
+        {
+            await EmitDeviceAndSensors(d, ct);
+        }
+        // 2. Emit procedural fakes in batches
+        var devices = SampleProfiles.GenerateDevices(total).ToArray();
+        for (int i = 0; i < devices.Length; i += batchSize)
+        {
+            var batch = devices.Skip(i).Take(batchSize);
+            var tasks = batch.Select(d => EmitDeviceAndSensors(d, ct));
+            await Task.WhenAll(tasks);
+        }
+    }
 
-                // Slim reading VO
-                var key = $"{d.Inventory}::{d.Serial}::{code}";
-                // Publish reading via FlowEvent
-                var at = DateTimeOffset.UtcNow;
-                var readingEvent = FlowEvent.ForModel("reading")
-                    .With(Keys.Sensor.Key, key)
-                    .With(Keys.Reading.Value, value)
-                    .With(Keys.Reading.CapturedAt, at.ToString("O"))
-                    .With(Keys.Sensor.Unit, unit)
-                    .With(Keys.Reading.Source, OemAdapterConstants.Source);
-                readingEvent.SourceId = OemAdapterConstants.Source;
-                readingEvent.CorrelationId = key;
-                await readingEvent.Send(stoppingToken);
-                _log.LogInformation("OEM sent Reading {Key}={Value}{Unit} at {At}", key, value, unit, at);
-            }
-            catch (Exception ex)
-            {
-                _log.LogWarning(ex, "OEM publish failed");
-            }
-            try { await Task.Delay(TimeSpan.FromSeconds(2.5), stoppingToken); } catch (TaskCanceledException) { }
+    private async Task EmitDeviceAndSensors(Device d, CancellationToken ct)
+    {
+        var oemDeviceId = $"{d.Inventory}:{d.Serial}";
+        var deviceEvent = FlowEvent.ForModel("device")
+            .With(Keys.Device.Inventory, d.Inventory)
+            .With(Keys.Device.Serial, d.Serial)
+            .With(Keys.Device.Manufacturer, d.Manufacturer)
+            .With(Keys.Device.Model, d.Model)
+            .With(Keys.Device.Kind, d.Kind)
+            .With(Keys.Device.Code, d.Code)
+            .With(OemAdapterConstants.ExternalIds.Device, oemDeviceId)
+            .With(OemAdapterConstants.SourceKey, OemAdapterConstants.Source);
+        deviceEvent.SourceId = OemAdapterConstants.Source;
+        deviceEvent.CorrelationId = oemDeviceId;
+        await deviceEvent.Send(ct);
+        foreach (var s in SampleProfiles.GenerateSensorsForOem(d))
+        {
+            var sensorEvent = FlowEvent.ForModel("sensor")
+                .With(Keys.Sensor.Key, s.SensorKey)
+                .With("DeviceId", s.DeviceId)
+                .With(Keys.Sensor.Code, s.Code)
+                .With(Keys.Sensor.Unit, s.Unit)
+                .With(OemAdapterConstants.SourceKey, OemAdapterConstants.Source);
+            sensorEvent.SourceId = OemAdapterConstants.Source;
+            sensorEvent.CorrelationId = s.SensorKey;
+            await sensorEvent.Send(ct);
         }
     }
 

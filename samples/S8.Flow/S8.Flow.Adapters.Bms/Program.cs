@@ -1,3 +1,4 @@
+using S8.Flow.Shared;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -5,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Sora.Core;
 using Sora.Messaging;
 using Sora.Messaging.RabbitMq;
-using S8.Flow.Shared;
+using Sora.Flow.Model;
 // removed events; use plain-bag seeds and direct VO Send()
 using Sora.Flow.Actions;
 using Sora.Core.Hosting.App;
@@ -59,78 +60,70 @@ public sealed class BmsPublisher : BackgroundService
     public BmsPublisher(ILogger<BmsPublisher> log)
     { _log = log; }
 
-    protected override async Task ExecuteAsync(CancellationToken ct)
+    protected override Task ExecuteAsync(CancellationToken ct)
     {
-        // Initial bulk seed on startup via MQ (resilient to broker warm-up)
-        await SeedAllWithRetryAsync(ct);
+        // No-op: all work is event/message driven
+        return Task.CompletedTask;
+    }
 
-        var rng = new Random();
-        var lastAnnounce = DateTimeOffset.MinValue;
-        while (!ct.IsCancellationRequested)
+    // Handle ControlCommand messages (seed, etc)
+    public async Task HandleAsync(Sora.Flow.Model.ControlCommand cmd, CancellationToken ct)
+    {
+        if (cmd.Verb?.Equals(BmsAdapterConstants.Cap.Seed, StringComparison.OrdinalIgnoreCase) == true)
         {
-            try
-            {
-                var idx = rng.Next(0, SampleProfiles.Fleet.Length);
-                var d = SampleProfiles.Fleet[idx];
-                // Periodic independent announcements (devices + sensors)
-                if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromMinutes(5))
-                {
-                    // Seed device via FlowEvent (plain bag)
-                    var bmsDeviceId = $"{d.Inventory}:{d.Serial}";
-                    var deviceBag = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        [Keys.Device.Inventory] = d.Inventory,
-                        [Keys.Device.Serial] = d.Serial,
-                        [Keys.Device.Manufacturer] = d.Manufacturer,
-                        [Keys.Device.Model] = d.Model,
-                        [Keys.Device.Kind] = d.Kind,
-                        [Keys.Device.Code] = d.Code,
-                        [BmsAdapterConstants.ExternalIds.Device] = bmsDeviceId,
-                        [BmsAdapterConstants.SourceKey] = BmsAdapterConstants.Source,
-                    };
-                    var devEvent = FlowEvent.ForModel("device");
-                    devEvent.SourceId = BmsAdapterConstants.Source;
-                    devEvent.CorrelationId = bmsDeviceId;
-                    foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
-                    await devEvent.Send(ct);
+            int total = 1000;
+            if (cmd.Parameters != null && cmd.Parameters.TryGetValue("count", out var countElem) && countElem.TryGetInt32(out var parsed))
+                total = parsed;
+            await SeedProceduralAsync(total, ct);
+            _log.LogInformation("BMS adapter completed procedural seed for {Total} devices", total);
+        }
+    }
 
-                    // Seed temperature sensor via FlowEvent
-                    foreach (var s in SampleProfiles.SensorsForBms(d))
-                    {
-                        var sensorEvent = FlowEvent.ForModel("sensor")
-                            .With(Keys.Sensor.Key, s.SensorKey)
-                            .With("DeviceId", s.DeviceId)
-                            .With(Keys.Sensor.Code, s.Code)
-                            .With(Keys.Sensor.Unit, s.Unit)
-                            .With(BmsAdapterConstants.SourceKey, BmsAdapterConstants.Source);
-                        sensorEvent.SourceId = BmsAdapterConstants.Source;
-                        sensorEvent.CorrelationId = s.SensorKey;
-                        await sensorEvent.Send(ct);
-                    }
-                    lastAnnounce = DateTimeOffset.UtcNow;
-                    _log.LogInformation("BMS announced Device {Inv}/{Serial} and Sensor TEMP", d.Inventory, d.Serial);
-                }
+    // Procedural seed: emits both SampleProfiles and generated fakes, batching by 100
+    private async Task SeedProceduralAsync(int total, CancellationToken ct)
+    {
+        var batchSize = 100;
+        // 1. Emit all SampleProfiles
+        foreach (var d in SampleProfiles.Fleet)
+        {
+            await EmitDeviceAndSensors(d, ct);
+        }
+        // 2. Emit procedural fakes in batches
+        var devices = SampleProfiles.GenerateDevices(total).ToArray();
+        for (int i = 0; i < devices.Length; i += batchSize)
+        {
+            var batch = devices.Skip(i).Take(batchSize);
+            var tasks = batch.Select(d => EmitDeviceAndSensors(d, ct));
+            await Task.WhenAll(tasks);
+        }
+    }
 
-                // Publish reading via FlowEvent
-                var key = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}";
-                var at = DateTimeOffset.UtcNow;
-                var val = Math.Round(20 + rng.NextDouble() * 10, 2);
-                var readingEvent = FlowEvent.ForModel("reading")
-                    .With(Keys.Sensor.Key, key)
-                    .With(Keys.Reading.Value, val)
-                    .With(Keys.Reading.CapturedAt, at.ToString("O"))
-                    .With(Keys.Sensor.Unit, Units.C)
-                    .With(Keys.Reading.Source, BmsAdapterConstants.Source);
-                readingEvent.SourceId = BmsAdapterConstants.Source;
-                readingEvent.CorrelationId = key;
-                await readingEvent.Send(ct);
-                _log.LogInformation("BMS sent Reading {Key}={Value}{Unit} at {At}", key, val, Units.C, at);
-            }
-            catch (Exception ex)
-            {
-                _log.LogWarning(ex, "BMS publish failed");
-            }
-            try { await Task.Delay(TimeSpan.FromSeconds(1.5), ct); } catch (TaskCanceledException) { }
+    private async Task EmitDeviceAndSensors(Device d, CancellationToken ct)
+    {
+        var bmsDeviceId = $"{d.Inventory}:{d.Serial}";
+        var deviceEvent = FlowEvent.ForModel("device")
+            .With(Keys.Device.Inventory, d.Inventory)
+            .With(Keys.Device.Serial, d.Serial)
+            .With(Keys.Device.Manufacturer, d.Manufacturer)
+            .With(Keys.Device.Model, d.Model)
+            .With(Keys.Device.Kind, d.Kind)
+            .With(Keys.Device.Code, d.Code)
+            .With(BmsAdapterConstants.ExternalIds.Device, bmsDeviceId)
+            .With(BmsAdapterConstants.SourceKey, BmsAdapterConstants.Source);
+        deviceEvent.SourceId = BmsAdapterConstants.Source;
+        deviceEvent.CorrelationId = bmsDeviceId;
+        await deviceEvent.Send(ct);
+        foreach (var s in SampleProfiles.GenerateSensorsForBms(d))
+        {
+            var sensorEvent = FlowEvent.ForModel("sensor")
+                .With(Keys.Sensor.Key, s.SensorKey)
+                .With("DeviceId", s.DeviceId)
+                .With(Keys.Sensor.Code, s.Code)
+                .With(Keys.Sensor.Unit, s.Unit)
+                .With(BmsAdapterConstants.SourceKey, BmsAdapterConstants.Source);
+            sensorEvent.SourceId = BmsAdapterConstants.Source;
+            sensorEvent.CorrelationId = s.SensorKey;
+            await sensorEvent.Send(ct);
         }
     }
 

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>S8 Flow Operations Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link href="/styles.css" rel="stylesheet">
@@ -197,7 +198,7 @@
               <i class="fas fa-refresh mr-2"></i>
               Reproject Views
             </button>
-            <button onclick="openBulkModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors">
+            <button onclick="openBulkImportModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors">
               <i class="fas fa-upload mr-2"></i>
               Bulk Import
             </button>
@@ -319,8 +320,8 @@
   <!-- Modals will be added here -->
   <div id="modalContainer"></div>
 
-  <script src="/js/dashboard.js"></script>
-  <script src="/js/modals.js"></script>
-  <script src="/js/api-client.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/api-service.js"></script>
+  <script src="/js/modals-service.js"></script>
 </body>
 </html>
