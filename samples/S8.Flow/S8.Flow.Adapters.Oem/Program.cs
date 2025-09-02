@@ -12,6 +12,8 @@ using Sora.Flow.Sending;
 using Sora.Flow.Attributes;
 using Sora.Flow;
 using Sora.Data.Core; // AddSora()
+using System;
+using System.Linq;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -29,6 +31,77 @@ builder.Configuration
 // and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
 
+// React to command VOs published by orchestrators or tools
+builder.Services.OnMessages(h =>
+{
+    h.On<ControlCommand>(async (env, cmd, ct) =>
+    {
+        try
+        {
+            var verb = (cmd.Verb ?? string.Empty).Trim().ToLowerInvariant();
+            switch (verb)
+            {
+                case "announce":
+                {
+                    // From SensorKey (INV::SER::CODE) infer device seeds and publish via FlowEvent
+                    if (TryParseSensorKey(cmd.SensorKey, out var inv, out var ser, out var _))
+                    {
+                        var d = SampleProfiles.Fleet.FirstOrDefault(x => x.Inventory == inv && x.Serial == ser);
+                        if (d is not null)
+                        {
+                            var oemDeviceId = $"{d.Inventory}:{d.Serial}";
+                            var devEvent = FlowEvent.ForModel("device")
+                                .With(Keys.Device.Inventory, d.Inventory)
+                                .With(Keys.Device.Serial, d.Serial)
+                                .With(Keys.Device.Manufacturer, d.Manufacturer)
+                                .With(Keys.Device.Model, d.Model)
+                                .With(Keys.Device.Kind, d.Kind)
+                                .With(Keys.Device.Code, d.Code)
+                                .With("identifier.external.oem", oemDeviceId)
+                                .With("source", "oem");
+                            devEvent.SourceId = "oem";
+                            devEvent.CorrelationId = oemDeviceId;
+                            await devEvent.Send(ct);
+                            foreach (var s in SampleProfiles.SensorsForOem(d))
+                            {
+                                var sensorEvent = FlowEvent.ForModel("sensor")
+                                    .With(Keys.Sensor.Key, s.SensorKey)
+                                    .With("DeviceId", s.DeviceId)
+                                    .With(Keys.Sensor.Code, s.Code)
+                                    .With(Keys.Sensor.Unit, s.Unit)
+                                    .With("source", "oem");
+                                sensorEvent.SourceId = "oem";
+                                sensorEvent.CorrelationId = s.SensorKey;
+                                await sensorEvent.Send(ct);
+                            }
+                        }
+                    }
+                    break;
+                }
+                case "ping":
+                default:
+                {
+                    // Ack back to the system; keep it simple for the sample
+                    await new Sora.Flow.Actions.FlowAck(
+                        Model: "controlcommand",
+                        Verb: verb,
+                        ReferenceId: cmd.SensorKey,
+                        Status: verb == "ping" ? "ok" : "unsupported",
+                        Message: verb == "ping" ? null : $"Unknown verb '{cmd.Verb}'",
+                        CorrelationId: env.CorrelationId
+                    ).Send(ct);
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Best-effort error ack
+            await new Sora.Flow.Actions.FlowAck("controlcommand", cmd.Verb ?? string.Empty, cmd.SensorKey, "error", ex.Message, env.CorrelationId).Send(ct);
+        }
+    });
+});
+
 var app = builder.Build();
 await app.RunAsync();
 
@@ -40,9 +113,6 @@ public sealed class OemPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-    // Example: react to simple control commands sent via VO
-    // In a real app, this would be wired via OnMessages in a host that runs consumers for OEM; here we just sketch the intent.
-    _ = stoppingToken; // placeholder to avoid warnings in sample
     // Initial bulk seed on startup via MQ (resilient to broker warm-up)
     await SeedAllWithRetryAsync(stoppingToken);
 
@@ -117,6 +187,16 @@ public sealed class OemPublisher : BackgroundService
             }
             try { await Task.Delay(TimeSpan.FromSeconds(2.5), stoppingToken); } catch (TaskCanceledException) { }
         }
+    }
+
+    private static bool TryParseSensorKey(string sensorKey, out string inventory, out string serial, out string code)
+    {
+        inventory = serial = code = string.Empty;
+        if (string.IsNullOrWhiteSpace(sensorKey)) return false;
+        var parts = sensorKey.Split("::", StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 3) return false;
+        (inventory, serial, code) = (parts[0], parts[1], parts[2]);
+        return true;
     }
 
     // Iterate device catalog and publish normalized seeds via MQ
