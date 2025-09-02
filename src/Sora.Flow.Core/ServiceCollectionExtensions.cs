@@ -770,8 +770,10 @@ public static class ServiceCollectionExtensions
                 if (t is null || !t.IsClass || t.IsAbstract) continue;
                 var bt = t.BaseType;
                 if (bt is null || !bt.IsGenericType) continue;
-                if (bt.GetGenericTypeDefinition() != typeof(FlowEntity<>)) continue;
-                result.Add(t);
+                var def = bt.GetGenericTypeDefinition();
+                // Discover both root FlowEntity<> models and FlowValueObject<> VOs
+                if (def == typeof(FlowEntity<>) || def == typeof(FlowValueObject<>))
+                    result.Add(t);
             }
         }
         return result;
