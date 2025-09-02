@@ -29,6 +29,10 @@ using Sora.Flow.Monitoring;
 using Sora.Messaging;
 using Sora.Flow.Actions;
 using Sora.Flow.Sending;
+using Microsoft.Extensions.Configuration;
+#if SORA_DATA_MONGO
+using Sora.Data.Mongo;
+#endif
 
 namespace Sora.Flow;
 
@@ -61,9 +65,13 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddSoraFlow(this IServiceCollection services)
     {
-        // Options
-        services.AddOptions<FlowOptions>();
-        services.AddOptions<FlowMaterializationOptions>();
+    // Options
+    services.AddOptions<FlowOptions>();
+    services.AddOptions<FlowMaterializationOptions>();
+    // Install global naming policy for Flow entities
+    services.AddSoraFlowNaming();
+
+
 
         // Materialization engine
         services.TryAddSingleton<IFlowMaterializer, Materialization.FlowMaterializer>();
@@ -77,6 +85,41 @@ public static class ServiceCollectionExtensions
     services.TryAddSingleton<Sora.Flow.Sending.IFlowIdentityStamper, Sora.Flow.Sending.FlowIdentityStamper>();
     services.AddFlowActions();
 
+        return services;
+    }
+
+    /// <summary>
+    /// Installs the global storage naming override used by Flow to map generic wrappers to "{ModelFullName}#flow.*".
+    /// Safe to use in publisher-only processes; does not register workers.
+    /// </summary>
+    public static IServiceCollection AddSoraFlowNaming(this IServiceCollection services)
+    {
+        services.OverrideStorageNaming((type, defaults) =>
+        {
+            if (!type.IsGenericType) return null;
+            var def = type.GetGenericTypeDefinition();
+            var args = type.GetGenericArguments();
+            if (args.Length == 0) return null;
+            var model = args[0];
+            var modelFull = model.FullName ?? model.Name;
+
+            // Root-scoped logical docs
+            if (def == typeof(Sora.Flow.Model.IdentityLink<>)) return modelFull + "#flow.identityLink";
+            if (def == typeof(Sora.Flow.Model.KeyIndex<>)) return modelFull + "#flow.keyIndex";
+            if (def == typeof(Sora.Flow.Model.ReferenceItem<>)) return modelFull + "#flow.reference";
+            if (def == typeof(Sora.Flow.Model.ProjectionTask<>)) return modelFull + "#flow.tasks";
+            if (def == typeof(Sora.Flow.Model.PolicyState<>)) return modelFull + "#flow.policies";
+            if (def == typeof(Sora.Flow.Model.DynamicFlowEntity<>)) return modelFull + "#flow.root";
+
+            // Stage/View docs (set suffix appended via DataSetContext -> StorageNameRegistry)
+            if (def == typeof(Sora.Flow.Model.StageRecord<>)) return modelFull;
+            if (def == typeof(Sora.Flow.Model.ParkedRecord<>)) return modelFull;
+            if (def == typeof(Sora.Flow.Model.CanonicalProjection<>)) return modelFull;
+            if (def == typeof(Sora.Flow.Model.LineageProjection<>)) return modelFull;
+
+            // Unknown generic → let defaults resolve
+            return null;
+        });
         return services;
     }
 

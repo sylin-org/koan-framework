@@ -3,7 +3,7 @@ using Sora.Flow.Attributes;
 
 namespace S8.Flow.Shared;
 
-public sealed class SensorReadingVo : FlowValueObject<SensorReadingVo>
+public sealed class Reading : FlowValueObject<Reading>
 {
     [ParentKey(parent: typeof(Sensor))]
     public string SensorKey { get; set; } = string.Empty;

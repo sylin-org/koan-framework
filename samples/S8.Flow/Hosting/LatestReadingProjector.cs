@@ -41,7 +41,6 @@ public sealed class LatestReadingProjector : BackgroundService
                             var viewDoc = new SensorLatestReading
                             {
                                 Id = $"{ViewName}::{g.Key}",
-                                ReferenceId = g.Key,
                                 ViewName = ViewName,
                                 View = new Dictionary<string, object>
                                 {
@@ -51,7 +50,7 @@ public sealed class LatestReadingProjector : BackgroundService
                                     [Keys.Sensor.Code] = payload.TryGetValue(Keys.Sensor.Code, out var code) ? code : string.Empty,
                                 }
                             };
-                            await Data<SensorLatestReading, string>.UpsertAsync(viewDoc, set: FlowSets.ViewShort(ViewName), token: stoppingToken);
+                            await Data<SensorLatestReading, string>.UpsertAsync(viewDoc, set: FlowSets.ViewShort(ViewName), ct: stoppingToken);
                         }
                     }
                 }

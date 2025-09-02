@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using S8.Flow.Shared;
+﻿using S8.Flow.Shared;
 using Sora.Data.Core;
 using Sora.Flow.Infrastructure;
 using Sora.Flow.Model;
@@ -15,12 +12,12 @@ internal sealed class KeyedAdapterHealthRegistry : IAdapterHealthRegistry
     {
         try
         {
-            IReadOnlyList<StageRecord<SensorReadingVo>> list;
-            // Inspect up to 500 recent SensorReadingVo records using a synchronous async-enumerator loop
-            var buf = new List<StageRecord<SensorReadingVo>>(capacity: 500);
+            IReadOnlyList<StageRecord<Reading>> list;
+            // Inspect up to 500 recent Reading records using a synchronous async-enumerator loop
+            var buf = new List<StageRecord<Reading>>(capacity: 500);
             using (DataSetContext.With(FlowSets.StageShort(FlowSets.Keyed)))
             {
-                var e = StageRecord<SensorReadingVo>.AllStream(batchSize: 200).GetAsyncEnumerator();
+                var e = StageRecord<Reading>.AllStream(batchSize: 200).GetAsyncEnumerator();
                 try
                 {
                     while (buf.Count < 500 && e.MoveNextAsync().AsTask().GetAwaiter().GetResult())
@@ -34,7 +31,7 @@ internal sealed class KeyedAdapterHealthRegistry : IAdapterHealthRegistry
             {
                 using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
                 {
-                    var e = StageRecord<SensorReadingVo>.AllStream(batchSize: 200).GetAsyncEnumerator();
+                    var e = StageRecord<Reading>.AllStream(batchSize: 200).GetAsyncEnumerator();
                     try
                     {
                         while (buf.Count < 500 && e.MoveNextAsync().AsTask().GetAwaiter().GetResult())

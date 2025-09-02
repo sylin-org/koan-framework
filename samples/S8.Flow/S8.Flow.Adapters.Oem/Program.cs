@@ -12,6 +12,7 @@ using Sora.Flow.Sending;
 using Sora.Flow.Attributes;
 using Sora.Data.Core;
 using Sora.Data.Mongo;
+using Sora.Flow;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -35,6 +36,8 @@ builder.Services.AddMongoAdapter(o =>
 {
     o.ConnectionString = builder.Configuration.GetConnectionString("Default") ?? o.ConnectionString;
 });
+// Install Flow naming policy so generic wrappers map to {ModelFullName}#flow.*
+builder.Services.AddSoraFlowNaming();
 
 builder.Services.AddHostedService<OemPublisher>();
 // Register Flow sender + identity stamper for entity/VO Send() with server-side stamping
@@ -98,15 +101,15 @@ public sealed class OemPublisher : BackgroundService
 
                     // Seed sensors via entity Send(); DefaultSource inferred (oem)
                     foreach (var s in SampleProfiles.SensorsForOem(d))
-                        await s.Send();
+                        await s.Send(stoppingToken);
                     lastAnnounce = DateTimeOffset.UtcNow;
                     _log.LogInformation("OEM announced Device {Inv}/{Serial} and OEM sensors", d.Inventory, d.Serial);
                 }
 
                 // Slim reading VO
                 var key = $"{d.Inventory}::{d.Serial}::{code}";
-                var reading = new SensorReadingVo { SensorKey = key, Value = value, Unit = unit, Source = "oem", CapturedAt = DateTimeOffset.UtcNow };
-                await reading.Send();
+                var reading = new Reading { SensorKey = key, Value = value, Unit = unit, Source = "oem", CapturedAt = DateTimeOffset.UtcNow };
+                await reading.Send(stoppingToken);
                 _log.LogInformation("OEM sent Reading {Key}={Value}{Unit} at {At}", key, value, unit, reading.CapturedAt);
             }
             catch (Exception ex)

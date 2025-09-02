@@ -1,20 +1,12 @@
-﻿using Sora.Core.Hosting;
-using Sora.Flow;
+﻿using Sora.Data.Core; // AddSora()
+using Sora.Flow;      // AddSoraFlow(), AddSoraFlowWeb()
 using Sora.Flow.Options;
 using Sora.Testing.Flow;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Sora base setup
-builder.Services.AddSora(builder.Configuration, app =>
-{
-    app.UseSwagger();
-    app.UseDataCore();
-    app.UseWeb();
-});
-
-// Data persistence (JSON for demo simplicity)
-builder.Services.AddSoraDataCore();
+// Sora base setup (core + data + web)
+builder.Services.AddSora();
 
 // Flow capabilities with ubiquitous keys
 builder.Services.AddSoraFlow();
@@ -26,11 +18,12 @@ builder.Services.Configure<FlowOptions>(o =>
     o.PurgeInterval = TimeSpan.FromMinutes(30);
 });
 
-// Flow Web API endpoints
-builder.Services.AddSoraFlowWeb();
+// Controllers (Flow.Web controllers discovered by assembly reference)
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
-app.UseSora();
-
+app.MapControllers();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.Run();

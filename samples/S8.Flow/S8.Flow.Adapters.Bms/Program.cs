@@ -13,6 +13,7 @@ using Sora.Flow.Attributes;
 using Sora.Flow.Sending;
 using Sora.Data.Core;
 using Sora.Data.Mongo;
+using Sora.Flow;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -36,6 +37,8 @@ builder.Services.AddMongoAdapter(o =>
 {
     o.ConnectionString = builder.Configuration.GetConnectionString("Default") ?? o.ConnectionString;
 });
+// Install Flow naming policy so generic wrappers map to {ModelFullName}#flow.*
+builder.Services.AddSoraFlowNaming();
 
 builder.Services.AddHostedService<BmsPublisher>();
 // Register Flow sender + identity stamper for entity/VO Send() with server-side stamping
@@ -55,14 +58,14 @@ public sealed class BmsPublisher : BackgroundService
     public BmsPublisher(ILogger<BmsPublisher> log)
     { _log = log; }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken ct)
     {
     // Initial bulk seed on startup
-    await SeedAllAsync(stoppingToken);
+    await SeedAllAsync(ct);
 
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
-        while (!stoppingToken.IsCancellationRequested)
+        while (!ct.IsCancellationRequested)
         {
             try
             {
@@ -88,14 +91,14 @@ public sealed class BmsPublisher : BackgroundService
 
                     // Seed temperature sensor via entity Send(); DefaultSource inferred (bms)
                     foreach (var s in SampleProfiles.SensorsForBms(d))
-                        await s.Send();
+                        await s.Send(ct);
                     lastAnnounce = DateTimeOffset.UtcNow;
                     _log.LogInformation("BMS announced Device {Inv}/{Serial} and Sensor TEMP", d.Inventory, d.Serial);
                 }
 
                 // Fast-tracked reading VO: only key + values
                 var key = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}";
-                var reading = new SensorReadingVo
+                var reading = new Reading
                 {
                     SensorKey = key,
                     Value = Math.Round(20 + rng.NextDouble() * 10, 2),
@@ -103,14 +106,14 @@ public sealed class BmsPublisher : BackgroundService
                     Source = "bms",
                     CapturedAt = DateTimeOffset.UtcNow
                 };
-                await reading.Send();
+                await reading.Send(ct);
                 _log.LogInformation("BMS sent Reading {Key}={Value}{Unit} at {At}", key, reading.Value, Units.C, reading.CapturedAt);
             }
             catch (Exception ex)
             {
                 _log.LogWarning(ex, "BMS publish failed");
             }
-            try { await Task.Delay(TimeSpan.FromSeconds(1.5), stoppingToken); } catch (TaskCanceledException) { }
+            try { await Task.Delay(TimeSpan.FromSeconds(1.5), ct); } catch (TaskCanceledException) { }
         }
     }
 

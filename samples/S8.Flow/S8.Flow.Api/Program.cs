@@ -1,21 +1,14 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Sora.Data.Core;
+﻿using Sora.Data.Core;
 using Sora.Flow;
 using Sora.Flow.Options;
 using S8.Flow.Shared;
 using Sora.Messaging;
 using S8.Flow.Api.Adapters;
-using Microsoft.Extensions.Logging;
 using Sora.Flow.Model;
 using Sora.Flow.Infrastructure;
 using Sora.Data.Mongo;
 using Sora.Messaging.RabbitMq;
-using System.Linq;
 using Sora.Web.Swagger;
-using Sora.Flow.Sending;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,14 +48,12 @@ builder.Services.Configure<FlowOptions>(o =>
 builder.Services.AddControllers();
 builder.Services.AddRouting();
 builder.Services.AddSoraSwagger(builder.Configuration);
-builder.Services.AddHostedService<S8.Flow.Api.Hosting.LatestReadingProjector>();
-builder.Services.AddHostedService<S8.Flow.Api.Hosting.WindowReadingProjector>();
 
 // Message-driven adapters: handle events and persist to Flow intake
 builder.Services.OnMessages(h =>
 {
     // Only fast-tracked readings remain as messages; device/sensor announcements are seeded by adapters via FlowAction seed.
-    h.On<SensorReadingVo>(async (env, msg, ct) =>
+    h.On<Reading>(async (env, msg, ct) =>
     {
         var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
@@ -72,7 +63,7 @@ builder.Services.OnMessages(h =>
         };
         if (!string.IsNullOrWhiteSpace(msg.Unit)) payload[Keys.Sensor.Unit] = msg.Unit;
         if (!string.IsNullOrWhiteSpace(msg.Source)) payload[Keys.Reading.Source] = msg.Source;
-        var typed = new StageRecord<SensorReadingVo>
+        var typed = new StageRecord<Reading>
         {
             Id = Guid.NewGuid().ToString("n"),
             SourceId = msg.Source ?? "events",
@@ -122,21 +113,5 @@ app.MapControllers();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseSoraSwagger();
-
-// Ensure the latest.reading view set exists (idempotent) — custom view
-try
-{
-    using (Sora.Data.Core.DataSetContext.With(Sora.Flow.Infrastructure.FlowSets.ViewShort(S8.Flow.Api.Hosting.LatestReadingProjector.ViewName)))
-    { await Sora.Data.Core.Data<S8.Flow.Shared.SensorLatestReading, string>.FirstPage(1); }
-}
-catch { }
-
-// Ensure the window.5m view set exists (idempotent) — custom view
-try
-{
-    using (Sora.Data.Core.DataSetContext.With(Sora.Flow.Infrastructure.FlowSets.ViewShort(S8.Flow.Api.Hosting.WindowReadingProjector.ViewName)))
-    { await Sora.Data.Core.Data<S8.Flow.Shared.SensorWindowReading, string>.FirstPage(1); }
-}
-catch { }
 
 app.Run();

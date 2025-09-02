@@ -5,6 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>preview</LangVersion>
   </PropertyGroup>
+  <!-- Avoid compiling nested sample subprojects under this aggregator project -->
+  <ItemGroup>
+    <Compile Remove="S8.Flow.Api\**\*.cs" />
+    <Compile Remove="S8.Flow.Adapters.Bms\**\*.cs" />
+    <Compile Remove="S8.Flow.Adapters.Oem\**\*.cs" />
+    <Compile Remove="S8.Flow.Shared\**\*.cs" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sora.Core\Sora.Core.csproj" />
     <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
@@ -14,5 +21,6 @@
     <ProjectReference Include="..\..\src\Sora.Flow.Core\Sora.Flow.Core.csproj" />
     <ProjectReference Include="..\..\src\Sora.Flow.Web\Sora.Flow.Web.csproj" />
     <ProjectReference Include="..\..\tests\Sora.Testing\Sora.Testing.csproj" />
+  <ProjectReference Include="S8.Flow.Shared\S8.Flow.Shared.csproj" />
   </ItemGroup>
 </Project>

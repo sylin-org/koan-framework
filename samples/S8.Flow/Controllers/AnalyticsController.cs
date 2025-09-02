@@ -57,7 +57,7 @@ public class AnalyticsController : ControllerBase
         {
             referenceId,
             version = refItem?.Version ?? 0,
-            lastUpdated = refItem?.LastUpdated,
+            lastUpdated = (DateTimeOffset?)null,
             canonical,
             lineage,
             summary = new
@@ -101,7 +101,7 @@ public class AnalyticsController : ControllerBase
         {
             referenceId,
             version = refItem?.Version ?? 0,
-            lastUpdated = refItem?.LastUpdated,
+            lastUpdated = (DateTimeOffset?)null,
             canonical,
             lineage,
             summary = new { totalSources, dataPoints = canonical?.Count ?? 0 }
@@ -115,8 +115,8 @@ public class AnalyticsController : ControllerBase
     public async Task<IActionResult> GetPipelineStats(CancellationToken ct = default)
     {
     // Typed pipeline metrics for Sensor
-    List<StageRecord<Sensor>> intakeRecords;
-    List<StageRecord<Sensor>> keyedRecords;
+    IReadOnlyList<StageRecord<Sensor>> intakeRecords;
+    IReadOnlyList<StageRecord<Sensor>> keyedRecords;
     using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
     { intakeRecords = await StageRecord<Sensor>.All(ct); }
     using (DataSetContext.With(FlowSets.StageShort(FlowSets.Keyed)))
