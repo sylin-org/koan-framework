@@ -13,6 +13,9 @@ using Sora.Flow.Attributes;
 using Sora.Flow.Sending;
 using Sora.Data.Core;
 using Sora.Flow;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -22,18 +25,34 @@ if (!Sora.Core.SoraEnv.InContainer)
     return;
 }
 
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: true)
-    .AddEnvironmentVariables();
-
 // Minimal boot: Sora + auto-registrars wire Messaging Core, RabbitMQ, Flow identity stamper,
 // and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
 
+// No local ControlCommand responders; announce/ping handled by API-side responders (opt-out via config).
+
 var app = builder.Build();
 await app.RunAsync();
 
-[FlowAdapter(system: "bms", adapter: "bms", DefaultSource = "bms")]
+// Adapter identity + capabilities constants (single source of truth)
+internal static class BmsAdapterConstants
+{
+    public const string System = "bms";
+    public const string Adapter = "bms";
+    public const string Source = "bms"; // DefaultSource & SourceId
+    public const string SourceKey = "source"; // bag key
+    public static class Cap
+    {
+        public const string Seed = "seed";
+        public const string Reading = "reading";
+    }
+    public static class ExternalIds
+    {
+        public const string Device = "identifier.external.bms"; // device correlation id key
+    }
+}
+
+[FlowAdapter(system: BmsAdapterConstants.System, adapter: BmsAdapterConstants.Adapter, DefaultSource = BmsAdapterConstants.Source, Capabilities = new[] { BmsAdapterConstants.Cap.Seed, BmsAdapterConstants.Cap.Reading })]
 public sealed class BmsPublisher : BackgroundService
 {
     private readonly ILogger<BmsPublisher> _log;
@@ -42,8 +61,8 @@ public sealed class BmsPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-    // Initial bulk seed on startup via MQ (resilient to broker warm-up)
-    await SeedAllWithRetryAsync(ct);
+        // Initial bulk seed on startup via MQ (resilient to broker warm-up)
+        await SeedAllWithRetryAsync(ct);
 
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
@@ -66,11 +85,11 @@ public sealed class BmsPublisher : BackgroundService
                         [Keys.Device.Model] = d.Model,
                         [Keys.Device.Kind] = d.Kind,
                         [Keys.Device.Code] = d.Code,
-                        ["identifier.external.bms"] = bmsDeviceId,
-                        ["source"] = "bms",
+                        [BmsAdapterConstants.ExternalIds.Device] = bmsDeviceId,
+                        [BmsAdapterConstants.SourceKey] = BmsAdapterConstants.Source,
                     };
                     var devEvent = FlowEvent.ForModel("device");
-                    devEvent.SourceId = "bms";
+                    devEvent.SourceId = BmsAdapterConstants.Source;
                     devEvent.CorrelationId = bmsDeviceId;
                     foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
                     await devEvent.Send(ct);
@@ -83,8 +102,8 @@ public sealed class BmsPublisher : BackgroundService
                             .With("DeviceId", s.DeviceId)
                             .With(Keys.Sensor.Code, s.Code)
                             .With(Keys.Sensor.Unit, s.Unit)
-                            .With("source", "bms");
-                        sensorEvent.SourceId = "bms";
+                            .With(BmsAdapterConstants.SourceKey, BmsAdapterConstants.Source);
+                        sensorEvent.SourceId = BmsAdapterConstants.Source;
                         sensorEvent.CorrelationId = s.SensorKey;
                         await sensorEvent.Send(ct);
                     }
@@ -101,8 +120,8 @@ public sealed class BmsPublisher : BackgroundService
                     .With(Keys.Reading.Value, val)
                     .With(Keys.Reading.CapturedAt, at.ToString("O"))
                     .With(Keys.Sensor.Unit, Units.C)
-                    .With(Keys.Reading.Source, "bms");
-                readingEvent.SourceId = "bms";
+                    .With(Keys.Reading.Source, BmsAdapterConstants.Source);
+                readingEvent.SourceId = BmsAdapterConstants.Source;
                 readingEvent.CorrelationId = key;
                 await readingEvent.Send(ct);
                 _log.LogInformation("BMS sent Reading {Key}={Value}{Unit} at {At}", key, val, Units.C, at);
@@ -113,6 +132,16 @@ public sealed class BmsPublisher : BackgroundService
             }
             try { await Task.Delay(TimeSpan.FromSeconds(1.5), ct); } catch (TaskCanceledException) { }
         }
+    }
+
+    private static bool TryParseSensorKey(string sensorKey, out string inventory, out string serial, out string code)
+    {
+        inventory = serial = code = string.Empty;
+        if (string.IsNullOrWhiteSpace(sensorKey)) return false;
+        var parts = sensorKey.Split("::", StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 3) return false;
+        (inventory, serial, code) = (parts[0], parts[1], parts[2]);
+        return true;
     }
 
     // Iterate device catalog and publish normalized seeds via MQ
@@ -128,9 +157,9 @@ public sealed class BmsPublisher : BackgroundService
                 .With(Keys.Device.Model, d.Model)
                 .With(Keys.Device.Kind, d.Kind)
                 .With(Keys.Device.Code, d.Code)
-                .With("identifier.external.bms", bmsDeviceId)
-                .With("source", "bms");
-            deviceEvent.SourceId = "bms";
+                .With(BmsAdapterConstants.ExternalIds.Device, bmsDeviceId)
+                .With(BmsAdapterConstants.SourceKey, BmsAdapterConstants.Source);
+            deviceEvent.SourceId = BmsAdapterConstants.Source;
             deviceEvent.CorrelationId = bmsDeviceId;
             await deviceEvent.Send(ct);
 
@@ -141,8 +170,8 @@ public sealed class BmsPublisher : BackgroundService
                     .With("DeviceId", s.DeviceId)
                     .With(Keys.Sensor.Code, s.Code)
                     .With(Keys.Sensor.Unit, s.Unit)
-                    .With("source", "bms");
-                sensorEvent.SourceId = "bms";
+                    .With(BmsAdapterConstants.SourceKey, BmsAdapterConstants.Source);
+                sensorEvent.SourceId = BmsAdapterConstants.Source;
                 sensorEvent.CorrelationId = s.SensorKey;
                 await sensorEvent.Send(ct);
             }

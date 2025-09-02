@@ -42,6 +42,10 @@ Well-known endpoints
 - Challenge/Callback: `GET /auth/{provider}/challenge`, `GET /auth/{provider}/callback`
 - Logout: `GET|POST /auth/logout`
 
+Flow runtime endpoints
+- `GET /api/flow/adapters` — returns active adapter instances and summary by `system:adapter`.
+- Control responders (opt-out): announce/ping via `ControlCommand` are handled by the API when enabled; see `Sora:Flow:Control:AutoResponse:*:Enabled` in the Flow reference.
+
 Notes
 - `challenge` accepts `return` (relative path) and optional `prompt` (e.g., `login`); unknown hints are ignored by the core and simply forwarded to the IdP.
 - In development, the bundled TestProvider respects a lightweight remembered-user cookie; central logout clears this cookie to avoid silent re-login.

@@ -28,6 +28,16 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         // Provide identity stamper for server-side stamping (safe in producers)
         services.TryAddSingleton<IFlowIdentityStamper, FlowIdentityStamper>();
 
+    // Lightweight, producer-safe self-announcement: enable adapters to publish heartbeat announcements
+    // without pulling in full Flow runtime. Options are needed for timings/gates.
+    services.AddOptions<AdapterRegistryOptions>().BindConfiguration("Sora:Flow:AdapterRegistry");
+    services.TryAddSingleton<IAdapterIdentity>(sp =>
+    {
+        var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AdapterRegistryOptions>>().Value;
+        return new AdapterIdentity(opts.HeartbeatSeconds);
+    });
+    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AdapterSelfAnnouncer>());
+
         // Auto-register adapter publishers: BackgroundService types annotated with [FlowAdapter]
         // Config gates: Sora:Flow:Adapters:AutoStart (bool), Include (string[] "system:adapter"), Exclude (string[])
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ISoraInitializer>(sp => new AdapterScannerInitializer()));

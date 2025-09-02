@@ -8,6 +8,7 @@ using Sora.Flow.Infrastructure;
 using Sora.Flow;
 using Sora.Flow.Materialization;
 using System.Reflection;
+using Sora.Messaging;
 
 namespace Sora.Flow.Web.Initialization;
 
@@ -57,7 +58,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         }
         // Health/metrics are assumed to be added by host; controllers expose endpoints only.
 
-        // Opt-out turnkey: auto-add Flow runtime in web hosts unless disabled via config.
+    // Opt-out turnkey: auto-add Flow runtime in web hosts unless disabled via config.
         // Gate: Sora:Flow:AutoRegister (default: true). Idempotent: skips if already added.
         try
         {
@@ -85,6 +86,112 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             }
         }
         catch { }
+
+    // API-side responder for announce control commands (turnkey ON, opt-out via config)
+    services.OnMessages(h => h.On<Sora.Flow.Model.ControlCommand>(async (env, cmd, ct) =>
+        {
+            try
+            {
+                // Check gate
+                var sp = Sora.Core.Hosting.App.AppHost.Current;
+                var cfg = sp?.GetService(typeof(IConfiguration)) as IConfiguration;
+                var announceEnabled = cfg?.GetValue<bool?>(Sora.Flow.Web.Infrastructure.WebConstants.Control.Config.AnnounceEnabled) ?? true;
+                var pingEnabled = cfg?.GetValue<bool?>(Sora.Flow.Web.Infrastructure.WebConstants.Control.Config.PingEnabled) ?? true;
+
+                var verbStr = (cmd.Verb ?? string.Empty).Trim().ToLowerInvariant();
+                if (verbStr == Sora.Flow.Web.Infrastructure.WebConstants.Control.Verbs.Ping)
+                {
+                    if (!pingEnabled) return;
+                    var reference = cmd.Target ?? string.Empty;
+                    // If a target is provided, verify existence in registry; otherwise general pong
+                    var pingTarget = (cmd.Target ?? cmd.Arg ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(pingTarget))
+                    {
+                        await new Sora.Flow.Actions.FlowAck(Sora.Flow.Web.Infrastructure.WebConstants.Control.Model, verbStr, reference, Sora.Flow.Web.Infrastructure.WebConstants.Control.Status.Ok, null, env.CorrelationId).Send(ct);
+                        return;
+                    }
+                    if (!pingTarget.Contains(':'))
+                    {
+                        await new Sora.Flow.Actions.FlowAck(Sora.Flow.Web.Infrastructure.WebConstants.Control.Model, verbStr, reference, Sora.Flow.Web.Infrastructure.WebConstants.Control.Status.Unsupported, Sora.Flow.Web.Infrastructure.WebConstants.Control.Messages.TargetRequired, env.CorrelationId).Send(ct);
+                        return;
+                    }
+                    var pingParts = pingTarget.Split(':', 2);
+                    var pingSys = pingParts[0];
+                    var pingAdp = pingParts[1];
+                    var pingReg = (Sora.Flow.Monitoring.IAdapterRegistry?)sp?.GetService(typeof(Sora.Flow.Monitoring.IAdapterRegistry));
+                    if (pingReg is null)
+                    {
+                        await new Sora.Flow.Actions.FlowAck(Sora.Flow.Web.Infrastructure.WebConstants.Control.Model, verbStr, reference, Sora.Flow.Web.Infrastructure.WebConstants.Control.Status.Error, Sora.Flow.Web.Infrastructure.WebConstants.Control.Messages.RegistryUnavailable, env.CorrelationId).Send(ct);
+                        return;
+                    }
+                    var pingExists = pingReg.All().Any(x => string.Equals(x.System, pingSys, StringComparison.OrdinalIgnoreCase)
+                                                  && (pingAdp == "*" || string.Equals(x.Adapter, pingAdp, StringComparison.OrdinalIgnoreCase)));
+                    if (!pingExists)
+                    {
+                        await new Sora.Flow.Actions.FlowAck(Sora.Flow.Web.Infrastructure.WebConstants.Control.Model, verbStr, reference, Sora.Flow.Web.Infrastructure.WebConstants.Control.Status.NotFound, Sora.Flow.Web.Infrastructure.WebConstants.Control.Messages.NoAdapterMatched(pingTarget), env.CorrelationId).Send(ct);
+                        return;
+                    }
+                    await new Sora.Flow.Actions.FlowAck(Sora.Flow.Web.Infrastructure.WebConstants.Control.Model, verbStr, reference, Sora.Flow.Web.Infrastructure.WebConstants.Control.Status.Ok, null, env.CorrelationId).Send(ct);
+                    return;
+                }
+                if (verbStr != Sora.Flow.Web.Infrastructure.WebConstants.Control.Verbs.Announce) return;
+
+                var target = (cmd.Target ?? cmd.Arg ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(target) || !target.Contains(':'))
+                {
+                    await new Sora.Flow.Actions.FlowAck(Sora.Flow.Web.Infrastructure.WebConstants.Control.Model, verbStr, string.Empty, Sora.Flow.Web.Infrastructure.WebConstants.Control.Status.Unsupported, Sora.Flow.Web.Infrastructure.WebConstants.Control.Messages.TargetRequired, env.CorrelationId).Send(ct);
+                    return;
+                }
+                var parts = target.Split(':', 2);
+                var sys = parts[0];
+                var adp = parts[1];
+
+                var reg = (Sora.Flow.Monitoring.IAdapterRegistry?)sp?.GetService(typeof(Sora.Flow.Monitoring.IAdapterRegistry));
+                if (reg is null)
+                {
+                    await new Sora.Flow.Actions.FlowAck(Sora.Flow.Web.Infrastructure.WebConstants.Control.Model, verbStr, string.Empty, Sora.Flow.Web.Infrastructure.WebConstants.Control.Status.Error, Sora.Flow.Web.Infrastructure.WebConstants.Control.Messages.RegistryUnavailable, env.CorrelationId).Send(ct);
+                    return;
+                }
+
+                var items = reg.All()
+                    .Where(x => string.Equals(x.System, sys, StringComparison.OrdinalIgnoreCase)
+                             && (adp == "*" || string.Equals(x.Adapter, adp, StringComparison.OrdinalIgnoreCase)))
+                    .OrderByDescending(x => x.LastSeenAt)
+                    .ToList();
+                var found = items.FirstOrDefault();
+                if (found is null)
+                {
+                    await new Sora.Flow.Actions.FlowAck(Sora.Flow.Web.Infrastructure.WebConstants.Control.Model, verbStr, string.Empty, Sora.Flow.Web.Infrastructure.WebConstants.Control.Status.NotFound, Sora.Flow.Web.Infrastructure.WebConstants.Control.Messages.NoAdapterMatched(target), env.CorrelationId).Send(ct);
+                    return;
+                }
+
+                var payload = new Sora.Flow.Model.AdapterAnnouncement
+                {
+                    System = found.System,
+                    Adapter = found.Adapter,
+                    InstanceId = found.InstanceId,
+                    Version = found.Version,
+                    Capabilities = found.Capabilities,
+                    Bus = found.Bus,
+                    Group = found.Group,
+                    Host = found.Host,
+                    Pid = found.Pid,
+                    StartedAt = found.StartedAt,
+                    LastSeenAt = found.LastSeenAt,
+                    HeartbeatSeconds = found.HeartbeatSeconds,
+                };
+                await new Sora.Flow.Actions.ControlResponse<Sora.Flow.Model.AdapterAnnouncement>
+                {
+                    Model = "adapter",
+                    Verb = Sora.Flow.Web.Infrastructure.WebConstants.Control.Verbs.Announce,
+                    Status = Sora.Flow.Web.Infrastructure.WebConstants.Control.Status.Ok,
+                    Message = null,
+                    CorrelationId = env.CorrelationId,
+                    Payload = payload
+                }.Send(ct);
+            }
+            catch { /* best-effort */ }
+    }));
     }
 
     public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)

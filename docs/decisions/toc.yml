@@ -158,6 +158,8 @@
        href: FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md
        - name: Adapter auto-scan and minimal boot
          href: FLOW-0106-adapter-auto-scan-and-minimal-boot.md
+      - name: Adapter announcements, registry, and HTTP API
+        href: FLOW-0107-adapter-announcements-registry-and-api.md
  - name: Storage (STOR)
    items:
      - name: Storage module and contracts
