@@ -19,8 +19,7 @@ if (!Sora.Core.SoraEnv.InContainer)
     return;
 }
 
-builder.Services.AddSora(); // core + data + health + scheduling; messaging and rabbit auto-register via SoraAutoRegistrar
-// Flow runtime is auto-registered by Sora.Flow.Web (turnkey ON by default). Set Sora:Flow:AutoRegister=false to opt out.
+builder.Services.AddSora();
 
 builder.Services.Configure<FlowOptions>(o =>
 {
@@ -45,23 +44,24 @@ builder.Services.OnMessages(h =>
     // Only fast-tracked readings remain as messages; device/sensor announcements are seeded by adapters via FlowAction seed.
     h.On<Reading>(async (env, msg, ct) =>
     {
-        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-        {
-            [Keys.Sensor.Key] = msg.SensorKey,
-            [Keys.Reading.Value] = msg.Value,
-            [Keys.Reading.CapturedAt] = msg.CapturedAt.ToString("O"),
-        };
-        if (!string.IsNullOrWhiteSpace(msg.Unit)) payload[Keys.Sensor.Unit] = msg.Unit;
-        if (!string.IsNullOrWhiteSpace(msg.Source)) payload[Keys.Reading.Source] = msg.Source;
-        var typed = new StageRecord<Reading>
+        // Build a normalized event bag uniformly (works for VOs and entities)
+        var ev = FlowEvent.For<Reading>()
+            .With(Keys.Sensor.Key, msg.SensorKey)
+            .With(Keys.Reading.Value, msg.Value)
+            .With(Keys.Reading.CapturedAt, msg.CapturedAt.ToString("O"));
+        if (!string.IsNullOrWhiteSpace(msg.Unit)) ev.With(Keys.Sensor.Unit, msg.Unit);
+        if (!string.IsNullOrWhiteSpace(msg.Source)) ev.With(Keys.Reading.Source, msg.Source);
+
+        // Persist to Flow intake as a typed StageRecord
+        var rec = new StageRecord<Reading>
         {
             Id = Guid.NewGuid().ToString("n"),
             SourceId = msg.Source ?? "events",
             OccurredAt = msg.CapturedAt,
-            StagePayload = payload.ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase),
+            StagePayload = ev.Bag,
             CorrelationId = msg.SensorKey,
         };
-        await typed.Save(FlowSets.StageShort(FlowSets.Intake));
+        await rec.Save(FlowSets.StageShort(FlowSets.Intake));
     });
 });
 
