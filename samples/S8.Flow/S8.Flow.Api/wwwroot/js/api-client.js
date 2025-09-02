@@ -83,7 +83,7 @@ class FlowApiClient {
   // Value Object APIs - Readings
   async getReadings(params = {}) {
     const query = new URLSearchParams(params).toString();
-    return this.fetchJson(`/api/vo/reading${query ? '?' + query : ''}`);
+  return this.fetchJson(`/api/readings${query ? '?' + query : ''}`);
   }
 
   async getReadingsByReference(referenceId, params = {}) {
@@ -106,12 +106,14 @@ class FlowApiClient {
   // Flow Entity APIs - Advanced Views
   async getFlowDevices(params = {}) {
     const query = new URLSearchParams(params).toString();
-    return this.fetchJson(`/api/flow/device${query ? '?' + query : ''}`);
+  // Fallback to base device listing for now
+  return this.fetchJson(`/api/devices${query ? '?' + query : ''}`);
   }
 
   async getFlowSensors(params = {}) {
     const query = new URLSearchParams(params).toString();
-    return this.fetchJson(`/api/flow/sensor${query ? '?' + query : ''}`);
+  // Fallback to base sensor listing for now
+  return this.fetchJson(`/api/sensors${query ? '?' + query : ''}`);
   }
 
   async getCanonicalView(model, referenceId) {
@@ -197,7 +199,8 @@ class FlowApiClient {
   }
 
   async bulkCreateReadings(readings) {
-    return this.fetchJson('/api/vo/reading/bulk', {
+  // Endpoint not implemented server-side; keep for future wiring
+  return this.fetchJson('/api/readings/bulk', {
       method: 'POST',
       body: JSON.stringify(readings)
     });
@@ -236,9 +239,9 @@ class FlowApiClient {
       ]);
 
       return {
-        devices: devices?.items?.length || 0,
-        sensors: sensors?.items?.length || 0,  
-        readings: readings?.items?.length || 0
+        devices: devices?.items?.length ?? (Array.isArray(devices) ? devices.length : 0),
+        sensors: sensors?.items?.length ?? (Array.isArray(sensors) ? sensors.length : 0),  
+        readings: readings?.items?.length ?? (Array.isArray(readings) ? readings.length : 0)
       };
     } catch (error) {
       console.error('Failed to get entity counts:', error);
@@ -255,7 +258,7 @@ class FlowApiClient {
         type: 'reading',
         timestamp: reading.at || new Date().toISOString(),
         title: `Reading ingested`,
-        subtitle: `Sensor: ${reading.payload?.key || 'Unknown'}`,
+  subtitle: `Sensor: ${reading.payload?.sensorKey || reading.correlationId || 'Unknown'}`,
         level: 'success',
         data: reading
       }));

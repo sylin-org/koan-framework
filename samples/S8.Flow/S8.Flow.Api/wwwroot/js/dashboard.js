@@ -253,8 +253,8 @@ class FlowDashboard {
   async fetchEntitiesForBrowser() {
     try {
       const [devices, sensors] = await Promise.all([
-        window.flowApi.getFlowDevices({ size: 10 }),
-        window.flowApi.getFlowSensors({ size: 20 })
+        window.flowApi.getDevices({ size: 10 }),
+        window.flowApi.getSensors({ size: 20 })
       ]);
 
       const entities = [];
@@ -266,7 +266,7 @@ class FlowDashboard {
             id: device.id,
             type: 'device',
             name: device.canonicalId || device.id,
-            meta: device.model?.name || 'Device',
+            meta: (device.model?.name || device.metadata?.name || 'Device'),
             children: []
           });
         });
@@ -279,7 +279,7 @@ class FlowDashboard {
             id: sensor.id,
             type: 'sensor',
             name: sensor.canonicalId || sensor.id,
-            meta: sensor.model?.type || 'Sensor',
+            meta: (sensor.model?.type || sensor.metadata?.type || 'Sensor'),
             parent: sensor.model?.deviceId
           });
         });

@@ -10,6 +10,46 @@ namespace S8.Flow.Api.Controllers;
 [Route("api/readings")] // VO-only ingest: posts a SensorReading and routes to VO StageRecord intake
 public sealed class ReadingsController : ControllerBase
 {
+    // Recent readings across the pipeline (defaults to Keyed, falls back to Intake)
+    [HttpGet]
+    public async Task<IActionResult> GetRecent([FromQuery] int size = 50, CancellationToken ct = default)
+    {
+        if (size < 1) size = 50; if (size > 1000) size = 1000;
+        var items = new List<StageRecord<Reading>>(capacity: size);
+
+        // Prefer Keyed stage for stabilized, correlated readings
+        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Keyed)))
+        {
+            var page1 = await StageRecord<Reading>.FirstPage(size, ct);
+            items.AddRange(page1);
+        }
+
+        // Fallback to Intake if nothing in Keyed yet
+        if (items.Count == 0)
+        {
+            using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
+            {
+                var page1 = await StageRecord<Reading>.FirstPage(size, ct);
+                items.AddRange(page1);
+            }
+        }
+
+        var list = items
+            .OrderByDescending(r => r.OccurredAt)
+            .Take(size)
+            .Select(r => new
+            {
+                id = r.Id,
+                at = r.OccurredAt,
+                source = r.SourceId,
+                payload = r.StagePayload,
+                correlationId = r.CorrelationId
+            })
+            .ToList();
+
+        return Ok(new { page = 1, size, returned = list.Count, items = list });
+    }
+
     [HttpGet("{referenceId}")]
     public async Task<IActionResult> Get(string referenceId, [FromQuery] int page = 1, [FromQuery] int size = 200, CancellationToken ct = default)
     {
