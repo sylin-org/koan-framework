@@ -28,6 +28,7 @@ using Sora.Core.Utilities.Ids;
 using Sora.Flow.Monitoring;
 using Sora.Messaging;
 using Sora.Flow.Actions;
+using Sora.Flow.Sending;
 
 namespace Sora.Flow;
 
@@ -70,6 +71,11 @@ public static class ServiceCollectionExtensions
         // Hosted workers
         services.AddHostedService<ModelAssociationWorkerHostedService>();
         services.AddHostedService<ModelProjectionWorkerHostedService>();
+
+    // Sender DX (normalized payload + batch), identity stamping, and actions
+    services.AddFlowSender();
+    services.TryAddSingleton<Sora.Flow.Sending.IFlowIdentityStamper, Sora.Flow.Sending.FlowIdentityStamper>();
+    services.AddFlowActions();
 
         return services;
     }
@@ -415,8 +421,14 @@ public static class ServiceCollectionExtensions
                                 var parentKeyPath = voParent!.Value.ParentKeyPath;
                                 if (!dict.TryGetValue(parentKeyPath, out var raw))
                                 {
-                                    await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "vo-parent-key-missing", path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
-                                    continue;
+                                    // Fallback: accept any reserved reference.* entry
+                                    var refKvp = dict.FirstOrDefault(kv => kv.Key.StartsWith(Constants.Reserved.ReferencePrefix, StringComparison.OrdinalIgnoreCase));
+                                    if (refKvp.Key is null)
+                                    {
+                                        await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "vo-parent-key-missing", path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
+                                        continue;
+                                    }
+                                    raw = refKvp.Value;
                                 }
                                 var parentKey = ToValuesFlexible(raw).FirstOrDefault();
                                 if (string.IsNullOrWhiteSpace(parentKey))
@@ -443,6 +455,19 @@ public static class ServiceCollectionExtensions
                                         if (string.IsNullOrWhiteSpace(sysV) || string.IsNullOrWhiteSpace(adpV) || string.IsNullOrWhiteSpace(v)) continue;
                                         var composite = string.Join('|', sysV, adpV, v);
                                         candidates.Add(($"env.{Constants.Envelope.System}|{Constants.Envelope.Adapter}|{extKey}", composite));
+                                    }
+                                }
+                                // Also accept contractless reserved identifier.external.* bag keys
+                                foreach (var kv in dict)
+                                {
+                                    if (!kv.Key.StartsWith(Constants.Reserved.IdentifierExternalPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+                                    var sysV = ToValuesFlexible(sys).FirstOrDefault();
+                                    var adpV = ToValuesFlexible(adp).FirstOrDefault();
+                                    foreach (var v in ToValuesFlexible(kv.Value))
+                                    {
+                                        if (string.IsNullOrWhiteSpace(sysV) || string.IsNullOrWhiteSpace(adpV) || string.IsNullOrWhiteSpace(v)) continue;
+                                        var composite = string.Join('|', sysV, adpV, v);
+                                        candidates.Add(($"env.{Constants.Envelope.System}|{Constants.Envelope.Adapter}|{kv.Key}", composite));
                                     }
                                 }
                             }
@@ -609,6 +634,40 @@ public static class ServiceCollectionExtensions
                         var upsertM = idData.GetMethod("UpsertAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { idType, typeof(CancellationToken) })!;
                         await (Task)upsertM.Invoke(null, new object?[] { provisional, ct })!;
             return ulid;
+                    }
+                }
+            }
+            // Also accept contractless reserved identifier.external.* entries
+            foreach (var kv in dict)
+            {
+                if (!kv.Key.StartsWith(Constants.Reserved.IdentifierExternalPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+                foreach (var ext in ToValuesFlexible(kv.Value))
+                {
+                    if (string.IsNullOrWhiteSpace(ext)) continue;
+                    var composite = string.Join('|', sys, adp, ext);
+                    var getM = idData.GetMethod("GetAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) });
+                    if (getM is null) continue;
+                    var task = (Task)getM.Invoke(null, new object?[] { composite, ct })!; await task.ConfigureAwait(false);
+                    var link = GetTaskResult(task);
+                    if (link is not null)
+                    {
+                        var rulid = idType.GetProperty("ReferenceUlid")!.GetValue(link) as string;
+                        if (!string.IsNullOrWhiteSpace(rulid)) return rulid!;
+                    }
+                    else
+                    {
+                        var ulid = UlidId.New();
+                        var provisional = Activator.CreateInstance(idType)!;
+                        idType.GetProperty("Id")!.SetValue(provisional, composite);
+                        idType.GetProperty("System")!.SetValue(provisional, sys);
+                        idType.GetProperty("Adapter")!.SetValue(provisional, adp);
+                        idType.GetProperty("ExternalId")!.SetValue(provisional, ext);
+                        idType.GetProperty("ReferenceUlid")!.SetValue(provisional, ulid);
+                        idType.GetProperty("Provisional")!.SetValue(provisional, true);
+                        idType.GetProperty("ExpiresAt")!.SetValue(provisional, DateTimeOffset.UtcNow.AddDays(2));
+                        var upsertM = idData.GetMethod("UpsertAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { idType, typeof(CancellationToken) })!;
+                        await (Task)upsertM.Invoke(null, new object?[] { provisional, ct })!;
+                        return ulid;
                     }
                 }
             }

@@ -34,10 +34,9 @@ public sealed class IdentityModel : FlowEntity<IdentityModel>
     [AggregationTag("dummy")] public string? Dummy { get; set; }
 }
 
-// VO envelope declaring an external-id for IdentityModel via [EntityLink]
+// Envelope declaring an external-id for IdentityModel via reserved identifier.external.* key
 public sealed class IdentityEnvelope
 {
-    [EntityLink(typeof(IdentityModel), LinkKind.ExternalId)]
     public required string ExternalRef { get; init; }
 
     public required string System { get; init; }
@@ -160,9 +159,9 @@ public class TypedFlowTests
         }, TimeSpan.FromSeconds(10));
 
         // Assert Canonical view content shape
-        var canonical = await Data<CanonicalProjection<TestModel>, string>.GetAsync($"{Constants.Views.Canonical}::{refId}", FlowSets.ViewShort(Constants.Views.Canonical), ct);
-        canonical.Should().NotBeNull();
-        canonical!.ReferenceId.Should().Be(refId);
+    var canonical = await Data<CanonicalProjection<TestModel>, string>.GetAsync($"{Constants.Views.Canonical}::{refId}", FlowSets.ViewShort(Constants.Views.Canonical), ct);
+    canonical.Should().NotBeNull();
+    canonical!.ReferenceUlid.Should().Be(refId);
         canonical.ViewName.Should().Be(Constants.Views.Canonical);
         canonical.Model.Should().NotBeNull();
         // Verify nested Model contains name.first range with "Ann"
@@ -175,20 +174,20 @@ public class TypedFlowTests
         firstArr!.Select(x => x?.ToString()).Should().Contain("Ann");
 
         // Assert Lineage view exists
-        var lineage = await Data<LineageProjection<TestModel>, string>.GetAsync($"{Constants.Views.Lineage}::{refId}", FlowSets.ViewShort(Constants.Views.Lineage), ct);
-        lineage.Should().NotBeNull();
-        lineage!.ReferenceId.Should().Be(refId);
+    var lineage = await Data<LineageProjection<TestModel>, string>.GetAsync($"{Constants.Views.Lineage}::{refId}", FlowSets.ViewShort(Constants.Views.Lineage), ct);
+    lineage.Should().NotBeNull();
+    lineage!.ReferenceUlid.Should().Be(refId);
         lineage.ViewName.Should().Be(Constants.Views.Lineage);
 
         // Assert materialized root and policy state exist
-        var root = await Data<DynamicFlowEntity<TestModel>, string>.GetAsync(refId!, ct);
-        root.Should().NotBeNull();
-        root!.ReferenceId.Should().Be(refId);
+    var root = await Data<DynamicFlowEntity<TestModel>, string>.GetAsync(refId!, ct);
+    root.Should().NotBeNull();
+    root!.Id.Should().Be(refId);
         root.Model.Should().NotBeNull();
 
-        var policies = await Data<PolicyState<TestModel>, string>.GetAsync(refId!, ct);
-        policies.Should().NotBeNull();
-        policies!.ReferenceId.Should().Be(refId);
+    var policies = await Data<PolicyState<TestModel>, string>.GetAsync(refId!, ct);
+    policies.Should().NotBeNull();
+    policies!.ReferenceUlid.Should().Be(refId);
     }
 
     private static string NewWorkDir()
@@ -416,7 +415,7 @@ public class TypedFlowTests
         {
             [Constants.Envelope.System] = env.System,
             [Constants.Envelope.Adapter] = env.Adapter,
-            [nameof(IdentityEnvelope.ExternalRef)] = env.ExternalRef
+            [$"{Sora.Flow.Infrastructure.Constants.Reserved.IdentifierExternalPrefix}default"] = env.ExternalRef
         };
 
         var rec = new StageRecord<IdentityModel>
@@ -445,16 +444,16 @@ public class TypedFlowTests
         correlation.Should().NotBeNullOrWhiteSpace();
 
         // Verify identity link created and provisional, pointing to correlation ULID
-        var compositeKey = string.Join('|', env.System, env.Adapter, env.ExternalRef);
-        var link = await Data<IdentityLink<IdentityModel>, string>.GetAsync(compositeKey, ct);
-        link.Should().NotBeNull();
-        link!.ReferenceId.Should().Be(correlation);
+    var compositeKey = string.Join('|', env.System, env.Adapter, env.ExternalRef);
+    var link = await Data<IdentityLink<IdentityModel>, string>.GetAsync(compositeKey, ct);
+    link.Should().NotBeNull();
+    link!.ReferenceUlid.Should().Be(correlation);
         link.Provisional.Should().BeTrue();
 
         // Verify a KeyIndex exists for the composite candidate
-        var ki = await Data<KeyIndex<IdentityModel>, string>.GetAsync(compositeKey, ct);
-        ki.Should().NotBeNull();
-        ki!.ReferenceId.Should().Be(correlation);
+    var ki = await Data<KeyIndex<IdentityModel>, string>.GetAsync(compositeKey, ct);
+    ki.Should().NotBeNull();
+    ki!.ReferenceUlid.Should().Be(correlation);
     }
 
     [Fact]
@@ -545,7 +544,7 @@ public class TypedFlowTests
             System = "sysX",
             Adapter = "adpY",
             ExternalId = "extZ",
-            ReferenceId = Guid.NewGuid().ToString("n"),
+            ReferenceUlid = Guid.NewGuid().ToString("n"),
             Provisional = true,
             ExpiresAt = DateTimeOffset.UtcNow.AddMilliseconds(-200)
         };

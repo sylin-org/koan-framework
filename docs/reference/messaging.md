@@ -2,6 +2,58 @@
 
 Canonical APIs and patterns for Sora messaging (bus, batching, aliasing, inbox).
 
+## Flow envelope and reserved keys
+
+See ADR [FLOW-0105](../decisions/FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md) for the full decision. Summary of reserved keys used by Flow adapters and the ingestion pipeline:
+
+### Adapter identity
+
+- Stamped on every message from a class annotated with `[FlowAdapter(system, adapter)]`:
+	- `adapter.system` — stable system identifier (e.g., `oem`, `opcua`, `sap`).
+	- `adapter.name` — adapter variant/name (e.g., `iot-oem-hub`).
+
+Centralize system names in `Infrastructure/Constants` per ARCH-0040.
+
+### External identifiers (envelope metadata)
+
+- `identifier.external.<system>` — external/native ID values from the producing adapter.
+	- Multiple entries allowed per message for different systems.
+	- Examples:
+		- `identifier.external.oem = OEM-00001`
+		- `identifier.external.erp = DEV-42`
+
+These keys are preserved end-to-end for audit and used to populate the ExternalId index when a canonical entity is created/updated.
+
+### Contractless (normalized bag) payloads
+
+When sending a normalized payload instead of a strong-typed model, use a JSON-path-like bag with reserved keys:
+
+- `model` — canonical entity key (e.g., `Keys.Device.Key`, `Keys.Sensor.Key`).
+- `reference.<entityKey>.external.<system>` — external ID of a referenced canonical entity to resolve `[ParentKey]` properties.
+	- Example: `reference.device.external.oem = OEM-00001`
+- Arbitrary field paths (e.g., `inventory`, `serial`, `sensorKey`) carry model data.
+
+The ingestion pipeline maps bag fields to the model contract and resolves canonical references via the ExternalId index before persistence.
+
+### Parent keys and canonical resolution
+
+- Mark canonical relationships in models with `[ParentKey(targetKey)]`.
+		- Example: `Sensor.DeviceId` is marked with `[ParentKey]`.
+- Adapters do not set canonical IDs.
+- The resolver fills canonical parent keys by:
+	1) Checking for an existing canonical value;
+	2) Looking for `reference.<targetKey>.external.<system>` in contractless bags;
+	3) Falling back to envelope `identifier.external.*` context if sufficient;
+	4) Deferring if unresolved (retry policy applies).
+
+### Error modes and policies
+
+- Unknown external ID: defer with retry; after threshold, dead-letter with `reason=external-id-not-found`.
+- Duplicate external ID mapping: reject or overwrite per configuration.
+- Validation: missing required `model` for normalized payloads is a hard error.
+
+Ensure all literals used for systems and keys are pulled from centralized constants.
+
 ## Contract
 - Publish/send via `IBus`; batching via `IMessageBatch`.
 - Aliasing defaults to full type name unless overridden by `[Message(Alias=...)]`.

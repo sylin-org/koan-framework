@@ -1,13 +1,13 @@
 ﻿## Flow bindings, canonical IDs, and value-object ingest
 
-This page defines how Sora Flow models declare binding hints, how OEM/source identifiers are resolved to canonical IDs, and how value objects (VOs) ingest independently while keeping lineage. It applies across modules and samples (e.g., S8).
+This page defines how Sora Flow models declare binding hints, how OEM/source identifiers are resolved to canonical IDs, and how value objects (VOs) ingest independently while keeping lineage. It applies across modules and samples (e.g., S8). See also ADR [FLOW-0105](../decisions/FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md) for adapter identity, envelope metadata, and external-ID resolution.
 
 ### contract
 
 - Inputs
   - Domain aggregates (perennial): e.g., `Device`, `Sensor`.
   - Value objects (append-only): e.g., `SensorReading`.
-  - Binding hints on models (attributes or registry) that identify association keys: `tenant.id`, `device.id`, `sensor.id`, `event.time`, etc.
+  - Binding hints on models (attributes or registry) that identify association keys: `tenant.id`, `device.id`, `sensor.id`, `event.time`, etc. Use `[ParentKey]` on canonical parent properties.
 - Outputs
   - Canonical aggregates with stable IDs ("canonical::…").
   - `KeyIndex<T>` entries mapping external keys → canonical IDs.

@@ -3,13 +3,14 @@ You are contributing to **Sora**, a greenfield framework for modern, modular app
 
 Begin with a concise checklist (3-7 bullets) of your planned steps before making substantive documentation or code edits.
 
-## Instructions
+# Instructions
 
-- Ensure all documentation remains accurate and up-to-date. Reflect new decisions promptly.
-- Refer to core documentation entry points:
-  - Engineering front door: `/docs/engineering/index.md` (high-signal rules and links)
-  - Architecture principles: `/docs/architecture/principles.md` (curated ADR digest)
-  - Documentation root: `/docs` and `/docs/toc.yml`
+## Core Engineering Principles (Mandatory)
+
+Premium DX, with semantically meaningful choices and sane-defaults. Terse but expressive interfaces/methods. Context-aware abstractions are preferred.
+Default assumptions apply unless a documented ADR grants an exception:
+This is a greenfield framework. Break and change as necessary, concerns for back-compat are minimum at the time. Interrupt and ask if you think answers will provide better direction.
+
 
 ## Data Access (Priority Guidance)
 
@@ -22,10 +23,6 @@ Begin with a concise checklist (3-7 bullets) of your planned steps before making
 
 - `/docs/guides/data/all-query-streaming-and-pager.md`
 - `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
-
-## Core Engineering Principles (Mandatory)
-
-Default assumptions apply unless a documented ADR grants an exception:
 
 ### 0. Prime Directives
 
@@ -123,6 +120,13 @@ After each documentation or code change, validate that updates are correctly lin
 - Do not manually modify generated documentation (files under `docs/reference/_generated/**`).
 
 ## Handy Anchors
+
+- When asked, ensure all documentation remains accurate and up-to-date. Reflect new decisions promptly.
+- Refer to core documentation entry points:
+
+  - Engineering front door: `/docs/engineering/index.md` (high-signal rules and links)
+  - Architecture principles: `/docs/architecture/principles.md` (curated ADR digest)
+  - Documentation root: `/docs` and `/docs/toc.yml`
 
 - Data Access: `/docs/guides/data/all-query-streaming-and-pager.md`, `/docs/guides/data/working-with-entity-data.md`, `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
 - Web API: `/docs/api/web-http-api.md`, `/docs/api/openapi-generation.md`, `/docs/decisions/WEB-0035-entitycontroller-transformers.md`

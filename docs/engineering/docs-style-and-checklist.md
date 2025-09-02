@@ -10,6 +10,7 @@ Audience: developers and agentic AIs. Keep it instructional and reference-first.
 - Cross-link ADRs and canonical pages (Engineering front door, Architecture principles, Decisions).
 
 ## PR checklist
+- DocFX strict build passes locally (no broken links).
 - No edits in `docs/reference/_generated/**`.
 - Examples compile or are trivially correct for the module.
 - Links to ADRs and sample code are stable.

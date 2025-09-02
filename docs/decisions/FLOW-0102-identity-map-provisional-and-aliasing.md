@@ -33,7 +33,8 @@ The Flow runtime must stay type‑agnostic while supporting high‑volume value 
 
 4) Attribute‑driven, default‑on indexing
    - Introduce an attribute under `Sora.Flow.Attributes` to mark VO properties that link to entities:
-     - `EntityLinkAttribute(Type flowEntityType, LinkKind kind)` where `kind ∈ { CanonicalId, ExternalId }`.
+       - Deprecated: `EntityLinkAttribute(Type flowEntityType, LinkKind kind)` where `kind ∈ { CanonicalId, ExternalId }`.
+          Use reserved keys `identifier.external.{source}` in intake payloads instead; mapping uses `system|adapter|externalId` composites.
    - Enable indexing by default for any VO property decorated with this attribute:
      - If `CanonicalId`: index (property, capturedAt DESC).
      - If `ExternalId`: index (system, adapter, property, capturedAt DESC).
@@ -43,7 +44,7 @@ The Flow runtime must stay type‑agnostic while supporting high‑volume value 
 
 6) Minimal VO envelope (type‑agnostic)
    - Envelope fields: `system`, `adapter`, `capturedAt`, optional `source` string, and the VO payload.
-   - VO payload includes one or more properties marked with `[EntityLink(...)]` to drive mapping and indexing.
+   - VO payload includes one or more entries under reserved `identifier.external.*` keys to drive mapping and indexing.
 
 ## Scope
 
@@ -60,17 +61,17 @@ Applies to the Flow pillar (runtime, workers, and samples such as S8). Type‑ag
 - Provisional GC: background worker deletes or flags entries older than TTL (default 2 days) when still provisional.
 - Aliases: `{ fromCanonicalId, toCanonicalId, reason, at }`; enforce chain length ≤ 1 by rewriting on each merge; cache terminal resolution with a short TTL.
 - Park‑and‑sweep: parallel `<EntityType>#flow.park` set; sweeper retries mapping and promotes on success; emit metrics (parked, promoted, expired).
-- Index registration: reflect VO types at startup, discover `[EntityLink]` properties, and register default indexes as above; log registrations.
+- Index registration: deprecated. External-id values are read from reserved keys at runtime; explicit registration not required.
 - Sensor→Device: introduce `deviceId` on Sensor; populate during upsert via resolver.
 - TelemetryEvent (sample): slim to external sensor identifier + unit, value, capturedAt, system, adapter, source.
 
 ## Follow‑ups
 
-- Implement `EntityLinkAttribute` in `Sora.Flow.Attributes` and reference in VO contracts.
+- Do not implement `EntityLinkAttribute`; prefer contractless `identifier.external.*` keys.
 - Add options for IdentityMap TTL and park sweeper cadence; expose minimal health/metrics.
 - Implement alias resolver with terminal ID caching and unit tests for merge/chains.
 - Update S8: `Sensor` gains `deviceId` (ULID); `TelemetryEvent` contract slimmed; docs and examples align.
-- Add docs for the VO envelope and `[EntityLink]` usage under `docs/reference/`.
+- Add docs for VO envelopes and reserved key usage under `docs/reference/`.
 
 ## References
 

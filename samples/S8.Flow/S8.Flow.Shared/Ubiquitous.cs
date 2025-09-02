@@ -47,26 +47,48 @@ public static class SensorCodes
     public const string GANTRY_RPM = "GANTRY_RPM";
 }
 
-public sealed class DeviceProfile
-{
-    public required string Inventory { get; init; }
-    public required string Serial { get; init; }
-    public required string Manufacturer { get; init; }
-    public required string Model { get; init; }
-    public required string Kind { get; init; }
-    public required string Code { get; init; }
-}
-
 public static class SampleProfiles
 {
-    public static readonly DeviceProfile[] Fleet = new[]
+    public static readonly Device[] Fleet = new[]
     {
-        new DeviceProfile { Inventory = "INV-1001", Serial = "SN-MRI-7000-001", Manufacturer = "BrandA", Model = "MRI-7000", Kind = "MRI", Code = "MRI-7000-A" },
-        new DeviceProfile { Inventory = "INV-1002", Serial = "SN-MRI-7000-002", Manufacturer = "BrandB", Model = "MRI-7000", Kind = "MRI", Code = "MRI-7000-B" },
-        new DeviceProfile { Inventory = "INV-2001", Serial = "SN-CT-300-001", Manufacturer = "BrandC", Model = "CT-300", Kind = "CT", Code = "CT-300-1" },
-        new DeviceProfile { Inventory = "INV-2002", Serial = "SN-CT-300-002", Manufacturer = "BrandC", Model = "CT-300", Kind = "CT", Code = "CT-300-2" },
-        new DeviceProfile { Inventory = "INV-3001", Serial = "SN-CRYO-200-001", Manufacturer = "BrandA", Model = "CRYO-200", Kind = "CRYO", Code = "CRYO-200-1" },
+        new Device { DeviceId = "INV-1001:SN-MRI-7000-001", Inventory = "INV-1001", Serial = "SN-MRI-7000-001", Manufacturer = "BrandA", Model = "MRI-7000", Kind = "MRI", Code = "MRI-7000-A" },
+        new Device { DeviceId = "INV-1002:SN-MRI-7000-002", Inventory = "INV-1002", Serial = "SN-MRI-7000-002", Manufacturer = "BrandB", Model = "MRI-7000", Kind = "MRI", Code = "MRI-7000-B" },
+        new Device { DeviceId = "INV-2001:SN-CT-300-001", Inventory = "INV-2001", Serial = "SN-CT-300-001", Manufacturer = "BrandC", Model = "CT-300", Kind = "CT", Code = "CT-300-1" },
+        new Device { DeviceId = "INV-2002:SN-CT-300-002", Inventory = "INV-2002", Serial = "SN-CT-300-002", Manufacturer = "BrandC", Model = "CT-300", Kind = "CT", Code = "CT-300-2" },
+        new Device { DeviceId = "INV-3001:SN-CRYO-200-001", Inventory = "INV-3001", Serial = "SN-CRYO-200-001", Manufacturer = "BrandA", Model = "CRYO-200", Kind = "CRYO", Code = "CRYO-200-1" },
     };
+
+    // BMS publishes temperature sensors only
+    public static IEnumerable<Sensor> SensorsForBms(Device d)
+    {
+        var sensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}";
+        yield return new Sensor
+        {
+            DeviceId = d.DeviceId,
+            SensorKey = sensorKey,
+            Code = SensorCodes.TEMP,
+            Unit = Units.C,
+        };
+    }
+
+    // OEM publishes power and coolant pressure sensors
+    public static IEnumerable<Sensor> SensorsForOem(Device d)
+    {
+        yield return new Sensor
+        {
+            DeviceId = d.DeviceId,
+            SensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.PWR}",
+            Code = SensorCodes.PWR,
+            Unit = Units.Watt,
+        };
+        yield return new Sensor
+        {
+            DeviceId = d.DeviceId,
+            SensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.COOLANT_PRESSURE}",
+            Code = SensorCodes.COOLANT_PRESSURE,
+            Unit = Units.KPa,
+        };
+    }
 }
 
 public sealed class SensorReading

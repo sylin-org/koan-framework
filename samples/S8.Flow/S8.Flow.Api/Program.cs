@@ -14,8 +14,8 @@ using Sora.Flow.Infrastructure;
 using Sora.Data.Mongo;
 using Sora.Messaging.RabbitMq;
 using System.Linq;
-using S8.Flow.Shared.Events;
 using Sora.Web.Swagger;
+using Sora.Flow.Sending;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,40 +61,7 @@ builder.Services.AddHostedService<S8.Flow.Api.Hosting.WindowReadingProjector>();
 // Message-driven adapters: handle events and persist to Flow intake
 builder.Services.OnMessages(h =>
 {
-    // Device announcements -> canonicalize Device model
-    h.On<DeviceAnnounceEvent>(async (env, msg, ct) =>
-    {
-        // Write an intake record for Device; association/projection workers will canonicalize
-        var payload = msg.ToPayloadDictionary();
-        payload[Constants.Envelope.System] = msg.System;
-        payload[Constants.Envelope.Adapter] = msg.Adapter;
-        var rec = new StageRecord<Device>
-        {
-            Id = Guid.NewGuid().ToString("n"),
-            SourceId = msg.Source ?? $"{msg.System}.{msg.Adapter}",
-            OccurredAt = msg.OccurredAt,
-            StagePayload = payload.ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase)
-        };
-        await rec.Save(FlowSets.StageShort(FlowSets.Intake));
-    });
-
-    // Sensor announcements -> upsert Sensor with key; device FK will bind via later association.
-    h.On<SensorAnnounceEvent>(async (env, msg, ct) =>
-    {
-        var payload = msg.ToPayloadDictionary();
-        payload[Constants.Envelope.System] = msg.System;
-        payload[Constants.Envelope.Adapter] = msg.Adapter;
-        var rec = new StageRecord<Sensor>
-        {
-            Id = Guid.NewGuid().ToString("n"),
-            SourceId = msg.Source ?? $"{msg.System}.{msg.Adapter}",
-            OccurredAt = msg.OccurredAt,
-            StagePayload = payload.ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase)
-        };
-        await rec.Save(FlowSets.StageShort(FlowSets.Intake));
-    });
-
-    // Fast-tracked readings -> write StageRecord<SensorReadingVo> with only the key + values.
+    // Only fast-tracked readings remain as messages; device/sensor announcements are seeded by adapters via FlowAction seed.
     h.On<SensorReadingVo>(async (env, msg, ct) =>
     {
         var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
@@ -111,7 +78,6 @@ builder.Services.OnMessages(h =>
             SourceId = msg.Source ?? "events",
             OccurredAt = msg.CapturedAt,
             StagePayload = payload.ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase),
-            // Group/read views by the sensor key
             CorrelationId = msg.SensorKey,
         };
         await typed.Save(FlowSets.StageShort(FlowSets.Intake));

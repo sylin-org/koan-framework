@@ -58,4 +58,15 @@ public static class Constants
         public const string System = "system";
         public const string Adapter = "adapter";
     }
+
+    // Reserved prefixes and keys used inside intake payload dictionaries ("bag")
+    public static class Reserved
+    {
+        // Prefix for external identifiers provided by adapters, e.g., "identifier.external.deviceId"
+        public const string IdentifierExternalPrefix = "identifier.external.";
+        // Prefix for parent/related references, e.g., "reference.device", "reference.ulid"
+        public const string ReferencePrefix = "reference.";
+        // Prefix for model payload scoping, e.g., "model.temperature.celsius"
+        public const string ModelPrefix = "model.";
+    }
 }

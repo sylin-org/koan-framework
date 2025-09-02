@@ -1,10 +1,14 @@
-﻿using Sora.Flow.Attributes;
+﻿using System.ComponentModel.DataAnnotations;
+using Sora.Flow.Attributes;
 using Sora.Flow.Model;
 
 namespace S8.Flow.Shared;
 
 public sealed class Device : FlowEntity<Device>
 {
+    [Key]
+    public string DeviceId { get; set; } = default!;
+
     [AggregationTag(Keys.Device.Inventory)]
     public string Inventory { get; set; } = default!;
 

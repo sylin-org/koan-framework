@@ -64,8 +64,14 @@
       Sora__Messaging__Buses__default__ProvisionOnStart: "true"
       Sora__Messaging__DefaultBus: default
       Sora__Messaging__DefaultGroup: flow
+      # Data provider: use Mongo inside the compose network
+      ConnectionStrings__Default: mongodb://mongo:27017
+      Sora__Data__Mongo__Database: s8
+      Sora__Data__DefaultProvider: mongo
       DOTNET_ENVIRONMENT: Development
     depends_on:
+      mongo:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     command: ["dotnet", "S8.Flow.Adapters.Bms.dll"]
@@ -80,8 +86,14 @@
       Sora__Messaging__Buses__default__ProvisionOnStart: "true"
       Sora__Messaging__DefaultBus: default
       Sora__Messaging__DefaultGroup: flow
+      # Data provider: use Mongo inside the compose network
+      ConnectionStrings__Default: mongodb://mongo:27017
+      Sora__Data__Mongo__Database: s8
+      Sora__Data__DefaultProvider: mongo
       DOTNET_ENVIRONMENT: Development
     depends_on:
+      mongo:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     command: ["dotnet", "S8.Flow.Adapters.Oem.dll"]

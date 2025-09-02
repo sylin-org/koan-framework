@@ -29,12 +29,12 @@ This project houses the provider-neutral Flow core: options, entities, DI wiring
 Identity map
 - Entity: `IdentityLink<TModel>` with fields (Id, System, Adapter, ExternalId, ReferenceId, Provisional, CreatedAt, ExpiresAt)
 - Id format: `"{system}|{adapter}|{externalId}"` for O(1) lookups across providers
-- External-id keys are discovered from `[EntityLink(typeof(Model), LinkKind.ExternalId)]` properties across loaded assemblies (no hardcoded names)
+- External-id keys are provided via reserved bag entries: `identifier.external.{source}`. Attribute-based discovery is deprecated.
 - Resolution in association first tries IdentityLink; if missing, issues a canonical ULID and creates a provisional link to that ULID, then returns the ULID as ReferenceId
 - Provisional links get a soft TTL (ExpiresAt ~ now + 2 days) and are purged by the Flow purge worker when expired
 
 Envelope keys
-- Common envelope keys used in intake payloads: `system`, `adapter` (Constants.Envelope). External-id fields must be present using the exact property names marked with `[EntityLink(..., ExternalId)]` for the target model.
+- Common envelope keys used in intake payloads: `system`, `adapter` (Constants.Envelope). External-id values should be provided under reserved keys `identifier.external.{source}` for the target model.
 
 ## Projection reducer
 - Canonical view: tag -> unique values[]

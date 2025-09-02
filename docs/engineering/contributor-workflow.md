@@ -29,7 +29,9 @@ ADR notes
 
 ## 4) Build locally
 - Build code and tests via VS Code task: build (dotnet)
-- Docs site generation has been removed from this repository.
+- Build docs:
+  - VS Code task: docs:build
+  - Serve locally: docs:serve (port 8080 by default)
 
 ## 5) PR Checklist
 - [ ] Routes are in controllers only

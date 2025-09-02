@@ -40,7 +40,7 @@ Demonstrates rejection when data lacks configured aggregation keys:
 
 ### Analytics
 
-- `GET /api/analytics/customer-360/{referenceId}` - Get unified customer view
+- `GET /api/analytics/customer-360/{referenceUlid}` - Get unified customer view
 - `GET /api/analytics/pipeline-stats` - Flow pipeline health metrics
 - `GET /api/analytics/rejections` - Rejection analysis for debugging
 
@@ -77,9 +77,9 @@ Demonstrates rejection when data lacks configured aggregation keys:
    curl http://localhost:5000/api/analytics/pipeline-stats
    ```
 
-5. **View customer 360** (use referenceId from KeyIndex):
+5. **View customer 360** (use ULID from `ReferenceItem.Id`, aka ReferenceUlid):
    ```bash
-   curl http://localhost:5000/api/analytics/customer-360/{referenceId}
+   curl http://localhost:5000/api/analytics/customer-360/{referenceUlid}
    ```
 
 ## Configuration

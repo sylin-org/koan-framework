@@ -2,7 +2,7 @@
 
 Welcome to the Sora Framework API reference. This site includes:
 
-- Reference docs curated from C# APIs and conventions (see Reference).
+- Reference docs generated from C# XML comments (see Reference).
 - A map of assemblies and what they provide (Core, Data, Messaging, Web).
 - HTTP API conventions (endpoints, filtering, paging headers, well-known routes).
 - Instructions to generate OpenAPI specs for your Sora-based APIs.

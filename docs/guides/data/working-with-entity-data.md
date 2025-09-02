@@ -265,3 +265,220 @@ All APIs shown accept an optional CancellationToken as the last parameter (e.g.,
 See Engineering front door and Reference/Data Access for setup.
 - 15-entity-filtering-and-query.md for full filter language details
 - docs/decisions for ADRs 0029 (filter language), 0030 (sets), 0031 (ignoreCase)
+
+
+## Flow: parent relationships and ingestion without canonical IDs
+
+Adapters do not know canonical ULIDs. Declare canonical relationships on models with `[ParentKey]` and let the ingestion resolver fill them using external IDs provided in envelopes or normalized bags. See ADR [FLOW-0105](../../decisions/FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md).
+
+### Declare Parent Relationships
+
+Mark parent properties with `[ParentKey]` so the resolver can bind canonical references:
+
+```csharp
+// Example: Sensor → Device parent relationship
+public sealed class Sensor : FlowEntity<Sensor>
+{
+    // Canonical Device ULID (filled by the resolver)
+    [ParentKey]
+    public string DeviceId { get; set; } = default!;
+
+    [AggregationTag(Keys.Sensor.Key)]
+    public string SensorKey { get; set; } = default!;
+
+    public string Code { get; set; } = default!;
+    public string Unit { get; set; } = default!;
+}
+```
+
+Adapters do not set `DeviceId`. The ingestion pipeline resolves it using external IDs.
+
+### Strong-Typed Ingestion (Envelope External IDs)
+
+Send strong-typed models in bulk and attach external IDs inline with each item. The envelope carries adapter identity automatically.
+
+```csharp
+// Adapter code (example)
+var batch = new[]
+{
+    FlowSendItem.Of(
+        new Device { Inventory = "INV-123", Serial = "SN-ABC", Manufacturer = "Hitachi", Model = "X1000", Kind = "PLC", Code = "DEV-01" },
+        new Dictionary<string,string> { [ExternalSystems.Oem] = "OEM-00001" }),
+
+    FlowSendItem.Of(
+        new Sensor { SensorKey = "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
+        // Include parent’s external ID to enable resolver to fill Sensor.DeviceId
+        new Dictionary<string,string> { ["oem-device"] = "OEM-00001", ["oem-sensor"] = "S-00987" })
+};
+
+// Bulk send; entities remain canonical-only
+await _sender.SendBatchAsync(batch, ct);
+```
+
+### Contractless ingestion (plain bag, server-stamped)
+
+Prefer sending a simple dictionary bag per item; the server stamps adapter identity and resolves external IDs.
+
+```csharp
+var items = new[]
+{
+    // Device
+    FlowSendPlainItem.Of<Device>(
+        bag: new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Keys.Device.Inventory] = "INV-123",
+            [Keys.Device.Serial] = "SN-ABC",
+            [Keys.Device.Manufacturer] = "Hitachi",
+            [Keys.Device.Model] = "X1000",
+            [Keys.Device.Kind] = "PLC",
+            [Keys.Device.Code] = "DEV-01",
+            // External/native IDs (identifier.external.*)
+            [$"{Constants.Reserved.IdentifierExternal}.oem"] = "OEM-00001",
+        },
+        sourceId: "events",
+        occurredAt: DateTimeOffset.UtcNow),
+
+    // Sensor referencing Device via the same external OEM id
+    FlowSendPlainItem.Of<Sensor>(
+        bag: new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Keys.Sensor.Key] = "INV-123::SN-ABC::TEMP",
+            [Keys.Sensor.Code] = "TEMP",
+            [Keys.Sensor.Unit] = "C",
+            [$"{Constants.Reserved.Reference}.device"] = new Dictionary<string, object?>
+            {
+                ["oem"] = "OEM-00001"
+            },
+            [$"{Constants.Reserved.IdentifierExternal}.oem-sensor"] = "S-00987",
+        },
+        sourceId: "events",
+        occurredAt: DateTimeOffset.UtcNow)
+};
+
+await _sender.SendAsync(items, ct: ct);
+```
+
+Notes:
+- Do not stamp adapter identity in the bag; the ingestion API stamps it based on the host/envelope.
+- For large batches, pass IEnumerable<FlowSendPlainItem> to stream or page as needed.
+
+### Resolution and Persistence
+
+- External IDs are indexed as `(entityKey, system, externalId) -> canonicalId`.
+- Before persistence, the resolver:
+  - Fills `[ParentKey]` properties with canonical IDs.
+  - Maps normalized bag fields to model properties.
+  - Preserves envelope metadata for audit.
+
+### Notes
+
+- Use centralized constants for systems and reserved keys (see ARCH-0040).
+- For large reads of canonical data later, use streaming or paging.
+
+This section shows how to declare canonical relationships and how adapters submit data without knowing canonical IDs. See ADR [FLOW-0105](../../decisions/FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md).
+
+### Declare Parent Relationships
+
+Mark parent properties with `[ParentKey]` so the resolver can bind canonical references:
+
+```csharp
+// Example: Sensor → Device parent relationship
+public sealed class Sensor : FlowEntity<Sensor>
+{
+    // Canonical Device ULID (filled by the resolver)
+    [ParentKey(Keys.Device.Key)]
+    public string DeviceId { get; set; } = default!;
+
+    [AggregationTag(Keys.Sensor.Key)]
+    public string SensorKey { get; set; } = default!;
+
+    public string Code { get; set; } = default!;
+    public string Unit { get; set; } = default!;
+}
+```
+
+Adapters do not set `DeviceId`. The ingestion pipeline resolves it using external IDs.
+
+### Strong-Typed Ingestion (Envelope External IDs)
+
+Send strong-typed models in bulk and attach external IDs inline with each item. The envelope carries adapter identity automatically.
+
+```csharp
+// Adapter code (example)
+var batch = new[]
+{
+    FlowSendItem.Of(
+        new Device { Inventory = "INV-123", Serial = "SN-ABC", Manufacturer = "Hitachi", Model = "X1000", Kind = "PLC", Code = "DEV-01" },
+        new Dictionary<string,string> { [ExternalSystems.Oem] = "OEM-00001" }),
+
+    FlowSendItem.Of(
+        new Sensor { SensorKey = "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
+        // Include parent’s external ID to enable resolver to fill Sensor.DeviceId
+        new Dictionary<string,string> { ["oem-device"] = "OEM-00001", ["oem-sensor"] = "S-00987" })
+};
+
+// Bulk send; entities remain canonical-only
+await _sender.SendBatchAsync(batch, ct);
+```
+
+### Contractless ingestion (plain bag, server-stamped)
+
+Prefer sending a simple dictionary bag per item; the server stamps adapter identity and resolves external IDs.
+
+```csharp
+var items = new[]
+{
+    FlowSendPlainItem.Of<Device>(
+        new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Keys.Device.Inventory] = "INV-123",
+            [Keys.Device.Serial] = "SN-ABC",
+            [Keys.Device.Manufacturer] = "Hitachi",
+            [Keys.Device.Model] = "X1000",
+            [Keys.Device.Kind] = "PLC",
+            [Keys.Device.Code] = "DEV-01",
+            [$"{Constants.Reserved.IdentifierExternal}.oem"] = "OEM-00001",
+        },
+        sourceId: "events",
+        occurredAt: DateTimeOffset.UtcNow),
+
+    FlowSendPlainItem.Of<Sensor>(
+        new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Keys.Sensor.Key] = "INV-123::SN-ABC::TEMP",
+            [Keys.Sensor.Code] = "TEMP",
+            [Keys.Sensor.Unit] = "C",
+            [$"{Constants.Reserved.Reference}.device"] = new Dictionary<string, object?> { ["oem"] = "OEM-00001" },
+            [$"{Constants.Reserved.IdentifierExternal}.oem-sensor"] = "S-00987",
+        },
+        sourceId: "events",
+        occurredAt: DateTimeOffset.UtcNow)
+};
+
+await _sender.SendAsync(items, ct: ct);
+```
+
+Tip: For quick paths, call Send() directly on entities:
+
+```csharp
+await new Device { Inventory = "INV-123", Serial = "SN-ABC", Manufacturer = "Hitachi", Model = "X1000", Kind = "PLC", Code = "DEV-01" }
+    .Send(sourceId: "events", occurredAt: DateTimeOffset.UtcNow, ct: ct);
+
+await new[]
+{
+    new Sensor { SensorKey = "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" }
+}.Send(sourceId: "events", occurredAt: DateTimeOffset.UtcNow, ct: ct);
+```
+
+### Resolution and Persistence
+
+- External IDs are indexed as `(entityKey, system, externalId) -> canonicalId`.
+- Before persistence, the resolver:
+  - Fills `[ParentKey]` properties with canonical IDs.
+  - Maps normalized bag fields to model properties.
+  - Preserves envelope metadata for audit.
+
+### Notes
+
+- Use centralized constants for systems and reserved keys (see ARCH-0040).
+- For large reads of canonical data later, use streaming or paging.

@@ -42,9 +42,8 @@ public static class FlowRegistry
     }
 
     /// <summary>
-    /// If the provided type is a Flow value-object, returns its parent Flow entity type and the parent key path
-    /// used for association (extracted from either [ParentKey] attribute or matching property name in payload).
-    /// Returns null when the type is not recognized as a VO or metadata is missing.
+    /// Returns the parent Flow entity type and key path for a value-object type (deriving from <see cref="Sora.Flow.Model.FlowValueObject{T}"/>),
+    /// based on the first [ParentKey(parent: ...)] property found. Returns null if not applicable.
     /// </summary>
     public static (Type Parent, string ParentKeyPath)? GetValueObjectParent(Type t)
     {
@@ -52,68 +51,26 @@ public static class FlowRegistry
         {
             var bt = type.BaseType;
             if (bt is null || !bt.IsGenericType || bt.GetGenericTypeDefinition() != typeof(FlowValueObject<>)) return null;
-            var voAttr = type.GetCustomAttribute<FlowValueObjectAttribute>();
-            if (voAttr is null || voAttr.Parent is null) return null;
-            // Determine parent key path: first [ParentKey] payload path if present, else fall back to a property named like the attribute target
-            string? path = null;
-            PropertyInfo? targetProp = null;
+            // Determine parent via first [ParentKey(parent: ...)]
             foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
                 var pk = p.GetCustomAttribute<ParentKeyAttribute>(inherit: true);
-                if (pk is not null)
-                {
-                    targetProp = p;
-                    path = string.IsNullOrWhiteSpace(pk.PayloadPath) ? p.Name : pk.PayloadPath;
-                    break;
-                }
+                if (pk is null || pk.Parent is null) continue;
+                var path = string.IsNullOrWhiteSpace(pk.PayloadPath) ? p.Name : pk.PayloadPath;
+                if (string.IsNullOrWhiteSpace(path)) continue;
+                return (pk.Parent, path);
             }
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                // Best-effort: look for a common property name
-                targetProp = type.GetProperty("SensorKey") ?? type.GetProperty("ParentKey") ?? type.GetProperty("Key");
-                path = targetProp?.Name;
-            }
-            if (string.IsNullOrWhiteSpace(path)) return null;
-            return (voAttr.Parent, path!);
+            return null;
         });
     }
 
     /// <summary>
-    /// Discover external-id property names from [EntityLink(typeof(TModel), LinkKind.ExternalId)]
-    /// across all loaded assemblies. Returned names are distinct and case-insensitive.
+    /// External-id property discovery via attributes is deprecated. Reserved keys (identifier.external.*) are used.
     /// </summary>
     public static string[] GetExternalIdKeys(Type modelType)
     {
-        return s_externalIdProps.GetOrAdd(modelType, static mt =>
-        {
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (var asm in assemblies)
-            {
-                Type?[] types;
-                try { types = asm.GetTypes(); }
-                catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
-                catch { continue; }
-                foreach (var t in types)
-                {
-                    if (t is null || !t.IsClass || t.IsAbstract) continue;
-                    var props = t.GetProperties(BindingFlags.Instance | BindingFlags.Public);
-                    foreach (var p in props)
-                    {
-                        var links = p.GetCustomAttributes<EntityLinkAttribute>(inherit: true);
-                        foreach (var link in links)
-                        {
-                            if (link is null) continue;
-                            if (link.Kind != LinkKind.ExternalId) continue;
-                            if (link.FlowEntityType != mt) continue;
-                            if (!string.IsNullOrWhiteSpace(p.Name)) names.Add(p.Name);
-                        }
-                    }
-                }
-            }
-            // Stable ordering for predictability
-            return names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToArray();
-        });
+        // vNext: rely on reserved identifier.external.* keys; explicit [EntityLink] is removed.
+        return s_externalIdProps.GetOrAdd(modelType, static _ => Array.Empty<string>());
     }
 
     public static Type? ResolveModel(string name)

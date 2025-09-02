@@ -4,8 +4,7 @@ namespace S8.Flow.Shared;
 
 public sealed class TelemetryEvent
 {
-    // External identity of the Sensor; mapping uses envelope system/adapter.
-    [EntityLink(typeof(Sensor), LinkKind.ExternalId)]
+    // External identity of the Sensor; mapping uses envelope system/adapter and reserved identifier.external.* keys.
     public required string SensorExternalId { get; init; }
 
     public required string Unit { get; init; }
@@ -43,7 +42,7 @@ public sealed class TelemetryEvent
             // External reference for indexing and late joins when needed
             ["system"] = System,
             ["adapter"] = Adapter,
-            ["sensorExternalId"] = SensorExternalId,
+            [$"{Sora.Flow.Infrastructure.Constants.Reserved.IdentifierExternalPrefix}sensor"] = SensorExternalId,
 
             // Reading core
             [Keys.Sensor.Unit] = Unit,

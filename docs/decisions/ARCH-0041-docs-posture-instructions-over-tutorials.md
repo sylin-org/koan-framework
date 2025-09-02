@@ -20,7 +20,7 @@ Sora’s documentation was a mix of conceptual references, engineering guidance,
   - Remove tutorial- and course-aligned docs (quickstarts, “getting started,” step-by-step courses, capstones).
   - Prefer runnable, minimal examples embedded in reference/guides over multi-part tutorials.
 - Enforce posture in the build:
-  - Historical note: we previously excluded tutorial paths in DocFX (`docs/api/docfx.json`). Doc generation has since been removed from this repo.
+  - Exclude tutorial paths in DocFX (`docs/api/docfx.json`) so they don’t publish even if present locally.
   - Keep Strict docs builds as a gate; broken links to removed content must be eliminated before merge.
 - Centralize adapter capabilities in a single YAML source and generate the matrix at build time; link to it from relevant references instead of duplicating.
 - Keep “front doors” prominent and canonical:
@@ -46,7 +46,7 @@ Sora’s documentation was a mix of conceptual references, engineering guidance,
   - `docs/guides/core/getting-started.md`, `docs/guides/core/cqrs-for-humans.md`
   - `docs/guides/messaging/messaging-getting-started.md`, `docs/guides/messaging/messaging-how-to.md`
 - Scrubbed inbound references in pages and ADRs; updated guidance to point to Reference/Decisions.
-- Historical: Hardened DocFX content excludes in `docs/api/docfx.json` (doc generation now removed).
+- Hardened DocFX content excludes in `docs/api/docfx.json` to skip the above paths.
 - Validated Strict builds end-to-end.
 
 ## Follow-ups
@@ -59,5 +59,5 @@ Sora’s documentation was a mix of conceptual references, engineering guidance,
 - Engineering front door: `docs/engineering/index.md`
 - Architecture principles: `docs/architecture/principles.md`
 - Copilot entrypoint: `.github/copilot-instructions.md`
-- DocFX config (historical): `docs/api/docfx.json` (removed)
+- DocFX config: `docs/api/docfx.json`
 - Adapter matrix source: `docs/reference/_data/adapters.yml`

@@ -1,6 +1,6 @@
 ﻿# Sora.Flow — Model-typed pipeline (ingest → standardize → key → associate → project)
 
-Contract (at a glance) — see also: [Bindings and canonical IDs](./flow-bindings-and-canonical-ids.md)
+Contract (at a glance) — see also: [Bindings and canonical IDs](./flow-bindings-and-canonical-ids.md) and ADR [FLOW-0105](../decisions/FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md)
 - Inputs: Normalized deltas (patch-like) per model over HTTP/MQ; options under Sora:Flow.
 - Outputs: Per-model canonical projections and lineage; processed hot-stage records; diagnostics.
 - Error modes: Rejections with reason/evidence; DLQs; readiness/health.
@@ -54,6 +54,26 @@ Examples (snippets)
 
 See also
 
+Direct send ergonomics and normalized ingestion
+- Send entities directly: `await entity.Send(sourceId, occurredAt)` or `await entities.Send(sourceId, occurredAt)`; this builds a normalized bag internally and the server stamps adapter identity.
+- If the publisher class is annotated with `[FlowAdapter(System, Adapter, DefaultSource = "...")]`, you may omit `sourceId`; the sender infers it from `DefaultSource` and passes the host type for stamping.
+- Plain-bag ingestion: `FlowSendPlainItem.Of<TModel>(bag, sourceId, occurredAt)` with reserved prefixes (`identifier.external.*`, `reference.*`, `model.*`). Avoid client-side stamping.
+
+## Reserved envelope and bag keys (adapter identity and external IDs)
+
+Per FLOW-0105, adapters do not set canonical IDs. Instead, the sender/runtime stamps adapter identity and accepts external IDs in envelopes and normalized bags:
+
+- Envelope metadata keys
+  - `adapter.system` — stamped from `[FlowAdapter(system, adapter)]` on the publisher.
+  - `adapter.name` — adapter variant.
+  - `identifier.external.<system>` — one or more external/native IDs attached to the message.
+
+- Normalized bag reserved keys
+  - `model` — canonical entity key (e.g., `Keys.Device.Key`).
+  - `reference.<entityKey>.external.<system>` — external ID for a referenced canonical entity (used to resolve `[ParentKey]`).
+
+The ingestion resolver maintains an ExternalId index `(entityKey, system, externalId) -> canonicalId` and fills `[ParentKey]` properties before persistence. See FLOW-0105 for error modes and policies.
+
 ## Running with Dapr (notes)
 
 - Canonical: Nested range → values object aligned to root snapshot. Each leaf path expands from dotted tags into nested objects and stores value arrays preserving insertion order (diagnostics-first; not a materialized single value).
@@ -102,7 +122,7 @@ Monitor (business rules)
 
 Adapter metadata
 - `[FlowAdapter(System, Adapter, DefaultSource, Policies[], Capabilities)]` decorates adapter hosts.
-- Auto-enriches intake payloads with `system`, `adapter`, and default `source`.
+- Auto-enriches intake payloads with `system`, `adapter` and enables default `source` inference for `Send()` calls.
 
 Actions
 - `IFlowActions` to send; adapters reply with `FlowAck`/`FlowReport`.

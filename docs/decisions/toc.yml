@@ -152,8 +152,10 @@
        href: FLOW-0102-identity-map-provisional-and-aliasing.md
      - name: Flow DX toolkit — controllers, monitor, adapter metadata, actions
        href: FLOW-0103-flow-dx-toolkit-controllers-monitor-adapter.md
-      - name: ULID primary id with CanonicalId (business key)
-        href: FLOW-0104-ulid-primary-id-and-canonical-id.md
+     - name: ULID primary id with CanonicalId (business key)
+       href: FLOW-0104-ulid-primary-id-and-canonical-id.md
+     - name: External ID translation, adapter identity, and normalized payload ingestion
+       href: FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md
  - name: Storage (STOR)
    items:
      - name: Storage module and contracts
