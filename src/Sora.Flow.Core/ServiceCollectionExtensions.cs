@@ -109,7 +109,8 @@ public static class ServiceCollectionExtensions
             if (def == typeof(Sora.Flow.Model.ReferenceItem<>)) return modelFull + "#flow.reference";
             if (def == typeof(Sora.Flow.Model.ProjectionTask<>)) return modelFull + "#flow.tasks";
             if (def == typeof(Sora.Flow.Model.PolicyState<>)) return modelFull + "#flow.policies";
-            if (def == typeof(Sora.Flow.Model.DynamicFlowEntity<>)) return modelFull + "#flow.root";
+            // Root container should be just the model name (no suffix)
+            if (def == typeof(Sora.Flow.Model.DynamicFlowEntity<>)) return modelFull;
 
             // Stage/View docs (set suffix appended via DataSetContext -> StorageNameRegistry)
             if (def == typeof(Sora.Flow.Model.StageRecord<>)) return modelFull;
