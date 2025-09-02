@@ -72,7 +72,9 @@ public static class FlowActionsRegistration
 {
     public static IServiceCollection AddFlowActions(this IServiceCollection services)
     {
-        services.TryAddSingleton<IFlowActions, FlowActionsSender>();
+    services.TryAddSingleton<IFlowActions, FlowActionsSender>();
+    // Register the default action handler so adapters can send FlowAction seeds without custom wiring
+    services.TryAddSingleton<IMessageHandler<FlowAction>, FlowActionHandler>();
         return services;
     }
 }
