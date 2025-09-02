@@ -74,6 +74,7 @@ Examples (snippets)
   - public sealed class Device : FlowEntity<Device> { [AggregationTag("inventory.serial")] public string Serial { get; set; } = default!; }
   - await new DynamicFlowEntity<Device> { Id = "dev:123", Model = fromAdapter }.Save(FlowSets.Stage<Device>("intake"), ct);
   - using (DataSetContext.With(FlowSets.View<Device>("canonical"))) { var page = await CanonicalProjection<Device>.FirstPage(50, ct); }
+  - Build normalized events consistently for entities and VOs: `FlowEvent.For<Device>()` or `FlowEvent.For<Reading>()`
 
 See also
 

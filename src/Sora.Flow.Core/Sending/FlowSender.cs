@@ -28,6 +28,21 @@ public class FlowEvent
     public static FlowEvent ForModel(string model)
         => new FlowEvent { Model = model };
 
+    // Unified factory for FlowEntity<T> and FlowValueObject<T> types.
+    // Resolves the model name via FlowRegistry, so callers can simply write: FlowEvent.For<Device>() or FlowEvent.For<Reading>()
+    public static FlowEvent For<T>()
+        => For(typeof(T));
+
+    // Non-generic counterpart
+    public static FlowEvent For(Type type)
+    {
+        if (type is null) throw new ArgumentNullException(nameof(type));
+        var name = FlowRegistry.GetModelName(type);
+        // Fallback to simple type name if registry has no mapping (defensive)
+        if (string.IsNullOrWhiteSpace(name)) name = type.Name;
+        return new FlowEvent { Model = name };
+    }
+
     public FlowEvent With(string path, object? value)
     { Bag[path] = value; return this; }
 
