@@ -58,6 +58,8 @@ public sealed class OemPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+    // Ensure data provider is reachable before initial seed
+    await WaitForDataAsync(stoppingToken);
     // Initial bulk seed on startup
     await SeedAllAsync(stoppingToken);
 
@@ -129,5 +131,32 @@ public sealed class OemPublisher : BackgroundService
         foreach (var d in SampleProfiles.Fleet)
             foreach (var s in SampleProfiles.SensorsForOem(d))
                 await s.Send(ct: ct);
+    }
+
+    // Probe the data provider by performing a tiny paged read; retry until success or cancellation
+    private static async Task WaitForDataAsync(CancellationToken ct)
+    {
+        var attempt = 0;
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                var recType = typeof(Sora.Flow.Model.StageRecord<>).MakeGenericType(typeof(Device));
+                var dataType = typeof(Sora.Data.Core.Data<,>).MakeGenericType(recType, typeof(string));
+                var firstPage = dataType.GetMethod("FirstPage", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
+                using (Sora.Data.Core.DataSetContext.With(Sora.Flow.Infrastructure.FlowSets.StageShort(Sora.Flow.Infrastructure.FlowSets.Intake)))
+                {
+                    var t = (Task)firstPage.Invoke(null, new object?[] { 1, ct })!;
+                    await t.ConfigureAwait(false);
+                }
+                return;
+            }
+            catch
+            {
+                attempt++;
+                var delay = TimeSpan.FromSeconds(Math.Min(10, 0.5 + attempt * 0.5));
+                try { await Task.Delay(delay, ct); } catch (TaskCanceledException) { }
+            }
+        }
     }
 }
