@@ -180,9 +180,22 @@ public static class FlowSenderRegistration
 {
     public static IServiceCollection AddFlowSender(this IServiceCollection services)
     {
-    services.TryAddSingleton<IFlowSender, FlowSender>();
-    // Also register the FlowEvent handler (only orchestrator processes will consume, producers won’t run consumers)
-    services.TryAddSingleton<Sora.Messaging.IMessageHandler<FlowEvent>, FlowEventHandler>();
+        // Register the real sender as an internal type
+        services.TryAddSingleton<FlowSender>();
+        // Register a singleton readiness lifecycle
+    services.TryAddSingleton<Sora.Flow.Sending.MessagingReadinessLifecycle>();
+    // Bridge AppDomain readiness flags (set by messaging orchestrator) to lifecycle
+    services.AddHostedService<Sora.Flow.Sending.MessagingReadinessBridgeHostedService>();
+        // Register the buffered sender as the public IFlowSender
+        services.AddSingleton<IFlowSender>(sp =>
+        {
+            var inner = sp.GetRequiredService<FlowSender>();
+            var log = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Sora.Flow.Sending.BufferedFlowSender>>();
+            var lifecycle = sp.GetRequiredService<Sora.Flow.Sending.MessagingReadinessLifecycle>();
+            return new BufferedFlowSender(inner, log, 32_000, lifecycle);
+        });
+        // Also register the FlowEvent handler (only orchestrator processes will consume, producers won’t run consumers)
+        services.TryAddSingleton<Sora.Messaging.IMessageHandler<FlowEvent>, FlowEventHandler>();
         return services;
     }
 }

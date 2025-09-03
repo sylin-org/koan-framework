@@ -15,6 +15,7 @@ using Sora.Data.Core; // AddSora()
 
 var builder = Host.CreateApplicationBuilder(args);
 
+
 if (!Sora.Core.SoraEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Flow.Adapters.Oem is container-only. Use samples/S8.Compose/docker-compose.yml.");
@@ -41,10 +42,9 @@ public sealed class OemPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-    // Example: react to simple control commands sent via VO
-    // In a real app, this would be wired via OnMessages in a host that runs consumers for OEM; here we just sketch the intent.
-    _ = stoppingToken; // placeholder to avoid warnings in sample
+        _log.LogInformation("[OEM] Starting ExecuteAsync");
         // Initial bulk seed on startup via MQ (resilient to broker warm-up)
+        _log.LogInformation("[OEM] Seeding catalog with {DeviceCount} devices", SampleProfiles.Fleet.Length);
         await AdapterSeeding.SeedCatalogWithRetryAsync(
             FlowSampleConstants.Sources.Oem,
             SampleProfiles.Fleet,
@@ -60,6 +60,7 @@ public sealed class OemPublisher : BackgroundService
             {
                 var idx = rng.Next(0, SampleProfiles.Fleet.Length);
                 var d = SampleProfiles.Fleet[idx];
+                _log.LogDebug("[OEM] Preparing to announce Device {DeviceId}", d.DeviceId);
                 var code = rng.Next(0, 2) == 0 ? SensorCodes.PWR : SensorCodes.COOLANT_PRESSURE;
                 var unit = code == SensorCodes.PWR ? Units.Watt : Units.KPa;
                 var value = code == SensorCodes.PWR ? Math.Round(100 + rng.NextDouble() * 900, 2) : Math.Round(200 + rng.NextDouble() * 50, 2);
@@ -83,11 +84,13 @@ public sealed class OemPublisher : BackgroundService
                     devEvent.SourceId = FlowSampleConstants.Sources.Oem;
                     devEvent.CorrelationId = oemDeviceId;
                     foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
+                    _log.LogDebug("[OEM] Sending device event for {DeviceId}", d.DeviceId);
                     await devEvent.Send(stoppingToken);
 
                     // Seed sensors via FlowEvent (pure MQ)
                     foreach (var s in SampleProfiles.SensorsForOem(d))
                     {
+                        _log.LogDebug("[OEM] Sending sensor event for {SensorKey}", s.SensorKey);
                         var sensorEvent = FlowEvent.ForModel("sensor")
                             .With(Keys.Sensor.Key, s.SensorKey)
                             .With("DeviceId", s.DeviceId)
@@ -99,7 +102,7 @@ public sealed class OemPublisher : BackgroundService
                         await sensorEvent.Send(stoppingToken);
                     }
                     lastAnnounce = DateTimeOffset.UtcNow;
-                    _log.LogInformation("OEM announced Device {Inv}/{Serial} and OEM sensors", d.Inventory, d.Serial);
+                    _log.LogInformation("[OEM] Announced Device {Inv}/{Serial} and Sensors", d.Inventory, d.Serial);
                 }
 
                 // Slim reading VO

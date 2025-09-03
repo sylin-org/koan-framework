@@ -17,6 +17,10 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
     private readonly IOptions<Sora.Messaging.MessagingOptions> _msgOpts;
 
     private const string FlagKey = "Sora.Messaging.Provisioning.Orchestrated";
+    private const string ReadyFlag = "Sora.Messaging.Ready";
+    private const string PendingFlag = "Sora.Messaging.Readiness.Pending";
+
+    private enum OrchestrateResult { Completed, PendingProvider, NoPlanner }
 
     public TopologyOrchestratorHostedService(IServiceProvider sp, IOptions<Sora.Messaging.MessagingOptions> msgOpts, ILogger<TopologyOrchestratorHostedService>? logger = null)
     {
@@ -31,20 +35,64 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
         if (AppDomain.CurrentDomain.GetData(FlagKey) is bool b && b)
             return Task.CompletedTask;
 
+        OrchestrateResult result;
         try
         {
-            Orchestrate();
-            AppDomain.CurrentDomain.SetData(FlagKey, true);
+            result = Orchestrate();
+            if (result == OrchestrateResult.Completed)
+            {
+                AppDomain.CurrentDomain.SetData(FlagKey, true);
+            }
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Messaging topology orchestration failed");
-            // For production safety we swallow to not block app unless desired; could be configurable later.
+            _logger?.LogError(ex, "Messaging topology orchestration failed (initial attempt)");
+            return Task.CompletedTask; // swallow – app can still run with buffering
+        }
+
+        if (result == OrchestrateResult.PendingProvider && !cancellationToken.IsCancellationRequested)
+        {
+            // Fire-and-forget retry loop (deferred provisioning once provider options become available)
+            _ = Task.Run(() => RetryLoopAsync(cancellationToken));
         }
         return Task.CompletedTask;
     }
 
-    private void Orchestrate()
+    private async Task RetryLoopAsync(CancellationToken ct)
+    {
+        const int maxAttempts = 20; // ~ (5*2s + 15*5s) == 85s worst case
+        for (var attempt = 1; attempt <= maxAttempts && !ct.IsCancellationRequested; attempt++)
+        {
+            if (AppDomain.CurrentDomain.GetData(FlagKey) is bool done && done) return; // another instance completed
+            var delay = attempt <= 5 ? TimeSpan.FromSeconds(2) : TimeSpan.FromSeconds(5);
+            try
+            {
+                var result = Orchestrate();
+                if (result == OrchestrateResult.Completed)
+                {
+                    AppDomain.CurrentDomain.SetData(FlagKey, true);
+                    _logger?.LogInformation("[messaging.provision] deferred provisioning succeeded attempt={Attempt}", attempt);
+                    return;
+                }
+                if (result == OrchestrateResult.NoPlanner)
+                {
+                    // Nothing to do – abort loop.
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "[messaging.provision] retry attempt failed (attempt={Attempt})", attempt);
+            }
+            try { await Task.Delay(delay, ct).ConfigureAwait(false); } catch { return; }
+        }
+        if (!(AppDomain.CurrentDomain.GetData(ReadyFlag) is bool r && r))
+        {
+            _logger?.LogWarning("[messaging.provision] deferred provisioning exhausted attempts without readiness");
+        }
+    }
+
+    private OrchestrateResult Orchestrate()
     {
         var msgOpts = _msgOpts.Value;
         // Determine mode: env override > implicit (prod=Off else CreateIfMissing)
@@ -59,12 +107,12 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
             mode = isProd ? Sora.Messaging.Provisioning.ProvisioningMode.Off : Sora.Messaging.Provisioning.ProvisioningMode.CreateIfMissing;
         }
 
-    var diag = _sp.GetService(typeof(Sora.Messaging.IMessagingDiagnostics)) as Sora.Messaging.IMessagingDiagnostics;
-    var planner = _sp.GetService(typeof(Sora.Messaging.Provisioning.ITopologyPlanner)) as Sora.Messaging.Provisioning.ITopologyPlanner;
+        var diag = _sp.GetService(typeof(Sora.Messaging.IMessagingDiagnostics)) as Sora.Messaging.IMessagingDiagnostics;
+        var planner = _sp.GetService(typeof(Sora.Messaging.Provisioning.ITopologyPlanner)) as Sora.Messaging.Provisioning.ITopologyPlanner;
         if (planner is null)
         {
             _logger?.LogDebug("No core topology planner registered; skipping orchestration");
-            return;
+            return OrchestrateResult.NoPlanner;
         }
 
         var bus = msgOpts.DefaultBus ?? "default";
@@ -87,9 +135,14 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
         // If providerOptionsForPlan is just a plain object, log and skip planning for this bus
         if (planner.GetType().FullName?.Contains("RabbitMqProvisioner") == true && providerOptionsForPlan.GetType() == typeof(object))
         {
-            _logger?.LogWarning("[messaging.provision] Skipping plan phase for bus={Bus} due to missing or invalid provider options (expected RabbitMqOptions)", bus);
-            return; // skip planning for this bus
+            if (!(AppDomain.CurrentDomain.GetData(PendingFlag) is bool p && p))
+                _logger?.LogWarning("[messaging.provision] provider options unavailable; deferring provisioning bus={Bus}", bus);
+            // Mark a soft readiness pending state so buffered senders can continue waiting
+            AppDomain.CurrentDomain.SetData(PendingFlag, true);
+            return OrchestrateResult.PendingProvider; // defer
         }
+        // Mark readiness (at least one provider options set extracted) – prior to planning so buffered senders can flush on success
+        AppDomain.CurrentDomain.SetData(ReadyFlag, true);
     _logger?.LogDebug("[messaging.provision] starting plan phase bus={Bus} mode={Mode}", msgOpts.DefaultBus ?? "default", mode);
     var sw = System.Diagnostics.Stopwatch.StartNew();
     var desired = planner.Plan(bus, msgOpts.DefaultGroup, providerOptionsForPlan, new BasicCapabilities(), _sp.GetService(typeof(Sora.Messaging.ITypeAliasRegistry)) as Sora.Messaging.ITypeAliasRegistry);
@@ -190,7 +243,7 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
                     if (string.Equals(existing, desiredHash, StringComparison.OrdinalIgnoreCase) && (diff.ExchangesToCreate.Count + diff.QueuesToCreate.Count + diff.BindingsToCreate.Count + diff.ExchangeUpdates.Count + diff.QueueUpdates.Count + diff.ExchangesToRemove.Count + diff.QueuesToRemove.Count + diff.BindingsToRemove.Count) == 0)
                     {
                         _logger?.LogInformation("[messaging.provision] plan hash unchanged and no diff; skipping diagnostics update (bus={Bus})", bus);
-                        return; // Short-circuit: nothing changed; avoid updating timestamp to signal true no-op
+                        return OrchestrateResult.Completed; // Short-circuit: nothing changed; avoid updating timestamp to signal true no-op
                     }
                 }
                 System.IO.File.WriteAllText(file, desiredHash);
@@ -231,6 +284,7 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
         );
     diag?.SetProvisioning(bus, pd);
     _logger?.LogInformation("[messaging.provision] diagnostics recorded bus={Bus} hash={Hash} planMs={PlanMs} inspectMs={InspectMs} diffMs={DiffMs} applyMs={ApplyMs}", bus, desiredHash, planMs, inspectMs, diffMs, applyMs);
+    return OrchestrateResult.Completed;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

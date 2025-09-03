@@ -16,6 +16,7 @@ using Sora.Flow;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+
 if (!Sora.Core.SoraEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Flow.Adapters.Bms is container-only. Use samples/S8.Compose/docker-compose.yml.");
@@ -43,7 +44,9 @@ public sealed class BmsPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        _log.LogInformation("[BMS] Starting ExecuteAsync");
         // Initial bulk seed on startup via MQ (resilient to broker warm-up)
+        _log.LogInformation("[BMS] Seeding catalog with {DeviceCount} devices", SampleProfiles.Fleet.Length);
         await AdapterSeeding.SeedCatalogWithRetryAsync(
             FlowSampleConstants.Sources.Bms,
             SampleProfiles.Fleet,
@@ -59,6 +62,7 @@ public sealed class BmsPublisher : BackgroundService
             {
                 var idx = rng.Next(0, SampleProfiles.Fleet.Length);
                 var d = SampleProfiles.Fleet[idx];
+                _log.LogDebug("[BMS] Preparing to announce Device {DeviceId}", d.DeviceId);
                 // Periodic independent announcements (devices + sensors)
                 if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
                 {
@@ -79,11 +83,13 @@ public sealed class BmsPublisher : BackgroundService
                     devEvent.SourceId = FlowSampleConstants.Sources.Bms;
                     devEvent.CorrelationId = bmsDeviceId;
                     foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
+                    _log.LogDebug("[BMS] Sending device event for {DeviceId}", d.DeviceId);
                     await devEvent.Send(ct);
 
                     // Seed temperature sensor via FlowEvent
                     foreach (var s in SampleProfiles.SensorsForBms(d))
                     {
+                        _log.LogDebug("[BMS] Sending sensor event for {SensorKey}", s.SensorKey);
                         var sensorEvent = FlowEvent.ForModel("sensor")
                             .With(Keys.Sensor.Key, s.SensorKey)
                             .With("DeviceId", s.DeviceId)
@@ -95,7 +101,7 @@ public sealed class BmsPublisher : BackgroundService
                         await sensorEvent.Send(ct);
                     }
                     lastAnnounce = DateTimeOffset.UtcNow;
-                    _log.LogInformation("BMS announced Device {Inv}/{Serial} and Sensor TEMP", d.Inventory, d.Serial);
+                    _log.LogInformation("[BMS] Announced Device {Inv}/{Serial} and Sensor TEMP", d.Inventory, d.Serial);
                 }
 
                 // Publish reading via FlowEvent
