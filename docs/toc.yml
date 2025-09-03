@@ -45,6 +45,11 @@
       homepage: reference/web-auth.md
     - name: Messaging
       href: reference/messaging.md
+      items:
+        - name: Primitives
+          href: reference/messaging-primitives.md
+        - name: Topology Lifecycle
+          href: reference/messaging-topology-lifecycle.md
     - name: AI
       href: reference/ai.md
     - name: Flow

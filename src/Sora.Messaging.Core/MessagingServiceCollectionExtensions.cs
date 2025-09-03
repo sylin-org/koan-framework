@@ -14,6 +14,23 @@ public static class MessagingServiceCollectionExtensions
         services.TryAddSingleton<IMessageBusSelector, MessageBusSelector>();
         services.TryAddSingleton<ITypeAliasRegistry, DefaultTypeAliasRegistry>();
         services.TryAddSingleton<IMessagingDiagnostics, MessagingDiagnostics>();
+        // Topology naming & provisioner defaults (providers can override)
+        services.TryAddSingleton<Provisioning.ITopologyNaming, DefaultTopologyNaming>();
+        services.TryAddSingleton<Provisioning.ITopologyProvisioner, NoopTopologyProvisioner>();
+    services.AddHostedService<Sora.Messaging.Provisioning.TopologyOrchestratorHostedService>();
+
+        // Register DefaultTopologyPlanner with all dependencies
+
+        services.TryAddSingleton<Provisioning.ITopologyPlanner>(sp =>
+            new Core.Provisioning.DefaultTopologyPlanner(
+                sp.GetRequiredService<Provisioning.ITopologyProvisioner>(),
+                sp.GetRequiredService<Provisioning.ITopologyNaming>(),
+                sp.GetRequiredService<ITypeAliasRegistry>(),
+                sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MessagingOptions>>()));
+
+        // Register hosted service to run planner at startup
+        services.AddHostedService<Core.Provisioning.TopologyPlannerHostedService>();
+
         return services;
     }
 }

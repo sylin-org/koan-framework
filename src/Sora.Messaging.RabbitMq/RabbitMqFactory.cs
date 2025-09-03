@@ -155,8 +155,8 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         // Determine effective provisioning default: true normally, false in Production unless Sora:AllowMagicInProduction = true
         bool isProd = false;
         try { isProd = SoraEnv.IsProduction; }
-        catch { isProd = string.Equals(Configuration.ReadFirst(null, Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment) ?? string.Empty, "Production", StringComparison.OrdinalIgnoreCase); }
-        bool allowMagic = Configuration.Read(configRoot, Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
+    catch { isProd = string.Equals(Configuration.ReadFirst(null, Sora.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment) ?? string.Empty, "Production", StringComparison.OrdinalIgnoreCase); }
+    bool allowMagic = Configuration.Read(configRoot, Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);
         // Provisioning mode selection per MESS-0028
         ProvisioningMode mode;
         if (opts.ProvisionMode.HasValue)
@@ -175,50 +175,123 @@ public sealed class RabbitMqFactory : IMessageBusFactory
             mode = ProvisioningMode.Off;
         }
 
-        // Provisioning: plan/inspect/diff/apply
+        // Skip internal provisioning if central orchestrator already ran
+        var orchestrated = AppDomain.CurrentDomain.GetData("Sora.Messaging.Provisioning.Orchestrated") is bool already && already;
+        if (orchestrated)
+        {
+            logger?.LogDebug("Skipping RabbitMQ internal provisioning (orchestrator ran)");
+            mode = ProvisioningMode.Off; // force off to signal no internal provisioning
+        }
+
+        // Provisioning: plan/inspect/diff/apply (skip entirely if orchestrated)
         var msgOptsAccessor = sp.GetService(typeof(IOptions<MessagingOptions>)) as IOptions<MessagingOptions>;
         var msgOpts = msgOptsAccessor?.Value ?? new MessagingOptions();
-        var provisioner = new RabbitMqProvisioner();
-        // Default subscription if none configured and provisioning is on; subscribe catch-all to DefaultGroup
-        if (opts.Subscriptions.Count == 0 && mode != ProvisioningMode.Off)
-        {
-            var effectiveGroup = string.IsNullOrWhiteSpace(msgOpts.DefaultGroup) ? "workers" : msgOpts.DefaultGroup;
-            opts.Subscriptions.Add(new SubscriptionOption { Name = effectiveGroup, RoutingKeys = new[] { "#" }, Dlq = true, Concurrency = 1 });
-        }
-        var desired = provisioner.Plan(busCode, msgOpts.DefaultGroup, opts, new RabbitMqCapabilities(), sp.GetService(typeof(ITypeAliasRegistry)) as ITypeAliasRegistry);
-        CurrentTopology current = new(Array.Empty<ExchangeSpec>(), Array.Empty<QueueSpec>(), Array.Empty<BindingSpec>());
-        if (mode != ProvisioningMode.Off && mode != ProvisioningMode.CreateIfMissing)
-        {
-            current = provisioner.Inspect(busCode, (connection, channel, opts));
-        }
-        var diff = provisioner.Diff(desired, current);
         var diagSvc = sp.GetService(typeof(IMessagingDiagnostics)) as IMessagingDiagnostics;
-        if (mode == ProvisioningMode.DryRun)
+        if (!orchestrated)
         {
-            // Record effective plan and provisioning diagnostics; no apply
-            var capsTmp = new RabbitMqCapabilities();
-            var planTmp = Negotiation.BuildPlan(busCode, ProviderName, capsTmp, opts.Retry, opts.Dlq, requestDelay: false);
-            diagSvc?.SetEffectivePlan(busCode, planTmp);
-            diagSvc?.SetProvisioning(busCode, new ProvisioningDiagnostics(
-                BusCode: busCode,
-                Provider: ProviderName,
-                Mode: mode,
-                Desired: desired,
-                Current: current,
-                Diff: diff,
-                Timestamp: DateTimeOffset.UtcNow));
-        }
-        else
-        {
-            provisioner.Apply(busCode, mode, diff, (connection, channel, opts));
-            diagSvc?.SetProvisioning(busCode, new ProvisioningDiagnostics(
-                BusCode: busCode,
-                Provider: ProviderName,
-                Mode: mode,
-                Desired: desired,
-                Current: current,
-                Diff: diff,
-                Timestamp: DateTimeOffset.UtcNow));
+            var provisioner = new RabbitMqProvisioner();
+            // Default subscription if none configured and provisioning is on; subscribe catch-all to DefaultGroup
+            if (opts.Subscriptions.Count == 0 && mode != ProvisioningMode.Off)
+            {
+                var effectiveGroup = string.IsNullOrWhiteSpace(msgOpts.DefaultGroup) ? "workers" : msgOpts.DefaultGroup;
+                opts.Subscriptions.Add(new SubscriptionOption { Name = effectiveGroup, RoutingKeys = new[] { "#" }, Dlq = true, Concurrency = 1 });
+            }
+            var swPlan = System.Diagnostics.Stopwatch.StartNew();
+            var desired = provisioner.Plan(busCode, msgOpts.DefaultGroup, opts, new RabbitMqCapabilities(), sp.GetService(typeof(ITypeAliasRegistry)) as ITypeAliasRegistry);
+            swPlan.Stop();
+            CurrentTopology current = new(Array.Empty<ExchangeSpec>(), Array.Empty<QueueSpec>(), Array.Empty<BindingSpec>());
+            long inspectMs = 0, diffMs = 0, applyMs = 0;
+            if (mode != ProvisioningMode.Off && mode != ProvisioningMode.CreateIfMissing)
+            {
+                var swInspect = System.Diagnostics.Stopwatch.StartNew();
+                current = provisioner.Inspect(busCode, (connection, channel, opts));
+                swInspect.Stop();
+                inspectMs = swInspect.ElapsedMilliseconds;
+            }
+            var swDiff = System.Diagnostics.Stopwatch.StartNew();
+            var diff = provisioner.Diff(desired, current);
+            swDiff.Stop();
+            diffMs = swDiff.ElapsedMilliseconds;
+            string? desiredHash;
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var ex in desired.Exchanges.OrderBy(e => e.Name)) sb.Append(ex.Name).Append('|').Append(ex.Type).Append(';');
+                foreach (var q in desired.Queues.OrderBy(q => q.Name)) sb.Append(q.Name).Append('|').Append(q.Durable).Append(';');
+                foreach (var b in desired.Bindings.OrderBy(b => b.FromExchange).ThenBy(b => b.To).ThenBy(b => b.RoutingKey)) sb.Append(b.FromExchange).Append('>').Append(b.To).Append('|').Append(b.RoutingKey).Append(';');
+                using var sha = System.Security.Cryptography.SHA256.Create();
+                var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+                desiredHash = Convert.ToHexString(sha.ComputeHash(bytes));
+            }
+            catch { desiredHash = null; }
+            if (mode == ProvisioningMode.DryRun)
+            {
+                // Record effective plan and provisioning diagnostics; no apply
+                var capsTmp = new RabbitMqCapabilities();
+                var planTmp = Negotiation.BuildPlan(busCode, ProviderName, capsTmp, opts.Retry, opts.Dlq, requestDelay: false);
+                diagSvc?.SetEffectivePlan(busCode, planTmp);
+                diagSvc?.SetProvisioning(busCode, new ProvisioningDiagnostics(
+                    BusCode: busCode,
+                    Provider: ProviderName,
+                    Mode: mode,
+                    Desired: desired,
+                    Current: current,
+                    Diff: diff,
+                    Timestamp: DateTimeOffset.UtcNow,
+                    DesiredPlanHash: desiredHash,
+                    PlanMs: swPlan.ElapsedMilliseconds,
+                    InspectMs: inspectMs,
+                    DiffMs: diffMs,
+                    ApplyMs: 0,
+                    DesiredExchangeCount: desired.Exchanges.Count,
+                    DesiredQueueCount: desired.Queues.Count,
+                    DesiredBindingCount: desired.Bindings.Count,
+                    DiffCreateExchangeCount: diff.ExchangesToCreate.Count,
+                    DiffCreateQueueCount: diff.QueuesToCreate.Count,
+                    DiffCreateBindingCount: diff.BindingsToCreate.Count,
+                    DiffUpdateExchangeCount: diff.ExchangeUpdates.Count,
+                    DiffUpdateQueueCount: diff.QueueUpdates.Count,
+                    DiffRemoveExchangeCount: diff.ExchangesToRemove.Count,
+                    DiffRemoveQueueCount: diff.QueuesToRemove.Count,
+                    DiffRemoveBindingCount: diff.BindingsToRemove.Count,
+                    AppliedExchangeCount: diff.ExchangesToCreate.Count + diff.ExchangeUpdates.Count,
+                    AppliedQueueCount: diff.QueuesToCreate.Count + diff.QueueUpdates.Count,
+                    AppliedBindingCount: diff.BindingsToCreate.Count));
+            }
+            else
+            {
+                var swApply = System.Diagnostics.Stopwatch.StartNew();
+                provisioner.Apply(busCode, mode, diff, (connection, channel, opts));
+                swApply.Stop();
+                applyMs = swApply.ElapsedMilliseconds;
+                diagSvc?.SetProvisioning(busCode, new ProvisioningDiagnostics(
+                    BusCode: busCode,
+                    Provider: ProviderName,
+                    Mode: mode,
+                    Desired: desired,
+                    Current: current,
+                    Diff: diff,
+                    Timestamp: DateTimeOffset.UtcNow,
+                    DesiredPlanHash: desiredHash,
+                    PlanMs: swPlan.ElapsedMilliseconds,
+                    InspectMs: inspectMs,
+                    DiffMs: diffMs,
+                    ApplyMs: applyMs,
+                    DesiredExchangeCount: desired.Exchanges.Count,
+                    DesiredQueueCount: desired.Queues.Count,
+                    DesiredBindingCount: desired.Bindings.Count,
+                    DiffCreateExchangeCount: diff.ExchangesToCreate.Count,
+                    DiffCreateQueueCount: diff.QueuesToCreate.Count,
+                    DiffCreateBindingCount: diff.BindingsToCreate.Count,
+                    DiffUpdateExchangeCount: diff.ExchangeUpdates.Count,
+                    DiffUpdateQueueCount: diff.QueueUpdates.Count,
+                    DiffRemoveExchangeCount: diff.ExchangesToRemove.Count,
+                    DiffRemoveQueueCount: diff.QueuesToRemove.Count,
+                    DiffRemoveBindingCount: diff.BindingsToRemove.Count,
+                    AppliedExchangeCount: diff.ExchangesToCreate.Count + diff.ExchangeUpdates.Count,
+                    AppliedQueueCount: diff.QueuesToCreate.Count + diff.QueueUpdates.Count,
+                    AppliedBindingCount: diff.BindingsToCreate.Count));
+            }
         }
 
         // Ensure base exchange exists (idempotent); provisioner already declared in most modes 
