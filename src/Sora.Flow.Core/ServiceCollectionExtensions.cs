@@ -65,7 +65,6 @@ public static class ServiceCollectionExtensions
         // Options
         services.AddOptions<FlowOptions>();
         services.AddOptions<FlowMaterializationOptions>();
-        services.AddOptions<AdapterRegistryOptions>();
         // Install global naming policy for Flow entities
         services.AddSoraFlowNaming();
 
@@ -83,79 +82,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<Sora.Flow.Sending.IFlowIdentityStamper, Sora.Flow.Sending.FlowIdentityStamper>();
         services.AddFlowActions();
 
-        // Adapter registry + self-announcer
-        services.TryAddSingleton<IAdapterRegistry, InMemoryAdapterRegistry>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, InMemoryAdapterRegistry>());
-        // Provide shared adapter identity used by self-announcer and helpers
-        services.TryAddSingleton<Sora.Flow.Initialization.IAdapterIdentity>(sp =>
-        {
-            var opts = sp.GetRequiredService<IOptions<AdapterRegistryOptions>>().Value;
-            return new Sora.Flow.Initialization.AdapterIdentity(opts.HeartbeatSeconds);
-        });
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, Sora.Flow.Initialization.AdapterSelfAnnouncer>());
-
-        // Upsert announcements into registry
-        services.OnMessages(h => h.On<AdapterAnnouncement>((env, msg, ct) =>
-        {
-            var sp = Sora.Core.Hosting.App.AppHost.Current ?? throw new InvalidOperationException("AppHost not initialized");
-            var reg = (IAdapterRegistry)sp.GetService(typeof(IAdapterRegistry))!;
-            reg.Upsert(new AdapterEntry
-            {
-                System = msg.System,
-                Adapter = msg.Adapter,
-                InstanceId = msg.InstanceId,
-                Version = msg.Version,
-                Capabilities = msg.Capabilities,
-                Bus = msg.Bus,
-                Group = msg.Group,
-                Host = msg.Host,
-                Pid = msg.Pid,
-                StartedAt = msg.StartedAt,
-                LastSeenAt = msg.LastSeenAt,
-                HeartbeatSeconds = msg.HeartbeatSeconds,
-            });
-            return Task.CompletedTask;
-        }));
-
         return services;
-    }
-
-    /// <summary>
-    /// Helper API for adapters to send a standard announce reply without hand-building payloads.
-    /// </summary>
-    public static class AdapterInfo
-    {
-    public static async Task SendAnnounceReply(string? correlationId, string[]? capabilities = null, CancellationToken ct = default)
-        {
-            var sp = Sora.Core.Hosting.App.AppHost.Current ?? throw new InvalidOperationException("AppHost not initialized");
-            var id = (Sora.Flow.Initialization.IAdapterIdentity)sp.GetService(typeof(Sora.Flow.Initialization.IAdapterIdentity))!;
-            if (string.IsNullOrWhiteSpace(id.System) || string.IsNullOrWhiteSpace(id.Adapter))
-                throw new InvalidOperationException("Adapter identity not available (missing [FlowAdapter]).");
-            var payload = new Sora.Flow.Model.AdapterAnnouncement
-            {
-                System = id.System!,
-                Adapter = id.Adapter!,
-                InstanceId = id.InstanceId,
-                Version = id.Version,
-        Capabilities = capabilities ?? id.Capabilities,
-                Bus = id.Bus,
-                Group = id.Group,
-                Host = id.Host,
-                Pid = id.Pid,
-                StartedAt = id.StartedAt,
-                LastSeenAt = DateTimeOffset.UtcNow,
-                HeartbeatSeconds = id.HeartbeatSeconds,
-            };
-            await new ControlResponse<Sora.Flow.Model.AdapterAnnouncement>
-            {
-                Model = "adapter",
-                Verb = "announce",
-                Status = "ok",
-                Message = null,
-                CorrelationId = correlationId,
-                Payload = payload
-            }.Send(ct);
-        }
     }
 
     /// <summary>

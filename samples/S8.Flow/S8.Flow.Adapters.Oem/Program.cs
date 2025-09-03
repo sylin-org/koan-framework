@@ -18,11 +18,6 @@ using System.Linq;
 var builder = Host.CreateApplicationBuilder(args);
 
 if (!Sora.Core.SoraEnv.InContainer)
-// ITL 2025-09-02 (github copilot)
-// - Introduced OemAdapterConstants for system, adapter, source, capabilities, and external ID keys.
-// - Replaced all inline literals in FlowAdapter attribute, event bag, and SourceId assignments with constants.
-// - Rationale: single source of truth for adapter identity, deduplication, and maintainability.
-// - See also: BmsAdapterConstants in S8.Flow.Adapters.Bms.
 {
     Console.Error.WriteLine("S8.Flow.Adapters.Oem is container-only. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -36,30 +31,81 @@ builder.Configuration
 // and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
 
-// No local ControlCommand responders; announce/ping handled by API-side responders (opt-out via config).
+// React to command VOs published by orchestrators or tools
+builder.Services.OnMessages(h =>
+{
+    h.On<ControlCommand>(async (env, cmd, ct) =>
+    {
+        try
+        {
+            var verb = (cmd.Verb ?? string.Empty).Trim().ToLowerInvariant();
+            switch (verb)
+            {
+                case "announce":
+                {
+                    // From SensorKey (INV::SER::CODE) infer device seeds and publish via FlowEvent
+                    if (TryParseSensorKey(cmd.SensorKey, out var inv, out var ser, out var _))
+                    {
+                        var d = SampleProfiles.Fleet.FirstOrDefault(x => x.Inventory == inv && x.Serial == ser);
+                        if (d is not null)
+                        {
+                            var oemDeviceId = $"{d.Inventory}:{d.Serial}";
+                            var devEvent = FlowEvent.ForModel("device")
+                                .With(Keys.Device.Inventory, d.Inventory)
+                                .With(Keys.Device.Serial, d.Serial)
+                                .With(Keys.Device.Manufacturer, d.Manufacturer)
+                                .With(Keys.Device.Model, d.Model)
+                                .With(Keys.Device.Kind, d.Kind)
+                                .With(Keys.Device.Code, d.Code)
+                                .With("identifier.external.oem", oemDeviceId)
+                                .With("source", "oem");
+                            devEvent.SourceId = "oem";
+                            devEvent.CorrelationId = oemDeviceId;
+                            await devEvent.Send(ct);
+                            foreach (var s in SampleProfiles.SensorsForOem(d))
+                            {
+                                var sensorEvent = FlowEvent.ForModel("sensor")
+                                    .With(Keys.Sensor.Key, s.SensorKey)
+                                    .With("DeviceId", s.DeviceId)
+                                    .With(Keys.Sensor.Code, s.Code)
+                                    .With(Keys.Sensor.Unit, s.Unit)
+                                    .With("source", "oem");
+                                sensorEvent.SourceId = "oem";
+                                sensorEvent.CorrelationId = s.SensorKey;
+                                await sensorEvent.Send(ct);
+                            }
+                        }
+                    }
+                    break;
+                }
+                case "ping":
+                default:
+                {
+                    // Ack back to the system; keep it simple for the sample
+                    await new Sora.Flow.Actions.FlowAck(
+                        Model: "controlcommand",
+                        Verb: verb,
+                        ReferenceId: cmd.SensorKey,
+                        Status: verb == "ping" ? "ok" : "unsupported",
+                        Message: verb == "ping" ? null : $"Unknown verb '{cmd.Verb}'",
+                        CorrelationId: env.CorrelationId
+                    ).Send(ct);
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Best-effort error ack
+            await new Sora.Flow.Actions.FlowAck("controlcommand", cmd.Verb ?? string.Empty, cmd.SensorKey, "error", ex.Message, env.CorrelationId).Send(ct);
+        }
+    });
+});
 
 var app = builder.Build();
 await app.RunAsync();
 
-// Adapter identity + capabilities constants (single source of truth)
-internal static class OemAdapterConstants
-{
-    public const string System = "oem";
-    public const string Adapter = "oem";
-    public const string Source = "oem"; // DefaultSource & SourceId
-    public const string SourceKey = "source"; // bag key
-    public static class Cap
-    {
-        public const string Seed = "seed";
-        public const string Reading = "reading";
-    }
-    public static class ExternalIds
-    {
-        public const string Device = "identifier.external.oem"; // device correlation id key
-    }
-}
-
-[FlowAdapter(system: OemAdapterConstants.System, adapter: OemAdapterConstants.Adapter, DefaultSource = OemAdapterConstants.Source, Capabilities = new[] { OemAdapterConstants.Cap.Seed, OemAdapterConstants.Cap.Reading })]
+[FlowAdapter(system: "oem", adapter: "oem", DefaultSource = "oem")]
 public sealed class OemPublisher : BackgroundService
 {
     private readonly ILogger<OemPublisher> _log;
@@ -94,11 +140,11 @@ public sealed class OemPublisher : BackgroundService
                         [Keys.Device.Model] = d.Model,
                         [Keys.Device.Kind] = d.Kind,
                         [Keys.Device.Code] = d.Code,
-                        [OemAdapterConstants.ExternalIds.Device] = oemDeviceId,
-                        [OemAdapterConstants.SourceKey] = OemAdapterConstants.Source,
+                        ["identifier.external.oem"] = oemDeviceId,
+                        ["source"] = "oem",
                     };
                     var devEvent = FlowEvent.ForModel("device");
-                    devEvent.SourceId = OemAdapterConstants.Source;
+                    devEvent.SourceId = "oem";
                     devEvent.CorrelationId = oemDeviceId;
                     foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
                     await devEvent.Send(stoppingToken);
@@ -111,8 +157,8 @@ public sealed class OemPublisher : BackgroundService
                             .With("DeviceId", s.DeviceId)
                             .With(Keys.Sensor.Code, s.Code)
                             .With(Keys.Sensor.Unit, s.Unit)
-                            .With(OemAdapterConstants.SourceKey, OemAdapterConstants.Source);
-                        sensorEvent.SourceId = OemAdapterConstants.Source;
+                            .With("source", "oem");
+                        sensorEvent.SourceId = "oem";
                         sensorEvent.CorrelationId = s.SensorKey;
                         await sensorEvent.Send(stoppingToken);
                     }
@@ -129,8 +175,8 @@ public sealed class OemPublisher : BackgroundService
                     .With(Keys.Reading.Value, value)
                     .With(Keys.Reading.CapturedAt, at.ToString("O"))
                     .With(Keys.Sensor.Unit, unit)
-                    .With(Keys.Reading.Source, OemAdapterConstants.Source);
-                readingEvent.SourceId = OemAdapterConstants.Source;
+                    .With(Keys.Reading.Source, "oem");
+                readingEvent.SourceId = "oem";
                 readingEvent.CorrelationId = key;
                 await readingEvent.Send(stoppingToken);
                 _log.LogInformation("OEM sent Reading {Key}={Value}{Unit} at {At}", key, value, unit, at);
@@ -166,9 +212,9 @@ public sealed class OemPublisher : BackgroundService
                 .With(Keys.Device.Model, d.Model)
                 .With(Keys.Device.Kind, d.Kind)
                 .With(Keys.Device.Code, d.Code)
-                .With(OemAdapterConstants.ExternalIds.Device, oemDeviceId)
-                .With(OemAdapterConstants.SourceKey, OemAdapterConstants.Source);
-            deviceEvent.SourceId = OemAdapterConstants.Source;
+                .With("identifier.external.oem", oemDeviceId)
+                .With("source", "oem");
+            deviceEvent.SourceId = "oem";
             deviceEvent.CorrelationId = oemDeviceId;
             await deviceEvent.Send(ct);
 
@@ -179,8 +225,8 @@ public sealed class OemPublisher : BackgroundService
                     .With("DeviceId", s.DeviceId)
                     .With(Keys.Sensor.Code, s.Code)
                     .With(Keys.Sensor.Unit, s.Unit)
-                    .With(OemAdapterConstants.SourceKey, OemAdapterConstants.Source);
-                sensorEvent.SourceId = OemAdapterConstants.Source;
+                    .With("source", "oem");
+                sensorEvent.SourceId = "oem";
                 sensorEvent.CorrelationId = s.SensorKey;
                 await sensorEvent.Send(ct);
             }
