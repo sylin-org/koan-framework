@@ -89,56 +89,6 @@ public static class SampleProfiles
             Unit = Units.KPa,
         };
     }
-
-    // Procedural generation for seeding: generates 'total' devices and sensors
-    public static IEnumerable<Device> GenerateDevices(int total = 1000)
-    {
-        for (int i = 1; i <= total; i++)
-        {
-            var inv = $"INV-{1000 + i}";
-            var serial = $"SN-FAKE-{i:D6}";
-            yield return new Device
-            {
-                DeviceId = $"{inv}:{serial}",
-                Inventory = inv,
-                Serial = serial,
-                Manufacturer = $"Brand{(char)('A' + (i % 5))}",
-                Model = $"MODEL-{i % 10}",
-                Kind = (i % 2 == 0) ? "MRI" : "CT",
-                Code = $"CODE-{i % 20}",
-            };
-        }
-    }
-
-    public static IEnumerable<Sensor> GenerateSensorsForBms(Device d)
-    {
-        var sensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}";
-        yield return new Sensor
-        {
-            DeviceId = d.DeviceId,
-            SensorKey = sensorKey,
-            Code = SensorCodes.TEMP,
-            Unit = Units.C,
-        };
-    }
-
-    public static IEnumerable<Sensor> GenerateSensorsForOem(Device d)
-    {
-        yield return new Sensor
-        {
-            DeviceId = d.DeviceId,
-            SensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.PWR}",
-            Code = SensorCodes.PWR,
-            Unit = Units.Watt,
-        };
-        yield return new Sensor
-        {
-            DeviceId = d.DeviceId,
-            SensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.COOLANT_PRESSURE}",
-            Code = SensorCodes.COOLANT_PRESSURE,
-            Unit = Units.KPa,
-        };
-    }
 }
 
 public sealed class SensorReading
