@@ -29,11 +29,12 @@ builder.Configuration
 // Minimal boot: Sora + auto-registrars wire Messaging Core, RabbitMQ, Flow identity stamper,
 // and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
+    builder.Services.AddRabbitMq();
 
 var app = builder.Build();
 await app.RunAsync();
 
-[FlowAdapter(system: "bms", adapter: "bms", DefaultSource = "bms")]
+[FlowAdapter(system: FlowSampleConstants.Sources.Bms, adapter: FlowSampleConstants.Sources.Bms, DefaultSource = FlowSampleConstants.Sources.Bms)]
 public sealed class BmsPublisher : BackgroundService
 {
     private readonly ILogger<BmsPublisher> _log;
@@ -42,8 +43,13 @@ public sealed class BmsPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-    // Initial bulk seed on startup via MQ (resilient to broker warm-up)
-    await SeedAllWithRetryAsync(ct);
+        // Initial bulk seed on startup via MQ (resilient to broker warm-up)
+        await AdapterSeeding.SeedCatalogWithRetryAsync(
+            FlowSampleConstants.Sources.Bms,
+            SampleProfiles.Fleet,
+            SampleProfiles.SensorsForBms,
+            _log,
+            ct);
 
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
@@ -54,7 +60,7 @@ public sealed class BmsPublisher : BackgroundService
                 var idx = rng.Next(0, SampleProfiles.Fleet.Length);
                 var d = SampleProfiles.Fleet[idx];
                 // Periodic independent announcements (devices + sensors)
-                if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromMinutes(5))
+                if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
                 {
                     // Seed device via FlowEvent (plain bag)
                     var bmsDeviceId = $"{d.Inventory}:{d.Serial}";
@@ -70,7 +76,7 @@ public sealed class BmsPublisher : BackgroundService
                         ["source"] = "bms",
                     };
                     var devEvent = FlowEvent.ForModel("device");
-                    devEvent.SourceId = "bms";
+                    devEvent.SourceId = FlowSampleConstants.Sources.Bms;
                     devEvent.CorrelationId = bmsDeviceId;
                     foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
                     await devEvent.Send(ct);
@@ -84,7 +90,7 @@ public sealed class BmsPublisher : BackgroundService
                             .With(Keys.Sensor.Code, s.Code)
                             .With(Keys.Sensor.Unit, s.Unit)
                             .With("source", "bms");
-                        sensorEvent.SourceId = "bms";
+                        sensorEvent.SourceId = FlowSampleConstants.Sources.Bms;
                         sensorEvent.CorrelationId = s.SensorKey;
                         await sensorEvent.Send(ct);
                     }
@@ -102,7 +108,7 @@ public sealed class BmsPublisher : BackgroundService
                     .With(Keys.Reading.CapturedAt, at.ToString("O"))
                     .With(Keys.Sensor.Unit, Units.C)
                     .With(Keys.Reading.Source, "bms");
-                readingEvent.SourceId = "bms";
+                readingEvent.SourceId = FlowSampleConstants.Sources.Bms;
                 readingEvent.CorrelationId = key;
                 await readingEvent.Send(ct);
                 _log.LogInformation("BMS sent Reading {Key}={Value}{Unit} at {At}", key, val, Units.C, at);
@@ -111,61 +117,7 @@ public sealed class BmsPublisher : BackgroundService
             {
                 _log.LogWarning(ex, "BMS publish failed");
             }
-            try { await Task.Delay(TimeSpan.FromSeconds(1.5), ct); } catch (TaskCanceledException) { }
-        }
-    }
-
-    // Iterate device catalog and publish normalized seeds via MQ
-    private static async Task SeedAllAsync(CancellationToken ct)
-    {
-        foreach (var d in SampleProfiles.Fleet)
-        {
-            var bmsDeviceId = $"{d.Inventory}:{d.Serial}";
-            var deviceEvent = FlowEvent.ForModel("device")
-                .With(Keys.Device.Inventory, d.Inventory)
-                .With(Keys.Device.Serial, d.Serial)
-                .With(Keys.Device.Manufacturer, d.Manufacturer)
-                .With(Keys.Device.Model, d.Model)
-                .With(Keys.Device.Kind, d.Kind)
-                .With(Keys.Device.Code, d.Code)
-                .With("identifier.external.bms", bmsDeviceId)
-                .With("source", "bms");
-            deviceEvent.SourceId = "bms";
-            deviceEvent.CorrelationId = bmsDeviceId;
-            await deviceEvent.Send(ct);
-
-            foreach (var s in SampleProfiles.SensorsForBms(d))
-            {
-                var sensorEvent = FlowEvent.ForModel("sensor")
-                    .With(Keys.Sensor.Key, s.SensorKey)
-                    .With("DeviceId", s.DeviceId)
-                    .With(Keys.Sensor.Code, s.Code)
-                    .With(Keys.Sensor.Unit, s.Unit)
-                    .With("source", "bms");
-                sensorEvent.SourceId = "bms";
-                sensorEvent.CorrelationId = s.SensorKey;
-                await sensorEvent.Send(ct);
-            }
-        }
-    }
-
-    // Retry wrapper to avoid host crash if RabbitMQ isn’t ready yet
-    private async Task SeedAllWithRetryAsync(CancellationToken ct)
-    {
-        const int maxAttempts = 30;
-        for (int attempt = 1; attempt <= maxAttempts && !ct.IsCancellationRequested; attempt++)
-        {
-            try
-            {
-                await SeedAllAsync(ct);
-                _log.LogInformation("Initial seed completed on attempt {Attempt}", attempt);
-                return;
-            }
-            catch (Exception ex)
-            {
-                _log.LogWarning(ex, "Initial seed attempt {Attempt} failed; retrying in 1s", attempt);
-                try { await Task.Delay(TimeSpan.FromSeconds(1), ct); } catch (TaskCanceledException) { break; }
-            }
+            try { await Task.Delay(FlowSampleConstants.Timing.BmsLoopDelay, ct); } catch (TaskCanceledException) { }
         }
     }
 }

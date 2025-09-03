@@ -7,6 +7,7 @@ using Sora.Data.Core;
 
 namespace S8.Flow.Api.Controllers;
 
+[ApiController]
 [Route("api/devices")]
 [SoraDataBehavior(MustPaginate = true, DefaultPageSize = 20, MaxPageSize = 200)]
 public sealed class DevicesController : EntityController<DynamicFlowEntity<Device>>

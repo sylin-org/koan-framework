@@ -10,16 +10,18 @@ using Sora.Messaging.RabbitMq;
 using Sora.Web.Swagger;
 using Sora.Flow.Sending; // AddFlowSender
 
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Container-only sample guard
+builder.Services.AddSora();
+    builder.Services.AddRabbitMq();
+
+// Container-only sample guard (must be after service registration so DI is wired)
 if (!Sora.Core.SoraEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Flow.Api is container-only. Use samples/S8.Compose/docker-compose.yml.");
     return;
 }
-
-builder.Services.AddSora();
 
 builder.Services.Configure<FlowOptions>(o =>
 {
@@ -56,7 +58,7 @@ builder.Services.OnMessages(h =>
         var rec = new StageRecord<Reading>
         {
             Id = Guid.NewGuid().ToString("n"),
-            SourceId = msg.Source ?? "events",
+            SourceId = msg.Source ?? FlowSampleConstants.Sources.Events,
             OccurredAt = msg.CapturedAt,
             StagePayload = ev.Bag,
             CorrelationId = msg.SensorKey,

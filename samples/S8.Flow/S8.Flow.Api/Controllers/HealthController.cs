@@ -4,7 +4,7 @@ using S8.Flow.Api.Adapters;
 namespace S8.Flow.Api.Controllers;
 
 [ApiController]
-[Route("adapters")] // /adapters/health
+[Route("api/adapters")] // normalized API prefix
 public sealed class HealthController : ControllerBase
 {
     private readonly IAdapterHealthRegistry _reg;

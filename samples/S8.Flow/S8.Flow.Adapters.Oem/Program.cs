@@ -28,11 +28,12 @@ builder.Configuration
 // Minimal boot: Sora + auto-registrars provide Messaging Core, RabbitMQ, Flow identity stamper,
 // and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
+    builder.Services.AddRabbitMq();
 
 var app = builder.Build();
 await app.RunAsync();
 
-[FlowAdapter(system: "oem", adapter: "oem", DefaultSource = "oem")]
+[FlowAdapter(system: FlowSampleConstants.Sources.Oem, adapter: FlowSampleConstants.Sources.Oem, DefaultSource = FlowSampleConstants.Sources.Oem)]
 public sealed class OemPublisher : BackgroundService
 {
     private readonly ILogger<OemPublisher> _log;
@@ -43,8 +44,13 @@ public sealed class OemPublisher : BackgroundService
     // Example: react to simple control commands sent via VO
     // In a real app, this would be wired via OnMessages in a host that runs consumers for OEM; here we just sketch the intent.
     _ = stoppingToken; // placeholder to avoid warnings in sample
-    // Initial bulk seed on startup via MQ (resilient to broker warm-up)
-    await SeedAllWithRetryAsync(stoppingToken);
+        // Initial bulk seed on startup via MQ (resilient to broker warm-up)
+        await AdapterSeeding.SeedCatalogWithRetryAsync(
+            FlowSampleConstants.Sources.Oem,
+            SampleProfiles.Fleet,
+            SampleProfiles.SensorsForOem,
+            _log,
+            stoppingToken);
 
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
@@ -58,7 +64,7 @@ public sealed class OemPublisher : BackgroundService
                 var unit = code == SensorCodes.PWR ? Units.Watt : Units.KPa;
                 var value = code == SensorCodes.PWR ? Math.Round(100 + rng.NextDouble() * 900, 2) : Math.Round(200 + rng.NextDouble() * 50, 2);
                 // Periodic independent announcements
-                if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromMinutes(5))
+                if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
                 {
                     // Seed Device via FlowEvent (pure MQ)
                     var oemDeviceId = $"{d.Inventory}:{d.Serial}";
@@ -74,7 +80,7 @@ public sealed class OemPublisher : BackgroundService
                         ["source"] = "oem",
                     };
                     var devEvent = FlowEvent.ForModel("device");
-                    devEvent.SourceId = "oem";
+                    devEvent.SourceId = FlowSampleConstants.Sources.Oem;
                     devEvent.CorrelationId = oemDeviceId;
                     foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
                     await devEvent.Send(stoppingToken);
@@ -88,7 +94,7 @@ public sealed class OemPublisher : BackgroundService
                             .With(Keys.Sensor.Code, s.Code)
                             .With(Keys.Sensor.Unit, s.Unit)
                             .With("source", "oem");
-                        sensorEvent.SourceId = "oem";
+                        sensorEvent.SourceId = FlowSampleConstants.Sources.Oem;
                         sensorEvent.CorrelationId = s.SensorKey;
                         await sensorEvent.Send(stoppingToken);
                     }
@@ -106,7 +112,7 @@ public sealed class OemPublisher : BackgroundService
                     .With(Keys.Reading.CapturedAt, at.ToString("O"))
                     .With(Keys.Sensor.Unit, unit)
                     .With(Keys.Reading.Source, "oem");
-                readingEvent.SourceId = "oem";
+                readingEvent.SourceId = FlowSampleConstants.Sources.Oem;
                 readingEvent.CorrelationId = key;
                 await readingEvent.Send(stoppingToken);
                 _log.LogInformation("OEM sent Reading {Key}={Value}{Unit} at {At}", key, value, unit, at);
@@ -115,61 +121,7 @@ public sealed class OemPublisher : BackgroundService
             {
                 _log.LogWarning(ex, "OEM publish failed");
             }
-            try { await Task.Delay(TimeSpan.FromSeconds(2.5), stoppingToken); } catch (TaskCanceledException) { }
-        }
-    }
-
-    // Iterate device catalog and publish normalized seeds via MQ
-    private static async Task SeedAllAsync(CancellationToken ct)
-    {
-        foreach (var d in SampleProfiles.Fleet)
-        {
-            var oemDeviceId = $"{d.Inventory}:{d.Serial}";
-            var deviceEvent = FlowEvent.ForModel("device")
-                .With(Keys.Device.Inventory, d.Inventory)
-                .With(Keys.Device.Serial, d.Serial)
-                .With(Keys.Device.Manufacturer, d.Manufacturer)
-                .With(Keys.Device.Model, d.Model)
-                .With(Keys.Device.Kind, d.Kind)
-                .With(Keys.Device.Code, d.Code)
-                .With("identifier.external.oem", oemDeviceId)
-                .With("source", "oem");
-            deviceEvent.SourceId = "oem";
-            deviceEvent.CorrelationId = oemDeviceId;
-            await deviceEvent.Send(ct);
-
-            foreach (var s in SampleProfiles.SensorsForOem(d))
-            {
-                var sensorEvent = FlowEvent.ForModel("sensor")
-                    .With(Keys.Sensor.Key, s.SensorKey)
-                    .With("DeviceId", s.DeviceId)
-                    .With(Keys.Sensor.Code, s.Code)
-                    .With(Keys.Sensor.Unit, s.Unit)
-                    .With("source", "oem");
-                sensorEvent.SourceId = "oem";
-                sensorEvent.CorrelationId = s.SensorKey;
-                await sensorEvent.Send(ct);
-            }
-        }
-    }
-
-    // Retry wrapper to avoid host crash if RabbitMQ isn’t ready yet
-    private async Task SeedAllWithRetryAsync(CancellationToken ct)
-    {
-        const int maxAttempts = 30;
-        for (int attempt = 1; attempt <= maxAttempts && !ct.IsCancellationRequested; attempt++)
-        {
-            try
-            {
-                await SeedAllAsync(ct);
-                _log.LogInformation("Initial seed completed on attempt {Attempt}", attempt);
-                return;
-            }
-            catch (Exception ex)
-            {
-                _log.LogWarning(ex, "Initial seed attempt {Attempt} failed; retrying in 1s", attempt);
-                try { await Task.Delay(TimeSpan.FromSeconds(1), ct); } catch (TaskCanceledException) { break; }
-            }
+            try { await Task.Delay(FlowSampleConstants.Timing.OemLoopDelay, stoppingToken); } catch (TaskCanceledException) { }
         }
     }
 }

@@ -131,7 +131,7 @@ public sealed class ReadingsController : ControllerBase
         var typed = new StageRecord<Reading>
         {
             Id = Guid.NewGuid().ToString("n"),
-            SourceId = reading.Source ?? "api",
+            SourceId = reading.Source ?? FlowSampleConstants.Sources.Api,
             OccurredAt = reading.CapturedAt,
             StagePayload = payload,
             CorrelationId = reading.SensorKey
