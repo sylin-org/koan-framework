@@ -14,33 +14,32 @@ var builder = WebApplication.CreateBuilder(args);
 // ✨ NEW BEAUTIFUL MESSAGING - ZERO CONFIGURATION! ✨
 builder.Services.AddSora();
 
-// Register Flow message handlers - consumers for FlowTargetedMessage<T> will be created automatically!
-builder.Services.ConfigureFlow(flow =>
-{
-    flow.On<Reading>(async reading =>
-    {
-        Console.WriteLine($"📊 Received Reading: {reading.SensorKey} = {reading.Value}{reading.Unit}");
-        
-        // Route to Flow intake for processing
-        await reading.SendToFlowIntake();
-    });
-
-    flow.On<Device>(async device =>
-    {
-        Console.WriteLine($"🏭 Device registered: {device.DeviceId} ({device.Manufacturer} {device.Model})");
-        
-        // Route to Flow intake for processing
-        await device.SendToFlowIntake();
-    });
-
-    flow.On<Sensor>(async sensor =>
-    {
-        Console.WriteLine($"📡 Sensor registered: {sensor.SensorKey} ({sensor.Code}) - Unit: {sensor.Unit}");
-        
-        // Route to Flow intake for processing
-        await sensor.SendToFlowIntake();
-    });
-});
+// ✨ BEAUTIFUL AUTO-CONFIGURED FLOW HANDLERS ✨
+// Automatically registers handlers for all FlowEntity and FlowValueObject types!
+// No more boilerplate - each handler logs appropriately and routes to Flow intake.
+//
+// BEFORE (26 lines of repetitive boilerplate):
+// builder.Services.ConfigureFlow(flow =>
+// {
+//     flow.On<Reading>(async reading =>
+//     {
+//         Console.WriteLine($"📊 Received Reading: {reading.SensorKey} = {reading.Value}{reading.Unit}");
+//         await reading.SendToFlowIntake();
+//     });
+//     flow.On<Device>(async device =>
+//     {
+//         Console.WriteLine($"🏭 Device registered: {device.DeviceId} ({device.Manufacturer} {device.Model})");
+//         await device.SendToFlowIntake();
+//     });
+//     flow.On<Sensor>(async sensor =>
+//     {
+//         Console.WriteLine($"📡 Sensor registered: {sensor.SensorKey} ({sensor.Code}) - Unit: {sensor.Unit}");
+//         await sensor.SendToFlowIntake();
+//     });
+// });
+//
+// AFTER (1 line with automatic discovery and guaranteed consistency):
+builder.Services.AutoConfigureFlow(typeof(Device).Assembly);
 
 // Keep FlowCommandMessage as direct handler (not wrapped in FlowTargetedMessage)
 builder.Services.On<FlowCommandMessage>(async cmd =>
