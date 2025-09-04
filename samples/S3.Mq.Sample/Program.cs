@@ -18,31 +18,9 @@ services.AddSingleton<IConfiguration>(cfg);
 services.AddSora();
 
 // register handlers with simple chaining
-services
-    .OnMessage<Hello>((env, msg) =>
-    {
-        Console.WriteLine($"[handler] {env.TypeAlias} -> Hello, {msg.Name}!");
-    })
-    .OnMessage<UserRegistered>((env, msg) =>
-    {
-        Console.WriteLine($"[handler] {env.TypeAlias} -> Welcome user {msg.UserId} ({msg.Email})");
-    })
-    // batch handler: grouped processing for larger/paginated payloads
-    .OnBatch<UserRegistered>((env, batch, ct) =>
-    {
-        Console.WriteLine($"[batch] {env.TypeAlias} -> Saving {batch.Items.Count} users...");
-        // simulate save/commit
-        foreach (var u in batch.Items)
-            Console.WriteLine($"[batch] -> {u.UserId} ({u.Email})");
-        return Task.CompletedTask;
-    });
+// [REMOVED obsolete OnMessage/OnBatch handlers]
 
-// alternatively, using a semantic builder
-// services.OnMessages(h =>
-// {
-//     h.On<Hello>((env, msg) => Console.WriteLine($"[handler] {env.TypeAlias} -> Hello, {msg.Name}!"));
-//     h.On<UserRegistered>((env, msg) => Console.WriteLine($"[handler] {env.TypeAlias} -> Welcome user {msg.UserId} ({msg.Email})"));
-// });
+// [REMOVED obsolete semantic builder example]
 
 // Build and start
 var sp = services.BuildServiceProvider();
@@ -63,7 +41,7 @@ var moreUsers = new List<UserRegistered>
     new() { UserId = "u-3", Email = "u3@example.com" },
     new() { UserId = "u-4", Email = "u4@example.com" }
 };
-await moreUsers.SendAsBatch();
+// [REMOVED obsolete SendAsBatch usage]
 
 Console.WriteLine("Message sent. Listening... Press Ctrl+C to exit.");
 

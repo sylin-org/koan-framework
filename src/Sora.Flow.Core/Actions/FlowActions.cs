@@ -16,18 +16,16 @@ public interface IFlowActions
 }
 
 // Message contracts (aliases reflect intent; model-qualified via fields)
-[Message(Alias = "flow.action", Version = 1)]
 public sealed record FlowAction(
     string Model,
     string Verb,
     string? ReferenceId,
     object? Payload,
-    [property: IdempotencyKey] string IdempotencyKey,
-    [property: PartitionKey] string PartitionKey,
+    string IdempotencyKey,
+    string PartitionKey,
     string? CorrelationId = null,
     int DelaySeconds = 0);
 
-[Message(Alias = "flow.ack", Version = 1)]
 public sealed record FlowAck(
     string Model,
     string Verb,
@@ -36,7 +34,6 @@ public sealed record FlowAck(
     string? Message,
     string? CorrelationId = null);
 
-[Message(Alias = "flow.report", Version = 1)]
 public sealed record FlowReport(
     string Model,
     string? ReferenceId,
@@ -74,7 +71,7 @@ public static class FlowActionsRegistration
     {
     services.TryAddSingleton<IFlowActions, FlowActionsSender>();
     // Register the default action handler so adapters can send FlowAction seeds without custom wiring
-    services.TryAddSingleton<IMessageHandler<FlowAction>, FlowActionHandler>();
+    // services.TryAddSingleton<IMessageHandler<FlowAction>, FlowActionHandler>();
         return services;
     }
 }

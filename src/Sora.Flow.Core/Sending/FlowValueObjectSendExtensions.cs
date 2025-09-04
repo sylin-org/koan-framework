@@ -65,10 +65,10 @@ public static class FlowValueObjectSendExtensions
     }
 
     /// <summary>
-    /// INTERNAL: Send FlowValueObject directly to Flow intake (bypasses messaging).
-    /// This is for orchestrator use only - external callers should use Send() or SendTo().
+    /// Send FlowValueObject directly to Flow intake for processing.
+    /// Routes to the Flow orchestrator for value object processing and storage.
     /// </summary>
-    internal static async Task SendToFlowIntake<TValueObject>(this TValueObject valueObject, string? sourceId = null, CancellationToken ct = default)
+    public static async Task SendToFlowIntake<TValueObject>(this TValueObject valueObject, string? sourceId = null, CancellationToken ct = default)
         where TValueObject : FlowValueObject<TValueObject>, new()
     {
         if (valueObject is null) throw new ArgumentNullException(nameof(valueObject));

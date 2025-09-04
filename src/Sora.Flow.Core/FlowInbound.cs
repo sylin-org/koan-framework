@@ -25,7 +25,7 @@ public sealed class FlowInbound
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
         var services = ResolveServiceCollection();
-        services.On<FlowTargetedMessage<T>>(async (msg, ct) =>
+        services.On<FlowTargetedMessage<T>>(async msg =>
         {
             // Apply targeting filter if needed
             if (ShouldProcessMessage(msg.Target))
@@ -45,11 +45,11 @@ public sealed class FlowInbound
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
         var services = ResolveServiceCollection();
-        services.On<FlowTargetedMessage<T>>(async (msg, ct) =>
+        services.On<FlowTargetedMessage<T>>(async msg =>
         {
             if (ShouldProcessMessage(msg.Target))
             {
-                await handler(msg.Entity, ct);
+                await handler(msg.Entity, CancellationToken.None);
             }
         });
         
@@ -66,7 +66,7 @@ public sealed class FlowInbound
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
         var services = ResolveServiceCollection();
-        services.On<FlowCommandMessage>(async (msg, ct) =>
+        services.On<FlowCommandMessage>(async msg =>
         {
             if (string.Equals(msg.Command, command, StringComparison.OrdinalIgnoreCase) &&
                 ShouldProcessMessage(msg.Target))
@@ -87,12 +87,12 @@ public sealed class FlowInbound
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
         var services = ResolveServiceCollection();
-        services.On<FlowCommandMessage>(async (msg, ct) =>
+        services.On<FlowCommandMessage>(async msg =>
         {
             if (string.Equals(msg.Command, command, StringComparison.OrdinalIgnoreCase) &&
                 ShouldProcessMessage(msg.Target))
             {
-                await handler(msg.Payload, ct);
+                await handler(msg.Payload, CancellationToken.None);
             }
         });
         
@@ -178,7 +178,7 @@ public sealed class FlowHandlerBuilder
     {
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
-        _services.On<FlowTargetedMessage<T>>(async (msg, ct) =>
+        _services.On<FlowTargetedMessage<T>>(async msg =>
         {
             if (ShouldProcessMessage(msg.Target))
             {
@@ -196,11 +196,11 @@ public sealed class FlowHandlerBuilder
     {
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
-        _services.On<FlowTargetedMessage<T>>(async (msg, ct) =>
+        _services.On<FlowTargetedMessage<T>>(async msg =>
         {
             if (ShouldProcessMessage(msg.Target))
             {
-                await handler(msg.Entity, ct);
+                await handler(msg.Entity, CancellationToken.None);
             }
         });
         
@@ -216,7 +216,7 @@ public sealed class FlowHandlerBuilder
         if (string.IsNullOrWhiteSpace(command)) throw new ArgumentException("Command cannot be null or empty", nameof(command));
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
-        _services.On<FlowCommandMessage>(async (msg, ct) =>
+        _services.On<FlowCommandMessage>(async msg =>
         {
             if (string.Equals(msg.Command, command, StringComparison.OrdinalIgnoreCase) &&
                 ShouldProcessMessage(msg.Target))
@@ -236,12 +236,12 @@ public sealed class FlowHandlerBuilder
         if (string.IsNullOrWhiteSpace(command)) throw new ArgumentException("Command cannot be null or empty", nameof(command));
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
-        _services.On<FlowCommandMessage>(async (msg, ct) =>
+        _services.On<FlowCommandMessage>(async msg =>
         {
             if (string.Equals(msg.Command, command, StringComparison.OrdinalIgnoreCase) &&
                 ShouldProcessMessage(msg.Target))
             {
-                await handler(msg.Payload, ct);
+                await handler(msg.Payload, CancellationToken.None);
             }
         });
         

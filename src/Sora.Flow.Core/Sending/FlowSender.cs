@@ -13,7 +13,7 @@ namespace Sora.Flow.Sending;
 
 // Preferred name for normalized, contractless Flow ingestion payloads.
 // Values must be primitives/arrays/dictionaries.
-[Sora.Messaging.Message(Alias = "flow.event", Version = 1)]
+// Removed Message attribute - new messaging system doesn't use attributes
 public class FlowEvent
 {
     // Optional routing hint so the orchestrator can resolve the target model type
@@ -100,7 +100,7 @@ public sealed record FlowSendPlainItem(
 public interface IFlowSender
 {
     Task SendAsync(IEnumerable<FlowSendItem> items, CancellationToken ct = default);
-    Task SendAsync(IEnumerable<FlowSendPlainItem> items, MessageEnvelope? envelope = null, object? message = null, Type? hostType = null, CancellationToken ct = default);
+    Task SendAsync(IEnumerable<FlowSendPlainItem> items, object? envelope = null, object? message = null, Type? hostType = null, CancellationToken ct = default);
 }
 
 internal sealed class FlowSender : IFlowSender
@@ -142,7 +142,7 @@ internal sealed class FlowSender : IFlowSender
         }
     }
 
-    public async Task SendAsync(IEnumerable<FlowSendPlainItem> items, MessageEnvelope? envelope = null, object? message = null, Type? hostType = null, CancellationToken ct = default)
+    public async Task SendAsync(IEnumerable<FlowSendPlainItem> items, object? envelope = null, object? message = null, Type? hostType = null, CancellationToken ct = default)
     {
         if (items is null) return;
         var list = items.ToList(); if (list.Count == 0) return;
@@ -182,26 +182,10 @@ public static class FlowSenderRegistration
     {
         // Register the real sender as an internal type
         services.TryAddSingleton<FlowSender>();
-        // Register MessagingReadinessProvider as singleton
-        services.TryAddSingleton<Sora.Messaging.Provisioning.IMessagingReadinessProvider, Sora.Messaging.Provisioning.MessagingReadinessProvider>();
-        // Register a singleton readiness lifecycle, injecting the provider
-        services.TryAddSingleton<Sora.Flow.Sending.MessagingReadinessLifecycle>(sp =>
-        {
-            var provider = sp.GetRequiredService<Sora.Messaging.Provisioning.IMessagingReadinessProvider>();
-            return new Sora.Flow.Sending.MessagingReadinessLifecycle(provider);
-        });
-        // Bridge readiness provider to lifecycle
-        services.AddHostedService<Sora.Flow.Sending.MessagingReadinessBridgeHostedService>();
-        // Register the buffered sender as the public IFlowSender
-        services.AddSingleton<IFlowSender>(sp =>
-        {
-            var inner = sp.GetRequiredService<FlowSender>();
-            var log = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Sora.Flow.Sending.BufferedFlowSender>>();
-            var lifecycle = sp.GetRequiredService<Sora.Flow.Sending.MessagingReadinessLifecycle>();
-            return new BufferedFlowSender(inner, log, 32_000, lifecycle);
-        });
-        // Also register the FlowEvent handler (only orchestrator processes will consume, producers won’t run consumers)
-        services.TryAddSingleton<Sora.Messaging.IMessageHandler<FlowEvent>, FlowEventHandler>();
+        // Removed old messaging readiness system - new system handles this automatically
+        // Register the sender directly as IFlowSender
+        services.TryAddSingleton<IFlowSender, FlowSender>();
+        // Removed old message handler registration - new system uses .On<T>() pattern
         return services;
     }
 }

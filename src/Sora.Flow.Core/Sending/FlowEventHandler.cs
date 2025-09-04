@@ -9,9 +9,11 @@ using System.Threading.Tasks;
 
 namespace Sora.Flow.Sending;
 
-internal sealed class FlowEventHandler : IMessageHandler<FlowEvent>
+// This handler is disabled - the new messaging system uses the .On<T>() pattern instead
+// internal sealed class FlowEventHandler : IMessageHandler<FlowEvent>
+internal sealed class FlowEventHandler
 {
-    public async Task HandleAsync(MessageEnvelope envelope, FlowEvent msg, CancellationToken ct)
+    public async Task HandleAsync(object envelope, FlowEvent msg, CancellationToken ct)
     {
         // Resolve model type from msg.Model if provided, else infer from bag via FlowRegistry (if supported)
         var modelType = !string.IsNullOrWhiteSpace(msg.Model) ? FlowRegistry.ResolveModel(msg.Model!) : null;
@@ -25,15 +27,11 @@ internal sealed class FlowEventHandler : IMessageHandler<FlowEvent>
         var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
         var record = Activator.CreateInstance(recordType)!;
         recordType.GetProperty("Id")!.SetValue(record, Guid.NewGuid().ToString("n"));
-        recordType.GetProperty("SourceId")!.SetValue(record, msg.SourceId ?? envelope.Headers?.GetValueOrDefault("source") ?? "events");
+        recordType.GetProperty("SourceId")!.SetValue(record, msg.SourceId ?? "events");
         recordType.GetProperty("OccurredAt")!.SetValue(record, msg.OccurredAt ?? DateTimeOffset.UtcNow);
         if (!string.IsNullOrWhiteSpace(msg.CorrelationId)) recordType.GetProperty("CorrelationId")?.SetValue(record, msg.CorrelationId);
         // Ensure envelope system/adapter present; orchestrator will often run IdentityStamper upstream, but we can patch here too
         var bag = msg.Bag ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        if (!bag.ContainsKey(Constants.Envelope.System) && !string.IsNullOrWhiteSpace(envelope.Headers?.GetValueOrDefault(Constants.Envelope.System)))
-            bag[Constants.Envelope.System] = envelope.Headers![Constants.Envelope.System];
-        if (!bag.ContainsKey(Constants.Envelope.Adapter) && !string.IsNullOrWhiteSpace(envelope.Headers?.GetValueOrDefault(Constants.Envelope.Adapter)))
-            bag[Constants.Envelope.Adapter] = envelope.Headers![Constants.Envelope.Adapter];
         recordType.GetProperty("StagePayload")!.SetValue(record, bag);
 
         var dataType = typeof(Data<,>).MakeGenericType(recordType, typeof(string));

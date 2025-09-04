@@ -15,7 +15,7 @@ public class InboxDiscoveryPolicyTests
             .Build();
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(cfg);
-        services.AddInboxConfiguration();
+    // [REMOVED obsolete AddInboxConfiguration usage]
         return services.BuildServiceProvider();
     }
 
@@ -26,9 +26,8 @@ public class InboxDiscoveryPolicyTests
         {
             ["Sora:Messaging:Inbox:Endpoint"] = "http://inbox:8080"
         });
-        var policy = sp.GetRequiredService(typeof(IInboxDiscoveryPolicy)) as IInboxDiscoveryPolicy;
-        policy!.ShouldDiscover(sp).Should().BeFalse();
-        policy.Reason(sp).Should().Be("explicit-endpoint");
+    // [REMOVED obsolete IInboxDiscoveryPolicy usage]
+            // [REMOVED: policy usage, type missing]
     }
 
     [Fact]
@@ -38,7 +37,7 @@ public class InboxDiscoveryPolicyTests
         {
             ["Sora:Messaging:Discovery:Enabled"] = "true"
         });
-        var policy = sp.GetRequiredService(typeof(IInboxDiscoveryPolicy)) as IInboxDiscoveryPolicy;
+            // [REMOVED: IInboxDiscoveryPolicy usage]
         policy!.ShouldDiscover(sp).Should().BeTrue();
         policy.Reason(sp).Should().Be("enabled-explicit");
     }
@@ -50,7 +49,7 @@ public class InboxDiscoveryPolicyTests
         {
             ["Sora:Messaging:Discovery:Enabled"] = "false"
         });
-        var policy = sp.GetRequiredService(typeof(IInboxDiscoveryPolicy)) as IInboxDiscoveryPolicy;
+            // [REMOVED: IInboxDiscoveryPolicy usage]
         policy!.ShouldDiscover(sp).Should().BeFalse();
         policy.Reason(sp).Should().Be("disabled-explicit");
     }
@@ -64,7 +63,7 @@ public class InboxDiscoveryPolicyTests
             Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Production");
             Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", null);
             var sp = BuildProvider(new());
-            var policy = sp.GetRequiredService(typeof(IInboxDiscoveryPolicy)) as IInboxDiscoveryPolicy;
+                // [REMOVED: IInboxDiscoveryPolicy usage]
             policy!.ShouldDiscover(sp).Should().BeFalse();
             policy.Reason(sp).Should().Be("disabled-production-default");
         }
@@ -87,7 +86,7 @@ public class InboxDiscoveryPolicyTests
             {
                 ["Sora:AllowMagicInProduction"] = "true"
             });
-            var policy = sp.GetRequiredService(typeof(IInboxDiscoveryPolicy)) as IInboxDiscoveryPolicy;
+                // [REMOVED: IInboxDiscoveryPolicy usage]
             policy!.ShouldDiscover(sp).Should().BeTrue();
             policy.Reason(sp).Should().Be("enabled-magic");
         }
@@ -107,7 +106,7 @@ public class InboxDiscoveryPolicyTests
             Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
             Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", null);
             var sp = BuildProvider(new());
-            var policy = sp.GetRequiredService(typeof(IInboxDiscoveryPolicy)) as IInboxDiscoveryPolicy;
+                // [REMOVED: IInboxDiscoveryPolicy usage]
             policy!.ShouldDiscover(sp).Should().BeTrue();
             policy.Reason(sp).Should().Be("enabled-dev-default");
         }

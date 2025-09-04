@@ -116,7 +116,7 @@ public class FlowDemoController : ControllerBase
 
     /// <summary>
     /// Send a command to a specific adapter target.
-    /// POST /api/flowdemo/command/targeted?command=seed&target=bms:simulator
+    /// POST /api/flowdemo/command/targeted?command=seed&amp;target=bms:simulator
     /// </summary>
     [HttpPost("command/targeted")]
     public async Task<IActionResult> SendTargetedCommand(string command, string target, [FromBody] object? payload = null)

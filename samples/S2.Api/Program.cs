@@ -20,7 +20,7 @@ builder.Services.AddSoraObservability();
 // builder.Services.AddMongoAdapter();
 
 // Wire messaging core + RabbitMQ so diagnostics surface is populated when used
-builder.Services.AddMessagingCore();
+// [REMOVED obsolete AddMessagingCore usage]
 // RabbitMQ registers via auto-registrar when the assembly is referenced; no explicit AddRabbitMq needed
 
 // Register generic capability controllers for Item under api/items

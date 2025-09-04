@@ -28,60 +28,61 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Minimal boot: Sora + auto-registrars provide Messaging Core, RabbitMQ, Flow identity stamper,
+// ✨ BEAUTIFUL NEW MESSAGING - ZERO CONFIGURATION! ✨
+// Auto-registrars provide Messaging Core, RabbitMQ, Flow identity stamper,
 // and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
-    builder.Services.AddRabbitMq();
 
-
-// ✨ BEAUTIFUL FLOW COMMAND HANDLING ✨
-// Listen for seed commands targeted at this OEM adapter
-builder.Services.ConfigureFlow(flow => flow.On("seed", async (payload, ct) =>
+// Listen for seed commands (using new messaging system)
+builder.Services.On<FlowCommandMessage>(async cmd =>
 {
-    Console.WriteLine("🌱 OEM received seed command!");
-    
-    // Parse count from payload (if it's a dictionary)
-    var count = 1;
-    if (payload is Dictionary<string, object> dict && dict.TryGetValue("count", out var v))
+    if (cmd.Command == "seed")
     {
-        count = Convert.ToInt32(v);
-    }
-    
-    var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
-    
-    // Send entities via beautiful messaging patterns
-    foreach (var deviceProfile in subset)
-    {
-        var device = new Device
-        {
-            DeviceId = deviceProfile.DeviceId,
-            Inventory = deviceProfile.Inventory,
-            Serial = deviceProfile.Serial,
-            Manufacturer = deviceProfile.Manufacturer,
-            Model = deviceProfile.Model,
-            Kind = deviceProfile.Kind,
-            Code = deviceProfile.Code
-        };
+        Console.WriteLine("🌱 OEM received seed command!");
         
-        await device.Send(ct); // ✨ Beautiful messaging-first seeding
-        
-        // Send sensors for this device
-        foreach (var sensorProfile in SampleProfiles.SensorsForOem(deviceProfile))
+        // Parse count from payload (if it's a dictionary)
+        var count = 1;
+        if (cmd.Payload is Dictionary<string, object> dict && dict.TryGetValue("count", out var v))
         {
-            var sensor = new Sensor
+            count = Convert.ToInt32(v);
+        }
+        
+        var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
+        
+        // Send entities via beautiful messaging patterns
+        foreach (var deviceProfile in subset)
+        {
+            var device = new Device
             {
-                SensorKey = sensorProfile.SensorKey,
-                DeviceId = sensorProfile.DeviceId,
-                Code = sensorProfile.Code,
-                Unit = sensorProfile.Unit
+                DeviceId = deviceProfile.DeviceId,
+                Inventory = deviceProfile.Inventory,
+                Serial = deviceProfile.Serial,
+                Manufacturer = deviceProfile.Manufacturer,
+                Model = deviceProfile.Model,
+                Kind = deviceProfile.Kind,
+                Code = deviceProfile.Code
             };
             
-            await sensor.Send(ct);
+            await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device); // ✨ Beautiful messaging-first seeding
+            
+            // Send sensors for this device
+            foreach (var sensorProfile in SampleProfiles.SensorsForOem(deviceProfile))
+            {
+                var sensor = new Sensor
+                {
+                    SensorKey = sensorProfile.SensorKey,
+                    DeviceId = sensorProfile.DeviceId,
+                    Code = sensorProfile.Code,
+                    Unit = sensorProfile.Unit
+                };
+                
+                await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor);
+            }
         }
+        
+        Console.WriteLine($"✅ OEM seeded {subset.Length} devices via messaging");
     }
-    
-    Console.WriteLine($"✅ OEM seeded {subset.Length} devices via messaging");
-}));
+});
 
 var app = builder.Build();
 await app.RunAsync();
@@ -133,7 +134,7 @@ public sealed class OemPublisher : BackgroundService
                     };
                     
                     _log.LogDebug("[OEM] 🏭 Sending Device entity for {DeviceId}", d.DeviceId);
-                    await device.Send(stoppingToken); // ✨ Routes through messaging → orchestrator → Flow intake
+                    await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, stoppingToken); // ✨ Routes through messaging → orchestrator → Flow intake
 
                     // Send Sensor entities
                     foreach (var s in SampleProfiles.SensorsForOem(d))
@@ -147,7 +148,7 @@ public sealed class OemPublisher : BackgroundService
                         };
                         
                         _log.LogDebug("[OEM] 📡 Sending Sensor entity for {SensorKey}", s.SensorKey);
-                        await sensor.Send(stoppingToken); // ✨ Beautiful messaging-first routing
+                        await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor, stoppingToken); // ✨ Beautiful messaging-first routing
                     }
                     
                     lastAnnounce = DateTimeOffset.UtcNow;
@@ -165,7 +166,7 @@ public sealed class OemPublisher : BackgroundService
                 };
                 
                 _log.LogInformation("📊 OEM sending Reading {Key}={Value}{Unit} via messaging", reading.SensorKey, reading.Value, reading.Unit);
-                await reading.Send(stoppingToken); // ✨ Messaging-first: routes to orchestrator automatically
+                await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, stoppingToken); // ✨ Messaging-first: routes to orchestrator automatically
             }
             catch (Exception ex)
             {

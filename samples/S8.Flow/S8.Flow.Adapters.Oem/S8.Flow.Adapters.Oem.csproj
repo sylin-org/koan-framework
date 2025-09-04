@@ -6,9 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Sora.Messaging.Abstractions\Sora.Messaging.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Sora.Messaging.Inbox.InMemory\Sora.Messaging.Inbox.InMemory.csproj" />
     <ProjectReference Include="..\..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
     <ProjectReference Include="..\..\..\src\Sora.Core\Sora.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />

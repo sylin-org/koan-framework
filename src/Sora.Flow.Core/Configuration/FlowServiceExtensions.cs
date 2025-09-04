@@ -46,7 +46,7 @@ public sealed class FlowHandlerConfigurator
     {
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
-        _services.On<FlowTargetedMessage<T>>(async (msg, ct) =>
+        _services.On<FlowTargetedMessage<T>>(async msg =>
         {
             if (ShouldProcessMessage(msg.Target))
             {
@@ -64,11 +64,11 @@ public sealed class FlowHandlerConfigurator
     {
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
-        _services.On<FlowTargetedMessage<T>>(async (msg, ct) =>
+        _services.On<FlowTargetedMessage<T>>(async msg =>
         {
             if (ShouldProcessMessage(msg.Target))
             {
-                await handler(msg.Entity, ct);
+                await handler(msg.Entity, CancellationToken.None);
             }
         });
         
@@ -84,7 +84,7 @@ public sealed class FlowHandlerConfigurator
         if (string.IsNullOrWhiteSpace(command)) throw new ArgumentException("Command cannot be null or empty", nameof(command));
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
-        _services.On<FlowCommandMessage>(async (msg, ct) =>
+        _services.On<FlowCommandMessage>(async msg =>
         {
             if (string.Equals(msg.Command, command, StringComparison.OrdinalIgnoreCase) &&
                 ShouldProcessMessage(msg.Target))
@@ -104,12 +104,12 @@ public sealed class FlowHandlerConfigurator
         if (string.IsNullOrWhiteSpace(command)) throw new ArgumentException("Command cannot be null or empty", nameof(command));
         if (handler is null) throw new ArgumentNullException(nameof(handler));
         
-        _services.On<FlowCommandMessage>(async (msg, ct) =>
+        _services.On<FlowCommandMessage>(async msg =>
         {
             if (string.Equals(msg.Command, command, StringComparison.OrdinalIgnoreCase) &&
                 ShouldProcessMessage(msg.Target))
             {
-                await handler(msg.Payload, ct);
+                await handler(msg.Payload, CancellationToken.None);
             }
         });
         

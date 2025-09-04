@@ -9,12 +9,12 @@ namespace Sora.Flow.Sending;
 
 public interface IFlowIdentityStamper
 {
-    void Stamp(IDictionary<string, object?> bag, MessageEnvelope? envelope = null, object? message = null, Type? hostType = null);
+    void Stamp(IDictionary<string, object?> bag, object? envelope = null, object? message = null, Type? hostType = null);
 }
 
 internal sealed class FlowIdentityStamper : IFlowIdentityStamper
 {
-    public void Stamp(IDictionary<string, object?> bag, MessageEnvelope? envelope = null, object? message = null, Type? hostType = null)
+    public void Stamp(IDictionary<string, object?> bag, object? envelope = null, object? message = null, Type? hostType = null)
     {
         if (bag is null) return;
         // Respect existing values
@@ -36,11 +36,7 @@ internal sealed class FlowIdentityStamper : IFlowIdentityStamper
             catch { }
         }
 
-        // 2) From envelope headers
-        if (string.IsNullOrWhiteSpace(sys) && envelope is not null && envelope.Headers is not null)
-            envelope.Headers.TryGetValue(Constants.Envelope.System, out sys);
-        if (string.IsNullOrWhiteSpace(adp) && envelope is not null && envelope.Headers is not null)
-            envelope.Headers.TryGetValue(Constants.Envelope.Adapter, out adp);
+        // 2) From envelope headers (disabled - new messaging system doesn't use envelope headers)
 
         // 3) From host type annotated with [FlowAdapter]
         if ((string.IsNullOrWhiteSpace(sys) || string.IsNullOrWhiteSpace(adp)) && hostType is not null)

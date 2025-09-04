@@ -72,10 +72,10 @@ public static class FlowEntitySendExtensions
     }
 
     /// <summary>
-    /// INTERNAL: Send directly to Flow intake (bypasses messaging).
-    /// This is for orchestrator use only - external callers should use Send() or SendTo().
+    /// Send directly to Flow intake for processing.
+    /// Routes to the Flow orchestrator for entity processing and storage.
     /// </summary>
-    internal static async Task SendToFlowIntake<TModel>(this TModel entity, string? sourceId = null, DateTimeOffset? occurredAt = null, CancellationToken ct = default)
+    public static async Task SendToFlowIntake<TModel>(this TModel entity, string? sourceId = null, DateTimeOffset? occurredAt = null, CancellationToken ct = default)
         where TModel : FlowEntity<TModel>, new()
     {
         if (entity is null) throw new ArgumentNullException(nameof(entity));

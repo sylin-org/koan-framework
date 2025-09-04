@@ -1,25 +1,52 @@
-﻿// ✨ BEAUTIFUL FLOW ORCHESTRATOR ✨
-// This assembly is now a Flow orchestrator - it will auto-register message handlers
-// for all FlowEntity and FlowValueObject types discovered in this assembly!
 using S8.Flow.Api.Entities;
 using Sora.Data.Core;
 using Sora.Flow;
-using Sora.Flow.Attributes;
 using Sora.Flow.Configuration;
 using Sora.Flow.Options;
 using S8.Flow.Shared;
 using Sora.Messaging;
 using S8.Flow.Api.Adapters;
-using Sora.Messaging.RabbitMq;
 using Sora.Web.Swagger;
-
-[assembly: FlowOrchestrator]
-
+using Sora.Flow.Sending;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ✨ NEW BEAUTIFUL MESSAGING - ZERO CONFIGURATION! ✨
 builder.Services.AddSora();
-    builder.Services.AddRabbitMq();
+
+// Register Flow message handlers - consumers for FlowTargetedMessage<T> will be created automatically!
+builder.Services.ConfigureFlow(flow =>
+{
+    flow.On<Reading>(async reading =>
+    {
+        Console.WriteLine($"📊 Received Reading: {reading.SensorKey} = {reading.Value}{reading.Unit}");
+        
+        // Route to Flow intake for processing
+        await reading.SendToFlowIntake();
+    });
+
+    flow.On<Device>(async device =>
+    {
+        Console.WriteLine($"🏭 Device registered: {device.DeviceId} ({device.Manufacturer} {device.Model})");
+        
+        // Route to Flow intake for processing
+        await device.SendToFlowIntake();
+    });
+
+    flow.On<Sensor>(async sensor =>
+    {
+        Console.WriteLine($"📡 Sensor registered: {sensor.SensorKey} ({sensor.Code}) - Unit: {sensor.Unit}");
+        
+        // Route to Flow intake for processing
+        await sensor.SendToFlowIntake();
+    });
+});
+
+// Keep FlowCommandMessage as direct handler (not wrapped in FlowTargetedMessage)
+builder.Services.On<FlowCommandMessage>(async cmd =>
+{
+    Console.WriteLine($"🌱 Received command: {cmd.Command} with payload: {cmd.Payload}");
+});
 
 // Container-only sample guard (must be after service registration so DI is wired)
 if (!Sora.Core.SoraEnv.InContainer)
@@ -46,33 +73,9 @@ builder.Services.AddControllers();
 builder.Services.AddRouting();
 builder.Services.AddSoraSwagger(builder.Configuration);
 
-// ✨ BEAUTIFUL FLOW ORCHESTRATOR PATTERNS ✨
-// The [FlowOrchestrator] attribute above auto-registers handlers for:
-// - Device entities: Device.Send() → auto-routed to Flow intake
-// - Sensor entities: Sensor.Send() → auto-routed to Flow intake  
-// - Reading value objects: Reading.Send() → auto-routed to Flow intake
-// 
-// Custom business logic can be added via proper service registration:
-builder.Services.ConfigureFlow(flow => flow
-    .On<Reading>(async reading =>
-    {
-        // Apply custom business rules before Flow intake
-        if (reading.Value < 0)
-        {
-            Console.WriteLine($"⚠️  Received negative reading: {reading.Value} from {reading.SensorKey}");
-        }
-        // The auto-registered handler will route to Flow intake automatically
-    })
-    .On<Device>(async device =>
-    {
-        Console.WriteLine($"🏭 New device registered: {device.DeviceId} ({device.Manufacturer} {device.Model})");
-    })
-    .On("seed", async (payload, ct) =>
-    {
-        Console.WriteLine($"🌱 Received seed command with payload: {payload}");
-        // Handle seed commands from adapters
-    })
-);
+// That's it! No complex Flow orchestrator setup needed.
+// Messages sent via .Send() will be automatically routed to handlers above.
+// Handlers will then route to Flow intake for processing.
 
 // Health snapshot based on recent Keyed stage records
 builder.Services.AddSingleton<IAdapterHealthRegistry, S8.Flow.Api.Adapters.KeyedAdapterHealthRegistry>();

@@ -58,9 +58,9 @@ public sealed class Compose_OneToOne_CommandResponseTests
         responses[0].OrderId.Should().Be("o-1");
     }
 
-    [Message(Alias = "Orders.Create")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class CreateOrder { public string OrderId { get; init; } = string.Empty; }
 
-    [Message(Alias = "Orders.Created")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class OrderCreated { public string OrderId { get; init; } = string.Empty; }
 }

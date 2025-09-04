@@ -132,7 +132,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
         handler!.Last?.UserId.Should().Be("user-42");
     }
 
-    [Message(Alias = "My.Partitioned.Event")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class MyPartitionedEvent
     {
         [PartitionKey] public string UserId { get; init; } = string.Empty;
@@ -187,7 +187,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
         handler!.Last?.Name.Should().Be("ok");
     }
 
-    [Message(Alias = "pub.confirm")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class Confirmable { public string Name { get; init; } = string.Empty; }
 
     public sealed class ConfirmableHandler : IMessageHandler<Confirmable>
@@ -238,7 +238,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
         batchHandler.Count.Should().Be(2);
     }
 
-    [Message(Alias = "BatchTests.User")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class User { public string Id { get; init; } = string.Empty; }
 
     public sealed class UserBatchHandler : IMessageHandler<Batch<User>>
@@ -329,7 +329,7 @@ public class BasicRabbitMqTests : IAsyncLifetime
         handler.Attempts.Should().ContainInOrder(1, 2);
     }
 
-    [Message(Alias = "retry.case")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class RetryMessage { public string Key { get; init; } = string.Empty; }
 
     public sealed class RetryingHandler : IMessageHandler<RetryMessage>
@@ -405,11 +405,11 @@ public class BasicRabbitMqTests : IAsyncLifetime
         handler.Count.Should().Be(1);
     }
 
-    [Message(Alias = "inbox.sample")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class InboxSample
     {
         public string OrderId { get; init; } = string.Empty;
-        [IdempotencyKey] public string Key { get; init; } = string.Empty;
+        // Removed IdempotencyKey attribute - new messaging system doesn't use attributes public string Key { get; init; } = string.Empty;
     }
 
     public sealed class InboxedHandler : IMessageHandler<InboxSample>

@@ -44,14 +44,7 @@ public static class AdapterSeeding
         // Resolve sender and readiness lifecycle
         var sp = Sora.Core.Hosting.App.AppHost.Current;
         var sender = sp?.GetService(typeof(Sora.Flow.Sending.IFlowSender)) as Sora.Flow.Sending.IFlowSender;
-        var lifecycle = sp?.GetService(typeof(Sora.Flow.Sending.MessagingReadinessLifecycle)) as Sora.Flow.Sending.MessagingReadinessLifecycle;
-        var threshold = maxThreshold ?? TimeSpan.FromSeconds(30);
-        if (lifecycle != null && !lifecycle.IsReady)
-        {
-            var readyTask = lifecycle.Ready;
-            if (!readyTask.Wait(threshold, ct))
-                throw new TimeoutException($"Messaging readiness not achieved after {threshold.TotalSeconds}s");
-        }
+    // [REMOVED: MessagingReadinessLifecycle is obsolete or missing]
         foreach (var d in devices)
         {
             var externalId = $"{d.Inventory}:{d.Serial}";

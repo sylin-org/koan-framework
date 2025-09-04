@@ -53,6 +53,6 @@ public sealed class Compose_OneToMany_BroadcastTests
         foreach (var h in hosts) await h.DisposeAsync();
     }
 
-    [Message(Alias = "Users.Registered")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class UserRegistered { public string UserId { get; init; } = string.Empty; }
 }

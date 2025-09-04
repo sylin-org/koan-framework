@@ -87,7 +87,7 @@ public sealed class FlowSendBuilder
     {
         try
         {
-            var messageBus = ResolveMessageBus();
+            var messageProxy = ResolveMessageProxy();
             
             // Create command message with targeting information
             var commandMessage = new FlowCommandMessage
@@ -98,7 +98,7 @@ public sealed class FlowSendBuilder
                 Timestamp = DateTimeOffset.UtcNow
             };
 
-            await messageBus.SendAsync(commandMessage, ct);
+            await messageProxy.SendAsync(commandMessage, ct);
         }
         catch (Exception ex) when (!(ex is OperationCanceledException))
         {
@@ -109,16 +109,15 @@ public sealed class FlowSendBuilder
         }
     }
 
-    private static IMessageBus ResolveMessageBus()
+    private static IMessageProxy ResolveMessageProxy()
     {
         var serviceProvider = AppHost.Current 
             ?? throw new InvalidOperationException("AppHost.Current is not initialized. Ensure AddSora() was called during startup.");
             
-        var selector = serviceProvider.GetService<IMessageBusSelector>()
-            ?? throw new InvalidOperationException("IMessageBusSelector is not registered. Ensure AddSora() and messaging core services are configured.");
+        var messageProxy = serviceProvider.GetService<IMessageProxy>()
+            ?? throw new InvalidOperationException("IMessageProxy is not registered. Ensure AddSora() and messaging core services are configured.");
             
-        var messageBus = selector.ResolveDefault(serviceProvider);
-        return messageBus;
+        return messageProxy;
     }
 }
 
@@ -166,7 +165,7 @@ public sealed class FlowSendBuilder<T> where T : class
     {
         try
         {
-            var messageBus = ResolveMessageBus();
+            var messageProxy = ResolveMessageProxy();
             
             // Create targeted message wrapper
             var targetedMessage = new FlowTargetedMessage<T>
@@ -176,7 +175,7 @@ public sealed class FlowSendBuilder<T> where T : class
                 Timestamp = DateTimeOffset.UtcNow
             };
 
-            await messageBus.SendAsync(targetedMessage, ct);
+            await messageProxy.SendAsync(targetedMessage, ct);
         }
         catch (Exception ex) when (!(ex is OperationCanceledException))
         {
@@ -187,23 +186,22 @@ public sealed class FlowSendBuilder<T> where T : class
         }
     }
 
-    private static IMessageBus ResolveMessageBus()
+    private static IMessageProxy ResolveMessageProxy()
     {
         var serviceProvider = AppHost.Current 
             ?? throw new InvalidOperationException("AppHost.Current is not initialized. Ensure AddSora() was called during startup.");
             
-        var selector = serviceProvider.GetService<IMessageBusSelector>()
-            ?? throw new InvalidOperationException("IMessageBusSelector is not registered. Ensure AddSora() and messaging core services are configured.");
+        var messageProxy = serviceProvider.GetService<IMessageProxy>()
+            ?? throw new InvalidOperationException("IMessageProxy is not registered. Ensure AddSora() and messaging core services are configured.");
             
-        var messageBus = selector.ResolveDefault(serviceProvider);
-        return messageBus;
+        return messageProxy;
     }
 }
 
 /// <summary>
 /// Message wrapper for named commands with targeting.
 /// </summary>
-[Sora.Messaging.Message(Alias = "flow.command", Version = 1)]
+// Removed Message attribute - new messaging system doesn't use attributes
 public sealed class FlowCommandMessage
 {
     public string Command { get; set; } = default!;
@@ -215,7 +213,7 @@ public sealed class FlowCommandMessage
 /// <summary>
 /// Message wrapper for typed entities with targeting.
 /// </summary>
-[Sora.Messaging.Message(Alias = "flow.entity", Version = 1)]
+// Removed Message attribute - new messaging system doesn't use attributes
 public sealed class FlowTargetedMessage<T> where T : class
 {
     public T Entity { get; set; } = default!;

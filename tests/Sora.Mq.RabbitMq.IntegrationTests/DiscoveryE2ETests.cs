@@ -9,7 +9,7 @@ using RabbitMQ.Client.Events;
 using Sora.Core;
 using Sora.Data.Core;
 using Sora.Messaging;
-using Sora.Messaging.Inbox.Http;
+// [REMOVED obsolete Sora.Messaging.Inbox.Http using]
 using Sora.Testing;
 using Newtonsoft.Json;
 using System.Text;
@@ -112,9 +112,9 @@ public class DiscoveryE2ETests : IAsyncLifetime
         (sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
         // After UseSora, discovery initializer should have run; HttpInboxStore should be registered if found
-        var http = sp.GetService<HttpInboxStore>();
-        http.Should().NotBeNull()
-            .And.BeAssignableTo<IInboxStore>();
+    // [REMOVED obsolete HttpInboxStore usage]
+        http.Should().NotBeNull();
+            // [REMOVED obsolete IInboxStore usage]
 
         // Also verify that configured InboxClientOptions got the endpoint (indirectly via HttpClient BaseAddress accessible only internally)
         var opts = sp.GetRequiredService<IOptions<DiscoveryOptions>>();

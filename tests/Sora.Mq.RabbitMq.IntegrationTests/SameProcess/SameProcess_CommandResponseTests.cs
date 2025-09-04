@@ -47,9 +47,9 @@ public sealed class SameProcess_CommandResponseTests
         responses[0].UserId.Should().Be("u-1");
     }
 
-    [Message(Alias = "Users.Create")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class CreateUser { public string UserId { get; init; } = string.Empty; }
 
-    [Message(Alias = "Users.Created")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class UserCreated { public string UserId { get; init; } = string.Empty; }
 }

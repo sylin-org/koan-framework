@@ -57,6 +57,6 @@ public sealed class Compose_OneToMany_RoundRobinTests
         foreach (var h in hosts) await h.DisposeAsync();
     }
 
-    [Message(Alias = "Work.Do")]
+    // Removed Message attribute - new messaging system doesn't use attributes
     public sealed class Work { public string JobId { get; init; } = string.Empty; }
 }

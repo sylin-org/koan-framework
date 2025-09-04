@@ -146,7 +146,7 @@ public static class ServiceCollectionExtensions
                     }
                     foreach (var modelType in models)
                     {
-                        _log.LogDebug($"[flow.projection] Processing model: {modelType.Name}");
+                        _log.LogTrace($"[flow.projection] Processing model: {modelType.Name}");
                         var taskType = typeof(ProjectionTask<>).MakeGenericType(modelType);
                         var pageMethod = typeof(Data<,>).MakeGenericType(taskType, typeof(string))
                             .GetMethod("Page", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(int), typeof(CancellationToken) });
@@ -154,14 +154,14 @@ public static class ServiceCollectionExtensions
                         int pageNum = 1;
                         while (!stoppingToken.IsCancellationRequested)
                         {
-                            _log.LogDebug($"[flow.projection] Fetching projection tasks page {pageNum} (batch={batch})");
+                            _log.LogTrace($"[flow.projection] Fetching projection tasks page {pageNum} (batch={batch})");
                             var task = (Task)pageMethod.Invoke(null, new object?[] { pageNum, batch, stoppingToken })!;
                             await task.ConfigureAwait(false);
                             var enumerable = (System.Collections.IEnumerable)GetTaskResult(task)!;
                             var tasks = enumerable.Cast<object>().ToList();
                             if (tasks.Count == 0)
                             {
-                                _log.LogDebug($"[flow.projection] No projection tasks found for model {modelType.Name} on page {pageNum}");
+                                _log.LogTrace($"[flow.projection] No projection tasks found for model {modelType.Name} on page {pageNum}");
                                 break;
                             }
                             _log.LogDebug($"[flow.projection] Processing {tasks.Count} projection tasks for model {modelType.Name} on page {pageNum}");
@@ -424,7 +424,7 @@ public static class ServiceCollectionExtensions
                     }
                     foreach (var modelType in models)
                     {
-                        _log.LogDebug($"[flow.association] Processing model: {modelType.Name}");
+                        _log.LogTrace($"[flow.association] Processing model: {modelType.Name}");
                         var intakeSet = FlowSets.StageShort(FlowSets.Intake);
                         var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
                         List<object> page;
@@ -439,7 +439,7 @@ public static class ServiceCollectionExtensions
                         }
                         if (page.Count == 0)
                         {
-                            _log.LogDebug($"[flow.association] No intake records found for model {modelType.Name}");
+                            _log.LogTrace($"[flow.association] No intake records found for model {modelType.Name}");
                             continue;
                         }
                         _log.LogDebug($"[flow.association] Processing {page.Count} intake records for model {modelType.Name}");

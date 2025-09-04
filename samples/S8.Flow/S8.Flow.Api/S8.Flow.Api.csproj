@@ -11,9 +11,7 @@
   <ProjectReference Include="..\..\..\src\Sora.Flow.Web\Sora.Flow.Web.csproj" />
   <ProjectReference Include="..\..\..\src\Sora.Web.Swagger\Sora.Web.Swagger.csproj" />
     <ProjectReference Include="..\S8.Flow.Shared\S8.Flow.Shared.csproj" />
-  <ProjectReference Include="..\..\..\src\Sora.Messaging.Abstractions\Sora.Messaging.Abstractions.csproj" />
   <ProjectReference Include="..\..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
-  <ProjectReference Include="..\..\..\src\Sora.Messaging.Inbox.InMemory\Sora.Messaging.Inbox.InMemory.csproj" />
   <ProjectReference Include="..\..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
   </ItemGroup>
   <ItemGroup>
