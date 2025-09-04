@@ -9,6 +9,7 @@ using Sora.Core;
 using Sora.Flow.Options;
 using Sora.Flow.Sending;
 using Sora.Flow.Attributes;
+using Sora.Messaging;
 
 namespace Sora.Flow.Initialization;
 
@@ -31,6 +32,10 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         // Auto-register adapter publishers: BackgroundService types annotated with [FlowAdapter]
         // Config gates: Sora:Flow:Adapters:AutoStart (bool), Include (string[] "system:adapter"), Exclude (string[])
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ISoraInitializer>(sp => new AdapterScannerInitializer()));
+
+        // ✨ BEAUTIFUL ORCHESTRATOR AUTO-REGISTRATION ✨
+        // Auto-register Flow message handlers for assemblies marked with [FlowOrchestrator]
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ISoraInitializer>(sp => new OrchestratorScannerInitializer()));
     }
 
     private sealed class AdapterScannerInitializer : ISoraInitializer
@@ -98,6 +103,181 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
                 }
             }
             return results;
+        }
+    }
+
+    /// <summary>
+    /// ✨ BEAUTIFUL ORCHESTRATOR AUTO-REGISTRATION ✨
+    /// Scans for assemblies marked with [FlowOrchestrator] and auto-registers message handlers
+    /// that bridge Sora.Messaging → Sora.Flow intake pipeline.
+    /// </summary>
+    private sealed class OrchestratorScannerInitializer : ISoraInitializer
+    {
+        public void Initialize(IServiceCollection services)
+        {
+            var orchestratorAssemblies = DiscoverOrchestratorAssemblies();
+            
+            foreach (var assembly in orchestratorAssemblies)
+            {
+                var flowTypes = DiscoverFlowTypesInAssembly(assembly);
+                
+                foreach (var flowType in flowTypes)
+                {
+                    RegisterFlowHandler(services, flowType);
+                }
+
+                // Also register handler for FlowCommandMessage (named commands)
+                RegisterCommandHandler(services);
+            }
+        }
+
+        private static List<Assembly> DiscoverOrchestratorAssemblies()
+        {
+            var result = new List<Assembly>();
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            
+            foreach (var asm in assemblies)
+            {
+                try
+                {
+                    var attr = asm.GetCustomAttribute<FlowOrchestratorAttribute>();
+                    if (attr is not null)
+                        result.Add(asm);
+                }
+                catch
+                {
+                    // Skip assemblies that can't be examined
+                }
+            }
+            
+            return result;
+        }
+
+        private static List<Type> DiscoverFlowTypesInAssembly(Assembly assembly)
+        {
+            var result = new List<Type>();
+            
+            try
+            {
+                Type?[] types;
+                try { types = assembly.GetTypes(); }
+                catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
+                catch { return result; }
+                
+                foreach (var t in types)
+                {
+                    if (t is null || !t.IsClass || t.IsAbstract) continue;
+                    
+                    // Check for FlowIgnore attribute to opt out
+                    if (t.GetCustomAttribute<FlowIgnoreAttribute>() is not null) continue;
+                    
+                    var bt = t.BaseType;
+                    if (bt is null || !bt.IsGenericType) continue;
+                    
+                    var def = bt.GetGenericTypeDefinition();
+                    if (def == typeof(Model.FlowEntity<>) || def == typeof(Model.FlowValueObject<>))
+                        result.Add(t);
+                }
+            }
+            catch
+            {
+                // Skip assemblies that can't be examined
+            }
+            
+            return result;
+        }
+
+        private static void RegisterFlowHandler(IServiceCollection services, Type flowType)
+        {
+            var baseType = flowType.BaseType;
+            if (baseType?.IsGenericType != true) return;
+            
+            var genericDef = baseType.GetGenericTypeDefinition();
+            
+            if (genericDef == typeof(Model.FlowEntity<>))
+            {
+                // Register handler for FlowEntity - receives targeted messages and routes to Flow intake
+                RegisterEntityHandler(services, flowType);
+            }
+            else if (genericDef == typeof(Model.FlowValueObject<>))
+            {
+                // Register handler for FlowValueObject - needs special handling
+                RegisterValueObjectHandler(services, flowType);
+            }
+        }
+
+        private static void RegisterEntityHandler(IServiceCollection services, Type entityType)
+        {
+            // Use a much simpler approach: register a generic handler factory
+            // that dynamically creates handlers for each discovered Flow entity type
+            
+            var registerMethod = typeof(OrchestratorScannerInitializer)
+                .GetMethod(nameof(RegisterEntityHandlerGeneric), BindingFlags.NonPublic | BindingFlags.Static)
+                ?.MakeGenericMethod(entityType);
+                
+            registerMethod?.Invoke(null, new object[] { services });
+        }
+
+        private static void RegisterValueObjectHandler(IServiceCollection services, Type valueObjectType)
+        {
+            var registerMethod = typeof(OrchestratorScannerInitializer)
+                .GetMethod(nameof(RegisterValueObjectHandlerGeneric), BindingFlags.NonPublic | BindingFlags.Static)
+                ?.MakeGenericMethod(valueObjectType);
+                
+            registerMethod?.Invoke(null, new object[] { services });
+        }
+
+        private static void RegisterEntityHandlerGeneric<T>(IServiceCollection services) 
+            where T : Model.FlowEntity<T>, new()
+        {
+            // Clean, simple registration using Sora.Messaging extensions
+            services.On<FlowTargetedMessage<T>>(async (msg, ct) =>
+            {
+                try
+                {
+                    // Route the entity to Flow intake automatically
+                    await msg.Entity.SendToFlowIntake(ct: ct);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️  Flow orchestrator failed to route {typeof(T).Name}: {ex.Message}");
+                    throw; // Re-throw for messaging system error handling
+                }
+            });
+        }
+
+        private static void RegisterValueObjectHandlerGeneric<T>(IServiceCollection services) 
+            where T : Model.FlowValueObject<T>, new()
+        {
+            services.On<FlowTargetedMessage<T>>(async (msg, ct) =>
+            {
+                try
+                {
+                    // Route the value object to Flow intake automatically  
+                    await msg.Entity.SendToFlowIntake(ct: ct);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️  Flow orchestrator failed to route {typeof(T).Name}: {ex.Message}");
+                    throw;
+                }
+            });
+        }
+
+        private static void RegisterCommandHandler(IServiceCollection services)
+        {
+            // Register a generic handler for FlowCommandMessage that logs or processes commands
+            // This is a placeholder - real orchestrators would override specific command handlers
+            services.On<FlowCommandMessage>(async msg =>
+            {
+                // For now, just log that we received a command
+                // Real orchestrators would implement specific command handling logic
+                System.Diagnostics.Debug.WriteLine($"Flow orchestrator received command: {msg.Command}");
+                
+                // TODO: Implement command routing/processing logic
+                // This could route to specific handlers based on msg.Command
+                await Task.CompletedTask;
+            });
         }
     }
 

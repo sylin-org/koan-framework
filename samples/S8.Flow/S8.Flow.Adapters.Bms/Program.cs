@@ -7,10 +7,10 @@ using Sora.Messaging;
 using Sora.Messaging.RabbitMq;
 using S8.Flow.Shared;
 using S8.Flow.Shared.Commands;
-// removed events; use plain-bag seeds and direct VO Send()
 using Sora.Flow.Actions;
 using Sora.Core.Hosting.App;
 using Sora.Flow.Attributes;
+using Sora.Flow.Configuration;
 using Sora.Flow.Sending;
 using Sora.Data.Core;
 using Sora.Flow;
@@ -34,14 +34,54 @@ builder.Services.AddSora();
     builder.Services.AddRabbitMq();
 
 
-// Register FlowCommand handler for 'seed' (target: bms)
-builder.Services.AddFlowCommands(reg =>
-    reg.On("seed", async (ctx, args, ct) => {
-        var count = args.TryGetValue("count", out var v) ? Convert.ToInt32(v) : 1;
-        var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
-        await AdapterSeeding.SeedCatalogAsync(FlowSampleConstants.Sources.Bms, subset, SampleProfiles.SensorsForBms, ct);
-    }, target: FlowSampleConstants.Sources.Bms)
-);
+// ✨ BEAUTIFUL FLOW COMMAND HANDLING ✨
+// Listen for seed commands targeted at this BMS adapter
+builder.Services.ConfigureFlow(flow => flow.On("seed", async (payload, ct) =>
+{
+    Console.WriteLine("🌱 BMS received seed command!");
+    
+    // Parse count from payload (if it's a dictionary)
+    var count = 1;
+    if (payload is Dictionary<string, object> dict && dict.TryGetValue("count", out var v))
+    {
+        count = Convert.ToInt32(v);
+    }
+    
+    var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
+    
+    // Send entities via beautiful messaging patterns
+    foreach (var deviceProfile in subset)
+    {
+        var device = new Device
+        {
+            DeviceId = deviceProfile.DeviceId,
+            Inventory = deviceProfile.Inventory,
+            Serial = deviceProfile.Serial,
+            Manufacturer = deviceProfile.Manufacturer,
+            Model = deviceProfile.Model,
+            Kind = deviceProfile.Kind,
+            Code = deviceProfile.Code
+        };
+        
+        await device.Send(ct); // ✨ Beautiful messaging-first seeding
+        
+        // Send sensors for this device
+        foreach (var sensorProfile in SampleProfiles.SensorsForBms(deviceProfile))
+        {
+            var sensor = new Sensor
+            {
+                SensorKey = sensorProfile.SensorKey,
+                DeviceId = sensorProfile.DeviceId,
+                Code = sensorProfile.Code,
+                Unit = sensorProfile.Unit
+            };
+            
+            await sensor.Send(ct);
+        }
+    }
+    
+    Console.WriteLine($"✅ BMS seeded {subset.Length} devices via messaging");
+}));
 
 var app = builder.Build();
 await app.RunAsync();
@@ -74,61 +114,56 @@ public sealed class BmsPublisher : BackgroundService
                 var idx = rng.Next(0, SampleProfiles.Fleet.Length);
                 var d = SampleProfiles.Fleet[idx];
                 _log.LogDebug("[BMS] Preparing to announce Device {DeviceId}", d.DeviceId);
-                // Periodic independent announcements (devices + sensors)
+                // ✨ BEAUTIFUL NEW MESSAGING-FIRST PATTERNS ✨
+                // Periodic device and sensor announcements
                 if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
                 {
-                    // Seed device via FlowEvent (plain bag)
-                    var bmsDeviceId = $"{d.Inventory}:{d.Serial}";
-                    var deviceBag = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    // Create and send Device entity through messaging system
+                    var device = new Device
                     {
-                        [Keys.Device.Inventory] = d.Inventory,
-                        [Keys.Device.Serial] = d.Serial,
-                        [Keys.Device.Manufacturer] = d.Manufacturer,
-                        [Keys.Device.Model] = d.Model,
-                        [Keys.Device.Kind] = d.Kind,
-                        [Keys.Device.Code] = d.Code,
-                        ["identifier.external.bms"] = bmsDeviceId,
-                        ["source"] = "bms",
+                        DeviceId = d.DeviceId,
+                        Inventory = d.Inventory,
+                        Serial = d.Serial,
+                        Manufacturer = d.Manufacturer,
+                        Model = d.Model,
+                        Kind = d.Kind,
+                        Code = d.Code
                     };
-                    var devEvent = FlowEvent.ForModel("device");
-                    devEvent.SourceId = FlowSampleConstants.Sources.Bms;
-                    devEvent.CorrelationId = bmsDeviceId;
-                    foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
-                    _log.LogDebug("[BMS] Sending device event for {DeviceId}", d.DeviceId);
-                    await devEvent.Send(ct);
+                    
+                    _log.LogDebug("[BMS] 🏭 Sending Device entity for {DeviceId}", d.DeviceId);
+                    await device.Send(ct); // ✨ Routes through messaging → orchestrator → Flow intake
 
-                    // Seed temperature sensor via FlowEvent
+                    // Send Sensor entities
                     foreach (var s in SampleProfiles.SensorsForBms(d))
                     {
-                        _log.LogDebug("[BMS] Sending sensor event for {SensorKey}", s.SensorKey);
-                        var sensorEvent = FlowEvent.ForModel("sensor")
-                            .With(Keys.Sensor.Key, s.SensorKey)
-                            .With("DeviceId", s.DeviceId)
-                            .With(Keys.Sensor.Code, s.Code)
-                            .With(Keys.Sensor.Unit, s.Unit)
-                            .With("source", "bms");
-                        sensorEvent.SourceId = FlowSampleConstants.Sources.Bms;
-                        sensorEvent.CorrelationId = s.SensorKey;
-                        await sensorEvent.Send(ct);
+                        var sensor = new Sensor
+                        {
+                            SensorKey = s.SensorKey,
+                            DeviceId = s.DeviceId,
+                            Code = s.Code,
+                            Unit = s.Unit
+                        };
+                        
+                        _log.LogDebug("[BMS] 📡 Sending Sensor entity for {SensorKey}", s.SensorKey);
+                        await sensor.Send(ct); // ✨ Beautiful messaging-first routing
                     }
+                    
                     lastAnnounce = DateTimeOffset.UtcNow;
-                    _log.LogInformation("[BMS] Announced Device {Inv}/{Serial} and Sensor TEMP", d.Inventory, d.Serial);
+                    _log.LogInformation("✅ [BMS] Announced Device {Inv}/{Serial} and sensors via messaging", d.Inventory, d.Serial);
                 }
 
-                // Publish reading via FlowEvent
-                var key = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}";
-                var at = DateTimeOffset.UtcNow;
-                var val = Math.Round(20 + rng.NextDouble() * 10, 2);
-                var readingEvent = FlowEvent.ForModel("reading")
-                    .With(Keys.Sensor.Key, key)
-                    .With(Keys.Reading.Value, val)
-                    .With(Keys.Reading.CapturedAt, at.ToString("O"))
-                    .With(Keys.Sensor.Unit, Units.C)
-                    .With(Keys.Reading.Source, "bms");
-                readingEvent.SourceId = FlowSampleConstants.Sources.Bms;
-                readingEvent.CorrelationId = key;
-                await readingEvent.Send(ct);
-                _log.LogInformation("BMS sent Reading {Key}={Value}{Unit} at {At}", key, val, Units.C, at);
+                // Send Reading value object through messaging
+                var reading = new Reading
+                {
+                    SensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}",
+                    Value = Math.Round(20 + rng.NextDouble() * 10, 2),
+                    CapturedAt = DateTimeOffset.UtcNow,
+                    Unit = Units.C,
+                    Source = "bms"
+                };
+                
+                _log.LogInformation("📊 BMS sending Reading {Key}={Value}{Unit} via messaging", reading.SensorKey, reading.Value, reading.Unit);
+                await reading.Send(ct); // ✨ Messaging-first: routes to orchestrator automatically
             }
             catch (Exception ex)
             {

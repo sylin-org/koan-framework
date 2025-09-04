@@ -54,3 +54,10 @@ public sealed class ParentKeyAttribute : Attribute
         PayloadPath = string.IsNullOrWhiteSpace(payloadPath) ? null : payloadPath;
     }
 }
+
+/// <summary>
+/// Marks an assembly as a Flow orchestrator, enabling auto-registration of message handlers
+/// for all FlowEntity and FlowValueObject types discovered in the assembly.
+/// </summary>
+[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
+public sealed class FlowOrchestratorAttribute : Attribute { }

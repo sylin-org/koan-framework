@@ -11,7 +11,8 @@ using Sora.Flow.Actions;
 using Sora.Flow.Sending;
 using Sora.Flow.Attributes;
 using Sora.Flow;
-using Sora.Data.Core; // AddSora()
+using Sora.Flow.Configuration;
+using Sora.Data.Core;
 using S8.Flow.Shared.Commands;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -33,14 +34,54 @@ builder.Services.AddSora();
     builder.Services.AddRabbitMq();
 
 
-// Register FlowCommand handler for 'seed' (target: oem)
-builder.Services.AddFlowCommands(reg =>
-    reg.On("seed", async (ctx, args, ct) => {
-        var count = args.TryGetValue("count", out var v) ? Convert.ToInt32(v) : 1;
-        var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
-        await AdapterSeeding.SeedCatalogAsync(FlowSampleConstants.Sources.Oem, subset, SampleProfiles.SensorsForOem, ct);
-    }, target: FlowSampleConstants.Sources.Oem)
-);
+// ✨ BEAUTIFUL FLOW COMMAND HANDLING ✨
+// Listen for seed commands targeted at this OEM adapter
+builder.Services.ConfigureFlow(flow => flow.On("seed", async (payload, ct) =>
+{
+    Console.WriteLine("🌱 OEM received seed command!");
+    
+    // Parse count from payload (if it's a dictionary)
+    var count = 1;
+    if (payload is Dictionary<string, object> dict && dict.TryGetValue("count", out var v))
+    {
+        count = Convert.ToInt32(v);
+    }
+    
+    var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
+    
+    // Send entities via beautiful messaging patterns
+    foreach (var deviceProfile in subset)
+    {
+        var device = new Device
+        {
+            DeviceId = deviceProfile.DeviceId,
+            Inventory = deviceProfile.Inventory,
+            Serial = deviceProfile.Serial,
+            Manufacturer = deviceProfile.Manufacturer,
+            Model = deviceProfile.Model,
+            Kind = deviceProfile.Kind,
+            Code = deviceProfile.Code
+        };
+        
+        await device.Send(ct); // ✨ Beautiful messaging-first seeding
+        
+        // Send sensors for this device
+        foreach (var sensorProfile in SampleProfiles.SensorsForOem(deviceProfile))
+        {
+            var sensor = new Sensor
+            {
+                SensorKey = sensorProfile.SensorKey,
+                DeviceId = sensorProfile.DeviceId,
+                Code = sensorProfile.Code,
+                Unit = sensorProfile.Unit
+            };
+            
+            await sensor.Send(ct);
+        }
+    }
+    
+    Console.WriteLine($"✅ OEM seeded {subset.Length} devices via messaging");
+}));
 
 var app = builder.Build();
 await app.RunAsync();
@@ -75,61 +116,56 @@ public sealed class OemPublisher : BackgroundService
                 var code = rng.Next(0, 2) == 0 ? SensorCodes.PWR : SensorCodes.COOLANT_PRESSURE;
                 var unit = code == SensorCodes.PWR ? Units.Watt : Units.KPa;
                 var value = code == SensorCodes.PWR ? Math.Round(100 + rng.NextDouble() * 900, 2) : Math.Round(200 + rng.NextDouble() * 50, 2);
-                // Periodic independent announcements
+                // ✨ BEAUTIFUL NEW MESSAGING-FIRST PATTERNS ✨
+                // Periodic device and sensor announcements
                 if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
                 {
-                    // Seed Device via FlowEvent (pure MQ)
-                    var oemDeviceId = $"{d.Inventory}:{d.Serial}";
-                    var deviceBag = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    // Create and send Device entity through messaging system
+                    var device = new Device
                     {
-                        [Keys.Device.Inventory] = d.Inventory,
-                        [Keys.Device.Serial] = d.Serial,
-                        [Keys.Device.Manufacturer] = d.Manufacturer,
-                        [Keys.Device.Model] = d.Model,
-                        [Keys.Device.Kind] = d.Kind,
-                        [Keys.Device.Code] = d.Code,
-                        ["identifier.external.oem"] = oemDeviceId,
-                        ["source"] = "oem",
+                        DeviceId = d.DeviceId,
+                        Inventory = d.Inventory,
+                        Serial = d.Serial,
+                        Manufacturer = d.Manufacturer,
+                        Model = d.Model,
+                        Kind = d.Kind,
+                        Code = d.Code
                     };
-                    var devEvent = FlowEvent.ForModel("device");
-                    devEvent.SourceId = FlowSampleConstants.Sources.Oem;
-                    devEvent.CorrelationId = oemDeviceId;
-                    foreach (var kv in deviceBag) devEvent.With(kv.Key, kv.Value);
-                    _log.LogDebug("[OEM] Sending device event for {DeviceId}", d.DeviceId);
-                    await devEvent.Send(stoppingToken);
+                    
+                    _log.LogDebug("[OEM] 🏭 Sending Device entity for {DeviceId}", d.DeviceId);
+                    await device.Send(stoppingToken); // ✨ Routes through messaging → orchestrator → Flow intake
 
-                    // Seed sensors via FlowEvent (pure MQ)
+                    // Send Sensor entities
                     foreach (var s in SampleProfiles.SensorsForOem(d))
                     {
-                        _log.LogDebug("[OEM] Sending sensor event for {SensorKey}", s.SensorKey);
-                        var sensorEvent = FlowEvent.ForModel("sensor")
-                            .With(Keys.Sensor.Key, s.SensorKey)
-                            .With("DeviceId", s.DeviceId)
-                            .With(Keys.Sensor.Code, s.Code)
-                            .With(Keys.Sensor.Unit, s.Unit)
-                            .With("source", "oem");
-                        sensorEvent.SourceId = FlowSampleConstants.Sources.Oem;
-                        sensorEvent.CorrelationId = s.SensorKey;
-                        await sensorEvent.Send(stoppingToken);
+                        var sensor = new Sensor
+                        {
+                            SensorKey = s.SensorKey,
+                            DeviceId = s.DeviceId,
+                            Code = s.Code,
+                            Unit = s.Unit
+                        };
+                        
+                        _log.LogDebug("[OEM] 📡 Sending Sensor entity for {SensorKey}", s.SensorKey);
+                        await sensor.Send(stoppingToken); // ✨ Beautiful messaging-first routing
                     }
+                    
                     lastAnnounce = DateTimeOffset.UtcNow;
-                    _log.LogInformation("[OEM] Announced Device {Inv}/{Serial} and Sensors", d.Inventory, d.Serial);
+                    _log.LogInformation("✅ [OEM] Announced Device {Inv}/{Serial} and sensors via messaging", d.Inventory, d.Serial);
                 }
 
-                // Slim reading VO
-                var key = $"{d.Inventory}::{d.Serial}::{code}";
-                // Publish reading via FlowEvent
-                var at = DateTimeOffset.UtcNow;
-                var readingEvent = FlowEvent.ForModel("reading")
-                    .With(Keys.Sensor.Key, key)
-                    .With(Keys.Reading.Value, value)
-                    .With(Keys.Reading.CapturedAt, at.ToString("O"))
-                    .With(Keys.Sensor.Unit, unit)
-                    .With(Keys.Reading.Source, "oem");
-                readingEvent.SourceId = FlowSampleConstants.Sources.Oem;
-                readingEvent.CorrelationId = key;
-                await readingEvent.Send(stoppingToken);
-                _log.LogInformation("OEM sent Reading {Key}={Value}{Unit} at {At}", key, value, unit, at);
+                // Send Reading value object through messaging
+                var reading = new Reading
+                {
+                    SensorKey = $"{d.Inventory}::{d.Serial}::{code}",
+                    Value = value,
+                    CapturedAt = DateTimeOffset.UtcNow,
+                    Unit = unit,
+                    Source = "oem"
+                };
+                
+                _log.LogInformation("📊 OEM sending Reading {Key}={Value}{Unit} via messaging", reading.SensorKey, reading.Value, reading.Unit);
+                await reading.Send(stoppingToken); // ✨ Messaging-first: routes to orchestrator automatically
             }
             catch (Exception ex)
             {

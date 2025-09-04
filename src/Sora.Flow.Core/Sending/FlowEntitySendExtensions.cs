@@ -9,24 +9,84 @@ using Microsoft.Extensions.DependencyInjection;
 using Sora.Core.Hosting.App;
 using Sora.Flow.Model;
 using Sora.Flow.Attributes;
+using Sora.Messaging;
 
 namespace Sora.Flow.Sending;
 
+/// <summary>
+/// BEAUTIFUL messaging-first Flow entity extensions.
+/// Routes all sends through the messaging system for proper orchestration.
+/// </summary>
 public static class FlowEntitySendExtensions
 {
     /// <summary>
-    /// Send this FlowEntity to intake as a normalized record using server-side identity stamping.
-    /// Defaults: sourceId = "api", occurredAt = UtcNow.
+    /// Send this FlowEntity through the messaging system (broadcast).
+    /// This is the CORRECT way - routes through Sora.Messaging for orchestrator handling.
     /// </summary>
-    public static Task Send<TModel>(this TModel entity, string? sourceId = null, DateTimeOffset? occurredAt = null, CancellationToken ct = default)
+    public static Task Send<TModel>(this TModel entity, CancellationToken ct = default)
         where TModel : FlowEntity<TModel>, new()
-        => Send(new[] { entity }, sourceId, occurredAt, ct);
+    {
+        if (entity is null) throw new ArgumentNullException(nameof(entity));
+        return Flow.Send(entity).Broadcast(ct);
+    }
 
     /// <summary>
-    /// Send a batch of FlowEntity items to intake as normalized records using server-side identity stamping.
-    /// Defaults: sourceId = "api", occurredAt = UtcNow for each item.
+    /// Send this FlowEntity to a specific target through messaging.
+    /// Target format: "system:adapter" (e.g., "bms:simulator")
     /// </summary>
-    public static async Task Send<TModel>(this IEnumerable<TModel> entities, string? sourceId = null, DateTimeOffset? occurredAt = null, CancellationToken ct = default)
+    public static Task SendTo<TModel>(this TModel entity, string target, CancellationToken ct = default)
+        where TModel : FlowEntity<TModel>, new()
+    {
+        if (entity is null) throw new ArgumentNullException(nameof(entity));
+        return Flow.Send(entity).To(target, ct);
+    }
+
+    /// <summary>
+    /// Send a batch of FlowEntity items through messaging (broadcast).
+    /// Beautiful, concise, and routes through the messaging system properly.
+    /// </summary>
+    public static async Task Send<TModel>(this IEnumerable<TModel> entities, CancellationToken ct = default)
+        where TModel : FlowEntity<TModel>, new()
+    {
+        if (entities is null) return;
+        var list = entities.ToList();
+        if (list.Count == 0) return;
+
+        // Send each entity through messaging system
+        var tasks = list.Select(entity => entity.Send(ct));
+        await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    /// Send a batch of FlowEntity items to a specific target.
+    /// </summary>
+    public static async Task SendTo<TModel>(this IEnumerable<TModel> entities, string target, CancellationToken ct = default)
+        where TModel : FlowEntity<TModel>, new()
+    {
+        if (entities is null) return;
+        var list = entities.ToList();
+        if (list.Count == 0) return;
+
+        var tasks = list.Select(entity => entity.SendTo(target, ct));
+        await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    /// INTERNAL: Send directly to Flow intake (bypasses messaging).
+    /// This is for orchestrator use only - external callers should use Send() or SendTo().
+    /// </summary>
+    internal static async Task SendToFlowIntake<TModel>(this TModel entity, string? sourceId = null, DateTimeOffset? occurredAt = null, CancellationToken ct = default)
+        where TModel : FlowEntity<TModel>, new()
+    {
+        if (entity is null) throw new ArgumentNullException(nameof(entity));
+        await SendToFlowIntake(new[] { entity }, sourceId, occurredAt, ct);
+    }
+
+    /// <summary>
+    /// INTERNAL: Send batch directly to Flow intake (bypasses messaging).
+    /// This is the LEGACY implementation - now internal for orchestrator use only.
+    /// </summary>
+    internal static async Task SendToFlowIntake<TModel>(this IEnumerable<TModel> entities, string? sourceId = null, DateTimeOffset? occurredAt = null, CancellationToken ct = default)
         where TModel : FlowEntity<TModel>, new()
     {
         if (entities is null) return;
@@ -36,17 +96,14 @@ public static class FlowEntitySendExtensions
         var sender = sp.GetRequiredService<IFlowSender>();
 
         // Discover an adapter host annotated with [FlowAdapter] to infer defaults
-        // - If found and caller didn't pass sourceId, use DefaultSource from the attribute
-        // - Also pass hostType to the sender for server-side identity stamping (system/adapter)
         var (hostType, defaultSource) = FindAdapterHost();
-        var effectiveSource = sourceId ?? (!string.IsNullOrWhiteSpace(defaultSource) ? defaultSource : "api");
+        var effectiveSource = sourceId ?? (!string.IsNullOrWhiteSpace(defaultSource) ? defaultSource : "orchestrator");
 
         var now = DateTimeOffset.UtcNow;
         var items = new List<FlowSendPlainItem>(list.Count);
         foreach (var e in list)
         {
             var bag = BuildBagFromEntity(e);
-            // Try to include a reasonable correlation when available
             string? correlation = null;
             // Reuse Id for correlation to group records
             correlation = e.Id;

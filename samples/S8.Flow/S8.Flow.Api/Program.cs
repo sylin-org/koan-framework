@@ -1,16 +1,19 @@
-﻿// Removed: using S8.Flow.Api; // For FlowSeeder
+﻿// ✨ BEAUTIFUL FLOW ORCHESTRATOR ✨
+// This assembly is now a Flow orchestrator - it will auto-register message handlers
+// for all FlowEntity and FlowValueObject types discovered in this assembly!
 using S8.Flow.Api.Entities;
 using Sora.Data.Core;
 using Sora.Flow;
+using Sora.Flow.Attributes;
+using Sora.Flow.Configuration;
 using Sora.Flow.Options;
 using S8.Flow.Shared;
 using Sora.Messaging;
 using S8.Flow.Api.Adapters;
-using Sora.Flow.Model;
-using Sora.Flow.Infrastructure;
 using Sora.Messaging.RabbitMq;
 using Sora.Web.Swagger;
-using Sora.Flow.Sending; // AddFlowSender
+
+[assembly: FlowOrchestrator]
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,32 +46,33 @@ builder.Services.AddControllers();
 builder.Services.AddRouting();
 builder.Services.AddSoraSwagger(builder.Configuration);
 
-// Message-driven adapters: handle events and persist to Flow intake
-builder.Services.OnMessages(h =>
-{
-    // Only fast-tracked readings remain as messages; device/sensor announcements are seeded by adapters via FlowAction seed.
-    h.On<Reading>(async (env, msg, ct) =>
+// ✨ BEAUTIFUL FLOW ORCHESTRATOR PATTERNS ✨
+// The [FlowOrchestrator] attribute above auto-registers handlers for:
+// - Device entities: Device.Send() → auto-routed to Flow intake
+// - Sensor entities: Sensor.Send() → auto-routed to Flow intake  
+// - Reading value objects: Reading.Send() → auto-routed to Flow intake
+// 
+// Custom business logic can be added via proper service registration:
+builder.Services.ConfigureFlow(flow => flow
+    .On<Reading>(async reading =>
     {
-        // Build a normalized event bag uniformly (works for VOs and entities)
-        var ev = FlowEvent.For<Reading>()
-            .With(Keys.Sensor.Key, msg.SensorKey)
-            .With(Keys.Reading.Value, msg.Value)
-            .With(Keys.Reading.CapturedAt, msg.CapturedAt.ToString("O"));
-        if (!string.IsNullOrWhiteSpace(msg.Unit)) ev.With(Keys.Sensor.Unit, msg.Unit);
-        if (!string.IsNullOrWhiteSpace(msg.Source)) ev.With(Keys.Reading.Source, msg.Source);
-
-        // Persist to Flow intake as a typed StageRecord
-        var rec = new StageRecord<Reading>
+        // Apply custom business rules before Flow intake
+        if (reading.Value < 0)
         {
-            Id = Guid.NewGuid().ToString("n"),
-            SourceId = msg.Source ?? FlowSampleConstants.Sources.Events,
-            OccurredAt = msg.CapturedAt,
-            StagePayload = ev.Bag,
-            CorrelationId = msg.SensorKey,
-        };
-        await rec.Save(FlowSets.StageShort(FlowSets.Intake));
-    });
-});
+            Console.WriteLine($"⚠️  Received negative reading: {reading.Value} from {reading.SensorKey}");
+        }
+        // The auto-registered handler will route to Flow intake automatically
+    })
+    .On<Device>(async device =>
+    {
+        Console.WriteLine($"🏭 New device registered: {device.DeviceId} ({device.Manufacturer} {device.Model})");
+    })
+    .On("seed", async (payload, ct) =>
+    {
+        Console.WriteLine($"🌱 Received seed command with payload: {payload}");
+        // Handle seed commands from adapters
+    })
+);
 
 // Health snapshot based on recent Keyed stage records
 builder.Services.AddSingleton<IAdapterHealthRegistry, S8.Flow.Api.Adapters.KeyedAdapterHealthRegistry>();
@@ -96,7 +100,8 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
-// Only map controllers if other endpoints exist
+// Map controllers and configure routing
+app.MapControllers();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseSoraSwagger();
