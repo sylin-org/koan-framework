@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Sora.Core;
 using Sora.Core.Modules;
 using Sora.Data.Abstractions;
@@ -16,6 +17,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Sora.Data.Json.Initialization.SoraAutoRegistrar");
+    logger?.Log(LogLevel.Debug, "Sora.Data.Json SoraAutoRegistrar loaded.");
         // Bind options from config and register adapter + health contributor
         services.AddSoraOptions<JsonDataOptions>();
         services.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>, JsonDataOptionsConfigurator>();

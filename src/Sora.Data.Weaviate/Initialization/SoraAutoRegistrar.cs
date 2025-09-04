@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sora.Core;
 using Sora.Core.Modules;
+using Microsoft.Extensions.Logging;
 using Sora.Data.Abstractions;
 using Sora.Data.Vector.Abstractions;
 
@@ -16,6 +17,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Sora.Data.Weaviate.Initialization.SoraAutoRegistrar");
+    logger?.Log(LogLevel.Debug, "Sora.Data.Weaviate SoraAutoRegistrar loaded.");
         services.AddSoraOptions<WeaviateOptions>(Infrastructure.Constants.Configuration.Section);
         // Post-configure: if Endpoint is not explicitly provided (or left at default), try to self-configure
         services.PostConfigure<WeaviateOptions>(opts =>

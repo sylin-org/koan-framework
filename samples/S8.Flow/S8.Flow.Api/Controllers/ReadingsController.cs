@@ -119,7 +119,7 @@ public sealed class ReadingsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(reading.SensorKey)) return BadRequest("sensorKey is required");
 
-    var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             [Keys.Sensor.Key] = reading.SensorKey,
             [Keys.Reading.Value] = reading.Value,   
@@ -136,9 +136,15 @@ public sealed class ReadingsController : ControllerBase
             StagePayload = payload,
             CorrelationId = reading.SensorKey
         };
-        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
+        var setName = FlowSets.StageShort(FlowSets.Intake);
+        Console.WriteLine($"[DEBUG] Attempting to upsert StageRecord<Reading> to set '{setName}'");
+        using (DataSetContext.With(setName))
         {
+            var provider = S8.Flow.Api.DebugHelpers.ProviderDebug.GetProviderForStageRecordReading();
+            Console.WriteLine($"[DEBUG] Provider for StageRecord<Reading>: {provider}");
+            Console.WriteLine($"[DEBUG] StageRecord<Reading> entity: Id={typed.Id}, SourceId={typed.SourceId}, OccurredAt={typed.OccurredAt:O}, CorrelationId={typed.CorrelationId}");
             await Data<StageRecord<Reading>, string>.UpsertAsync(typed, ct);
+            Console.WriteLine($"[DEBUG] Upsert complete for StageRecord<Reading> Id={typed.Id}");
         }
         return Accepted();
     }

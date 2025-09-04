@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Core.Modules;
@@ -17,6 +18,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Sora.Data.Postgres.Initialization.SoraAutoRegistrar");
+    logger?.Log(LogLevel.Debug, "Sora.Data.Postgres SoraAutoRegistrar loaded.");
         services.AddSoraOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.AddSingleton<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();

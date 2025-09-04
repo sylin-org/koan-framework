@@ -48,6 +48,10 @@ public static class RabbitMqServiceCollectionExtensions
             var tuple = ((IConnection, IModel, RabbitMqOptions))client;
             return tuple.Item2;
         });
+
+        // The Sora Way: Auto-detect message handlers and ensure consumers exist
+        services.AddHostedService<RabbitMqConsumerAutoStarter>();
+
         return services;
     }
 }

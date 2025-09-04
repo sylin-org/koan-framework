@@ -57,9 +57,17 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         // Keep existing list if already populated by other means
         if (opts.Subscriptions.Count == 0)
         {
+            // DEBUG: Log what configuration we're seeing
+            try { 
+                Console.WriteLine($"[RabbitMqFactory][DEBUG] Checking for subscriptions..."); 
+                Console.WriteLine($"[RabbitMqFactory][DEBUG] Available config keys: {string.Join(", ", cfg.AsEnumerable().Select(kv => kv.Key))}");
+            } catch { }
+            
             // Prefer nested under RabbitMq:Subscriptions
             var rkCsv = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:RoutingKeys", null)
                       ?? Configuration.Read<string?>(cfg, "Subscriptions:0:RoutingKeys", null);
+            
+            try { Console.WriteLine($"[RabbitMqFactory][DEBUG] Found RoutingKeys: '{rkCsv}'"); } catch { }
             var name = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Name", null)
                      ?? Configuration.Read<string?>(cfg, "Subscriptions:0:Name", null);
             var queue = Configuration.Read<string?>(cfg, "RabbitMq:Subscriptions:0:Queue", null)
@@ -115,10 +123,10 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         var logger = sp.GetService(typeof(ILogger<RabbitMqFactory>)) as ILogger<RabbitMqFactory>;
         IConnection? connection = null;
         Exception? lastConnectError = null;
-        // Reuse retry options for initial connection attempts
-        var maxAttempts = Math.Max(3, opts.Retry.MaxAttempts);
-        var firstDelay = TimeSpan.FromSeconds(Math.Max(1, opts.Retry.FirstDelaySeconds));
-        var maxDelay = TimeSpan.FromSeconds(Math.Max(opts.Retry.FirstDelaySeconds, opts.Retry.MaxDelaySeconds));
+        // Enhanced retry logic for container startup scenarios - be more aggressive during startup
+        var maxAttempts = Math.Max(10, opts.Retry.MaxAttempts); // At least 10 attempts during startup
+        var firstDelay = TimeSpan.FromSeconds(Math.Max(2, opts.Retry.FirstDelaySeconds)); // Start with 2s delay
+        var maxDelay = TimeSpan.FromSeconds(Math.Max(15, opts.Retry.MaxDelaySeconds)); // Cap at 15s delay
         TimeSpan NextDelay(int attempt)
         {
             // simple exponential backoff with cap
@@ -306,14 +314,21 @@ public sealed class RabbitMqFactory : IMessageBusFactory
         // record diagnostics
         (sp.GetService(typeof(IMessagingDiagnostics)) as IMessagingDiagnostics)?.SetEffectivePlan(busCode, plan);
 
-        // Optional simple consumer dispatcher: bind each configured subscription and dispatch by alias
+        // Create consumers for configured subscriptions (if any)
+        // Note: This runs after successful connection, so RabbitMQ is available
+        logger?.LogDebug("[RabbitMqFactory] Subscription count: {Count}", opts.Subscriptions.Count);
         if (opts.Subscriptions.Count > 0)
         {
+            logger?.LogInformation("[RabbitMqFactory] Creating {SubscriptionCount} subscription consumers", opts.Subscriptions.Count);
+            
             var retryExchange = Naming.RetryExchange(opts.Exchange);
             foreach (var sub in opts.Subscriptions)
             {
                 var queue = string.IsNullOrWhiteSpace(sub.Queue) ? Naming.Queue(busCode, sub.Name ?? "default") : sub.Queue!;
                 var consumers = Math.Max(1, sub.Concurrency);
+                
+                logger?.LogDebug("[RabbitMqFactory] Creating {ConsumerCount} consumer(s) for queue '{Queue}' (subscription: {SubName})", consumers, queue, sub.Name);
+                
                 for (int i = 0; i < consumers; i++)
                 {
                     var consumer = new AsyncEventingBasicConsumer(channel);
@@ -389,7 +404,13 @@ public sealed class RabbitMqFactory : IMessageBusFactory
                     };
                     channel.BasicConsume(queue, autoAck: false, consumer: consumer);
                 }
+                
+                logger?.LogInformation("[RabbitMqFactory] Created {ConsumerCount} consumer(s) for queue '{Queue}'", consumers, queue);
             }
+        }
+        else
+        {
+            logger?.LogWarning("[RabbitMqFactory] No subscriptions configured - no consumers will be created");
         }
         return (bus, caps);
     }

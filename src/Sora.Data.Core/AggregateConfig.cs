@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 
 namespace Sora.Data.Core;
 
-internal sealed class AggregateConfig<TEntity, TKey>
+public sealed class AggregateConfig<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {

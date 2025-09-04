@@ -1,4 +1,5 @@
 ﻿// Removed: using S8.Flow.Api; // For FlowSeeder
+using S8.Flow.Api.Entities;
 using Sora.Data.Core;
 using Sora.Flow;
 using Sora.Flow.Options;
@@ -72,7 +73,23 @@ builder.Services.OnMessages(h =>
 // Health snapshot based on recent Keyed stage records
 builder.Services.AddSingleton<IAdapterHealthRegistry, S8.Flow.Api.Adapters.KeyedAdapterHealthRegistry>();
 
+
 var app = builder.Build();
+
+// Defer test entity save until the host is fully started (AppHost.Current initialized by AddSora())
+app.Lifetime.ApplicationStarted.Register(async () =>
+{
+    try
+    {
+        var setting = new AppSetting { Id = "test", Value = $"Saved at {DateTime.UtcNow:O}" };
+        await setting.Save();
+        Console.WriteLine($"[TEST] AppSetting saved via provider 'mongo': {setting.Id} = {setting.Value}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[TEST][ERROR] Failed saving AppSetting: {ex.Message}\n{ex}");
+    }
+});
 
 if (app.Environment.IsDevelopment())
 {

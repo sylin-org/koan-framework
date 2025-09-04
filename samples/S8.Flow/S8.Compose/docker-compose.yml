@@ -32,17 +32,12 @@
     environment:
       ASPNETCORE_URLS: http://+:4903
       # Use Mongo in containers
-      ConnectionStrings__Default: mongodb://mongo:27017
       Sora__Data__Mongo__Database: s8
-      # Messaging via rabbit (defaults handle provisioning/subscription)
-      Sora__Messaging__DefaultBus: default
+      # Messaging via rabbit bus (matches appsettings.json configuration)
+      Sora__Messaging__DefaultBus: rabbit
       Sora__Messaging__DefaultGroup: flow
-      # Explicit bus-level RabbitMQ connection string (inside compose network)
-      Sora__Messaging__Buses__default__RabbitMq__ConnectionString: amqp://guest:guest@rabbitmq:5672
-      # Ensure provisioning creates exchanges/queues on start in dev
-      Sora__Messaging__Buses__default__ProvisionOnStart: "true"
-      # Force provider to create queues/bindings if missing (fixes bus-level ProvisionOnStart gating)
-      Sora__Messaging__Buses__default__RabbitMq__ProvisionMode: CreateIfMissing
+      # Override RabbitMQ connection string for container network
+      Sora__Messaging__Buses__rabbit__RabbitMq__ConnectionString: amqp://guest:guest@rabbitmq:5672
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_ENVIRONMENT: Development
     depends_on:
@@ -59,15 +54,10 @@
       context: ../../..
       dockerfile: samples/S8.Flow/S8.Flow.Adapters.Bms/Dockerfile
     environment:
-      # Bus-level RabbitMQ connection for the default bus
-      Sora__Messaging__Buses__default__RabbitMq__ConnectionString: amqp://guest:guest@rabbitmq:5672
-      Sora__Messaging__Buses__default__ProvisionOnStart: "true"
-      Sora__Messaging__DefaultBus: default
+      # Bus-level RabbitMQ connection for the rabbit bus
+      Sora__Messaging__Buses__rabbit__RabbitMq__ConnectionString: amqp://guest:guest@rabbitmq:5672
+      Sora__Messaging__DefaultBus: rabbit
       Sora__Messaging__DefaultGroup: flow
-      # Data provider: use Mongo inside the compose network
-      ConnectionStrings__Default: mongodb://mongo:27017
-      Sora__Data__Mongo__Database: s8
-      Sora__Data__DefaultProvider: mongo
       DOTNET_ENVIRONMENT: Development
     depends_on:
       mongo:
@@ -81,15 +71,10 @@
       context: ../../..
       dockerfile: samples/S8.Flow/S8.Flow.Adapters.Oem/Dockerfile
     environment:
-      # Bus-level RabbitMQ connection for the default bus
-      Sora__Messaging__Buses__default__RabbitMq__ConnectionString: amqp://guest:guest@rabbitmq:5672
-      Sora__Messaging__Buses__default__ProvisionOnStart: "true"
-      Sora__Messaging__DefaultBus: default
+      # Bus-level RabbitMQ connection for the rabbit bus
+      Sora__Messaging__Buses__rabbit__RabbitMq__ConnectionString: amqp://guest:guest@rabbitmq:5672
+      Sora__Messaging__DefaultBus: rabbit
       Sora__Messaging__DefaultGroup: flow
-      # Data provider: use Mongo inside the compose network
-      ConnectionStrings__Default: mongodb://mongo:27017
-      Sora__Data__Mongo__Database: s8
-      Sora__Data__DefaultProvider: mongo
       DOTNET_ENVIRONMENT: Development
     depends_on:
       mongo:

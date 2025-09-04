@@ -133,28 +133,38 @@ public static class ServiceCollectionExtensions
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            _log.LogInformation("[flow.projection] ModelProjectionWorker started");
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
                     var batch = Math.Max(1, _opts.CurrentValue.BatchSize);
                     var models = DiscoverModels();
+                    if (models.Count == 0)
+                    {
+                        _log.LogDebug("[flow.projection] No models discovered");
+                    }
                     foreach (var modelType in models)
                     {
+                        _log.LogDebug($"[flow.projection] Processing model: {modelType.Name}");
                         var taskType = typeof(ProjectionTask<>).MakeGenericType(modelType);
-                        // Static generics on Entity<T> are not discoverable via derived type; call through Data<,>
                         var pageMethod = typeof(Data<,>).MakeGenericType(taskType, typeof(string))
                             .GetMethod("Page", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(int), typeof(CancellationToken) });
                         if (pageMethod is null) continue;
                         int pageNum = 1;
                         while (!stoppingToken.IsCancellationRequested)
                         {
+                            _log.LogDebug($"[flow.projection] Fetching projection tasks page {pageNum} (batch={batch})");
                             var task = (Task)pageMethod.Invoke(null, new object?[] { pageNum, batch, stoppingToken })!;
                             await task.ConfigureAwait(false);
                             var enumerable = (System.Collections.IEnumerable)GetTaskResult(task)!;
                             var tasks = enumerable.Cast<object>().ToList();
-                            if (tasks.Count == 0) break;
-
+                            if (tasks.Count == 0)
+                            {
+                                _log.LogDebug($"[flow.projection] No projection tasks found for model {modelType.Name} on page {pageNum}");
+                                break;
+                            }
+                            _log.LogDebug($"[flow.projection] Processing {tasks.Count} projection tasks for model {modelType.Name} on page {pageNum}");
                             foreach (var t in tasks)
                             {
                                 var refUlid = t.GetType().GetProperty("ReferenceUlid")?.GetValue(t) as string;
@@ -381,7 +391,7 @@ public static class ServiceCollectionExtensions
                     }
                 }
                 catch (Exception ex)
-                { _log.LogDebug(ex, "ModelProjectionWorker iteration failed (will retry)"); }
+                { _log.LogError(ex, "[flow.projection] ModelProjectionWorker iteration failed (will retry)"); }
 
                 try { await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken); }
                 catch (TaskCanceledException) { }
@@ -401,15 +411,20 @@ public static class ServiceCollectionExtensions
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Greenfield: no legacy flags; always active
+            _log.LogInformation("[flow.association] ModelAssociationWorker started");
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
                     var batch = Math.Max(1, _opts.CurrentValue.BatchSize);
                     var models = DiscoverModels();
+                    if (models.Count == 0)
+                    {
+                        _log.LogDebug("[flow.association] No models discovered");
+                    }
                     foreach (var modelType in models)
                     {
+                        _log.LogDebug($"[flow.association] Processing model: {modelType.Name}");
                         var intakeSet = FlowSets.StageShort(FlowSets.Intake);
                         var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
                         List<object> page;
@@ -422,7 +437,12 @@ public static class ServiceCollectionExtensions
                             var resultEnum = (System.Collections.IEnumerable)GetTaskResult(task)!;
                             page = resultEnum.Cast<object>().ToList();
                         }
-                        if (page.Count == 0) continue;
+                        if (page.Count == 0)
+                        {
+                            _log.LogDebug($"[flow.association] No intake records found for model {modelType.Name}");
+                            continue;
+                        }
+                        _log.LogDebug($"[flow.association] Processing {page.Count} intake records for model {modelType.Name}");
 
                         var voParent = Infrastructure.FlowRegistry.GetValueObjectParent(modelType);
                         var isVo = voParent is not null;
@@ -627,7 +647,7 @@ public static class ServiceCollectionExtensions
                     }
                 }
                 catch (Exception ex)
-                { _log.LogDebug(ex, "ModelAssociationWorker iteration failed"); }
+                { _log.LogError(ex, "[flow.association] ModelAssociationWorker iteration failed"); }
 
                 try { await Task.Delay(TimeSpan.FromMilliseconds(500), stoppingToken); }
                 catch (TaskCanceledException) { }

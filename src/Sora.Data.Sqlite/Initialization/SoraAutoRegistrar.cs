@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Core.Modules;
@@ -18,6 +19,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Sora.Data.Sqlite.Initialization.SoraAutoRegistrar");
+    logger?.Log(LogLevel.Debug, "Sora.Data.Sqlite SoraAutoRegistrar loaded.");
         services.AddSoraOptions<SqliteOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.AddSingleton<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();

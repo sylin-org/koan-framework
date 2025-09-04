@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core;
 using Sora.Core.Modules;
@@ -16,6 +17,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Sora.Data.Mongo.Initialization.SoraAutoRegistrar");
+    logger?.Log(LogLevel.Debug, "Sora.Data.Mongo SoraAutoRegistrar loaded.");
         services.AddSoraOptions<MongoOptions>();
         services.AddSingleton<IConfigureOptions<MongoOptions>, MongoOptionsConfigurator>();
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
@@ -44,8 +47,18 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         if (string.IsNullOrWhiteSpace(cs) && !string.IsNullOrWhiteSpace(csByName)) cs = csByName;
         if (string.IsNullOrWhiteSpace(cs))
         {
-            var inContainer = SoraEnv.InContainer;
-            cs = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
+            // Use the same auto-detection logic as the configurator for consistency
+            var isProd = SoraEnv.IsProduction;
+            if (isProd)
+            {
+                cs = MongoConstants.DefaultLocalUri;
+            }
+            else
+            {
+                // In non-production, prefer container hostname but don't ping here to avoid blocking bootstrap
+                var inContainer = SoraEnv.InContainer;
+                cs = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
+            }
         }
         if (!string.IsNullOrWhiteSpace(cs) &&
             !cs.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) &&
