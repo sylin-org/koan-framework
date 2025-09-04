@@ -205,6 +205,13 @@
               <i class="fas fa-shield-alt mr-2"></i>
               Policy Update
             </button>
+            <div class="col-span-2 flex space-x-2">
+              <input id="seedCount" type="number" min="1" value="5" class="w-24 bg-slate-800 text-white rounded px-3 py-2 text-sm border border-slate-700" placeholder="Count" />
+              <button onclick="seedFlow()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-4 py-3 rounded-lg transition-colors">
+                <i class="fas fa-seedling mr-2"></i>
+                Seed Flow
+              </button>
+            </div>
           </div>
           
           <!-- Status Panel -->
@@ -318,9 +325,52 @@
 
   <!-- Modals will be added here -->
   <div id="modalContainer"></div>
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed top-4 right-4 space-y-3 z-50"></div>
 
   <script src="/js/dashboard.js"></script>
   <script src="/js/modals.js"></script>
   <script src="/js/api-client.js"></script>
+  <script>
+    function showToast(message, type = 'info', details) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const id = 't' + Date.now();
+      const colors = {
+        info: 'bg-slate-800 border-slate-600',
+        success: 'bg-green-800/80 border-green-500',
+        error: 'bg-red-800/80 border-red-500',
+        warning: 'bg-amber-800/80 border-amber-500'
+      };
+      const color = colors[type] || colors.info;
+      const el = document.createElement('div');
+      el.id = id;
+      el.className = `border rounded-lg p-4 shadow-lg text-sm animate-fade-in ${color}`;
+      el.innerHTML = `<div class='font-semibold mb-1'>${message}</div>` + (details ? `<pre class='text-xs whitespace-pre-wrap opacity-80'>${details}</pre>` : '');
+      container.appendChild(el);
+      setTimeout(() => { el.classList.add('opacity-0','transition-opacity','duration-700'); setTimeout(() => el.remove(), 800); }, 6000);
+    }
+
+    async function seedFlow() {
+      const countInput = document.getElementById('seedCount');
+      const count = parseInt(countInput?.value || '5', 10);
+      showToast(`Seeding requested (${count} devices subset)...`, 'info');
+      const started = performance.now();
+      try {
+        const result = await window.flowApi.seedFlow(count);
+        const elapsed = result.elapsedMs ?? Math.round(performance.now() - started);
+        const per = result.perSource || {};        
+        showToast(`Seed complete in ${elapsed} ms`, 'success', `Devices: ${result.seededDevices}\nBMS sensors: ${per.bms?.sensors ?? '?'}\nOEM sensors: ${per.oem?.sensors ?? '?'}`);
+        // Trigger UI refresh
+        if (window.dashboard) {
+          window.dashboard.updateEntityCounts();
+          window.dashboard.updateActivityFeed();
+        }
+      } catch (err) {
+        showToast('Seed failed', 'error', err.message || String(err));
+      }
+    }
+    window.seedFlow = seedFlow;
+  </script>
 </body>
 </html>

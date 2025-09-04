@@ -6,6 +6,7 @@ using Sora.Core;
 using Sora.Messaging;
 using Sora.Messaging.RabbitMq;
 using S8.Flow.Shared;
+using S8.Flow.Shared.Commands;
 // removed events; use plain-bag seeds and direct VO Send()
 using Sora.Flow.Actions;
 using Sora.Core.Hosting.App;
@@ -31,6 +32,16 @@ builder.Configuration
 // and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
     builder.Services.AddRabbitMq();
+
+
+// Register FlowCommand handler for 'seed' (target: bms)
+builder.Services.AddFlowCommands(reg =>
+    reg.On("seed", async (ctx, args, ct) => {
+        var count = args.TryGetValue("count", out var v) ? Convert.ToInt32(v) : 1;
+        var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
+        await AdapterSeeding.SeedCatalogAsync(FlowSampleConstants.Sources.Bms, subset, SampleProfiles.SensorsForBms, ct);
+    }, target: FlowSampleConstants.Sources.Bms)
+);
 
 var app = builder.Build();
 await app.RunAsync();

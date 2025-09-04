@@ -1,4 +1,5 @@
-﻿using Sora.Data.Core;
+﻿// Removed: using S8.Flow.Api; // For FlowSeeder
+using Sora.Data.Core;
 using Sora.Flow;
 using Sora.Flow.Options;
 using S8.Flow.Shared;
@@ -35,6 +36,7 @@ builder.Services.Configure<FlowOptions>(o =>
     // Keep canonical clean: drop VO tags from canonical/lineage
     o.CanonicalExcludeTagPrefixes = new[] { "reading.", "sensorreading." };
 });
+
 
 builder.Services.AddControllers();
 builder.Services.AddRouting();
@@ -77,7 +79,7 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
-app.MapControllers();
+// Only map controllers if other endpoints exist
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseSoraSwagger();

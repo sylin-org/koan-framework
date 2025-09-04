@@ -182,10 +182,16 @@ public static class FlowSenderRegistration
     {
         // Register the real sender as an internal type
         services.TryAddSingleton<FlowSender>();
-        // Register a singleton readiness lifecycle
-    services.TryAddSingleton<Sora.Flow.Sending.MessagingReadinessLifecycle>();
-    // Bridge AppDomain readiness flags (set by messaging orchestrator) to lifecycle
-    services.AddHostedService<Sora.Flow.Sending.MessagingReadinessBridgeHostedService>();
+        // Register MessagingReadinessProvider as singleton
+        services.TryAddSingleton<Sora.Messaging.Provisioning.IMessagingReadinessProvider, Sora.Messaging.Provisioning.MessagingReadinessProvider>();
+        // Register a singleton readiness lifecycle, injecting the provider
+        services.TryAddSingleton<Sora.Flow.Sending.MessagingReadinessLifecycle>(sp =>
+        {
+            var provider = sp.GetRequiredService<Sora.Messaging.Provisioning.IMessagingReadinessProvider>();
+            return new Sora.Flow.Sending.MessagingReadinessLifecycle(provider);
+        });
+        // Bridge readiness provider to lifecycle
+        services.AddHostedService<Sora.Flow.Sending.MessagingReadinessBridgeHostedService>();
         // Register the buffered sender as the public IFlowSender
         services.AddSingleton<IFlowSender>(sp =>
         {

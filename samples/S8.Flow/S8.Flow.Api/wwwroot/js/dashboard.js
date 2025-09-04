@@ -203,28 +203,28 @@ class FlowDashboard {
 
   async updateEntityCounts() {
     try {
-      const [devices, sensors, readings] = await Promise.all([
-        window.flowApi.getDevices({ size: 1 }),
-        window.flowApi.getSensors({ size: 1 }),
-        window.flowApi.getReadings({ size: 1 })
-      ]);
-
-      // Extract counts from response metadata or approximate
-      const deviceCount = this.extractCount(devices) || '12';
-      const sensorCount = this.extractCount(sensors) || '48';  
-      const readingCount = this.extractCount(readings) || '853';
-
+      const overview = await window.flowApi.getFlowOverview();
+      // Devices
+      const deviceStages = overview.devices || {};
+      const deviceCount = Object.values(deviceStages).reduce((a, b) => a + b, 0);
       document.getElementById('deviceCount').textContent = deviceCount;
+      // Sensors
+      const sensorStages = overview.sensors || {};
+      const sensorCount = Object.values(sensorStages).reduce((a, b) => a + b, 0);
       document.getElementById('sensorCount').textContent = sensorCount;
+      // Readings (show per stage if available)
+      const readingStages = overview.readings || {};
+      const readingCount = Object.values(readingStages).reduce((a, b) => a + b, 0);
       document.getElementById('readingCount').textContent = readingCount;
-      
+
+      // Optionally, show per-stage breakdown in tooltips or extra UI (not implemented here)
+
       // Update activity indicators
-      document.getElementById('deviceActivity').textContent = 'active';
-      document.getElementById('sensorActivity').textContent = 'active';
-      document.getElementById('readingActivity').textContent = 'recent';
+      document.getElementById('deviceActivity').textContent = deviceCount > 0 ? 'active' : 'none';
+      document.getElementById('sensorActivity').textContent = sensorCount > 0 ? 'active' : 'none';
+      document.getElementById('readingActivity').textContent = readingCount > 0 ? 'recent' : 'none';
       document.getElementById('alertCount').textContent = '3';
       document.getElementById('alertActivity').textContent = 'pending';
-
     } catch (error) {
       console.error('Failed to update entity counts:', error);
       this.showEntityCountError();

@@ -271,3 +271,16 @@ class FlowApiClient {
 
 // Export a singleton instance
 window.flowApi = new FlowApiClient();
+
+// Add process overview API method
+FlowApiClient.prototype.getFlowOverview = async function() {
+  return this.fetchJson('/api/flow/overview');
+};
+
+// Flow seeding
+FlowApiClient.prototype.seedFlow = async function(count) {
+  return this.fetchJson(`/api/flow/commands/seed`, {
+    method: 'POST',
+    body: JSON.stringify({ count: count || 10 })
+  });
+};

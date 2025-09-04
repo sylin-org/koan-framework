@@ -17,10 +17,11 @@ public static class MessagingServiceCollectionExtensions
         // Topology naming & provisioner defaults (providers can override)
         services.TryAddSingleton<Provisioning.ITopologyNaming, DefaultTopologyNaming>();
         services.TryAddSingleton<Provisioning.ITopologyProvisioner, NoopTopologyProvisioner>();
-    services.AddHostedService<Sora.Messaging.Provisioning.TopologyOrchestratorHostedService>();
+        // Register MessagingReadinessProvider for auto-registration
+        services.TryAddSingleton<Provisioning.IMessagingReadinessProvider, Provisioning.MessagingReadinessProvider>();
+        services.AddHostedService<Sora.Messaging.Provisioning.TopologyOrchestratorHostedService>();
 
         // Register DefaultTopologyPlanner with all dependencies
-
         services.TryAddSingleton<Provisioning.ITopologyPlanner>(sp =>
             new Core.Provisioning.DefaultTopologyPlanner(
                 sp.GetRequiredService<Provisioning.ITopologyProvisioner>(),

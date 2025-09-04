@@ -27,7 +27,7 @@ internal sealed class RabbitMqProviderClientAccessor : IProviderClientAccessor, 
     {
         try
         {
-            return _clients.GetOrAdd(busCode, static (bc, state) => ((RabbitMqProviderClientAccessor)state).Create(bc), this);
+            return _clients.GetOrAdd(busCode, static (bc, state) => ((RabbitMqProviderClientAccessor)state).CreateContext(bc), this);
         }
         catch (Exception ex)
         {
@@ -36,7 +36,7 @@ internal sealed class RabbitMqProviderClientAccessor : IProviderClientAccessor, 
         }
     }
 
-    private object Create(string busCode)
+    private object CreateContext(string busCode)
     {
         // Build minimal RabbitMqOptions replicating factory logic (subset relevant for provisioning)
         var cfgSection = _configuration.GetSection($"Sora:Messaging:Buses:{busCode}");
@@ -128,7 +128,7 @@ internal sealed class RabbitMqProviderClientAccessor : IProviderClientAccessor, 
             throw lastErr ?? new Exception("RabbitMQ accessor connection failed");
         }
         var channel = connection.CreateModel();
-        return (connection, channel, opts);
+        return new RabbitMqProviderContext(busCode, connection, channel, opts);
     }
 
     private static string? Read(IConfiguration cfg, string key) => cfg[key];

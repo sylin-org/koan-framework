@@ -17,8 +17,7 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
     private readonly IOptions<Sora.Messaging.MessagingOptions> _msgOpts;
 
     private const string FlagKey = "Sora.Messaging.Provisioning.Orchestrated";
-    private const string ReadyFlag = "Sora.Messaging.Ready";
-    private const string PendingFlag = "Sora.Messaging.Readiness.Pending";
+    private readonly IMessagingReadinessProvider _readinessProvider;
 
     private enum OrchestrateResult { Completed, PendingProvider, NoPlanner }
 
@@ -27,6 +26,7 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
         _sp = sp;
         _msgOpts = msgOpts;
         _logger = logger;
+        _readinessProvider = sp.GetService(typeof(IMessagingReadinessProvider)) as IMessagingReadinessProvider ?? throw new InvalidOperationException("IMessagingReadinessProvider not registered");
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -86,7 +86,7 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
             }
             try { await Task.Delay(delay, ct).ConfigureAwait(false); } catch { return; }
         }
-        if (!(AppDomain.CurrentDomain.GetData(ReadyFlag) is bool r && r))
+        if (!_readinessProvider.IsReady)
         {
             _logger?.LogWarning("[messaging.provision] deferred provisioning exhausted attempts without readiness");
         }
@@ -119,35 +119,69 @@ internal sealed class TopologyOrchestratorHostedService : IHostedService
         // Acquire provider client (if any) before planning so we can supply provider options to planner
         var clientAccessor = _sp.GetService(typeof(Sora.Messaging.Provisioning.IProviderClientAccessor)) as Sora.Messaging.Provisioning.IProviderClientAccessor;
         object? providerClient = clientAccessor?.GetProviderClient(bus);
-        object providerOptionsForPlan = new object();
+    object providerOptionsForPlan = new object();
         if (providerClient is not null)
         {
-            // Attempt to extract Item3 (options) from known tuple shapes (e.g., (IConnection,IModel,RabbitMqOptions)) via reflection to keep orchestrator provider-agnostic
-            try
+            // If the provider client is a RabbitMqProviderContext, use it directly
+            var clientTypeName = providerClient.GetType().FullName ?? "(unknown)";
+            if (providerClient.GetType().FullName == "Sora.Messaging.RabbitMq.Provisioning.RabbitMqProviderContext")
             {
-                var t = providerClient.GetType();
-                var item3 = t.GetProperty("Item3");
-                var val = item3?.GetValue(providerClient);
-                if (val is not null) providerOptionsForPlan = val;
+                providerOptionsForPlan = providerClient;
             }
-            catch { /* ignore */ }
+            else
+            {
+                // Legacy tuple pattern matching (for other providers or legacy code)
+                if (providerClient is ValueType && providerClient is System.Runtime.CompilerServices.ITuple vt && vt.Length >= 3)
+                {
+                    var raw = vt[2];
+                    if (raw is not null) providerOptionsForPlan = raw;
+                }
+                else if (providerClient is (object _, object _, object optsAny) && optsAny is not null)
+                {
+                    providerOptionsForPlan = optsAny;
+                }
+                // If still default object, attempt last-chance pattern for known Rabbit tuple
+                if (providerOptionsForPlan is object && providerOptionsForPlan.GetType() == typeof(object))
+                {
+                    try
+                    {
+                        // Create a minimal placeholder options instance for RabbitMQ if planner requires it
+                        if (planner.GetType().FullName?.Contains("RabbitMqProvisioner") == true)
+                        {
+                            var rabbitOptsType = Type.GetType("Sora.Messaging.RabbitMq.RabbitMqOptions, Sora.Messaging.RabbitMq", throwOnError: false);
+                            if (rabbitOptsType is not null)
+                            {
+                                providerOptionsForPlan = Activator.CreateInstance(rabbitOptsType) ?? providerOptionsForPlan;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogDebug(ex, "[messaging.provision] failed creating placeholder provider options (bus={Bus})", bus);
+                    }
+                }
+            }
+            var optsTypeName = providerOptionsForPlan?.GetType().FullName ?? "(null)";
+            _logger?.LogInformation("[messaging.provision] provider client detected type={Type} optsType={OptsType} bus={Bus}", clientTypeName, optsTypeName, bus);
+            // Mark readiness since we do have a client; provisioning should proceed even if options are placeholder
+            _readinessProvider.SetReady();
         }
-        // If providerOptionsForPlan is just a plain object, log and skip planning for this bus
-        if (planner.GetType().FullName?.Contains("RabbitMqProvisioner") == true && providerOptionsForPlan.GetType() == typeof(object))
+        else
         {
-            if (!(AppDomain.CurrentDomain.GetData(PendingFlag) is bool p && p))
-                _logger?.LogWarning("[messaging.provision] provider options unavailable; deferring provisioning bus={Bus}", bus);
-            // Mark a soft readiness pending state so buffered senders can continue waiting
-            AppDomain.CurrentDomain.SetData(PendingFlag, true);
-            return OrchestrateResult.PendingProvider; // defer
+            _logger?.LogWarning("[messaging.provision] no provider client available for bus={Bus}" , bus);
+            // Only defer if planner requires provider-specific options; otherwise proceed (e.g., default planner)
+            if (planner.GetType().FullName?.Contains("RabbitMqProvisioner") == true)
+            {
+                _readinessProvider.SetPending("provider client unavailable");
+                return OrchestrateResult.PendingProvider;
+            }
         }
-        // Mark readiness (at least one provider options set extracted) – prior to planning so buffered senders can flush on success
-        AppDomain.CurrentDomain.SetData(ReadyFlag, true);
-    _logger?.LogDebug("[messaging.provision] starting plan phase bus={Bus} mode={Mode}", msgOpts.DefaultBus ?? "default", mode);
-    var sw = System.Diagnostics.Stopwatch.StartNew();
-    var desired = planner.Plan(bus, msgOpts.DefaultGroup, providerOptionsForPlan, new BasicCapabilities(), _sp.GetService(typeof(Sora.Messaging.ITypeAliasRegistry)) as Sora.Messaging.ITypeAliasRegistry);
-    sw.Stop();
-    long planMs = sw.ElapsedMilliseconds;
+
+        _logger?.LogDebug("[messaging.provision] starting plan phase bus={Bus} mode={Mode}", msgOpts.DefaultBus ?? "default", mode);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+    var desired = planner.Plan(bus, msgOpts.DefaultGroup, providerOptionsForPlan ?? new object(), new BasicCapabilities(), _sp.GetService(typeof(Sora.Messaging.ITypeAliasRegistry)) as Sora.Messaging.ITypeAliasRegistry);
+        sw.Stop();
+        long planMs = sw.ElapsedMilliseconds;
 
         Sora.Messaging.Provisioning.CurrentTopology current = new(Array.Empty<Sora.Messaging.Provisioning.ExchangeSpec>(), Array.Empty<Sora.Messaging.Provisioning.QueueSpec>(), Array.Empty<Sora.Messaging.Provisioning.BindingSpec>());
         Sora.Messaging.Provisioning.TopologyDiff diff = new(

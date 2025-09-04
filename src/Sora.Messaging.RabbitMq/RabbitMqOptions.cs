@@ -3,7 +3,7 @@ using Sora.Messaging.Provisioning;
 
 namespace Sora.Messaging.RabbitMq;
 
-internal sealed class RabbitMqOptions
+public sealed class RabbitMqOptions
 {
     public string? ConnectionString { get; set; }
     public string? ConnectionStringName { get; set; }

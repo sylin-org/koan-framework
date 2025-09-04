@@ -1,6 +1,6 @@
 namespace Sora.Messaging.RabbitMq;
 
-internal sealed class SubscriptionOption
+public sealed class SubscriptionOption
 {
     public string Name { get; set; } = "default";
     public string? Queue { get; set; }

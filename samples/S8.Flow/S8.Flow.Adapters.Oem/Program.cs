@@ -12,6 +12,7 @@ using Sora.Flow.Sending;
 using Sora.Flow.Attributes;
 using Sora.Flow;
 using Sora.Data.Core; // AddSora()
+using S8.Flow.Shared.Commands;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -30,6 +31,16 @@ builder.Configuration
 // and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
     builder.Services.AddRabbitMq();
+
+
+// Register FlowCommand handler for 'seed' (target: oem)
+builder.Services.AddFlowCommands(reg =>
+    reg.On("seed", async (ctx, args, ct) => {
+        var count = args.TryGetValue("count", out var v) ? Convert.ToInt32(v) : 1;
+        var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
+        await AdapterSeeding.SeedCatalogAsync(FlowSampleConstants.Sources.Oem, subset, SampleProfiles.SensorsForOem, ct);
+    }, target: FlowSampleConstants.Sources.Oem)
+);
 
 var app = builder.Build();
 await app.RunAsync();
