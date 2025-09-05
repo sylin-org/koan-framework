@@ -170,6 +170,7 @@
 
 .entity-tree-item--device .entity-tree-item__icon { color: #3b82f6; }
 .entity-tree-item--sensor .entity-tree-item__icon { color: #8b5cf6; }
+.entity-tree-item--manufacturer .entity-tree-item__icon { color: #6366f1; }
 .entity-tree-item--reading .entity-tree-item__icon { color: #eab308; }
 
 /* Modal styles */

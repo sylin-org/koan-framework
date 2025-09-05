@@ -83,7 +83,7 @@
             </div>
             <div class="flex items-center space-x-2">
               <div class="flex items-center space-x-1">
-                <span class="text-blue-200 text-sm">Keyed→Canon:</span>
+                <span class="text-blue-200 text-sm">Keyed→Processed:</span>
                 <div class="w-24 bg-slate-800 rounded-full h-2">
                   <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" id="keyedCanonBar" style="width: 0%"></div>
                 </div>
@@ -100,6 +100,127 @@
           <div class="text-center">
             <div class="text-2xl font-bold text-green-400" id="adaptersOem">●</div>
             <div class="text-xs text-gray-400">OEM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow State Breakdown -->
+    <div class="bg-slate-900 rounded-xl border border-slate-800 mb-8">
+      <div class="p-6 border-b border-slate-800">
+        <h3 class="text-lg font-semibold text-white">
+          <i class="fas fa-flow-chart mr-2 text-cyan-500"></i>
+          Flow State Breakdown
+        </h3>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <!-- Devices Flow -->
+          <div class="flow-breakdown-section">
+            <h4 class="text-sm font-medium text-gray-300 mb-3 flex items-center">
+              <i class="fas fa-microchip mr-2 text-blue-400"></i>Devices
+            </h4>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Intake:</span>
+                <span class="text-sm font-mono text-white" id="deviceIntakeCount">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Keyed:</span>
+                <span class="text-sm font-mono text-white" id="deviceKeyedCount">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Processed:</span>
+                <span class="text-sm font-mono text-white" id="deviceProcessedCount">-</span>
+              </div>
+              <div class="border-t border-slate-700 pt-2 mt-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-medium text-gray-300">Total:</span>
+                  <span class="text-sm font-mono font-bold text-blue-400" id="deviceTotalCount">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sensors Flow -->
+          <div class="flow-breakdown-section">
+            <h4 class="text-sm font-medium text-gray-300 mb-3 flex items-center">
+              <i class="fas fa-thermometer-half mr-2 text-purple-400"></i>Sensors
+            </h4>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Intake:</span>
+                <span class="text-sm font-mono text-white" id="sensorIntakeCount">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Keyed:</span>
+                <span class="text-sm font-mono text-white" id="sensorKeyedCount">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Processed:</span>
+                <span class="text-sm font-mono text-white" id="sensorProcessedCount">-</span>
+              </div>
+              <div class="border-t border-slate-700 pt-2 mt-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-medium text-gray-300">Total:</span>
+                  <span class="text-sm font-mono font-bold text-purple-400" id="sensorTotalCount">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Readings Flow -->
+          <div class="flow-breakdown-section">
+            <h4 class="text-sm font-medium text-gray-300 mb-3 flex items-center">
+              <i class="fas fa-chart-line mr-2 text-yellow-400"></i>Readings
+            </h4>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Intake:</span>
+                <span class="text-sm font-mono text-white" id="readingIntakeCount">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Keyed:</span>
+                <span class="text-sm font-mono text-white" id="readingKeyedCount">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Processed:</span>
+                <span class="text-sm font-mono text-white" id="readingProcessedCount">-</span>
+              </div>
+              <div class="border-t border-slate-700 pt-2 mt-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-medium text-gray-300">Total:</span>
+                  <span class="text-sm font-mono font-bold text-yellow-400" id="readingTotalCount">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Manufacturers Flow -->
+          <div class="flow-breakdown-section">
+            <h4 class="text-sm font-medium text-gray-300 mb-3 flex items-center">
+              <i class="fas fa-building mr-2 text-indigo-400"></i>Manufacturers
+            </h4>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Intake:</span>
+                <span class="text-sm font-mono text-white" id="manufacturerIntakeCount">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Keyed:</span>
+                <span class="text-sm font-mono text-white" id="manufacturerKeyedCount">-</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400">Processed:</span>
+                <span class="text-sm font-mono text-white" id="manufacturerProcessedCount">-</span>
+              </div>
+              <div class="border-t border-slate-700 pt-2 mt-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-medium text-gray-300">Total:</span>
+                  <span class="text-sm font-mono font-bold text-indigo-400" id="manufacturerTotalCount">-</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -165,12 +286,12 @@
             <div class="bg-slate-800 rounded-lg p-4">
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-gray-400 text-sm">Alerts</p>
-                  <p class="text-2xl font-bold text-white" id="alertCount">-</p>
-                  <p class="text-xs text-red-400" id="alertActivity">pending</p>
+                  <p class="text-gray-400 text-sm">Manufacturers</p>
+                  <p class="text-2xl font-bold text-white" id="manufacturerCount">-</p>
+                  <p class="text-xs text-blue-400" id="manufacturerActivity">active</p>
                 </div>
-                <div class="bg-red-500 bg-opacity-20 p-3 rounded-lg">
-                  <i class="fas fa-exclamation-triangle text-red-500"></i>
+                <div class="bg-indigo-500 bg-opacity-20 p-3 rounded-lg">
+                  <i class="fas fa-building text-indigo-500"></i>
                 </div>
               </div>
             </div>
@@ -245,6 +366,7 @@
                 <option value="all">All Types</option>
                 <option value="device">Devices</option>
                 <option value="sensor">Sensors</option>
+                <option value="manufacturer">Manufacturers</option>
                 <option value="reading">Readings</option>
               </select>
             </div>

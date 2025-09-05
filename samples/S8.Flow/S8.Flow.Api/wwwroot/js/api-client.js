@@ -80,6 +80,27 @@ class FlowApiClient {
     });
   }
 
+  // Entity APIs - Manufacturers
+  async getManufacturers(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.fetchJson(`/api/manufacturers${query ? '?' + query : ''}`);
+  }
+
+  async getManufacturer(id) {
+    return this.fetchJson(`/api/manufacturers/${id}`);
+  }
+
+  async getManufacturerByCanonicalId(canonicalId) {
+    return this.fetchJson(`/api/manufacturers/by-cid/${canonicalId}`);
+  }
+
+  async queryManufacturers(query) {
+    return this.fetchJson('/api/manufacturers/query', {
+      method: 'POST',
+      body: JSON.stringify(query)
+    });
+  }
+
   // Value Object APIs - Readings
   async getReadings(params = {}) {
     const query = new URLSearchParams(params).toString();
@@ -232,20 +253,22 @@ class FlowApiClient {
   // High-level convenience methods
   async getEntityCounts() {
     try {
-      const [devices, sensors, readings] = await Promise.all([
+      const [devices, sensors, readings, manufacturers] = await Promise.all([
         this.getDevices({ size: 1 }),
         this.getSensors({ size: 1 }),
-        this.getReadings({ size: 1 })
+        this.getReadings({ size: 1 }),
+        this.getManufacturers({ size: 1 }).catch(() => ({ items: [] })) // Graceful fallback if endpoint doesn't exist
       ]);
 
       return {
         devices: devices?.items?.length ?? (Array.isArray(devices) ? devices.length : 0),
         sensors: sensors?.items?.length ?? (Array.isArray(sensors) ? sensors.length : 0),  
-        readings: readings?.items?.length ?? (Array.isArray(readings) ? readings.length : 0)
+        readings: readings?.items?.length ?? (Array.isArray(readings) ? readings.length : 0),
+        manufacturers: manufacturers?.items?.length ?? (Array.isArray(manufacturers) ? manufacturers.length : 0)
       };
     } catch (error) {
       console.error('Failed to get entity counts:', error);
-      return { devices: 0, sensors: 0, readings: 0 };
+      return { devices: 0, sensors: 0, readings: 0, manufacturers: 0 };
     }
   }
 
@@ -279,7 +302,7 @@ FlowApiClient.prototype.getFlowOverview = async function() {
 
 // Flow seeding
 FlowApiClient.prototype.seedFlow = async function(count) {
-  return this.fetchJson(`/api/flow/commands/seed`, {
+  return this.fetchJson(`/api/flow/seed`, {
     method: 'POST',
     body: JSON.stringify({ count: count || 10 })
   });

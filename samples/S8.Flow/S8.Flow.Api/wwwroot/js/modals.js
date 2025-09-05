@@ -504,6 +504,8 @@ class FlowModals {
         return await window.flowApi.getDevice(entityId);
       case 'sensor':
         return await window.flowApi.getSensor(entityId);
+      case 'manufacturer':
+        return await window.flowApi.getManufacturer(entityId).catch(() => ({ id: entityId, model: { identifier: { name: 'Unknown' } }, metadata: {} }));
       case 'reading':
         // There isn't a direct reading-by-id route; return recent as a placeholder
         const page = await window.flowApi.getReadings({ size: 1 });
@@ -555,6 +557,8 @@ class FlowModals {
         return this.renderDeviceSpecific(entity);
       case 'sensor':
         return this.renderSensorSpecific(entity);
+      case 'manufacturer':
+        return this.renderManufacturerSpecific(entity);
       case 'reading':
         return this.renderReadingSpecific(entity);
       default:
@@ -591,6 +595,35 @@ class FlowModals {
           <dd>${sensor.model?.range || 'Unspecified'}</dd>
           <dt>Device ID</dt>
           <dd class="font-mono">${sensor.model?.deviceId || 'N/A'}</dd>
+        </dl>
+      </div>
+    `;
+  }
+
+  renderManufacturerSpecific(manufacturer) {
+    const identifier = manufacturer.model?.identifier || {};
+    const manufacturing = manufacturer.model?.manufacturing || {};
+    const support = manufacturer.model?.support || {};
+    const certifications = manufacturer.model?.certifications || {};
+    
+    return `
+      <div class="entity-details__section mt-6">
+        <h4 class="entity-details__heading">Manufacturer Information</h4>
+        <dl class="entity-details__list">
+          <dt>Company Name</dt>
+          <dd>${identifier.name || 'Unknown'}</dd>
+          <dt>Company Code</dt>
+          <dd class="font-mono">${identifier.code || 'N/A'}</dd>
+          <dt>Country</dt>
+          <dd>${manufacturing.country || 'Unspecified'}</dd>
+          <dt>Established</dt>
+          <dd>${manufacturing.established || 'Unknown'}</dd>
+          <dt>Support Tier</dt>
+          <dd><span class="chip chip--info">${support.tier || 'Standard'}</span></dd>
+          <dt>Contact</dt>
+          <dd>${support.email || support.phone || 'N/A'}</dd>
+          <dt>ISO 9001 Certified</dt>
+          <dd>${certifications.iso9001 ? '✓ Yes' : '○ No'}</dd>
         </dl>
       </div>
     `;
@@ -763,6 +796,7 @@ class FlowModals {
     switch (type) {
       case 'device': return 'microchip';
       case 'sensor': return 'thermometer-half';
+      case 'manufacturer': return 'building';
       case 'reading': return 'chart-line';
       default: return 'circle';
     }

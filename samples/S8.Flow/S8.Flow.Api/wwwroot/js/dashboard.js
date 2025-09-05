@@ -10,6 +10,7 @@ class FlowDashboard {
     this.selectedEntities = new Set();
     this.refreshTimers = new Map();
     this.lastUpdateTime = new Date();
+    this.stageData = {}; // Store per-state counts for flow visualization
     
     this.initialize();
   }
@@ -204,31 +205,124 @@ class FlowDashboard {
   async updateEntityCounts() {
     try {
       const overview = await window.flowApi.getFlowOverview();
+      
       // Devices
       const deviceStages = overview.devices || {};
-      const deviceCount = Object.values(deviceStages).reduce((a, b) => a + b, 0);
+      const deviceCount = deviceStages.total || 0;
       document.getElementById('deviceCount').textContent = deviceCount;
+      
       // Sensors
       const sensorStages = overview.sensors || {};
-      const sensorCount = Object.values(sensorStages).reduce((a, b) => a + b, 0);
+      const sensorCount = sensorStages.total || 0;
       document.getElementById('sensorCount').textContent = sensorCount;
-      // Readings (show per stage if available)
+      
+      // Readings
       const readingStages = overview.readings || {};
-      const readingCount = Object.values(readingStages).reduce((a, b) => a + b, 0);
+      const readingCount = readingStages.total || 0;
       document.getElementById('readingCount').textContent = readingCount;
-
-      // Optionally, show per-stage breakdown in tooltips or extra UI (not implemented here)
+      
+      // Manufacturers (new)
+      const manufacturerStages = overview.manufacturers || {};
+      const manufacturerCount = manufacturerStages.total || 0;
+      document.getElementById('manufacturerCount').textContent = manufacturerCount;
 
       // Update activity indicators
       document.getElementById('deviceActivity').textContent = deviceCount > 0 ? 'active' : 'none';
       document.getElementById('sensorActivity').textContent = sensorCount > 0 ? 'active' : 'none';
       document.getElementById('readingActivity').textContent = readingCount > 0 ? 'recent' : 'none';
-      document.getElementById('alertCount').textContent = '3';
-      document.getElementById('alertActivity').textContent = 'pending';
+      document.getElementById('manufacturerActivity').textContent = manufacturerCount > 0 ? 'active' : 'none';
+      
+      // Store the detailed stage data for flow visualization
+      this.stageData = {
+        devices: deviceStages,
+        sensors: sensorStages,
+        readings: readingStages,
+        manufacturers: manufacturerStages
+      };
+      
+      // Update detailed flow state breakdown
+      this.updateFlowStateBreakdown();
+      
+      // Update flow visualization
+      this.updateFlowVisualization();
     } catch (error) {
       console.error('Failed to update entity counts:', error);
       this.showEntityCountError();
     }
+  }
+
+  updateFlowStateBreakdown() {
+    try {
+      const { devices, sensors, readings, manufacturers } = this.stageData;
+      
+      // Update device breakdown
+      if (devices) {
+        document.getElementById('deviceIntakeCount').textContent = devices.intake || 0;
+        document.getElementById('deviceKeyedCount').textContent = devices.keyed || 0;
+        document.getElementById('deviceProcessedCount').textContent = devices.processed || 0;
+        document.getElementById('deviceTotalCount').textContent = devices.total || 0;
+      }
+      
+      // Update sensor breakdown
+      if (sensors) {
+        document.getElementById('sensorIntakeCount').textContent = sensors.intake || 0;
+        document.getElementById('sensorKeyedCount').textContent = sensors.keyed || 0;
+        document.getElementById('sensorProcessedCount').textContent = sensors.processed || 0;
+        document.getElementById('sensorTotalCount').textContent = sensors.total || 0;
+      }
+      
+      // Update reading breakdown
+      if (readings) {
+        document.getElementById('readingIntakeCount').textContent = readings.intake || 0;
+        document.getElementById('readingKeyedCount').textContent = readings.keyed || 0;
+        document.getElementById('readingProcessedCount').textContent = readings.processed || 0;
+        document.getElementById('readingTotalCount').textContent = readings.total || 0;
+      }
+      
+      // Update manufacturer breakdown
+      if (manufacturers) {
+        document.getElementById('manufacturerIntakeCount').textContent = manufacturers.intake || 0;
+        document.getElementById('manufacturerKeyedCount').textContent = manufacturers.keyed || 0;
+        document.getElementById('manufacturerProcessedCount').textContent = manufacturers.processed || 0;
+        document.getElementById('manufacturerTotalCount').textContent = manufacturers.total || 0;
+      }
+    } catch (error) {
+      console.error('Failed to update flow state breakdown:', error);
+    }
+  }
+
+  updateFlowVisualization() {
+    try {
+      // Update pipeline flow rates based on real stage data
+      const readings = this.stageData.readings || {};
+      
+      // Calculate flow rates between stages
+      const intakeToKeyedRate = this.calculateFlowRate(readings.intake, readings.keyed);
+      const keyedToProcessedRate = this.calculateFlowRate(readings.keyed, readings.processed);
+      
+      // Update flow indicators
+      document.getElementById('intakeKeyedRate').textContent = `${intakeToKeyedRate}/min`;
+      document.getElementById('keyedCanonRate').textContent = `${keyedToProcessedRate}/min`;
+      
+      // Update progress bars based on throughput
+      const intakeKeyedPercent = Math.min(100, Math.max(0, (intakeToKeyedRate / 100) * 100));
+      const keyedCanonPercent = Math.min(100, Math.max(0, (keyedToProcessedRate / 100) * 100));
+      
+      document.getElementById('intakeKeyedBar').style.width = `${intakeKeyedPercent}%`;
+      document.getElementById('keyedCanonBar').style.width = `${keyedCanonPercent}%`;
+      
+    } catch (error) {
+      console.error('Failed to update flow visualization:', error);
+    }
+  }
+
+  calculateFlowRate(current, next) {
+    // Simple heuristic: if we have more in current stage than next, there's active flow
+    // In real implementation, this would be based on timestamp deltas and actual flow metrics
+    if (!current || !next) return 0;
+    
+    const flowRate = Math.max(0, current - next);
+    return Math.min(150, flowRate); // Cap at reasonable rate for visualization
   }
 
   extractCount(response) {
@@ -252,9 +346,10 @@ class FlowDashboard {
 
   async fetchEntitiesForBrowser() {
     try {
-      const [devices, sensors] = await Promise.all([
+      const [devices, sensors, manufacturers] = await Promise.all([
         window.flowApi.getDevices({ size: 10 }),
-        window.flowApi.getSensors({ size: 20 })
+        window.flowApi.getSensors({ size: 20 }),
+        window.flowApi.getManufacturers({ size: 10 }).catch(() => ({ items: [] })) // Graceful fallback
       ]);
 
       const entities = [];
@@ -281,6 +376,21 @@ class FlowDashboard {
             name: sensor.canonicalId || sensor.id,
             meta: (sensor.model?.type || sensor.metadata?.type || 'Sensor'),
             parent: sensor.model?.deviceId
+          });
+        });
+      }
+
+      // Add manufacturers
+      if (manufacturers?.items) {
+        manufacturers.items.forEach(manufacturer => {
+          const name = manufacturer.model?.identifier?.name || manufacturer.canonicalId || manufacturer.id;
+          const code = manufacturer.model?.identifier?.code || 'MFG';
+          entities.push({
+            id: manufacturer.id,
+            type: 'manufacturer',
+            name: name,
+            meta: code,
+            children: []
           });
         });
       }
@@ -323,6 +433,7 @@ class FlowDashboard {
     switch (type) {
       case 'device': return 'microchip';
       case 'sensor': return 'thermometer-half';
+      case 'manufacturer': return 'building';
       case 'reading': return 'chart-line';
       default: return 'circle';
     }
@@ -523,7 +634,7 @@ class FlowDashboard {
     document.getElementById('deviceCount').textContent = '–';
     document.getElementById('sensorCount').textContent = '–';
     document.getElementById('readingCount').textContent = '–';
-    document.getElementById('alertCount').textContent = '–';
+    document.getElementById('manufacturerCount').textContent = '–';
   }
 
   showEntityBrowserError() {
