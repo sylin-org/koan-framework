@@ -20,16 +20,12 @@ public abstract class FlowValueObject<TVo> : Entity<TVo> where TVo : FlowValueOb
 // Base interface for DynamicFlowEntity types
 public interface IDynamicFlowEntity
 {
-    string? CanonicalId { get; set; }
     ExpandoObject? Model { get; set; }
 }
 
 // Normalized transport/delta for a model: Id + dynamic data (JObject or dictionary)
 public class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>>, IDynamicFlowEntity
 {
-    // Canonical business key for the target entity
-    [Index]
-    public string? CanonicalId { get; set; }
     // Nested JSON snapshot using ExpandoObject (document) + primitives/arrays for provider-friendly serialization
     public ExpandoObject? Model { get; set; }
 }
@@ -59,7 +55,6 @@ public sealed class StageRecord<TModel> : Entity<StageRecord<TModel>>
     public string? ReferenceUlid { get; set; }
     // Use dictionary payload to avoid Mongo discriminator wrappers (_t/_v) on object
     public Dictionary<string, object?>? StagePayload { get; set; }
-    public object? Diagnostics { get; set; }
 }
 
 // Parked intake records (dead-letter with TTL) for later inspection/sweep
@@ -87,51 +82,21 @@ public sealed class KeyIndex<TModel> : Entity<KeyIndex<TModel>>
     public string AggregationKey { get => Id; set => Id = value; }
     [Index]
     public string ReferenceUlid { get; set; } = default!;
-    // New: map aggregation key to CanonicalId (business key)
-    [Index]
-    public string? CanonicalId { get; set; }
 }
 
 // Reference version/projection state per model
 public sealed class ReferenceItem<TModel> : Entity<ReferenceItem<TModel>>
 {
     // ULID is stored in Id (from Entity<>)
-    // Canonical business key; unique across the model
-    [Index]
-    public string CanonicalId { get; set; } = default!;
     [Index]
     public ulong Version { get; set; }
     public bool RequiresProjection { get; set; }
 
-    // Lookup helpers
-    public static async Task<ReferenceItem<TModel>?> GetByCanonicalId(string canonicalId, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(canonicalId)) return null;
-    await foreach (var item in Data<ReferenceItem<TModel>, string>.AllStream(null, ct))
-        {
-            if (string.Equals(item.CanonicalId, canonicalId, StringComparison.Ordinal))
-                return item;
-        }
-        return null;
-    }
-
-    public static async Task<ReferenceItem<TModel>?> ResolveAsync(string idOrCanonicalId, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(idOrCanonicalId)) return null;
-        // Try by ULID (Id) first
-        var byId = await Data<ReferenceItem<TModel>, string>.GetAsync(idOrCanonicalId, ct);
-        if (byId is not null) return byId;
-        // Fallback to CanonicalId
-        return await GetByCanonicalId(idOrCanonicalId, ct);
-    }
 }
 
 // Projection task per model
 public sealed class ProjectionTask<TModel> : Entity<ProjectionTask<TModel>>
 {
-    // New fields to explicitly carry both identifiers
-    [Index]
-    public string? CanonicalId { get; set; }
     [Index]
     public string? ReferenceUlid { get; set; }
     public ulong Version { get; set; }
@@ -145,9 +110,7 @@ public class ProjectionView<TModel, TView> : Entity<ProjectionView<TModel, TView
 {
     [Index]
     public string ViewName { get; set; } = default!;
-    // New: include both identifiers for filtering and joins
-    [Index]
-    public string? CanonicalId { get; set; }
+    // Identifier for filtering and joins
     [Index]
     public string? ReferenceUlid { get; set; }
     public TView? View { get; set; }
@@ -162,9 +125,7 @@ public sealed class CanonicalProjection<TModel> : Entity<CanonicalProjection<TMo
 {
     [Index]
     public string ViewName { get; set; } = default!;
-    // New: include both identifiers for filtering and joins
-    [Index]
-    public string? CanonicalId { get; set; }
+    // Identifier for filtering and joins
     [Index]
     public string? ReferenceUlid { get; set; }
     public object? Model { get; set; }

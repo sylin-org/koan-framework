@@ -710,13 +710,6 @@ public sealed class FlowHandlerConfigurator
                 if (idValue != null) return $"Id: {idValue}";
             }
             
-            // Look for CanonicalId property (specific to DynamicFlowEntity)
-            var canonicalIdProp = typeof(TModel).GetProperty("CanonicalId");
-            if (canonicalIdProp != null)
-            {
-                var canonicalValue = canonicalIdProp.GetValue(entity);
-                if (canonicalValue != null) return $"CanonicalId: {canonicalValue}";
-            }
 
             return "received";
         }

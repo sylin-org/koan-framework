@@ -169,7 +169,6 @@ public static class ServiceCollectionExtensions
                             {
                                 var refUlid = t.GetType().GetProperty("ReferenceUlid")?.GetValue(t) as string;
                                 var refId = refUlid ?? string.Empty;
-                                var canonicalId = t.GetType().GetProperty("CanonicalId")?.GetValue(t) as string;
                                 // Pull recent stage records for this reference from keyed, fallback to intake
                                 var keyedSet = FlowSets.StageShort(FlowSets.Keyed);
                                 var intakeSet = FlowSets.StageShort(FlowSets.Intake);
@@ -265,8 +264,6 @@ public static class ServiceCollectionExtensions
                                 var canDoc = Activator.CreateInstance(canType)!;
                                 canType.GetProperty("Id")!.SetValue(canDoc, $"{Constants.Views.Canonical}::{refId}");
                                 // legacy ReferenceId removed; identifiers are CanonicalId and ReferenceUlid
-                                // Populate identifier fields when available
-                                if (!string.IsNullOrWhiteSpace(canonicalId)) canType.GetProperty("CanonicalId")?.SetValue(canDoc, canonicalId);
                                 if (!string.IsNullOrWhiteSpace(refUlid)) canType.GetProperty("ReferenceUlid")?.SetValue(canDoc, refUlid);
                                 canType.GetProperty("ViewName")!.SetValue(canDoc, Constants.Views.Canonical);
                                 // Canonical now publishes nested ranges under Model
@@ -279,8 +276,7 @@ public static class ServiceCollectionExtensions
                                 var linType = typeof(LineageProjection<>).MakeGenericType(modelType);
                                 var linDoc = Activator.CreateInstance(linType)!;
                                 linType.GetProperty("Id")!.SetValue(linDoc, $"{Constants.Views.Lineage}::{refId}");
-                                // legacy ReferenceId removed; identifiers are CanonicalId and ReferenceUlid
-                                if (!string.IsNullOrWhiteSpace(canonicalId)) linType.GetProperty("CanonicalId")?.SetValue(linDoc, canonicalId);
+                                // legacy ReferenceId removed; identifier is ReferenceUlid
                                 if (!string.IsNullOrWhiteSpace(refUlid)) linType.GetProperty("ReferenceUlid")?.SetValue(linDoc, refUlid);
                                 linType.GetProperty("ViewName")!.SetValue(linDoc, Constants.Views.Lineage);
                                 linType.GetProperty("View")!.SetValue(linDoc, lineageView);
@@ -345,8 +341,7 @@ public static class ServiceCollectionExtensions
                                     var dynType = typeof(DynamicFlowEntity<>).MakeGenericType(modelType);
                                     var dyn = Activator.CreateInstance(dynType)!;
                                     dynType.GetProperty("Id")!.SetValue(dyn, refId);
-                                    // no legacy ReferenceId on root; Id carries ULID. CanonicalId populated below.
-                                    if (!string.IsNullOrWhiteSpace(canonicalId)) dynType.GetProperty("CanonicalId")?.SetValue(dyn, canonicalId);
+                                        // no legacy ReferenceId on root; Id carries ULID.
                                     if (!string.IsNullOrWhiteSpace(refUlid)) dynType.GetProperty("ReferenceUlid")?.SetValue(dyn, refUlid);
                                     // Root materialized snapshot stored under Model (renamed from Data)
                                     var dynModelProp = dynType.GetProperty("Model") ?? dynType.GetProperty("Data");
@@ -459,7 +454,6 @@ public static class ServiceCollectionExtensions
                             }
 
                             var candidates = new List<(string tag, string value)>();
-                            string? canonicalId = null;
                             if (!isVo)
                             {
                                 foreach (var tag in tags)
@@ -470,8 +464,6 @@ public static class ServiceCollectionExtensions
                                         if (!string.IsNullOrWhiteSpace(v))
                                         {
                                             candidates.Add((tag, v));
-                                            // Heuristic: prefer the first aggregation key as CanonicalId if none explicit
-                                            canonicalId ??= v;
                                         }
                                     }
                                 }
@@ -497,7 +489,6 @@ public static class ServiceCollectionExtensions
                                     await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "vo-parent-key-empty", path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
                                     continue;
                                 }
-                                canonicalId = parentKey;
                                 candidates.Add((parentKeyPath, parentKey));
                             }
                             // Optional composite candidate: system|adapter|externalId for safer ownership, when present
@@ -577,9 +568,6 @@ public static class ServiceCollectionExtensions
                                     var newKi = Activator.CreateInstance(kiType)!;
                                     kiType.GetProperty("AggregationKey")!.SetValue(newKi, c.value);
                                     kiType.GetProperty("ReferenceUlid")!.SetValue(newKi, referenceUlid);
-                                    // also record CanonicalId if known
-                                    if (!string.IsNullOrWhiteSpace(canonicalId))
-                                        kiType.GetProperty("CanonicalId")?.SetValue(newKi, canonicalId);
                                     await (Task)kiData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { kiType, typeof(CancellationToken) })!
                                         .Invoke(null, new object?[] { newKi, stoppingToken })!;
                                 }
@@ -602,9 +590,6 @@ public static class ServiceCollectionExtensions
                             {
                                 refType.GetProperty("Id")!.SetValue(ri, referenceUlid);
                             }
-                            // Set CanonicalId (business key)
-                            if (!string.IsNullOrWhiteSpace(canonicalId))
-                                refType.GetProperty("CanonicalId")?.SetValue(ri, canonicalId);
                             var nextVersion = (ulong)((refType.GetProperty("Version")!.GetValue(ri) as ulong?) ?? 0) + 1UL;
                             refType.GetProperty("Version")!.SetValue(ri, nextVersion);
                             refType.GetProperty("RequiresProjection")!.SetValue(ri, true);
@@ -619,7 +604,6 @@ public static class ServiceCollectionExtensions
                                 var newTask = Activator.CreateInstance(taskType)!;
                                 taskType.GetProperty("Id")!.SetValue(newTask, $"{refUlid}::{nextVersion}::{Constants.Views.Canonical}");
                                 taskType.GetProperty("ReferenceUlid")?.SetValue(newTask, refUlid);
-                                if (!string.IsNullOrWhiteSpace(canonicalId)) taskType.GetProperty("CanonicalId")?.SetValue(newTask, canonicalId);
                                 taskType.GetProperty("Version")!.SetValue(newTask, nextVersion);
                                 taskType.GetProperty("ViewName")!.SetValue(newTask, Constants.Views.Canonical);
                                 taskType.GetProperty("CreatedAt")!.SetValue(newTask, DateTimeOffset.UtcNow);
@@ -630,9 +614,6 @@ public static class ServiceCollectionExtensions
 
                             // Move record to keyed set and drop from intake
                             var keyedSet = FlowSets.StageShort(FlowSets.Keyed);
-                            // CorrelationId can carry business key (optional) for diagnostics; leave as-is if already present
-                            if (!string.IsNullOrWhiteSpace(canonicalId))
-                                rec.GetType().GetProperty("CorrelationId")?.SetValue(rec, canonicalId);
                             // also propagate ULID on stage record for downstream consumers
                             rec.GetType().GetProperty("ReferenceUlid")?.SetValue(rec, refUlid);
                             var recData = typeof(Data<,>).MakeGenericType(recordType, typeof(string));

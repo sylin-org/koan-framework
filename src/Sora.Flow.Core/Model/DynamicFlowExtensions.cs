@@ -317,7 +317,7 @@ public static class DynamicFlowEntityExtensions
             SourceId: effectiveSource,
             OccurredAt: effectiveOccurredAt,
             Bag: bag,
-            CorrelationId: entity.CanonicalId);
+            CorrelationId: null);
 
         // Send to Flow intake directly (bypassing messaging)
         await sender.SendAsync(new[] { item }, envelope: null, message: null, hostType: null, ct);
@@ -328,11 +328,6 @@ public static class DynamicFlowEntityExtensions
         var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         if (entity is null) return dict;
 
-        // Add CanonicalId
-        if (!string.IsNullOrWhiteSpace(entity.CanonicalId))
-        {
-            dict["CanonicalId"] = entity.CanonicalId;
-        }
 
         // Extract all flattened paths from the ExpandoObject Model
         if (entity.Model is ExpandoObject expando)

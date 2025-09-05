@@ -104,15 +104,6 @@ public sealed class ReadingsController : ControllerBase
         return Ok(new { page, size, returned = list.Count, items = list });
     }
 
-    // Secondary route: resolve by CanonicalId (business key) and use ULID for correlation
-    [HttpGet("by-cid/{canonicalId}")]
-    public async Task<IActionResult> GetByCanonicalId(string canonicalId, [FromQuery] int page = 1, [FromQuery] int size = 200, CancellationToken ct = default)
-    {
-        var refItem = await ReferenceItem<Reading>.GetByCanonicalId(canonicalId, ct);
-        if (refItem is null) return NotFound();
-        // Reuse Get handler with ULID id
-        return await Get(refItem.Id, page, size, ct);
-    }
 
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] SensorReading reading, CancellationToken ct)
