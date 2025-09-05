@@ -233,6 +233,16 @@ public sealed class FlowHandlerConfigurator
                     continue;
                 }
 
+                // Check if it's a DynamicFlowEntity<T> first
+                var dynamicEntityBaseType = GetDynamicFlowEntityBaseType(type);
+                if (dynamicEntityBaseType != null)
+                {
+                    Console.WriteLine($"🔧 AUTO-CONFIG DEBUG: Found DynamicFlowEntity: {type.Name} -> registering dynamic handler");
+                    RegisterDynamicFlowEntityHandler(type, dynamicEntityBaseType, options);
+                    totalHandlersRegistered++;
+                    continue;
+                }
+
                 // Check if it's a FlowEntity<T>
                 var entityBaseType = GetFlowEntityBaseType(type);
                 if (entityBaseType != null)
@@ -289,6 +299,26 @@ public sealed class FlowHandlerConfigurator
         {
             return Array.Empty<Type>();
         }
+    }
+
+    private static Type? GetDynamicFlowEntityBaseType(Type type)
+    {
+        if (type.IsAbstract || type.IsInterface) return null;
+        
+        var current = type;
+        while (current != null && current != typeof(object))
+        {
+            if (current.IsGenericType)
+            {
+                var generic = current.GetGenericTypeDefinition();
+                if (generic == typeof(DynamicFlowEntity<>))
+                {
+                    return current;
+                }
+            }
+            current = current.BaseType;
+        }
+        return null;
     }
 
     private static Type? GetFlowEntityBaseType(Type type)
@@ -379,6 +409,54 @@ public sealed class FlowHandlerConfigurator
         }
     }
 
+    private void RegisterDynamicFlowEntityHandler(Type entityType, Type baseType, AutoFlowOptions options)
+    {
+        Console.WriteLine($"🔧 REGISTER DEBUG: Starting DynamicFlowEntity handler registration for {entityType.Name}");
+        
+        // Create handler method using reflection
+        var onMethods = typeof(FlowHandlerConfigurator).GetMethods()
+            .Where(m => m.Name == nameof(On) && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
+            .ToArray();
+        
+        Console.WriteLine($"🔧 REGISTER DEBUG: Found {onMethods.Length} On<T> method candidates for {entityType.Name}");
+        
+        var onMethod = onMethods.FirstOrDefault(m => 
+        {
+            var parameterType = m.GetParameters()[0].ParameterType;
+            Console.WriteLine($"🔧 REGISTER DEBUG: Checking method with parameter type: {parameterType}");
+            return parameterType.IsGenericType && 
+                   parameterType.GetGenericTypeDefinition() == typeof(Func<,>) &&
+                   parameterType.GetGenericArguments()[1] == typeof(Task);
+        });
+        
+        if (onMethod == null) 
+        {
+            Console.WriteLine($"❌ REGISTER ERROR: Could not find compatible On<T> method for {entityType.Name}");
+            return;
+        }
+        Console.WriteLine($"✅ REGISTER DEBUG: Found On<T> method for {entityType.Name}");
+
+        // Create the generic method
+        var genericMethod = onMethod.MakeGenericMethod(entityType);
+        Console.WriteLine($"✅ REGISTER DEBUG: Created generic On<{entityType.Name}> method");
+
+        // Create the handler delegate
+        var handlerType = typeof(Func<,>).MakeGenericType(entityType, typeof(Task));
+        var handler = CreateEntityHandler(entityType, options);
+        Console.WriteLine($"✅ REGISTER DEBUG: Created handler delegate for {entityType.Name}");
+
+        // Invoke On<EntityType>(handler)
+        try
+        {
+            genericMethod.Invoke(this, new object[] { handler });
+            Console.WriteLine($"🎯 REGISTER SUCCESS: Successfully registered DynamicFlowEntity handler for {entityType.Name}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ REGISTER ERROR: Failed to register DynamicFlowEntity handler for {entityType.Name}: {ex.Message}");
+        }
+    }
+
     private void RegisterFlowValueObjectHandler(Type valueObjectType, Type baseType, AutoFlowOptions options)
     {
         Console.WriteLine($"🔧 REGISTER DEBUG: Starting FlowValueObject handler registration for {valueObjectType.Name}");
@@ -431,9 +509,26 @@ public sealed class FlowHandlerConfigurator
     {
         // Create a closure that captures the options
         var handlerType = typeof(Func<,>).MakeGenericType(entityType, typeof(Task));
-        var method = typeof(FlowHandlerConfigurator).GetMethod(nameof(CreateEntityHandlerGeneric), BindingFlags.NonPublic | BindingFlags.Static);
-        var genericMethod = method!.MakeGenericMethod(entityType);
-        return (Delegate)genericMethod.Invoke(null, new object[] { options })!;
+        
+        // Check if this is a DynamicFlowEntity<T>
+        if (IsDynamicFlowEntity(entityType))
+        {
+            var method = typeof(FlowHandlerConfigurator).GetMethod(nameof(CreateDynamicEntityHandlerGeneric), BindingFlags.NonPublic | BindingFlags.Static);
+            var genericMethod = method!.MakeGenericMethod(entityType);
+            return (Delegate)genericMethod.Invoke(null, new object[] { options })!;
+        }
+        else
+        {
+            // Regular FlowEntity<T>
+            var method = typeof(FlowHandlerConfigurator).GetMethod(nameof(CreateEntityHandlerGeneric), BindingFlags.NonPublic | BindingFlags.Static);
+            var genericMethod = method!.MakeGenericMethod(entityType);
+            return (Delegate)genericMethod.Invoke(null, new object[] { options })!;
+        }
+    }
+
+    private bool IsDynamicFlowEntity(Type type)
+    {
+        return typeof(IDynamicFlowEntity).IsAssignableFrom(type) && !type.IsInterface && !type.IsAbstract;
     }
 
     private Delegate CreateValueObjectHandler(Type valueObjectType, AutoFlowOptions options)
@@ -469,6 +564,35 @@ public sealed class FlowHandlerConfigurator
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ AUTO-HANDLER ERROR: Failed to process {typeof(TModel).Name}: {ex.Message}");
+                throw;
+            }
+        };
+    }
+
+    private static Func<TModel, Task> CreateDynamicEntityHandlerGeneric<TModel>(AutoFlowOptions options) 
+        where TModel : class, IDynamicFlowEntity, new()
+    {
+        return async entity =>
+        {
+            Console.WriteLine($"🏭 AUTO-HANDLER DEBUG: Processing DynamicFlowEntity<{typeof(TModel).Name}> at {DateTime.Now:HH:mm:ss.fff}");
+            
+            if (options.EnableLogging)
+            {
+                var typeName = typeof(TModel).Name;
+                var keyInfo = GetDynamicEntityKeyInfo(entity);
+                Console.WriteLine(string.Format(options.EntityLogFormat, typeName, keyInfo));
+            }
+            
+            try
+            {
+                // Route to Flow intake directly (bypass messaging loop)
+                Console.WriteLine($"🏭 AUTO-HANDLER DEBUG: Sending DynamicFlowEntity {typeof(TModel).Name} to Flow intake");
+                await entity.SendToFlowIntake();
+                Console.WriteLine($"✅ AUTO-HANDLER DEBUG: Successfully processed DynamicFlowEntity {typeof(TModel).Name}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ AUTO-HANDLER ERROR: Failed to process DynamicFlowEntity {typeof(TModel).Name}: {ex.Message}");
                 throw;
             }
         };
@@ -564,6 +688,34 @@ public sealed class FlowHandlerConfigurator
                     var unit = unitProp.GetValue(valueObject);
                     return $"{sensor} = {value}{unit}";
                 }
+            }
+
+            return "received";
+        }
+        catch
+        {
+            return "received";
+        }
+    }
+    
+    private static string GetDynamicEntityKeyInfo<TModel>(TModel entity) where TModel : class
+    {
+        try
+        {
+            // For DynamicFlowEntity types, look for Id property first
+            var idProp = typeof(TModel).GetProperty("Id");
+            if (idProp != null)
+            {
+                var idValue = idProp.GetValue(entity);
+                if (idValue != null) return $"Id: {idValue}";
+            }
+            
+            // Look for CanonicalId property (specific to DynamicFlowEntity)
+            var canonicalIdProp = typeof(TModel).GetProperty("CanonicalId");
+            if (canonicalIdProp != null)
+            {
+                var canonicalValue = canonicalIdProp.GetValue(entity);
+                if (canonicalValue != null) return $"CanonicalId: {canonicalValue}";
             }
 
             return "received";

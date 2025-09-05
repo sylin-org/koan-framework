@@ -17,8 +17,15 @@ public abstract class FlowEntity<TModel> : Entity<TModel> where TModel : FlowEnt
 // and projected into parent-scoped views (e.g., latest/window aggregates).
 public abstract class FlowValueObject<TVo> : Entity<TVo> where TVo : FlowValueObject<TVo>, new() { }
 
+// Base interface for DynamicFlowEntity types
+public interface IDynamicFlowEntity
+{
+    string? CanonicalId { get; set; }
+    ExpandoObject? Model { get; set; }
+}
+
 // Normalized transport/delta for a model: Id + dynamic data (JObject or dictionary)
-public sealed class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>>
+public class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>>, IDynamicFlowEntity
 {
     // Canonical business key for the target entity
     [Index]

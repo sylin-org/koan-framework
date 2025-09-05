@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 
 namespace Sora.Flow.Attributes;
 
@@ -61,3 +62,25 @@ public sealed class ParentKeyAttribute : Attribute
 /// </summary>
 [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
 public sealed class FlowOrchestratorAttribute : Attribute { }
+
+/// <summary>
+/// Declares aggregation keys at the class level for DynamicFlowEntity models.
+/// These keys are JSON paths used to identify and aggregate entities from multiple sources.
+/// Example: [AggregationKeys("identifier.username", "identifier.employeeId")]
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+public sealed class AggregationKeysAttribute : Attribute
+{
+    public string[] Keys { get; }
+    
+    public AggregationKeysAttribute(params string[] keys)
+    {
+        if (keys == null || keys.Length == 0)
+            throw new ArgumentException("At least one aggregation key must be specified", nameof(keys));
+        
+        Keys = keys.Where(k => !string.IsNullOrWhiteSpace(k)).ToArray();
+        
+        if (Keys.Length == 0)
+            throw new ArgumentException("At least one non-empty aggregation key must be specified", nameof(keys));
+    }
+}

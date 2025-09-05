@@ -6,7 +6,6 @@ using Sora.Core;
 using Sora.Messaging;
 using Sora.Messaging.RabbitMq;
 using S8.Flow.Shared;
-using S8.Flow.Shared.Commands;
 using Sora.Flow.Actions;
 using Sora.Core.Hosting.App;
 using Sora.Flow.Attributes;
@@ -14,6 +13,7 @@ using Sora.Flow.Configuration;
 using Sora.Flow.Sending;
 using Sora.Data.Core;
 using Sora.Flow;
+using System.Collections.Generic;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -106,8 +106,13 @@ public sealed class BmsPublisher : BackgroundService
             _log,
             ct);
 
+        // Send initial manufacturer data using new dynamic capabilities
+        _log.LogInformation("[BMS] 🏭 Sending manufacturer data using dynamic Flow model");
+        await SendManufacturerData();
+
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
+        var lastManufacturerUpdate = DateTimeOffset.MinValue;
         while (!ct.IsCancellationRequested)
         {
             try
@@ -165,12 +170,81 @@ public sealed class BmsPublisher : BackgroundService
                 
                 _log.LogInformation("📊 BMS sending Reading {Key}={Value}{Unit} via messaging", reading.SensorKey, reading.Value, reading.Unit);
                 await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, ct); // ✨ Messaging-first: routes to orchestrator automatically
+
+                // Periodically update manufacturer data (every 5 minutes)
+                if (DateTimeOffset.UtcNow - lastManufacturerUpdate > TimeSpan.FromMinutes(5))
+                {
+                    _log.LogInformation("[BMS] 🏭 Updating manufacturer data");
+                    await SendManufacturerData();
+                    lastManufacturerUpdate = DateTimeOffset.UtcNow;
+                }
             }
             catch (Exception ex)
             {
                 _log.LogWarning(ex, "BMS publish failed");
             }
             try { await Task.Delay(FlowSampleConstants.Timing.BmsLoopDelay, ct); } catch (TaskCanceledException) { }
+        }
+    }
+
+    private async Task SendManufacturerData()
+    {
+        // BMS provides manufacturing and production data for manufacturers
+        var manufacturers = new[]
+        {
+            new Dictionary<string, object?>
+            {
+                ["identifier.code"] = "MFG001",
+                ["identifier.name"] = "Acme Corp",
+                ["identifier.external.bms"] = "BMS-MFG-001",
+                ["manufacturing.country"] = "USA",
+                ["manufacturing.established"] = "1985",
+                ["manufacturing.facilities"] = new[] { "Plant A", "Plant B", "Plant C" },
+                ["products.categories"] = new[] { "sensors", "actuators", "controllers" },
+                ["production.capacity"] = "10000 units/month",
+                ["quality.defectRate"] = 0.002
+            },
+            new Dictionary<string, object?>
+            {
+                ["identifier.code"] = "MFG002", 
+                ["identifier.name"] = "TechFlow Industries",
+                ["identifier.external.bms"] = "BMS-MFG-002",
+                ["manufacturing.country"] = "Germany",
+                ["manufacturing.established"] = "1992",
+                ["manufacturing.facilities"] = new[] { "Berlin Factory", "Munich Lab" },
+                ["products.categories"] = new[] { "flow sensors", "pressure gauges" },
+                ["production.capacity"] = "5000 units/month",
+                ["quality.defectRate"] = 0.001
+            },
+            new Dictionary<string, object?>
+            {
+                ["identifier.code"] = "MFG003",
+                ["identifier.name"] = "Precision Dynamics",
+                ["identifier.external.bms"] = "BMS-MFG-003", 
+                ["manufacturing.country"] = "Japan",
+                ["manufacturing.established"] = "1978",
+                ["manufacturing.facilities"] = new[] { "Tokyo HQ", "Osaka Plant" },
+                ["products.categories"] = new[] { "precision instruments", "calibration tools" },
+                ["production.capacity"] = "3000 units/month",
+                ["quality.defectRate"] = 0.0005
+            }
+        };
+
+        foreach (var mfgData in manufacturers)
+        {
+            try
+            {
+                // Use new beautiful DX: Send dictionary directly as DynamicFlowEntity
+                await Flow.Send<Manufacturer>(mfgData).Broadcast();
+                
+                var code = mfgData["identifier.code"];
+                var name = mfgData["identifier.name"];
+                _log.LogInformation("[BMS] ✅ Sent manufacturer {Code} ({Name}) data via dynamic Flow", code, name);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "[BMS] Failed to send manufacturer data");
+            }
         }
     }
 }

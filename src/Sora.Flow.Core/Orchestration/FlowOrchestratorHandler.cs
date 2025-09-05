@@ -12,7 +12,7 @@ namespace Sora.Flow.Orchestration;
 /// Implements the orchestrator pattern where adapters send entities → orchestrator → intake queue → business logic.
 /// </summary>
 /// <typeparam name="T">The FlowEntity type</typeparam>
-public sealed class FlowEntityOrchestratorHandler<T> where T : FlowEntity<T>, new()
+internal sealed class FlowEntityOrchestratorHandler<T> where T : FlowEntity<T>, new()
 {
     private readonly ILogger<FlowEntityOrchestratorHandler<T>> _logger;
 
@@ -54,7 +54,7 @@ public sealed class FlowEntityOrchestratorHandler<T> where T : FlowEntity<T>, ne
 /// Implements the orchestrator pattern where adapters send value objects → orchestrator → intake queue → business logic.
 /// </summary>
 /// <typeparam name="T">The FlowValueObject type</typeparam>
-public sealed class FlowValueObjectOrchestratorHandler<T> where T : FlowValueObject<T>, new()
+internal sealed class FlowValueObjectOrchestratorHandler<T> where T : FlowValueObject<T>, new()
 {
     private readonly IFlowSender _flowSender;
     private readonly ILogger<FlowValueObjectOrchestratorHandler<T>> _logger;

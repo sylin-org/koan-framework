@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Sora.Flow.Model;
 
 namespace Sora.Flow;
 
@@ -63,6 +65,20 @@ public static class Flow
     /// </summary>
     public static FlowSendBuilder<T> Send<T>(T entity) where T : class 
         => Outbound.Send(entity);
+
+    /// <summary>
+    /// Send a DynamicFlowEntity constructed from a dictionary of JSON paths and values.
+    /// Usage: Flow.Send<Manufacturer>(new Dictionary<string, object> { ["identifier.code"] = "MFG001" }).Broadcast()
+    /// </summary>
+    public static FlowSendBuilder<T> Send<T>(Dictionary<string, object?> pathValues) where T : class, IDynamicFlowEntity, new()
+        => Outbound.Send(pathValues.ToDynamicFlowEntity<T>());
+
+    /// <summary>
+    /// Send a DynamicFlowEntity constructed from a nested object structure.
+    /// Usage: Flow.Send<Manufacturer>(new { identifier = new { code = "MFG001" } }).Broadcast()
+    /// </summary>
+    public static FlowSendBuilder<T> Send<T>(object nestedData) where T : class, IDynamicFlowEntity, new()
+        => Outbound.Send(nestedData.ToDynamicFlowEntity<T>());
 
     /// <summary>
     /// Register a handler for typed messages.

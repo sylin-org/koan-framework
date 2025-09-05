@@ -13,7 +13,7 @@ using Sora.Flow.Attributes;
 using Sora.Flow;
 using Sora.Flow.Configuration;
 using Sora.Data.Core;
-using S8.Flow.Shared.Commands;
+using System.Collections.Generic;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -105,8 +105,13 @@ public sealed class OemPublisher : BackgroundService
             _log,
             stoppingToken);
 
+        // Send initial manufacturer data using new dynamic capabilities
+        _log.LogInformation("[OEM] 🎯 Sending manufacturer support and certification data using dynamic Flow model");
+        await SendManufacturerData();
+
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
+        var lastManufacturerUpdate = DateTimeOffset.MinValue;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -167,12 +172,144 @@ public sealed class OemPublisher : BackgroundService
                 
                 _log.LogInformation("📊 OEM sending Reading {Key}={Value}{Unit} via messaging", reading.SensorKey, reading.Value, reading.Unit);
                 await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, stoppingToken); // ✨ Messaging-first: routes to orchestrator automatically
+
+                // Periodically update manufacturer data (every 5 minutes)
+                if (DateTimeOffset.UtcNow - lastManufacturerUpdate > TimeSpan.FromMinutes(5))
+                {
+                    _log.LogInformation("[OEM] 🎯 Updating manufacturer support and certification data");
+                    await SendManufacturerData();
+                    lastManufacturerUpdate = DateTimeOffset.UtcNow;
+                }
             }
             catch (Exception ex)
             {
                 _log.LogWarning(ex, "OEM publish failed");
             }
             try { await Task.Delay(FlowSampleConstants.Timing.OemLoopDelay, stoppingToken); } catch (TaskCanceledException) { }
+        }
+    }
+
+    private async Task SendManufacturerData()
+    {
+        // OEM provides support, warranty, and certification data for manufacturers
+        // Using nested anonymous objects for a different DX pattern
+        var manufacturers = new object[]
+        {
+            new 
+            {
+                identifier = new 
+                {
+                    code = "MFG001",
+                    name = "Acme Corp",
+                    external = new { oem = "OEM-VENDOR-42" }
+                },
+                support = new 
+                {
+                    phone = "1-800-ACME",
+                    email = "support@acme.com",
+                    tier = "Premium",
+                    hours = "24/7",
+                    sla = "4 hour response"
+                },
+                certifications = new 
+                {
+                    iso9001 = true,
+                    iso14001 = true,
+                    ce = true,
+                    ul = true
+                },
+                warranty = new 
+                {
+                    standard = "2 years",
+                    extended = "5 years",
+                    coverage = "Parts and labor"
+                }
+            },
+            new
+            {
+                identifier = new 
+                {
+                    code = "MFG002",
+                    name = "TechFlow Industries",
+                    external = new { oem = "OEM-VENDOR-88" }
+                },
+                support = new 
+                {
+                    phone = "+49-30-555-0100",
+                    email = "hilfe@techflow.de",
+                    tier = "Standard",
+                    hours = "Mon-Fri 8AM-6PM CET",
+                    sla = "24 hour response"
+                },
+                certifications = new 
+                {
+                    iso9001 = true,
+                    iso14001 = false,
+                    ce = true,
+                    ul = false
+                },
+                warranty = new 
+                {
+                    standard = "1 year",
+                    extended = "3 years",
+                    coverage = "Parts only"
+                }
+            },
+            new
+            {
+                identifier = new 
+                {
+                    code = "MFG003",
+                    name = "Precision Dynamics",
+                    external = new { oem = "OEM-VENDOR-123" }
+                },
+                support = new 
+                {
+                    phone = "+81-3-5555-0001",
+                    email = "support@precision-dynamics.jp",
+                    tier = "Platinum",
+                    hours = "24/7 with dedicated engineer",
+                    sla = "1 hour response"
+                },
+                certifications = new 
+                {
+                    iso9001 = true,
+                    iso14001 = true,
+                    ce = true,
+                    ul = true,
+                    jis = true
+                },
+                warranty = new 
+                {
+                    standard = "3 years",
+                    extended = "10 years",
+                    coverage = "Full replacement"
+                },
+                partnership = new
+                {
+                    level = "Strategic",
+                    discount = "15%",
+                    priority = true
+                }
+            }
+        };
+
+        foreach (var mfgData in manufacturers)
+        {
+            try
+            {
+                // Use new beautiful DX: Send nested anonymous object directly as DynamicFlowEntity
+                await Flow.Send<Manufacturer>(mfgData).Broadcast();
+                
+                dynamic mfg = mfgData;
+                string code = mfg.identifier.code;
+                string name = mfg.identifier.name;
+                _log.LogInformation("[OEM] ✅ Sent manufacturer {Code} ({Name}) support/certification data via dynamic Flow", code, name);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "[OEM] Failed to send manufacturer data");
+            }
         }
     }
 }

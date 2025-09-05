@@ -174,7 +174,6 @@ public static class FlowEntitySendExtensions
             if (!IsSimple(val)) continue;
             var name = p.Name;
             dict[name] = val;
-            dict[$"{Infrastructure.Constants.Reserved.ModelPrefix}{name}"] = val;
         }
         return dict;
     }

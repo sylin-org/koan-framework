@@ -791,6 +791,9 @@ public static class ServiceCollectionExtensions
                 // Discover both root FlowEntity<> models and FlowValueObject<> VOs
                 if (def == typeof(FlowEntity<>) || def == typeof(FlowValueObject<>))
                     result.Add(t);
+                // Also discover DynamicFlowEntity<> types  
+                else if (def == typeof(DynamicFlowEntity<>))
+                    result.Add(t);
             }
         }
         return result;
