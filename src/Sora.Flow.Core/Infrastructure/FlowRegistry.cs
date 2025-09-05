@@ -30,13 +30,23 @@ public static class FlowRegistry
     {
         return s_aggTags.GetOrAdd(t, static type =>
         {
-            var props = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
             var tags = new List<string>();
+            
+            // Check for class-level [AggregationKeys] attribute
+            var classLevelAttr = type.GetCustomAttribute<AggregationKeysAttribute>(inherit: true);
+            if (classLevelAttr?.Keys != null)
+            {
+                tags.AddRange(classLevelAttr.Keys.Where(s => !string.IsNullOrWhiteSpace(s))!);
+            }
+            
+            // Check for property-level [AggregationTag] attributes (legacy)
+            var props = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
             foreach (var p in props)
             {
                 var attrs = p.GetCustomAttributes<AggregationTagAttribute>(inherit: true);
                 tags.AddRange(attrs.Select(a => a.Path).Where(s => !string.IsNullOrWhiteSpace(s))!);
             }
+            
             return tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         });
     }
