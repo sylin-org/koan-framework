@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Sora.Flow.Core</AssemblyName>
+    <RootNamespace>Sora.Flow</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
+    <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
+  <ProjectReference Include="..\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
+  </ItemGroup>
+</Project>

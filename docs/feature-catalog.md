@@ -8,6 +8,8 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - Unified runtime/config, health/readiness, secure defaults, auto-registration, boot reports, optional OpenTelemetry.
 - Data
   - Adapter-agnostic persistence (relational/NoSQL/JSON), pushdown-first, Direct escape hatch, CQRS/outbox, vector module.
+- Flow
+  - Model-typed pipeline (ingest → standardize → key → associate → project), aggregation tags and identity map, canonical/lineage views, parked/rejections, and a DX toolkit (generic controllers, actions, monitors).
 - Storage
   - Profile-based storage orchestrator with thin providers; local filesystem provider; DX helpers and model-centric API.
 - Media
@@ -34,6 +36,7 @@ References
 - Media: docs/reference/media.md
 - Web: docs/reference/web.md
 - Messaging: docs/reference/messaging.md
+- Flow: docs/reference/flow.md
 - AI: docs/reference/ai.md
 - Recipes: docs/reference/recipes.md
 - Orchestration: docs/reference/orchestration.md
@@ -54,6 +57,12 @@ References
   - CQRS patterns with outbox support for MongoDB and event-driven architectures.
   - Relational orchestration: [RelationalStorage] attribute + EnsureCreated orchestration with attribute > options precedence.
   - Singleflight dedupe for in-flight operations across core and relational adapters.
+- Flow
+  - Model-typed pipeline and sets: per-model stage sets (intake/standardized/keyed/processed), task and view sets, and stable IDs ("{view}::{referenceId}").
+  - Aggregation and identity: attribute-driven aggregation tags, association and identity map, collision detection with parked records and structured rejection reports.
+  - Views and materialization: canonical and lineage projections with per-model view sets; dynamic transport for adapter-neutral payloads.
+  - DX toolkit: generic `FlowEntityController<TModel>` under `/api/flow/{model}`, action verbs (`seed`, `report`, `ping`) via `IFlowActions` + responder, and monitor hooks (`OnProjectedAsync`) with atomic Model/Policies mutation.
+  - Auto-registration: controllers/handlers wired via auto-registrar; first-class statics on entities and views for consistent data access.
 - Storage
   - Storage orchestrator (Sora.Storage) with profile-based routing to thin providers; capability-aware operations (seek/range, stat, server-side copy, presign when supported).
   - Local filesystem provider (Sora.Storage.Local): safe-by-default (key sanitization, base path enforcement), atomic writes (temp+rename), range reads, lightweight Head, and server-side copy.
@@ -128,6 +137,7 @@ References
 
 - Greenfield APIs/services: ship quickly on JSON/SQLite; swap to Postgres/SQL Server/Mongo without API churn.
 - Enterprise data services: enforceable governance (DDL policy, naming, projection), measurable performance (pushdown), and traceability (db.\* tags).
+- Entity coalescence/MDM: unify multi-source identities with aggregation tags and an identity map; expose canonical/lineage views, investigate collisions via parked/rejections, and control ingestion via actions and monitors.
 - CQRS/event-driven: inbox/idempotency, batch semantics, provider-neutral retries/DLQ.
 - Ops/reporting: Direct API for audited, parameterized ad-hoc access; neutral rows; limits and policy gates.
 - Modern UI backends: REST + GraphQL from the same model with consistent naming and filter semantics.

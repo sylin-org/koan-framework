@@ -48,6 +48,8 @@ var app = builder.Build();
 
 // Sora.Web startup filter auto-wires static files, controller routing, and Swagger
 
+// TestProvider endpoints are auto-mapped by its auto-registrar in Development.
+
 app.Run();
 
 namespace S5.Recs

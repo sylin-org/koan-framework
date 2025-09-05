@@ -1,201 +1,104 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Core;
+using Sora.Core.Hosting.App;
 
 namespace Sora.Messaging;
 
+/// <summary>
+/// Beautiful developer experience extensions for the Sora messaging system.
+/// Provides <c>.Send()</c> and <c>.On&lt;T&gt;()</c> patterns for zero-config messaging.
+/// </summary>
 public static class MessagingExtensions
 {
-    public static Task Send(this object message, CancellationToken ct = default)
-        => Resolve().SendAsync(message, ct);
-
-    public static Task SendTo(this object message, string busCode, CancellationToken ct = default)
-        => Resolve(busCode).SendAsync(message, ct);
-
-    public static Task Send<T>(this IEnumerable<T> messages, CancellationToken ct = default)
-        => Resolve().SendManyAsync(messages.Cast<object>(), ct);
-
-    public static Task SendTo<T>(this IEnumerable<T> messages, string busCode, CancellationToken ct = default)
-        => Resolve(busCode).SendManyAsync(messages.Cast<object>(), ct);
-
-    // Explicit overloads for discoverability with non-generic collections
-    public static Task Send(this IEnumerable<object> messages, CancellationToken ct = default)
-        => Resolve().SendManyAsync(messages, ct);
-
-    public static Task SendTo(this IEnumerable<object> messages, string busCode, CancellationToken ct = default)
-        => Resolve(busCode).SendManyAsync(messages, ct);
-
-    // Send a single grouped message (Batch<T>) for explicit batch semantics
-    public static Task SendBatch<T>(this IEnumerable<T> items, CancellationToken ct = default)
-        => Resolve().SendAsync(new Batch<T>(items), ct);
-
-    public static Task SendBatchTo<T>(this IEnumerable<T> items, string busCode, CancellationToken ct = default)
-        => Resolve(busCode).SendAsync(new Batch<T>(items), ct);
-
-    // Readability aliases
-    public static Task SendAsBatch<T>(this IEnumerable<T> items, CancellationToken ct = default)
-        => items.SendBatch(ct);
-
-    public static Task SendAsBatchTo<T>(this IEnumerable<T> items, string busCode, CancellationToken ct = default)
-        => items.SendBatchTo(busCode, ct);
-
-    // OnMessage sugar: register a delegate-based handler via DI.
-    public static IServiceCollection OnMessage<T>(this IServiceCollection services, Func<MessageEnvelope, T, CancellationToken, Task> handler)
+    /// <summary>
+    /// Send a message through the Sora messaging system.
+    /// Automatically buffers during startup, then routes to live provider.
+    /// </summary>
+    public static async Task Send<T>(this T message, CancellationToken cancellationToken = default) where T : class
     {
-        services.AddSingleton<IMessageHandler<T>>(sp => new DelegateMessageHandler<T>(handler));
+        if (message == null)
+            throw new ArgumentNullException(nameof(message));
+        
+        var proxy = ResolveMessageProxy();
+        await proxy.SendAsync(message, cancellationToken);
+    }
+    
+    /// <summary>
+    /// Register a message handler using fluent syntax via <c>services.On&lt;T&gt;(handler)</c>.
+    /// </summary>
+    public static IServiceCollection On<T>(this IServiceCollection services, Func<T, Task> handler) where T : class
+    {
+        if (handler == null)
+            throw new ArgumentNullException(nameof(handler));
+            
+        services.Configure<HandlerRegistry>(registry => 
+        {
+            registry.AddHandler(typeof(T), handler);
+        });
+        
         return services;
     }
-
-    public static IServiceCollection OnMessage<T>(this IServiceCollection services, Action<MessageEnvelope, T> handler)
+    
+    private static IMessageProxy ResolveMessageProxy()
     {
-        services.AddSingleton<IMessageHandler<T>>(sp => new DelegateMessageHandler<T>((env, msg, ct) => { handler(env, msg); return Task.CompletedTask; }));
-        return services;
+        var serviceProvider = AppHost.Current 
+            ?? throw new InvalidOperationException("AppHost.Current is not initialized. Ensure AddSora() was called during startup.");
+            
+        var proxy = serviceProvider.GetService<IMessageProxy>()
+            ?? throw new InvalidOperationException("IMessageProxy is not registered. Ensure AddSora() and messaging core services are configured.");
+            
+        return proxy;
     }
+}
 
-    // Ultra-terse handler registration (no envelope parameter)
-    // Async with CancellationToken
-    public static IServiceCollection On<T>(this IServiceCollection services, Func<T, CancellationToken, Task> handler)
-        => services.OnMessage<T>((_, msg, ct) => handler(msg, ct));
-
-    // Async without CancellationToken
-    public static IServiceCollection On<T>(this IServiceCollection services, Func<T, Task> handler)
-        => services.OnMessage<T>((_, msg, ct) => handler(msg));
-
-    // Sync
-    public static IServiceCollection On<T>(this IServiceCollection services, Action<T> handler)
-        => services.OnMessage<T>((_, msg) => handler(msg));
-
-    // Semantic aliases for intent signaling (map to On<T>)
-    public static IServiceCollection OnCommand<T>(this IServiceCollection services, Func<T, CancellationToken, Task> handler)
-        => services.On(handler);
-
-    public static IServiceCollection OnCommand<T>(this IServiceCollection services, Func<T, Task> handler)
-        => services.On(handler);
-
-    public static IServiceCollection OnCommand<T>(this IServiceCollection services, Action<T> handler)
-        => services.On(handler);
-
-    public static IServiceCollection OnEvent<T>(this IServiceCollection services, Func<T, CancellationToken, Task> handler)
-        => services.On(handler);
-
-    public static IServiceCollection OnEvent<T>(this IServiceCollection services, Func<T, Task> handler)
-        => services.On(handler);
-
-    public static IServiceCollection OnEvent<T>(this IServiceCollection services, Action<T> handler)
-        => services.On(handler);
-
-    // Readability alias
-    public static IServiceCollection Handle<T>(this IServiceCollection services, Func<T, CancellationToken, Task> handler)
-        => services.On(handler);
-
-    public static IServiceCollection Handle<T>(this IServiceCollection services, Func<T, Task> handler)
-        => services.On(handler);
-
-    public static IServiceCollection Handle<T>(this IServiceCollection services, Action<T> handler)
-        => services.On(handler);
-
-    // Register multiple handlers in one fluent block
-    public static IServiceCollection OnMessages(this IServiceCollection services, Action<MessageHandlerBuilder> configure)
+/// <summary>
+/// Registry for message handlers configured during startup.
+/// Handlers are registered via <c>.On&lt;T&gt;()</c> extension and then used to create consumers.
+/// </summary>
+public class HandlerRegistry
+{
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Delegate> _handlers = new();
+    
+    /// <summary>
+    /// Adds a handler for the specified message type.
+    /// </summary>
+    public void AddHandler<T>(Type messageType, Func<T, Task> handler) where T : class
     {
-        var builder = new MessageHandlerBuilder(services);
-        configure(builder);
-        return services;
+        _handlers.TryAdd(messageType, handler);
     }
-
-    // Fluent builder for handler registration
-    public sealed class MessageHandlerBuilder
+    
+    /// <summary>
+    /// Gets all registered handlers.
+    /// </summary>
+    public System.Collections.Generic.Dictionary<Type, Delegate> GetAllHandlers()
     {
-        private readonly IServiceCollection _services;
-        public MessageHandlerBuilder(IServiceCollection services) => _services = services;
-
-        public MessageHandlerBuilder On<T>(Func<MessageEnvelope, T, CancellationToken, Task> handler)
-        { _services.OnMessage<T>(handler); return this; }
-
-        public MessageHandlerBuilder On<T>(Action<MessageEnvelope, T> handler)
-        { _services.OnMessage<T>(handler); return this; }
-
-        // Terse overloads (no envelope)
-        public MessageHandlerBuilder On<T>(Func<T, CancellationToken, Task> handler)
-        { _services.On(handler); return this; }
-
-        public MessageHandlerBuilder On<T>(Func<T, Task> handler)
-        { _services.On(handler); return this; }
-
-        public MessageHandlerBuilder On<T>(Action<T> handler)
-        { _services.On(handler); return this; }
-
-        // Intent-signaling aliases
-        public MessageHandlerBuilder OnCommand<T>(Func<T, CancellationToken, Task> handler)
-        { _services.OnCommand(handler); return this; }
-
-        public MessageHandlerBuilder OnCommand<T>(Func<T, Task> handler)
-        { _services.OnCommand(handler); return this; }
-
-        public MessageHandlerBuilder OnCommand<T>(Action<T> handler)
-        { _services.OnCommand(handler); return this; }
-
-        public MessageHandlerBuilder OnEvent<T>(Func<T, CancellationToken, Task> handler)
-        { _services.OnEvent(handler); return this; }
-
-        public MessageHandlerBuilder OnEvent<T>(Func<T, Task> handler)
-        { _services.OnEvent(handler); return this; }
-
-        public MessageHandlerBuilder OnEvent<T>(Action<T> handler)
-        { _services.OnEvent(handler); return this; }
-
-        public MessageHandlerBuilder Handle<T>(Func<T, CancellationToken, Task> handler)
-        { _services.Handle(handler); return this; }
-
-        public MessageHandlerBuilder Handle<T>(Func<T, Task> handler)
-        { _services.Handle(handler); return this; }
-
-        public MessageHandlerBuilder Handle<T>(Action<T> handler)
-        { _services.Handle(handler); return this; }
-
-        // Convenience for grouped batches
-        public MessageHandlerBuilder OnBatch<T>(Func<MessageEnvelope, Batch<T>, CancellationToken, Task> handler)
-        { _services.OnBatch(handler); return this; }
-
-        public MessageHandlerBuilder OnBatch<T>(Action<MessageEnvelope, Batch<T>> handler)
-        { _services.OnBatch(handler); return this; }
-
-        public MessageHandlerBuilder OnMessages<T>(Func<MessageEnvelope, IReadOnlyList<T>, CancellationToken, Task> handler)
-        { _services.OnMessages(handler); return this; }
-
-        public MessageHandlerBuilder OnMessages<T>(Action<MessageEnvelope, IReadOnlyList<T>> handler)
-        { _services.OnMessages(handler); return this; }
+        return new System.Collections.Generic.Dictionary<Type, Delegate>(_handlers);
     }
-
-    // Delegate sugar for Batch<T>
-    public static IServiceCollection OnBatch<T>(this IServiceCollection services, Func<MessageEnvelope, Batch<T>, CancellationToken, Task> handler)
+    
+    /// <summary>
+    /// Creates message consumers for all registered handlers.
+    /// Called during Phase 3 of the messaging lifecycle.
+    /// </summary>
+    public async Task CreateConsumersAsync(IMessageBus bus, CancellationToken cancellationToken = default)
     {
-        services.AddSingleton<IMessageHandler<Batch<T>>>(sp => new DelegateMessageHandler<Batch<T>>(handler));
-        return services;
-    }
-
-    public static IServiceCollection OnBatch<T>(this IServiceCollection services, Action<MessageEnvelope, Batch<T>> handler)
-    {
-        services.AddSingleton<IMessageHandler<Batch<T>>>(sp => new DelegateMessageHandler<Batch<T>>((env, msg, ct) => { handler(env, msg); return Task.CompletedTask; }));
-        return services;
-    }
-
-    // Sugar: handle grouped messages as IReadOnlyList<T> without dealing with Batch<T>
-    public static IServiceCollection OnMessages<T>(this IServiceCollection services, Func<MessageEnvelope, IReadOnlyList<T>, CancellationToken, Task> handler)
-        => services.OnBatch<T>((env, batch, ct) => handler(env, batch.Items, ct));
-
-    public static IServiceCollection OnMessages<T>(this IServiceCollection services, Action<MessageEnvelope, IReadOnlyList<T>> handler)
-        => services.OnBatch<T>((env, batch) => handler(env, batch.Items));
-
-    private sealed class DelegateMessageHandler<T> : IMessageHandler<T>
-    {
-        private readonly Func<MessageEnvelope, T, CancellationToken, Task> _handler;
-        public DelegateMessageHandler(Func<MessageEnvelope, T, CancellationToken, Task> handler) => _handler = handler;
-        public Task HandleAsync(MessageEnvelope envelope, T message, CancellationToken ct) => _handler(envelope, message, ct);
-    }
-    private static IMessageBus Resolve(string? busCode = null)
-    {
-        var sp = Sora.Core.Hosting.App.AppHost.Current ?? throw new InvalidOperationException("AppHost.Current is not set. Ensure services.AddSora() and greenfield boot set AppHost.Current during startup.");
-        var sel = (IMessageBusSelector?)sp.GetService(typeof(IMessageBusSelector))
-            ?? throw new InvalidOperationException("Messaging is not configured. Reference a provider package or register explicitly.");
-        return busCode is null ? sel.ResolveDefault(sp) : sel.Resolve(sp, busCode);
+        foreach (var (messageType, handler) in _handlers)
+        {
+            try
+            {
+                // Use reflection to call CreateConsumerAsync<T> with the correct type
+                var createConsumerMethod = typeof(IMessageBus)
+                    .GetMethod(nameof(IMessageBus.CreateConsumerAsync))!
+                    .MakeGenericMethod(messageType);
+                
+                await (Task)createConsumerMethod.Invoke(bus, new object[] { handler, cancellationToken })!;
+            }
+            catch (Exception ex)
+            {
+                // Log error but continue creating other consumers
+                System.Diagnostics.Debug.WriteLine($"Failed to create consumer for {messageType.Name}: {ex.Message}");
+            }
+        }
     }
 }

@@ -1,154 +1,134 @@
-﻿You are contributing to **Sora**, a greenfield framework for building modern, modular applications. Sora emphasizes **simplicity** and **flexibility**, drawing inspiration from the legacy Zen framework.
+﻿Developer: ## Role and Objective
+You are contributing to **Sora**, a greenfield framework for modern, modular applications that emphasizes **simplicity** and **flexibility**, informed by lessons learned from the Zen framework.
 
-#### Entry points for agents and developers
+Begin with a concise checklist (3-7 bullets) of your planned steps before making substantive documentation or code edits.
 
-- Engineering front door: `/docs/engineering/index.md` (high-signal rules and quick links)
-- Architecture principles: `/docs/architecture/principles.md` (curated ADR digest)
-- Full docs root: `/docs` and `/docs/toc.yml`
+# Instructions
 
-Keep documentation updated with new decisions to ensure accuracy and consistency.
+## Core Engineering Principles (Mandatory)
 
-## Data access (priority guidance)
+Premium DX, with semantically meaningful choices and sane-defaults. Terse but expressive interfaces/methods. Context-aware abstractions are preferred.
+Default assumptions apply unless a documented ADR grants an exception:
+This is a greenfield framework. Break and change as necessary, concerns for back-compat are minimum at the time. Interrupt and ask if you think answers will provide better direction.
 
-- Prefer first-class, static model methods for all top-level data access in samples, docs, and code suggestions:
-  - Examples: `MyModel.All(ct)`, `MyModel.Query(...)`, `MyModel.AllStream(...)`, `MyModel.QueryStream(...)`, `MyModel.FirstPage(...)`, `MyModel.Page(...)`.
-- Treat generic facades like `Data<TEntity, TKey>` as second-class helpers; only use them when a first-class model static is not available for the scenario.
-- All/Query without paging must materialize the complete result set. Use streaming (`AllStream`/`QueryStream`) or explicit paging (`FirstPage`/`Page`) for large sets.
 
-References:
+## Data Access (Priority Guidance)
+
+- Use first-class static model methods for prominent data access in samples, documentation, and code suggestions:
+  - Examples: `MyModel.All(ct)`, `MyModel.Query(...)`, `MyModel.AllStream(...)`, `MyModel.QueryStream(...)`, `MyModel.FirstPage(...)`, `MyModel.Page(...)`
+- Use generic facades like `Data<TEntity, TKey>` only when a first-class static is unavailable.
+- For large result sets, prefer streaming (`AllStream`, `QueryStream`) or explicit paging (`FirstPage`, `Page`); avoid non-paged `All`/`Query` over large data.
+
+**References:**
+
 - `/docs/guides/data/all-query-streaming-and-pager.md`
 - `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
 
-## Core engineering concerns (mandatory)
+### 0. Prime Directives
 
-These are default assumptions for all code. Follow them unless a documented ADR explicitly allows an exception.
+- Prioritize separation of concerns, DRY (Don't Repeat Yourself), and ease of use.
+- Prefer concise method names (e.g., `Save()`, `Get()`, `Find()`). Avoid unnecessary repetition.
 
-0. Prime directives: Separation of Concern. DRY. Easy.
+### 1. Controllers, Not Inline Endpoints
 
-Avoid repetition; if all methods are async, names should be shorter and concise; Save(), Get(), Find().
+- Expose HTTP routes via MVC controllers using attribute routing.
+- Do not declare endpoints inline (avoid `MapGet`/`MapPost`/etc. in startup or module initialization).
+- Reference: `/docs/decisions/WEB-0035-entitycontroller-transformers.md` for payload shaping.
 
-1. Controllers, not inline endpoints
+### 2. No Stubs or Empty Artifacts
 
-- Do: expose HTTP routes via MVC controllers (attribute-routed). Keep routing in controllers for discoverability and testability.
-- Don’t: declare endpoints inline (no MapGet/MapPost/etc. in startup or module initialization).
+- Remove empty classes, placeholder files, and commented-out scaffolds.
+- Do not stub code "for later"; retain only code that delivers current value.
 
-Reference: `/docs/decisions/WEB-0035-entitycontroller-transformers.md` for payload shaping.
+### 3. No Magic Values; Centralize Constants
 
-2. No stubs or empty artifacts
+- Elevate magic literals to a unified Constants class scoped to the project (e.g., `Infrastructure/Constants`).
+- Use typed Options for tunables and constants for stable identifiers (headers, routes, keys).
+- Do not scatter literals across the codebase.
+- Reference: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`.
 
-- Do: remove empty classes, placeholder files, and commented-out scaffolds.
-- Don’t: add stubs “for later.” This is greenfield—only keep code that delivers value now.
+### 4. Project Root Hygiene
 
-3. No magic values; centralize constants
+- For projects with over four classes, only the `.csproj` should reside at root; organize sources into folders (e.g., Controllers, Hosting, Extensions).
+- Avoid placing multiple `.cs` source files at the project root in larger projects.
 
-- Do: hoist magic strings/numbers into a project-scoped Constants class (for example, Infrastructure/Constants or Infrastructure/<Area>Constants).
-- Prefer typed Options for tunables; use constants for stable names (headers, routes, keys, defaults) and policy literals.
-- Don’t: scatter literals (headers, routes, paging sizes, media types) across the codebase.
+### 5. Class/File Layout and Co-location
 
-Reference: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`.
+- One public/top-level class per file. Nest satellite helpers within main types rather than using separate files.
+- Interfaces and attributes may share a file only if they address the same concern; name such files accordingly (e.g., `AuthorizationHooks.cs`).
+- Place unrelated types in separate files with descriptive, concern-reflective filenames.
 
-4. Project root hygiene
+## Working Conventions
 
-- Do: if a project has more than 4 classes, keep only the .csproj at the project root. Place all source files into semantically meaningful folders (e.g., Controllers, Hosting, Options, Extensions, Infrastructure, Filtering, Hooks, Attributes, etc.).
-- Don’t: leave multiple .cs files at the root of busy projects.
+- Document all changes; update `/docs` or ADRs as needed to reflect current implementations and decisions.
+- Remove backward-compatibility shims unless explicitly required. Favor clean, cohesive designs.
+- Submit improvement proposals for unclear areas. Make enhancements small and reviewable.
+- Prioritize predictable defaults, sound folder structure, and consistent naming to optimize developer experience.
+- Choose simple and intuitive constructs.
 
-5. Class/file layout and co-location
+## Quick Checklist
 
-- Do: keep one public/top-level class per file. If a helper is a true satellite of a main type, prefer nesting it inside the main class rather than creating a separate file.
-- Do: allow interfaces and attributes to share the same file only when they address the exact same concern; name the file after the concern (e.g., AuthorizationHooks.cs).
-- Do: Separate concerns into different files (e.g., controllers, services, models).
-- Don’t: co-locate unrelated types in the same file. Ensure filenames reflect their primary concern.
+- Add or modify HTTP routes only within controllers.
+- Remove empty or placeholder files before committing.
+- Replace literals with constants or options and centralize them in the Constants class.
+- When a project exceeds four classes, organize files into folders, leaving only the `.csproj` at root.
+- Maintain one public class per file, nest satellite helpers, and co-locate interfaces/attributes only when addressing the same concern.
+- For any exceptions, document the rationale and scope in `/docs/decisions` as an ADR.
+- Refrain from custom methods when similar ones are available in Sora.Core libraries.
 
-## Working conventions
+**Also see:**
 
-Documentation first
-
-- Refer to /docs for implementation guidance. When making decisions, update documentation (and/or ADRs) to keep it authoritative.
-
-Clean content
-
-- No backward-compat shims unless explicitly required. Favour a polished, cohesive design over incremental legacy support.
-
-Feedback & collaboration
-
-- Propose improvements and point out unclear areas. Favor small, reviewable changes that improve clarity and usability.
-
-Developer experience
-
-- Minimize friction. Prefer predictable defaults, clear folder structures, and consistent naming so developers can onboard quickly.
-
-Clarity & design
-
-- Prioritize simple, intuitive constructs that are easy to adopt and extend.
-
-## How to apply (quick checklist)
-
-- Add or modify HTTP routes in controllers only.
-- Before committing, remove any empty/placeholder files.
-- Replace literals with constants or options; if constant, add to a central Constants class for the project.
-- If a project grows beyond 4 classes, move .cs files into folders; keep only the .csproj at the root.
-- Keep one public class per file; nest satellites; co-locate interfaces/attributes only when they share a single concern and name the file accordingly.
-- If an exception is needed, add a short ADR or decision note in /docs/decisions with rationale and scope.
-- Do not implement bespoke methods if a similar one is already present in a core library (Sora.Core, Sora.Dat.Core, etc.)
-
-See also:
 - Engineering: `/docs/engineering/index.md`
 - Architecture: `/docs/architecture/principles.md`
 
-## Doc requests: translate “document …” into concrete edits
+## Doc Requests: Translate "document..." into Edits
 
-When a user asks to “document X”, choose the right target(s) and produce instruction-first content (no tutorials). Use this routing guide and checklist.
+- Select the appropriate target per routing map. Emphasize instruction-first content (not tutorials).
+  - For modules/projects: follow `ARCH-0042`. Create `README.md` (information, setup, safe snippets) and `TECHNICAL.md` (reference, architecture) at project root.
+  - For architectural policies: add ADRs to `docs/decisions` and update `toc.yml`.
+  - For engineering guidance: edit/extend under `docs/engineering/`.
+  - For reference, how-to, API docs: update/add under `docs/reference/` (e.g., `reference/data-access.md`).
+  - For web conventions: use `docs/api/web-http-api.md`, etc.
+  - For adapters: update `docs/reference/_data/adapters.yml`. Allow the build process to update generated docs; do not edit generated artifacts manually.
+  - For guides: create under `docs/guides/<area>/` and update local TOCs.
 
-Routing map (what to create/edit)
-// Per-project module docs (ARCH-0042)
-- When asked to “document a module/project,” implement `ARCH-0042`:
-  - Create or update per-project companion docs at the project root:
-    - `src/<Project>/README.md` — informational (capabilities, minimal setup, 2–4 safe usage snippets).
-    - `src/<Project>/TECHNICAL.md` (or `ARCHITECTURE.md`) — reference + architecture (contracts, options, design/ops, extensibility, performance, security, operations).
-  - Align samples with Sora guardrails: controllers (no inline endpoints), first-class data model statics (`All/Query/FirstPage/Page/Stream`), no magic values (use constants/options).
-  - Cross-link relevant ADRs and guides; keep snippets production-safe and short.
-  - Reference: `/docs/decisions/ARCH-0042-per-project-companion-docs.md`.
-- Architecture decision (ADR): when the ask is a policy, tradeoff, or framework-wide behavior.
-  - Create `docs/decisions/<ID>-<slug>.md` with front-matter (id, slug, domain, status, date, title).
-  - Sections: Context → Decision → Scope → Consequences → Implementation notes → Follow-ups → References.
-  - Add to `docs/decisions/toc.yml` in the proper domain group.
-- Engineering guidance: rules and guardrails for developers.
-  - Edit `docs/engineering/index.md` or add a focused page under `docs/engineering/` and link it from the index.
-- Reference (canonical how-to + API-centric): default for features, modules, adapters.
-  - Data/Web/Messaging/Vector: prefer updating/creating under `docs/reference/` (e.g., `reference/messaging.md`, `reference/data-access.md`).
-  - Web HTTP conventions: `docs/api/web-http-api.md`, `docs/api/openapi-generation.md`, `docs/api/well-known-endpoints.md`.
-  - Adapters: update capabilities/guardrails in `docs/reference/_data/adapters.yml` (single source). The matrix is generated to `docs/reference/_generated/adapter-matrix.md` at build time—don’t hand edit generated files.
-- Guides (concise, instructional, API-anchored): place under `docs/guides/<area>/` only when it maps 1:1 to stable APIs (no narratives/quickstarts).
-  - Update the local `toc.yml`.
+**Include developer samples:**
 
-Always include developer samples (when applicable)
-- Add an Examples section with minimal, runnable snippets:
-  - C# first-class model statics for data access: `Item.All(ct)`, `Item.Query(...)`, `Item.FirstPage(...)`.
-  - HTTP examples for controllers/headers with realistic payloads.
-  - Link to sample apps in `samples/` when deeper context helps (keep links minimal and stable), e.g., `samples/S2.Api/`.
-- Keep examples short and production-safe (headers, paging, error handling cues). No multi-part tutorials.
+- Provide code snippets (e.g., C# model statics, HTTP controller examples) and URLs to samples for context. Ensure samples are brief and production-safe.
 
-Content patterns to apply
-- Lead with a short “contract” block: Inputs/Outputs, options, error modes, success criteria.
-- List 3–5 edge cases (null/empty, large/slow, auth/permission, concurrency/timeouts).
-- Hoist literals into constants/options and link relevant ADRs.
-- Cross-link canonical pages (Engineering front door, Architecture principles, Decisions).
+**Content patterns:**
 
-Process checklist (green-before-done)
-1) Pick targets using the Routing map; create/edit files accordingly.
-2) If adding an ADR, register it in `docs/decisions/toc.yml` under the correct domain.
-3) If touching adapters, update `docs/reference/_data/adapters.yml`; let the build generate the matrix.
-4) Update any affected TOCs (`docs/toc.yml`, per-folder `toc.yml`).
-5) Run strict docs build (Task: docs:build (clean)) and fix broken links.
-6) Commit with a conventional message, e.g., `docs(ref): web pagination headers with examples` or `docs(adr): ARCH-00xx <title>`.
+- Start documentation with a concise contract block (inputs/outputs, error modes, criteria).
+- List 3–5 edge cases (e.g., null, large data, permissions, concurrency).
+- Consolidate literals, cross-link relevant ADRs and canonical docs.
 
-Posture guardrails (enforced)
-- No tutorials, quickstarts, or course-style flows. Keep docs instructional and reference-focused as per ADR ARCH-0041.
-- Prefer first-class model statics over generic facades in samples.
-- Don’t hand-edit `docs/reference/_generated/**`.
+## Process Checklist
 
-Handy anchors
-- Data access patterns: `/docs/guides/data/all-query-streaming-and-pager.md`, `/docs/guides/data/working-with-entity-data.md`, `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`.
-- Web API conventions: `/docs/api/web-http-api.md`, `/docs/api/openapi-generation.md`, `/docs/decisions/WEB-0035-entitycontroller-transformers.md`.
-- Messaging basics: `docs/reference/messaging.md` (create if missing) and decisions under `docs/decisions/MESS-*.md`.
-- Adapter matrix source: `docs/reference/_data/adapters.yml` → generated matrix include at `docs/reference/adapter-matrix.md`.
+1. Select documentation targets as indicated by the routing map.
+2. Register new ADRs in `docs/decisions/toc.yml`.
+3. Update adapters YAML; rely on the build process to update generated docs.
+4. Revise any affected TOCs.
+5. Run the strict docs build and resolve any link issues.
+6. Use a clear, conventional commit message (e.g., `docs(ref): web pagination headers with examples`).
+
+After each documentation or code change, validate that updates are correctly linked, formatted, and reflect the intended change. If validation fails (e.g., link errors, build failures), self-correct and rerun the checklist before finalizing.
+
+## Posture Guardrails (Strict)
+
+- Avoid tutorials, quickstarts, or course-like flows. Keep documentation focused and instructional (per ARCH-0041).
+- Use first-class model statics in all code samples.
+- Do not manually modify generated documentation (files under `docs/reference/_generated/**`).
+
+## Handy Anchors
+
+- When asked, ensure all documentation remains accurate and up-to-date. Reflect new decisions promptly.
+- Refer to core documentation entry points:
+
+  - Engineering front door: `/docs/engineering/index.md` (high-signal rules and links)
+  - Architecture principles: `/docs/architecture/principles.md` (curated ADR digest)
+  - Documentation root: `/docs` and `/docs/toc.yml`
+
+- Data Access: `/docs/guides/data/all-query-streaming-and-pager.md`, `/docs/guides/data/working-with-entity-data.md`, `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- Web API: `/docs/api/web-http-api.md`, `/docs/api/openapi-generation.md`, `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
+- Messaging: `docs/reference/messaging.md`, decisions in `docs/decisions/MESS-*.md`
+- Adapter Matrix: `docs/reference/_data/adapters.yml` → `docs/reference/adapter-matrix.md` (generated)

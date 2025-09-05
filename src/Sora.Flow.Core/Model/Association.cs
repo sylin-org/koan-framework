@@ -1,0 +1,26 @@
+﻿using Sora.Data.Core.Model;
+using Sora.Data.Abstractions.Annotations;
+
+namespace Sora.Flow.Model;
+
+public sealed class KeyIndex : Entity<KeyIndex>
+{
+    public string AggregationKey { get => Id; set => Id = value; }
+    [Index]
+    public string ReferenceUlid { get; set; } = default!;
+    // New: map aggregation key to CanonicalId (business key)
+    [Index]
+    public string? CanonicalId { get; set; }
+}
+
+public sealed class ReferenceItem : Entity<ReferenceItem>
+{
+    // ULID is stored in Id (from Entity<>)
+    // Canonical business key; unique across the model
+    [Index]
+    public string CanonicalId { get; set; } = default!;
+    // Back-compat alias previously exposed as ReferenceId has been removed; use CanonicalId instead
+    [Index]
+    public ulong Version { get; set; }
+    public bool RequiresProjection { get; set; }
+}

@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../src/Sora.Data.Core/Sora.Data.Core.csproj" />
+    <ProjectReference Include="../src/Sora.Data.Mongo/Sora.Data.Mongo.csproj" />
+    <ProjectReference Include="../src/Sora.Messaging.RabbitMq/Sora.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="../src/Sora.Flow.Core/Sora.Flow.Core.csproj" />
+  </ItemGroup>
+
+</Project>

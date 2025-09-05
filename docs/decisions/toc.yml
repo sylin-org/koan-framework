@@ -96,8 +96,12 @@
       href: DATA-0003-write-capabilities-and-bulk-markers.md
     - name: Index anchoring and JSON mapping
       href: DATA-0004-index-anchoring-and-json-mapping.md
+    - name: Ranges as canonical and materialized model
+      href: DATA-0063-ranges-as-canonical-and-materialized-model.md
 - name: Web (WEB)
   items:
+    - name: S8 Flow IoT sample and SSE monitor
+      href: WEB-0050-s8-flow-iot-sample-and-sse-monitor.md
     - name: Web templates and rate limiters
       href: WEB-0012-web-templates-and-rate-limiters.md
     - name: GraphQL module and controller
@@ -140,6 +144,20 @@
       href: MESS-0028-mq-provisioning-plan-diff-apply-modes.md
     - name: Terse handler delegates and semantic aliases
       href: MESS-0029-terse-handler-delegates-and-aliases.md
+ - name: Flow (FLOW)
+   items:
+     - name: Flow bindings, canonical IDs, and value-object ingest
+       href: FLOW-0101-bindings-canonical-ids-and-vo-ingest.md
+     - name: Identity map, provisional mappings, aliasing (cap=1), and VO indexing
+       href: FLOW-0102-identity-map-provisional-and-aliasing.md
+     - name: Flow DX toolkit — controllers, monitor, adapter metadata, actions
+       href: FLOW-0103-flow-dx-toolkit-controllers-monitor-adapter.md
+     - name: ULID primary id with CanonicalId (business key)
+       href: FLOW-0104-ulid-primary-id-and-canonical-id.md
+     - name: External ID translation, adapter identity, and normalized payload ingestion
+       href: FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md
+       - name: Adapter auto-scan and minimal boot
+         href: FLOW-0106-adapter-auto-scan-and-minimal-boot.md
  - name: Storage (STOR)
    items:
      - name: Storage module and contracts

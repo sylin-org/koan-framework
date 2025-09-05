@@ -23,7 +23,7 @@ builder.Services.AddSoraSwagger(builder.Configuration);
 // Options auto-bind from configuration; defaults safe for Development
 builder.Services.AddMongoAdapter();
 
-// Controllers; Sora.Web.Auth auto-registrar wires authentication
+// Controllers; Sora auto-registrars wire authentication; TestProvider will attach itself in Development
 builder.Services.AddControllers();
 
 // Authorization with role-based policies
@@ -71,6 +71,8 @@ app.UseAuthorization();
 // Static files first, then API routes
 app.UseStaticFiles();
 app.MapControllers();
+
+// TestProvider endpoints are auto-mapped by its auto-registrar when enabled.
 
 // SPA fallback for client-side routing
 app.MapFallbackToFile("index.html");

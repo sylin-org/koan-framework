@@ -6,6 +6,23 @@ namespace Sora.Core;
 // Single, immutable runtime snapshot available statically
 public static class SoraEnv
 {
+    /// <summary>
+    /// Dumps the current environment snapshot to the console for diagnostics.
+    /// </summary>
+    public static void DumpSnapshot()
+    {
+        var snap = Current;
+        Console.WriteLine("[SoraEnv][INFO] Environment snapshot:");
+        Console.WriteLine($"  EnvironmentName: {snap.EnvironmentName}");
+        Console.WriteLine($"  IsDevelopment: {snap.IsDevelopment}");
+        Console.WriteLine($"  IsProduction: {snap.IsProduction}");
+        Console.WriteLine($"  IsStaging: {snap.IsStaging}");
+        Console.WriteLine($"  InContainer: {snap.InContainer}");
+        Console.WriteLine($"  IsCi: {snap.IsCi}");
+        Console.WriteLine($"  AllowMagicInProduction: {snap.AllowMagicInProduction}");
+        Console.WriteLine($"  ProcessStart: {snap.ProcessStart:O}");
+    }
+
     private static readonly object _gate = new();
     private static volatile bool _initialized;
     private static Snapshot? _snap;
@@ -18,6 +35,7 @@ public static class SoraEnv
             if (_initialized) return;
             _snap = ComputeSnapshot(cfg, env);
             _initialized = true;
+            DumpSnapshot();
         }
     }
 
@@ -45,11 +63,16 @@ public static class SoraEnv
         bool isDev = env?.IsDevelopment() ?? string.Equals(envName, "Development", StringComparison.OrdinalIgnoreCase);
         bool isProd = env?.IsProduction() ?? string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase);
         bool isStg = env?.IsStaging() ?? string.Equals(envName, "Staging", StringComparison.OrdinalIgnoreCase);
-        bool inContainer = Configuration.Read(
-                    cfg,
-                    Infrastructure.Constants.Configuration.Env.DotnetRunningInContainer,
-                    false)
-                || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KubernetesServiceHost, null));
+        // Check both colon and underscore env var names for Docker/K8s compatibility
+        bool inContainer =
+            // Colon-names (legacy Sora config)
+            Configuration.Read(cfg, Infrastructure.Constants.Configuration.Env.DotnetRunningInContainer, false)
+            // Underscore-names (standard Docker/K8s)
+            || Configuration.Read(cfg, "DOTNET_RUNNING_IN_CONTAINER", false)
+            // Colon-names (legacy Sora config)
+            || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KubernetesServiceHost, null))
+            // Underscore-names (standard Docker/K8s)
+            || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, "KUBERNETES_SERVICE_HOST", null));
         bool isCi = Configuration.Read(cfg, Infrastructure.Constants.Configuration.Env.Ci, false)
                      || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.TfBuild, null));
         // Read flag with precedence (env var overrides config) via SoraConfig

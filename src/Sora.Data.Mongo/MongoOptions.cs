@@ -9,7 +9,7 @@ namespace Sora.Data.Mongo;
 public sealed class MongoOptions
 {
     [Required]
-    public string ConnectionString { get; set; } = MongoConstants.DefaultLocalUri; // safe default even without configurator
+    public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
     [Required]
     public string Database { get; set; } = "sora";
     public Func<Type, string>? CollectionName { get; set; }

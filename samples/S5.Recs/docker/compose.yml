@@ -1,3 +1,4 @@
+name: sora-s5-recs
 services:
   api:
     build:
@@ -22,7 +23,7 @@ services:
       Sora__Ai__Services__Ollama__0__DefaultModel: "all-minilm"
   # Disable explicit registration in dev so discovery picks a single best endpoint (host-first)
       Sora__Ai__Services__Ollama__0__Enabled: "false"
-      # Readiness: require the embedding model to be present
+  # Readiness: require the embedding model to be present
       Sora__Ai__Ollama__RequiredModels__0: "all-minilm"
     volumes:
       - ../data:/app/data

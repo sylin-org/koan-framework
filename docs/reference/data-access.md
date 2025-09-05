@@ -123,6 +123,68 @@ Notes
 - Paging pushdown with in-memory fallback (DATA-0032); guardrails (DATA-0044).
 - See Adapter Matrix for provider support nuances.
 
+## Adapter parity: on-demand schema and indices
+
+Contract
+- Inputs: entity models annotated with `[Index]` on properties that should be queryable; optional relational materialization options.
+- Options (relational): `RelationalMaterializationOptions` — `Materialization` (None | ComputedProjections | PhysicalColumns), `DdlPolicy` (AutoCreate | Disabled), `AllowProductionDdl`, `SchemaMatching`.
+- Behavior: adapters provision required tables/columns/indexes on demand when allowed; otherwise they read/write JSON-only and rely on existing DDL.
+- Success: Flow and Data APIs work across adapters without code changes; indices improve performance but are not required for correctness.
+- Errors: when DDL is disallowed, relational adapters throw a clear error; features fall back when a capability isn’t supported (e.g., computed JSON columns).
+
+Per-adapter behavior (indexed access)
+- MongoDB
+  - Uses `IndexMetadata` from `[Index]` attributes to create collections’ indexes on demand via the driver.
+  - JSON-first storage; no separate DDL step for columns. Index creation is safe to run repeatedly.
+- SQL Server
+  - Creates table with `Id` and `Json` plus projected columns. When JSON functions are available, uses computed/generated columns via `JSON_VALUE`.
+  - Creates non-unique indexes for properties marked `[Index]` (indexes on computed columns when supported).
+  - Respects `DdlPolicy` and `AllowProductionDdl` before creating or altering schema.
+- Postgres
+  - JSONB-first; provisions expression indexes on extracted JSON paths for `[Index]` properties or generated columns where available.
+  - Respects DDL policy flags; CREATE TABLE/INDEX are gated accordingly.
+- Sqlite
+  - No JSON computed columns; creates physical nullable columns for projections and `CREATE INDEX` as needed.
+  - Falls back to JSON-only read/write when DDL is disabled.
+
+Example: declare an indexed property
+
+```csharp
+public sealed class Movie : IEntity<string>
+{
+    public string Id { get; set; } = default!;
+
+    [Index] // adapter-agnostic: drives index metadata across providers
+    public string? Title { get; set; }
+
+    [Index]
+    public int? Year { get; set; }
+}
+```
+
+Example: enable relational auto-DDL in Development
+
+```csharp
+// in Startup/Program service registration
+services.Configure<RelationalMaterializationOptions>(o =>
+{
+    o.Materialization = RelationalMaterializationPolicy.ComputedProjections; // or PhysicalColumns
+    o.DdlPolicy = RelationalDdlPolicy.AutoCreate;          // allow adapters to create tables/columns
+    o.AllowProductionDdl = false;                          // keep off in Production (default)
+});
+```
+
+Operational notes
+- Flow is storage-agnostic: canonical/lineage views and materialized roots/policies are persisted uniformly; adapters differ only in how they optimize storage.
+- Indexes are performance features. Without them, correctness holds but queries may be slower. Add `[Index]` only where query paths matter.
+- Production safety: keep `AllowProductionDdl=false` and pre-provision schema via migrations for regulated environments.
+- Validation: relational adapters expose schema validation reports; state is computed as Healthy/Degraded/Unhealthy based on table/column presence and matching mode.
+
+Edge cases
+- DDL disabled: relational adapters will not create missing schema and will throw a clear error. Either enable AutoCreate in non-prod or provision schema ahead of time.
+- Limited capabilities: when computed columns or indexes-on-computed aren’t supported, adapters fall back to physical columns and/or skip those indexes.
+- Stable ordering: all adapters provide Id-ascending stable iteration to keep paging consistent during writes.
+
 ## References
 - guides/data/all-query-streaming-and-pager.md
 - decisions/DATA-0061-data-access-pagination-and-streaming.md

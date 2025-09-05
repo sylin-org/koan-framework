@@ -8,6 +8,14 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="wwwroot\**\*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+    <!-- Embed login HTML as a fallback when running from published container where content may be trimmed -->
+    <EmbeddedResource Include="wwwroot\testprovider-login.html" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Sora.Web.Auth\Sora.Web.Auth.csproj" />
     <ProjectReference Include="..\Sora.Core\Sora.Core.csproj" />
   </ItemGroup>

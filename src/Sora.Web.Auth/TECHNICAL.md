@@ -112,6 +112,9 @@ Security
 - Always enable state/nonce/PKCE where applicable.
 - Limit scopes to least privilege; validate issuer/audience for OIDC.
 
+Development provider mapping
+- In Development, the TestProvider's userinfo may include `roles`, `permissions`, and a `claims` object. The callback maps these into the cookie principal to simulate downstream authorization (e.g., Sora.Web.Auth.Roles). This behavior is confined to dev/test providers.
+
 Operations
 - Metrics: count challenges, successful sign-ins, failed callbacks (by reason), and sign-outs.
 - Logging: include correlation IDs spanning challenge→callback; never log tokens or PII.

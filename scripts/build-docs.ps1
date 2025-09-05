@@ -157,6 +157,25 @@ try {
   Write-Host "Repo Root: $repoRoot"
   Write-Host "Config   : $configFullPath"
 
+  # Read config JSON early to honor optional disabled stub files
+  $json = $null
+  try {
+    $json = Get-Content $configFullPath -Raw | ConvertFrom-Json -ErrorAction Stop
+  } catch { }
+
+  if ($json -and $json.PSObject.Properties.Name -contains 'disabled' -and $json.disabled -eq $true) {
+    Write-Host "DocFX config is marked as disabled. Skipping DocFX build." -ForegroundColor Yellow
+    # Still generate any pre-build content that other docs might depend on
+    $artifactsRoot = Join-Path $repoRoot 'artifacts/docs'
+    if (-not (Test-Path $artifactsRoot)) { New-Item -ItemType Directory -Path $artifactsRoot | Out-Null }
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $logFile = Join-Path $artifactsRoot "build-$stamp.log"
+    "Docs build skipped due to disabled config at $configFullPath" | Set-Content -Path $logFile -Encoding UTF8
+    Write-Heading "Build complete (skipped)"
+    Write-Host "Log file: $logFile"
+    return
+  }
+
   $docfx = Get-DocfxCommand
   if (-not $docfx) {
     Write-Warning "'docfx' CLI not found in PATH."
@@ -169,7 +188,7 @@ try {
   # Determine output directory (optional override)
   $destFromConfig = $null
   try {
-    $json = Get-Content $configFullPath -Raw | ConvertFrom-Json -ErrorAction Stop
+    if (-not $json) { $json = Get-Content $configFullPath -Raw | ConvertFrom-Json -ErrorAction Stop }
     $destFromConfig = $json.build.dest
   } catch { }
 

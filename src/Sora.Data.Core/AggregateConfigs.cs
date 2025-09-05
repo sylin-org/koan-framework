@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 
 namespace Sora.Data.Core;
 
-internal static class AggregateConfigs
+public static class AggregateConfigs
 {
     private static readonly ConcurrentDictionary<(Type, Type), object> Cache = new();
 
@@ -37,7 +37,7 @@ internal static class AggregateConfigs
     private static string DefaultProvider(IServiceProvider sp)
     {
         var factories = sp.GetServices<IDataAdapterFactory>().ToList();
-        if (factories.Count == 0) return "json"; // safe fallback
+        if (factories.Count == 0) throw new InvalidOperationException("No IDataAdapterFactory instances registered. Ensure AddSoraData() has been called.");
 
         // Rank by ProviderPriorityAttribute (higher wins), then by type name for stability
         var ranked = factories

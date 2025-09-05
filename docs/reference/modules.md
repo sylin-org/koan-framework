@@ -4,10 +4,12 @@ description: Index of per-project companion docs (README and TECHNICAL) across S
 ---
 
 This index links to project-scoped companion docs as per ADR ARCH-0042. Each project exposes:
+
 - README — informational overview, capabilities, minimal setup, quick usage
 - TECHNICAL — contracts, options, design/ops, extensibility, performance, security
 
 Data
+
 - Sora.Data.Core — [README](../modules/Sora.Data.Core/README.md) · [TECHNICAL](../modules/Sora.Data.Core/TECHNICAL.md)
 - Sora.Data.Cqrs — [README](../modules/Sora.Data.Cqrs/README.md) · [TECHNICAL](../modules/Sora.Data.Cqrs/TECHNICAL.md)
 - Sora.Data.Cqrs.Outbox.Mongo — [README](../modules/Sora.Data.Cqrs.Outbox.Mongo/README.md) · [TECHNICAL](../modules/Sora.Data.Cqrs.Outbox.Mongo/TECHNICAL.md)
@@ -24,6 +26,7 @@ Data
 - Sora.Data.Weaviate — [README](../modules/Sora.Data.Weaviate/README.md) · [TECHNICAL](../modules/Sora.Data.Weaviate/TECHNICAL.md)
 
 Messaging
+
 - Sora.Messaging.Core — [README](../modules/Sora.Messaging.Core/README.md) · [TECHNICAL](../modules/Sora.Messaging.Core/TECHNICAL.md)
 - Sora.Messaging.Abstractions — [README](../modules/Sora.Messaging.Abstractions/README.md) · [TECHNICAL](../modules/Sora.Messaging.Abstractions/TECHNICAL.md)
 - Sora.Messaging.RabbitMq — [README](../modules/Sora.Messaging.RabbitMq/README.md) · [TECHNICAL](../modules/Sora.Messaging.RabbitMq/TECHNICAL.md)
@@ -32,6 +35,7 @@ Messaging
 - Sora.Service.Inbox.Redis — [README](../modules/Sora.Service.Inbox.Redis/README.md) · [TECHNICAL](../modules/Sora.Service.Inbox.Redis/TECHNICAL.md)
 
 Web
+
 - Sora.Web — [README](../modules/Sora.Web/README.md) · [TECHNICAL](../modules/Sora.Web/TECHNICAL.md)
 - Sora.Web.Transformers — [README](../modules/Sora.Web.Transformers/README.md) · [TECHNICAL](../modules/Sora.Web.Transformers/TECHNICAL.md)
 - Sora.Web.Swagger — [README](../modules/Sora.Web.Swagger/README.md) · [TECHNICAL](../modules/Sora.Web.Swagger/TECHNICAL.md)
@@ -44,13 +48,16 @@ Web
 - Sora.Web.Auth.TestProvider — [README](../modules/Sora.Web.Auth.TestProvider/README.md) · [TECHNICAL](../modules/Sora.Web.Auth.TestProvider/TECHNICAL.md)
 
 AI
+
 - Sora.AI — [README](../modules/Sora.AI/README.md) · [TECHNICAL](../modules/Sora.AI/TECHNICAL.md)
 - Sora.AI.Contracts — [README](../modules/Sora.AI.Contracts/README.md) · [TECHNICAL](../modules/Sora.AI.Contracts/TECHNICAL.md)
 - Sora.AI.Web — [README](../modules/Sora.AI.Web/README.md) · [TECHNICAL](../modules/Sora.AI.Web/TECHNICAL.md)
 - Sora.Ai.Provider.Ollama — [README](../modules/Sora.Ai.Provider.Ollama/README.md) · [TECHNICAL](../modules/Sora.Ai.Provider.Ollama/TECHNICAL.md)
 
 Scheduling
+
 - Sora.Scheduling — [README](../modules/Sora.Scheduling/README.md) · [TECHNICAL](../modules/Sora.Scheduling/TECHNICAL.md)
 
 Core
+
 - Sora.Core — [README](../modules/Sora.Core/README.md) · [TECHNICAL](../modules/Sora.Core/TECHNICAL.md)
