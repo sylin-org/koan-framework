@@ -194,12 +194,12 @@ public static class DynamicFlowExtensions
             dict = (IDictionary<string, object?>)dict[segment]!;
         }
         
-        if (dict.TryGetValue(segments[^1], out var value))
+        if (dict.TryGetValue(segments[^1], out var value) && value is not null)
         {
             if (value is T typedValue)
                 return typedValue;
-            
-            // Try conversion for common types
+
+            // Try conversion for common types when value is convertible
             try
             {
                 return (T)Convert.ChangeType(value, typeof(T));
@@ -274,11 +274,11 @@ public static class DynamicFlowEntityExtensions
             dict = (IDictionary<string, object?>)dict[segment]!;
         }
         
-        if (dict.TryGetValue(segments[^1], out var value))
+        if (dict.TryGetValue(segments[^1], out var value) && value is not null)
         {
             if (value is T typedValue)
                 return typedValue;
-            
+
             try
             {
                 return (T)Convert.ChangeType(value, typeof(T));

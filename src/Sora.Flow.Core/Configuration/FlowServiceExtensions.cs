@@ -18,7 +18,7 @@ public static class FlowServiceExtensions
 {
     /// <summary>
     /// Configure Flow message handlers during service registration.
-    /// Usage: services.ConfigureFlow(flow => flow.On<Device>(device => ProcessDevice(device)))
+    /// Usage: <c>services.ConfigureFlow(flow => flow.On&lt;Device&gt;(device => ProcessDevice(device)))</c>
     /// </summary>
     public static IServiceCollection ConfigureFlow(this IServiceCollection services, Action<FlowHandlerConfigurator> configure)
     {
@@ -119,7 +119,7 @@ public sealed class FlowHandlerConfigurator
 
     /// <summary>
     /// Register a handler for typed messages.
-    /// Usage: flow.On<Device>(device => ProcessDevice(device))
+    /// Usage: <c>flow.On&lt;Device&gt;(device => ProcessDevice(device))</c>
     /// </summary>
     public FlowHandlerConfigurator On<T>(Func<T, Task> handler) where T : class
     {
@@ -393,7 +393,7 @@ public sealed class FlowHandlerConfigurator
         {
             genericMethod.Invoke(this, new object[] { handler });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Silent failure - registration will be attempted again if needed
         }
@@ -431,7 +431,7 @@ public sealed class FlowHandlerConfigurator
         {
             genericMethod.Invoke(this, new object[] { handler });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Silent failure - registration will be attempted again if needed
         }
@@ -469,7 +469,7 @@ public sealed class FlowHandlerConfigurator
         {
             genericMethod.Invoke(this, new object[] { handler });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Silent failure - registration will be attempted again if needed
         }
@@ -527,7 +527,7 @@ public sealed class FlowHandlerConfigurator
                 // Route to Flow intake for processing
                 await entity.SendToFlowIntake();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Re-throw for proper error handling upstream
                 throw;
@@ -552,7 +552,7 @@ public sealed class FlowHandlerConfigurator
                 // Route to Flow intake directly (bypass messaging loop)
                 await entity.SendToFlowIntake();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Re-throw for proper error handling upstream
                 throw;
@@ -577,7 +577,7 @@ public sealed class FlowHandlerConfigurator
                 // Route to Flow intake for processing
                 await valueObject.SendToFlowIntake();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Re-throw for proper error handling upstream
                 throw;

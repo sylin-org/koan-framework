@@ -2,8 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Sora.Core.Hosting.App;
-using Sora.Messaging;
+using Sora.Messaging; // Needed for IServiceCollection.On<T>() extension
 
 namespace Sora.Flow;
 
@@ -18,7 +17,6 @@ public sealed class FlowInbound
 
     /// <summary>
     /// Register a handler for typed messages.
-    /// Usage: Flow.Inbound.On<Device>(device => ProcessDevice(device))
     /// </summary>
     public FlowHandlerBuilder On<T>(Func<T, Task> handler) where T : class
     {
@@ -58,7 +56,7 @@ public sealed class FlowInbound
 
     /// <summary>
     /// Register a handler for named commands.
-    /// Usage: Flow.Inbound.On("seed", payload => HandleSeed(payload))
+    /// Usage: <c>Flow.Inbound.On("seed", payload =&gt; HandleSeed(payload))</c>
     /// </summary>
     public FlowHandlerBuilder On(string command, Func<object?, Task> handler)
     {
@@ -172,7 +170,7 @@ public sealed class FlowHandlerBuilder
 
     /// <summary>
     /// Chain registration of another typed message handler.
-    /// Usage: builder.On<Device>(...).On<Reading>(...)
+    /// Usage: <c>builder.On&lt;Device&gt;(...).On&lt;Reading&gt;(...)</c>
     /// </summary>
     public FlowHandlerBuilder On<T>(Func<T, Task> handler) where T : class
     {
@@ -209,7 +207,6 @@ public sealed class FlowHandlerBuilder
 
     /// <summary>
     /// Chain registration of a named command handler.
-    /// Usage: builder.On<Device>(...).On("seed", ...)
     /// </summary>
     public FlowHandlerBuilder On(string command, Func<object?, Task> handler)
     {

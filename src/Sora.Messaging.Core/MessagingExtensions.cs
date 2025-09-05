@@ -2,14 +2,13 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Sora.Core.Hosting.App;
 
 namespace Sora.Messaging;
 
 /// <summary>
 /// Beautiful developer experience extensions for the Sora messaging system.
-/// Provides .Send() and .On<T>() patterns for zero-config messaging.
+/// Provides <c>.Send()</c> and <c>.On&lt;T&gt;()</c> patterns for zero-config messaging.
 /// </summary>
 public static class MessagingExtensions
 {
@@ -27,7 +26,7 @@ public static class MessagingExtensions
     }
     
     /// <summary>
-    /// Register a message handler using beautiful fluent syntax.
+    /// Register a message handler using fluent syntax via <c>services.On&lt;T&gt;(handler)</c>.
     /// </summary>
     public static IServiceCollection On<T>(this IServiceCollection services, Func<T, Task> handler) where T : class
     {
@@ -56,7 +55,7 @@ public static class MessagingExtensions
 
 /// <summary>
 /// Registry for message handlers configured during startup.
-/// Handlers are registered via .On<T>() extension and then used to create consumers.
+/// Handlers are registered via <c>.On&lt;T&gt;()</c> extension and then used to create consumers.
 /// </summary>
 public class HandlerRegistry
 {

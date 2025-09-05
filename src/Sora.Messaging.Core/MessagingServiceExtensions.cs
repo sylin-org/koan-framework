@@ -9,8 +9,8 @@ namespace Sora.Messaging;
 public static class MessagingServiceExtensions
 {
     /// <summary>
-    /// Adds the core Sora messaging services with beautiful developer experience.
-    /// Enables .Send() extensions and .On<T>() handler registration.
+    /// Adds the core Sora messaging services with developer experience helpers.
+    /// Enables <c>.Send()</c> and <c>.On&lt;T&gt;()</c> handler registration patterns.
     /// </summary>
     public static IServiceCollection AddSoraMessaging(this IServiceCollection services)
     {
@@ -19,7 +19,7 @@ public static class MessagingServiceExtensions
         services.TryAddSingleton<AdaptiveMessageProxy>();
         services.TryAddSingleton<IMessageProxy>(provider => provider.GetRequiredService<AdaptiveMessageProxy>());
         
-        // Handler registry for .On<T>() pattern
+    // Handler registry for .On<T>() pattern
         services.Configure<HandlerRegistry>(_ => { }); // Initialize empty registry
         
         // Messaging lifecycle management
