@@ -39,6 +39,11 @@ builder.Services.AddSora();
 // });
 //
 // EXPLICIT HANDLER REGISTRATION (AutoConfigureFlow has issues):
+Console.WriteLine($"📋 DEBUG: Registering handlers - API will consume from these queues:");
+Console.WriteLine($"📋 DEBUG: - FlowTargetedMessage<Reading> -> Queue name will be determined by RabbitMqProvider");
+Console.WriteLine($"📋 DEBUG: - FlowTargetedMessage<Device> -> Queue name will be determined by RabbitMqProvider");  
+Console.WriteLine($"📋 DEBUG: - FlowTargetedMessage<Sensor> -> Queue name will be determined by RabbitMqProvider");
+
 builder.Services.ConfigureFlow(flow =>
 {
     flow.On<Reading>(async reading =>

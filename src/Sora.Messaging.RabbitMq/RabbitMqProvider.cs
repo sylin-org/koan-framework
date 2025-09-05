@@ -154,15 +154,20 @@ internal class RabbitMqBus : IMessageBus
             var queueName = GetQueueName<T>();
             
             // Ensure queue exists
-            channel.QueueDeclare(queueName, durable: true, exclusive: false, autoDelete: false);
+            var queueResult = channel.QueueDeclare(queueName, durable: true, exclusive: false, autoDelete: false);
+            Console.WriteLine($"🏗️ SEND DEBUG: Ensured queue '{queueName}' exists (messages: {queueResult.MessageCount}, consumers: {queueResult.ConsumerCount})");
             
             // Serialize message
             var body = JsonSerializer.SerializeToUtf8Bytes(message);
             
-            // Send message
+            // Send message with persistence for guaranteed delivery
+            var properties = channel.CreateBasicProperties();
+            properties.Persistent = true; // Ensure message survives broker restarts
+            
             channel.BasicPublish(
                 exchange: "", // Use default exchange for direct routing
                 routingKey: queueName,
+                basicProperties: properties,
                 body: body);
             
             _logger?.LogTrace("📤 Sent {MessageType} to queue {QueueName}", typeof(T).Name, queueName);
@@ -180,6 +185,7 @@ internal class RabbitMqBus : IMessageBus
         
         _consumers[typeof(T)] = consumer;
         
+        Console.WriteLine($"🎯 CONSUMER DEBUG: Created consumer for {typeof(T).Name} on queue '{queueName}' at {DateTime.Now:HH:mm:ss.fff}");
         _logger?.LogInformation("👂 Created consumer for {MessageType} on queue {QueueName}", typeof(T).Name, queueName);
         
         return consumer;
@@ -205,21 +211,55 @@ internal class RabbitMqBus : IMessageBus
         
         var factory = new ConnectionFactory { Uri = new Uri(_connectionString) };
         _connection = factory.CreateConnection();
+        
+        // Pre-create all expected queues for guaranteed delivery
+        PreCreateExpectedQueues();
+    }
+    
+    private void PreCreateExpectedQueues()
+    {
+        Console.WriteLine("🚀 QUEUE INIT: Pre-creating all expected queues for guaranteed delivery...");
+        
+        using var channel = _connection!.CreateModel();
+        
+        // Pre-create queues for known Flow message types
+        var expectedQueues = new[]
+        {
+            "Sora.Flow.FlowCommandMessage",
+            "Sora.Flow.S8.Flow.Shared.Reading", 
+            "Sora.Flow.S8.Flow.Shared.Device",
+            "Sora.Flow.S8.Flow.Shared.Sensor"
+        };
+        
+        foreach (var queueName in expectedQueues)
+        {
+            var queueResult = channel.QueueDeclare(queueName, durable: true, exclusive: false, autoDelete: false);
+            Console.WriteLine($"✅ QUEUE INIT: Pre-created queue '{queueName}' (messages: {queueResult.MessageCount})");
+        }
+        
+        Console.WriteLine($"🎯 QUEUE INIT: All {expectedQueues.Length} queues pre-created successfully!");
     }
     
     private static string GetQueueName<T>()
     {
         var type = typeof(T);
+        string queueName;
         
         // Special handling for FlowTargetedMessage<T> - use inner type name
         if (type.IsGenericType && type.GetGenericTypeDefinition().Name.StartsWith("FlowTargetedMessage"))
         {
             var innerType = type.GetGenericArguments()[0];
-            return $"Sora.Flow.{innerType.FullName ?? innerType.Name}";
+            queueName = $"Sora.Flow.{innerType.FullName ?? innerType.Name}";
+            Console.WriteLine($"🏷️  QUEUE DEBUG: {type.Name} -> Queue: {queueName}");
+        }
+        else
+        {
+            // Default: Full type name becomes queue name
+            queueName = type.FullName ?? type.Name;
+            Console.WriteLine($"🏷️  QUEUE DEBUG: {type.Name} -> Queue: {queueName}");
         }
         
-        // Default: Full type name becomes queue name
-        return type.FullName ?? type.Name;
+        return queueName;
     }
 }
 

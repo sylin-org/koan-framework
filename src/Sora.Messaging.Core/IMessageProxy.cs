@@ -56,6 +56,7 @@ internal class AdaptiveMessageProxy : IMessageProxy
         else
         {
             // Still initializing - buffer the message
+            Console.WriteLine($"🔄 BUFFER DEBUG: Buffering {typeof(T).Name} message (total buffered: {_buffer.BufferedCount + 1})");
             await _buffer.BufferAsync(message, cancellationToken);
         }
     }
@@ -70,6 +71,7 @@ internal class AdaptiveMessageProxy : IMessageProxy
             throw new InvalidOperationException("Already live");
         
         // Flush all buffered messages to the live bus
+        Console.WriteLine($"🚀 BUFFER DEBUG: Going live! About to flush {_buffer.BufferedCount} buffered messages...");
         var flushedCount = await _buffer.FlushToAsync(bus, cancellationToken);
         
         // Switch to live mode
