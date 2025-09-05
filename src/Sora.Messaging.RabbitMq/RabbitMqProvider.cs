@@ -35,11 +35,16 @@ public class RabbitMqProvider : IMessagingProvider
             
             foreach (var connectionString in connectionStrings)
             {
+                _logger?.LogDebug("🔌 Trying RabbitMQ connection: {ConnectionString}", MaskConnectionString(connectionString));
                 if (await TryConnectAsync(connectionString, cancellationToken))
                 {
                     _workingConnectionString = connectionString;
                     _logger?.LogDebug("🐰 RabbitMQ connection successful: {ConnectionString}", MaskConnectionString(connectionString));
                     return true;
+                }
+                else
+                {
+                    _logger?.LogDebug("❌ RabbitMQ connection failed: {ConnectionString}", MaskConnectionString(connectionString));
                 }
             }
             
@@ -155,7 +160,6 @@ internal class RabbitMqBus : IMessageBus
             
             // Ensure queue exists
             var queueResult = channel.QueueDeclare(queueName, durable: true, exclusive: false, autoDelete: false);
-            Console.WriteLine($"🏗️ SEND DEBUG: Ensured queue '{queueName}' exists (messages: {queueResult.MessageCount}, consumers: {queueResult.ConsumerCount})");
             
             // Serialize message
             var body = JsonSerializer.SerializeToUtf8Bytes(message);
@@ -185,7 +189,6 @@ internal class RabbitMqBus : IMessageBus
         
         _consumers[typeof(T)] = consumer;
         
-        Console.WriteLine($"🎯 CONSUMER DEBUG: Created consumer for {typeof(T).Name} on queue '{queueName}' at {DateTime.Now:HH:mm:ss.fff}");
         _logger?.LogInformation("👂 Created consumer for {MessageType} on queue {QueueName}", typeof(T).Name, queueName);
         
         return consumer;
@@ -218,8 +221,6 @@ internal class RabbitMqBus : IMessageBus
     
     private void PreCreateExpectedQueues()
     {
-        Console.WriteLine("🚀 QUEUE INIT: Pre-creating all expected queues for guaranteed delivery...");
-        
         using var channel = _connection!.CreateModel();
         
         // Pre-create queues for known Flow message types
@@ -234,10 +235,7 @@ internal class RabbitMqBus : IMessageBus
         foreach (var queueName in expectedQueues)
         {
             var queueResult = channel.QueueDeclare(queueName, durable: true, exclusive: false, autoDelete: false);
-            Console.WriteLine($"✅ QUEUE INIT: Pre-created queue '{queueName}' (messages: {queueResult.MessageCount})");
         }
-        
-        Console.WriteLine($"🎯 QUEUE INIT: All {expectedQueues.Length} queues pre-created successfully!");
     }
     
     private static string GetQueueName<T>()
@@ -250,13 +248,11 @@ internal class RabbitMqBus : IMessageBus
         {
             var innerType = type.GetGenericArguments()[0];
             queueName = $"Sora.Flow.{innerType.FullName ?? innerType.Name}";
-            Console.WriteLine($"🏷️  QUEUE DEBUG: {type.Name} -> Queue: {queueName}");
         }
         else
         {
             // Default: Full type name becomes queue name
             queueName = type.FullName ?? type.Name;
-            Console.WriteLine($"🏷️  QUEUE DEBUG: {type.Name} -> Queue: {queueName}");
         }
         
         return queueName;

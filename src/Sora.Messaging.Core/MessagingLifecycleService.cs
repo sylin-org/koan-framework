@@ -90,44 +90,88 @@ internal class MessagingLifecycleService : IHostedService
         
         _logger.LogDebug("🔍 Selecting messaging provider from {ProviderCount} available", availableProviders.Count);
         
-        // Try providers in priority order
+        // Retry configuration
+        const int maxRetries = 5;
+        const int baseDelayMs = 2000; // Start with 2 seconds
+        
+        // Try providers in priority order with retry logic
         foreach (var provider in availableProviders.OrderByDescending(p => p.Priority))
         {
-            try
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
-                _logger.LogDebug("🔌 Trying provider: {ProviderName} (Priority: {Priority})", provider.Name, provider.Priority);
-                
-                // Check if provider can connect
-                var canConnect = await provider.CanConnectAsync(cancellationToken);
-                
-                if (!canConnect)
+                try
                 {
-                    _logger.LogDebug("❌ Provider {ProviderName} cannot connect", provider.Name);
-                    continue;
+                    if (attempt == 1)
+                    {
+                        _logger.LogDebug("🔌 Trying provider: {ProviderName} (Priority: {Priority})", provider.Name, provider.Priority);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("🔄 Retry {Attempt}/{MaxRetries} for provider: {ProviderName}", attempt, maxRetries, provider.Name);
+                    }
+                    
+                    // Check if provider can connect
+                    var canConnect = await provider.CanConnectAsync(cancellationToken);
+                    
+                    if (!canConnect)
+                    {
+                        if (attempt < maxRetries)
+                        {
+                            var delay = baseDelayMs * attempt; // Exponential backoff
+                            _logger.LogDebug("❌ Provider {ProviderName} cannot connect, retrying in {Delay}ms", provider.Name, delay);
+                            await Task.Delay(delay, cancellationToken);
+                            continue;
+                        }
+                        else
+                        {
+                            _logger.LogDebug("❌ Provider {ProviderName} cannot connect after {MaxRetries} attempts", provider.Name, maxRetries);
+                            break; // Move to next provider
+                        }
+                    }
+                    
+                    // Initialize the provider
+                    var bus = await provider.CreateBusAsync(cancellationToken);
+                    
+                    // Verify it's actually working
+                    var isHealthy = await bus.IsHealthyAsync(cancellationToken);
+                    
+                    if (!isHealthy)
+                    {
+                        if (attempt < maxRetries)
+                        {
+                            var delay = baseDelayMs * attempt;
+                            _logger.LogDebug("❌ Provider {ProviderName} is not healthy, retrying in {Delay}ms", provider.Name, delay);
+                            await Task.Delay(delay, cancellationToken);
+                            continue;
+                        }
+                        else
+                        {
+                            _logger.LogDebug("❌ Provider {ProviderName} is not healthy after {MaxRetries} attempts", provider.Name, maxRetries);
+                            break; // Move to next provider
+                        }
+                    }
+                    
+                    _logger.LogInformation("🚀 Phase 2 Complete: Selected provider '{ProviderName}' after {Attempt} attempt(s)", provider.Name, attempt);
+                    return bus;
                 }
-                
-                // Initialize the provider
-                var bus = await provider.CreateBusAsync(cancellationToken);
-                
-                // Verify it's actually working
-                var isHealthy = await bus.IsHealthyAsync(cancellationToken);
-                
-                if (!isHealthy)
+                catch (Exception ex)
                 {
-                    _logger.LogDebug("❌ Provider {ProviderName} is not healthy", provider.Name);
-                    continue;
+                    if (attempt < maxRetries)
+                    {
+                        var delay = baseDelayMs * attempt;
+                        _logger.LogDebug(ex, "❌ Provider '{ProviderName}' initialization failed on attempt {Attempt}, retrying in {Delay}ms", provider.Name, attempt, delay);
+                        await Task.Delay(delay, cancellationToken);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(ex, "❌ Provider '{ProviderName}' initialization failed after {MaxRetries} attempts", provider.Name, maxRetries);
+                        break; // Move to next provider
+                    }
                 }
-                
-                _logger.LogInformation("🚀 Phase 2 Complete: Selected provider '{ProviderName}'", provider.Name);
-                return bus;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "❌ Provider '{ProviderName}' initialization failed", provider.Name);
             }
         }
         
-        _logger.LogWarning("❌ No providers could be initialized");
+        _logger.LogWarning("❌ No providers could be initialized after retry attempts");
         return null;
     }
     

@@ -38,54 +38,11 @@ builder.Services.AddSora();
 //     });
 // });
 //
-// EXPLICIT HANDLER REGISTRATION (AutoConfigureFlow has issues):
-Console.WriteLine($"📋 DEBUG: Registering handlers - API will consume from these queues:");
-Console.WriteLine($"📋 DEBUG: - FlowTargetedMessage<Reading> -> Queue name will be determined by RabbitMqProvider");
-Console.WriteLine($"📋 DEBUG: - FlowTargetedMessage<Device> -> Queue name will be determined by RabbitMqProvider");  
-Console.WriteLine($"📋 DEBUG: - FlowTargetedMessage<Sensor> -> Queue name will be determined by RabbitMqProvider");
-
-builder.Services.ConfigureFlow(flow =>
-{
-    flow.On<Reading>(async reading =>
-    {
-        Console.WriteLine($"🔥 DEBUG: API RECEIVED Reading: {reading.SensorKey} = {reading.Value}{reading.Unit} at {DateTime.Now:HH:mm:ss.fff}");
-        try
-        {
-            await reading.SendToFlowIntake();
-            Console.WriteLine($"✅ DEBUG: Reading processed successfully: {reading.SensorKey}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ DEBUG: Reading processing failed: {ex.Message}");
-        }
-    });
-    flow.On<Device>(async device =>
-    {
-        Console.WriteLine($"🔥 DEBUG: API RECEIVED Device: {device.DeviceId} ({device.Manufacturer} {device.Model}) at {DateTime.Now:HH:mm:ss.fff}");
-        try
-        {
-            await device.SendToFlowIntake();
-            Console.WriteLine($"✅ DEBUG: Device processed successfully: {device.DeviceId}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ DEBUG: Device processing failed: {ex.Message}");
-        }
-    });
-    flow.On<Sensor>(async sensor =>
-    {
-        Console.WriteLine($"🔥 DEBUG: API RECEIVED Sensor: {sensor.SensorKey} ({sensor.Code}) - Unit: {sensor.Unit} at {DateTime.Now:HH:mm:ss.fff}");
-        try
-        {
-            await sensor.SendToFlowIntake();
-            Console.WriteLine($"✅ DEBUG: Sensor processed successfully: {sensor.SensorKey}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ DEBUG: Sensor processing failed: {ex.Message}");
-        }
-    });
-});
+// ✨ BEAUTIFUL AUTO-CONFIGURED FLOW HANDLERS ✨
+// Automatically registers handlers for all FlowEntity and FlowValueObject types!
+// No more boilerplate - each handler logs appropriately and routes to Flow intake.
+Console.WriteLine($"🔧 AUTO-CONFIG DEBUG: Registering AutoConfigureFlow with S8.Flow.Shared assembly");
+builder.Services.AutoConfigureFlow(typeof(Reading).Assembly);
 
 // Keep FlowCommandMessage as direct handler (not wrapped in FlowTargetedMessage)
 builder.Services.On<FlowCommandMessage>(async cmd =>
@@ -93,13 +50,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
     Console.WriteLine($"🔥 DEBUG: API RECEIVED FlowCommandMessage: {cmd.Command} with payload: {cmd.Payload} at {DateTime.Now:HH:mm:ss.fff}");
 });
 
-// ADD: Test basic message reception without Flow wrapping
-builder.Services.On<FlowTargetedMessage<Reading>>(async msg =>
-{
-    Console.WriteLine($"🚨 RAW MESSAGE DEBUG: Received FlowTargetedMessage<Reading> at {DateTime.Now:HH:mm:ss.fff}");
-    Console.WriteLine($"🚨 Message Target: {msg.Target}");
-    Console.WriteLine($"🚨 Message Entity: {msg.Entity?.SensorKey} = {msg.Entity?.Value}{msg.Entity?.Unit}");
-});
+// AutoConfigured handlers will process FlowTargetedMessage types automatically
 
 // Container-only sample guard (must be after service registration so DI is wired)
 if (!Sora.Core.SoraEnv.InContainer)
