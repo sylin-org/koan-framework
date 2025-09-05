@@ -28,5 +28,5 @@ Notes
 
 	Additional tips
 
-	- Use `FlowEvent.For<T>()` as a single entry point for both Flow entities and value objects (e.g., `FlowEvent.For<Device>()`, `FlowEvent.For<Reading>()`).
+	- Use `FlowEntitySendExtensions.Send()` for entities and `FlowValueObjectSendExtensions.Send()` for value objects with the messaging-first pattern.
 	- For adapter commands, define a small VO (e.g., `ControlCommand`) and handle it in the adapter host to react to verbs.

@@ -41,12 +41,10 @@ public static class AdapterSeeding
         CancellationToken ct,
         TimeSpan? maxThreshold = null)
     {
-        // Use the new messaging-first pattern for reliable delivery
-        // This demonstrates both approaches: direct entity send and FlowEvent pattern
-        
+        // Use the messaging-first pattern for reliable delivery
         foreach (var d in devices)
         {
-            // Option 1: Direct entity send (preferred for typed models)
+            // Send Device entity through messaging system
             var device = new Device
             {
                 DeviceId = d.DeviceId,
@@ -59,24 +57,6 @@ public static class AdapterSeeding
             };
             
             await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, ct);
-
-            // Option 2: FlowEvent pattern (for dynamic/untyped scenarios)
-            // Demonstrating that FlowEvent can also work with messaging
-            /*
-            var devEvent = FlowEvent.ForModel("device")
-                .With(Keys.Device.Inventory, d.Inventory)
-                .With(Keys.Device.Serial, d.Serial)
-                .With(Keys.Device.Manufacturer, d.Manufacturer)
-                .With(Keys.Device.Model, d.Model)
-                .With(Keys.Device.Kind, d.Kind)
-                .With(Keys.Device.Code, d.Code)
-                .With($"identifier.external.{source}", $"{d.Inventory}:{d.Serial}")
-                .With(Keys.Reading.Source, source);
-            devEvent.SourceId = source;
-            devEvent.CorrelationId = $"{d.Inventory}:{d.Serial}";
-            
-            await Sora.Flow.Sending.FlowEventSendExtensions.Send(devEvent, ct);
-            */
 
             // Send Sensor entities through messaging system
             foreach (var s in sensorSelector(d))
