@@ -35,22 +35,22 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
             
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            DebugLog($"✓ Using explicit connection string from configuration: '{explicitConnectionString}'");
+            DebugLog($"Using explicit connection string from configuration: '{explicitConnectionString}'");
             options.ConnectionString = explicitConnectionString;
         }
         else if (string.Equals(options.ConnectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
         {
-            DebugLog("🔍 Auto-detection mode activated - resolving MongoDB connection...");
+            DebugLog("Auto-detection mode activated - resolving MongoDB connection...");
             options.ConnectionString = ResolveAutoConnection(DebugLog);
         }
         else if (string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            DebugLog("⚠️  No connection string provided - falling back to auto-detection");
+            DebugLog("No connection string provided - falling back to auto-detection");
             options.ConnectionString = ResolveAutoConnection(DebugLog);
         }
         else
         {
-            DebugLog($"✓ Using pre-configured connection string: '{options.ConnectionString}'");
+            DebugLog($"Using pre-configured connection string: '{options.ConnectionString}'");
         }
         // Configure other options
         options.Database = Configuration.ReadFirst(
@@ -74,8 +74,8 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
         // Final connection string normalization and logging
         options.ConnectionString = NormalizeConnectionString(options.ConnectionString);
         DebugLog($"=== Final MongoDB Configuration ===");
-        DebugLog($"✓ Connection: {options.ConnectionString}");
-        DebugLog($"✓ Database: {options.Database}");
+        DebugLog($"Connection: {options.ConnectionString}");
+        DebugLog($"Database: {options.Database}");
         DebugLog($"=== MongoDB Auto-Configuration Complete ===");
     }
 
@@ -84,7 +84,7 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
         // Check if auto-detection is explicitly disabled first
         if (IsAutoDetectionDisabled())
         {
-            debugLog("❌ Auto-detection disabled via configuration - using localhost");
+            debugLog("Auto-detection disabled via configuration - using localhost");
             return MongoConstants.DefaultLocalUri;
         }
 
@@ -119,11 +119,11 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
             var list = Environment.GetEnvironmentVariable(MongoConstants.EnvList);
             if (string.IsNullOrWhiteSpace(list))
             {
-                debugLog($"📝 Environment variable {MongoConstants.EnvList} not set");
+                debugLog($"Environment variable {MongoConstants.EnvList} not set");
                 return null;
             }
 
-            debugLog($"🔍 Testing MongoDB URLs from {MongoConstants.EnvList}: {list}");
+            debugLog($"Testing MongoDB URLs from {MongoConstants.EnvList}: {list}");
             foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var candidate = part.Trim();
@@ -134,16 +134,16 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
                 
                 if (TryMongoPing(normalized, TimeSpan.FromMilliseconds(500)))
                 {
-                    debugLog($"  ✅ SUCCESS: {normalized} is reachable");
+                    debugLog($"  SUCCESS: {normalized} is reachable");
                     return normalized;
                 }
-                debugLog($"  ❌ Failed: {normalized} not reachable");
+                debugLog($"  Failed: {normalized} not reachable");
             }
-            debugLog("❌ No URLs from environment variable were reachable");
+            debugLog("No URLs from environment variable were reachable");
         }
         catch (Exception ex)
         {
-            debugLog($"⚠️  Error processing {MongoConstants.EnvList}: {ex.Message}");
+            debugLog($"Error processing {MongoConstants.EnvList}: {ex.Message}");
         }
         return null;
     }
@@ -153,10 +153,10 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
         var cs = Configuration.Read(config, Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, null);
         if (!string.IsNullOrWhiteSpace(cs))
         {
-            debugLog($"🔍 Found ConnectionStrings:Default = '{cs}'");
+            debugLog($"Found ConnectionStrings:Default = '{cs}'");
             return cs;
         }
-        debugLog("📝 No ConnectionStrings:Default found");
+        debugLog("No ConnectionStrings:Default found");
         return null;
     }
 
@@ -165,7 +165,7 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
         var isProd = SoraEnv.IsProduction;
         var inContainer = SoraEnv.InContainer;
 
-        debugLog($"🌍 Environment-based resolution: Production={isProd}, Container={inContainer}");
+        debugLog($"Environment-based resolution: Production={isProd}, Container={inContainer}");
         
         if (isProd)
         {
@@ -174,7 +174,7 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
         }
 
         // Development environment: try smart detection with connectivity testing
-        debugLog("🧪 Development environment: testing connectivity...");
+        debugLog("Development environment: testing connectivity...");
         
         var candidates = new[]
         {
@@ -187,16 +187,16 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
             debugLog($"  Testing {description}: {uri}");
             if (TryMongoPing(uri, TimeSpan.FromMilliseconds(500)))
             {
-                debugLog($"  ✅ SUCCESS: {description} is reachable");
+                debugLog($"  SUCCESS: {description} is reachable");
                 return uri;
             }
-            debugLog($"  ❌ Failed: {description} not reachable");
+            debugLog($"  Failed: {description} not reachable");
         }
 
         // Nothing reachable - choose intelligent fallback
         var fallback = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
         var reason = inContainer ? "container environment detected" : "bare metal environment detected";
-        debugLog($"⚠️  No MongoDB reachable - intelligent fallback: {fallback} ({reason})");
+        debugLog($"No MongoDB reachable - intelligent fallback: {fallback} ({reason})");
         return fallback;
     }
 

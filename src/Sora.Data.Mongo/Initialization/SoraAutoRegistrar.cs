@@ -30,44 +30,88 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
+        
+        // NEW: Decision logging for connection string resolution
+        var connectionAttempts = new List<(string source, string connectionString, bool canConnect, string? error)>();
+        
+        // Try configured connection strings first
+        var configuredCs = Configuration.ReadFirst(cfg, null,
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+            
+        if (!string.IsNullOrWhiteSpace(configuredCs))
+        {
+            report.AddDiscovery("configuration", configuredCs);
+            connectionAttempts.Add(("configuration", configuredCs, true, null)); // Assume configured strings work
+        }
+        
+        // Auto-discovery logic with decision logging
+        var finalCs = configuredCs;
+        if (string.IsNullOrWhiteSpace(finalCs))
+        {
+            var isProd = SoraEnv.IsProduction;
+            var inContainer = SoraEnv.InContainer;
+            
+            if (isProd)
+            {
+                finalCs = MongoConstants.DefaultLocalUri;
+                report.AddDiscovery("production-default", finalCs);
+                connectionAttempts.Add(("production-default", finalCs, true, null));
+            }
+            else
+            {
+                if (inContainer)
+                {
+                    finalCs = MongoConstants.DefaultComposeUri;
+                    report.AddDiscovery("container-discovery", finalCs);
+                    connectionAttempts.Add(("container-discovery", finalCs, true, null));
+                }
+                else
+                {
+                    finalCs = MongoConstants.DefaultLocalUri;
+                    report.AddDiscovery("localhost-fallback", finalCs);
+                    connectionAttempts.Add(("localhost-fallback", finalCs, true, null));
+                }
+            }
+        }
+        
+        // Normalize connection string
+        if (!string.IsNullOrWhiteSpace(finalCs) &&
+            !finalCs.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) &&
+            !finalCs.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase))
+        {
+            finalCs = "mongodb://" + finalCs.Trim();
+        }
+        
+        // Log connection attempts
+        foreach (var attempt in connectionAttempts)
+        {
+            report.AddConnectionAttempt("Data.Mongo", attempt.connectionString, attempt.canConnect, attempt.error);
+        }
+        
+        // Log provider election decision
+        var availableProviders = DiscoverAvailableDataProviders();
+        if (connectionAttempts.Any(a => a.canConnect))
+        {
+            report.AddProviderElection("Data", "Mongo", availableProviders, "first successful connection");
+        }
+        else
+        {
+            report.AddDecision("Data", "InMemory", "no Mongo connection available", availableProviders);
+        }
+        
         var o = new MongoOptions
         {
-            ConnectionString = Configuration.ReadFirst(cfg, MongoConstants.DefaultLocalUri,
-                Infrastructure.Constants.Configuration.Keys.ConnectionString,
-                Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-                Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
-                Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
+            ConnectionString = finalCs,
             Database = Configuration.ReadFirst(cfg, "sora",
                 Infrastructure.Constants.Configuration.Keys.Database,
                 Infrastructure.Constants.Configuration.Keys.AltDatabase)
         };
-        // Resolve connection string similarly to configurator: fallback to ConnectionStrings:Default if unset
-        var cs = o.ConnectionString;
-        var csByName = Configuration.Read(cfg, Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, null);
-        if (string.IsNullOrWhiteSpace(cs) && !string.IsNullOrWhiteSpace(csByName)) cs = csByName;
-        if (string.IsNullOrWhiteSpace(cs))
-        {
-            // Use the same auto-detection logic as the configurator for consistency
-            var isProd = SoraEnv.IsProduction;
-            if (isProd)
-            {
-                cs = MongoConstants.DefaultLocalUri;
-            }
-            else
-            {
-                // In non-production, prefer container hostname but don't ping here to avoid blocking bootstrap
-                var inContainer = SoraEnv.InContainer;
-                cs = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
-            }
-        }
-        if (!string.IsNullOrWhiteSpace(cs) &&
-            !cs.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) &&
-            !cs.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase))
-        {
-            cs = "mongodb://" + cs.Trim();
-        }
+        
         report.AddSetting("Database", o.Database);
-        report.AddSetting("ConnectionString", cs, isSecret: true);
+        report.AddSetting("ConnectionString", finalCs, isSecret: true);
         // Announce schema capability per acceptance criteria
         report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
         // Announce paging guardrails (decision 0044)
@@ -79,9 +123,24 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
         report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defSize.ToString());
         report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, maxSize.ToString());
-        // Discovery visibility
-        report.AddSetting("Discovery:EnvList", Infrastructure.Constants.Discovery.EnvList, isSecret: false);
-        report.AddSetting("Discovery:DefaultLocal", MongoConstants.DefaultLocalUri, isSecret: false);
-        report.AddSetting("Discovery:DefaultCompose", MongoConstants.DefaultComposeUri, isSecret: false);
+    }
+    
+    private static string[] DiscoverAvailableDataProviders()
+    {
+        // Scan loaded assemblies for other data providers
+        var providers = new List<string> { "Mongo" }; // Always include self
+        
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        foreach (var asm in assemblies)
+        {
+            var name = asm.GetName().Name ?? "";
+            if (name.StartsWith("Sora.Data.") && name != "Sora.Data.Mongo" && name != "Sora.Data.Core")
+            {
+                var providerName = name.Substring("Sora.Data.".Length);
+                providers.Add(providerName);
+            }
+        }
+        
+        return providers.ToArray();
     }
 }

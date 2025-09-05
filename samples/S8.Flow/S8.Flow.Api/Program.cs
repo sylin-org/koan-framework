@@ -11,51 +11,26 @@ using Sora.Flow.Sending;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ✨ NEW BEAUTIFUL MESSAGING - ZERO CONFIGURATION! ✨
+// Sora framework with auto-configuration
 builder.Services.AddSora();
 
-// ✨ BEAUTIFUL AUTO-CONFIGURED FLOW HANDLERS ✨
-// Automatically registers handlers for all FlowEntity and FlowValueObject types!
-// No more boilerplate - each handler logs appropriately and routes to Flow intake.
-//
-// BEFORE (26 lines of repetitive boilerplate):
-// builder.Services.ConfigureFlow(flow =>
-// {
-//     flow.On<Reading>(async reading =>
-//     {
-//         Console.WriteLine($"📊 Received Reading: {reading.SensorKey} = {reading.Value}{reading.Unit}");
-//         await reading.SendToFlowIntake();
-//     });
-//     flow.On<Device>(async device =>
-//     {
-//         Console.WriteLine($"🏭 Device registered: {device.DeviceId} ({device.Manufacturer} {device.Model})");
-//         await device.SendToFlowIntake();
-//     });
-//     flow.On<Sensor>(async sensor =>
-//     {
-//         Console.WriteLine($"📡 Sensor registered: {sensor.SensorKey} ({sensor.Code}) - Unit: {sensor.Unit}");
-//         await sensor.SendToFlowIntake();
-//     });
-// });
-//
-// ✨ BEAUTIFUL AUTO-CONFIGURED FLOW HANDLERS ✨
-// Automatically registers handlers for all FlowEntity and FlowValueObject types!
-// No more boilerplate - each handler logs appropriately and routes to Flow intake.
-Console.WriteLine($"🔧 AUTO-CONFIG DEBUG: Registering AutoConfigureFlow with S8.Flow.Shared assembly");
+// Auto-configure Flow handlers for all FlowEntity and FlowValueObject types
+// Eliminates boilerplate - handlers route to Flow intake automatically
 builder.Services.AutoConfigureFlow(typeof(Reading).Assembly);
 
-// Keep FlowCommandMessage as direct handler (not wrapped in FlowTargetedMessage)
+// FlowCommandMessage handler for API commands
 builder.Services.On<FlowCommandMessage>(async cmd =>
 {
-    Console.WriteLine($"🔥 DEBUG: API RECEIVED FlowCommandMessage: {cmd.Command} with payload: {cmd.Payload} at {DateTime.Now:HH:mm:ss.fff}");
+    // Commands are processed by registered handlers
+    await Task.CompletedTask;
 });
 
 // AutoConfigured handlers will process FlowTargetedMessage types automatically
 
-// Container-only sample guard (must be after service registration so DI is wired)
+// Container environment requirement
 if (!Sora.Core.SoraEnv.InContainer)
 {
-    Console.Error.WriteLine("S8.Flow.Api is container-only. Use samples/S8.Compose/docker-compose.yml.");
+    Console.Error.WriteLine("S8.Flow.Api requires container environment. Use samples/S8.Compose/docker-compose.yml.");
     return;
 }
 
@@ -87,18 +62,22 @@ builder.Services.AddSingleton<IAdapterHealthRegistry, S8.Flow.Api.Adapters.Keyed
 
 var app = builder.Build();
 
-// Defer test entity save until the host is fully started (AppHost.Current initialized by AddSora())
+// Test data provider functionality on startup
 app.Lifetime.ApplicationStarted.Register(async () =>
 {
     try
     {
         var setting = new AppSetting { Id = "test", Value = $"Saved at {DateTime.UtcNow:O}" };
         await setting.Save();
-        Console.WriteLine($"[TEST] AppSetting saved via provider 'mongo': {setting.Id} = {setting.Value}");
+        using var scope = app.Services.CreateScope();
+        var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
+        logger?.LogInformation("[API] Data provider test: AppSetting saved successfully");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[TEST][ERROR] Failed saving AppSetting: {ex.Message}\n{ex}");
+        using var scope = app.Services.CreateScope();
+        var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
+        logger?.LogError(ex, "[API] Data provider test failed");
     }
 });
 

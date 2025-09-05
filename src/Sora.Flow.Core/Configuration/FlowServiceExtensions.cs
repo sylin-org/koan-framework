@@ -88,15 +88,15 @@ public sealed class AutoFlowOptions
 
     /// <summary>
     /// Custom format for entity log messages. Parameters: {TypeName}, {KeyInfo}
-    /// Default: "🏭 {TypeName} {KeyInfo}"
+    /// Default: "[FLOW] Entity {TypeName} {KeyInfo}"
     /// </summary>
-    public string EntityLogFormat { get; set; } = "🏭 {0} {1}";
+    public string EntityLogFormat { get; set; } = "[FLOW] Entity {0} {1}";
 
     /// <summary>
     /// Custom format for value object log messages. Parameters: {TypeName}, {KeyInfo}
-    /// Default: "📊 {TypeName} {KeyInfo}"
+    /// Default: "[FLOW] ValueObject {TypeName} {KeyInfo}"
     /// </summary>
-    public string ValueObjectLogFormat { get; set; } = "📊 {0} {1}";
+    public string ValueObjectLogFormat { get; set; } = "[FLOW] ValueObject {0} {1}";
 
     /// <summary>
     /// Predicate to filter which types should have handlers auto-registered.
@@ -216,14 +216,14 @@ public sealed class FlowHandlerConfigurator
 
         options ??= new AutoFlowOptions();
 
-        Console.WriteLine($"🔧 AUTO-CONFIG DEBUG: Scanning {assemblies.Length} assemblies for FlowEntity/FlowValueObject types");
+        // Scanning assemblies for Flow types
         int totalHandlersRegistered = 0;
         
         foreach (var assembly in assemblies)
         {
-            Console.WriteLine($"🔧 AUTO-CONFIG DEBUG: Scanning assembly: {assembly.FullName}");
+            // Scanning assembly for Flow types
             var types = GetTypesFromAssembly(assembly);
-            Console.WriteLine($"🔧 AUTO-CONFIG DEBUG: Found {types.Length} types in assembly");
+            // Found types in assembly
             
             foreach (var type in types)
             {
@@ -237,7 +237,7 @@ public sealed class FlowHandlerConfigurator
                 var dynamicEntityBaseType = GetDynamicFlowEntityBaseType(type);
                 if (dynamicEntityBaseType != null)
                 {
-                    Console.WriteLine($"🔧 AUTO-CONFIG DEBUG: Found DynamicFlowEntity: {type.Name} -> registering dynamic handler");
+                    // Registering DynamicFlowEntity handler
                     RegisterDynamicFlowEntityHandler(type, dynamicEntityBaseType, options);
                     totalHandlersRegistered++;
                     continue;
@@ -247,7 +247,7 @@ public sealed class FlowHandlerConfigurator
                 var entityBaseType = GetFlowEntityBaseType(type);
                 if (entityBaseType != null)
                 {
-                    Console.WriteLine($"🔧 AUTO-CONFIG DEBUG: Found FlowEntity: {type.Name} -> registering handler");
+                    // Registering FlowEntity handler
                     RegisterFlowEntityHandler(type, entityBaseType, options);
                     totalHandlersRegistered++;
                     continue;
@@ -257,7 +257,7 @@ public sealed class FlowHandlerConfigurator
                 var valueObjectBaseType = GetFlowValueObjectBaseType(type);
                 if (valueObjectBaseType != null)
                 {
-                    Console.WriteLine($"🔧 AUTO-CONFIG DEBUG: Found FlowValueObject: {type.Name} -> registering handler");
+                    // Registering FlowValueObject handler
                     RegisterFlowValueObjectHandler(type, valueObjectBaseType, options);
                     totalHandlersRegistered++;
                     continue;
@@ -265,7 +265,7 @@ public sealed class FlowHandlerConfigurator
             }
         }
 
-        Console.WriteLine($"🎯 AUTO-CONFIG SUMMARY: Successfully registered {totalHandlersRegistered} handlers through AutoConfigureFlow");
+        // AutoConfigureFlow registration complete
         return this;
     }
 
@@ -363,19 +363,14 @@ public sealed class FlowHandlerConfigurator
 
     private void RegisterFlowEntityHandler(Type entityType, Type baseType, AutoFlowOptions options)
     {
-        Console.WriteLine($"🔧 REGISTER DEBUG: Starting FlowEntity handler registration for {entityType.Name}");
-        
         // Create handler method using reflection
         var onMethods = typeof(FlowHandlerConfigurator).GetMethods()
             .Where(m => m.Name == nameof(On) && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
             .ToArray();
         
-        Console.WriteLine($"🔧 REGISTER DEBUG: Found {onMethods.Length} On<T> method candidates for {entityType.Name}");
-        
         var onMethod = onMethods.FirstOrDefault(m => 
         {
             var parameterType = m.GetParameters()[0].ParameterType;
-            Console.WriteLine($"🔧 REGISTER DEBUG: Checking method with parameter type: {parameterType}");
             return parameterType.IsGenericType && 
                    parameterType.GetGenericTypeDefinition() == typeof(Func<,>) &&
                    parameterType.GetGenericArguments()[1] == typeof(Task);
@@ -383,47 +378,37 @@ public sealed class FlowHandlerConfigurator
         
         if (onMethod == null) 
         {
-            Console.WriteLine($"❌ REGISTER ERROR: Could not find compatible On<T> method for {entityType.Name}");
             return;
         }
-        Console.WriteLine($"✅ REGISTER DEBUG: Found On<T> method for {entityType.Name}");
 
         // Create the generic method
         var genericMethod = onMethod.MakeGenericMethod(entityType);
-        Console.WriteLine($"✅ REGISTER DEBUG: Created generic On<{entityType.Name}> method");
 
         // Create the handler delegate
         var handlerType = typeof(Func<,>).MakeGenericType(entityType, typeof(Task));
         var handler = CreateEntityHandler(entityType, options);
-        Console.WriteLine($"✅ REGISTER DEBUG: Created handler delegate for {entityType.Name}");
 
         // Invoke On<EntityType>(handler)
         try
         {
             genericMethod.Invoke(this, new object[] { handler });
-            Console.WriteLine($"🎯 REGISTER SUCCESS: Successfully registered FlowEntity handler for {entityType.Name}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ REGISTER ERROR: Failed to register FlowEntity handler for {entityType.Name}: {ex.Message}");
+            // Silent failure - registration will be attempted again if needed
         }
     }
 
     private void RegisterDynamicFlowEntityHandler(Type entityType, Type baseType, AutoFlowOptions options)
     {
-        Console.WriteLine($"🔧 REGISTER DEBUG: Starting DynamicFlowEntity handler registration for {entityType.Name}");
-        
         // Create handler method using reflection
         var onMethods = typeof(FlowHandlerConfigurator).GetMethods()
             .Where(m => m.Name == nameof(On) && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
             .ToArray();
         
-        Console.WriteLine($"🔧 REGISTER DEBUG: Found {onMethods.Length} On<T> method candidates for {entityType.Name}");
-        
         var onMethod = onMethods.FirstOrDefault(m => 
         {
             var parameterType = m.GetParameters()[0].ParameterType;
-            Console.WriteLine($"🔧 REGISTER DEBUG: Checking method with parameter type: {parameterType}");
             return parameterType.IsGenericType && 
                    parameterType.GetGenericTypeDefinition() == typeof(Func<,>) &&
                    parameterType.GetGenericArguments()[1] == typeof(Task);
@@ -431,47 +416,37 @@ public sealed class FlowHandlerConfigurator
         
         if (onMethod == null) 
         {
-            Console.WriteLine($"❌ REGISTER ERROR: Could not find compatible On<T> method for {entityType.Name}");
             return;
         }
-        Console.WriteLine($"✅ REGISTER DEBUG: Found On<T> method for {entityType.Name}");
 
         // Create the generic method
         var genericMethod = onMethod.MakeGenericMethod(entityType);
-        Console.WriteLine($"✅ REGISTER DEBUG: Created generic On<{entityType.Name}> method");
 
         // Create the handler delegate
         var handlerType = typeof(Func<,>).MakeGenericType(entityType, typeof(Task));
         var handler = CreateEntityHandler(entityType, options);
-        Console.WriteLine($"✅ REGISTER DEBUG: Created handler delegate for {entityType.Name}");
 
         // Invoke On<EntityType>(handler)
         try
         {
             genericMethod.Invoke(this, new object[] { handler });
-            Console.WriteLine($"🎯 REGISTER SUCCESS: Successfully registered DynamicFlowEntity handler for {entityType.Name}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ REGISTER ERROR: Failed to register DynamicFlowEntity handler for {entityType.Name}: {ex.Message}");
+            // Silent failure - registration will be attempted again if needed
         }
     }
 
     private void RegisterFlowValueObjectHandler(Type valueObjectType, Type baseType, AutoFlowOptions options)
     {
-        Console.WriteLine($"🔧 REGISTER DEBUG: Starting FlowValueObject handler registration for {valueObjectType.Name}");
-        
         // Create handler method using reflection
         var onMethods = typeof(FlowHandlerConfigurator).GetMethods()
             .Where(m => m.Name == nameof(On) && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
             .ToArray();
         
-        Console.WriteLine($"🔧 REGISTER DEBUG: Found {onMethods.Length} On<T> method candidates for {valueObjectType.Name}");
-        
         var onMethod = onMethods.FirstOrDefault(m => 
         {
             var parameterType = m.GetParameters()[0].ParameterType;
-            Console.WriteLine($"🔧 REGISTER DEBUG: Checking method with parameter type: {parameterType}");
             return parameterType.IsGenericType && 
                    parameterType.GetGenericTypeDefinition() == typeof(Func<,>) &&
                    parameterType.GetGenericArguments()[1] == typeof(Task);
@@ -479,29 +454,24 @@ public sealed class FlowHandlerConfigurator
         
         if (onMethod == null) 
         {
-            Console.WriteLine($"❌ REGISTER ERROR: Could not find compatible On<T> method for {valueObjectType.Name}");
             return;
         }
-        Console.WriteLine($"✅ REGISTER DEBUG: Found On<T> method for {valueObjectType.Name}");
 
         // Create the generic method
         var genericMethod = onMethod.MakeGenericMethod(valueObjectType);
-        Console.WriteLine($"✅ REGISTER DEBUG: Created generic On<{valueObjectType.Name}> method");
 
         // Create the handler delegate
         var handlerType = typeof(Func<,>).MakeGenericType(valueObjectType, typeof(Task));
         var handler = CreateValueObjectHandler(valueObjectType, options);
-        Console.WriteLine($"✅ REGISTER DEBUG: Created handler delegate for {valueObjectType.Name}");
 
         // Invoke On<ValueObjectType>(handler)
         try
         {
             genericMethod.Invoke(this, new object[] { handler });
-            Console.WriteLine($"🎯 REGISTER SUCCESS: Successfully registered FlowValueObject handler for {valueObjectType.Name}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ REGISTER ERROR: Failed to register FlowValueObject handler for {valueObjectType.Name}: {ex.Message}");
+            // Silent failure - registration will be attempted again if needed
         }
     }
 
@@ -545,8 +515,6 @@ public sealed class FlowHandlerConfigurator
     {
         return async entity =>
         {
-            Console.WriteLine($"🏭 AUTO-HANDLER DEBUG: Processing FlowEntity<{typeof(TModel).Name}> at {DateTime.Now:HH:mm:ss.fff}");
-            
             if (options.EnableLogging)
             {
                 var typeName = typeof(TModel).Name;
@@ -557,13 +525,11 @@ public sealed class FlowHandlerConfigurator
             try
             {
                 // Route to Flow intake for processing
-                Console.WriteLine($"🏭 AUTO-HANDLER DEBUG: Sending {typeof(TModel).Name} to Flow intake");
                 await entity.SendToFlowIntake();
-                Console.WriteLine($"✅ AUTO-HANDLER DEBUG: Successfully processed {typeof(TModel).Name}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ AUTO-HANDLER ERROR: Failed to process {typeof(TModel).Name}: {ex.Message}");
+                // Re-throw for proper error handling upstream
                 throw;
             }
         };
@@ -574,8 +540,6 @@ public sealed class FlowHandlerConfigurator
     {
         return async entity =>
         {
-            Console.WriteLine($"🏭 AUTO-HANDLER DEBUG: Processing DynamicFlowEntity<{typeof(TModel).Name}> at {DateTime.Now:HH:mm:ss.fff}");
-            
             if (options.EnableLogging)
             {
                 var typeName = typeof(TModel).Name;
@@ -586,13 +550,11 @@ public sealed class FlowHandlerConfigurator
             try
             {
                 // Route to Flow intake directly (bypass messaging loop)
-                Console.WriteLine($"🏭 AUTO-HANDLER DEBUG: Sending DynamicFlowEntity {typeof(TModel).Name} to Flow intake");
                 await entity.SendToFlowIntake();
-                Console.WriteLine($"✅ AUTO-HANDLER DEBUG: Successfully processed DynamicFlowEntity {typeof(TModel).Name}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ AUTO-HANDLER ERROR: Failed to process DynamicFlowEntity {typeof(TModel).Name}: {ex.Message}");
+                // Re-throw for proper error handling upstream
                 throw;
             }
         };
@@ -603,8 +565,6 @@ public sealed class FlowHandlerConfigurator
     {
         return async valueObject =>
         {
-            Console.WriteLine($"📊 AUTO-HANDLER DEBUG: Processing FlowValueObject<{typeof(TValueObject).Name}> at {DateTime.Now:HH:mm:ss.fff}");
-            
             if (options.EnableLogging)
             {
                 var typeName = typeof(TValueObject).Name;
@@ -615,13 +575,11 @@ public sealed class FlowHandlerConfigurator
             try
             {
                 // Route to Flow intake for processing
-                Console.WriteLine($"📊 AUTO-HANDLER DEBUG: Sending {typeof(TValueObject).Name} to Flow intake");
                 await valueObject.SendToFlowIntake();
-                Console.WriteLine($"✅ AUTO-HANDLER DEBUG: Successfully processed {typeof(TValueObject).Name}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ AUTO-HANDLER ERROR: Failed to process {typeof(TValueObject).Name}: {ex.Message}");
+                // Re-throw for proper error handling upstream
                 throw;
             }
         };

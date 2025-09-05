@@ -267,23 +267,120 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         var opts = cfg.GetSection("Sora:Flow").Get<FlowOptions>() ?? new FlowOptions();
-    report.AddModule(ModuleName, ModuleVersion);
-    report.AddSetting("runtime", "InMemory");
-    report.AddSetting("batch", opts.BatchSize.ToString());
-    report.AddSetting("concurrency.Standardize", opts.StandardizeConcurrency.ToString());
-    report.AddSetting("concurrency.Key", opts.KeyConcurrency.ToString());
-    report.AddSetting("concurrency.Associate", opts.AssociateConcurrency.ToString());
-    report.AddSetting("concurrency.Project", opts.ProjectConcurrency.ToString());
-    report.AddSetting("ttl.Intake", opts.IntakeTtl.ToString());
-    report.AddSetting("ttl.Standardized", opts.StandardizedTtl.ToString());
-    report.AddSetting("ttl.Keyed", opts.KeyedTtl.ToString());
-    report.AddSetting("ttl.ProjectionTask", opts.ProjectionTaskTtl.ToString());
-    report.AddSetting("ttl.RejectionReport", opts.RejectionReportTtl.ToString());
-    report.AddSetting("purge.Enabled", opts.PurgeEnabled.ToString().ToLowerInvariant());
-    report.AddSetting("purge.Interval", opts.PurgeInterval.ToString());
-    report.AddSetting("dlq", opts.DeadLetterEnabled.ToString().ToLowerInvariant());
-    report.AddSetting("defaultView", opts.DefaultViewName);
-    if (opts.AggregationTags?.Length > 0)
-        report.AddSetting("aggregation.tags", string.Join(",", opts.AggregationTags));
+        report.AddModule(ModuleName, ModuleVersion);
+        
+        // NEW: Decision logging for Flow runtime selection
+        var availableRuntimes = DiscoverAvailableFlowRuntimes();
+        var selectedRuntime = "InMemory"; // Default
+        var reason = "default runtime";
+        
+        if (SoraEnv.InContainer)
+        {
+            reason = "container environment detected";
+        }
+        
+        // Check if Dapr is available (example of runtime election)
+        if (availableRuntimes.Contains("Dapr"))
+        {
+            // In a real scenario, we might have logic to prefer Dapr in certain conditions
+            // For now, stick with InMemory but show the decision
+            report.AddDecision("Flow.Runtime", selectedRuntime, reason, availableRuntimes);
+        }
+        else
+        {
+            report.AddProviderElection("Flow.Runtime", selectedRuntime, availableRuntimes, reason);
+        }
+        
+        // NEW: Discovery logging for Flow model types
+        var discoveredModels = DiscoverFlowModels();
+        if (discoveredModels.Any())
+        {
+            report.AddDiscovery("flow-models", $"{discoveredModels.Count} FlowEntity/FlowValueObject types found");
+            foreach (var model in discoveredModels.Take(3)) // Show first few
+            {
+                report.AddDiscovery("model-discovered", model);
+            }
+            if (discoveredModels.Count > 3)
+            {
+                report.AddNote($"and {discoveredModels.Count - 3} more Flow models");
+            }
+        }
+        
+        // NEW: Worker configuration decisions
+        var workerDecisions = new[]
+        {
+            ("projection", "enabled", "canonical view generation required"),
+            ("association", "enabled", "entity key resolution required"),
+            ("purge", opts.PurgeEnabled ? "enabled" : "disabled", opts.PurgeEnabled ? "cleanup configured" : "retain all data")
+        };
+        
+        foreach (var (worker, status, reasoning) in workerDecisions)
+        {
+            report.AddDecision($"Flow.Worker.{worker}", status, reasoning);
+        }
+        
+        report.AddSetting("runtime", selectedRuntime);
+        report.AddSetting("batch", opts.BatchSize.ToString());
+        report.AddSetting("concurrency.Standardize", opts.StandardizeConcurrency.ToString());
+        report.AddSetting("concurrency.Key", opts.KeyConcurrency.ToString());
+        report.AddSetting("concurrency.Associate", opts.AssociateConcurrency.ToString());
+        report.AddSetting("concurrency.Project", opts.ProjectConcurrency.ToString());
+        report.AddSetting("ttl.Intake", opts.IntakeTtl.ToString());
+        report.AddSetting("ttl.Standardized", opts.StandardizedTtl.ToString());
+        report.AddSetting("ttl.Keyed", opts.KeyedTtl.ToString());
+        report.AddSetting("ttl.ProjectionTask", opts.ProjectionTaskTtl.ToString());
+        report.AddSetting("ttl.RejectionReport", opts.RejectionReportTtl.ToString());
+        report.AddSetting("purge.Enabled", opts.PurgeEnabled.ToString().ToLowerInvariant());
+        report.AddSetting("purge.Interval", opts.PurgeInterval.ToString());
+        report.AddSetting("dlq", opts.DeadLetterEnabled.ToString().ToLowerInvariant());
+        report.AddSetting("defaultView", opts.DefaultViewName);
+        if (opts.AggregationTags?.Length > 0)
+            report.AddSetting("aggregation.tags", string.Join(",", opts.AggregationTags));
+    }
+    
+    private static string[] DiscoverAvailableFlowRuntimes()
+    {
+        var runtimes = new List<string> { "InMemory" }; // Always available
+        
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        foreach (var asm in assemblies)
+        {
+            var name = asm.GetName().Name ?? "";
+            if (name.StartsWith("Sora.Flow.Runtime."))
+            {
+                var runtimeName = name.Substring("Sora.Flow.Runtime.".Length);
+                runtimes.Add(runtimeName);
+            }
+        }
+        
+        return runtimes.ToArray();
+    }
+    
+    private static List<string> DiscoverFlowModels()
+    {
+        var models = new List<string>();
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        
+        foreach (var asm in assemblies)
+        {
+            Type[] types;
+            try { types = asm.GetTypes(); }
+            catch { continue; }
+            
+            foreach (var t in types)
+            {
+                if (t.IsAbstract || !t.IsClass) continue;
+                var baseType = t.BaseType;
+                if (baseType?.IsGenericType != true) continue;
+                
+                var genericDef = baseType.GetGenericTypeDefinition();
+                if (genericDef == typeof(Model.FlowEntity<>) || genericDef == typeof(Model.FlowValueObject<>))
+                {
+                    models.Add(t.Name);
+                }
+            }
+        }
+        
+        return models;
     }
 }

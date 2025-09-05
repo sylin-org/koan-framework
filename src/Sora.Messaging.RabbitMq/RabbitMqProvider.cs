@@ -35,25 +35,25 @@ public class RabbitMqProvider : IMessagingProvider
             
             foreach (var connectionString in connectionStrings)
             {
-                _logger?.LogDebug("🔌 Trying RabbitMQ connection: {ConnectionString}", MaskConnectionString(connectionString));
+                _logger?.LogDebug("[RabbitMQ] Trying connection: {ConnectionString}", MaskConnectionString(connectionString));
                 if (await TryConnectAsync(connectionString, cancellationToken))
                 {
                     _workingConnectionString = connectionString;
-                    _logger?.LogDebug("🐰 RabbitMQ connection successful: {ConnectionString}", MaskConnectionString(connectionString));
+                    _logger?.LogDebug("[RabbitMQ] Connection successful: {ConnectionString}", MaskConnectionString(connectionString));
                     return true;
                 }
                 else
                 {
-                    _logger?.LogDebug("❌ RabbitMQ connection failed: {ConnectionString}", MaskConnectionString(connectionString));
+                    _logger?.LogDebug("[RabbitMQ] Connection failed: {ConnectionString}", MaskConnectionString(connectionString));
                 }
             }
             
-            _logger?.LogDebug("🐰 RabbitMQ not available - tried {Count} connection strings", connectionStrings.Count());
+            _logger?.LogDebug("[RabbitMQ] Not available - tried {Count} connection strings", connectionStrings.Count());
             return false;
         }
         catch (Exception ex)
         {
-            _logger?.LogDebug(ex, "🐰 RabbitMQ connection check failed");
+            _logger?.LogDebug(ex, "[RabbitMQ] Connection check failed");
             return false;
         }
     }
@@ -174,7 +174,7 @@ internal class RabbitMqBus : IMessageBus
                 basicProperties: properties,
                 body: body);
             
-            _logger?.LogTrace("📤 Sent {MessageType} to queue {QueueName}", typeof(T).Name, queueName);
+            _logger?.LogTrace("[RabbitMQ] Sent {MessageType} to queue {QueueName}", typeof(T).Name, queueName);
         }, cancellationToken);
     }
     
@@ -189,7 +189,7 @@ internal class RabbitMqBus : IMessageBus
         
         _consumers[typeof(T)] = consumer;
         
-        _logger?.LogInformation("👂 Created consumer for {MessageType} on queue {QueueName}", typeof(T).Name, queueName);
+        _logger?.LogInformation("[RabbitMQ] Consumer created for {MessageType} on queue {QueueName}", typeof(T).Name, queueName);
         
         return consumer;
     }
@@ -327,7 +327,7 @@ internal class RabbitMqConsumer : IMessageConsumer
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "💥 Failed to handle message in queue {QueueName}", _queueName);
+            _logger?.LogError(ex, "[RabbitMQ] Failed to handle message in queue {QueueName}", _queueName);
             
             // Reject message (will go to DLQ if configured)
             _channel!.BasicNack(args.DeliveryTag, multiple: false, requeue: false);

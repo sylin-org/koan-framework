@@ -43,14 +43,14 @@ internal class MessagingLifecycleService : IHostedService
             var handlerRegistry = GetHandlerRegistry();
             var handlerCount = handlerRegistry.GetAllHandlers().Count;
             
-            _logger.LogInformation("📋 Phase 1 Complete: {HandlerCount} message handlers registered", handlerCount);
+            _logger.LogInformation("[Messaging] Phase 1: {HandlerCount} handlers registered", handlerCount);
             
             // Phase 2: Initialize messaging provider
             var provider = await SelectAndInitializeProviderAsync(cancellationToken);
             
             if (provider == null)
             {
-                _logger.LogWarning("⚠️  No messaging providers available - messages will remain buffered");
+                _logger.LogWarning("[Messaging] No providers available - messages will remain buffered");
                 return;
             }
             
@@ -60,22 +60,22 @@ internal class MessagingLifecycleService : IHostedService
             // Create consumers for all registered handlers
             await handlerRegistry.CreateConsumersAsync(provider, cancellationToken);
             
-            _logger.LogInformation("✅ Messaging lifecycle complete - system is live!");
+            _logger.LogInformation("[Messaging] System ready - {HandlerCount} consumers active", handlerCount);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "💥 Failed to start messaging lifecycle");
+            _logger.LogError(ex, "[Messaging] Failed to start messaging lifecycle");
             // Don't rethrow - app should still start even if messaging fails
         }
     }
     
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("🛑 Stopping messaging lifecycle");
+        _logger.LogInformation("[Messaging] Stopping messaging lifecycle");
         
         // TODO: Gracefully stop consumers and close connections
         // For now, we'll just log
-        _logger.LogInformation("🛑 Messaging lifecycle stopped");
+        _logger.LogInformation("[Messaging] Lifecycle stopped");
     }
     
     private async Task<IMessageBus?> SelectAndInitializeProviderAsync(CancellationToken cancellationToken)
@@ -88,7 +88,7 @@ internal class MessagingLifecycleService : IHostedService
             return null;
         }
         
-        _logger.LogDebug("🔍 Selecting messaging provider from {ProviderCount} available", availableProviders.Count);
+        _logger.LogDebug("[Messaging] Selecting provider from {ProviderCount} available", availableProviders.Count);
         
         // Retry configuration
         const int maxRetries = 5;
@@ -103,11 +103,11 @@ internal class MessagingLifecycleService : IHostedService
                 {
                     if (attempt == 1)
                     {
-                        _logger.LogDebug("🔌 Trying provider: {ProviderName} (Priority: {Priority})", provider.Name, provider.Priority);
+                        _logger.LogDebug("[Messaging] Trying provider: {ProviderName} (Priority: {Priority})", provider.Name, provider.Priority);
                     }
                     else
                     {
-                        _logger.LogDebug("🔄 Retry {Attempt}/{MaxRetries} for provider: {ProviderName}", attempt, maxRetries, provider.Name);
+                        _logger.LogDebug("[Messaging] Retry {Attempt}/{MaxRetries} for provider: {ProviderName}", attempt, maxRetries, provider.Name);
                     }
                     
                     // Check if provider can connect
@@ -118,13 +118,13 @@ internal class MessagingLifecycleService : IHostedService
                         if (attempt < maxRetries)
                         {
                             var delay = baseDelayMs * attempt; // Exponential backoff
-                            _logger.LogDebug("❌ Provider {ProviderName} cannot connect, retrying in {Delay}ms", provider.Name, delay);
+                            _logger.LogDebug("[Messaging] Provider {ProviderName} cannot connect, retrying in {Delay}ms", provider.Name, delay);
                             await Task.Delay(delay, cancellationToken);
                             continue;
                         }
                         else
                         {
-                            _logger.LogDebug("❌ Provider {ProviderName} cannot connect after {MaxRetries} attempts", provider.Name, maxRetries);
+                            _logger.LogDebug("[Messaging] Provider {ProviderName} cannot connect after {MaxRetries} attempts", provider.Name, maxRetries);
                             break; // Move to next provider
                         }
                     }
@@ -140,18 +140,18 @@ internal class MessagingLifecycleService : IHostedService
                         if (attempt < maxRetries)
                         {
                             var delay = baseDelayMs * attempt;
-                            _logger.LogDebug("❌ Provider {ProviderName} is not healthy, retrying in {Delay}ms", provider.Name, delay);
+                            _logger.LogDebug("[Messaging] Provider {ProviderName} not healthy, retrying in {Delay}ms", provider.Name, delay);
                             await Task.Delay(delay, cancellationToken);
                             continue;
                         }
                         else
                         {
-                            _logger.LogDebug("❌ Provider {ProviderName} is not healthy after {MaxRetries} attempts", provider.Name, maxRetries);
+                            _logger.LogDebug("[Messaging] Provider {ProviderName} not healthy after {MaxRetries} attempts", provider.Name, maxRetries);
                             break; // Move to next provider
                         }
                     }
                     
-                    _logger.LogInformation("🚀 Phase 2 Complete: Selected provider '{ProviderName}' after {Attempt} attempt(s)", provider.Name, attempt);
+                    _logger.LogInformation("[Messaging] Phase 2: Selected provider '{ProviderName}' after {Attempt} attempt(s)", provider.Name, attempt);
                     return bus;
                 }
                 catch (Exception ex)
@@ -159,19 +159,19 @@ internal class MessagingLifecycleService : IHostedService
                     if (attempt < maxRetries)
                     {
                         var delay = baseDelayMs * attempt;
-                        _logger.LogDebug(ex, "❌ Provider '{ProviderName}' initialization failed on attempt {Attempt}, retrying in {Delay}ms", provider.Name, attempt, delay);
+                        _logger.LogDebug(ex, "[Messaging] Provider '{ProviderName}' failed on attempt {Attempt}, retrying in {Delay}ms", provider.Name, attempt, delay);
                         await Task.Delay(delay, cancellationToken);
                     }
                     else
                     {
-                        _logger.LogWarning(ex, "❌ Provider '{ProviderName}' initialization failed after {MaxRetries} attempts", provider.Name, maxRetries);
+                        _logger.LogWarning(ex, "[Messaging] Provider '{ProviderName}' failed after {MaxRetries} attempts", provider.Name, maxRetries);
                         break; // Move to next provider
                     }
                 }
             }
         }
         
-        _logger.LogWarning("❌ No providers could be initialized after retry attempts");
+        _logger.LogWarning("[Messaging] No providers could be initialized after retry attempts");
         return null;
     }
     

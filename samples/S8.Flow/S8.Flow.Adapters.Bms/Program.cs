@@ -28,19 +28,14 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// ✨ BEAUTIFUL NEW MESSAGING - ZERO CONFIGURATION! ✨
-// Auto-registrars wire Messaging Core, RabbitMQ, Flow identity stamper,
-// and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
+// Sora framework with auto-configuration
 builder.Services.AddSora();
 
-// Listen for seed commands (using new messaging system)
+// Handle seed commands via messaging
 builder.Services.On<FlowCommandMessage>(async cmd =>
 {
     if (cmd.Command == "seed")
     {
-        Console.WriteLine("🌱 BMS received seed command!");
-        
-        // Parse count from payload (if it's a dictionary)
         var count = 1;
         if (cmd.Payload is Dictionary<string, object> dict && dict.TryGetValue("count", out var v))
         {
@@ -49,7 +44,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
         
         var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
         
-        // Send entities via beautiful messaging patterns
+        // Send device and sensor entities 
         foreach (var deviceProfile in subset)
         {
             var device = new Device
@@ -63,7 +58,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
                 Code = deviceProfile.Code
             };
             
-            await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device); // ✨ Beautiful messaging-first seeding
+            await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device);
             
             // Send sensors for this device
             foreach (var sensorProfile in SampleProfiles.SensorsForBms(deviceProfile))
@@ -79,8 +74,6 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
                 await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor);
             }
         }
-        
-        Console.WriteLine($"✅ BMS seeded {subset.Length} devices via messaging");
     }
 });
 
@@ -107,7 +100,7 @@ public sealed class BmsPublisher : BackgroundService
             ct);
 
         // Send initial manufacturer data using new dynamic capabilities
-        _log.LogInformation("[BMS] 🏭 Sending manufacturer data using dynamic Flow model");
+        _log.LogDebug("[BMS] Initializing manufacturer data");
         await SendManufacturerData();
 
         var rng = new Random();
@@ -120,7 +113,7 @@ public sealed class BmsPublisher : BackgroundService
                 var idx = rng.Next(0, SampleProfiles.Fleet.Length);
                 var d = SampleProfiles.Fleet[idx];
                 _log.LogDebug("[BMS] Preparing to announce Device {DeviceId}", d.DeviceId);
-                // ✨ BEAUTIFUL NEW MESSAGING-FIRST PATTERNS ✨
+                // Periodic device announcements
                 // Periodic device and sensor announcements
                 if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
                 {
@@ -136,7 +129,7 @@ public sealed class BmsPublisher : BackgroundService
                         Code = d.Code
                     };
                     
-                    _log.LogDebug("[BMS] 🏭 Sending Device entity for {DeviceId}", d.DeviceId);
+                    _log.LogTrace("[BMS] Device entity: {DeviceId}", d.DeviceId);
                     await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, ct); // ✨ Routes through messaging → orchestrator → Flow intake
 
                     // Send Sensor entities
@@ -150,12 +143,12 @@ public sealed class BmsPublisher : BackgroundService
                             Unit = s.Unit
                         };
                         
-                        _log.LogDebug("[BMS] 📡 Sending Sensor entity for {SensorKey}", s.SensorKey);
+                        _log.LogTrace("[BMS] Sensor entity: {SensorKey}", s.SensorKey);
                         await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor, ct); // ✨ Beautiful messaging-first routing
                     }
                     
                     lastAnnounce = DateTimeOffset.UtcNow;
-                    _log.LogInformation("✅ [BMS] Announced Device {Inv}/{Serial} and sensors via messaging", d.Inventory, d.Serial);
+                    _log.LogDebug("[BMS] Device {Inv}/{Serial} announced with sensors", d.Inventory, d.Serial);
                 }
 
                 // Send Reading value object through messaging
@@ -168,13 +161,13 @@ public sealed class BmsPublisher : BackgroundService
                     Source = "bms"
                 };
                 
-                _log.LogInformation("📊 BMS sending Reading {Key}={Value}{Unit} via messaging", reading.SensorKey, reading.Value, reading.Unit);
-                await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, ct); // ✨ Messaging-first: routes to orchestrator automatically
+                _log.LogTrace("[BMS] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
+                await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, ct);
 
                 // Periodically update manufacturer data (every 5 minutes)
                 if (DateTimeOffset.UtcNow - lastManufacturerUpdate > TimeSpan.FromMinutes(5))
                 {
-                    _log.LogInformation("[BMS] 🏭 Updating manufacturer data");
+                    _log.LogDebug("[BMS] Updating manufacturer data");
                     await SendManufacturerData();
                     lastManufacturerUpdate = DateTimeOffset.UtcNow;
                 }
@@ -239,7 +232,7 @@ public sealed class BmsPublisher : BackgroundService
                 
                 var code = mfgData["identifier.code"];
                 var name = mfgData["identifier.name"];
-                _log.LogInformation("[BMS] ✅ Sent manufacturer {Code} ({Name}) data via dynamic Flow", code, name);
+                _log.LogDebug("[BMS] Manufacturer data sent: {Code} ({Name})", code, name);
             }
             catch (Exception ex)
             {

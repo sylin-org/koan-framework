@@ -333,17 +333,10 @@ public static class DynamicFlowEntityExtensions
         if (entity.Model is ExpandoObject expando)
         {
             var flattened = FlattenExpandoObject(expando);
-            Console.WriteLine($"🐛 DEBUG BuildBagFromDynamicEntity: Found {flattened.Count} flattened properties");
             foreach (var kvp in flattened)
             {
-                Console.WriteLine($"🐛 DEBUG: {kvp.Key} = {kvp.Value} ({kvp.Value?.GetType().Name})");
                 dict[kvp.Key] = kvp.Value;
             }
-            Console.WriteLine($"🐛 DEBUG: Final bag has {dict.Count} entries");
-        }
-        else
-        {
-            Console.WriteLine($"🐛 DEBUG: entity.Model is not ExpandoObject, it's {entity.Model?.GetType().Name}");
         }
 
         return dict;
@@ -356,23 +349,17 @@ public static class DynamicFlowEntityExtensions
     {
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var dict = (IDictionary<string, object?>)expando;
-
-        Console.WriteLine($"🔍 DEBUG FlattenExpandoObject: prefix='{prefix}', found {dict.Count} properties");
         
         foreach (var kvp in dict)
         {
             var currentPath = string.IsNullOrEmpty(prefix) ? kvp.Key : $"{prefix}.{kvp.Key}";
-            Console.WriteLine($"🔍 DEBUG: Processing {kvp.Key} = {kvp.Value} ({kvp.Value?.GetType().Name})");
 
             if (kvp.Value is ExpandoObject nested)
             {
-                Console.WriteLine($"🔍 DEBUG: Recursively flattening {currentPath}");
                 // Recursively flatten nested ExpandoObjects
                 var nestedFlattened = FlattenExpandoObject(nested, currentPath);
-                Console.WriteLine($"🔍 DEBUG: Got {nestedFlattened.Count} nested results from {currentPath}");
                 foreach (var nestedKvp in nestedFlattened)
                 {
-                    Console.WriteLine($"🔍 DEBUG: Adding nested {nestedKvp.Key} = {nestedKvp.Value}");
                     result[nestedKvp.Key] = nestedKvp.Value;
                 }
             }
@@ -385,25 +372,20 @@ public static class DynamicFlowEntityExtensions
                     // If conversion resulted in another ExpandoObject, recursively flatten it
                     if (convertedValue is ExpandoObject convertedExpando)
                     {
-                        Console.WriteLine($"🔍 DEBUG: Recursively flattening converted ExpandoObject {currentPath}");
                         var nestedFlattened = FlattenExpandoObject(convertedExpando, currentPath);
-                        Console.WriteLine($"🔍 DEBUG: Got {nestedFlattened.Count} nested results from converted {currentPath}");
                         foreach (var nestedKvp in nestedFlattened)
                         {
-                            Console.WriteLine($"🔍 DEBUG: Adding nested {nestedKvp.Key} = {nestedKvp.Value}");
                             result[nestedKvp.Key] = nestedKvp.Value;
                         }
                     }
                     else
                     {
-                        Console.WriteLine($"🔍 DEBUG: Adding leaf {currentPath} = {convertedValue}");
                         result[currentPath] = convertedValue;
                     }
                 }
             }
         }
 
-        Console.WriteLine($"🔍 DEBUG FlattenExpandoObject: returning {result.Count} flattened results");
         return result;
     }
 

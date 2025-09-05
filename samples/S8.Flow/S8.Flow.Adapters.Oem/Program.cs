@@ -38,7 +38,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
 {
     if (cmd.Command == "seed")
     {
-        Console.WriteLine("🌱 OEM received seed command!");
+        Console.WriteLine("[OEM] Received seed command");
         
         // Parse count from payload (if it's a dictionary)
         var count = 1;
@@ -80,7 +80,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
             }
         }
         
-        Console.WriteLine($"✅ OEM seeded {subset.Length} devices via messaging");
+        Console.WriteLine($"[OEM] Seeded {subset.Length} devices via messaging");
     }
 });
 
@@ -106,7 +106,7 @@ public sealed class OemPublisher : BackgroundService
             stoppingToken);
 
         // Send initial manufacturer data using new dynamic capabilities
-        _log.LogInformation("[OEM] 🎯 Sending manufacturer support and certification data using dynamic Flow model");
+        _log.LogDebug("[OEM] Sending manufacturer support and certification data");
         await SendManufacturerData();
 
         var rng = new Random();
@@ -152,12 +152,12 @@ public sealed class OemPublisher : BackgroundService
                             Unit = s.Unit
                         };
                         
-                        _log.LogDebug("[OEM] 📡 Sending Sensor entity for {SensorKey}", s.SensorKey);
+                        _log.LogTrace("[OEM] Sensor entity: {SensorKey}", s.SensorKey);
                         await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor, stoppingToken); // ✨ Beautiful messaging-first routing
                     }
                     
                     lastAnnounce = DateTimeOffset.UtcNow;
-                    _log.LogInformation("✅ [OEM] Announced Device {Inv}/{Serial} and sensors via messaging", d.Inventory, d.Serial);
+                    _log.LogDebug("[OEM] Device {Inv}/{Serial} announced with sensors", d.Inventory, d.Serial);
                 }
 
                 // Send Reading value object through messaging
@@ -170,13 +170,13 @@ public sealed class OemPublisher : BackgroundService
                     Source = "oem"
                 };
                 
-                _log.LogInformation("📊 OEM sending Reading {Key}={Value}{Unit} via messaging", reading.SensorKey, reading.Value, reading.Unit);
+                _log.LogTrace("[OEM] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
                 await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, stoppingToken); // ✨ Messaging-first: routes to orchestrator automatically
 
                 // Periodically update manufacturer data (every 5 minutes)
                 if (DateTimeOffset.UtcNow - lastManufacturerUpdate > TimeSpan.FromMinutes(5))
                 {
-                    _log.LogInformation("[OEM] 🎯 Updating manufacturer support and certification data");
+                    _log.LogDebug("[OEM] Updating manufacturer support data");
                     await SendManufacturerData();
                     lastManufacturerUpdate = DateTimeOffset.UtcNow;
                 }
@@ -304,7 +304,7 @@ public sealed class OemPublisher : BackgroundService
                 dynamic mfg = mfgData;
                 string code = mfg.identifier.code;
                 string name = mfg.identifier.name;
-                _log.LogInformation("[OEM] ✅ Sent manufacturer {Code} ({Name}) support/certification data via dynamic Flow", code, name);
+                _log.LogDebug("[OEM] Manufacturer data sent: {Code} ({Name})", code, name);
             }
             catch (Exception ex)
             {
