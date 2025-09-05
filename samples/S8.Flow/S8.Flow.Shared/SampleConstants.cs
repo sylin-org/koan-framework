@@ -41,48 +41,35 @@ public static class AdapterSeeding
         CancellationToken ct,
         TimeSpan? maxThreshold = null)
     {
-        // Resolve sender and readiness lifecycle
-        var sp = Sora.Core.Hosting.App.AppHost.Current;
-        var sender = sp?.GetService(typeof(Sora.Flow.Sending.IFlowSender)) as Sora.Flow.Sending.IFlowSender;
-    // [REMOVED: MessagingReadinessLifecycle is obsolete or missing]
+        // Use the new messaging-first pattern for reliable delivery
         foreach (var d in devices)
         {
-            var externalId = $"{d.Inventory}:{d.Serial}";
-            var devEvent = FlowEvent.ForModel("device");
-            devEvent.SourceId = source;
-            devEvent.CorrelationId = externalId;
-            devEvent
-                .With(Keys.Device.Inventory, d.Inventory)
-                .With(Keys.Device.Serial, d.Serial)
-                .With(Keys.Device.Manufacturer, d.Manufacturer)
-                .With(Keys.Device.Model, d.Model)
-                .With(Keys.Device.Kind, d.Kind)
-                .With(Keys.Device.Code, d.Code)
-                .With($"identifier.external.{source}", externalId)
-                .With(Keys.Reading.Source, source); // uniform source tag
-            if (sender is not null)
+            // Send Device entity through messaging system
+            var device = new Device
             {
-                var bag = devEvent.Bag; // already constructed
-                var item = Sora.Flow.Sending.FlowSendPlainItem.Of<object>(bag, devEvent.SourceId ?? source, devEvent.OccurredAt ?? DateTimeOffset.UtcNow, devEvent.CorrelationId);
-                await sender.SendAsync(new[] { item }, null, null, hostType: null, ct);
-            }
+                DeviceId = d.DeviceId,
+                Inventory = d.Inventory,
+                Serial = d.Serial,
+                Manufacturer = d.Manufacturer,
+                Model = d.Model,
+                Kind = d.Kind,
+                Code = d.Code
+            };
+            
+            await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, ct);
 
+            // Send Sensor entities through messaging system
             foreach (var s in sensorSelector(d))
             {
-                var sensorEvent = FlowEvent.ForModel("sensor")
-                    .With(Keys.Sensor.Key, s.SensorKey)
-                    .With("DeviceId", s.DeviceId)
-                    .With(Keys.Sensor.Code, s.Code)
-                    .With(Keys.Sensor.Unit, s.Unit)
-                    .With(Keys.Reading.Source, source);
-                sensorEvent.SourceId = source;
-                sensorEvent.CorrelationId = s.SensorKey;
-                if (sender is not null)
+                var sensor = new Sensor
                 {
-                    var bag = sensorEvent.Bag;
-                    var item = Sora.Flow.Sending.FlowSendPlainItem.Of<object>(bag, sensorEvent.SourceId ?? source, sensorEvent.OccurredAt ?? DateTimeOffset.UtcNow, sensorEvent.CorrelationId);
-                    await sender.SendAsync(new[] { item }, null, null, hostType: null, ct);
-                }
+                    SensorKey = s.SensorKey,
+                    DeviceId = s.DeviceId,
+                    Code = s.Code,
+                    Unit = s.Unit
+                };
+                
+                await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor, ct);
             }
         }
     }
