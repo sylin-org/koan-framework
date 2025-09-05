@@ -38,13 +38,62 @@ builder.Services.AddSora();
 //     });
 // });
 //
-// AFTER (1 line with automatic discovery and guaranteed consistency):
-builder.Services.AutoConfigureFlow(typeof(Device).Assembly);
+// EXPLICIT HANDLER REGISTRATION (AutoConfigureFlow has issues):
+builder.Services.ConfigureFlow(flow =>
+{
+    flow.On<Reading>(async reading =>
+    {
+        Console.WriteLine($"🔥 DEBUG: API RECEIVED Reading: {reading.SensorKey} = {reading.Value}{reading.Unit} at {DateTime.Now:HH:mm:ss.fff}");
+        try
+        {
+            await reading.SendToFlowIntake();
+            Console.WriteLine($"✅ DEBUG: Reading processed successfully: {reading.SensorKey}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ DEBUG: Reading processing failed: {ex.Message}");
+        }
+    });
+    flow.On<Device>(async device =>
+    {
+        Console.WriteLine($"🔥 DEBUG: API RECEIVED Device: {device.DeviceId} ({device.Manufacturer} {device.Model}) at {DateTime.Now:HH:mm:ss.fff}");
+        try
+        {
+            await device.SendToFlowIntake();
+            Console.WriteLine($"✅ DEBUG: Device processed successfully: {device.DeviceId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ DEBUG: Device processing failed: {ex.Message}");
+        }
+    });
+    flow.On<Sensor>(async sensor =>
+    {
+        Console.WriteLine($"🔥 DEBUG: API RECEIVED Sensor: {sensor.SensorKey} ({sensor.Code}) - Unit: {sensor.Unit} at {DateTime.Now:HH:mm:ss.fff}");
+        try
+        {
+            await sensor.SendToFlowIntake();
+            Console.WriteLine($"✅ DEBUG: Sensor processed successfully: {sensor.SensorKey}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ DEBUG: Sensor processing failed: {ex.Message}");
+        }
+    });
+});
 
 // Keep FlowCommandMessage as direct handler (not wrapped in FlowTargetedMessage)
 builder.Services.On<FlowCommandMessage>(async cmd =>
 {
-    Console.WriteLine($"🌱 Received command: {cmd.Command} with payload: {cmd.Payload}");
+    Console.WriteLine($"🔥 DEBUG: API RECEIVED FlowCommandMessage: {cmd.Command} with payload: {cmd.Payload} at {DateTime.Now:HH:mm:ss.fff}");
+});
+
+// ADD: Test basic message reception without Flow wrapping
+builder.Services.On<FlowTargetedMessage<Reading>>(async msg =>
+{
+    Console.WriteLine($"🚨 RAW MESSAGE DEBUG: Received FlowTargetedMessage<Reading> at {DateTime.Now:HH:mm:ss.fff}");
+    Console.WriteLine($"🚨 Message Target: {msg.Target}");
+    Console.WriteLine($"🚨 Message Entity: {msg.Entity?.SensorKey} = {msg.Entity?.Value}{msg.Entity?.Unit}");
 });
 
 // Container-only sample guard (must be after service registration so DI is wired)

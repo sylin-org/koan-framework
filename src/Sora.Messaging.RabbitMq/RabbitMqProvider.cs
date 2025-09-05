@@ -209,8 +209,17 @@ internal class RabbitMqBus : IMessageBus
     
     private static string GetQueueName<T>()
     {
-        // Convention: Full type name becomes queue name
-        return typeof(T).FullName ?? typeof(T).Name;
+        var type = typeof(T);
+        
+        // Special handling for FlowTargetedMessage<T> - use inner type name
+        if (type.IsGenericType && type.GetGenericTypeDefinition().Name.StartsWith("FlowTargetedMessage"))
+        {
+            var innerType = type.GetGenericArguments()[0];
+            return $"Sora.Flow.{innerType.FullName ?? innerType.Name}";
+        }
+        
+        // Default: Full type name becomes queue name
+        return type.FullName ?? type.Name;
     }
 }
 
