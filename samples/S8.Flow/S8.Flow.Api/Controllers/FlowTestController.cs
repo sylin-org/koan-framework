@@ -54,7 +54,7 @@ public class FlowTestController : ControllerBase
             // Test creating Flow entities
             var device = new Device
             {
-                DeviceId = "test-device",
+                Id = "test-device",
                 Inventory = "TEST-001",
                 Serial = "SN-123",
                 Manufacturer = "Test Corp",
@@ -66,7 +66,7 @@ public class FlowTestController : ControllerBase
             var sensor = new Sensor
             {
                 SensorKey = "test::device::temp",
-                DeviceId = "test-device",
+                Id = "test-device",
                 Code = "TEMP",
                 Unit = "°C"
             };
@@ -82,7 +82,7 @@ public class FlowTestController : ControllerBase
 
             return Ok(new { 
                 status = "✅ Successfully created Flow entities",
-                device = new { device.DeviceId, device.Manufacturer, device.Model },
+                device = new { device.Id, device.Manufacturer, device.Model },
                 sensor = new { sensor.SensorKey, sensor.Code, sensor.Unit },
                 reading = new { reading.SensorKey, reading.Value, reading.Unit },
                 message = "Entities created successfully - Flow model types are working"
@@ -109,7 +109,7 @@ public class FlowTestController : ControllerBase
         {
             var device = new Device
             {
-                DeviceId = $"test-{Guid.NewGuid():N}",
+                Id = $"test-{Guid.NewGuid():N}",
                 Inventory = "TEST-SEND",
                 Serial = $"SN-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}",
                 Manufacturer = "Flow Test Corp",
@@ -124,7 +124,7 @@ public class FlowTestController : ControllerBase
 
             return Ok(new { 
                 status = "✅ Successfully sent entity via Flow messaging pipeline!",
-                device = new { device.DeviceId, device.Manufacturer, device.Model },
+                device = new { device.Id, device.Manufacturer, device.Model },
                 pipeline = "entity.Send() → Messaging → [FlowOrchestrator] → Flow Intake → Processing",
                 message = "If you see this, the beautiful messaging-first architecture is working!"
             });

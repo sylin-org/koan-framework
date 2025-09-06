@@ -54,7 +54,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
         {
             var device = new Device
             {
-                DeviceId = deviceProfile.DeviceId,
+                Id = deviceProfile.Id,
                 Inventory = deviceProfile.Inventory,
                 Serial = deviceProfile.Serial,
                 Manufacturer = deviceProfile.Manufacturer,
@@ -70,6 +70,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
             {
                 var sensor = new Sensor
                 {
+                    Id = sensorProfile.Id,
                     SensorKey = sensorProfile.SensorKey,
                     DeviceId = sensorProfile.DeviceId,
                     Code = sensorProfile.Code,
@@ -112,16 +113,15 @@ public sealed class OemPublisher : BackgroundService
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
         var lastManufacturerUpdate = DateTimeOffset.MinValue;
+        var deviceIndex = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var idx = rng.Next(0, SampleProfiles.Fleet.Length);
-                var d = SampleProfiles.Fleet[idx];
-                _log.LogDebug("[OEM] Preparing to announce Device {DeviceId}", d.DeviceId);
-                var code = rng.Next(0, 2) == 0 ? SensorCodes.PWR : SensorCodes.COOLANT_PRESSURE;
-                var unit = code == SensorCodes.PWR ? Units.Watt : Units.KPa;
-                var value = code == SensorCodes.PWR ? Math.Round(100 + rng.NextDouble() * 900, 2) : Math.Round(200 + rng.NextDouble() * 50, 2);
+                // Cycle through ALL devices instead of random selection
+                var d = SampleProfiles.Fleet[deviceIndex];
+                deviceIndex = (deviceIndex + 1) % SampleProfiles.Fleet.Length;
+                _log.LogDebug("[OEM] Preparing to announce Device {DeviceId}", d.Id);
                 // ✨ BEAUTIFUL NEW MESSAGING-FIRST PATTERNS ✨
                 // Periodic device and sensor announcements
                 if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
@@ -129,7 +129,7 @@ public sealed class OemPublisher : BackgroundService
                     // Create and send Device entity through messaging system
                     var device = new Device
                     {
-                        DeviceId = d.DeviceId,
+                        Id = d.Id,
                         Inventory = d.Inventory,
                         Serial = d.Serial,
                         Manufacturer = d.Manufacturer,
@@ -138,7 +138,7 @@ public sealed class OemPublisher : BackgroundService
                         Code = d.Code
                     };
                     
-                    _log.LogDebug("[OEM] 🏭 Sending Device entity for {DeviceId}", d.DeviceId);
+                    _log.LogDebug("[OEM] 🏭 Sending Device entity for {DeviceId}", d.Id);
                     await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, stoppingToken); // ✨ Routes through messaging → orchestrator → Flow intake
 
                     // Send Sensor entities
@@ -146,7 +146,8 @@ public sealed class OemPublisher : BackgroundService
                     {
                         var sensor = new Sensor
                         {
-                            SensorKey = s.SensorKey,
+                            Id = s.Id,
+                        SensorKey = s.SensorKey,
                             DeviceId = s.DeviceId,
                             Code = s.Code,
                             Unit = s.Unit
@@ -160,18 +161,38 @@ public sealed class OemPublisher : BackgroundService
                     _log.LogDebug("[OEM] Device {Inv}/{Serial} announced with sensors", d.Inventory, d.Serial);
                 }
 
-                // Send Reading value object through messaging
-                var reading = new Reading
+                // Send readings for ALL sensors of this device
+                foreach (var sensor in SampleProfiles.SensorsForOem(d))
                 {
-                    SensorKey = $"{d.Inventory}::{d.Serial}::{code}",
-                    Value = value,
-                    CapturedAt = DateTimeOffset.UtcNow,
-                    Unit = unit,
-                    Source = "oem"
-                };
-                
-                _log.LogTrace("[OEM] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
-                await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, stoppingToken); // ✨ Messaging-first: routes to orchestrator automatically
+                    double value;
+                    switch (sensor.Code)
+                    {
+                        case SensorCodes.TEMP:
+                            value = Math.Round(20 + rng.NextDouble() * 10, 2);
+                            break;
+                        case SensorCodes.PWR:
+                            value = Math.Round(100 + rng.NextDouble() * 900, 2);
+                            break;
+                        case SensorCodes.COOLANT_PRESSURE:
+                            value = Math.Round(200 + rng.NextDouble() * 50, 2);
+                            break;
+                        default:
+                            value = 0;
+                            break;
+                    }
+                    
+                    var reading = new Reading
+                    {
+                        SensorKey = sensor.SensorKey,
+                        Value = value,
+                        CapturedAt = DateTimeOffset.UtcNow,
+                        Unit = sensor.Unit,
+                        Source = "oem"
+                    };
+                    
+                    _log.LogTrace("[OEM] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
+                    await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, stoppingToken);
+                }
 
                 // Periodically update manufacturer data (every 5 minutes)
                 if (DateTimeOffset.UtcNow - lastManufacturerUpdate > TimeSpan.FromMinutes(5))

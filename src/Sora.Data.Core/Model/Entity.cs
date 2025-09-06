@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Sora.Data.Abstractions;
 
 namespace Sora.Data.Core.Model;
@@ -8,6 +9,7 @@ public abstract class Entity<TEntity, TKey> : IEntity<TKey>
     where TKey : notnull
 {
     [Identifier]
+    [Key]
     public TKey Id { get; set; } = default!;
 
     // Static conveniences forward to the data facade without exposing its namespace in domain types

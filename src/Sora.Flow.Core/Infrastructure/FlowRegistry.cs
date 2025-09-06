@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.ComponentModel.DataAnnotations;
 using Sora.Flow.Attributes;
 using Sora.Flow.Model;
 
@@ -32,15 +33,25 @@ public static class FlowRegistry
         {
             var tags = new List<string>();
             
-            // Check for class-level [AggregationKeys] attribute
+            // Check for class-level [AggregationKeys] attribute (for DynamicFlowEntity)
             var classLevelAttr = type.GetCustomAttribute<AggregationKeysAttribute>(inherit: true);
             if (classLevelAttr?.Keys != null)
             {
                 tags.AddRange(classLevelAttr.Keys.Where(s => !string.IsNullOrWhiteSpace(s))!);
             }
             
-            // Check for property-level [AggregationTag] attributes (legacy)
+            // Check for property-level [AggregationKey] attributes (for FlowEntity<T>)
             var props = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+            foreach (var p in props)
+            {
+                var keyAttr = p.GetCustomAttribute<AggregationKeyAttribute>(inherit: true);
+                if (keyAttr != null)
+                {
+                    tags.Add(p.Name);
+                }
+            }
+            
+            // Check for property-level [AggregationTag] attributes (legacy - deprecated)
             foreach (var p in props)
             {
                 var attrs = p.GetCustomAttributes<AggregationTagAttribute>(inherit: true);
@@ -54,6 +65,7 @@ public static class FlowRegistry
     /// <summary>
     /// Returns the parent Flow entity type and key path for a value-object type (deriving from <see cref="Sora.Flow.Model.FlowValueObject{T}"/>),
     /// based on the first [ParentKey(parent: ...)] property found. Returns null if not applicable.
+    /// The parent key path is automatically resolved to the [Key] property of the parent type.
     /// </summary>
     public static (Type Parent, string ParentKeyPath)? GetValueObjectParent(Type t)
     {
@@ -66,6 +78,14 @@ public static class FlowRegistry
             {
                 var pk = p.GetCustomAttribute<ParentKeyAttribute>(inherit: true);
                 if (pk is null || pk.Parent is null) continue;
+                
+                // Find the [Key] property on the parent type
+                var parentKeyProperty = pk.Parent.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                    .FirstOrDefault(prop => prop.GetCustomAttribute<KeyAttribute>(inherit: true) != null);
+                
+                if (parentKeyProperty == null)
+                    throw new InvalidOperationException($"Parent type {pk.Parent.Name} has no [Key] property for ParentKey resolution");
+                
                 var path = string.IsNullOrWhiteSpace(pk.PayloadPath) ? p.Name : pk.PayloadPath;
                 if (string.IsNullOrWhiteSpace(path)) continue;
                 return (pk.Parent, path);

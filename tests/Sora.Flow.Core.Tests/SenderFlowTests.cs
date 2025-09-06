@@ -23,7 +23,7 @@ public sealed class SenderFlowTests
 {
     public sealed class TestSenderModel : FlowEntity<TestSenderModel>
     {
-        [AggregationTag("dummy")] public string? Dummy { get; set; }
+        [AggregationKey] public string? Dummy { get; set; }
     }
 
     private static IHost? _host;

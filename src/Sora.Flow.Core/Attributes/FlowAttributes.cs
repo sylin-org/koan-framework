@@ -64,6 +64,13 @@ public sealed class ParentKeyAttribute : Attribute
 public sealed class FlowOrchestratorAttribute : Attribute { }
 
 /// <summary>
+/// Marks a property as an aggregation key for strongly-typed FlowEntity models.
+/// The property value will be used for entity identification and aggregation across sources.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+public sealed class AggregationKeyAttribute : Attribute { }
+
+/// <summary>
 /// Declares aggregation keys at the class level for DynamicFlowEntity models.
 /// These keys are JSON paths used to identify and aggregate entities from multiple sources.
 /// Example: [AggregationKeys("identifier.username", "identifier.employeeId")]

@@ -23,15 +23,15 @@ namespace Sora.Flow.Core.Tests;
 // Minimal typed model used for discovery in tests
 public sealed class TestModel : FlowEntity<TestModel>
 {
-    // Presence of at least one tag avoids early NO_KEYS gate due to zero tags
-    [AggregationTag("dummy")]
+    // Presence of at least one aggregation key avoids early NO_KEYS gate due to zero keys
+    [AggregationKey]
     public string? Dummy { get; set; }
 }
 
 // Separate model for identity tests to avoid cross-test state
 public sealed class IdentityModel : FlowEntity<IdentityModel>
 {
-    [AggregationTag("dummy")] public string? Dummy { get; set; }
+    [AggregationKey] public string? Dummy { get; set; }
 }
 
 // Envelope declaring an external-id for IdentityModel via reserved identifier.external.* key

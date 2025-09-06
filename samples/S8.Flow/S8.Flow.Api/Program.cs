@@ -36,8 +36,8 @@ if (!Sora.Core.SoraEnv.InContainer)
 
 builder.Services.Configure<FlowOptions>(o =>
 {
-    // Default tags act as fallback when model has no AggregationTag attributes.
-    // Our Sensor model carries [AggregationTag(Keys.Sensor.Key)], so this isn't required,
+    // Default tags act as fallback when model has no AggregationKey attributes.
+    // Our Sensor model carries [AggregationKey] on SensorKey, so this isn't required,
     // but we keep a conservative default for other models.
     o.AggregationTags = new[] { Keys.Sensor.Key };
     // Enable purge for VO-heavy workloads and keep keyed retention modest by default

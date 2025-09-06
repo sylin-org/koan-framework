@@ -72,8 +72,8 @@ public sealed class FlowSeeder : IFlowSeeder
             seededDevices = subset.Length,
             sources = new[] { FlowSampleConstants.Sources.Bms, FlowSampleConstants.Sources.Oem },
             perSource = new {
-                bms = new { devices = subset.Length, sensors = subset.Length * 1 },
-                oem = new { devices = subset.Length, sensors = subset.Length * 2 }
+                bms = new { devices = subset.Length, sensors = subset.Length * 3 },
+                oem = new { devices = subset.Length, sensors = subset.Length * 3 }
             },
             elapsedMs = Math.Round(elapsed.TotalMilliseconds, 0)
         };

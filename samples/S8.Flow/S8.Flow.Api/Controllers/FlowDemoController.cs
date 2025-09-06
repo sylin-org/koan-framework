@@ -22,7 +22,7 @@ public class FlowDemoController : ControllerBase
     {
         var device = new Device
         {
-            DeviceId = request?.DeviceId ?? $"test-{Guid.NewGuid():N}",
+            Id = request?.DeviceId ?? $"test-{Guid.NewGuid():N}",
             Inventory = request?.Inventory ?? "TEST-INV",
             Serial = request?.Serial ?? "TEST-SERIAL",
             Manufacturer = request?.Manufacturer ?? "Demo Corp",
@@ -36,7 +36,7 @@ public class FlowDemoController : ControllerBase
         
         return Ok(new { 
             message = "✅ Device sent via messaging-first Flow patterns!", 
-            device = device.DeviceId,
+            device = device.Id,
             route = "Messaging → [FlowOrchestrator] → Flow Intake → Processing Pipeline"
         });
     }
@@ -50,7 +50,7 @@ public class FlowDemoController : ControllerBase
     {
         var device = new Device
         {
-            DeviceId = request?.DeviceId ?? $"targeted-{Guid.NewGuid():N}",
+            Id = request?.DeviceId ?? $"targeted-{Guid.NewGuid():N}",
             Inventory = request?.Inventory ?? "TARGETED-INV",
             Serial = request?.Serial ?? "TARGETED-SERIAL",
             Manufacturer = request?.Manufacturer ?? "Target Corp",
@@ -64,7 +64,7 @@ public class FlowDemoController : ControllerBase
         
         return Ok(new { 
             message = $"✅ Device sent to target '{target}' via messaging!", 
-            device = device.DeviceId,
+            device = device.Id,
             target,
             route = $"Messaging → Target({target}) → Flow Processing"
         });

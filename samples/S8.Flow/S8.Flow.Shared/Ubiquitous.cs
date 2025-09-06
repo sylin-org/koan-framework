@@ -51,40 +51,74 @@ public static class SampleProfiles
 {
     public static readonly Device[] Fleet = new[]
     {
-        new Device { DeviceId = "INV-1001:SN-MRI-7000-001", Inventory = "INV-1001", Serial = "SN-MRI-7000-001", Manufacturer = "BrandA", Model = "MRI-7000", Kind = "MRI", Code = "MRI-7000-A" },
-        new Device { DeviceId = "INV-1002:SN-MRI-7000-002", Inventory = "INV-1002", Serial = "SN-MRI-7000-002", Manufacturer = "BrandB", Model = "MRI-7000", Kind = "MRI", Code = "MRI-7000-B" },
-        new Device { DeviceId = "INV-2001:SN-CT-300-001", Inventory = "INV-2001", Serial = "SN-CT-300-001", Manufacturer = "BrandC", Model = "CT-300", Kind = "CT", Code = "CT-300-1" },
-        new Device { DeviceId = "INV-2002:SN-CT-300-002", Inventory = "INV-2002", Serial = "SN-CT-300-002", Manufacturer = "BrandC", Model = "CT-300", Kind = "CT", Code = "CT-300-2" },
-        new Device { DeviceId = "INV-3001:SN-CRYO-200-001", Inventory = "INV-3001", Serial = "SN-CRYO-200-001", Manufacturer = "BrandA", Model = "CRYO-200", Kind = "CRYO", Code = "CRYO-200-1" },
+        new Device { Id = "D1", Inventory = "INV-1001", Serial = "SN-MRI-7000-001", Manufacturer = "BrandA", Model = "MRI-7000", Kind = "MRI", Code = "MRI-7000-A" },
+        new Device { Id = "D2", Inventory = "INV-1002", Serial = "SN-MRI-7000-002", Manufacturer = "BrandB", Model = "MRI-7000", Kind = "MRI", Code = "MRI-7000-B" },
+        new Device { Id = "D3", Inventory = "INV-2001", Serial = "SN-CT-300-001", Manufacturer = "BrandC", Model = "CT-300", Kind = "CT", Code = "CT-300-1" },
+        new Device { Id = "D4", Inventory = "INV-2002", Serial = "SN-CT-300-002", Manufacturer = "BrandC", Model = "CT-300", Kind = "CT", Code = "CT-300-2" },
+        new Device { Id = "D5", Inventory = "INV-3001", Serial = "SN-CRYO-200-001", Manufacturer = "BrandA", Model = "CRYO-200", Kind = "CRYO", Code = "CRYO-200-1" },
     };
 
-    // BMS publishes temperature sensors only
+    // BMS publishes ALL sensors (temperature, power, coolant pressure) for ALL devices
     public static IEnumerable<Sensor> SensorsForBms(Device d)
     {
-        var sensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}";
+        // Get device index for consistent sensor numbering
+        var deviceIndex = Array.IndexOf(Fleet, d);
+        var baseIndex = deviceIndex * 3; // 3 sensors per device
+        
         yield return new Sensor
         {
-            DeviceId = d.DeviceId,
-            SensorKey = sensorKey,
+            Id = $"S{baseIndex + 1}",
+            DeviceId = d.Id,
+            SensorKey = $"S{baseIndex + 1}",
             Code = SensorCodes.TEMP,
             Unit = Units.C,
         };
-    }
-
-    // OEM publishes power and coolant pressure sensors
-    public static IEnumerable<Sensor> SensorsForOem(Device d)
-    {
         yield return new Sensor
         {
-            DeviceId = d.DeviceId,
-            SensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.PWR}",
+            Id = $"S{baseIndex + 2}",
+            DeviceId = d.Id,
+            SensorKey = $"S{baseIndex + 2}",
             Code = SensorCodes.PWR,
             Unit = Units.Watt,
         };
         yield return new Sensor
         {
-            DeviceId = d.DeviceId,
-            SensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.COOLANT_PRESSURE}",
+            Id = $"S{baseIndex + 3}",
+            DeviceId = d.Id,
+            SensorKey = $"S{baseIndex + 3}",
+            Code = SensorCodes.COOLANT_PRESSURE,
+            Unit = Units.KPa,
+        };
+    }
+
+    // OEM also publishes ALL sensors for ALL devices
+    public static IEnumerable<Sensor> SensorsForOem(Device d)
+    {
+        // Use same sensor IDs as BMS to test merging capabilities
+        var deviceIndex = Array.IndexOf(Fleet, d);
+        var baseIndex = deviceIndex * 3; // 3 sensors per device
+        
+        yield return new Sensor
+        {
+            Id = $"S{baseIndex + 1}",
+            DeviceId = d.Id,
+            SensorKey = $"S{baseIndex + 1}",
+            Code = SensorCodes.TEMP,
+            Unit = Units.C,
+        };
+        yield return new Sensor
+        {
+            Id = $"S{baseIndex + 2}",
+            DeviceId = d.Id,
+            SensorKey = $"S{baseIndex + 2}",
+            Code = SensorCodes.PWR,
+            Unit = Units.Watt,
+        };
+        yield return new Sensor
+        {
+            Id = $"S{baseIndex + 3}",
+            DeviceId = d.Id,
+            SensorKey = $"S{baseIndex + 3}",
             Code = SensorCodes.COOLANT_PRESSURE,
             Unit = Units.KPa,
         };

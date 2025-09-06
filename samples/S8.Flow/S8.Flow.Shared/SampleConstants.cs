@@ -47,7 +47,7 @@ public static class AdapterSeeding
             // Send Device entity through messaging system
             var device = new Device
             {
-                DeviceId = d.DeviceId,
+                Id = d.Id,
                 Inventory = d.Inventory,
                 Serial = d.Serial,
                 Manufacturer = d.Manufacturer,
@@ -63,6 +63,7 @@ public static class AdapterSeeding
             {
                 var sensor = new Sensor
                 {
+                    Id = s.Id,
                     SensorKey = s.SensorKey,
                     DeviceId = s.DeviceId,
                     Code = s.Code,

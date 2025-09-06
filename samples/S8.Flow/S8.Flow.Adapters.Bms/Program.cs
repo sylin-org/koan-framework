@@ -49,7 +49,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
         {
             var device = new Device
             {
-                DeviceId = deviceProfile.DeviceId,
+                Id = deviceProfile.Id,
                 Inventory = deviceProfile.Inventory,
                 Serial = deviceProfile.Serial,
                 Manufacturer = deviceProfile.Manufacturer,
@@ -65,6 +65,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
             {
                 var sensor = new Sensor
                 {
+                    Id = sensorProfile.Id,
                     SensorKey = sensorProfile.SensorKey,
                     DeviceId = sensorProfile.DeviceId,
                     Code = sensorProfile.Code,
@@ -106,13 +107,15 @@ public sealed class BmsPublisher : BackgroundService
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
         var lastManufacturerUpdate = DateTimeOffset.MinValue;
+        var deviceIndex = 0;
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                var idx = rng.Next(0, SampleProfiles.Fleet.Length);
-                var d = SampleProfiles.Fleet[idx];
-                _log.LogDebug("[BMS] Preparing to announce Device {DeviceId}", d.DeviceId);
+                // Cycle through ALL devices instead of random selection
+                var d = SampleProfiles.Fleet[deviceIndex];
+                deviceIndex = (deviceIndex + 1) % SampleProfiles.Fleet.Length;
+                _log.LogDebug("[BMS] Preparing to announce Device {DeviceId}", d.Id);
                 // Periodic device announcements
                 // Periodic device and sensor announcements
                 if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
@@ -120,7 +123,7 @@ public sealed class BmsPublisher : BackgroundService
                     // Create and send Device entity through messaging system
                     var device = new Device
                     {
-                        DeviceId = d.DeviceId,
+                        Id = d.Id,
                         Inventory = d.Inventory,
                         Serial = d.Serial,
                         Manufacturer = d.Manufacturer,
@@ -129,7 +132,7 @@ public sealed class BmsPublisher : BackgroundService
                         Code = d.Code
                     };
                     
-                    _log.LogTrace("[BMS] Device entity: {DeviceId}", d.DeviceId);
+                    _log.LogTrace("[BMS] Device entity: {DeviceId}", d.Id);
                     await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, ct); // ✨ Routes through messaging → orchestrator → Flow intake
 
                     // Send Sensor entities
@@ -137,7 +140,8 @@ public sealed class BmsPublisher : BackgroundService
                     {
                         var sensor = new Sensor
                         {
-                            SensorKey = s.SensorKey,
+                            Id = s.Id,
+                        SensorKey = s.SensorKey,
                             DeviceId = s.DeviceId,
                             Code = s.Code,
                             Unit = s.Unit
@@ -151,18 +155,38 @@ public sealed class BmsPublisher : BackgroundService
                     _log.LogDebug("[BMS] Device {Inv}/{Serial} announced with sensors", d.Inventory, d.Serial);
                 }
 
-                // Send Reading value object through messaging
-                var reading = new Reading
+                // Send readings for ALL sensors of this device
+                foreach (var sensor in SampleProfiles.SensorsForBms(d))
                 {
-                    SensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}",
-                    Value = Math.Round(20 + rng.NextDouble() * 10, 2),
-                    CapturedAt = DateTimeOffset.UtcNow,
-                    Unit = Units.C,
-                    Source = "bms"
-                };
-                
-                _log.LogTrace("[BMS] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
-                await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, ct);
+                    double value;
+                    switch (sensor.Code)
+                    {
+                        case SensorCodes.TEMP:
+                            value = Math.Round(20 + rng.NextDouble() * 10, 2);
+                            break;
+                        case SensorCodes.PWR:
+                            value = Math.Round(100 + rng.NextDouble() * 900, 2);
+                            break;
+                        case SensorCodes.COOLANT_PRESSURE:
+                            value = Math.Round(200 + rng.NextDouble() * 50, 2);
+                            break;
+                        default:
+                            value = 0;
+                            break;
+                    }
+                    
+                    var reading = new Reading
+                    {
+                        SensorKey = sensor.SensorKey,
+                        Value = value,
+                        CapturedAt = DateTimeOffset.UtcNow,
+                        Unit = sensor.Unit,
+                        Source = "bms"
+                    };
+                    
+                    _log.LogTrace("[BMS] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
+                    await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, ct);
+                }
 
                 // Periodically update manufacturer data (every 5 minutes)
                 if (DateTimeOffset.UtcNow - lastManufacturerUpdate > TimeSpan.FromMinutes(5))
