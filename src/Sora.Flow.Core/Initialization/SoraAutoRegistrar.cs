@@ -55,6 +55,13 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         foreach (var assembly in orchestratorAssemblies)
         {
             var flowTypes = DiscoverFlowTypesInAssembly(assembly);
+            try
+            {
+                Console.WriteLine($"[Flow.Auto][Discover] Assembly={assembly.GetName().Name} FlowTypes={flowTypes.Count}");
+                foreach (var ft in flowTypes)
+                    Console.WriteLine($"[Flow.Auto][Discover]  -> {ft.FullName}");
+            }
+            catch { }
             
             foreach (var flowType in flowTypes)
             {
@@ -143,38 +150,93 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     private void RegisterEntityHandlerGeneric<T>(IServiceCollection services) 
         where T : Model.FlowEntity<T>, new()
     {
-        // Clean, simple registration using Sora.Messaging extensions
+    // Register handler that writes directly to Flow intake (targets only FlowTargetedMessage<T>)
+    Console.WriteLine($"[Flow.Auto][Entity] Register targeted handler for {typeof(T).FullName}");
         services.On<FlowTargetedMessage<T>>(async msg =>
         {
+            Console.WriteLine($"[Flow.Auto][Entity] Handler INVOKED for {typeof(T).Name} Id={msg.Entity?.GetType().GetProperty("Id")?.GetValue(msg.Entity)}");
             try
             {
-                // Route the entity to Flow intake automatically
-                await msg.Entity.SendToFlowIntake();
+                var sp = Sora.Core.Hosting.App.AppHost.Current;
+                var sender = sp?.GetService<Sora.Flow.Sending.IFlowSender>();
+                if (sender is null)
+                {
+                    // Fallback: previous behavior (will re-create backlog but preserves functionality if sender missing)
+                    await Sora.Messaging.MessagingExtensions.Send(msg.Entity!);
+                    return;
+                }
+
+                var bag = ToBag(msg.Entity!);
+                var item = Sora.Flow.Sending.FlowSendPlainItem.Of<T>(bag, sourceId: "orchestrator", occurredAt: DateTimeOffset.UtcNow);
+                Console.WriteLine($"[Flow.Auto][Entity] Intake targeted {typeof(T).Name} Id={msg.Entity?.GetType().GetProperty("Id")?.GetValue(msg.Entity)}");
+                await sender.SendAsync(new[] { item }, message: msg, hostType: typeof(T));
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"⚠️  Flow orchestrator failed to route {typeof(T).Name}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"⚠️  Flow orchestrator failed to intake {typeof(T).Name}: {ex.Message}");
                 throw; // Re-throw for messaging system error handling
             }
         });
+    // Legacy plain entity consumption removed intentionally: all producers must emit FlowTargetedMessage<T>.
     }
 
     private void RegisterValueObjectHandlerGeneric<T>(IServiceCollection services) 
         where T : Model.FlowValueObject<T>, new()
     {
-        services.On<FlowTargetedMessage<T>>(async msg =>
+    Console.WriteLine($"[Flow.Auto][ValueObject] Register targeted handler for {typeof(T).FullName}");
+    services.On<FlowTargetedMessage<T>>(async msg =>
         {
+            Console.WriteLine($"[Flow.Auto][ValueObject] Handler INVOKED for {typeof(T).Name} Id={msg.Entity?.GetType().GetProperty("Id")?.GetValue(msg.Entity)}");
             try
             {
-                // Route the value object to Flow intake automatically  
-                await msg.Entity.SendToFlowIntake();
+                var sp = Sora.Core.Hosting.App.AppHost.Current;
+                var sender = sp?.GetService<Sora.Flow.Sending.IFlowSender>();
+                if (sender is null)
+                {
+                    await Sora.Messaging.MessagingExtensions.Send(msg.Entity!);
+                    return;
+                }
+
+                var bag = ToBag(msg.Entity!);
+                var item = Sora.Flow.Sending.FlowSendPlainItem.Of<T>(bag, sourceId: "orchestrator", occurredAt: DateTimeOffset.UtcNow);
+                Console.WriteLine($"[Flow.Auto][ValueObject] Intake targeted {typeof(T).Name} Id={msg.Entity?.GetType().GetProperty("Id")?.GetValue(msg.Entity)}");
+                await sender.SendAsync(new[] { item }, message: msg, hostType: typeof(T));
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"⚠️  Flow orchestrator failed to route {typeof(T).Name}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"⚠️  Flow orchestrator failed to intake {typeof(T).Name}: {ex.Message}");
                 throw;
             }
         });
+    // Legacy plain value object consumption removed intentionally: all producers must emit FlowTargetedMessage<T>.
+    }
+
+    private static System.Collections.Generic.IDictionary<string, object?> ToBag(object entity)
+    {
+        var dict = new System.Collections.Generic.Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        if (entity is null) return dict;
+        try
+        {
+            var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+            foreach (var p in props)
+            {
+                if (!p.CanRead) continue;
+                var val = p.GetValue(entity);
+                // Avoid deep object graphs / navigation properties; include primitives, strings, decimals, DateTimes, GUIDs, enums.
+                if (val is null || IsSimple(val.GetType()))
+                {
+                    dict[p.Name] = val;
+                }
+            }
+        }
+        catch { }
+        return dict;
+    }
+
+    private static bool IsSimple(Type t)
+    {
+        if (t.IsPrimitive || t.IsEnum) return true;
+        return t == typeof(string) || t == typeof(decimal) || t == typeof(DateTime) || t == typeof(DateTimeOffset) || t == typeof(Guid) || t == typeof(TimeSpan);
     }
 
     private void RegisterCommandHandler(IServiceCollection services)

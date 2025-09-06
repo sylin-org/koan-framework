@@ -521,15 +521,27 @@ public sealed class FlowHandlerConfigurator
                 var keyInfo = GetEntityKeyInfo(entity);
                 Console.WriteLine(string.Format(options.EntityLogFormat, typeName, keyInfo));
             }
-            
+
             try
             {
-                // Route to Flow intake for processing
-                await entity.SendToFlowIntake();
+                // Direct intake via IFlowSender (avoid re-publishing plain entity messages which have no consumers)
+                var sp = Sora.Core.Hosting.App.AppHost.Current;
+                var sender = sp?.GetService<IFlowSender>();
+                if (sender != null)
+                {
+                    var bag = ToBag(entity);
+                    var item = FlowSendPlainItem.Of<TModel>(bag, sourceId: "auto-handler", occurredAt: DateTimeOffset.UtcNow);
+                    await sender.SendAsync(new[] { item }, message: null, hostType: typeof(TModel));
+                }
+                else
+                {
+                    // Fallback (no sender registered) – do NOT re-send to messaging to avoid backlog loop
+                    System.Diagnostics.Debug.WriteLine($"⚠️  IFlowSender not available for {typeof(TModel).Name}; intake skipped.");
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Re-throw for proper error handling upstream
+                System.Diagnostics.Debug.WriteLine($"⚠️  Flow auto handler failed to intake {typeof(TModel).Name}: {ex.Message}");
                 throw;
             }
         };
@@ -546,15 +558,25 @@ public sealed class FlowHandlerConfigurator
                 var keyInfo = GetDynamicEntityKeyInfo(entity);
                 Console.WriteLine(string.Format(options.EntityLogFormat, typeName, keyInfo));
             }
-            
+
             try
             {
-                // Route to Flow intake directly (bypass messaging loop)
-                await entity.SendToFlowIntake();
+                var sp = Sora.Core.Hosting.App.AppHost.Current;
+                var sender = sp?.GetService<IFlowSender>();
+                if (sender != null)
+                {
+                    var bag = ToBag(entity);
+                    var item = FlowSendPlainItem.Of<TModel>(bag, sourceId: "auto-handler", occurredAt: DateTimeOffset.UtcNow);
+                    await sender.SendAsync(new[] { item }, message: null, hostType: typeof(TModel));
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️  IFlowSender not available for dynamic {typeof(TModel).Name}; intake skipped.");
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Re-throw for proper error handling upstream
+                System.Diagnostics.Debug.WriteLine($"⚠️  Flow auto handler failed to intake dynamic {typeof(TModel).Name}: {ex.Message}");
                 throw;
             }
         };
@@ -571,18 +593,56 @@ public sealed class FlowHandlerConfigurator
                 var keyInfo = GetValueObjectKeyInfo(valueObject);
                 Console.WriteLine(string.Format(options.ValueObjectLogFormat, typeName, keyInfo));
             }
-            
+
             try
             {
-                // Route to Flow intake for processing
-                await valueObject.SendToFlowIntake();
+                var sp = Sora.Core.Hosting.App.AppHost.Current;
+                var sender = sp?.GetService<IFlowSender>();
+                if (sender != null)
+                {
+                    var bag = ToBag(valueObject);
+                    var item = FlowSendPlainItem.Of<TValueObject>(bag, sourceId: "auto-handler", occurredAt: DateTimeOffset.UtcNow);
+                    await sender.SendAsync(new[] { item }, message: null, hostType: typeof(TValueObject));
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️  IFlowSender not available for {typeof(TValueObject).Name} value object; intake skipped.");
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Re-throw for proper error handling upstream
+                System.Diagnostics.Debug.WriteLine($"⚠️  Flow auto handler failed to intake value object {typeof(TValueObject).Name}: {ex.Message}");
                 throw;
             }
         };
+    }
+
+    // Simple property bag extraction (duplicates logic in SoraAutoRegistrar to avoid dependency tangle)
+    private static System.Collections.Generic.IDictionary<string, object?> ToBag(object entity)
+    {
+        var dict = new System.Collections.Generic.Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        if (entity is null) return dict;
+        try
+        {
+            var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+            foreach (var p in props)
+            {
+                if (!p.CanRead) continue;
+                var val = p.GetValue(entity);
+                if (val is null || IsSimple(val.GetType()))
+                {
+                    dict[p.Name] = val;
+                }
+            }
+        }
+        catch { }
+        return dict;
+    }
+
+    private static bool IsSimple(Type t)
+    {
+        if (t.IsPrimitive || t.IsEnum) return true;
+        return t == typeof(string) || t == typeof(decimal) || t == typeof(DateTime) || t == typeof(DateTimeOffset) || t == typeof(Guid) || t == typeof(TimeSpan);
     }
 
     private static string GetEntityKeyInfo<TModel>(TModel entity) where TModel : FlowEntity<TModel>, new()

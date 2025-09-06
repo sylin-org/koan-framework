@@ -24,8 +24,9 @@ public class FlowTestController : ControllerBase
             // Verify Flow static API is accessible
             var outbound = Sora.Flow.Flow.Outbound;
             var inbound = Sora.Flow.Flow.Inbound;
-            
-            return Ok(new { 
+
+            return Ok(new
+            {
                 status = "✅ Flow orchestrator APIs are accessible",
                 outbound = outbound != null ? "Available" : "Null",
                 inbound = inbound != null ? "Available" : "Null",
@@ -35,9 +36,10 @@ public class FlowTestController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { 
-                status = "❌ Flow orchestrator API failed", 
-                error = ex.Message 
+            return StatusCode(500, new
+            {
+                status = "❌ Flow orchestrator API failed",
+                error = ex.Message
             });
         }
     }
@@ -80,7 +82,8 @@ public class FlowTestController : ControllerBase
                 Source = "test"
             };
 
-            return Ok(new { 
+            return Ok(new
+            {
                 status = "✅ Successfully created Flow entities",
                 device = new { device.Id, device.Manufacturer, device.Model },
                 sensor = new { sensor.SensorKey, sensor.Code, sensor.Unit },
@@ -90,10 +93,11 @@ public class FlowTestController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { 
-                status = "❌ Failed to create Flow entities", 
+            return StatusCode(500, new
+            {
+                status = "❌ Failed to create Flow entities",
                 error = ex.Message,
-                stack_trace = ex.StackTrace 
+                stack_trace = ex.StackTrace
             });
         }
     }
@@ -120,9 +124,10 @@ public class FlowTestController : ControllerBase
 
             // This is the moment of truth! 
             // device.Send() should route through messaging → orchestrator → Flow intake
-            await device.Send();
+            await Sora.Messaging.MessagingExtensions.Send(device);
 
-            return Ok(new { 
+            return Ok(new
+            {
                 status = "✅ Successfully sent entity via Flow messaging pipeline!",
                 device = new { device.Id, device.Manufacturer, device.Model },
                 pipeline = "entity.Send() → Messaging → [FlowOrchestrator] → Flow Intake → Processing",
@@ -131,8 +136,9 @@ public class FlowTestController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { 
-                status = "❌ Failed to send entity via Flow pipeline", 
+            return StatusCode(500, new
+            {
+                status = "❌ Failed to send entity via Flow pipeline",
                 error = ex.Message,
                 inner_error = ex.InnerException?.Message,
                 stack_trace = ex.StackTrace,

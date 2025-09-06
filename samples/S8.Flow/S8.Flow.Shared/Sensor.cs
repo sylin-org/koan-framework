@@ -7,9 +7,9 @@ namespace S8.Flow.Shared;
 public sealed class Sensor : FlowEntity<Sensor>
 {
     // Uses inherited Id property from Entity<T> for source-specific IDs
-    
+
     // FK to Device (canonical ULID or aggregation/external key resolvable server-side)
-    [ParentKey(parent: typeof(Device))]
+    [ParentKey(typeof(Device))]
     public string DeviceId { get; set; } = default!;
 
     // Unique per device sensor identity: Inventory::Serial::SensorCode

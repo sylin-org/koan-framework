@@ -32,14 +32,16 @@
       href: ARCH-0051-secrets-dev-alignment-and-provider-swap-guardrails.md
     - name: Core IDs (ShortId + ULID) and JSON merge policy
       href: ARCH-0052-core-ids-and-json-merge-policy.md
-- name: Data (DATA)
-  items:
-    - name: Instance Save(set) is first-class
-      href: DATA-0062-instance-save-set-first-class.md
-    - name: Data access semantics (All/Query; streaming; pager)
-      href: DATA-0061-data-access-pagination-and-streaming.md
-    - name: Vector module split and clean separation
-      href: DATA-0060-vector-module-split-and-clean-separation.md
+    - name: Data (DATA)
+      items:
+        - name: Instance Save(set) is first-class
+          href: DATA-0062-instance-save-set-first-class.md
+        - name: Data access semantics (All/Query; streaming; pager)
+          href: DATA-0061-data-access-pagination-and-streaming.md
+        - name: Messaging envelope transformers
+          href: DATA-0072-messaging-envelope-transformers.md
+        - name: Vector module split and clean separation
+          href: DATA-0060-vector-module-split-and-clean-separation.md
     - name: Adapter role attributes and entity mapping
       href: DATA-0058-adapter-role-attributes-and-entity-store-mapping.md
     - name: Entity-first facade and Save semantics

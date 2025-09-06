@@ -41,9 +41,17 @@ internal class MessagingLifecycleService : IHostedService
         {
             // Phase 1 is already complete (handlers registered during ConfigureServices)
             var handlerRegistry = GetHandlerRegistry();
-            var handlerCount = handlerRegistry.GetAllHandlers().Count;
-            
+            var allHandlers = handlerRegistry.GetAllHandlers();
+            var handlerCount = allHandlers.Count;
             _logger.LogInformation("[Messaging] Phase 1: {HandlerCount} handlers registered", handlerCount);
+            try
+            {
+                foreach (var kvp in allHandlers)
+                {
+                    Console.WriteLine($"[Messaging][Phase1] Handler registered: {kvp.Key.FullName ?? kvp.Key.Name}");
+                }
+            }
+            catch { /* ignore diagnostics failures */ }
             
             // Phase 2: Initialize messaging provider
             var provider = await SelectAndInitializeProviderAsync(cancellationToken);

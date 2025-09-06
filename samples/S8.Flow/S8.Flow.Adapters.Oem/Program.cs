@@ -49,7 +49,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
         
         var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
         
-        // Send entities via beautiful messaging patterns
+        // Send entities via unified transport envelope
         foreach (var deviceProfile in subset)
         {
             var device = new Device
@@ -62,9 +62,9 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
                 Kind = deviceProfile.Kind,
                 Code = deviceProfile.Code
             };
-            
-            await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device); // ✨ Beautiful messaging-first seeding
-            
+            // Send as targeted message (plain entity consumers removed)
+            await new FlowTargetedMessage<Device> { Entity = device, Timestamp = DateTimeOffset.UtcNow }.Send();
+
             // Send sensors for this device
             foreach (var sensorProfile in SampleProfiles.SensorsForOem(deviceProfile))
             {
@@ -76,8 +76,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
                     Code = sensorProfile.Code,
                     Unit = sensorProfile.Unit
                 };
-                
-                await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor);
+                await new FlowTargetedMessage<Sensor> { Entity = sensor, Timestamp = DateTimeOffset.UtcNow }.Send();
             }
         }
         
@@ -88,11 +87,15 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
 var app = builder.Build();
 await app.RunAsync();
 
+
 [FlowAdapter(system: FlowSampleConstants.Sources.Oem, adapter: FlowSampleConstants.Sources.Oem, DefaultSource = FlowSampleConstants.Sources.Oem)]
 public sealed class OemPublisher : BackgroundService
 {
     private readonly ILogger<OemPublisher> _log;
     public OemPublisher(ILogger<OemPublisher> log) { _log = log; }
+
+    // Unified transport envelope sender
+    // Use FlowEnvelopeSender.SendWithEnvelope for all sends
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -139,7 +142,8 @@ public sealed class OemPublisher : BackgroundService
                     };
                     
                     _log.LogDebug("[OEM] 🏭 Sending Device entity for {DeviceId}", d.Id);
-                    await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, stoppingToken); // ✨ Routes through messaging → orchestrator → Flow intake
+                    var targetedDevice = new FlowTargetedMessage<Device> { Entity = device, Timestamp = DateTimeOffset.UtcNow };
+                    await targetedDevice.Send(cancellationToken: stoppingToken); // Targeted routing
 
                     // Send Sensor entities
                     foreach (var s in SampleProfiles.SensorsForOem(d))
@@ -154,7 +158,8 @@ public sealed class OemPublisher : BackgroundService
                         };
                         
                         _log.LogTrace("[OEM] Sensor entity: {SensorKey}", s.SensorKey);
-                        await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor, stoppingToken); // ✨ Beautiful messaging-first routing
+                        var targetedSensor = new FlowTargetedMessage<Sensor> { Entity = sensor, Timestamp = DateTimeOffset.UtcNow };
+                        await targetedSensor.Send(cancellationToken: stoppingToken); // Targeted routing
                     }
                     
                     lastAnnounce = DateTimeOffset.UtcNow;
@@ -191,7 +196,8 @@ public sealed class OemPublisher : BackgroundService
                     };
                     
                     _log.LogTrace("[OEM] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
-                    await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, stoppingToken);
+                    var targetedReading = new FlowTargetedMessage<Reading> { Entity = reading, Timestamp = DateTimeOffset.UtcNow };
+                    await targetedReading.Send(cancellationToken: stoppingToken);
                 }
 
                 // Periodically update manufacturer data (every 5 minutes)
@@ -320,7 +326,7 @@ public sealed class OemPublisher : BackgroundService
             try
             {
                 // Use new beautiful DX: Send nested anonymous object directly as DynamicFlowEntity
-                await Flow.Send<Manufacturer>(mfgData).Broadcast();
+                await Flow.Send<Manufacturer>(mfgData).Broadcast(); // If needed, update to use descriptor
                 
                 dynamic mfg = mfgData;
                 string code = mfg.identifier.code;

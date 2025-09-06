@@ -29,7 +29,7 @@ internal sealed class FlowActionHandler
             var modelType = Sora.Flow.Infrastructure.FlowRegistry.ResolveModel(msg.Model);
             if (modelType is null)
             {
-                await new FlowAck(msg.Model, msg.Verb, msg.ReferenceId, "unsupported", $"Unknown model '{msg.Model}'", msg.CorrelationId).Send(ct);
+                await new FlowAck(msg.Model, msg.Verb, msg.ReferenceId, "unsupported", $"Unknown model '{msg.Model}'", msg.CorrelationId).Send(cancellationToken: ct);
                 return;
             }
 
@@ -43,17 +43,17 @@ internal sealed class FlowActionHandler
                     await HandleReportAsync(modelType, msg, ct);
                     break;
                 case "ping":
-                    await new FlowAck(msg.Model, msg.Verb ?? "ping", msg.ReferenceId, "ok", null, msg.CorrelationId).Send(ct);
+                    await new FlowAck(msg.Model, msg.Verb ?? "ping", msg.ReferenceId, "ok", null, msg.CorrelationId).Send(cancellationToken: ct);
                     break;
                 default:
-                    await new FlowAck(msg.Model, msg.Verb ?? string.Empty, msg.ReferenceId, "unsupported", $"Unknown verb '{msg.Verb}'", msg.CorrelationId).Send(ct);
+                    await new FlowAck(msg.Model, msg.Verb ?? string.Empty, msg.ReferenceId, "unsupported", $"Unknown verb '{msg.Verb}'", msg.CorrelationId).Send(cancellationToken: ct);
                     break;
             }
         }
         catch (Exception ex)
         {
             _log.LogDebug(ex, "FlowAction handling failed for {Model}/{Verb}", msg.Model, msg.Verb);
-            try { await new FlowAck(msg.Model, msg.Verb, msg.ReferenceId, "error", ex.Message, msg.CorrelationId).Send(ct); } catch { }
+            try { await new FlowAck(msg.Model, msg.Verb, msg.ReferenceId, "error", ex.Message, msg.CorrelationId).Send(cancellationToken: ct); } catch { }
         }
     }
 
@@ -78,7 +78,7 @@ internal sealed class FlowActionHandler
         var upsert = dataType.GetMethod("UpsertAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { recordType, typeof(string), typeof(CancellationToken) })!;
         await (Task)upsert.Invoke(null, new object?[] { record, FlowSets.StageShort(FlowSets.Intake), ct })!;
 
-        await new FlowAck(msg.Model, msg.Verb, msg.ReferenceId, "ok", null, msg.CorrelationId).Send(ct);
+    await new FlowAck(msg.Model, msg.Verb, msg.ReferenceId, "ok", null, msg.CorrelationId).Send(cancellationToken: ct);
     }
 
     private static async Task HandleReportAsync(Type modelType, FlowAction msg, CancellationToken ct)
@@ -109,7 +109,7 @@ internal sealed class FlowActionHandler
             ["roots"] = dynCount,
             ["policies"] = polCount
         };
-        await new FlowReport(msg.Model, msg.ReferenceId, stats, msg.CorrelationId).Send(ct);
+    await new FlowReport(msg.Model, msg.ReferenceId, stats, msg.CorrelationId).Send(cancellationToken: ct);
     }
 
     private static async Task<int> CountAsync(Type entityType, string? set, CancellationToken ct)

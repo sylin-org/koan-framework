@@ -36,8 +36,20 @@ internal sealed class FlowEntityOrchestratorHandler<T> where T : FlowEntity<T>, 
         {
             _logger.LogDebug("Orchestrator handling {EntityType} entity: {EntityId}", typeof(T).Name, entity.Id);
             
-            // Use internal method to send directly to Flow intake (bypass messaging loop)
-            await entity.SendToFlowIntake(ct: ct);
+            // Directly persist to Flow intake to avoid creating plain entity message backlog
+            var sp = Sora.Core.Hosting.App.AppHost.Current;
+            var sender = sp?.GetService(typeof(Sora.Flow.Sending.IFlowSender)) as Sora.Flow.Sending.IFlowSender;
+            if (sender is null)
+            {
+                // Fallback to legacy path if sender not available
+                await Sora.Messaging.MessagingExtensions.Send(entity, cancellationToken: ct);
+            }
+            else
+            {
+                var bag = FlowOrchestratorBagHelpers.ExtractBag(entity);
+                var item = Sora.Flow.Sending.FlowSendPlainItem.Of<T>(bag, sourceId: "orchestrator", occurredAt: DateTimeOffset.UtcNow);
+                await sender.SendAsync(new[] { item }, message: entity, hostType: typeof(T), ct: ct);
+            }
             
             _logger.LogDebug("Successfully sent {EntityType} entity {EntityId} to Flow intake", typeof(T).Name, entity.Id);
         }
@@ -80,8 +92,18 @@ internal sealed class FlowValueObjectOrchestratorHandler<T> where T : FlowValueO
         {
             _logger.LogDebug("Orchestrator handling {ValueObjectType} value object", typeof(T).Name);
             
-            // Use internal method to send directly to Flow intake (bypass messaging loop)
-            await valueObject.SendToFlowIntake(ct: ct);
+            var sp = Sora.Core.Hosting.App.AppHost.Current;
+            var sender = sp?.GetService(typeof(Sora.Flow.Sending.IFlowSender)) as Sora.Flow.Sending.IFlowSender;
+            if (sender is null)
+            {
+                await Sora.Messaging.MessagingExtensions.Send(valueObject, cancellationToken: ct);
+            }
+            else
+            {
+                var bag = FlowOrchestratorBagHelpers.ExtractBag(valueObject);
+                var item = Sora.Flow.Sending.FlowSendPlainItem.Of<T>(bag, sourceId: "orchestrator", occurredAt: DateTimeOffset.UtcNow);
+                await sender.SendAsync(new[] { item }, message: valueObject, hostType: typeof(T), ct: ct);
+            }
             
             _logger.LogDebug("Successfully sent {ValueObjectType} value object to Flow intake", typeof(T).Name);
         }
@@ -90,5 +112,35 @@ internal sealed class FlowValueObjectOrchestratorHandler<T> where T : FlowValueO
             _logger.LogError(ex, "Failed to send {ValueObjectType} value object to Flow intake", typeof(T).Name);
             throw;
         }
+    }
+}
+
+internal static partial class FlowOrchestratorBagHelpers
+{
+    internal static System.Collections.Generic.IDictionary<string, object?> ExtractBag(object entity)
+    {
+        var dict = new System.Collections.Generic.Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        if (entity is null) return dict;
+        try
+        {
+            var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+            foreach (var p in props)
+            {
+                if (!p.CanRead) continue;
+                var val = p.GetValue(entity);
+                if (val is null || IsSimple(val.GetType()))
+                {
+                    dict[p.Name] = val;
+                }
+            }
+        }
+        catch { }
+        return dict;
+    }
+
+    private static bool IsSimple(Type t)
+    {
+        if (t.IsPrimitive || t.IsEnum) return true;
+        return t == typeof(string) || t == typeof(decimal) || t == typeof(DateTime) || t == typeof(DateTimeOffset) || t == typeof(Guid) || t == typeof(TimeSpan);
     }
 }

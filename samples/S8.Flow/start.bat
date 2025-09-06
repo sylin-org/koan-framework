@@ -21,12 +21,12 @@ REM Prefer modern "docker compose"; fallback to legacy docker-compose
 for /f "tokens=*" %%i in ('docker compose version 2^>nul') do set HAS_DOCKER_COMPOSE_CLI=1
 if defined HAS_DOCKER_COMPOSE_CLI (
   echo Using "docker compose" CLI
-  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build --no-cache || goto :error
+  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build || goto :error
   docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
 ) else (
   where docker-compose >nul 2>nul || goto :nolegacy
   echo Using legacy "docker-compose" CLI
-  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build --no-cache || goto :error
+  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build || goto :error
   docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
 )
 

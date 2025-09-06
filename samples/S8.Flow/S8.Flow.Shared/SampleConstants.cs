@@ -55,8 +55,7 @@ public static class AdapterSeeding
                 Kind = d.Kind,
                 Code = d.Code
             };
-            
-            await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, ct);
+            await Sora.Messaging.MessagingExtensions.Send(device, cancellationToken: ct);
 
             // Send Sensor entities through messaging system
             foreach (var s in sensorSelector(d))
@@ -69,8 +68,7 @@ public static class AdapterSeeding
                     Code = s.Code,
                     Unit = s.Unit
                 };
-                
-                await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor, ct);
+                await Sora.Messaging.MessagingExtensions.Send(sensor, cancellationToken: ct);
             }
         }
     }

@@ -58,10 +58,10 @@ internal sealed class FlowActionsSender : IFlowActions
 
     private static Task SendAsync(string model, string verb, string? referenceId, object? payload, string? correlationId, CancellationToken ct)
     {
-        var idk = Key(model, verb, referenceId);
-        var partition = model;
-        var msg = new FlowAction(model, verb, referenceId, payload, idk, partition, correlationId);
-        return msg.Send(ct);
+    var idk = Key(model, verb, referenceId);
+    var partition = model;
+    var msg = new FlowAction(model, verb, referenceId, payload, idk, partition, correlationId);
+    return msg.Send(cancellationToken: ct);
     }
 }
 

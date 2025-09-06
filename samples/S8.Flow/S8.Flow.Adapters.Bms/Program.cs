@@ -58,7 +58,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
                 Code = deviceProfile.Code
             };
             
-            await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device);
+            await new FlowTargetedMessage<Device> { Entity = device, Timestamp = DateTimeOffset.UtcNow }.Send();
             
             // Send sensors for this device
             foreach (var sensorProfile in SampleProfiles.SensorsForBms(deviceProfile))
@@ -72,7 +72,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
                     Unit = sensorProfile.Unit
                 };
                 
-                await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor);
+                await new FlowTargetedMessage<Sensor> { Entity = sensor, Timestamp = DateTimeOffset.UtcNow }.Send();
             }
         }
     }
@@ -133,7 +133,8 @@ public sealed class BmsPublisher : BackgroundService
                     };
                     
                     _log.LogTrace("[BMS] Device entity: {DeviceId}", d.Id);
-                    await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, ct); // ✨ Routes through messaging → orchestrator → Flow intake
+                    var targetedDevice = new FlowTargetedMessage<Device> { Entity = device, Timestamp = DateTimeOffset.UtcNow };
+                    await targetedDevice.Send(cancellationToken: ct); // Targeted routing
 
                     // Send Sensor entities
                     foreach (var s in SampleProfiles.SensorsForBms(d))
@@ -148,7 +149,8 @@ public sealed class BmsPublisher : BackgroundService
                         };
                         
                         _log.LogTrace("[BMS] Sensor entity: {SensorKey}", s.SensorKey);
-                        await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor, ct); // ✨ Beautiful messaging-first routing
+                        var targetedSensor = new FlowTargetedMessage<Sensor> { Entity = sensor, Timestamp = DateTimeOffset.UtcNow };
+                        await targetedSensor.Send(cancellationToken: ct); // Targeted routing
                     }
                     
                     lastAnnounce = DateTimeOffset.UtcNow;
@@ -185,7 +187,8 @@ public sealed class BmsPublisher : BackgroundService
                     };
                     
                     _log.LogTrace("[BMS] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
-                    await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, ct);
+                    var targetedReading = new FlowTargetedMessage<Reading> { Entity = reading, Timestamp = DateTimeOffset.UtcNow };
+                    await targetedReading.Send(cancellationToken: ct);
                 }
 
                 // Periodically update manufacturer data (every 5 minutes)
