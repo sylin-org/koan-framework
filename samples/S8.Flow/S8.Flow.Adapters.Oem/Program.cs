@@ -1,18 +1,10 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Sora.Core;
 using Sora.Messaging;
-using Sora.Messaging.RabbitMq;
 using S8.Flow.Shared;
-using Sora.Core.Hosting.App;
-using Sora.Flow.Actions;
-using Sora.Flow.Extensions;
 using Sora.Flow.Attributes;
 using Sora.Flow.Model;
 using Sora.Data.Core;
-using System.Collections.Generic;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -23,15 +15,7 @@ if (!Sora.Core.SoraEnv.InContainer)
     return;
 }
 
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: true)
-    .AddEnvironmentVariables();
-
-// ✨ BEAUTIFUL NEW MESSAGING - ZERO CONFIGURATION! ✨
-// Auto-registrars provide Messaging Core, RabbitMQ, Flow identity stamper,
-// and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
-
 
 var app = builder.Build();
 await app.RunAsync();
@@ -42,9 +26,6 @@ public sealed class OemPublisher : BackgroundService
 {
     private readonly ILogger<OemPublisher> _log;
     public OemPublisher(ILogger<OemPublisher> log) { _log = log; }
-
-    // Unified transport envelope sender
-    // Use FlowEnvelopeSender.SendWithEnvelope for all sends
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -89,7 +70,7 @@ public sealed class OemPublisher : BackgroundService
                         Kind = d.Kind,
                         Code = d.Code
                     };
-                    
+
                     _log.LogInformation("[OEM] 🏭 Sending Device entity: Id={DeviceId}, Serial={Serial}, Inventory={Inventory}", d.Id, device.Serial, device.Inventory);
                     await device.Send(cancellationToken: stoppingToken); // Direct entity sending with automatic transport wrapping
                     _log.LogInformation("[OEM] Device sent successfully");
@@ -100,16 +81,16 @@ public sealed class OemPublisher : BackgroundService
                         var sensor = new Sensor
                         {
                             Id = s.Id,
-                        SensorKey = s.SensorKey,
+                            SensorKey = s.SensorKey,
                             DeviceId = s.DeviceId,
                             Code = s.Code,
                             Unit = s.Unit
                         };
-                        
+
                         _log.LogTrace("[OEM] Sensor entity: {SensorKey}", s.SensorKey);
                         await sensor.Send(cancellationToken: stoppingToken); // Direct entity sending with automatic transport wrapping
                     }
-                    
+
                     lastAnnounce = DateTimeOffset.UtcNow;
                     _log.LogDebug("[OEM] Device {Inv}/{Serial} announced with sensors", d.Inventory, d.Serial);
                 }
@@ -133,7 +114,7 @@ public sealed class OemPublisher : BackgroundService
                             value = 0;
                             break;
                     }
-                    
+
                     var reading = new Reading
                     {
                         SensorKey = sensor.SensorKey,
@@ -142,7 +123,7 @@ public sealed class OemPublisher : BackgroundService
                         Unit = sensor.Unit,
                         Source = "oem"
                     };
-                    
+
                     _log.LogTrace("[OEM] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
                     await reading.Send(cancellationToken: stoppingToken);
                 }
@@ -169,15 +150,15 @@ public sealed class OemPublisher : BackgroundService
         // Using nested anonymous objects for a different DX pattern
         var manufacturers = new object[]
         {
-            new 
+            new
             {
-                identifier = new 
+                identifier = new
                 {
                     code = "MFG001",
                     name = "Acme Corp",
                     external = new { oem = "OEM-VENDOR-42" }
                 },
-                support = new 
+                support = new
                 {
                     phone = "1-800-ACME",
                     email = "support@acme.com",
@@ -185,14 +166,14 @@ public sealed class OemPublisher : BackgroundService
                     hours = "24/7",
                     sla = "4 hour response"
                 },
-                certifications = new 
+                certifications = new
                 {
                     iso9001 = true,
                     iso14001 = true,
                     ce = true,
                     ul = true
                 },
-                warranty = new 
+                warranty = new
                 {
                     standard = "2 years",
                     extended = "5 years",
@@ -201,13 +182,13 @@ public sealed class OemPublisher : BackgroundService
             },
             new
             {
-                identifier = new 
+                identifier = new
                 {
                     code = "MFG002",
                     name = "TechFlow Industries",
                     external = new { oem = "OEM-VENDOR-88" }
                 },
-                support = new 
+                support = new
                 {
                     phone = "+49-30-555-0100",
                     email = "hilfe@techflow.de",
@@ -215,14 +196,14 @@ public sealed class OemPublisher : BackgroundService
                     hours = "Mon-Fri 8AM-6PM CET",
                     sla = "24 hour response"
                 },
-                certifications = new 
+                certifications = new
                 {
                     iso9001 = true,
                     iso14001 = false,
                     ce = true,
                     ul = false
                 },
-                warranty = new 
+                warranty = new
                 {
                     standard = "1 year",
                     extended = "3 years",
@@ -231,13 +212,13 @@ public sealed class OemPublisher : BackgroundService
             },
             new
             {
-                identifier = new 
+                identifier = new
                 {
                     code = "MFG003",
                     name = "Precision Dynamics",
                     external = new { oem = "OEM-VENDOR-123" }
                 },
-                support = new 
+                support = new
                 {
                     phone = "+81-3-5555-0001",
                     email = "support@precision-dynamics.jp",
@@ -245,7 +226,7 @@ public sealed class OemPublisher : BackgroundService
                     hours = "24/7 with dedicated engineer",
                     sla = "1 hour response"
                 },
-                certifications = new 
+                certifications = new
                 {
                     iso9001 = true,
                     iso14001 = true,
@@ -253,7 +234,7 @@ public sealed class OemPublisher : BackgroundService
                     ul = true,
                     jis = true
                 },
-                warranty = new 
+                warranty = new
                 {
                     standard = "3 years",
                     extended = "10 years",
@@ -274,7 +255,7 @@ public sealed class OemPublisher : BackgroundService
             {
                 // Create DynamicFlowEntity and send via transport envelope
                 var manufacturer = mfgData.ToDynamicFlowEntity<Manufacturer>();
-                
+
                 dynamic mfg = mfgData;
                 string code = mfg.identifier.code;
                 string name = mfg.identifier.name;
@@ -282,9 +263,9 @@ public sealed class OemPublisher : BackgroundService
                 _log.LogInformation("[OEM] DEBUG: manufacturer type: {Type}, FullName: {FullName}", manufacturer.GetType().Name, manufacturer.GetType().FullName);
                 _log.LogInformation("[OEM] DEBUG: manufacturer base type: {BaseType}", manufacturer.GetType().BaseType?.FullName);
                 _log.LogInformation("[OEM] DEBUG: Is IDynamicFlowEntity: {IsDynamic}", manufacturer is IDynamicFlowEntity);
-                
+
                 await manufacturer.Send();
-                
+
                 _log.LogInformation("[OEM] DEBUG: After calling manufacturer.Send() for {Code} ({Name})", code, name);
             }
             catch (Exception ex)

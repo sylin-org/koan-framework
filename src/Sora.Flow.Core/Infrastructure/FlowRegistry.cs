@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.ComponentModel.DataAnnotations;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using Sora.Flow.Attributes;
 using Sora.Flow.Model;
 
@@ -47,7 +49,9 @@ public static class FlowRegistry
                 var keyAttr = p.GetCustomAttribute<AggregationKeyAttribute>(inherit: true);
                 if (keyAttr != null)
                 {
-                    tags.Add(p.Name);
+                    // Convert C# property name to JSON property name using camelCase
+                    var jsonPropertyName = GetJsonPropertyName(p);
+                    tags.Add(jsonPropertyName);
                 }
             }
             
@@ -110,6 +114,24 @@ public static class FlowRegistry
         Scan();
         s_byName.TryGetValue(name, out t);
         return t;
+    }
+
+    /// <summary>
+    /// Gets the JSON property name for a C# property, respecting JsonProperty attributes
+    /// and falling back to camelCase conversion to match the system's JSON serialization.
+    /// </summary>
+    private static string GetJsonPropertyName(PropertyInfo property)
+    {
+        // Check for explicit JsonProperty attribute
+        var jsonPropertyAttr = property.GetCustomAttribute<JsonPropertyAttribute>();
+        if (jsonPropertyAttr?.PropertyName != null)
+        {
+            return jsonPropertyAttr.PropertyName;
+        }
+        
+        // Use camelCase conversion to match CamelCasePropertyNamesContractResolver
+        var camelCaseResolver = new CamelCasePropertyNamesContractResolver();
+        return camelCaseResolver.GetResolvedPropertyName(property.Name);
     }
 
     private static void Scan()
