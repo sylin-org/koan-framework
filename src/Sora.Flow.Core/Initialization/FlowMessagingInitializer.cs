@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Sora.Core;
 using Sora.Core.Hosting.App;
@@ -357,17 +358,22 @@ public static class FlowMessagingInitializer
     }
     
     /// <summary>
-    /// Converts payload to dictionary format, ensuring MongoDB-compatible types
+    /// Converts payload to dictionary format using Sora.Core.Json for MongoDB-compatible types.
+    /// Uses JObject approach to avoid JsonElement and ensure proper Newtonsoft.Json serialization.
     /// </summary>
     private static IDictionary<string, object?>? ToDict(object? payload)
     {
         if (payload is null) return null;
         
-        // Convert to JSON string and back to eliminate JsonElement and JObject issues
         try
         {
+            // Use Sora.Core.Json extension which uses JsonDefaults.Settings (Newtonsoft.Json)
             var json = payload.ToJson();
-            var dict = json.FromJson<Dictionary<string, object?>>();
+            
+            // Parse as JObject then convert to Dictionary to ensure MongoDB-compatible types
+            var jObject = JObject.Parse(json);
+            var dict = jObject.ToObject<Dictionary<string, object?>>(JsonSerializer.Create(JsonDefaults.Settings));
+            
             return dict;
         }
         catch

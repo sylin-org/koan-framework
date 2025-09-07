@@ -161,6 +161,12 @@ public static class FlowRegistry
                     var modelName = GetModelName(type);
                     s_byName[modelName] = type;
                 }
+                else if (baseType.GetGenericTypeDefinition() == typeof(DynamicFlowEntity<>))
+                {
+                    // Register DynamicFlowEntity types for model resolution
+                    var modelName = GetModelName(type);
+                    s_byName[modelName] = type;
+                }
             }
         }
     }
