@@ -16,8 +16,8 @@ namespace Sora.Flow.Actions;
 /// Supports verbs: seed (ingest into intake), report (emit stats), ping (ack-only).
 /// Model is resolved to a known Flow model type; behavior is adapter-agnostic.
 /// </summary>
-// This handler is disabled - the new messaging system uses the .On<T>() pattern instead
-internal sealed class FlowActionHandler
+// Re-enabled for Flow pipeline integration via .On<T>() pattern
+public sealed class FlowActionHandler
 {
     private readonly ILogger<FlowActionHandler> _log;
     public FlowActionHandler(ILogger<FlowActionHandler> log) { _log = log; }

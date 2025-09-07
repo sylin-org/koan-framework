@@ -9,10 +9,8 @@ using S8.Flow.Shared;
 using Sora.Core.Hosting.App;
 using Sora.Flow.Actions;
 using Sora.Flow.Extensions;
-using Sora.Flow.Sending;
 using Sora.Flow.Attributes;
-using Sora.Flow;
-using Sora.Flow.Configuration;
+using Sora.Flow.Model;
 using Sora.Data.Core;
 using System.Collections.Generic;
 
@@ -34,56 +32,6 @@ builder.Configuration
 // and auto-start this adapter (BackgroundService with [FlowAdapter]) in container environments.
 builder.Services.AddSora();
 
-// Listen for seed commands (using new messaging system)
-builder.Services.On<FlowCommandMessage>(async cmd =>
-{
-    if (cmd.Command == "seed")
-    {
-        Console.WriteLine("[OEM] Received seed command");
-        
-        // Parse count from payload (if it's a dictionary)
-        var count = 1;
-        if (cmd.Payload is Dictionary<string, object> dict && dict.TryGetValue("count", out var v))
-        {
-            count = Convert.ToInt32(v);
-        }
-        
-        var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
-        
-        // Send entities via unified transport envelope
-        foreach (var deviceProfile in subset)
-        {
-            var device = new Device
-            {
-                Id = deviceProfile.Id,
-                Inventory = deviceProfile.Inventory,
-                Serial = deviceProfile.Serial,
-                Manufacturer = deviceProfile.Manufacturer,
-                Model = deviceProfile.Model,
-                Kind = deviceProfile.Kind,
-                Code = deviceProfile.Code
-            };
-            // Send using new entity.Send() pattern
-            await device.Send();
-
-            // Send sensors for this device
-            foreach (var sensorProfile in SampleProfiles.SensorsForOem(deviceProfile))
-            {
-                var sensor = new Sensor
-                {
-                    Id = sensorProfile.Id,
-                    SensorKey = sensorProfile.SensorKey,
-                    DeviceId = sensorProfile.DeviceId,
-                    Code = sensorProfile.Code,
-                    Unit = sensorProfile.Unit
-                };
-                await sensor.Send();
-            }
-        }
-        
-        Console.WriteLine($"[OEM] Seeded {subset.Length} devices via messaging");
-    }
-});
 
 var app = builder.Build();
 await app.RunAsync();
@@ -111,7 +59,7 @@ public sealed class OemPublisher : BackgroundService
             stoppingToken);
 
         // Send initial manufacturer data using new dynamic capabilities
-        _log.LogDebug("[OEM] Sending manufacturer support and certification data");
+        _log.LogInformation("[OEM] Sending manufacturer support and certification data");
         await SendManufacturerData();
 
         var rng = new Random();
@@ -143,7 +91,7 @@ public sealed class OemPublisher : BackgroundService
                     };
                     
                     _log.LogInformation("[OEM] 🏭 Sending Device entity: Id={DeviceId}, Serial={Serial}, Inventory={Inventory}", d.Id, device.Serial, device.Inventory);
-                    await device.Send(stoppingToken); // Direct entity sending with automatic transport wrapping
+                    await device.Send(cancellationToken: stoppingToken); // Direct entity sending with automatic transport wrapping
                     _log.LogInformation("[OEM] Device sent successfully");
 
                     // Send Sensor entities
@@ -159,7 +107,7 @@ public sealed class OemPublisher : BackgroundService
                         };
                         
                         _log.LogTrace("[OEM] Sensor entity: {SensorKey}", s.SensorKey);
-                        await sensor.Send(stoppingToken); // Direct entity sending with automatic transport wrapping
+                        await sensor.Send(cancellationToken: stoppingToken); // Direct entity sending with automatic transport wrapping
                     }
                     
                     lastAnnounce = DateTimeOffset.UtcNow;
@@ -196,7 +144,7 @@ public sealed class OemPublisher : BackgroundService
                     };
                     
                     _log.LogTrace("[OEM] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
-                    await reading.Send(stoppingToken);
+                    await reading.Send(cancellationToken: stoppingToken);
                 }
 
                 // Periodically update manufacturer data (every 5 minutes)
@@ -324,13 +272,20 @@ public sealed class OemPublisher : BackgroundService
         {
             try
             {
-                // Use new beautiful DX: Send nested anonymous object directly as DynamicFlowEntity
-                await Flow.Send<Manufacturer>(mfgData).Broadcast(); // If needed, update to use descriptor
+                // Create DynamicFlowEntity and send via transport envelope
+                var manufacturer = mfgData.ToDynamicFlowEntity<Manufacturer>();
                 
                 dynamic mfg = mfgData;
                 string code = mfg.identifier.code;
                 string name = mfg.identifier.name;
-                _log.LogDebug("[OEM] Manufacturer data sent: {Code} ({Name})", code, name);
+                _log.LogInformation("[OEM] DEBUG: Before calling manufacturer.Send() for {Code} ({Name})", code, name);
+                _log.LogInformation("[OEM] DEBUG: manufacturer type: {Type}, FullName: {FullName}", manufacturer.GetType().Name, manufacturer.GetType().FullName);
+                _log.LogInformation("[OEM] DEBUG: manufacturer base type: {BaseType}", manufacturer.GetType().BaseType?.FullName);
+                _log.LogInformation("[OEM] DEBUG: Is IDynamicFlowEntity: {IsDynamic}", manufacturer is IDynamicFlowEntity);
+                
+                await manufacturer.Send();
+                
+                _log.LogInformation("[OEM] DEBUG: After calling manufacturer.Send() for {Code} ({Name})", code, name);
             }
             catch (Exception ex)
             {

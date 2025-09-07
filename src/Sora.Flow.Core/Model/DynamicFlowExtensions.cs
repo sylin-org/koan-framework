@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Sora.Flow.Sending;
 using Sora.Core.Hosting.App;
 
 namespace Sora.Flow.Model;
@@ -292,36 +291,6 @@ public static class DynamicFlowEntityExtensions
         return default;
     }
 
-    /// <summary>
-    /// Send DynamicFlowEntity directly to Flow intake for processing.
-    /// Routes to the Flow orchestrator for entity processing and storage.
-    /// This bypasses the messaging system to avoid broadcast loops.
-    /// </summary>
-    public static async Task SendToFlowIntake<T>(this T entity, string? sourceId = null, DateTimeOffset? occurredAt = null, CancellationToken ct = default)
-        where T : class, IDynamicFlowEntity
-    {
-        if (entity is null) throw new ArgumentNullException(nameof(entity));
-
-        var sp = AppHost.Current ?? throw new InvalidOperationException("AppHost.Current is not initialized.");
-        var sender = sp.GetRequiredService<Sora.Flow.Sending.IFlowSender>();
-
-        var effectiveSource = sourceId ?? "dynamic-flow-entity";
-        var effectiveOccurredAt = occurredAt ?? DateTimeOffset.UtcNow;
-
-        // Build bag from DynamicFlowEntity properties
-        var bag = BuildBagFromDynamicEntity(entity);
-
-        // Create FlowSendPlainItem
-        var item = new Sora.Flow.Sending.FlowSendPlainItem(
-            ModelType: typeof(T),
-            SourceId: effectiveSource,
-            OccurredAt: effectiveOccurredAt,
-            Bag: bag,
-            CorrelationId: null);
-
-        // Send to Flow intake directly (bypassing messaging)
-        await sender.SendAsync(new[] { item }, envelope: null, message: null, hostType: null, ct);
-    }
 
     private static Dictionary<string, object?> BuildBagFromDynamicEntity<T>(T entity) where T : class, IDynamicFlowEntity
     {

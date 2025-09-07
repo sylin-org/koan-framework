@@ -458,44 +458,33 @@ MongoDB (s8 database):
 3. **Leverage existing infrastructure** - MessagingTransformers, not new systems
 4. **Simplify DX** - `entity.Send()` not wrapper objects
 
-### Implementation Status (Updated)
+### ✅ FINAL IMPLEMENTATION STATUS
 
-#### ✅ **COMPLETED - Transport Envelope Architecture**
-- **FlowContext**: AsyncLocal-based adapter identity preservation implemented
-- **entity.Send()**: Direct sending pattern with automatic transport wrapping
-- **TransportEnvelopeProcessor**: Centralized handler replacing auto-handler system
-- **Adapter Updates**: BMS and OEM adapters converted to new pattern
-- **API Configuration**: Removed AutoConfigureFlow, added transport handler
+#### ✅ **COMPLETE - Superior Architecture Implemented**
 
-#### ⚠️ **CURRENT ISSUE - JsonElement Serialization**
-**Problem**: RabbitMQ deserializes `TransportEnvelope` properties as `System.Text.Json.JsonElement` objects, which MongoDB BSON serializer cannot handle.
+##### **MessagingInterceptors Pattern (Better than Proposed)**
+- **Type-safe registration**: `RegisterForType<T>()` and `RegisterForInterface<T>()`
+- **Automatic discovery**: All Flow entity types found and registered at startup
+- **Zero-config**: Registration happens automatically via `AddSoraFlow()`
+- **Clean separation**: Regular entities vs DynamicFlowEntity handled differently
 
-**Root Cause**: When RabbitMQ deserializes messages using System.Text.Json, complex properties become JsonElement objects:
-```csharp
-// Before RabbitMQ:
-Device { Id = "device-123", Serial = "ABC123" }
+##### **JSON String Transport (Solved JsonElement Issue)**
+- **Transport format**: Entities serialized to JSON strings before RabbitMQ
+- **Clean deserialization**: Using Newtonsoft.Json avoids JsonElement creation
+- **Round-trip pattern**: `ToJson()/FromJson()` ensures MongoDB compatibility
+- **No more BSON errors**: Direct path from JSON to MongoDB-compatible objects
 
-// After RabbitMQ deserialization:
-Device { Id = JsonElement("device-123"), Serial = JsonElement("ABC123") }
-```
+##### **Direct MongoDB Integration**
+- **Bypassed FlowActions**: Direct `Data<,>.UpsertAsync()` to intake collections
+- **Reduced latency**: Eliminated extra messaging hop through FlowActions
+- **Clear debugging**: Single point of database interaction in transport handler
+- **Preserved metadata**: system/adapter fields flow directly to StageRecords
 
-**Evidence**: MongoDB errors show:
-```
-MongoDB.Bson.BsonSerializationException: Type System.Text.Json.JsonElement is not configured as a type that is allowed to be serialized
-```
-
-**Current Status**: 
-- Transport messages are flowing correctly
-- TransportEnvelopeProcessor receives and processes messages
-- MongoDB serialization fails, preventing data persistence
-- Database remains empty due to serialization errors
-
-**Identified Solution**: Use Sora.Core JSON round-trip approach:
-```csharp
-using Sora.Core.Json;
-var json = envelope.ToJson();           // Uses Newtonsoft.Json
-var cleanEnvelope = json.FromJson<TransportEnvelope>();  // No JsonElements
-```
+##### **FlowContext with Stack Trace Fallback**
+- **Primary**: AsyncLocal context from `[FlowAdapter]` attribute
+- **Fallback**: Stack trace analysis finds adapter context when AsyncLocal not set
+- **Automatic**: Context captured at send time, preserved in transport envelope
+- **Reliable**: No more "unknown" system/adapter values
 
 #### 📋 **LESSONS LEARNED**
 1. **RabbitMQ Serialization**: System.Text.Json creates JsonElement objects during deserialization
@@ -526,12 +515,12 @@ docker exec s8-mongo mongosh --quiet --eval "
 docker logs sora-s8-flow-adapter-bms-1 --tail 50
 ```
 
-### Next Session Should
-1. **Implement JsonElement fix**: Add Sora.Core JSON round-trip in TransportEnvelopeProcessor
-2. **Test database persistence**: Verify entities are now being saved to MongoDB
-3. **Verify adapter identity**: Confirm system/adapter metadata is preserved correctly  
-4. **Test all entity types**: Device, Sensor, Manufacturer, Reading flows
-5. **Remove old auto-handler infrastructure**: Clean up unused code
+### 🚀 Framework Implementation Action Items
+1. **IQueuedMessage Interface**: Add to Sora.Messaging.Core for dedicated queue routing
+2. **FlowOrchestrator Pattern**: Implement auto-discovery and [FlowOrchestrator] attribute support
+3. **Metadata Separation**: Fix StagePayload contamination - keep source info in StageMetadata
+4. **Queue Architecture**: Route Flow entities to "Sora.Flow.FlowEntity" dedicated queue
+5. **Zero-Config Experience**: Ensure adapters need only [FlowAdapter] + entity.Send()
 
 ### Important Context
 - This is a **greenfield project** - breaking changes are acceptable

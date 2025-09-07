@@ -10,10 +10,8 @@ using Sora.Flow.Actions;
 using Sora.Flow.Extensions;
 using Sora.Core.Hosting.App;
 using Sora.Flow.Attributes;
-using Sora.Flow.Configuration;
-using Sora.Flow.Sending;
 using Sora.Data.Core;
-using Sora.Flow;
+using Sora.Flow.Model;
 using System.Collections.Generic;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -32,52 +30,6 @@ builder.Configuration
 // Sora framework with auto-configuration
 builder.Services.AddSora();
 
-// Handle seed commands via messaging
-builder.Services.On<FlowCommandMessage>(async cmd =>
-{
-    if (cmd.Command == "seed")
-    {
-        var count = 1;
-        if (cmd.Payload is Dictionary<string, object> dict && dict.TryGetValue("count", out var v))
-        {
-            count = Convert.ToInt32(v);
-        }
-        
-        var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
-        
-        // Send device and sensor entities 
-        foreach (var deviceProfile in subset)
-        {
-            var device = new Device
-            {
-                Id = deviceProfile.Id,
-                Inventory = deviceProfile.Inventory,
-                Serial = deviceProfile.Serial,
-                Manufacturer = deviceProfile.Manufacturer,
-                Model = deviceProfile.Model,
-                Kind = deviceProfile.Kind,
-                Code = deviceProfile.Code
-            };
-            
-            await device.Send();
-            
-            // Send sensors for this device
-            foreach (var sensorProfile in SampleProfiles.SensorsForBms(deviceProfile))
-            {
-                var sensor = new Sensor
-                {
-                    Id = sensorProfile.Id,
-                    SensorKey = sensorProfile.SensorKey,
-                    DeviceId = sensorProfile.DeviceId,
-                    Code = sensorProfile.Code,
-                    Unit = sensorProfile.Unit
-                };
-                
-                await sensor.Send();
-            }
-        }
-    }
-});
 
 var app = builder.Build();
 await app.RunAsync();
@@ -102,7 +54,7 @@ public sealed class BmsPublisher : BackgroundService
             ct);
 
         // Send initial manufacturer data using new dynamic capabilities
-        _log.LogDebug("[BMS] Initializing manufacturer data");
+        _log.LogInformation("[BMS] Initializing manufacturer data");
         await SendManufacturerData();
 
         var rng = new Random();
@@ -187,7 +139,7 @@ public sealed class BmsPublisher : BackgroundService
                     };
                     
                     _log.LogTrace("[BMS] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
-                    await reading.Send(ct);
+                    await reading.Send(cancellationToken: ct);
                 }
 
                 // Periodically update manufacturer data (every 5 minutes)
@@ -253,12 +205,13 @@ public sealed class BmsPublisher : BackgroundService
         {
             try
             {
-                // Use new beautiful DX: Send dictionary directly as DynamicFlowEntity
-                await Flow.Send<Manufacturer>(mfgData).Broadcast();
+                // Create DynamicFlowEntity and send via transport envelope
+                var manufacturer = mfgData.ToDynamicFlowEntity<Manufacturer>();
+                await manufacturer.Send();
                 
                 var code = mfgData["identifier.code"];
                 var name = mfgData["identifier.name"];
-                _log.LogDebug("[BMS] Manufacturer data sent: {Code} ({Name})", code, name);
+                _log.LogInformation("[BMS] Manufacturer data sent: {Code} ({Name})", code, name);
             }
             catch (Exception ex)
             {

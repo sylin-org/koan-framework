@@ -1,9 +1,9 @@
-# Flow Messaging Refactoring Proposal - IMPLEMENTATION COMPLETE
+# Flow Messaging Architecture - FRAMEWORK-LEVEL IMPLEMENTATION
 
 ## Executive Summary
-**✅ IMPLEMENTED**: Refactoring to eliminate auto-handlers, preserve adapter metadata, and simplify the entire flow from entity sending to database intake has been successfully completed.
+**🎯 OBJECTIVE**: Implement clean Flow messaging architecture at the Sora.Messaging/Sora.Flow framework level to provide lean, meaningful developer experience with zero user code changes.
 
-**⚠️ CURRENT STATUS**: Architecture refactor working correctly, JsonElement serialization issue identified and solution ready for implementation.
+**📋 STATUS**: Requirements analysis complete. Ready for framework-level implementation with dedicated queue routing and orchestrator pattern.
 
 ## ✅ RESOLVED Problems
 
@@ -32,44 +32,57 @@ await device.Send();
 - **RESULT**: Consistent with Sora messaging patterns
 - **STATUS**: Standard message handling via services.On<TransportEnvelope>()
 
-## ⚠️ CURRENT ISSUE: JsonElement Serialization
+## ✅ ARCHITECTURAL IMPROVEMENTS (Better Than Proposed)
 
-### Problem
-The new architecture works correctly through the messaging layer, but MongoDB persistence fails due to JsonElement serialization:
+### 1. MessagingInterceptors Pattern
+**Originally Proposed**: MessagingTransformers with string-based registration
+**Actually Implemented**: MessagingInterceptors with type-safe registration
 
-**Root Cause**: RabbitMQ uses System.Text.Json for deserialization, creating JsonElement objects:
 ```csharp
-// After RabbitMQ deserialization:
-Device { Id = JsonElement("device-123"), Serial = JsonElement("ABC123") }
+// BETTER: Type-safe interceptor registration
+MessagingInterceptors.RegisterForInterface<IDynamicFlowEntity>(entity => 
+    CreateDynamicTransportEnvelope(entity));
+
+MessagingInterceptors.RegisterForType<Device>(device => 
+    CreateTransportEnvelope(device));
 ```
 
-**Error**: MongoDB BSON serializer cannot handle JsonElement objects:
-```
-MongoDB.Bson.BsonSerializationException: Type System.Text.Json.JsonElement is not configured 
-as a type that is allowed to be serialized for this instance of ObjectSerializer
-```
+**Benefits**:
+- Type safety at compile time
+- Interface-based registration for DynamicFlowEntity types
+- Automatic interceptor discovery and registration
+- Clean separation between regular and dynamic entities
 
-### Ready Solution
-Use existing Sora.Core JSON capabilities to perform round-trip conversion:
+### 2. JSON String Transport
+**Originally Proposed**: Send TransportEnvelope<T> objects directly
+**Actually Implemented**: Serialize to JSON strings for transport
+
 ```csharp
-// In TransportEnvelopeProcessor:
-using Sora.Core.Json;
-
-public async Task ProcessTransportEnvelope(TransportEnvelope envelope)
-{
-    // Clean JsonElements using Newtonsoft.Json round-trip
-    var json = envelope.ToJson();
-    var cleanEnvelope = json.FromJson<TransportEnvelope>();
-    
-    // Continue with clean envelope...
-}
+// Transport as JSON string for RabbitMQ compatibility
+var envelope = CreateTransportEnvelope(entity);
+return envelope.ToJson(); // Returns JSON string for messaging
 ```
 
-**Benefits of This Solution**:
-- Uses existing Sora.Core infrastructure (DRY principle)
-- Newtonsoft.Json doesn't create JsonElement objects 
-- Minimal code change (2 lines)
-- Consistent with framework standards
+**Benefits**:
+- Compatible with RabbitMQ's JSON-based messaging
+- Eliminates JsonElement issues at the source
+- Uses Sora.Core's proven JSON serialization
+- Clean round-trip with Newtonsoft.Json
+
+### 3. Direct MongoDB Integration
+**Originally Proposed**: Use FlowSender service
+**Actually Implemented**: Direct Data<,>.UpsertAsync() calls
+
+```csharp
+// Direct MongoDB persistence, bypassing FlowActions messaging
+await DirectSeedToIntake(modelType, model, referenceId, payload);
+```
+
+**Benefits**:
+- Eliminates extra messaging hop
+- Reduces latency
+- Simpler debugging path
+- Direct error handling
 
 ## ✅ IMPLEMENTED Architecture
 
@@ -102,40 +115,170 @@ public async Task ProcessTransportEnvelope(TransportEnvelope envelope)
 - **✅ Metadata preservation**: system/adapter metadata carried through to MongoDB
 - **✅ Direct intake**: Writes to appropriate flow.intake collections
 
-## ✅ COMPLETED Files Modified
+## ✅ IMPLEMENTATION DETAILS
 
-### Successfully Updated
-1. **✅ S8.Flow.Api/Program.cs** - Removed `AutoConfigureFlow()`, added `AddFlowTransportHandler()`
-2. **✅ S8.Flow.Adapters.Bms/Program.cs** - Replaced FlowTargetedMessage with `entity.Send()`
-3. **✅ S8.Flow.Adapters.Oem/Program.cs** - Replaced FlowTargetedMessage with `entity.Send()`
+### Core Files Structure
+```
+src/Sora.Flow.Core/
+├── Context/
+│   ├── FlowContext.cs                    ✅ AsyncLocal context management
+│   └── FlowAdapterContextService.cs      ✅ Context service registration
+├── Extensions/
+│   └── FlowEntityExtensions.cs           ✅ Send() method & interceptor registration
+├── Model/
+│   └── DynamicTransportEnvelope.cs       ✅ Dynamic entity transport
+├── Initialization/
+│   └── FlowMessagingInitializer.cs       ✅ Transport handler & direct MongoDB integration
+└── ServiceCollectionExtensions.cs        ✅ Auto-registration via AddSoraFlow()
 
-### New Files Created
-1. **✅ Sora.Flow.Core/Context/FlowContext.cs** - AsyncLocal adapter context
-2. **✅ Sora.Flow.Core/Extensions/FlowEntityExtensions.cs** - Direct Send() method
-3. **✅ Enhanced FlowMessagingInitializer.cs** - Transport envelope processor
+src/Sora.Messaging.Core/
+└── TransportEnvelope.cs                  ✅ Generic transport envelope
 
-### 📋 REMAINING CLEANUP (Todo)
-1. **🔄 Pending**: Remove old auto-handler infrastructure files
-2. **🔄 Pending**: Clean up unused FlowTargetedMessage references
-3. **🔄 Pending**: Remove AutoConfigureFlow method
+samples/S8.Flow/
+├── S8.Flow.Api/Program.cs                ✅ Uses AddFlowTransportHandler()
+├── S8.Flow.Adapters.Bms/Program.cs       ✅ Uses entity.Send() pattern
+└── S8.Flow.Adapters.Oem/Program.cs       ✅ Uses entity.Send() pattern
+```
 
-## ✅ COMPLETED Migration Path
+### Key Implementation Patterns
 
-### ✅ Phase 1: New Infrastructure  
-- **DONE**: Implemented FlowContext for adapter identity
-- **DONE**: Created Send() extension method  
-- **DONE**: Registered transformers for all entity types
-- **DONE**: Added TransportEnvelopeProcessor
+#### 1. Zero-Config Registration
+```csharp
+// In ServiceCollectionExtensions.cs - automatic during AddSoraFlow()
+services.AddSingleton<IHostedService>(sp =>
+{
+    FlowEntityExtensions.RegisterFlowInterceptors();
+    return new FlowInterceptorRegistrationService();
+});
+```
 
-### ✅ Phase 2: Update Components
-- **DONE**: Removed FlowTargetedMessage usage from adapters
-- **DONE**: Switched to entity.Send() pattern
-- **DONE**: Verified transport envelope creation (metadata preservation blocked by JsonElement issue)
+#### 2. Adapter Context Preservation
+```csharp
+[FlowAdapter(system: "bms", adapter: "bms")]
+public class BmsPublisher : BackgroundService
+{
+    // FlowContext automatically captured from attribute
+    await device.Send(); // Context preserved in transport envelope
+}
+```
 
-### ⏳ Phase 3: Cleanup (Pending)
-- **TODO**: Delete auto-handler infrastructure
-- **TODO**: Remove AutoConfigureFlow calls
-- **TODO**: Clean up unused types
+#### 3. Transport Handler Processing
+```csharp
+// Single handler for all JSON transport messages
+services.On<string>(async json =>
+{
+    if (IsFlowTransportEnvelope(json))
+        await ProcessFlowTransportEnvelope(json);
+});
+```
+
+## 📋 FRAMEWORK-LEVEL IMPLEMENTATION PLAN
+
+### Phase 1: Enhanced Messaging Infrastructure (Priority: HIGH)
+**Goal**: Add dedicated queue routing to Sora.Messaging
+
+#### Tasks:
+1. **IQueuedMessage Interface**
+   ```csharp
+   // Sora.Messaging.Core/Contracts/IQueuedMessage.cs
+   public interface IQueuedMessage
+   {
+       string QueueName { get; }
+       object Payload { get; }
+   }
+   ```
+
+2. **Enhanced MessagingExtensions**
+   ```csharp
+   // Modify Send<T> to check for IQueuedMessage
+   // Route to specific queues when interceptors return IQueuedMessage
+   // Maintain backward compatibility
+   ```
+
+3. **Queue-Specific Routing**
+   ```csharp
+   // Add SendToQueueAsync method to messaging providers
+   // Support "Sora.Flow.FlowEntity" dedicated queue
+   ```
+
+### Phase 2: Flow Orchestrator Pattern (Priority: HIGH)
+**Goal**: Implement automatic orchestrator discovery and registration
+
+#### Tasks:
+1. **FlowOrchestrator Base Class**
+   ```csharp
+   // Sora.Flow.Core/Orchestration/FlowOrchestratorBase.cs
+   [FlowOrchestrator]
+   public abstract class FlowOrchestratorBase : BackgroundService
+   {
+       // Type-safe deserialization
+       // Clean metadata separation
+       // Direct intake writing
+   }
+   ```
+
+2. **Auto-Discovery Registration**
+   ```csharp
+   // Update SoraAutoRegistrar to find [FlowOrchestrator] classes
+   // Register as hosted services
+   // Auto-configure "Sora.Flow.FlowEntity" queue handler
+   ```
+
+3. **Default Orchestrator**
+   ```csharp
+   // Built-in DefaultFlowOrchestrator for API containers
+   // Automatically registered if no custom orchestrator found
+   // Zero-config for simple scenarios
+   ```
+
+### Phase 3: Clean Transport Implementation (Priority: HIGH)
+**Goal**: Fix interceptors to use dedicated queue and preserve metadata
+
+#### Tasks:
+1. **Flow Queue Routing**
+   ```csharp
+   // Modify FlowEntityExtensions interceptors
+   // Return FlowQueuedMessage instead of JSON string
+   // Route to "Sora.Flow.FlowEntity" queue
+   ```
+
+2. **Metadata Separation**
+   ```csharp
+   // Keep source/adapter metadata separate from payload
+   // Use StageMetadata for orchestration metadata
+   // Clean StagePayload with model data only
+   ```
+
+3. **Type-Safe Processing**
+   ```csharp
+   // Enhanced type detection from transport envelope
+   // Separate handlers for FlowEntity vs DynamicFlowEntity vs FlowValueObject
+   // Proper external ID composition using metadata
+   ```
+
+### Phase 4: Zero-Config Experience (Priority: MEDIUM)
+**Goal**: Ensure seamless developer experience
+
+#### Tasks:
+1. **Adapter Zero-Config**
+   ```csharp
+   // Just [FlowAdapter] + entity.Send() - nothing else required
+   // Framework handles all transport and routing
+   ```
+
+2. **API Zero-Config**
+   ```csharp
+   // DefaultFlowOrchestrator automatically handles intake
+   // No explicit registration needed
+   // Custom orchestrators via [FlowOrchestrator] attribute
+   ```
+
+3. **Advanced Customization**
+   ```csharp
+   // Override DefaultFlowOrchestrator with custom implementation
+   // Custom queue names via configuration
+   // Batch processing optimization hooks
+   ```
 
 ## ✅ ACHIEVED Benefits
 
@@ -252,27 +395,77 @@ await device.Send();
 
 ---
 
-## 🎯 IMPLEMENTATION SUMMARY
+## 🎯 FRAMEWORK-LEVEL ARCHITECTURE
 
-### ✅ **ARCHITECTURAL SUCCESS**
-The Flow messaging refactoring has been **successfully completed**. The system now:
+### 🏗️ **ARCHITECTURAL PRINCIPLES**
 
-- ✅ Uses clean `entity.Send()` pattern instead of wrapper objects
-- ✅ Preserves adapter identity through FlowContext and transport envelopes  
-- ✅ Eliminates hidden auto-handler complexity with single, transparent processor
-- ✅ Follows Sora messaging patterns using MessagingTransformers
-- ✅ Provides excellent developer experience and debugging capability
+#### Zero User Code Changes
+```csharp
+// Adapters: Just works
+[FlowAdapter(system: "oem", adapter: "oem")]
+public class OemPublisher : BackgroundService
+{
+    await device.Send();  // Clean, simple, no wrapper objects
+}
 
-### ⚠️ **CURRENT BLOCKER**
-**JsonElement serialization** prevents MongoDB persistence. Root cause identified: RabbitMQ deserializes with System.Text.Json, creating JsonElement objects that MongoDB BSON serializer rejects.
+// API: Just works
+builder.Services.AddSora();  // Auto-orchestrator handles everything
+```
 
-**Ready solution**: Use Sora.Core's `envelope.ToJson().FromJson<TransportEnvelope>()` round-trip with Newtonsoft.Json to eliminate JsonElements.
+#### Clean Separation of Concerns
+```mermaid
+graph TD
+    A[Adapter] -->|entity.Send()| B[MessagingInterceptors]
+    B -->|IQueuedMessage| C[Sora.Flow.FlowEntity Queue]
+    C --> D[FlowOrchestrator]
+    D -->|Type-based| E[Intake]
+    D -->|Metadata separate| F[StageMetadata]
+```
 
-### 📊 **IMPACT ACHIEVED**
-- **Architecture**: From complex auto-handlers to clean transport envelope pattern
-- **Developer Experience**: From verbose wrapper objects to simple `entity.Send()`
-- **Debugging**: From hidden handlers to transparent, single-point processing  
-- **Metadata**: From lost context ("unknown") to preserved adapter identity
-- **Consistency**: From parallel handler system to standard Sora messaging patterns
+### 📊 **IMPLEMENTATION METRICS**
 
-*This refactoring successfully aligns Flow with Sora's core messaging patterns, eliminates auto-handler complexity, and preserves all necessary metadata for data lineage. Only the JsonElement serialization fix remains for complete functionality.*
+| Component | Framework Changes | User Impact |
+|-----------|-----------------|-------------|
+| **Sora.Messaging** | Add IQueuedMessage interface | Zero - Backward compatible |
+| **Sora.Flow.Core** | Major orchestrator refactor | Zero - Transparent operation |
+| **Adapters** | None | Zero - Existing code works |
+| **API** | None | Zero - Auto-orchestrator |
+
+### 🎯 **SUCCESS CRITERIA**
+
+| Requirement | Framework Implementation | User Experience |
+|-------------|------------------------|------------------|
+| **Source Detection** | FlowContext + [FlowAdapter] | Just add attribute |
+| **Transport Wrapping** | MessagingInterceptors | Automatic via .Send() |
+| **Queue Strategy** | Dedicated "Sora.Flow.FlowEntity" | Invisible to users |
+| **Orchestrator** | Auto-discovery + [FlowOrchestrator] | Zero-config or custom |
+| **Metadata Separation** | StagePayload vs StageMetadata | Clean data model |
+
+### 🚀 **EXPECTED OUTCOMES**
+
+#### Developer Experience
+- **Adapters**: `[FlowAdapter]` + `entity.Send()` = Done
+- **Orchestrators**: Optional `[FlowOrchestrator]` for customization
+- **Zero Learning Curve**: Framework handles complexity
+
+#### Technical Excellence
+- **Dedicated Flow Queue**: "Sora.Flow.FlowEntity" 
+- **Type-Safe Processing**: FlowEntity vs DynamicFlowEntity vs FlowValueObject
+- **Clean Metadata**: Source info separate from model payload
+- **External ID Composition**: Using metadata only (e.g., "identifier.external.oem")
+
+#### Operational Benefits
+- **Scalability**: Dedicated orchestrator services
+- **Observability**: Clear queue boundaries and processing paths
+- **Maintainability**: Framework-level abstractions vs user code
+- **Extensibility**: Custom orchestrators for advanced scenarios
+
+### 💡 **ARCHITECTURAL INSIGHTS**
+
+1. **Framework Responsibility**: Complex messaging patterns belong in framework
+2. **User Simplicity**: Simple attributes and method calls for users
+3. **Clean Boundaries**: Dedicated queues prevent cross-contamination
+4. **Metadata Separation**: Source info is orchestration metadata, not model data
+5. **Zero-Config Default**: Framework provides sensible defaults, customization available
+
+*This architecture achieves the holy grail: maximum framework sophistication with minimal user complexity.*

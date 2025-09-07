@@ -7,7 +7,10 @@ using Sora.Core.Json;
 using Sora.Flow.Attributes;
 using Sora.Flow.Context;
 using Sora.Flow.Model;
+using Sora.Flow.Core.Messaging;
 using Sora.Messaging;
+using System.Dynamic;
+using System.Linq;
 
 namespace Sora.Flow.Extensions;
 
@@ -17,41 +20,82 @@ namespace Sora.Flow.Extensions;
 public static class FlowEntityExtensions
 {
     /// <summary>
-    /// Sends any Flow entity (FlowEntity, DynamicFlowEntity, or FlowValueObject) through the messaging system 
-    /// with automatic transport envelope wrapping and JSON serialization.
+    /// Registers MessagingInterceptors for Flow entity types to provide automatic transport envelope wrapping.
+    /// This should be called during application startup to configure Flow entity messaging.
     /// </summary>
-    /// <param name="entity">The entity to send</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Task representing the send operation</returns>
-    public static async Task Send(this object entity, CancellationToken cancellationToken = default)
+    public static void RegisterFlowInterceptors()
     {
-        if (entity == null) throw new ArgumentNullException(nameof(entity));
-        
-        System.Diagnostics.Debug.WriteLine($"[FlowEntityExtensions] DEBUG: Send() called for entity type {entity.GetType().Name}");
-        Console.Error.WriteLine($"[FlowEntityExtensions] DEBUG: Send() called for entity type {entity.GetType().Name}");
-        
-        // Verify this is a Flow entity type
-        var entityType = entity.GetType();
-        if (!IsFlowEntityType(entityType))
+        // Register interceptor for DynamicFlowEntity types using the IDynamicFlowEntity interface
+        MessagingInterceptors.RegisterForInterface<IDynamicFlowEntity>(entity =>
         {
-            throw new ArgumentException($"Entity type {entityType.Name} is not a Flow entity type. Must inherit from FlowEntity<T>, DynamicFlowEntity<T>, or FlowValueObject<T>.");
-        }
+            var envelope = CreateDynamicTransportEnvelope(entity);
+            return new FlowQueuedMessage(envelope);
+        });
         
-        // Get current flow context for adapter identity
+        // For regular FlowEntity types, we need to discover and register each type individually
+        // since they don't share a common interface
+        var allFlowTypes = DiscoverAllFlowTypes();
+        
+        foreach (var flowType in allFlowTypes)
+        {
+            var baseType = flowType.BaseType;
+            if (baseType != null && baseType.IsGenericType)
+            {
+                var genericDef = baseType.GetGenericTypeDefinition();
+                
+                // Skip DynamicFlowEntity types (handled by interface registration above)
+                if (genericDef == typeof(DynamicFlowEntity<>))
+                    continue;
+                    
+                // Register FlowEntity and FlowValueObject types
+                if (genericDef == typeof(FlowEntity<>) || genericDef == typeof(FlowValueObject<>))
+                {
+                    // Use reflection to call RegisterForType<T> with the specific type
+                    var method = typeof(MessagingInterceptors).GetMethod("RegisterForType")!.MakeGenericMethod(flowType);
+                    var delegateType = typeof(System.Func<,>).MakeGenericType(flowType, typeof(object));
+                    var interceptor = System.Delegate.CreateDelegate(delegateType, typeof(FlowEntityExtensions).GetMethod("CreateFlowQueuedMessageGeneric")!.MakeGenericMethod(flowType));
+                    method.Invoke(null, new object[] { interceptor });
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Generic method for creating transport envelopes for specific FlowEntity types.
+    /// Used with reflection to register type-specific interceptors.
+    /// </summary>
+    public static object CreateTransportEnvelopeGeneric<T>(T entity) where T : class
+    {
+        return CreateTransportEnvelope(entity);
+    }
+
+    /// <summary>
+    /// Generic method to create FlowQueuedMessage for any FlowEntity or FlowValueObject type.
+    /// Used by reflection in RegisterFlowInterceptors for the new queue routing approach.
+    /// </summary>
+    public static object CreateFlowQueuedMessageGeneric<T>(T entity) where T : class
+    {
+        var envelope = CreateTransportEnvelope(entity);
+        return new FlowQueuedMessage(envelope);
+    }
+    
+    /// <summary>
+    /// Creates a transport envelope for regular FlowEntity types.
+    /// </summary>
+    private static object CreateTransportEnvelope(object entity)
+    {
+        var entityType = entity.GetType();
         var context = FlowContext.Current ?? GetAdapterContextFromCallStack();
-        Console.Error.WriteLine($"[FlowEntityExtensions] DEBUG: Context - System: {context?.System}, Adapter: {context?.Adapter}");
         
         // Create generic transport envelope with strong typing
         var envelopeType = typeof(TransportEnvelope<>).MakeGenericType(entityType);
-        var envelope = Activator.CreateInstance(envelopeType);
-        Console.Error.WriteLine($"[FlowEntityExtensions] DEBUG: Created envelope type: {envelopeType.Name}");
+        var envelope = Activator.CreateInstance(envelopeType)!;
         
-        // Set envelope properties via reflection (since we're creating generic type dynamically)
+        // Set envelope properties via reflection
         SetEnvelopeProperty(envelope, "Version", "1");
         SetEnvelopeProperty(envelope, "Source", context?.GetEffectiveSource());
         SetEnvelopeProperty(envelope, "Model", entityType.Name);
-        var typeString = $"TransportEnvelope<{entityType.FullName ?? entityType.Name}>";
-        SetEnvelopeProperty(envelope, "Type", typeString);
+        SetEnvelopeProperty(envelope, "Type", $"TransportEnvelope<{entityType.FullName ?? entityType.Name}>");
         SetEnvelopeProperty(envelope, "Payload", entity);
         SetEnvelopeProperty(envelope, "Timestamp", DateTimeOffset.UtcNow);
         SetEnvelopeProperty(envelope, "Metadata", new Dictionary<string, object?>
@@ -60,15 +104,74 @@ public static class FlowEntityExtensions
             ["adapter"] = context?.Adapter ?? "unknown"
         });
         
-        Console.Error.WriteLine($"[FlowEntityExtensions] DEBUG: Envelope configured - Type: {typeString}");
+        // Serialize to JSON string for messaging system
+        return envelope.ToJson();
+    }
+    
+    /// <summary>
+    /// Creates a dynamic transport envelope for DynamicFlowEntity types.
+    /// </summary>
+    private static object CreateDynamicTransportEnvelope(IDynamicFlowEntity entity)
+    {
+        var entityType = entity.GetType();
+        var context = FlowContext.Current ?? GetAdapterContextFromCallStack();
         
-        // Serialize to JSON using Sora.Core (eliminates JsonElements)
-        var json = envelope.ToJson();
-        Console.Error.WriteLine($"[FlowEntityExtensions] DEBUG: JSON serialized, length: {json.Length}, starts with: {json.Substring(0, Math.Min(100, json.Length))}...");
+        // Create DynamicTransportEnvelope<T>
+        var envelopeType = typeof(DynamicTransportEnvelope<>).MakeGenericType(entityType);
+        var envelope = Activator.CreateInstance(envelopeType)!;
         
-        // Send JSON string via messaging system
-        await MessagingExtensions.Send(json, cancellationToken: cancellationToken);
-        Console.Error.WriteLine($"[FlowEntityExtensions] DEBUG: JSON string sent to messaging system");
+        // Extract dictionary payload from DynamicFlowEntity.Model
+        var payloadDict = new Dictionary<string, object?>();
+        if (entity.Model is ExpandoObject expando)
+        {
+            payloadDict = FlattenExpandoToDictionary(expando);
+        }
+        
+        // Set envelope properties via reflection
+        SetEnvelopeProperty(envelope, "Version", "1");
+        SetEnvelopeProperty(envelope, "Source", context?.GetEffectiveSource());
+        SetEnvelopeProperty(envelope, "Model", entityType.Name);
+        SetEnvelopeProperty(envelope, "Type", $"DynamicTransportEnvelope<{entityType.FullName ?? entityType.Name}>");
+        SetEnvelopeProperty(envelope, "Payload", payloadDict);
+        SetEnvelopeProperty(envelope, "Timestamp", DateTimeOffset.UtcNow);
+        SetEnvelopeProperty(envelope, "Metadata", new Dictionary<string, object?>
+        {
+            ["system"] = context?.System ?? "unknown",
+            ["adapter"] = context?.Adapter ?? "unknown"
+        });
+        
+        // Serialize to JSON string for messaging system
+        return envelope.ToJson();
+    }
+    
+    /// <summary>
+    /// Flattens an ExpandoObject to a dictionary with JSON path keys.
+    /// </summary>
+    private static Dictionary<string, object?> FlattenExpandoToDictionary(ExpandoObject expando, string prefix = "")
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var dict = (IDictionary<string, object?>)expando;
+        
+        foreach (var kvp in dict)
+        {
+            var currentPath = string.IsNullOrEmpty(prefix) ? kvp.Key : $"{prefix}.{kvp.Key}";
+            
+            if (kvp.Value is ExpandoObject nested)
+            {
+                // Recursively flatten nested ExpandoObjects
+                var nestedFlattened = FlattenExpandoToDictionary(nested, currentPath);
+                foreach (var nestedKvp in nestedFlattened)
+                {
+                    result[nestedKvp.Key] = nestedKvp.Value;
+                }
+            }
+            else if (kvp.Value != null)
+            {
+                result[currentPath] = kvp.Value;
+            }
+        }
+        
+        return result;
     }
     
     /// <summary>
@@ -127,5 +230,69 @@ public static class FlowEntityExtensions
         return genericDef == typeof(FlowEntity<>) || 
                genericDef == typeof(DynamicFlowEntity<>) || 
                genericDef == typeof(FlowValueObject<>);
+    }
+    
+    /// <summary>
+    /// Discovers all Flow entity types across all loaded assemblies.
+    /// Returns FlowEntity<T>, DynamicFlowEntity<T>, and FlowValueObject<T> types.
+    /// </summary>
+    private static List<Type> DiscoverAllFlowTypes()
+    {
+        var result = new List<Type>();
+        
+        // Scan all assemblies in the current AppDomain
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        
+        foreach (var assembly in assemblies)
+        {
+            var flowTypes = DiscoverFlowTypesInAssembly(assembly);
+            result.AddRange(flowTypes);
+        }
+        
+        return result;
+    }
+    
+    /// <summary>
+    /// Discovers Flow entity types within a specific assembly.
+    /// </summary>
+    private static List<Type> DiscoverFlowTypesInAssembly(Assembly assembly)
+    {
+        var result = new List<Type>();
+        
+        try
+        {
+            Type?[] types;
+            try { types = assembly.GetTypes(); }
+            catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
+            catch { return result; }
+            
+            foreach (var t in types)
+            {
+                if (t is null || !t.IsClass || t.IsAbstract) continue;
+                
+                // Check for FlowIgnore attribute to opt out
+                if (t.GetCustomAttribute<FlowIgnoreAttribute>() is not null) continue;
+                
+                var bt = t.BaseType;
+                if (bt is null || !bt.IsGenericType) continue;
+                
+                var def = bt.GetGenericTypeDefinition();
+                
+                // Include all Flow entity types
+                if (def == typeof(FlowEntity<>) || 
+                    def == typeof(FlowValueObject<>) || 
+                    def == typeof(DynamicFlowEntity<>))
+                {
+                    result.Add(t);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't fail - some assemblies might not be accessible
+            Console.WriteLine($"[FlowEntityExtensions] Warning: Failed to scan assembly {assembly.FullName}: {ex.Message}");
+        }
+        
+        return result;
     }
 }

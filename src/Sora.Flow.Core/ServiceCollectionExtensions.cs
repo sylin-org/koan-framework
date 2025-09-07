@@ -28,7 +28,6 @@ using Sora.Core.Utilities.Ids;
 using Sora.Flow.Monitoring;
 using Sora.Messaging;
 using Sora.Flow.Actions;
-using Sora.Flow.Sending;
 using Microsoft.Extensions.Configuration;
 
 namespace Sora.Flow;
@@ -68,7 +67,8 @@ public static class ServiceCollectionExtensions
         // Install global naming policy for Flow entities
         services.AddSoraFlowNaming();
 
-
+        // Register MessagingInterceptors for Flow entities
+        Extensions.FlowEntityExtensions.RegisterFlowInterceptors();
 
         // Materialization engine
         services.TryAddSingleton<IFlowMaterializer, Materialization.FlowMaterializer>();
@@ -77,9 +77,7 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelAssociationWorkerHostedService>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelProjectionWorkerHostedService>());
 
-        // Sender DX (normalized payload + batch), identity stamping, and actions
-        services.AddFlowSender();
-        services.TryAddSingleton<Sora.Flow.Sending.IFlowIdentityStamper, Sora.Flow.Sending.FlowIdentityStamper>();
+        // Identity stamping and actions
         services.AddFlowActions();
 
         return services;

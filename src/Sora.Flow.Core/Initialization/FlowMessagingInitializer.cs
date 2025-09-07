@@ -1,14 +1,23 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
+using Sora.Core;
+using Sora.Core.Hosting.App;
 using Sora.Core.Json;
+using Sora.Flow.Actions;
 using Sora.Flow.Attributes;
+using Sora.Flow.Context;
 using Sora.Flow.Model;
+using Sora.Flow.Infrastructure;
+using Sora.Data.Core;
 using Sora.Messaging;
 
 namespace Sora.Flow.Initialization;
@@ -20,27 +29,76 @@ namespace Sora.Flow.Initialization;
 public static class FlowMessagingInitializer
 {
     /// <summary>
-    /// Registers transport envelope transformers for all Flow entity types found in loaded assemblies.
-    /// This eliminates the need for manual registration and ensures all entities can use entity.Send().
+    /// Helper method to set properties on dynamically created envelopes.
     /// </summary>
-    public static void RegisterFlowTransformers()
+    private static void SetEnvelopeProperty(object envelope, string propertyName, object? value)
     {
-        var allFlowTypes = DiscoverAllFlowTypes();
-        
-        foreach (var flowType in allFlowTypes)
-        {
-            // Register each entity type so MessagingTransformers can wrap it in TransportEnvelope
-            // The transformer key is the full type name for precise matching
-            MessagingTransformers.Register(flowType.FullName ?? flowType.Name, payload =>
-            {
-                // Note: This transformer is called when the entity is sent
-                // The actual FlowContext will be captured in the Send extension method
-                // This is just a passthrough to let the messaging system know
-                // that this type should be handled specially
-                return payload;
-            });
-        }
+        var property = envelope.GetType().GetProperty(propertyName);
+        property?.SetValue(envelope, value);
     }
+    
+    /// <summary>
+    /// Flattens an ExpandoObject to a dictionary with JSON path keys.
+    /// </summary>
+    private static Dictionary<string, object?> FlattenExpandoToDictionary(ExpandoObject expando, string prefix = "")
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var dict = (IDictionary<string, object?>)expando;
+        
+        foreach (var kvp in dict)
+        {
+            var currentPath = string.IsNullOrEmpty(prefix) ? kvp.Key : $"{prefix}.{kvp.Key}";
+            
+            if (kvp.Value is ExpandoObject nested)
+            {
+                // Recursively flatten nested ExpandoObjects
+                var nestedFlattened = FlattenExpandoToDictionary(nested, currentPath);
+                foreach (var nestedKvp in nestedFlattened)
+                {
+                    result[nestedKvp.Key] = nestedKvp.Value;
+                }
+            }
+            else if (kvp.Value != null)
+            {
+                result[currentPath] = kvp.Value;
+            }
+        }
+        
+        return result;
+    }
+    
+    /// <summary>
+    /// Attempts to get adapter context from call stack when FlowContext.Current is not set.
+    /// </summary>
+    private static FlowContext? GetAdapterContextFromCallStack()
+    {
+        try
+        {
+            var stackTrace = new System.Diagnostics.StackTrace();
+            var frames = stackTrace.GetFrames();
+            
+            if (frames == null) return null;
+            
+            foreach (var frame in frames)
+            {
+                var method = frame.GetMethod();
+                if (method?.DeclaringType == null) continue;
+                
+                var adapterAttr = method.DeclaringType.GetCustomAttribute<FlowAdapterAttribute>(inherit: true);
+                if (adapterAttr != null)
+                {
+                    return new FlowContext(adapterAttr.System, adapterAttr.Adapter, adapterAttr.DefaultSource);
+                }
+            }
+        }
+        catch
+        {
+            // Stack trace analysis failed - return null
+        }
+        
+        return null;
+    }
+    
     
     /// <summary>
     /// Adds the Flow transport handler to the service collection.
@@ -55,18 +113,10 @@ public static class FlowMessagingInitializer
             Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: JSON preview: {json.Substring(0, Math.Min(200, json.Length))}...");
             
             // Check if this is a Flow transport envelope by looking for our Type field
-            if (json.Contains("\"type\":\"TransportEnvelope<"))
+            if (json.Contains("\"type\":\"TransportEnvelope<") || json.Contains("\"type\":\"DynamicTransportEnvelope<"))
             {
-                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Identified as Flow transport envelope, processing...");
-                var handler = services.BuildServiceProvider().GetService<FlowTransportProcessor>();
-                if (handler != null)
-                {
-                    await handler.ProcessFlowTransportJson(json);
-                }
-                else
-                {
-                    Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: FlowTransportProcessor not found in services");
-                }
+                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Flow transport envelope - processing into Flow pipeline");
+                await ProcessFlowTransportEnvelope(json);
             }
             else
             {
@@ -74,9 +124,121 @@ public static class FlowMessagingInitializer
             }
         });
         
-        // Register the processor as a service
-        services.AddSingleton<FlowTransportProcessor>();
         return services;
+    }
+    
+    /// <summary>
+    /// Processes a Flow transport envelope into the Flow pipeline stages.
+    /// Handles both regular TransportEnvelope and DynamicTransportEnvelope types.
+    /// </summary>
+    private static async Task ProcessFlowTransportEnvelope(string json)
+    {
+        try
+        {
+            // Deserialize the envelope as a dynamic object to extract metadata and payload
+            dynamic envelope = Newtonsoft.Json.JsonConvert.DeserializeObject(json)!;
+            
+            string model = envelope.model;
+            string source = envelope.source;
+            object payload = envelope.payload;
+            string? correlationId = envelope.metadata?.correlation_id;
+            
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Processing {model} from {source}");
+            
+            // Get the IFlowActions service from the current service provider
+            var serviceProvider = AppHost.Current;
+            if (serviceProvider == null)
+            {
+                Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: AppHost.Current is null, cannot process Flow envelope");
+                return;
+            }
+            
+            var flowActions = serviceProvider.GetService<IFlowActions>();
+            if (flowActions == null)
+            {
+                Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: IFlowActions service not registered");
+                return;
+            }
+            
+            // Generate a reference ID based on the payload
+            string referenceId = GenerateReferenceId(payload);
+            
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Seeding {model} with referenceId {referenceId} - bypassing FlowActions");
+            
+            // BYPASS FLOWACTIONS - Direct Flow pipeline integration
+            // Instead of calling FlowActions.SeedAsync() which creates FlowAction messages,
+            // directly invoke the FlowActionHandler logic to persist to MongoDB
+            try
+            {
+                var modelType = Sora.Flow.Infrastructure.FlowRegistry.ResolveModel(model);
+                if (modelType != null)
+                {
+                    Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Resolved model type {modelType.Name} for {model}");
+                    await DirectSeedToIntake(modelType, model, referenceId, payload);
+                    Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Successfully seeded {model} directly to intake");
+                }
+                else
+                {
+                    Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Could not resolve model type for {model}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Failed to seed {model} directly: {ex.Message}");
+                // Fallback to original FlowActions approach
+                await flowActions.SeedAsync(
+                    model: model,
+                    referenceId: referenceId,
+                    payload: payload,
+                    correlationId: correlationId
+                );
+            }
+            
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Successfully seeded {model} into Flow pipeline");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Failed to process Flow transport envelope: {ex.Message}");
+            Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Stack trace: {ex.StackTrace}");
+        }
+    }
+    
+    /// <summary>
+    /// Generates a reference ID for the Flow entity based on its payload.
+    /// For entities with an Id property, use that. Otherwise generate a new ULID.
+    /// </summary>
+    private static string GenerateReferenceId(object payload)
+    {
+        try
+        {
+            // Try to extract Id from payload if it's a dynamic object
+            if (payload is JObject jObject)
+            {
+                var id = jObject["id"]?.ToString() ?? jObject["Id"]?.ToString();
+                if (!string.IsNullOrEmpty(id))
+                {
+                    return id;
+                }
+                
+                // For DynamicFlowEntity, try to get identifier fields from nested model
+                if (jObject["model"] is JObject modelObj)
+                {
+                    // Try common identifier patterns for dynamic entities
+                    var code = modelObj["identifier"]?["code"]?.ToString();
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        return code;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Fall through to generate new ULID
+        }
+        
+        // Generate a new GUID as fallback
+        return StringId.New();
     }
     
     /// <summary>
@@ -143,329 +305,75 @@ public static class FlowMessagingInitializer
         
         return result;
     }
-}
-
-/// <summary>
-/// Service that handles incoming Flow transport JSON strings and processes them into Flow intake.
-/// Uses JSON path querying and type caching for optimal performance.
-/// </summary>
-internal class FlowTransportProcessor
-{
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<FlowTransportProcessor> _logger;
-    private static readonly Dictionary<string, Type> _envelopeTypeCache = new();
-    private static readonly object _cacheLock = new();
-    
-    public FlowTransportProcessor(IServiceProvider serviceProvider, ILogger<FlowTransportProcessor> logger)
-    {
-        _serviceProvider = serviceProvider;
-        _logger = logger;
-    }
-    
-    public async Task ProcessFlowTransportJson(string json)
-    {
-        try
-        {
-            Console.Error.WriteLine($"[FlowTransportProcessor] DEBUG: Starting ProcessFlowTransportJson, JSON length: {json.Length}");
-            
-            // Parse JSON and extract type information using Newtonsoft paths
-            var jObject = Newtonsoft.Json.Linq.JObject.Parse(json);
-            var typeValue = jObject["type"]?.ToString();
-            var modelValue = jObject["model"]?.ToString();
-            var systemValue = jObject["metadata"]?["system"]?.ToString();
-            var adapterValue = jObject["metadata"]?["adapter"]?.ToString();
-            
-            Console.Error.WriteLine($"[FlowTransportProcessor] DEBUG: Extracted - Type: {typeValue}, Model: {modelValue}, System: {systemValue}, Adapter: {adapterValue}");
-            
-            _logger.LogDebug("[FlowTransport] Processing JSON transport: Model={Model}, System={System}, Adapter={Adapter}", 
-                modelValue, systemValue, adapterValue);
-            
-            if (string.IsNullOrEmpty(typeValue))
-            {
-                _logger.LogWarning("[FlowTransport] Missing Type field in transport JSON");
-                return;
-            }
-            
-            // Extract payload type from generic envelope type (with caching)
-            var envelopeType = GetCachedEnvelopeType(typeValue);
-            if (envelopeType == null)
-            {
-                _logger.LogWarning("[FlowTransport] Could not resolve envelope type: {Type}", typeValue);
-                return;
-            }
-            
-            // Deserialize entire envelope using strongly-typed generic
-            var envelope = json.FromJson(envelopeType);
-            if (envelope == null)
-            {
-                _logger.LogWarning("[FlowTransport] Failed to deserialize transport envelope");
-                return;
-            }
-            
-            // Extract payload and metadata using reflection (since envelope is dynamic type)
-            var payloadProperty = envelopeType.GetProperty("Payload");
-            var metadataProperty = envelopeType.GetProperty("Metadata");
-            var sourceProperty = envelopeType.GetProperty("Source");
-            var timestampProperty = envelopeType.GetProperty("Timestamp");
-            
-            var entity = payloadProperty?.GetValue(envelope);
-            var metadata = metadataProperty?.GetValue(envelope) as Dictionary<string, object?>;
-            var source = sourceProperty?.GetValue(envelope)?.ToString();
-            var timestamp = (DateTimeOffset)(timestampProperty?.GetValue(envelope) ?? DateTimeOffset.UtcNow);
-            
-            if (entity == null)
-            {
-                _logger.LogWarning("[FlowTransport] Null payload in envelope for model: {Model}", modelValue);
-                return;
-            }
-            
-            // Get payload type for Flow processing
-            var payloadType = entity.GetType();
-            
-            // Get the Flow sender service
-            var sender = _serviceProvider.GetService<Sending.IFlowSender>();
-            if (sender == null)
-            {
-                _logger.LogError("[FlowTransport] IFlowSender not available");
-                return;
-            }
-            
-            // Convert entity to bag dictionary
-            var bag = ExtractEntityBag(entity);
-            
-            // Add metadata to bag (no JsonElements since we used Newtonsoft.Json throughout)
-            if (metadata != null)
-            {
-                foreach (var kvp in metadata)
-                {
-                    bag[kvp.Key] = kvp.Value;
-                }
-            }
-            
-            // Create the flow send item with preserved source information
-            var sourceId = source ?? "transport-handler";
-            var item = new Sending.FlowSendPlainItem(payloadType, sourceId, timestamp, bag);
-            
-            // Send to Flow intake
-            await sender.SendAsync(new[] { item }, null, null, null);
-            
-            _logger.LogDebug("[FlowTransport] Successfully processed transport for model: {Model}", modelValue);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[FlowTransport] Failed to process transport JSON: {Error}", ex.Message);
-        }
-    }
     
     /// <summary>
-    /// Gets or creates cached envelope type from type string with performance optimization.
+    /// Directly seeds payload into Flow intake stage, bypassing FlowAction messaging.
+    /// Replicates FlowActionHandler.HandleSeedAsync logic.
     /// </summary>
-    private static Type? GetCachedEnvelopeType(string typeValue)
+    private static async Task DirectSeedToIntake(Type modelType, string model, string referenceId, object payload)
     {
-        if (_envelopeTypeCache.TryGetValue(typeValue, out var cachedType))
+        // Create StageRecord<TModel> and save to intake set (from FlowActionHandler.HandleSeedAsync)
+        var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
+        var record = Activator.CreateInstance(recordType)!;
+        recordType.GetProperty("Id")!.SetValue(record, Guid.NewGuid().ToString("n"));
+        recordType.GetProperty("SourceId")!.SetValue(record, referenceId ?? model);
+        recordType.GetProperty("OccurredAt")!.SetValue(record, DateTimeOffset.UtcNow);
+        
+        // Convert payload to dictionary format and preserve metadata
+        var dict = ToDict(payload);
+        if (dict != null)
         {
-            return cachedType;
-        }
-        
-        lock (_cacheLock)
-        {
-            // Double-check pattern
-            if (_envelopeTypeCache.TryGetValue(typeValue, out cachedType))
-            {
-                return cachedType;
-            }
-            
-            // Parse type string: "TransportEnvelope<S8.Flow.Shared.Device>"
-            var match = System.Text.RegularExpressions.Regex.Match(typeValue, @"TransportEnvelope<(.+)>");
-            if (!match.Success)
-            {
-                return null;
-            }
-            
-            var payloadTypeName = match.Groups[1].Value;
-            var payloadType = FindTypeInAssemblies(payloadTypeName);
-            if (payloadType == null)
-            {
-                return null;
-            }
-            
-            // Create generic envelope type
-            var envelopeType = typeof(TransportEnvelope<>).MakeGenericType(payloadType);
-            _envelopeTypeCache[typeValue] = envelopeType;
-            
-            return envelopeType;
-        }
-    }
-    
-    /// <summary>
-    /// Extracts entity properties into a bag dictionary, handling both regular and dynamic entities.
-    /// This is similar to the ToBag method from auto-handlers but with better DynamicFlowEntity support.
-    /// </summary>
-    private static Dictionary<string, object?> ExtractEntityBag(object entity)
-    {
-        var bag = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        
-        if (entity == null) return bag;
-        
-        try
-        {
-            // Special handling for DynamicFlowEntity - extract from Model property
-            if (entity is IDynamicFlowEntity dynamicEntity && dynamicEntity.Model != null)
-            {
-                // Flatten the ExpandoObject Model to dictionary paths
-                var flattened = FlattenExpando(dynamicEntity.Model, "");
-                foreach (var kvp in flattened)
-                {
-                    bag[kvp.Key] = ConvertJsonElementValue(kvp.Value);
-                }
-                
-                // Also add the Id if present
-                var idProp = entity.GetType().GetProperty("Id");
-                if (idProp != null && idProp.CanRead)
-                {
-                    var idVal = idProp.GetValue(entity);
-                    if (idVal != null) bag["Id"] = ConvertJsonElementValue(idVal);
-                }
-            }
-            else
-            {
-                // Regular entity - extract simple properties
-                var props = entity.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public);
-                foreach (var prop in props)
-                {
-                    if (!prop.CanRead) continue;
-                    var val = prop.GetValue(entity);
-                    if (val == null || IsSimpleType(val.GetType()))
-                    {
-                        bag[prop.Name] = ConvertJsonElementValue(val);
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[FlowTransport] Warning: Failed to extract entity bag: {ex.Message}");
-        }
-        
-        return bag;
-    }
-    
-    /// <summary>
-    /// Flattens an ExpandoObject to dotted path notation for aggregation key matching.
-    /// </summary>
-    private static Dictionary<string, object?> FlattenExpando(System.Dynamic.ExpandoObject expando, string prefix)
-    {
-        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        var dict = (IDictionary<string, object?>)expando;
-        
-        foreach (var kvp in dict)
-        {
-            var currentPath = string.IsNullOrEmpty(prefix) ? kvp.Key : $"{prefix}.{kvp.Key}";
-            
-            if (kvp.Value is System.Dynamic.ExpandoObject nested)
-            {
-                var nestedFlattened = FlattenExpando(nested, currentPath);
-                foreach (var nestedKvp in nestedFlattened)
-                {
-                    result[nestedKvp.Key] = nestedKvp.Value;
-                }
-            }
-            else
-            {
-                result[currentPath] = ConvertJsonElementValue(kvp.Value);
-            }
-        }
-        
-        return result;
-    }
-    
-    /// <summary>
-    /// Checks if a type is a simple type that can be serialized directly.
-    /// </summary>
-    private static bool IsSimpleType(Type type)
-    {
-        if (type.IsPrimitive || type.IsEnum) return true;
-        return type == typeof(string) || 
-               type == typeof(decimal) || 
-               type == typeof(DateTime) || 
-               type == typeof(DateTimeOffset) || 
-               type == typeof(Guid) || 
-               type == typeof(TimeSpan);
-    }
-    
-    /// <summary>
-    /// Converts JsonElement values to primitive types that can be serialized to MongoDB.
-    /// Handles the common case where RabbitMQ deserializes metadata as JsonElement objects.
-    /// </summary>
-    private static object? ConvertJsonElementValue(object? value)
-    {
-        if (value == null) return null;
-        
-        // Handle System.Text.Json.JsonElement
-        if (value is System.Text.Json.JsonElement jsonElement)
-        {
-            return jsonElement.ValueKind switch
-            {
-                System.Text.Json.JsonValueKind.String => jsonElement.GetString(),
-                System.Text.Json.JsonValueKind.Number => jsonElement.TryGetInt64(out var longVal) ? longVal : jsonElement.GetDouble(),
-                System.Text.Json.JsonValueKind.True => true,
-                System.Text.Json.JsonValueKind.False => false,
-                System.Text.Json.JsonValueKind.Null => null,
-                _ => jsonElement.ToString() // For objects/arrays, convert to string
-            };
-        }
-        
-        // Return as-is for other types
-        return value;
-    }
-    
-    /// <summary>
-    /// Finds a type by name in all loaded assemblies.
-    /// </summary>
-    private static Type? FindTypeInAssemblies(string typeName)
-    {
-        // First try the simple approach
-        var type = Type.GetType(typeName);
-        if (type != null) return type;
-        
-        // Search through all loaded assemblies
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
+            // Extract system/adapter from the transport envelope metadata
             try
             {
-                type = assembly.GetType(typeName);
-                if (type != null) return type;
+                dynamic envelope = Newtonsoft.Json.JsonConvert.DeserializeObject(referenceId)!; // referenceId contains the original JSON
+                // Actually, we need to pass the metadata through properly
+                // For now, extract from model parameter which should have the metadata
+                if (!dict.ContainsKey(Constants.Envelope.System)) 
+                {
+                    // Try to extract from source field (e.g., "bms" or "oem")
+                    var parts = model.Split('.');
+                    var source = parts.Length > 0 ? parts[0] : "flow";
+                    dict[Constants.Envelope.System] = source;
+                }
+                if (!dict.ContainsKey(Constants.Envelope.Adapter)) 
+                {
+                    dict[Constants.Envelope.Adapter] = dict[Constants.Envelope.System] ?? "transport";
+                }
             }
             catch
             {
-                // Assembly might not be accessible, skip
+                // Fallback to defaults if extraction fails
+                if (!dict.ContainsKey(Constants.Envelope.System)) dict[Constants.Envelope.System] = "flow";
+                if (!dict.ContainsKey(Constants.Envelope.Adapter)) dict[Constants.Envelope.Adapter] = "transport";
             }
         }
-        
-        return null;
+        recordType.GetProperty("StagePayload")!.SetValue(record, dict);
+
+        // Save to MongoDB using Data<,>.UpsertAsync (from FlowActionHandler.HandleSeedAsync)
+        var dataType = typeof(Data<,>).MakeGenericType(recordType, typeof(string));
+        var upsert = dataType.GetMethod("UpsertAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { recordType, typeof(string), typeof(CancellationToken) })!;
+        await (Task)upsert.Invoke(null, new object?[] { record, FlowSets.StageShort(FlowSets.Intake), CancellationToken.None })!;
     }
     
     /// <summary>
-    /// Deserializes the payload to the exact expected type using Sora.Core JSON capabilities.
-    /// This eliminates JsonElement contamination by using Newtonsoft.Json instead of System.Text.Json.
+    /// Converts payload to dictionary format, ensuring MongoDB-compatible types
     /// </summary>
-    private static object? DeserializePayloadToExactType(object? payload, Type targetType)
+    private static IDictionary<string, object?>? ToDict(object? payload)
     {
-        if (payload == null) return null;
+        if (payload is null) return null;
         
+        // Convert to JSON string and back to eliminate JsonElement and JObject issues
         try
         {
-            // Use Sora.Core JSON round-trip to eliminate JsonElements
-            // Newtonsoft.Json doesn't create JsonElement objects like System.Text.Json does
             var json = payload.ToJson();
-            var cleanEntity = json.FromJson(targetType);
-            
-            return cleanEntity;
+            var dict = json.FromJson<Dictionary<string, object?>>();
+            return dict;
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"[FlowTransport] Failed to deserialize payload to type {targetType.Name}: {ex.Message}");
-            return null;
+            // Fallback to simple dictionary wrapping
+            return new Dictionary<string, object?> { ["value"] = payload?.ToString() };
         }
     }
 }

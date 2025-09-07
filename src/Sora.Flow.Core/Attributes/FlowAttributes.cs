@@ -57,10 +57,10 @@ public sealed class ParentKeyAttribute : Attribute
 }
 
 /// <summary>
-/// Marks an assembly as a Flow orchestrator, enabling auto-registration of message handlers
-/// for all FlowEntity and FlowValueObject types discovered in the assembly.
+/// Marks a class as a Flow orchestrator, enabling auto-registration and message processing
+/// for Flow entity transport envelopes from the dedicated "Sora.Flow.FlowEntity" queue.
 /// </summary>
-[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public sealed class FlowOrchestratorAttribute : Attribute { }
 
 /// <summary>

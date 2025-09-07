@@ -1,8 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using S8.Flow.Shared;
-using Sora.Flow;
-using Sora.Flow.Sending;
 using Sora.Flow.Extensions;
+using Sora.Messaging;
 
 namespace S8.Flow.Api.Controllers;
 
@@ -98,42 +97,6 @@ public class FlowDemoController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Send a command to all adapters via Flow's beautiful command API.
-    /// POST /api/flowdemo/command/broadcast?command=seed
-    /// </summary>
-    [HttpPost("command/broadcast")]
-    public async Task<IActionResult> BroadcastCommand(string command, [FromBody] object? payload = null)
-    {
-        // ✨ BEAUTIFUL: Flow command broadcasting
-        await Sora.Flow.Flow.Send(command, payload).Broadcast();
-        
-        return Ok(new { 
-            message = $"✅ Command '{command}' broadcast to all adapters!", 
-            command,
-            payload,
-            route = "Flow.Send().Broadcast() → All Adapter Handlers"
-        });
-    }
-
-    /// <summary>
-    /// Send a command to a specific adapter target.
-    /// POST /api/flowdemo/command/targeted?command=seed&amp;target=bms:simulator
-    /// </summary>
-    [HttpPost("command/targeted")]
-    public async Task<IActionResult> SendTargetedCommand(string command, string target, [FromBody] object? payload = null)
-    {
-        // ✨ BEAUTIFUL: Targeted command sending
-        await Sora.Flow.Flow.Send(command, payload).To(target);
-        
-        return Ok(new { 
-            message = $"✅ Command '{command}' sent to target '{target}'!", 
-            command,
-            target,
-            payload,
-            route = $"Flow.Send().To({target}) → Targeted Adapter Handler"
-        });
-    }
 }
 
 public record CreateDeviceRequest(

@@ -226,14 +226,15 @@ internal class RabbitMqBus : IMessageBus
     {
         var type = typeof(T);
 
-        // Distinguish wrapper vs plain entity messages to avoid shape collision.
-        // Previously FlowTargetedMessage<T> shared the same queue name as T causing
-        // deserialization of plain T JSON into FlowTargetedMessage<T> (Entity null -> Send(null) -> ArgumentNullException).
-        if (type.IsGenericType && type.GetGenericTypeDefinition().Name.StartsWith("FlowTargetedMessage"))
+        // Handle transport envelope types distinctly from their payload types
+        // to avoid queue name collisions and deserialization issues
+        if (type.IsGenericType && 
+            (type.GetGenericTypeDefinition().Name.StartsWith("TransportEnvelope") ||
+             type.GetGenericTypeDefinition().Name.StartsWith("DynamicTransportEnvelope")))
         {
             var innerType = type.GetGenericArguments()[0];
             var inner = innerType.FullName ?? innerType.Name;
-            return inner + ".targeted"; // generic, non-domain specific suffix
+            return inner + ".transport"; // transport envelope suffix
         }
 
         // Default: use the concrete type's full name (fallback to Name if null)

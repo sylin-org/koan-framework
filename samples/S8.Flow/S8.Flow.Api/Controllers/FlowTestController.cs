@@ -1,8 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using S8.Flow.Shared;
-using Sora.Flow;
-using Sora.Flow.Sending;
 using Sora.Flow.Extensions;
+using Sora.Messaging;
 
 namespace S8.Flow.Api.Controllers;
 
@@ -22,17 +21,11 @@ public class FlowTestController : ControllerBase
     {
         try
         {
-            // Verify Flow static API is accessible
-            var outbound = Sora.Flow.Flow.Outbound;
-            var inbound = Sora.Flow.Flow.Inbound;
-
             return Ok(new
             {
-                status = "✅ Flow orchestrator APIs are accessible",
-                outbound = outbound != null ? "Available" : "Null",
-                inbound = inbound != null ? "Available" : "Null",
-                assembly_marked = "This assembly has [FlowOrchestrator] attribute",
-                auto_registration = "Should auto-register handlers for Device, Sensor, Reading"
+                status = "✅ Flow messaging system is available",
+                messaging = "Entity.Send() pattern available",
+                transport = "TransportEnvelope system active"
             });
         }
         catch (Exception ex)

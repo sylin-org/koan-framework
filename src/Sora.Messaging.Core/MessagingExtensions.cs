@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Sora.Core.Hosting.App;
+using Sora.Messaging.Contracts;
 
 namespace Sora.Messaging
 {
@@ -19,6 +20,9 @@ namespace Sora.Messaging
 
         public static object Transform(string descriptor, object payload)
             => _registry.TryGetValue(descriptor, out var fn) ? fn(payload) : payload;
+
+        public static Func<object, object>? GetTransformer(string descriptor)
+            => _registry.TryGetValue(descriptor, out var fn) ? fn : null;
     }
 
     public static class MessagingInterceptors
@@ -85,13 +89,48 @@ namespace Sora.Messaging
             var intercepted = MessagingInterceptors.Intercept(transformed);
             var proxy = ResolveMessageProxy();
 
-            // Ensure type-based routing: invoke SendAsync<T> with the concrete type of intercepted
-            var concreteType = intercepted.GetType();
-            var sendAsyncMethod = proxy.GetType().GetMethod("SendAsync");
-            if (sendAsyncMethod == null)
-                throw new InvalidOperationException($"SendAsync method not found for type {concreteType.Name}");
-            var genericSendAsync = sendAsyncMethod.MakeGenericMethod(concreteType);
-            await (Task)genericSendAsync!.Invoke(proxy, new object[] { intercepted, cancellationToken })!;
+            // NEW: Check for queue-specific routing
+            if (intercepted is IQueuedMessage queuedMessage)
+            {
+                // Route to specific queue
+                await SendToQueueAsync(proxy, queuedMessage.QueueName, queuedMessage.Payload, cancellationToken);
+            }
+            else
+            {
+                // Default behavior: type-based routing
+                var concreteType = intercepted.GetType();
+                var sendAsyncMethod = proxy.GetType().GetMethod("SendAsync");
+                if (sendAsyncMethod == null)
+                    throw new InvalidOperationException($"SendAsync method not found for type {concreteType.Name}");
+                var genericSendAsync = sendAsyncMethod.MakeGenericMethod(concreteType);
+                await (Task)genericSendAsync!.Invoke(proxy, new object[] { intercepted, cancellationToken })!;
+            }
+        }
+
+        /// <summary>
+        /// Sends a message to a specific queue using the provider's queue-specific routing.
+        /// </summary>
+        private static async Task SendToQueueAsync(object proxy, string queueName, object payload, CancellationToken cancellationToken)
+        {
+            // Try to find SendToQueueAsync method on the provider
+            var sendToQueueMethod = proxy.GetType().GetMethod("SendToQueueAsync");
+            if (sendToQueueMethod != null)
+            {
+                // Provider supports queue-specific routing
+                var payloadType = payload.GetType();
+                var genericSendToQueue = sendToQueueMethod.MakeGenericMethod(payloadType);
+                await (Task)genericSendToQueue!.Invoke(proxy, new object[] { queueName, payload, cancellationToken })!;
+            }
+            else
+            {
+                // Fallback to regular SendAsync (for providers that don't support queue routing yet)
+                var concreteType = payload.GetType();
+                var sendAsyncMethod = proxy.GetType().GetMethod("SendAsync");
+                if (sendAsyncMethod == null)
+                    throw new InvalidOperationException($"Neither SendToQueueAsync nor SendAsync method found on provider {proxy.GetType().Name}");
+                var genericSendAsync = sendAsyncMethod.MakeGenericMethod(concreteType);
+                await (Task)genericSendAsync!.Invoke(proxy, new object[] { payload, cancellationToken })!;
+            }
         }
         
         /// <summary>
