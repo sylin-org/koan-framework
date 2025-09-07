@@ -138,7 +138,7 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
             stageRecordType.GetProperty("OccurredAt")!.SetValue(record, DateTimeOffset.UtcNow);
             
             // CLEAN payload - model data only (no system/adapter contamination)
-            stageRecordType.GetProperty("StagePayload")!.SetValue(record, payload);
+            stageRecordType.GetProperty("Data")!.SetValue(record, payload);
             
             // SEPARATE metadata - source info for external ID composition
             var stageMetadata = new Dictionary<string, object>

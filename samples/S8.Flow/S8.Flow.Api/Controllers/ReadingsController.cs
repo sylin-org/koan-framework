@@ -42,7 +42,7 @@ public sealed class ReadingsController : ControllerBase
                 id = r.Id,
                 at = r.OccurredAt,
                 source = r.SourceId,
-                payload = r.StagePayload,
+                payload = r.Data,
                 correlationId = r.CorrelationId
             })
             .ToList();
@@ -97,7 +97,7 @@ public sealed class ReadingsController : ControllerBase
                 id = r.Id,
                 at = r.OccurredAt,
                 source = r.SourceId,
-                payload = r.StagePayload
+                payload = r.Data
             })
             .ToList();
 
@@ -124,7 +124,7 @@ public sealed class ReadingsController : ControllerBase
             Id = Guid.NewGuid().ToString("n"),
             SourceId = reading.Source ?? FlowSampleConstants.Sources.Api,
             OccurredAt = reading.CapturedAt,
-            StagePayload = payload,
+            Data = payload,
             CorrelationId = reading.SensorKey
         };
         var setName = FlowSets.StageShort(FlowSets.Intake);

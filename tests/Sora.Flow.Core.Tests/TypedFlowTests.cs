@@ -113,7 +113,7 @@ public class TypedFlowTests
             Id = Guid.NewGuid().ToString("n"),
             SourceId = "src-proj-1",
             OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["dummy"] = "alpha",
                 ["name.first"] = "Ann",
@@ -125,7 +125,7 @@ public class TypedFlowTests
             Id = Guid.NewGuid().ToString("n"),
             SourceId = "src-proj-2",
             OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["dummy"] = "alpha",
                 ["name.first"] = "Ann",
@@ -231,7 +231,7 @@ public class TypedFlowTests
             Id = Guid.NewGuid().ToString("n"),
             SourceId = "src-no-keys",
             OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object?> { { "foo", "bar" } }
+            Data = new Dictionary<string, object?> { { "foo", "bar" } }
         };
         using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
         {
@@ -285,7 +285,7 @@ public class TypedFlowTests
             Id = Guid.NewGuid().ToString("n"),
             SourceId = "src-exclude-1",
             OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["dummy"] = "k1",
                 ["name.first"] = "Ann",
@@ -355,7 +355,7 @@ public class TypedFlowTests
             Id = Guid.NewGuid().ToString("n"),
             SourceId = "src-projtask-1",
             OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["dummy"] = "z1",
                 ["city"] = "Paris"
@@ -423,7 +423,7 @@ public class TypedFlowTests
             Id = Guid.NewGuid().ToString("n"),
             SourceId = "src-identity-1",
             OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = payload
+            Data = payload
         };
         using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
         {
@@ -475,12 +475,12 @@ public class TypedFlowTests
         var r1 = new StageRecord<TestModel>
         {
             Id = Guid.NewGuid().ToString("n"), SourceId = "seed-1", OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["dummy"] = "ka" }
+            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["dummy"] = "ka" }
         };
         var r2 = new StageRecord<TestModel>
         {
             Id = Guid.NewGuid().ToString("n"), SourceId = "seed-2", OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["dummy"] = "kb" }
+            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["dummy"] = "kb" }
         };
         using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
         {
@@ -499,7 +499,7 @@ public class TypedFlowTests
         var rx = new StageRecord<TestModel>
         {
             Id = Guid.NewGuid().ToString("n"), SourceId = "src-collision", OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["dummy"] = new[] { "ka", "kb" }
             }

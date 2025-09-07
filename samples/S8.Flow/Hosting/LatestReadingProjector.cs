@@ -36,7 +36,7 @@ public sealed class LatestReadingProjector : BackgroundService
                         foreach (var g in groups)
                         {
                             var latest = g.OrderByDescending(x => x.OccurredAt).First();
-                            var payload = Extract(latest.StagePayload);
+                            var payload = Extract(latest.Data);
                             if (payload is null) continue;
                             var viewDoc = new SensorLatestReading
                             {

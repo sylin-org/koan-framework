@@ -175,7 +175,7 @@ public static class FlowMessagingInitializer
                 if (modelType != null)
                 {
                     Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Resolved model type {modelType.Name} for {model}");
-                    await DirectSeedToIntake(modelType, model, referenceId, payload);
+                    await DirectSeedToIntake(modelType, model, referenceId, payload, source, correlationId);
                     Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Successfully seeded {model} directly to intake");
                 }
                 else
@@ -311,7 +311,7 @@ public static class FlowMessagingInitializer
     /// Directly seeds payload into Flow intake stage, bypassing FlowAction messaging.
     /// Replicates FlowActionHandler.HandleSeedAsync logic.
     /// </summary>
-    private static async Task DirectSeedToIntake(Type modelType, string model, string referenceId, object payload)
+    private static async Task DirectSeedToIntake(Type modelType, string model, string referenceId, object payload, string source, string? correlationId)
     {
         // Create StageRecord<TModel> and save to intake set (from FlowActionHandler.HandleSeedAsync)
         var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
@@ -320,36 +320,17 @@ public static class FlowMessagingInitializer
         recordType.GetProperty("SourceId")!.SetValue(record, referenceId ?? model);
         recordType.GetProperty("OccurredAt")!.SetValue(record, DateTimeOffset.UtcNow);
         
-        // Convert payload to dictionary format and preserve metadata
-        var dict = ToDict(payload);
-        if (dict != null)
+        // Convert payload to dictionary format (pure business data)
+        var data = ToDict(payload);
+        recordType.GetProperty("Data")!.SetValue(record, data);
+        
+        // Create separate source metadata dictionary
+        var sourceMetadata = new Dictionary<string, object?>
         {
-            // Extract system/adapter from the transport envelope metadata
-            try
-            {
-                dynamic envelope = Newtonsoft.Json.JsonConvert.DeserializeObject(referenceId)!; // referenceId contains the original JSON
-                // Actually, we need to pass the metadata through properly
-                // For now, extract from model parameter which should have the metadata
-                if (!dict.ContainsKey(Constants.Envelope.System)) 
-                {
-                    // Try to extract from source field (e.g., "bms" or "oem")
-                    var parts = model.Split('.');
-                    var source = parts.Length > 0 ? parts[0] : "flow";
-                    dict[Constants.Envelope.System] = source;
-                }
-                if (!dict.ContainsKey(Constants.Envelope.Adapter)) 
-                {
-                    dict[Constants.Envelope.Adapter] = dict[Constants.Envelope.System] ?? "transport";
-                }
-            }
-            catch
-            {
-                // Fallback to defaults if extraction fails
-                if (!dict.ContainsKey(Constants.Envelope.System)) dict[Constants.Envelope.System] = "flow";
-                if (!dict.ContainsKey(Constants.Envelope.Adapter)) dict[Constants.Envelope.Adapter] = "transport";
-            }
-        }
-        recordType.GetProperty("StagePayload")!.SetValue(record, dict);
+            [Constants.Envelope.System] = source,
+            [Constants.Envelope.Adapter] = source
+        };
+        recordType.GetProperty("Source")!.SetValue(record, sourceMetadata);
 
         // Save to MongoDB using Data<,>.UpsertAsync (from FlowActionHandler.HandleSeedAsync)
         var dataType = typeof(Data<,>).MakeGenericType(recordType, typeof(string));

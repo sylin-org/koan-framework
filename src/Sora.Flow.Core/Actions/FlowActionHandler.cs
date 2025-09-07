@@ -65,14 +65,17 @@ public sealed class FlowActionHandler
         recordType.GetProperty("Id")!.SetValue(record, Guid.NewGuid().ToString("n"));
         recordType.GetProperty("SourceId")!.SetValue(record, msg.Payload is IDictionary<string, object?> p && p.TryGetValue("source", out var s) ? (s?.ToString() ?? msg.Model) : (msg.ReferenceId ?? msg.Model));
         recordType.GetProperty("OccurredAt")!.SetValue(record, DateTimeOffset.UtcNow);
-        // Promote model/adapter envelope if present
-        var dict = ToDict(msg.Payload);
-        if (dict is not null)
+        // Convert payload to clean business data
+        var data = ToDict(msg.Payload);
+        recordType.GetProperty("Data")!.SetValue(record, data);
+        
+        // Create separate source metadata dictionary
+        var sourceMetadata = new Dictionary<string, object?>
         {
-            if (!dict.ContainsKey(Constants.Envelope.System)) dict[Constants.Envelope.System] = "flow";
-            if (!dict.ContainsKey(Constants.Envelope.Adapter)) dict[Constants.Envelope.Adapter] = "actions";
-        }
-        recordType.GetProperty("StagePayload")!.SetValue(record, dict);
+            [Constants.Envelope.System] = "flow",
+            [Constants.Envelope.Adapter] = "actions"
+        };
+        recordType.GetProperty("Source")!.SetValue(record, sourceMetadata);
 
         var dataType = typeof(Data<,>).MakeGenericType(recordType, typeof(string));
         var upsert = dataType.GetMethod("UpsertAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { recordType, typeof(string), typeof(CancellationToken) })!;

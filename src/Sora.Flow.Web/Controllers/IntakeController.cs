@@ -24,7 +24,7 @@ public sealed class IntakeController : ControllerBase
             OccurredAt = dto.OccurredAt,
             CorrelationId = dto.CorrelationId,
             PolicyVersion = dto.PolicyVersion,
-            StagePayload = dto.Payload
+            Data = dto.Payload
         };
         await rec.Save(Constants.Sets.Intake, ct);
         return Accepted(new { id = rec.RecordId });

@@ -98,7 +98,7 @@ public class FlowAssociationTests
             {
                 SourceId = "src1",
                 OccurredAt = DateTimeOffset.UtcNow,
-                StagePayload = new Dictionary<string, object> { { "foo", "bar" } }
+                Data = new Dictionary<string, object> { { "foo", "bar" } }
             }.Save(ct);
         }
 
@@ -127,7 +127,7 @@ public class FlowAssociationTests
             {
                 SourceId = "src1",
                 OccurredAt = DateTimeOffset.UtcNow,
-                StagePayload = new Dictionary<string, object> { { Sora.Testing.Flow.FlowTestConstants.Keys.Email, new object[] { Sora.Testing.Flow.FlowTestConstants.Samples.EmailA, Sora.Testing.Flow.FlowTestConstants.Samples.EmailB } } }
+                Data = new Dictionary<string, object> { { Sora.Testing.Flow.FlowTestConstants.Keys.Email, new object[] { Sora.Testing.Flow.FlowTestConstants.Samples.EmailA, Sora.Testing.Flow.FlowTestConstants.Samples.EmailB } } }
             }.Save(ct);
         }
     await WaitUntilAsync(async () => (await RejectionReport.All(ct)).Any(r => r.ReasonCode == Constants.Rejections.MultiOwnerCollision), TimeSpan.FromSeconds(6));
@@ -153,7 +153,7 @@ public class FlowAssociationTests
             {
                 SourceId = "src1",
                 OccurredAt = DateTimeOffset.UtcNow,
-                StagePayload = new Dictionary<string, object> { { Sora.Testing.Flow.FlowTestConstants.Keys.Email, Sora.Testing.Flow.FlowTestConstants.Samples.EmailA }, { "name", "Ann" } }
+                Data = new Dictionary<string, object> { { Sora.Testing.Flow.FlowTestConstants.Keys.Email, Sora.Testing.Flow.FlowTestConstants.Samples.EmailA }, { "name", "Ann" } }
             }.Save(ct);
         }
 

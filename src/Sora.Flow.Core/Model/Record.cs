@@ -13,6 +13,7 @@ public sealed class Record : Entity<Record>
     public string? PolicyVersion { get; set; }
     [Index]
     public string? CorrelationId { get; set; }
-    public object? StagePayload { get; set; }
+    public object? Data { get; set; }
+    public object? Source { get; set; }
     public object? Diagnostics { get; set; }
 }

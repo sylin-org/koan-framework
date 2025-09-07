@@ -208,7 +208,7 @@ public static class ServiceCollectionExtensions
                                 foreach (var r in all)
                                 {
                                     var src = (string)(r.GetType().GetProperty("SourceId")!.GetValue(r) ?? "unknown");
-                                    var payload = r.GetType().GetProperty("StagePayload")!.GetValue(r);
+                                    var payload = r.GetType().GetProperty("Data")!.GetValue(r);
                                     var dict = ExtractDict(payload);
                                     if (dict is null) continue;
                                     foreach (var kv in dict)
@@ -444,7 +444,7 @@ public static class ServiceCollectionExtensions
                         foreach (var rec in page)
                         {
                             using var _root = DataSetContext.With(null);
-                            var dict = ExtractDict(rec.GetType().GetProperty("StagePayload")!.GetValue(rec));
+                            var dict = ExtractDict(rec.GetType().GetProperty("Data")!.GetValue(rec));
                             if (dict is null || (!isVo && tags.Length == 0))
                             {
                                 await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = dict is null ? "no-payload" : "no-config-tags", tags }, rec, modelType, intakeSet, stoppingToken);
@@ -730,7 +730,7 @@ public static class ServiceCollectionExtensions
                 parkedType.GetProperty("OccurredAt")!.SetValue(parked, rec.GetType().GetProperty("OccurredAt")!.GetValue(rec));
                 parkedType.GetProperty("PolicyVersion")!.SetValue(parked, rec.GetType().GetProperty("PolicyVersion")!.GetValue(rec));
                 parkedType.GetProperty("CorrelationId")!.SetValue(parked, rec.GetType().GetProperty("CorrelationId")!.GetValue(rec));
-                parkedType.GetProperty("StagePayload")!.SetValue(parked, rec.GetType().GetProperty("StagePayload")!.GetValue(rec));
+                parkedType.GetProperty("Data")!.SetValue(parked, rec.GetType().GetProperty("Data")!.GetValue(rec));
                 parkedType.GetProperty("ReasonCode")!.SetValue(parked, code);
                 // Store original evidence object (also persisted in diagnostics as JSON)
                 parkedType.GetProperty("Evidence")!.SetValue(parked, evidence);

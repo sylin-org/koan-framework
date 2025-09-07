@@ -82,7 +82,7 @@ public class FlowActionsTests
         using (DataSetContext.With(FlowSets.StageShort(FlowSets.Intake)))
         {
             var page = await Data<StageRecord<TestModel>, string>.FirstPage(10, CancellationToken.None);
-            page.Any(r => TryGetStageValue(r.StagePayload, "dummy") == "a1").Should().BeTrue();
+            page.Any(r => TryGetStageValue(r.Data, "dummy") == "a1").Should().BeTrue();
         }
     }
 
