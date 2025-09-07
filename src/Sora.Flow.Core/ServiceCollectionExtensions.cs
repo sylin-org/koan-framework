@@ -209,9 +209,42 @@ public static class ServiceCollectionExtensions
                                 {
                                     var src = (string)(r.GetType().GetProperty("SourceId")!.GetValue(r) ?? "unknown");
                                     var payload = r.GetType().GetProperty("Data")!.GetValue(r);
+                                    var sourceMetadata = r.GetType().GetProperty("Source")?.GetValue(r);
                                     var dict = ExtractDict(payload);
+                                    var sourceDict = ExtractDict(sourceMetadata);
                                     if (dict is null) continue;
-                                    foreach (var kv in dict)
+
+                                    // ✅ NEW: Auto-populate external ID from source system + primary entity ID
+                                    if (sourceDict != null && dict != null)
+                                    {
+                                        var systemName = GetSourceSystem(sourceDict);
+                                        var primaryId = GetPrimaryEntityId(dict, modelType);
+                                        if (!string.IsNullOrEmpty(systemName) && !string.IsNullOrEmpty(primaryId))
+                                        {
+                                            var externalIdKey = $"identifier.external.{systemName}";
+                                            if (!canonical.TryGetValue(externalIdKey, out var externalIdList))
+                                            {
+                                                externalIdList = new List<string?>();
+                                                canonical[externalIdKey] = externalIdList;
+                                            }
+                                            externalIdList.Add(primaryId);
+                                            
+                                            // Also add to lineage tracking
+                                            if (!lineage.TryGetValue(externalIdKey, out var externalIdLineage))
+                                            {
+                                                externalIdLineage = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+                                                lineage[externalIdKey] = externalIdLineage;
+                                            }
+                                            if (!externalIdLineage.TryGetValue(primaryId, out var sources))
+                                            {
+                                                sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                                                externalIdLineage[primaryId] = sources;
+                                            }
+                                            sources.Add(src);
+                                        }
+                                    }
+
+                                    foreach (var kv in dict!)
                                     {
                                         var tag = kv.Key;
                                         if (exclude.Length > 0 && exclude.Any(p => tag.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
@@ -785,6 +818,72 @@ public static class ServiceCollectionExtensions
         {
             return type.GetProperty("Result")!.GetValue(t);
         }
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts the system name from Source metadata dictionary.
+    /// </summary>
+    private static string? GetSourceSystem(IDictionary<string, object?> sourceDict)
+    {
+        if (sourceDict.TryGetValue(Constants.Envelope.System, out var systemValue))
+        {
+            return systemValue?.ToString()?.Trim();
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts the primary entity ID from the data dictionary for external ID generation.
+    /// For strong-typed models: uses [Key] property value
+    /// For dynamic models: uses "id" property (case-insensitive)
+    /// </summary>
+    private static string? GetPrimaryEntityId(IDictionary<string, object?> dict, Type modelType)
+    {
+        // Check if it's a DynamicFlowEntity (has IDynamicFlowEntity interface)
+        var isDynamic = typeof(IDynamicFlowEntity).IsAssignableFrom(modelType);
+        
+        if (isDynamic)
+        {
+            // For dynamic entities, look for "id" property (case-insensitive)
+            var idKey = dict.Keys.FirstOrDefault(k => string.Equals(k, "id", StringComparison.OrdinalIgnoreCase));
+            if (idKey != null && dict.TryGetValue(idKey, out var idValue))
+            {
+                return idValue?.ToString()?.Trim();
+            }
+        }
+        else
+        {
+            // For strong-typed models, find the [Key] property
+            var keyProperty = modelType.GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                .FirstOrDefault(prop => prop.GetCustomAttribute<System.ComponentModel.DataAnnotations.KeyAttribute>(inherit: true) != null);
+            
+            if (keyProperty != null)
+            {
+                // Check for explicit JsonProperty attribute first
+                var jsonPropertyAttr = keyProperty.GetCustomAttribute<Newtonsoft.Json.JsonPropertyAttribute>();
+                var jsonPropertyName = jsonPropertyAttr?.PropertyName;
+                
+                // If no explicit name, use camelCase conversion
+                if (string.IsNullOrEmpty(jsonPropertyName))
+                {
+                    jsonPropertyName = char.ToLowerInvariant(keyProperty.Name[0]) + keyProperty.Name[1..];
+                }
+                
+                // Try to find the key value in the dictionary
+                if (dict.TryGetValue(jsonPropertyName, out var keyValue) && keyValue != null)
+                {
+                    return keyValue.ToString()?.Trim();
+                }
+                
+                // Fallback: try original property name
+                if (dict.TryGetValue(keyProperty.Name, out keyValue) && keyValue != null)
+                {
+                    return keyValue.ToString()?.Trim();
+                }
+            }
+        }
+        
         return null;
     }
 

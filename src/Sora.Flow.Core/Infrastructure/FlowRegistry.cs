@@ -99,12 +99,58 @@ public static class FlowRegistry
     }
 
     /// <summary>
-    /// External-id property discovery via attributes is deprecated. Reserved keys (identifier.external.*) are used.
+    /// Gets external ID keys for automatic population based on FlowPolicy configuration.
+    /// For AutoPopulate policy: returns the ExternalIdKey or default key property.
+    /// For other policies: returns empty array (manual or disabled external ID handling).
     /// </summary>
     public static string[] GetExternalIdKeys(Type modelType)
     {
-        // vNext: rely on reserved identifier.external.* keys; explicit [EntityLink] is removed.
-        return s_externalIdProps.GetOrAdd(modelType, static _ => Array.Empty<string>());
+        return s_externalIdProps.GetOrAdd(modelType, type =>
+        {
+            var policy = type.GetCustomAttribute<FlowPolicyAttribute>();
+            if (policy?.ExternalIdPolicy == ExternalIdPolicy.AutoPopulate)
+            {
+                // Use specified key or determine default key property
+                return new[] { policy.ExternalIdKey ?? GetDefaultEntityKey(type) };
+            }
+            // Manual, Disabled, or SourceOnly policies don't return specific keys
+            return Array.Empty<string>();
+        });
+    }
+
+    /// <summary>
+    /// Determines the default entity key property for external ID generation.
+    /// For strong-typed entities: first [Key] property name (camelCase).
+    /// For dynamic entities: "id".
+    /// </summary>
+    private static string GetDefaultEntityKey(Type modelType)
+    {
+        // Check if it's a DynamicFlowEntity
+        var isDynamic = typeof(IDynamicFlowEntity).IsAssignableFrom(modelType);
+        
+        if (isDynamic)
+        {
+            return "id"; // Default for dynamic entities
+        }
+        
+        // For strong-typed entities, find the [Key] property
+        var keyProperty = modelType.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .FirstOrDefault(prop => prop.GetCustomAttribute<KeyAttribute>(inherit: true) != null);
+        
+        if (keyProperty != null)
+        {
+            // Convert to camelCase JSON property name
+            var jsonPropertyAttr = keyProperty.GetCustomAttribute<JsonPropertyAttribute>();
+            if (!string.IsNullOrEmpty(jsonPropertyAttr?.PropertyName))
+            {
+                return jsonPropertyAttr.PropertyName;
+            }
+            return char.ToLowerInvariant(keyProperty.Name[0]) + keyProperty.Name[1..];
+        }
+        
+        // Fallback to first aggregation tag if no [Key] property found
+        var aggTags = GetAggregationTags(modelType);
+        return aggTags.Length > 0 ? aggTags[0] : "id";
     }
 
     public static Type? ResolveModel(string name)
