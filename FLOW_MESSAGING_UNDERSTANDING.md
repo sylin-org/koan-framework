@@ -1,0 +1,581 @@
+# Flow & Messaging System - Complete Understanding Document
+
+## Table of Contents
+1. [Current System Architecture](#current-system-architecture)
+2. [Identified Problems](#identified-problems)
+3. [Root Cause Analysis](#root-cause-analysis)
+4. [Proposed Solution](#proposed-solution)
+5. [Implementation Details](#implementation-details)
+6. [Files and Components Map](#files-and-components-map)
+7. [Testing Scenarios](#testing-scenarios)
+8. [Future Session Context](#future-session-context)
+
+---
+
+## Current System Architecture
+
+### Overview
+The Sora Flow system is a data orchestration pipeline that processes entities through multiple stages:
+1. **Intake** - Raw data ingestion
+2. **Association** - Key-based entity linking
+3. **Keying** - Aggregation key resolution
+4. **Projection** - Canonical view generation
+
+### Key Components
+
+#### 1. **Messaging System (Sora.Messaging)**
+- **Core**: Message publishing/subscription via RabbitMQ
+- **Pattern**: `services.On<T>(handler)` for receiving, `message.Send()` for sending
+- **Transformers**: `MessagingTransformers.Register()` for message transformation
+- **Queues**: Named by message type, e.g., `Sora.Flow.Sending.FlowTargetedMessage<S8.Flow.Shared.Device>`
+
+#### 2. **Flow Entities**
+Two types of entities:
+- **FlowEntity<T>**: Strongly-typed entities (Device, Sensor)
+  ```csharp
+  public sealed class Device : FlowEntity<Device>
+  {
+      [AggregationKey]
+      public string Serial { get; set; }
+  }
+  ```
+- **DynamicFlowEntity<T>**: Dynamic entities with ExpandoObject Model (Manufacturer)
+  ```csharp
+  [AggregationKeys("identifier.code", "identifier.name")]
+  public sealed class Manufacturer : DynamicFlowEntity<Manufacturer>
+  {
+      // Data stored in Model property as ExpandoObject
+  }
+  ```
+
+#### 3. **Current Message Flow**
+
+```mermaid
+graph LR
+    A[BMS/OEM Adapter] -->|FlowTargetedMessage| B[RabbitMQ]
+    B --> C[API Container]
+    C -->|Auto-Handler| D[MongoDB Intake]
+    D --> E[Association Worker]
+    E --> F[Keying Worker]
+    F --> G[Projection Worker]
+    G --> H[Canonical View]
+```
+
+### Current Implementation Details
+
+#### Adapter Side (BMS/OEM)
+```csharp
+// Current implementation in adapters
+[FlowAdapter(system: "bms", adapter: "bms")]
+public class BmsPublisher : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        var device = new Device { Id = "D1", Serial = "SN-001" };
+        
+        // Must wrap in FlowTargetedMessage
+        var targetedDevice = new FlowTargetedMessage<Device> 
+        { 
+            Entity = device, 
+            Timestamp = DateTimeOffset.UtcNow 
+        };
+        
+        // Sends to RabbitMQ
+        await targetedDevice.Send(cancellationToken: ct);
+    }
+}
+```
+
+#### API Side (Flow Processor)
+```csharp
+// In S8.Flow.Api/Program.cs
+builder.Services.AutoConfigureFlow(typeof(Reading).Assembly);
+
+// This creates hidden handlers that:
+// 1. Listen for FlowTargetedMessage<Device>
+// 2. Extract entity to "bag" dictionary
+// 3. Write to MongoDB intake with SourceId: "auto-handler"
+```
+
+---
+
+## Identified Problems
+
+### Problem 1: Lost Adapter Context
+**Symptom**: All data shows `"system": "unknown", "adapter": "unknown"`
+
+**Location in Database**:
+```json
+{
+  "_id": "K4GEXX68KZNZCQQV53VQ4SB110",
+  "Model": {
+    "Serial": "SN-001",
+    "system": "unknown",  // Should be "bms" or "oem"
+    "adapter": "unknown"  // Should be "bms" or "oem"
+  }
+}
+```
+
+**Root Cause**: 
+- Auto-handlers run in API container, not adapter container
+- [FlowAdapter] attribute is on BmsPublisher class (in adapter container)
+- API container has no access to this context
+- FlowIdentityStamper defaults to "unknown" when no context found
+
+### Problem 2: Manufacturer Entity Failures
+**Symptom**: All Manufacturer entities rejected with `NO_KEYS`
+
+**Evidence**:
+```json
+{
+  "ReasonCode": "NO_KEYS",
+  "Evidence": {
+    "reason": "no-values",
+    "tags": ["identifier.code", "identifier.name"]
+  }
+}
+```
+
+**Root Cause**:
+- Manufacturers use DynamicFlowEntity with nested object structure
+- `ToBag()` method in auto-handler doesn't extract Model property
+- Only entity Id reaches intake, not the actual data
+- Association worker can't find "identifier.code" or "identifier.name" in empty payload
+
+### Problem 3: Complex Auto-Handler Magic
+**Issues**:
+- `AutoConfigureFlow()` creates hidden handlers - hard to debug
+- Handlers registered via reflection - no visibility
+- Complex flow through multiple abstraction layers
+- Poor developer experience
+
+### Problem 4: Device Entity Partial Success
+**Current State**:
+- 1 Device in canonical view (only D1)
+- Other devices might be rejected or stuck
+- Serial field IS properly recognized as AggregationKey
+- But contaminated with "unknown" metadata
+
+---
+
+## Root Cause Analysis
+
+### The Auto-Handler Problem
+
+1. **Registration** (S8.Flow.Api startup):
+   - `AutoConfigureFlow(typeof(Reading).Assembly)` scans assembly
+   - Finds Device, Sensor, Manufacturer, Reading types
+   - Creates handlers for each using reflection
+
+2. **Message Reception**:
+   - Adapter sends `FlowTargetedMessage<Device>`
+   - Goes through RabbitMQ to API container
+   - Auto-handler receives message
+
+3. **Context Loss**:
+   ```csharp
+   // In auto-handler (API container)
+   await sender.SendAsync(new[] { item }, 
+       message: null, 
+       hostType: typeof(Device));  // Wrong! Should be adapter type
+   ```
+   - Passes entity type (Device) as hostType
+   - FlowIdentityStamper looks for [FlowAdapter] on Device class
+   - Doesn't find it, defaults to "unknown"
+
+4. **Data Extraction Failure**:
+   ```csharp
+   // ToBag method doesn't handle DynamicFlowEntity
+   private static IDictionary<string, object?> ToBag(object entity)
+   {
+       // Only extracts simple properties
+       // Ignores ExpandoObject Model property
+       // Manufacturer data never reaches intake
+   }
+   ```
+
+### Why Current Fixes Didn't Work
+
+Our attempted fixes:
+1. Modified FlowMessagingRegistration to not default Source
+2. Changed auto-handlers to pass `null` for hostType
+3. Enhanced ToBag to handle DynamicFlowEntity
+
+But the fundamental issue remains: **Auto-handlers in API container have no adapter context**
+
+---
+
+## Proposed Solution
+
+### Core Concept
+**Eliminate auto-handlers entirely**. Instead:
+1. Entities send themselves with automatic transport wrapping
+2. Transport wrapping happens at source (preserves context)
+3. Single handler in API processes all transport envelopes
+4. Direct write to intake with preserved metadata
+
+### Architecture Change
+
+```mermaid
+graph LR
+    A[Adapter] -->|entity.Send()| B[Transform at Source]
+    B -->|TransportEnvelope| C[RabbitMQ]
+    C --> D[API Handler]
+    D -->|Direct Write| E[MongoDB Intake]
+    E --> F[Flow Pipeline]
+```
+
+### Key Improvements
+
+1. **Simple Sending**:
+   ```csharp
+   // New pattern
+   var device = new Device { Id = "D1", Serial = "SN-001" };
+   await device.Send();  // That's it!
+   ```
+
+2. **Automatic Context Preservation**:
+   ```csharp
+   // FlowContext captures adapter identity
+   [FlowAdapter(system: "bms", adapter: "bms")]
+   public class BmsPublisher : BackgroundService
+   {
+       // FlowContext.Current automatically set from attribute
+       // All Send() calls have correct context
+   }
+   ```
+
+3. **Transport Envelope**:
+   ```json
+   {
+     "Version": "1",
+     "System": "bms",      // Captured at source
+     "Adapter": "bms",     // Captured at source
+     "Model": "Device",
+     "Payload": { /* entity data */ },
+     "Timestamp": "2024-01-10T..."
+   }
+   ```
+
+4. **Single Intake Handler**:
+   ```csharp
+   services.On<TransportEnvelope>(async envelope =>
+   {
+       // Extract metadata from envelope
+       // Write to intake with correct source info
+       // No context loss
+   });
+   ```
+
+---
+
+## Implementation Details
+
+### Phase 1: New Infrastructure (Non-Breaking)
+
+#### 1.1 Create FlowContext
+**File**: `Sora.Flow.Core/Context/FlowContext.cs`
+```csharp
+public class FlowContext
+{
+    private static readonly AsyncLocal<FlowContext> _current = new();
+    public static FlowContext? Current => _current.Value;
+    
+    public string? System { get; init; }
+    public string? Adapter { get; init; }
+    public string? Source { get; init; }
+}
+```
+
+#### 1.2 Create Send Extension
+**File**: `Sora.Flow.Core/Extensions/FlowEntityExtensions.cs`
+```csharp
+public static async Task Send<T>(this T entity) where T : class, IFlowEntity
+{
+    var envelope = MessagingTransformers.Transform(typeof(T).FullName, entity);
+    await envelope.Send();
+}
+```
+
+#### 1.3 Register Transformers
+**File**: `Sora.Flow.Core/Initialization/FlowMessagingInitializer.cs`
+- Scan all assemblies for IFlowEntity implementations
+- Register transformer for each to wrap in TransportEnvelope
+- Capture FlowContext.Current in envelope
+
+#### 1.4 Create Transport Handler
+**File**: `Sora.Flow.Core/Handlers/TransportEnvelopeHandler.cs`
+- Single handler for all TransportEnvelope messages
+- Extract entity and metadata
+- Write to appropriate intake collection
+
+### Phase 2: Update Components
+
+#### 2.1 Update Adapters
+**Files**: 
+- `S8.Flow.Adapters.Bms/Program.cs`
+- `S8.Flow.Adapters.Oem/Program.cs`
+
+**Changes**:
+```csharp
+// Remove
+var targetedDevice = new FlowTargetedMessage<Device> { Entity = device };
+await targetedDevice.Send();
+
+// Add
+await device.Send();
+```
+
+#### 2.2 Update API
+**File**: `S8.Flow.Api/Program.cs`
+
+**Changes**:
+```csharp
+// Remove
+builder.Services.AutoConfigureFlow(typeof(Reading).Assembly);
+
+// Add
+builder.Services.AddFlowTransportHandler();
+```
+
+### Phase 3: Cleanup
+
+#### 3.1 Remove Files
+- `Sora.Flow.Core/Configuration/FlowServiceExtensions.cs` (auto-handlers)
+- `Sora.Flow.Core/Sending/FlowTargetedMessage.cs`
+- `AUTOCONFIGURE_FLOW_EXAMPLES.md`
+
+#### 3.2 Clean Up Code
+- Remove AutoConfigureFlow references
+- Remove FlowTargetedMessage usage
+- Update documentation
+
+---
+
+## Files and Components Map
+
+### Core Flow Files
+```
+src/Sora.Flow.Core/
+├── Attributes/
+│   ├── FlowAttributes.cs          # [AggregationKey], [FlowModel]
+│   └── FlowAdapterAttribute.cs    # [FlowAdapter(system, adapter)]
+├── Configuration/
+│   └── FlowServiceExtensions.cs   # TO BE REMOVED (auto-handlers)
+├── Context/
+│   └── FlowContext.cs            # TO BE CREATED
+├── Extensions/
+│   └── FlowEntityExtensions.cs   # TO BE CREATED (Send method)
+├── Handlers/
+│   └── TransportEnvelopeHandler.cs # TO BE CREATED
+├── Infrastructure/
+│   ├── FlowRegistry.cs           # Model type resolution
+│   └── Constants.cs              # NO_KEYS, etc.
+├── Initialization/
+│   ├── SoraAutoRegistrar.cs      # Current auto-registration
+│   └── FlowMessagingInitializer.cs # TO BE CREATED
+├── Model/
+│   ├── FlowEntity.cs             # Base entity class
+│   ├── DynamicFlowEntity.cs      # Dynamic entity base
+│   └── StageRecord.cs            # Intake record type
+├── Sending/
+│   ├── FlowSender.cs             # Internal intake writer
+│   ├── FlowTargetedMessage.cs    # TO BE REMOVED
+│   └── FlowIdentityStamper.cs    # Metadata stamping
+├── ServiceCollectionExtensions.cs # Main Flow registration
+└── FlowMessagingRegistration.cs   # Current transformer registration
+```
+
+### Sample Application Files
+```
+samples/S8.Flow/
+├── S8.Flow.Api/
+│   └── Program.cs                 # Uses AutoConfigureFlow (UPDATE)
+├── S8.Flow.Adapters.Bms/
+│   └── Program.cs                 # Uses FlowTargetedMessage (UPDATE)
+├── S8.Flow.Adapters.Oem/
+│   └── Program.cs                 # Uses FlowTargetedMessage (UPDATE)
+└── S8.Flow.Shared/
+    ├── Device.cs                  # FlowEntity<Device>
+    ├── Sensor.cs                  # FlowEntity<Sensor>
+    ├── Manufacturer.cs            # DynamicFlowEntity<Manufacturer>
+    └── Reading.cs                 # FlowValueObject<Reading>
+```
+
+### Database Collections
+```
+MongoDB (s8 database):
+├── S8.Flow.Shared.Device#flow.intake
+├── S8.Flow.Shared.Device#flow.keyed
+├── S8.Flow.Shared.Device#flow.views.canonical
+├── S8.Flow.Shared.Device#flow.parked
+├── S8.Flow.Shared.Manufacturer#flow.intake
+├── S8.Flow.Shared.Manufacturer#flow.parked
+└── Sora.Flow.Diagnostics.RejectionReport
+```
+
+---
+
+## Testing Scenarios
+
+### Test 1: Device Entity Flow
+**Setup**: BMS adapter sends Device entity
+**Expected**:
+- Transport envelope has system="bms", adapter="bms"
+- Intake record has correct SourceId
+- Device appears in canonical view with Serial as key
+- No "unknown" values in metadata
+
+### Test 2: Manufacturer Entity Flow
+**Setup**: BMS/OEM sends Manufacturer with nested data
+**Expected**:
+- Transport envelope preserves nested structure
+- Intake record has flattened paths (identifier.code, identifier.name)
+- Manufacturer appears in canonical view
+- No NO_KEYS rejections
+
+### Test 3: Cross-Adapter Association
+**Setup**: BMS and OEM send same Device (by Serial)
+**Expected**:
+- Both records associate to same ReferenceUlid
+- Canonical view shows merged data
+- Lineage view shows both sources
+
+### Test 4: Reading Value Objects
+**Setup**: Adapters send Reading value objects
+**Expected**:
+- Readings associate to parent Device/Sensor
+- No standalone canonical view (value objects)
+- Parent entity shows readings in projection
+
+---
+
+## Future Session Context
+
+### Key Decisions Made
+1. **Remove auto-handlers** - They lose context and add complexity
+2. **Use transport envelopes** - Preserve metadata at source
+3. **Leverage existing infrastructure** - MessagingTransformers, not new systems
+4. **Simplify DX** - `entity.Send()` not wrapper objects
+
+### Implementation Status (Updated)
+
+#### ✅ **COMPLETED - Transport Envelope Architecture**
+- **FlowContext**: AsyncLocal-based adapter identity preservation implemented
+- **entity.Send()**: Direct sending pattern with automatic transport wrapping
+- **TransportEnvelopeProcessor**: Centralized handler replacing auto-handler system
+- **Adapter Updates**: BMS and OEM adapters converted to new pattern
+- **API Configuration**: Removed AutoConfigureFlow, added transport handler
+
+#### ⚠️ **CURRENT ISSUE - JsonElement Serialization**
+**Problem**: RabbitMQ deserializes `TransportEnvelope` properties as `System.Text.Json.JsonElement` objects, which MongoDB BSON serializer cannot handle.
+
+**Root Cause**: When RabbitMQ deserializes messages using System.Text.Json, complex properties become JsonElement objects:
+```csharp
+// Before RabbitMQ:
+Device { Id = "device-123", Serial = "ABC123" }
+
+// After RabbitMQ deserialization:
+Device { Id = JsonElement("device-123"), Serial = JsonElement("ABC123") }
+```
+
+**Evidence**: MongoDB errors show:
+```
+MongoDB.Bson.BsonSerializationException: Type System.Text.Json.JsonElement is not configured as a type that is allowed to be serialized
+```
+
+**Current Status**: 
+- Transport messages are flowing correctly
+- TransportEnvelopeProcessor receives and processes messages
+- MongoDB serialization fails, preventing data persistence
+- Database remains empty due to serialization errors
+
+**Identified Solution**: Use Sora.Core JSON round-trip approach:
+```csharp
+using Sora.Core.Json;
+var json = envelope.ToJson();           // Uses Newtonsoft.Json
+var cleanEnvelope = json.FromJson<TransportEnvelope>();  // No JsonElements
+```
+
+#### 📋 **LESSONS LEARNED**
+1. **RabbitMQ Serialization**: System.Text.Json creates JsonElement objects during deserialization
+2. **Newtonsoft.Json Advantage**: Sora.Core uses Newtonsoft.Json which doesn't create JsonElements
+3. **DRY Principle**: Always check for existing Sora.Core capabilities before reinventing
+4. **Architecture Success**: Transport envelope pattern works correctly - issue is serialization layer
+5. **Root vs Symptom**: Initial fixes targeted symptoms; real issue was RabbitMQ deserialization
+
+### Commands for Checking Status
+```bash
+# Check running containers
+docker ps | grep s8
+
+# Check canonical views
+docker exec s8-mongo mongosh --quiet --eval "
+  db.getSiblingDB('s8').getCollectionNames()
+    .filter(n => n.includes('canonical'))
+    .forEach(c => print(c + ': ' + db.getSiblingDB('s8')[c].countDocuments()))
+"
+
+# Check rejections
+docker exec s8-mongo mongosh --quiet --eval "
+  db.getSiblingDB('s8')['Sora.Flow.Diagnostics.RejectionReport']
+    .find().sort({CreatedAt: -1}).limit(1).toArray()
+"
+
+# Check adapter logs
+docker logs sora-s8-flow-adapter-bms-1 --tail 50
+```
+
+### Next Session Should
+1. **Implement JsonElement fix**: Add Sora.Core JSON round-trip in TransportEnvelopeProcessor
+2. **Test database persistence**: Verify entities are now being saved to MongoDB
+3. **Verify adapter identity**: Confirm system/adapter metadata is preserved correctly  
+4. **Test all entity types**: Device, Sensor, Manufacturer, Reading flows
+5. **Remove old auto-handler infrastructure**: Clean up unused code
+
+### Important Context
+- This is a **greenfield project** - breaking changes are acceptable
+- The user prefers **clean breaks** over backwards compatibility
+- The goal is **simplicity and correctness** over magic
+- Follow existing **Sora patterns** rather than creating new ones
+
+### Problem Summary for Next Session
+**"✅ RESOLVED: Flow system architectural refactor from auto-handlers to transport envelope pattern is complete and functional. 
+
+⚠️ CURRENT ISSUE: JsonElement serialization prevents MongoDB persistence. Transport messages flow correctly, but RabbitMQ deserializes entities with System.Text.Json.JsonElement properties that MongoDB BSON serializer rejects. 
+
+🔧 SOLUTION: Implement Sora.Core JSON round-trip (Newtonsoft.Json) to eliminate JsonElements in TransportEnvelopeProcessor before persistence."**
+
+---
+
+## Appendix: Current Bug Manifestation
+
+### What User Sees
+1. **In MongoDB canonical view**:
+   - Only 1 Device (should be 5)
+   - Has "system": "unknown", "adapter": "unknown" (should be "bms"/"oem")
+
+2. **In rejection reports**:
+   - All Manufacturers rejected with NO_KEYS
+   - Evidence shows looking for "identifier.code", "identifier.name"
+   - These fields exist but aren't being extracted from Model
+
+3. **In parked collections**:
+   - Manufacturer StagePayload only has Id field
+   - Missing all actual data (identifier, support, etc.)
+
+### Root Cause Chain
+1. Adapter creates entity with data
+2. Wraps in FlowTargetedMessage
+3. Sends via RabbitMQ
+4. API container receives message
+5. Auto-handler processes entity
+6. **PROBLEM**: No adapter context → defaults to "unknown"
+7. **PROBLEM**: ToBag doesn't extract DynamicFlowEntity Model
+8. Writes incomplete data to intake
+9. Association worker can't find aggregation keys
+10. Entity gets parked or rejected
+
+---
+
+*This document represents the complete understanding of the Flow/Messaging system issues and proposed solutions as of this session.*

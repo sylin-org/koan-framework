@@ -7,37 +7,14 @@ namespace Sora.Flow
 {
     public static class FlowMessagingRegistration
     {
+        // DEPRECATED: This class is part of the old auto-handler system
+        // New implementation uses TransportEnvelope<T> and JSON string messaging
+        
+        /*
         public static void RegisterTransformers()
         {
-            // Register transformer for FlowEntity
-            MessagingTransformers.Register("Sora.Flow.Model.FlowEntity", payload =>
-            {
-                var adapterAttr = payload.GetType().GetCustomAttributes(typeof(FlowAdapterAttribute), true)
-                    .FirstOrDefault() as FlowAdapterAttribute;
-                return new TransportEnvelope
-                {
-                    Version = "1",
-                    Source = adapterAttr?.System ?? "unknown",
-                    Model = payload.GetType().Name,
-                    Type = "Sora.Flow.Model.FlowEntity",
-                    Payload = payload
-                };
-            });
-
-            // Register transformer for DynamicFlowEntity
-            MessagingTransformers.Register("Sora.Flow.Model.DynamicFlowEntity", payload =>
-            {
-                var adapterAttr = payload.GetType().GetCustomAttributes(typeof(FlowAdapterAttribute), true)
-                    .FirstOrDefault() as FlowAdapterAttribute;
-                return new TransportEnvelope
-                {
-                    Version = "1",
-                    Source = adapterAttr?.System ?? "unknown",
-                    Model = payload.GetType().Name,
-                    Type = "Sora.Flow.Model.DynamicFlowEntity",
-                    Payload = payload
-                };
-            });
+            // Old transformer registration - no longer used
         }
+        */
     }
 }

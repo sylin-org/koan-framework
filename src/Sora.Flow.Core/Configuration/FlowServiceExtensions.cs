@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Dynamic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -531,7 +532,8 @@ public sealed class FlowHandlerConfigurator
                 {
                     var bag = ToBag(entity);
                     var item = FlowSendPlainItem.Of<TModel>(bag, sourceId: "auto-handler", occurredAt: DateTimeOffset.UtcNow);
-                    await sender.SendAsync(new[] { item }, message: null, hostType: typeof(TModel));
+                    // Don't pass entity type as hostType - that's for adapter classes with [FlowAdapter]
+                    await sender.SendAsync(new[] { item }, message: null, hostType: null);
                 }
                 else
                 {
@@ -567,7 +569,8 @@ public sealed class FlowHandlerConfigurator
                 {
                     var bag = ToBag(entity);
                     var item = FlowSendPlainItem.Of<TModel>(bag, sourceId: "auto-handler", occurredAt: DateTimeOffset.UtcNow);
-                    await sender.SendAsync(new[] { item }, message: null, hostType: typeof(TModel));
+                    // Don't pass entity type as hostType - that's for adapter classes with [FlowAdapter]
+                    await sender.SendAsync(new[] { item }, message: null, hostType: null);
                 }
                 else
                 {
@@ -624,19 +627,68 @@ public sealed class FlowHandlerConfigurator
         if (entity is null) return dict;
         try
         {
-            var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-            foreach (var p in props)
+            // Special handling for DynamicFlowEntity - extract from Model property
+            if (entity is IDynamicFlowEntity dynamicEntity && dynamicEntity.Model != null)
             {
-                if (!p.CanRead) continue;
-                var val = p.GetValue(entity);
-                if (val is null || IsSimple(val.GetType()))
+                // Flatten the ExpandoObject Model to dictionary paths
+                var flattened = FlattenExpando(dynamicEntity.Model, "");
+                foreach (var kvp in flattened)
                 {
-                    dict[p.Name] = val;
+                    dict[kvp.Key] = kvp.Value;
+                }
+                // Also add the Id if present
+                var idProp = entity.GetType().GetProperty("Id");
+                if (idProp != null && idProp.CanRead)
+                {
+                    var idVal = idProp.GetValue(entity);
+                    if (idVal != null) dict["Id"] = idVal;
+                }
+            }
+            else
+            {
+                // Regular entity - extract simple properties
+                var props = entity.GetType().GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+                foreach (var p in props)
+                {
+                    if (!p.CanRead) continue;
+                    var val = p.GetValue(entity);
+                    if (val is null || IsSimple(val.GetType()))
+                    {
+                        dict[p.Name] = val;
+                    }
                 }
             }
         }
         catch { }
         return dict;
+    }
+    
+    // Helper to flatten ExpandoObject to dotted paths
+    private static System.Collections.Generic.Dictionary<string, object?> FlattenExpando(System.Dynamic.ExpandoObject expando, string prefix)
+    {
+        var result = new System.Collections.Generic.Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var dict = (System.Collections.Generic.IDictionary<string, object?>)expando;
+        
+        foreach (var kvp in dict)
+        {
+            var currentPath = string.IsNullOrEmpty(prefix) ? kvp.Key : $"{prefix}.{kvp.Key}";
+            
+            if (kvp.Value is System.Dynamic.ExpandoObject nested)
+            {
+                // Recursively flatten nested ExpandoObjects
+                var nestedFlattened = FlattenExpando(nested, currentPath);
+                foreach (var nestedKvp in nestedFlattened)
+                {
+                    result[nestedKvp.Key] = nestedKvp.Value;
+                }
+            }
+            else
+            {
+                result[currentPath] = kvp.Value;
+            }
+        }
+        
+        return result;
     }
 
     private static bool IsSimple(Type t)

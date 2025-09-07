@@ -8,6 +8,7 @@ using Sora.Messaging.RabbitMq;
 using S8.Flow.Shared;
 using Sora.Core.Hosting.App;
 using Sora.Flow.Actions;
+using Sora.Flow.Extensions;
 using Sora.Flow.Sending;
 using Sora.Flow.Attributes;
 using Sora.Flow;
@@ -62,8 +63,8 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
                 Kind = deviceProfile.Kind,
                 Code = deviceProfile.Code
             };
-            // Send as targeted message (plain entity consumers removed)
-            await new FlowTargetedMessage<Device> { Entity = device, Timestamp = DateTimeOffset.UtcNow }.Send();
+            // Send using new entity.Send() pattern
+            await device.Send();
 
             // Send sensors for this device
             foreach (var sensorProfile in SampleProfiles.SensorsForOem(deviceProfile))
@@ -76,7 +77,7 @@ builder.Services.On<FlowCommandMessage>(async cmd =>
                     Code = sensorProfile.Code,
                     Unit = sensorProfile.Unit
                 };
-                await new FlowTargetedMessage<Sensor> { Entity = sensor, Timestamp = DateTimeOffset.UtcNow }.Send();
+                await sensor.Send();
             }
         }
         
@@ -124,7 +125,7 @@ public sealed class OemPublisher : BackgroundService
                 // Cycle through ALL devices instead of random selection
                 var d = SampleProfiles.Fleet[deviceIndex];
                 deviceIndex = (deviceIndex + 1) % SampleProfiles.Fleet.Length;
-                _log.LogDebug("[OEM] Preparing to announce Device {DeviceId}", d.Id);
+                _log.LogInformation("[OEM] Processing Device {DeviceId} (Index: {Index}/{Total})", d.Id, deviceIndex, SampleProfiles.Fleet.Length);
                 // ✨ BEAUTIFUL NEW MESSAGING-FIRST PATTERNS ✨
                 // Periodic device and sensor announcements
                 if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
@@ -141,9 +142,9 @@ public sealed class OemPublisher : BackgroundService
                         Code = d.Code
                     };
                     
-                    _log.LogDebug("[OEM] 🏭 Sending Device entity for {DeviceId}", d.Id);
-                    var targetedDevice = new FlowTargetedMessage<Device> { Entity = device, Timestamp = DateTimeOffset.UtcNow };
-                    await targetedDevice.Send(cancellationToken: stoppingToken); // Targeted routing
+                    _log.LogInformation("[OEM] 🏭 Sending Device entity: Id={DeviceId}, Serial={Serial}, Inventory={Inventory}", d.Id, device.Serial, device.Inventory);
+                    await device.Send(stoppingToken); // Direct entity sending with automatic transport wrapping
+                    _log.LogInformation("[OEM] Device sent successfully");
 
                     // Send Sensor entities
                     foreach (var s in SampleProfiles.SensorsForOem(d))
@@ -158,8 +159,7 @@ public sealed class OemPublisher : BackgroundService
                         };
                         
                         _log.LogTrace("[OEM] Sensor entity: {SensorKey}", s.SensorKey);
-                        var targetedSensor = new FlowTargetedMessage<Sensor> { Entity = sensor, Timestamp = DateTimeOffset.UtcNow };
-                        await targetedSensor.Send(cancellationToken: stoppingToken); // Targeted routing
+                        await sensor.Send(stoppingToken); // Direct entity sending with automatic transport wrapping
                     }
                     
                     lastAnnounce = DateTimeOffset.UtcNow;
@@ -196,8 +196,7 @@ public sealed class OemPublisher : BackgroundService
                     };
                     
                     _log.LogTrace("[OEM] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
-                    var targetedReading = new FlowTargetedMessage<Reading> { Entity = reading, Timestamp = DateTimeOffset.UtcNow };
-                    await targetedReading.Send(cancellationToken: stoppingToken);
+                    await reading.Send(stoppingToken);
                 }
 
                 // Periodically update manufacturer data (every 5 minutes)

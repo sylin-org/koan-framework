@@ -2,6 +2,7 @@
 using S8.Flow.Shared;
 using Sora.Flow;
 using Sora.Flow.Sending;
+using Sora.Flow.Extensions;
 
 namespace S8.Flow.Api.Controllers;
 
@@ -124,7 +125,7 @@ public class FlowTestController : ControllerBase
 
             // This is the moment of truth! 
             // device.Send() should route through messaging → orchestrator → Flow intake
-            await Sora.Messaging.MessagingExtensions.Send(device);
+            await device.Send();
 
             return Ok(new
             {

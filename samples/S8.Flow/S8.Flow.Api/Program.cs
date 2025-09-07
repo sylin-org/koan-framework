@@ -2,6 +2,7 @@ using S8.Flow.Api.Entities;
 using Sora.Data.Core;
 using Sora.Flow;
 using Sora.Flow.Configuration;
+using Sora.Flow.Initialization;
 using Sora.Flow.Options;
 using S8.Flow.Shared;
 using Sora.Messaging;
@@ -14,9 +15,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Sora framework with auto-configuration
 builder.Services.AddSora();
 
-// Auto-configure Flow handlers for all FlowEntity and FlowValueObject types
-// Eliminates boilerplate - handlers route to Flow intake automatically
-builder.Services.AutoConfigureFlow(typeof(Reading).Assembly);
+// Initialize Flow messaging transformers and transport handler
+// This replaces AutoConfigureFlow with the new transport envelope approach
+Sora.Flow.Initialization.FlowMessagingInitializer.RegisterFlowTransformers();
+builder.Services.AddFlowTransportHandler();
+
 
 // FlowCommandMessage handler for API commands
 builder.Services.On<FlowCommandMessage>(async cmd =>

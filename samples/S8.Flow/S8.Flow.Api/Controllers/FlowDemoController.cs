@@ -2,6 +2,7 @@
 using S8.Flow.Shared;
 using Sora.Flow;
 using Sora.Flow.Sending;
+using Sora.Flow.Extensions;
 
 namespace S8.Flow.Api.Controllers;
 
@@ -32,7 +33,7 @@ public class FlowDemoController : ControllerBase
         };
 
         // ✨ BEAUTIFUL: Routes through messaging → orchestrator → Flow intake
-    await Sora.Messaging.MessagingExtensions.Send(device);
+    await device.Send();
         
         return Ok(new { 
             message = "✅ Device sent via messaging-first Flow patterns!", 
@@ -61,7 +62,7 @@ public class FlowDemoController : ControllerBase
 
         // ✨ BEAUTIFUL: Send to specific target via messaging
     // Targeted send is obsolete; use messaging pattern or document as not supported
-    await Sora.Messaging.MessagingExtensions.Send(device);
+    await device.Send();
         
         return Ok(new { 
             message = $"✅ Device sent to target '{target}' via messaging!", 
@@ -88,7 +89,7 @@ public class FlowDemoController : ControllerBase
         };
 
         // ✨ BEAUTIFUL: Value objects route through messaging too
-    await Sora.Messaging.MessagingExtensions.Send(reading);
+    await reading.Send();
         
         return Ok(new { 
             message = "✅ Reading sent via messaging-first Flow patterns!", 

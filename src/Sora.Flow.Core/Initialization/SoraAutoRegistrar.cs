@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Sora.Core;
 using Sora.Flow.Options;
 using Sora.Flow.Sending;
@@ -296,7 +297,16 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             foreach (var (t, attr) in DiscoverAdapterHostedServices())
             {
                 if (!Matches(attr.System, attr.Adapter)) continue;
-                services.AddSingleton(typeof(IHostedService), t);
+                
+                // Register the adapter with FlowContext management
+                services.AddSingleton(t);
+                services.AddSingleton<IHostedService>(sp =>
+                {
+                    var adapterService = (BackgroundService)sp.GetRequiredService(t);
+                    var loggerFactory = sp.GetService<ILoggerFactory>();
+                    var logger = loggerFactory?.CreateLogger<Context.FlowAdapterContextService<BackgroundService>>();
+                    return new Context.FlowAdapterContextService<BackgroundService>(adapterService, logger);
+                });
             }
         }
 
