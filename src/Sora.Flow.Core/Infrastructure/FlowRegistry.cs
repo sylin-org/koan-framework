@@ -67,16 +67,21 @@ public static class FlowRegistry
     }
 
     /// <summary>
-    /// Returns the parent Flow entity type and key path for a value-object type (deriving from <see cref="Sora.Flow.Model.FlowValueObject{T}"/>),
-    /// based on the first [ParentKey(parent: ...)] property found. Returns null if not applicable.
-    /// The parent key path is automatically resolved to the [Key] property of the parent type.
+    /// Returns the parent Flow entity type and key path for any Flow type with [ParentKey] attributes.
+    /// Works for both FlowValueObject{T} and FlowEntity{T} types.
+    /// Based on the first [ParentKey(parent: ...)] property found. Returns null if not applicable.
     /// </summary>
     public static (Type Parent, string ParentKeyPath)? GetValueObjectParent(Type t)
     {
         return s_voParent.GetOrAdd(t, static type =>
         {
             var bt = type.BaseType;
-            if (bt is null || !bt.IsGenericType || bt.GetGenericTypeDefinition() != typeof(FlowValueObject<>)) return null;
+            if (bt is null || !bt.IsGenericType) return null;
+            
+            var def = bt.GetGenericTypeDefinition();
+            // Support both FlowValueObject<T> and FlowEntity<T> types
+            if (def != typeof(FlowValueObject<>) && def != typeof(FlowEntity<>)) return null;
+            
             // Determine parent via first [ParentKey(parent: ...)]
             foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
