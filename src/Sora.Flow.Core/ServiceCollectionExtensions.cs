@@ -214,17 +214,17 @@ public static class ServiceCollectionExtensions
                                     var sourceDict = ExtractDict(sourceMetadata);
                                     if (dict is null) continue;
 
-                                    // ✅ FIXED: Auto-populate external ID from source system + source entity's [Key] property
+                                    // ✅ FIXED: Auto-populate external ID from source system + source entity ID
                                     if (sourceDict != null && dict != null)
                                     {
                                         var systemName = GetSourceSystem(sourceDict);
                                         
-                                        // Get the source entity's ID from the [Key] property in the payload
-                                        // For FlowEntity<T> types, this is typically the "Id" property inherited from Entity<T>
-                                        // For DynamicFlowEntity, we look for "id" in the dictionary
-                                        var sourceEntityId = GetSourceEntityId(dict, modelType);
+                                        // The SourceId field in StageRecord already contains the source entity's ID
+                                        // This is the original entity ID from the source system (e.g., "D5", "S1")
+                                        // NOT the aggregation key value
+                                        var sourceEntityId = src; // src is the SourceId from the StageRecord
                                         
-                                        if (!string.IsNullOrEmpty(systemName) && !string.IsNullOrEmpty(sourceEntityId))
+                                        if (!string.IsNullOrEmpty(systemName) && !string.IsNullOrEmpty(sourceEntityId) && sourceEntityId != "unknown")
                                         {
                                             var externalIdKey = $"identifier.external.{systemName}";
                                             if (!canonical.TryGetValue(externalIdKey, out var externalIdList))
