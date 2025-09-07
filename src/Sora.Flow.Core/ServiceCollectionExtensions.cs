@@ -214,12 +214,17 @@ public static class ServiceCollectionExtensions
                                     var sourceDict = ExtractDict(sourceMetadata);
                                     if (dict is null) continue;
 
-                                    // ✅ NEW: Auto-populate external ID from source system + primary entity ID
+                                    // ✅ FIXED: Auto-populate external ID from source system + source entity's [Key] property
                                     if (sourceDict != null && dict != null)
                                     {
                                         var systemName = GetSourceSystem(sourceDict);
-                                        var primaryId = GetPrimaryEntityId(dict, modelType);
-                                        if (!string.IsNullOrEmpty(systemName) && !string.IsNullOrEmpty(primaryId))
+                                        
+                                        // Get the source entity's ID from the [Key] property in the payload
+                                        // For FlowEntity<T> types, this is typically the "Id" property inherited from Entity<T>
+                                        // For DynamicFlowEntity, we look for "id" in the dictionary
+                                        var sourceEntityId = GetSourceEntityId(dict, modelType);
+                                        
+                                        if (!string.IsNullOrEmpty(systemName) && !string.IsNullOrEmpty(sourceEntityId))
                                         {
                                             var externalIdKey = $"identifier.external.{systemName}";
                                             if (!canonical.TryGetValue(externalIdKey, out var externalIdList))
@@ -227,7 +232,7 @@ public static class ServiceCollectionExtensions
                                                 externalIdList = new List<string?>();
                                                 canonical[externalIdKey] = externalIdList;
                                             }
-                                            externalIdList.Add(primaryId);
+                                            externalIdList.Add(sourceEntityId);
                                             
                                             // Also add to lineage tracking
                                             if (!lineage.TryGetValue(externalIdKey, out var externalIdLineage))
@@ -235,10 +240,10 @@ public static class ServiceCollectionExtensions
                                                 externalIdLineage = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
                                                 lineage[externalIdKey] = externalIdLineage;
                                             }
-                                            if (!externalIdLineage.TryGetValue(primaryId, out var sources))
+                                            if (!externalIdLineage.TryGetValue(sourceEntityId, out var sources))
                                             {
                                                 sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                                                externalIdLineage[primaryId] = sources;
+                                                externalIdLineage[sourceEntityId] = sources;
                                             }
                                             sources.Add(src);
                                         }
@@ -247,6 +252,12 @@ public static class ServiceCollectionExtensions
                                     foreach (var kv in dict!)
                                     {
                                         var tag = kv.Key;
+                                        
+                                        // Skip source-specific ID fields - they should only be in identifier.external.{source}
+                                        if (string.Equals(tag, "id", StringComparison.OrdinalIgnoreCase) || 
+                                            string.Equals(tag, "Id", StringComparison.OrdinalIgnoreCase))
+                                            continue;
+                                            
                                         if (exclude.Length > 0 && exclude.Any(p => tag.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
                                             continue;
                                         var values = ToValuesFlexible(kv.Value);
@@ -314,6 +325,9 @@ public static class ServiceCollectionExtensions
                                 var linData = typeof(Data<,>).MakeGenericType(linType, typeof(string));
                                 await (Task)linData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { linType, typeof(string), typeof(CancellationToken) })!
                                     .Invoke(null, new object?[] { linDoc, FlowSets.ViewShort(Constants.Views.Lineage), stoppingToken })!;
+
+                                // ✅ Phase 4: Auto-Index Management - Create/Update IdentityLink entries for external IDs
+                                await CreateOrUpdateIdentityLinks(modelType, refUlid, canonical, stoppingToken);
 
                                 // Materialized snapshot via policy engine → give monitors a chance to adjust before commit
                                 var materializer = _sp.GetRequiredService<IFlowMaterializer>();
@@ -520,7 +534,45 @@ public static class ServiceCollectionExtensions
                                     await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "vo-parent-key-empty", path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
                                     continue;
                                 }
-                                candidates.Add((parentKeyPath, parentKey));
+                                
+                                // NEW: For ParentKey resolution, first try to find parent via external ID lookup
+                                // The parentKey value (e.g., "D1") is the source-specific ID
+                                // We need to find the parent whose identifier.external.{source} matches this value
+                                var sourceSystem = ToValuesFlexible(dict.TryGetValue(Constants.Envelope.System, out var sysVal) ? sysVal : null).FirstOrDefault();
+                                if (!string.IsNullOrWhiteSpace(sourceSystem))
+                                {
+                                    // Try to resolve parent via IdentityLink using external ID
+                                    var parentResolved = await TryResolveParentViaExternalId(
+                                        voParent.Value.Parent, 
+                                        sourceSystem, 
+                                        parentKey, 
+                                        stoppingToken);
+                                    
+                                    if (!string.IsNullOrWhiteSpace(parentResolved))
+                                    {
+                                        // Successfully resolved parent - use canonical ULID
+                                        candidates.Add((parentKeyPath, parentResolved));
+                                    }
+                                    else
+                                    {
+                                        // Parent not yet available - park this record
+                                        await this.SaveRejectAndDrop(
+                                            "PARENT_NOT_FOUND", 
+                                            new { 
+                                                reason = "parent-not-resolved", 
+                                                parentType = voParent.Value.Parent.Name, 
+                                                parentKey = parentKey, 
+                                                source = sourceSystem 
+                                            }, 
+                                            rec, modelType, intakeSet, stoppingToken);
+                                        continue;
+                                    }
+                                }
+                                else
+                                {
+                                    // No source system - fallback to original behavior
+                                    candidates.Add((parentKeyPath, parentKey));
+                                }
                             }
                             // Optional composite candidate: system|adapter|externalId for safer ownership, when present
                             if (dict.TryGetValue(Constants.Envelope.System, out var sys) &&
@@ -746,6 +798,38 @@ public static class ServiceCollectionExtensions
             }
             return null;
         }
+        
+        /// <summary>
+        /// Tries to resolve a parent entity's canonical ULID by looking up its external ID.
+        /// This enables cross-system parent-child relationships where child references parent by source-specific ID.
+        /// </summary>
+        private static async Task<string?> TryResolveParentViaExternalId(Type parentType, string sourceSystem, string parentExternalId, CancellationToken ct)
+        {
+            // Build composite key for IdentityLink lookup: system|adapter|externalId
+            // Using sourceSystem for both system and adapter since they come from same source
+            var composite = string.Join('|', sourceSystem, sourceSystem, parentExternalId);
+            
+            var idType = typeof(Sora.Flow.Model.IdentityLink<>).MakeGenericType(parentType);
+            var idData = typeof(Data<,>).MakeGenericType(idType, typeof(string));
+            var getM = idData.GetMethod("GetAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) });
+            
+            if (getM is null) return null;
+            
+            var task = (Task)getM.Invoke(null, new object?[] { composite, ct })!;
+            await task.ConfigureAwait(false);
+            var link = GetTaskResult(task);
+            
+            if (link is not null)
+            {
+                // Found parent via external ID - return its canonical ULID
+                var refUlid = idType.GetProperty("ReferenceUlid")!.GetValue(link) as string;
+                return refUlid;
+            }
+            
+            // Parent not found - will need to park until parent arrives
+            return null;
+        }
+        
         private async Task SaveRejectAndDrop(string code, object evidence, object rec, Type modelType, string intakeSet, CancellationToken ct)
         {
             var json = System.Text.Json.JsonSerializer.Serialize(evidence);
@@ -834,11 +918,12 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Extracts the primary entity ID from the data dictionary for external ID generation.
-    /// For strong-typed models: uses [Key] property value
+    /// Extracts the source entity ID from the data dictionary for external ID generation.
+    /// For strong-typed models: uses [Key] property value (typically "Id" from Entity<T>)
     /// For dynamic models: uses "id" property (case-insensitive)
+    /// This is the source-specific ID (e.g., "D1", "S1") that should be stored in identifier.external.{source}
     /// </summary>
-    private static string? GetPrimaryEntityId(IDictionary<string, object?> dict, Type modelType)
+    private static string? GetSourceEntityId(IDictionary<string, object?> dict, Type modelType)
     {
         // Check if it's a DynamicFlowEntity (has IDynamicFlowEntity interface)
         var isDynamic = typeof(IDynamicFlowEntity).IsAssignableFrom(modelType);
@@ -885,6 +970,76 @@ public static class ServiceCollectionExtensions
         }
         
         return null;
+    }
+
+    /// <summary>
+    /// Creates or updates IdentityLink entries for external IDs found in canonical projection.
+    /// This ensures proper indexing for efficient external ID → ReferenceUlid lookups.
+    /// </summary>
+    private static async Task CreateOrUpdateIdentityLinks(
+        Type modelType, 
+        string? refUlid, 
+        Dictionary<string, List<string?>> canonical, 
+        CancellationToken stoppingToken)
+    {
+        if (string.IsNullOrWhiteSpace(refUlid)) return;
+
+        var idType = typeof(Sora.Flow.Model.IdentityLink<>).MakeGenericType(modelType);
+        var idData = typeof(Data<,>).MakeGenericType(idType, typeof(string));
+        var getAsync = idData.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) });
+        var upsertAsync = idData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { idType, typeof(CancellationToken) });
+
+        if (getAsync == null || upsertAsync == null) return;
+
+        // Process all identifier.external.* keys in the canonical projection
+        foreach (var kv in canonical.Where(x => x.Key.StartsWith(Constants.Reserved.IdentifierExternalPrefix, StringComparison.OrdinalIgnoreCase)))
+        {
+            var systemName = kv.Key.Substring(Constants.Reserved.IdentifierExternalPrefix.Length);
+            if (string.IsNullOrWhiteSpace(systemName)) continue;
+
+            foreach (var externalId in kv.Value.Where(x => !string.IsNullOrWhiteSpace(x)))
+            {
+                if (externalId == null) continue;
+
+                // Create composite key: system|adapter|externalId (using system for both system and adapter)
+                var compositeId = string.Join('|', systemName, systemName, externalId);
+
+                // Check if IdentityLink already exists
+                var getTask = (Task)getAsync.Invoke(null, new object?[] { compositeId, stoppingToken })!;
+                await getTask.ConfigureAwait(false);
+                var existingLink = GetTaskResult(getTask);
+
+                if (existingLink == null)
+                {
+                    // Create new IdentityLink
+                    var newLink = Activator.CreateInstance(idType)!;
+                    idType.GetProperty("Id")!.SetValue(newLink, compositeId);
+                    idType.GetProperty("System")!.SetValue(newLink, systemName);
+                    idType.GetProperty("Adapter")!.SetValue(newLink, systemName);
+                    idType.GetProperty("ExternalId")!.SetValue(newLink, externalId);
+                    idType.GetProperty("ReferenceUlid")!.SetValue(newLink, refUlid);
+                    idType.GetProperty("Provisional")!.SetValue(newLink, false); // Non-provisional since it comes from canonical projection
+                    idType.GetProperty("CreatedAt")!.SetValue(newLink, DateTimeOffset.UtcNow);
+                    
+                    // Set expiration for cleanup (optional - could be configurable)
+                    idType.GetProperty("ExpiresAt")!.SetValue(newLink, DateTimeOffset.UtcNow.AddDays(365));
+
+                    await (Task)upsertAsync.Invoke(null, new object?[] { newLink, stoppingToken })!;
+                }
+                else
+                {
+                    // Update existing link if ReferenceUlid has changed
+                    var currentRefUlid = (string?)idType.GetProperty("ReferenceUlid")!.GetValue(existingLink);
+                    if (!string.Equals(currentRefUlid, refUlid, StringComparison.Ordinal))
+                    {
+                        idType.GetProperty("ReferenceUlid")!.SetValue(existingLink, refUlid);
+                        idType.GetProperty("Provisional")!.SetValue(existingLink, false);
+                        
+                        await (Task)upsertAsync.Invoke(null, new object?[] { existingLink, stoppingToken })!;
+                    }
+                }
+            }
+        }
     }
 
     private static List<string> ToValuesFlexible(object? raw)
