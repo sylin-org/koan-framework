@@ -485,37 +485,25 @@ public static class ServiceCollectionExtensions
                         _log.LogDebug($"[flow.association] Processing {page.Count} intake records for model {modelType.Name}");
 
                         var voParent = Infrastructure.FlowRegistry.GetValueObjectParent(modelType);
-                        var isVo = voParent is not null;
+                        var hasParentKey = voParent is not null;
                         var tags = Infrastructure.FlowRegistry.GetAggregationTags(modelType);
-                        if (!isVo && tags.Length == 0) tags = _opts.CurrentValue.AggregationTags ?? Array.Empty<string>();
+                        if (!hasParentKey && tags.Length == 0) tags = _opts.CurrentValue.AggregationTags ?? Array.Empty<string>();
                         foreach (var rec in page)
                         {
                             using var _root = DataSetContext.With(null);
                             var dict = ExtractDict(rec.GetType().GetProperty("Data")!.GetValue(rec));
-                            if (dict is null || (!isVo && tags.Length == 0))
+                            if (dict is null || (!hasParentKey && tags.Length == 0))
                             {
                                 await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = dict is null ? "no-payload" : "no-config-tags", tags }, rec, modelType, intakeSet, stoppingToken);
                                 continue;
                             }
 
                             var candidates = new List<(string tag, string value)>();
-                            if (!isVo)
+                            
+                            // Priority 1: Handle ParentKey resolution if present (for both FlowEntity and FlowValueObject)
+                            if (hasParentKey)
                             {
-                                foreach (var tag in tags)
-                                {
-                                    if (!dict.TryGetValue(tag, out var raw)) continue;
-                                    foreach (var v in ToValuesFlexible(raw))
-                                    {
-                                        if (!string.IsNullOrWhiteSpace(v))
-                                        {
-                                            candidates.Add((tag, v));
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // VO: parent association uses configured parent key path
+                                // Parent association uses configured parent key path
                                 var parentKeyPath = voParent!.Value.ParentKeyPath;
                                 if (!dict.TryGetValue(parentKeyPath, out var raw))
                                 {
@@ -574,6 +562,22 @@ public static class ServiceCollectionExtensions
                                     candidates.Add((parentKeyPath, parentKey));
                                 }
                             }
+                            
+                            // Priority 2: Handle aggregation keys (for entities that also have aggregation keys)
+                            if (tags.Length > 0)
+                            {
+                                foreach (var tag in tags)
+                                {
+                                    if (!dict.TryGetValue(tag, out var raw)) continue;
+                                    foreach (var v in ToValuesFlexible(raw))
+                                    {
+                                        if (!string.IsNullOrWhiteSpace(v))
+                                        {
+                                            candidates.Add((tag, v));
+                                        }
+                                    }
+                                }
+                            }
                             // Optional composite candidate: system|adapter|externalId for safer ownership, when present
                             if (dict.TryGetValue(Constants.Envelope.System, out var sys) &&
                                 dict.TryGetValue(Constants.Envelope.Adapter, out var adp))
@@ -612,7 +616,7 @@ public static class ServiceCollectionExtensions
                                 continue;
                             }
 
-                            var kiType = typeof(KeyIndex<>).MakeGenericType(isVo ? voParent!.Value.Parent : modelType);
+                            var kiType = typeof(KeyIndex<>).MakeGenericType(hasParentKey ? voParent!.Value.Parent : modelType);
                             var kiData = typeof(Data<,>).MakeGenericType(kiType, typeof(string));
                             var getKi = kiData.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
                             var owners = new HashSet<string>(StringComparer.Ordinal);
@@ -661,7 +665,7 @@ public static class ServiceCollectionExtensions
                                 }
                             }
 
-                            var refType = typeof(ReferenceItem<>).MakeGenericType(isVo ? voParent!.Value.Parent : modelType);
+                            var refType = typeof(ReferenceItem<>).MakeGenericType(hasParentKey ? voParent!.Value.Parent : modelType);
                             var refData = typeof(Data<,>).MakeGenericType(refType, typeof(string));
                             var getRef = refData.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
                             var refTask = (Task)getRef.Invoke(null, new object?[] { referenceUlid, stoppingToken })!;
@@ -681,7 +685,7 @@ public static class ServiceCollectionExtensions
 
                             // Create projection task for canonical roots only
                             var refUlid = (string)refType.GetProperty("Id")!.GetValue(ri)!;
-                            if (!isVo)
+                            if (!hasParentKey)
                             {
                                 var taskType = typeof(ProjectionTask<>).MakeGenericType(modelType);
                                 var newTask = Activator.CreateInstance(taskType)!;
