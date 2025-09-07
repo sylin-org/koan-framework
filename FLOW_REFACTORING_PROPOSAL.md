@@ -469,3 +469,45 @@ graph TD
 5. **Zero-Config Default**: Framework provides sensible defaults, customization available
 
 *This architecture achieves the holy grail: maximum framework sophistication with minimal user complexity.*
+
+---
+
+## 📅 **IMPLEMENTATION STATUS (2025-01-07)**
+
+### ✅ **COMPLETED Components**
+
+#### External ID Correlation (100%)
+- ✅ Correctly extracts source entity ID from [Key] property
+- ✅ Stores source IDs in `identifier.external.{source}` (NOT aggregation keys)
+- ✅ Strips source 'id' fields from canonical models
+- ✅ Full policy framework with FlowPolicyAttribute
+
+#### ParentKey Resolution (100%)
+- ✅ Resolves parents via external ID lookups
+- ✅ Replaces source-specific parent IDs with canonical ULIDs
+- ✅ Parks entities when parents haven't arrived
+
+#### Flow Messaging Core (100%)
+- ✅ MessagingInterceptors with type-safe registration
+- ✅ FlowContext preservation
+- ✅ Transport envelopes (regular and dynamic)
+- ✅ Direct MongoDB integration
+
+### ❌ **REMAINING Work**
+
+#### Messaging Infrastructure (0%)
+- ❌ IQueuedMessage interface
+- ❌ Queue routing in MessagingExtensions
+- ❌ RabbitMQ SendToQueueAsync
+
+#### Orchestrator Pattern (0%)
+- ❌ FlowOrchestratorBase class
+- ❌ Auto-discovery and registration
+- ❌ DefaultFlowOrchestrator
+
+#### Queue Provisioning (0%)
+- ❌ FlowQueueProvider
+- ❌ Auto-provisioning at startup
+
+### 📋 **Next Steps**
+See `FLOW_REMAINING_WORK.md` for detailed implementation plan and priorities.

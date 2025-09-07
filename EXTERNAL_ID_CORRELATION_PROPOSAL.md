@@ -142,34 +142,32 @@ Enable efficient parent lookups across systems:
 
 ## Implementation Analysis
 
-### Current Implementation State
+### Current Implementation State (Updated 2025-01-07)
 
-**✅ Existing Infrastructure**:
+**✅ FULLY IMPLEMENTED Components**:
 1. **IdentityLink<T> Model**: Complete external ID → ReferenceUlid mapping system (`src/Sora.Flow.Core/Model/Identity.cs:7`)
-2. **Canonical Projection Pipeline**: Working projection system (`src/Sora.Flow.Core/ServiceCollectionExtensions.cs:199-283`)
-3. **FlowRegistry**: Has GetExternalIdKeys method (currently returns empty array) (`src/Sora.Flow.Core/Infrastructure/FlowRegistry.cs:104-108`)
+2. **Canonical Projection Pipeline**: Enhanced with external ID auto-population (`src/Sora.Flow.Core/ServiceCollectionExtensions.cs:217-250`)
+3. **FlowRegistry**: GetExternalIdKeys method with policy-driven detection (`src/Sora.Flow.Core/Infrastructure/FlowRegistry.cs:106-119`)
 4. **Data/Source Separation**: Clean separation in StageRecord<T> with Data and Source properties (`src/Sora.Flow.Core/Model/Typed.cs:57-59`)
 5. **External ID Resolution**: Working IdentityLink resolution in intake pipeline (`src/Sora.Flow.Core/ServiceCollectionExtensions.cs:636-709`)
 6. **Reserved Key Infrastructure**: Constants for `identifier.external.*` prefix (`src/Sora.Flow.Core/Infrastructure/Constants.cs:66`)
+7. **Policy Framework**: FlowPolicyAttribute with ExternalIdPolicy enum (`src/Sora.Flow.Core/Attributes/FlowPolicyAttribute.cs`)
+8. **Source Entity ID Extraction**: GetSourceEntityId() extracts [Key] property values (`ServiceCollectionExtensions.cs:926-972`)
+9. **ParentKey Resolution**: TryResolveParentViaExternalId() for cross-system parent lookup (`ServiceCollectionExtensions.cs:806-831`)
+10. **Source ID Stripping**: Canonical models exclude source 'id' fields (`ServiceCollectionExtensions.cs:256-259`)
+11. **IdentityLink Auto-Creation**: CreateOrUpdateIdentityLinks() indexes external IDs (`ServiceCollectionExtensions.cs:978-1041`)
 
-**✅ Partial Implementation**:
-1. **External ID Processing in Intake**: IdentityLink creation works during intake for `identifier.external.*` keys (`ServiceCollectionExtensions.cs:680-709`)
-2. **Contractless Support**: Intake pipeline already accepts `identifier.external.*` bag keys (`ServiceCollectionExtensions.cs:510-522`)
-3. **IdentityLink Infrastructure**: Complete system for external ID → ReferenceUlid mapping with provisional support
-4. **Reserved Key Processing**: Both keyed entity association and canonical intake support `identifier.external.*` patterns
+**🔄 Implementation Status**:
+The external ID correlation infrastructure is **FULLY FUNCTIONAL**. The system now:
+- ✅ Automatically populates `identifier.external.{source}` with source entity IDs (from [Key] property, NOT aggregation keys)
+- ✅ Strips source-specific 'id' fields from canonical and root models
+- ✅ Resolves ParentKey relationships via external ID lookups to canonical ULIDs
+- ✅ Parks entities with PARENT_NOT_FOUND when parents haven't arrived yet
+- ✅ Creates and maintains IdentityLink indexes for efficient lookups
 
-**🔄 Infrastructure Assessment**:
-The external ID correlation infrastructure is **mostly complete** but **not actively generating external IDs**. The intake pipeline can process `identifier.external.*` keys when provided, and IdentityLink creation works correctly, but there's no automatic population of these keys from source system metadata. The framework is designed to handle external ID correlation but requires manual specification of external IDs in the incoming data.
+### Implementation Delta (COMPLETED)
 
-**❌ Missing Components**:
-1. **Auto-Population in Canonical Projection**: No automatic external ID extraction during canonical projection (lines 208-231)
-2. **Policy Framework**: No FlowPolicy attribute system for external ID configuration
-3. **Source-to-External-ID Generation**: No automatic `identifier.external.{source}:{id}` population from Source metadata
-4. **Enhanced FlowRegistry**: GetExternalIdKeys returns empty array instead of policy-driven keys
-
-### Implementation Delta
-
-#### Phase 1: Core External ID Processing ⭐ (Priority)
+#### Phase 1: Core External ID Processing ✅ (COMPLETED)
 
 **File**: `src/Sora.Flow.Core/ServiceCollectionExtensions.cs`
 **Location**: Lines 208-231 (canonical projection loop)
