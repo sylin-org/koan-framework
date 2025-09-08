@@ -1,9 +1,11 @@
 # Flow Messaging Implementation Plan
 
 ## Executive Summary
+
 Framework-level implementation for Flow messaging in Sora.Messaging/Sora.Flow to provide clean developer experience and dedicated queue routing.
 
 ## Requirements & Gaps
+
 - Strong-typed models with [FlowAdapter] detection.
 - entity.Send() pattern.
 - MessagingInterceptors for envelope wrapping.
@@ -12,6 +14,7 @@ Framework-level implementation for Flow messaging in Sora.Messaging/Sora.Flow to
 - Metadata separation.
 
 ## Phased Implementation
+
 - Phase 1: Sora.Messaging enhancement.
 - Phase 2: Queue architecture refactor.
 - Phase 3: Orchestrator pattern implementation.
