@@ -493,6 +493,12 @@ graph TD
 - ✅ Transport envelopes (regular and dynamic)
 - ✅ Direct MongoDB integration
 
+#### Root Collection Architecture (100%)
+- ✅ **Flat Root Storage**: Root collections (e.g., `S8.Flow.Shared.Device`) store entities as direct mirrors of the class definition
+- ✅ **Perfect Entity Alignment**: No `Model` wrapper in root storage - documents match Entity<T> structure exactly
+- ✅ **Clean Separation**: Flow metadata remains in Flow-specific views (canonical, lineage, etc.)
+- ✅ **Optimal Performance**: Direct field access for queries, smaller documents, natural MongoDB patterns
+
 ### ❌ **REMAINING Work**
 
 #### Messaging Infrastructure (0%)

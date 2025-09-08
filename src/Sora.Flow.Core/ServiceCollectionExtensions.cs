@@ -399,42 +399,91 @@ public static class ServiceCollectionExtensions
                                     var m = typeof(IFlowMonitor).GetMethod("OnProjectedAsync")!;
                                     var monitorTask2 = (Task)m.Invoke(um, new object?[] { modelType, ctx, stoppingToken })!; await monitorTask2.ConfigureAwait(false);
                                 }
-                                // Build nested JSON object from dotted paths
-                                var pathMap = new Dictionary<string, JToken?>(StringComparer.OrdinalIgnoreCase);
-                                foreach (var kvp in mutableModel)
-                                {
-                                    pathMap[kvp.Key] = kvp.Value is null ? JValue.CreateNull() : new JValue(kvp.Value);
-                                }
-                                var nested = JsonPathMapper.Expand(pathMap);
-                                // Convert JObject to plain dictionary recursively for provider-safe serialization
-                                static object? ToPlain(object? token)
-                                {
-                                    if (token is null) return null;
-                                    if (token is JValue jv) return jv.Value;
-                                    if (token is JArray ja) return ja.Select(t => ToPlain(t)).ToList();
-                                    if (token is JObject jo)
-                                    {
-                                        IDictionary<string, object?> exp = new ExpandoObject();
-                                        foreach (var p in jo.Properties()) exp[p.Name] = ToPlain(p.Value);
-                                        return (ExpandoObject)exp;
-                                    }
-                                    return token;
-                                }
-                                var plain = ToPlain(nested) as ExpandoObject;
-                                // Upsert dynamic root entity and policy state in ROOT scope (no set)
+                                // Upsert root entity with flat storage (no Model wrapper) in ROOT scope (no set)
                                 using (DataSetContext.With(null))
                                 {
-                                    var dynType = typeof(DynamicFlowEntity<>).MakeGenericType(modelType);
-                                    var dyn = Activator.CreateInstance(dynType)!;
-                                    dynType.GetProperty("Id")!.SetValue(dyn, refId);
-                                        // no legacy ReferenceId on root; Id carries ULID.
-                                    if (!string.IsNullOrWhiteSpace(refUlid)) dynType.GetProperty("ReferenceUlid")?.SetValue(dyn, refUlid);
-                                    // Root materialized snapshot stored under Model (renamed from Data)
-                                    var dynModelProp = dynType.GetProperty("Model") ?? dynType.GetProperty("Data");
-                                    dynModelProp!.SetValue(dyn, plain);
-                                    var dynData = typeof(Data<,>).MakeGenericType(dynType, typeof(string));
-                                    await (Task)dynData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { dynType, typeof(CancellationToken) })!
-                                        .Invoke(null, new object?[] { dyn, stoppingToken })!;
+                                    // For flat root storage, create instance of the actual modelType directly
+                                    // This eliminates the Model wrapper for both FlowEntity<T> and DynamicFlowEntity<T>
+                                    var rootEntity = Activator.CreateInstance(modelType)!;
+                                    modelType.GetProperty("Id")!.SetValue(rootEntity, refId);
+                                    if (!string.IsNullOrWhiteSpace(refUlid)) 
+                                        modelType.GetProperty("ReferenceUlid")?.SetValue(rootEntity, refUlid);
+                                    
+                                    // DEBUG: Log materialized data
+                                    Console.WriteLine($"[DEBUG] Processing {modelType.Name} with {mutableModel.Count} properties:");
+                                    foreach (var kvp in mutableModel)
+                                    {
+                                        Console.WriteLine($"[DEBUG]   {kvp.Key} = {kvp.Value ?? "NULL"}");
+                                    }
+                                    
+                                    // Handle different entity types differently
+                                    if (typeof(IDynamicFlowEntity).IsAssignableFrom(modelType))
+                                    {
+                                        Console.WriteLine($"[DEBUG] {modelType.Name} is DynamicFlowEntity - using Model property");
+                                        // For DynamicFlowEntity<T>, build nested JSON object from dotted paths and set Model property
+                                        var pathMap = new Dictionary<string, JToken?>(StringComparer.OrdinalIgnoreCase);
+                                        foreach (var kvp in mutableModel)
+                                        {
+                                            pathMap[kvp.Key] = kvp.Value is null ? JValue.CreateNull() : new JValue(kvp.Value);
+                                        }
+                                        var nested = JsonPathMapper.Expand(pathMap);
+                                        // Convert JObject to plain dictionary recursively for provider-safe serialization
+                                        static object? ToPlain(object? token)
+                                        {
+                                            if (token is null) return null;
+                                            if (token is JValue jv) return jv.Value;
+                                            if (token is JArray ja) return ja.Select(t => ToPlain(t)).ToList();
+                                            if (token is JObject jo)
+                                            {
+                                                IDictionary<string, object?> exp = new ExpandoObject();
+                                                foreach (var p in jo.Properties()) exp[p.Name] = ToPlain(p.Value);
+                                                return (ExpandoObject)exp;
+                                            }
+                                            return token;
+                                        }
+                                        var plain = ToPlain(nested) as ExpandoObject;
+                                        modelType.GetProperty("Model")!.SetValue(rootEntity, plain);
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine($"[DEBUG] {modelType.Name} is FlowEntity - setting properties directly");
+                                        // For FlowEntity<T>, set properties directly from flat materialized dictionary
+                                        foreach (var kvp in mutableModel)
+                                        {
+                                            if (kvp.Key != "Id" && kvp.Key != "ReferenceUlid")
+                                            {
+                                                // Try exact match first, then case-insensitive match
+                                                var prop = modelType.GetProperty(kvp.Key) ?? 
+                                                          modelType.GetProperty(kvp.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                                                if (prop != null && prop.CanWrite)
+                                                {
+                                                    Console.WriteLine($"[DEBUG]   Setting {prop.Name} = {kvp.Value ?? "NULL"} (from key: {kvp.Key})");
+                                                    prop.SetValue(rootEntity, kvp.Value);
+                                                }
+                                                else
+                                                {
+                                                    Console.WriteLine($"[DEBUG]   Property {kvp.Key} not found or not writable on {modelType.Name}");
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // DEBUG: Log final entity before saving
+                                    try
+                                    {
+                                        var json = Newtonsoft.Json.JsonConvert.SerializeObject(rootEntity, Newtonsoft.Json.Formatting.Indented);
+                                        Console.WriteLine($"[DEBUG] Final {modelType.Name} before save:");
+                                        Console.WriteLine(json);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"[DEBUG] Could not serialize {modelType.Name}: {ex.Message}");
+                                    }
+                                    
+                                    // Store the entity directly without DynamicFlowEntity wrapper
+                                    var entityData = typeof(Data<,>).MakeGenericType(modelType, typeof(string));
+                                    await (Task)entityData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { modelType, typeof(CancellationToken) })!
+                                        .Invoke(null, new object?[] { rootEntity, stoppingToken })!;
                                     // Upsert policy state
                                     var polType = typeof(PolicyState<>).MakeGenericType(modelType);
                                     var pol = Activator.CreateInstance(polType)!;

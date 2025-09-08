@@ -1,6 +1,5 @@
 ﻿@echo off
 setlocal enableextensions
-
 REM Ensure we run from the script's directory
 set "SCRIPT_DIR=%~dp0"
 pushd "%SCRIPT_DIR%"

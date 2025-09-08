@@ -8,11 +8,10 @@ namespace S8.Flow.Shared;
 public sealed class Device : FlowEntity<Device>
 {
     // Uses inherited Id property from Entity<T> for source-specific IDs
-    
+
     public string Inventory { get; set; } = default!;
-    
+
     [AggregationKey]
-    [Key]  // Primary key for external ID correlation
     public string Serial { get; set; } = default!;
 
     public string Manufacturer { get; set; } = default!;
