@@ -20,6 +20,21 @@ namespace Sora.Flow.Extensions;
 public static class FlowEntityExtensions
 {
     /// <summary>
+    /// Sends a dictionary as a DynamicFlowEntity of the specified type.
+    /// Provides clean DX for sending dynamic data without creating entity instances.
+    /// Usage: await myDict.Send&lt;Manufacturer&gt;();
+    /// </summary>
+    public static async Task Send<T>(this Dictionary<string, object> data, CancellationToken cancellationToken = default) 
+        where T : class, IDynamicFlowEntity, new()
+    {
+        // Convert dictionary to DynamicFlowEntity
+        var entity = data.ToDynamicFlowEntity<T>();
+        
+        // Send using existing messaging infrastructure
+        await entity.Send(cancellationToken: cancellationToken);
+    }
+    
+    /// <summary>
     /// Registers MessagingInterceptors for Flow entity types to provide automatic transport envelope wrapping.
     /// This should be called during application startup to configure Flow entity messaging.
     /// </summary>
@@ -73,6 +88,7 @@ public static class FlowEntityExtensions
     /// Generic method to create FlowQueuedMessage for any FlowEntity or FlowValueObject type.
     /// Used by reflection in RegisterFlowInterceptors for the new queue routing approach.
     /// </summary>
+    /// <typeparam name="T">The entity type</typeparam>
     public static object CreateFlowQueuedMessageGeneric<T>(T entity) where T : class
     {
         var envelope = CreateTransportEnvelope(entity);
@@ -234,7 +250,7 @@ public static class FlowEntityExtensions
     
     /// <summary>
     /// Discovers all Flow entity types across all loaded assemblies.
-    /// Returns FlowEntity<T>, DynamicFlowEntity<T>, and FlowValueObject<T> types.
+    /// Returns FlowEntity&lt;T&gt;, DynamicFlowEntity&lt;T&gt;, and FlowValueObject&lt;T&gt; types.
     /// </summary>
     private static List<Type> DiscoverAllFlowTypes()
     {

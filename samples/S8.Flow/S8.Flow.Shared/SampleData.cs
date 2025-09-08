@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Sora.Flow.Model;
 
 namespace S8.Flow.Shared;
 
@@ -76,5 +77,81 @@ public static class SampleData
         }
         
         return readings;
+    }
+    
+    /// <summary>
+    /// Creates sample manufacturer entities with dynamic data structure
+    /// </summary>
+    public static List<Manufacturer> CreateSampleManufacturers()
+    {
+        var manufacturers = new List<Manufacturer>();
+        
+        // Create manufacturers with BMS-specific data using JSON paths as keys
+        var mfg1 = new Dictionary<string, object>
+        {
+            ["identifier.code"] = "MFG001",
+            ["identifier.name"] = "Acme Corp",
+            ["identifier.external.bms"] = "BMS-MFG-001",
+            ["manufacturing.country"] = "USA",
+            ["manufacturing.established"] = "1985",
+            ["manufacturing.facilities"] = new[] { "Plant A", "Plant B" },
+            ["products.categories"] = new[] { "sensors", "actuators" }
+        }.ToDynamicFlowEntity<Manufacturer>();
+        manufacturers.Add(mfg1);
+        
+        var mfg2 = new Dictionary<string, object>
+        {
+            ["identifier.code"] = "MFG002",
+            ["identifier.name"] = "TechCorp Industries",
+            ["identifier.external.bms"] = "BMS-MFG-002",
+            ["manufacturing.country"] = "Germany",
+            ["manufacturing.established"] = "1992",
+            ["manufacturing.facilities"] = new[] { "Factory 1", "Factory 2", "Factory 3" },
+            ["products.categories"] = new[] { "controllers", "displays" }
+        }.ToDynamicFlowEntity<Manufacturer>();
+        manufacturers.Add(mfg2);
+        
+        return manufacturers;
+    }
+    
+    /// <summary>
+    /// Creates OEM-specific manufacturer data (support and certification info)
+    /// </summary>
+    public static List<Manufacturer> CreateOemManufacturers()
+    {
+        var manufacturers = new List<Manufacturer>();
+        
+        // Create manufacturers with OEM-specific data using JSON paths as keys
+        var mfg1 = new Dictionary<string, object>
+        {
+            ["identifier.code"] = "MFG001",
+            ["identifier.name"] = "Acme Corp",
+            ["identifier.external.oem"] = "OEM-VENDOR-42",
+            ["support.phone"] = "1-800-ACME",
+            ["support.email"] = "support@acme.com",
+            ["support.tier"] = "Premium",
+            ["certifications.iso9001"] = true,
+            ["certifications.iso14001"] = true,
+            ["warranty.standard"] = "2 years",
+            ["warranty.extended"] = "5 years"
+        }.ToDynamicFlowEntity<Manufacturer>();
+        manufacturers.Add(mfg1);
+        
+        var mfg2 = new Dictionary<string, object>
+        {
+            ["identifier.code"] = "MFG002",
+            ["identifier.name"] = "TechCorp Industries",
+            ["identifier.external.oem"] = "OEM-VENDOR-88",
+            ["support.phone"] = "49-123-456789",
+            ["support.email"] = "info@techcorp.de",
+            ["support.tier"] = "Standard",
+            ["certifications.iso9001"] = true,
+            ["certifications.iso14001"] = false,
+            ["warranty.standard"] = "3 years",
+            ["warranty.extended"] = "7 years"
+        }.ToDynamicFlowEntity<Manufacturer>();
+        manufacturers.Add(mfg2);
+        
+        return manufacturers;
     }
 }

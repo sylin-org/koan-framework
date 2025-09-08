@@ -4,7 +4,9 @@ using Sora.Messaging;
 using S8.Flow.Shared;
 using Sora.Flow.Attributes;
 using Sora.Flow.Model;
+using Sora.Flow.Extensions;
 using Sora.Data.Core;
+using System.Collections.Generic;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -47,6 +49,39 @@ public sealed class OemPublisher : BackgroundService
                 if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromSeconds(30))
                 {
                     _log.LogInformation("[OEM] Sending complete dataset");
+                    
+                    // Send manufacturers using clean dictionary approach (OEM-specific data)
+                    var mfg1 = new Dictionary<string, object>
+                    {
+                        ["identifier.code"] = "MFG001",
+                        ["identifier.name"] = "Acme Corp",
+                        ["identifier.external.oem"] = "OEM-VENDOR-42",
+                        ["support.phone"] = "1-800-ACME",
+                        ["support.email"] = "support@acme.com",
+                        ["support.tier"] = "Premium",
+                        ["certifications.iso9001"] = true,
+                        ["certifications.iso14001"] = true,
+                        ["warranty.standard"] = "2 years",
+                        ["warranty.extended"] = "5 years"
+                    };
+                    _log.LogDebug("[OEM] Sending Manufacturer: {Code}", mfg1["identifier.code"]);
+                    await mfg1.Send<Manufacturer>();
+                    
+                    var mfg2 = new Dictionary<string, object>
+                    {
+                        ["identifier.code"] = "MFG002",
+                        ["identifier.name"] = "TechCorp Industries",
+                        ["identifier.external.oem"] = "OEM-VENDOR-88",
+                        ["support.phone"] = "49-123-456789",
+                        ["support.email"] = "info@techcorp.de",
+                        ["support.tier"] = "Standard",
+                        ["certifications.iso9001"] = true,
+                        ["certifications.iso14001"] = false,
+                        ["warranty.standard"] = "3 years",
+                        ["warranty.extended"] = "7 years"
+                    };
+                    _log.LogDebug("[OEM] Sending Manufacturer: {Code}", mfg2["identifier.code"]);
+                    await mfg2.Send<Manufacturer>();
                     
                     foreach (var (deviceTemplate, sensorsTemplate) in sampleData)
                     {

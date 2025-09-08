@@ -62,6 +62,33 @@ public sealed class BmsPublisher : BackgroundService
                 {
                     _log.LogInformation("[BMS] Sending complete dataset");
                     
+                    // Send manufacturers using clean dictionary approach
+                    var mfg1 = new Dictionary<string, object>
+                    {
+                        ["identifier.code"] = "MFG001",
+                        ["identifier.name"] = "Acme Corp",
+                        ["identifier.external.bms"] = "BMS-MFG-001",
+                        ["manufacturing.country"] = "USA",
+                        ["manufacturing.established"] = "1985",
+                        ["manufacturing.facilities"] = new[] { "Plant A", "Plant B" },
+                        ["products.categories"] = new[] { "sensors", "actuators" }
+                    };
+                    _log.LogDebug("[BMS] Sending Manufacturer: {Code}", mfg1["identifier.code"]);
+                    await mfg1.Send<Manufacturer>();
+                    
+                    var mfg2 = new Dictionary<string, object>
+                    {
+                        ["identifier.code"] = "MFG002",
+                        ["identifier.name"] = "TechCorp Industries",
+                        ["identifier.external.bms"] = "BMS-MFG-002",
+                        ["manufacturing.country"] = "Germany",
+                        ["manufacturing.established"] = "1992",
+                        ["manufacturing.facilities"] = new[] { "Factory 1", "Factory 2", "Factory 3" },
+                        ["products.categories"] = new[] { "controllers", "displays" }
+                    };
+                    _log.LogDebug("[BMS] Sending Manufacturer: {Code}", mfg2["identifier.code"]);
+                    await mfg2.Send<Manufacturer>();
+                    
                     foreach (var (deviceTemplate, sensorsTemplate) in sampleData)
                     {
                         // Clone and adjust device for BMS
