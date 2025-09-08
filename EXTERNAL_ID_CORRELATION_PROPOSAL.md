@@ -69,11 +69,10 @@ Enhance the canonical projection pipeline to automatically extract and populate 
 {
   "_id": "canonical::K4JV48YABMVHQ1CHC7KC2S0330",
   "Model": {
-    "deviceId": ["D1"],
+    "deviceId": ["K4KDERR71A6AQN9ZRGV5ADPGG0"], // ✅ Canonical Device ULID (resolved from source "D1")
     "sensorKey": ["S1"],
     "code": ["TEMP"], 
     "unit": ["C"],
-    "id": ["S1"],
     "identifier": {
       "external": {
         "oem": "S1",          // ✅ Auto-populated from Source + entity ID
@@ -130,14 +129,15 @@ Leverage existing `IdentityLink<T>` infrastructure with automatic index creation
 
 ### 4. Cross-System Parent Resolution
 
-Enable efficient parent lookups across systems:
+Enable efficient parent lookups across systems with canonical ULID resolution:
 
 ```csharp
-// Reading entity from BMS system references deviceId: "D1" 
+// Sensor entity from BMS system references deviceId: "bmsD1" 
 // Framework automatically resolves:
-// 1. Look up identifier.external.bms: "D1" → ReferenceUlid: "ABC123"
-// 2. Correlate with OEM system identifier.external.oem: "DEVICE_001" → Same ReferenceUlid
-// 3. Create parent relationship using canonical ReferenceUlid
+// 1. Look up external ID: "bms|bms|bmsD1" in IdentityLink → ReferenceUlid: "K4KDERR71A6AQN9ZRGV5ADPGG0"
+// 2. Replace source parent ID with canonical ULID in canonical model
+// 3. Result: deviceId: ["K4KDERR71A6AQN9ZRGV5ADPGG0"] in canonical projection
+// 4. Preserve external ID correlation: identifier.external.bms: "bmsS1"
 ```
 
 ## Implementation Analysis

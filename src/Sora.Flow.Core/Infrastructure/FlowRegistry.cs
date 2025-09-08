@@ -67,20 +67,16 @@ public static class FlowRegistry
     }
 
     /// <summary>
-    /// Returns the parent Flow entity type and key path for any Flow type with [ParentKey] attributes.
-    /// Works for both FlowValueObject{T} and FlowEntity{T} types.
-    /// Based on the first [ParentKey(parent: ...)] property found. Returns null if not applicable.
+    /// Returns the parent Flow entity type and key path for a value-object type (deriving from <see cref="Sora.Flow.Model.FlowValueObject{T}"/>),
+    /// based on the first [ParentKey(parent: ...)] property found. Returns null if not applicable.
+    /// The parent key path is automatically resolved to the [Key] property of the parent type.
     /// </summary>
     public static (Type Parent, string ParentKeyPath)? GetValueObjectParent(Type t)
     {
         return s_voParent.GetOrAdd(t, static type =>
         {
             var bt = type.BaseType;
-            if (bt is null || !bt.IsGenericType) return null;
-            
-            var def = bt.GetGenericTypeDefinition();
-            // Support both FlowValueObject<T> and FlowEntity<T> types
-            if (def != typeof(FlowValueObject<>) && def != typeof(FlowEntity<>)) return null;
+            if (bt is null || !bt.IsGenericType || bt.GetGenericTypeDefinition() != typeof(FlowValueObject<>)) return null;
             
             // Determine parent via first [ParentKey(parent: ...)]
             foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
@@ -95,7 +91,42 @@ public static class FlowRegistry
                 if (parentKeyProperty == null)
                     throw new InvalidOperationException($"Parent type {pk.Parent.Name} has no [Key] property for ParentKey resolution");
                 
-                var path = string.IsNullOrWhiteSpace(pk.PayloadPath) ? p.Name : pk.PayloadPath;
+                var path = string.IsNullOrWhiteSpace(pk.PayloadPath) ? GetJsonPropertyName(p) : pk.PayloadPath;
+                if (string.IsNullOrWhiteSpace(path)) continue;
+                return (pk.Parent, path);
+            }
+            return null;
+        });
+    }
+
+    // Separate cache for entity parents to avoid conflicts
+    private static readonly ConcurrentDictionary<Type, (Type Parent, string ParentKeyPath)?> s_entityParent = new();
+    
+    /// <summary>
+    /// Returns the parent Flow entity type and key path for a FlowEntity{T} type with [ParentKey] attributes.
+    /// This is used for entities (not value objects) that have parent relationships.
+    /// </summary>
+    public static (Type Parent, string ParentKeyPath)? GetEntityParent(Type t)
+    {
+        return s_entityParent.GetOrAdd(t, static type =>
+        {
+            var bt = type.BaseType;
+            if (bt is null || !bt.IsGenericType || bt.GetGenericTypeDefinition() != typeof(FlowEntity<>)) return null;
+            
+            // Determine parent via first [ParentKey(parent: ...)]
+            foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            {
+                var pk = p.GetCustomAttribute<ParentKeyAttribute>(inherit: true);
+                if (pk is null || pk.Parent is null) continue;
+                
+                // Find the [Key] property on the parent type
+                var parentKeyProperty = pk.Parent.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                    .FirstOrDefault(prop => prop.GetCustomAttribute<KeyAttribute>(inherit: true) != null);
+                
+                if (parentKeyProperty == null)
+                    throw new InvalidOperationException($"Parent type {pk.Parent.Name} has no [Key] property for ParentKey resolution");
+                
+                var path = string.IsNullOrWhiteSpace(pk.PayloadPath) ? GetJsonPropertyName(p) : pk.PayloadPath;
                 if (string.IsNullOrWhiteSpace(path)) continue;
                 return (pk.Parent, path);
             }
@@ -171,7 +202,7 @@ public static class FlowRegistry
     /// Gets the JSON property name for a C# property, respecting JsonProperty attributes
     /// and falling back to camelCase conversion to match the system's JSON serialization.
     /// </summary>
-    private static string GetJsonPropertyName(PropertyInfo property)
+    public static string GetJsonPropertyName(PropertyInfo property)
     {
         // Check for explicit JsonProperty attribute
         var jsonPropertyAttr = property.GetCustomAttribute<JsonPropertyAttribute>();

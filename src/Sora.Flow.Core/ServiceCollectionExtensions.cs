@@ -249,6 +249,39 @@ public static class ServiceCollectionExtensions
                                         }
                                     }
 
+                                    // ✅ NEW: Resolve ParentKey fields to canonical ULIDs before canonical projection
+                                    var resolvedParentKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                                    
+                                    // Check if this model has ParentKey properties that need resolution
+                                    var entityParent = Infrastructure.FlowRegistry.GetEntityParent(modelType);
+                                    if (entityParent.HasValue && sourceDict != null)
+                                    {
+                                        var sourceSystem = GetSourceSystem(sourceDict);
+                                        if (!string.IsNullOrWhiteSpace(sourceSystem))
+                                        {
+                                            var parentKeyPath = entityParent.Value.ParentKeyPath;
+                                            if (dict.TryGetValue(parentKeyPath, out var parentKeyRaw))
+                                            {
+                                                var parentKey = ToValuesFlexible(parentKeyRaw).FirstOrDefault();
+                                                if (!string.IsNullOrWhiteSpace(parentKey))
+                                                {
+                                                    // Try to resolve parent via external ID
+                                                    var parentResolved = await TryResolveParentViaExternalId(
+                                                        entityParent.Value.Parent, 
+                                                        sourceSystem, 
+                                                        parentKey, 
+                                                        stoppingToken);
+                                                    
+                                                    if (!string.IsNullOrWhiteSpace(parentResolved))
+                                                    {
+                                                        // Store resolved canonical ULID for this ParentKey
+                                                        resolvedParentKeys[parentKeyPath] = parentResolved;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     foreach (var kv in dict!)
                                     {
                                         var tag = kv.Key;
@@ -260,8 +293,16 @@ public static class ServiceCollectionExtensions
                                             
                                         if (exclude.Length > 0 && exclude.Any(p => tag.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
                                             continue;
+                                        
                                         var values = ToValuesFlexible(kv.Value);
                                         if (values.Count == 0) continue;
+                                        
+                                        // ✅ NEW: Replace ParentKey source values with resolved canonical ULIDs
+                                        if (resolvedParentKeys.TryGetValue(tag, out var resolvedParentUlid))
+                                        {
+                                            // Use resolved canonical ULID instead of source value
+                                            values = new List<string?> { resolvedParentUlid };
+                                        }
                                         if (!canonical.TryGetValue(tag, out var list)) { list = new List<string?>(); canonical[tag] = list; }
                                         foreach (var v in values) list.Add(v);
                                         if (!lineage.TryGetValue(tag, out var m)) { m = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase); lineage[tag] = m; }
@@ -485,7 +526,9 @@ public static class ServiceCollectionExtensions
                         _log.LogDebug($"[flow.association] Processing {page.Count} intake records for model {modelType.Name}");
 
                         var voParent = Infrastructure.FlowRegistry.GetValueObjectParent(modelType);
-                        var hasParentKey = voParent is not null;
+                        var entityParent = Infrastructure.FlowRegistry.GetEntityParent(modelType);
+                        var hasParentKey = voParent is not null || entityParent is not null;
+                        var isValueObject = voParent is not null;
                         var tags = Infrastructure.FlowRegistry.GetAggregationTags(modelType);
                         if (!hasParentKey && tags.Length == 0) tags = _opts.CurrentValue.AggregationTags ?? Array.Empty<string>();
                         foreach (var rec in page)
@@ -500,18 +543,21 @@ public static class ServiceCollectionExtensions
 
                             var candidates = new List<(string tag, string value)>();
                             
-                            // Priority 1: Handle ParentKey resolution if present (for both FlowEntity and FlowValueObject)
+                            // Priority 1: Handle ParentKey resolution if present
                             if (hasParentKey)
                             {
-                                // Parent association uses configured parent key path
-                                var parentKeyPath = voParent!.Value.ParentKeyPath;
+                                // Get the correct parent info based on type
+                                var parentInfo = isValueObject ? voParent!.Value : entityParent!.Value;
+                                var parentKeyPath = parentInfo.ParentKeyPath;
+                                
                                 if (!dict.TryGetValue(parentKeyPath, out var raw))
                                 {
                                     // Fallback: accept any reserved reference.* entry
                                     var refKvp = dict.FirstOrDefault(kv => kv.Key.StartsWith(Constants.Reserved.ReferencePrefix, StringComparison.OrdinalIgnoreCase));
                                     if (refKvp.Key is null)
                                     {
-                                        await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "vo-parent-key-missing", path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
+                                        var reason = isValueObject ? "vo-parent-key-missing" : "entity-parent-key-missing";
+                                        await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = reason, path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
                                         continue;
                                     }
                                     raw = refKvp.Value;
@@ -519,19 +565,20 @@ public static class ServiceCollectionExtensions
                                 var parentKey = ToValuesFlexible(raw).FirstOrDefault();
                                 if (string.IsNullOrWhiteSpace(parentKey))
                                 {
-                                    await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = "vo-parent-key-empty", path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
+                                    var reason = isValueObject ? "vo-parent-key-empty" : "entity-parent-key-empty";
+                                    await this.SaveRejectAndDrop(Constants.Rejections.NoKeys, new { reason = reason, path = parentKeyPath }, rec, modelType, intakeSet, stoppingToken);
                                     continue;
                                 }
                                 
-                                // NEW: For ParentKey resolution, first try to find parent via external ID lookup
-                                // The parentKey value (e.g., "D1") is the source-specific ID
+                                // For ParentKey resolution, try to find parent via external ID lookup
+                                // The parentKey value (e.g., "oemD2") is the source-specific ID
                                 // We need to find the parent whose identifier.external.{source} matches this value
                                 var sourceSystem = ToValuesFlexible(dict.TryGetValue(Constants.Envelope.System, out var sysVal) ? sysVal : null).FirstOrDefault();
                                 if (!string.IsNullOrWhiteSpace(sourceSystem))
                                 {
                                     // Try to resolve parent via IdentityLink using external ID
                                     var parentResolved = await TryResolveParentViaExternalId(
-                                        voParent.Value.Parent, 
+                                        parentInfo.Parent, 
                                         sourceSystem, 
                                         parentKey, 
                                         stoppingToken);
@@ -544,11 +591,12 @@ public static class ServiceCollectionExtensions
                                     else
                                     {
                                         // Parent not yet available - park this record
+                                        var reason = isValueObject ? "vo-parent-not-resolved" : "entity-parent-not-resolved";
                                         await this.SaveRejectAndDrop(
                                             "PARENT_NOT_FOUND", 
                                             new { 
-                                                reason = "parent-not-resolved", 
-                                                parentType = voParent.Value.Parent.Name, 
+                                                reason = reason, 
+                                                parentType = parentInfo.Parent.Name, 
                                                 parentKey = parentKey, 
                                                 source = sourceSystem 
                                             }, 
@@ -616,7 +664,7 @@ public static class ServiceCollectionExtensions
                                 continue;
                             }
 
-                            var kiType = typeof(KeyIndex<>).MakeGenericType(hasParentKey ? voParent!.Value.Parent : modelType);
+                            var kiType = typeof(KeyIndex<>).MakeGenericType(hasParentKey ? (isValueObject ? voParent!.Value.Parent : entityParent!.Value.Parent) : modelType);
                             var kiData = typeof(Data<,>).MakeGenericType(kiType, typeof(string));
                             var getKi = kiData.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
                             var owners = new HashSet<string>(StringComparer.Ordinal);
@@ -665,7 +713,7 @@ public static class ServiceCollectionExtensions
                                 }
                             }
 
-                            var refType = typeof(ReferenceItem<>).MakeGenericType(hasParentKey ? voParent!.Value.Parent : modelType);
+                            var refType = typeof(ReferenceItem<>).MakeGenericType(hasParentKey ? (isValueObject ? voParent!.Value.Parent : entityParent!.Value.Parent) : modelType);
                             var refData = typeof(Data<,>).MakeGenericType(refType, typeof(string));
                             var getRef = refData.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
                             var refTask = (Task)getRef.Invoke(null, new object?[] { referenceUlid, stoppingToken })!;
@@ -683,9 +731,10 @@ public static class ServiceCollectionExtensions
                             await (Task)refData.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { refType, typeof(CancellationToken) })!
                                 .Invoke(null, new object?[] { ri, stoppingToken })!;
 
-                            // Create projection task for canonical roots only
+                            // Create projection task for canonical projections
                             var refUlid = (string)refType.GetProperty("Id")!.GetValue(ri)!;
-                            if (!hasParentKey)
+                            // Create tasks for: 1) entities without parents, 2) FlowEntity with parents (but not FlowValueObject with parents)
+                            if (!hasParentKey || (hasParentKey && !isValueObject))
                             {
                                 var taskType = typeof(ProjectionTask<>).MakeGenericType(modelType);
                                 var newTask = Activator.CreateInstance(taskType)!;
@@ -803,37 +852,6 @@ public static class ServiceCollectionExtensions
             return null;
         }
         
-        /// <summary>
-        /// Tries to resolve a parent entity's canonical ULID by looking up its external ID.
-        /// This enables cross-system parent-child relationships where child references parent by source-specific ID.
-        /// </summary>
-        private static async Task<string?> TryResolveParentViaExternalId(Type parentType, string sourceSystem, string parentExternalId, CancellationToken ct)
-        {
-            // Build composite key for IdentityLink lookup: system|adapter|externalId
-            // Using sourceSystem for both system and adapter since they come from same source
-            var composite = string.Join('|', sourceSystem, sourceSystem, parentExternalId);
-            
-            var idType = typeof(Sora.Flow.Model.IdentityLink<>).MakeGenericType(parentType);
-            var idData = typeof(Data<,>).MakeGenericType(idType, typeof(string));
-            var getM = idData.GetMethod("GetAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) });
-            
-            if (getM is null) return null;
-            
-            var task = (Task)getM.Invoke(null, new object?[] { composite, ct })!;
-            await task.ConfigureAwait(false);
-            var link = GetTaskResult(task);
-            
-            if (link is not null)
-            {
-                // Found parent via external ID - return its canonical ULID
-                var refUlid = idType.GetProperty("ReferenceUlid")!.GetValue(link) as string;
-                return refUlid;
-            }
-            
-            // Parent not found - will need to park until parent arrives
-            return null;
-        }
-        
         private async Task SaveRejectAndDrop(string code, object evidence, object rec, Type modelType, string intakeSet, CancellationToken ct)
         {
             var json = System.Text.Json.JsonSerializer.Serialize(evidence);
@@ -852,6 +870,7 @@ public static class ServiceCollectionExtensions
                 parkedType.GetProperty("PolicyVersion")!.SetValue(parked, rec.GetType().GetProperty("PolicyVersion")!.GetValue(rec));
                 parkedType.GetProperty("CorrelationId")!.SetValue(parked, rec.GetType().GetProperty("CorrelationId")!.GetValue(rec));
                 parkedType.GetProperty("Data")!.SetValue(parked, rec.GetType().GetProperty("Data")!.GetValue(rec));
+                parkedType.GetProperty("Source")!.SetValue(parked, rec.GetType().GetProperty("Source")!.GetValue(rec));
                 parkedType.GetProperty("ReasonCode")!.SetValue(parked, code);
                 // Store original evidence object (also persisted in diagnostics as JSON)
                 parkedType.GetProperty("Evidence")!.SetValue(parked, evidence);
@@ -870,6 +889,37 @@ public static class ServiceCollectionExtensions
                 .GetMethod("DeleteAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
             await (Task)delGeneric.Invoke(null, new object?[] { (string)recordType.GetProperty("Id")!.GetValue(rec)!, intakeSet, ct })!;
         }
+    }
+
+    /// <summary>
+    /// Tries to resolve a parent entity's canonical ULID by looking up its external ID.
+    /// This enables cross-system parent-child relationships where child references parent by source-specific ID.
+    /// </summary>
+    private static async Task<string?> TryResolveParentViaExternalId(Type parentType, string sourceSystem, string parentExternalId, CancellationToken ct)
+    {
+        // Build composite key for IdentityLink lookup: system|adapter|externalId
+        // Using sourceSystem for both system and adapter since they come from same source
+        var composite = string.Join('|', sourceSystem, sourceSystem, parentExternalId);
+        
+        var idType = typeof(Sora.Flow.Model.IdentityLink<>).MakeGenericType(parentType);
+        var idData = typeof(Data<,>).MakeGenericType(idType, typeof(string));
+        var getM = idData.GetMethod("GetAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) });
+        
+        if (getM is null) return null;
+        
+        var task = (Task)getM.Invoke(null, new object?[] { composite, ct })!;
+        await task.ConfigureAwait(false);
+        var link = GetTaskResult(task);
+        
+        if (link is not null)
+        {
+            // Found parent via external ID - return its canonical ULID
+            var refUlid = idType.GetProperty("ReferenceUlid")!.GetValue(link) as string;
+            return refUlid;
+        }
+        
+        // Parent not found - will need to park until parent arrives
+        return null;
     }
 
     private static List<Type> DiscoverModels()

@@ -12,11 +12,11 @@
 - ✅ Enhanced FlowRegistry with policy-driven detection
 - ✅ IdentityLink auto-creation and indexing
 
-#### ParentKey Resolution (100% Complete)
+#### ParentKey Resolution (90% Complete)
 - ✅ TryResolveParentViaExternalId() method for cross-system parent lookup
-- ✅ ParentKey values resolved to canonical ULIDs via external ID matching
+- ❌ ParentKey values resolved to canonical ULIDs in canonical models (TODO: canonical projection must use resolved ULIDs)
 - ✅ Entity parking with PARENT_NOT_FOUND when parent not available
-- ✅ Proper parent-child relationships across different source systems
+- ✅ Cross-system parent lookup and validation working
 
 #### Flow Messaging Core (100% Complete)
 - ✅ MessagingInterceptors with type-safe registration
