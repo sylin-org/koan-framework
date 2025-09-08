@@ -1,5 +1,4 @@
 - name: Overview
-  href: README.md
 - name: Engineering
   items:
     - name: Front door
@@ -20,6 +19,10 @@
       href: engineering/orchestration-manifest-generator.md
     - name: SoraService authoring (DX quick guide)
       href: engineering/sora-service-authoring.md
+    - name: Flow Messaging Status
+      href: engineering/flow-messaging-status.md
+    - name: Flow Messaging Implementation Plan
+      href: engineering/flow-messaging-implementation-plan.md
 - name: Architecture Principles
   href: architecture/principles.md
 - name: Reference
@@ -36,6 +39,10 @@
       href: reference/storage.md
     - name: Modules
       href: reference/modules.md
+    - name: Flow Messaging Architecture (Guide)
+      href: guides/flow/flow-messaging-architecture.md
+    - name: Flow & Messaging Capabilities
+      href: reference/flow-messaging-capabilities.md
     - name: Recipes
       href: reference/recipes.md
     - name: Sora CLI
@@ -50,15 +57,17 @@
           href: reference/messaging-primitives.md
         - name: Topology Lifecycle
           href: reference/messaging-topology-lifecycle.md
+    - name: Flow Key Resolution (Troubleshooting)
+      href: support/troubleshooting/flow-key-resolution.md
     - name: AI
       href: reference/ai.md
     - name: Flow
       href: reference/flow.md
       items:
-      - name: Bindings and canonical IDs
-        href: reference/flow-bindings-and-canonical-ids.md
-      - name: Materialization (policies and transformers)
-        href: reference/flow-materialization.md
+        - name: Bindings and canonical IDs
+          href: reference/flow-bindings-and-canonical-ids.md
+        - name: Materialization (policies and transformers)
+          href: reference/flow-materialization.md
     - name: Orchestration
       href: reference/orchestration.md
     - name: Secrets
@@ -71,10 +80,10 @@
       href: reference/config-and-constants.md
     - name: Adapter Matrix
       href: reference/adapter-matrix.md
- - name: Modules
-   items:
-     - name: S8.Flow — IoT Monitor
-       href: modules/s8-flow-iot-monitor.md
+- name: Modules
+  items:
+    - name: S8.Flow — IoT Monitor
+      href: modules/s8-flow-iot-monitor.md
 - name: Feature Catalog
   href: feature-catalog.md
 - name: Guides

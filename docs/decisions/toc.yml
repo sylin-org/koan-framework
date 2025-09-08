@@ -1,7 +1,7 @@
-- name: Decisions
-  href: index.md
-- name: Architecture (ARCH)
-  items:
+ - name: Decisions
+   href: index.md
+ - name: Architecture (ARCH)
+   items:
     - name: Foundational SoC namespaces and Abstractions
       href: ARCH-0045-foundational-soc-namespaces-and-abstractions.md
     - name: Per-project companion docs — README + TECHNICAL
@@ -38,6 +38,8 @@
           href: DATA-0062-instance-save-set-first-class.md
         - name: Data access semantics (All/Query; streaming; pager)
           href: DATA-0061-data-access-pagination-and-streaming.md
+        - name: External ID Correlation Framework
+          href: DATA-0070-external-id-correlation.md
         - name: Messaging envelope transformers
           href: DATA-0072-messaging-envelope-transformers.md
         - name: Vector module split and clean separation
@@ -100,10 +102,18 @@
       href: DATA-0004-index-anchoring-and-json-mapping.md
     - name: Ranges as canonical and materialized model
       href: DATA-0063-ranges-as-canonical-and-materialized-model.md
-- name: Web (WEB)
-  items:
-    - name: S8 Flow IoT sample and SSE monitor
-      href: WEB-0050-s8-flow-iot-sample-and-sse-monitor.md
+ - name: Web (WEB)
+   items:
+     - name: S8 Flow IoT sample and SSE monitor
+       href: WEB-0050-s8-flow-iot-sample-and-sse-monitor.md
+     - name: Flow Messaging Refactor
+       href: WEB-0060-flow-messaging-refactor.md
+ - name: Flow (FLOW)
+   items:
+     - name: External ID translation & adapter identity
+       href: FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md
+     - name: Direct seeding bypass FlowActions
+       href: FLOW-0110-flow-direct-seeding-bypass-flowactions.md
     - name: Web templates and rate limiters
       href: WEB-0012-web-templates-and-rate-limiters.md
     - name: GraphQL module and controller
