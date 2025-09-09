@@ -72,22 +72,17 @@ public static class FlowActionsRegistration
         services.TryAddSingleton<IFlowActions, FlowActionsSender>();
         
         // Register FlowAction handler using modern .On<T>() pattern  
-        Console.WriteLine("[FlowActions] DEBUG: Registering FlowAction handler...");
         services.TryAddSingleton<FlowActionHandler>();
         services.On<FlowAction>(async flowAction =>
         {
-            Console.WriteLine($"[FlowActions] DEBUG: FlowAction handler called for {flowAction.Model}/{flowAction.Verb}");
             var serviceProvider = Sora.Core.Hosting.App.AppHost.Current;
             var handler = serviceProvider?.GetService<FlowActionHandler>();
             if (handler != null)
             {
-                Console.WriteLine($"[FlowActions] DEBUG: Invoking FlowActionHandler for {flowAction.Model}");
                 await handler.HandleAsync(null!, flowAction, CancellationToken.None);
-                Console.WriteLine($"[FlowActions] DEBUG: FlowActionHandler completed for {flowAction.Model}");
             }
             else
             {
-                Console.WriteLine("[FlowActions] ERROR: FlowActionHandler not found in service provider");
             }
         });
         

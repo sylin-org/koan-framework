@@ -348,7 +348,6 @@ public static class FlowMessagingInitializer
         catch (Exception ex)
         {
             // Log error but don't fail - some assemblies might not be accessible
-            Console.WriteLine($"[FlowMessagingInitializer] Warning: Failed to scan assembly {assembly.FullName}: {ex.Message}");
         }
         
         return result;

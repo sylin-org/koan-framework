@@ -69,12 +69,10 @@ public static class ServiceCollectionExtensions
                 // Use FlattenExpandoObject from DynamicFlowExtensions to convert nested structure
                 // to flattened dot-notation keys (e.g., "identifier.code", "identifier.name")
                 var flattened = Sora.Flow.Model.DynamicFlowEntityExtensions.FlattenExpandoObject(expandoModel);
-                Console.WriteLine($"[ExtractDict] Flattened DynamicFlowEntity Model to {flattened.Count} keys: [{string.Join(", ", flattened.Keys.Take(5))}...]");
                 return flattened;
             }
             else
             {
-                Console.WriteLine($"[ExtractDict] Model is null or not ExpandoObject: {dynamicEntity.Model?.GetType().Name}");
                 return null;
             }
         }
@@ -95,7 +93,6 @@ public static class ServiceCollectionExtensions
         catch (Exception ex)
         {
             // Log the error but don't fail completely - this preserves existing error handling  
-            Console.WriteLine($"[ExtractDict] ERROR: Failed to convert {payload.GetType().Name} to dictionary: {ex.Message}");
             return null;
         }
     }
@@ -120,13 +117,11 @@ public static class ServiceCollectionExtensions
         // Hosted workers - only register if FlowOrchestrator services are present
         if (HasFlowOrchestrators())
         {
-            Console.WriteLine("[Sora.Flow] DEBUG: FlowOrchestrator services detected - registering background workers");
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelAssociationWorkerHostedService>());
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelProjectionWorkerHostedService>());
         }
         else
         {
-            Console.WriteLine("[Sora.Flow] DEBUG: No FlowOrchestrator services detected - skipping background workers");
         }
 
         // Identity stamping and actions
@@ -134,10 +129,8 @@ public static class ServiceCollectionExtensions
 
         // Register FlowEntity message handler for "Sora.Flow.FlowEntity" queue
         // This connects the queue to any registered FlowOrchestrator services
-        Console.WriteLine("[Sora.Flow] DEBUG: Registering FlowEntity message handler for orchestrator processing");
         services.On<string>(async (payload) =>
         {
-            Console.WriteLine($"[Sora.Flow] DEBUG: FlowEntity message handler called with payload length: {payload?.Length ?? 0}");
             try
             {
                 // Get any registered FlowOrchestrator service and process the message
@@ -145,19 +138,15 @@ public static class ServiceCollectionExtensions
                 var orchestrator = serviceProvider?.GetService<IFlowOrchestrator>();
                 if (orchestrator != null)
                 {
-                    Console.WriteLine("[Sora.Flow] DEBUG: Found FlowOrchestrator, processing FlowEntity message");
                     await orchestrator.ProcessFlowEntity(payload);
-                    Console.WriteLine("[Sora.Flow] DEBUG: FlowOrchestrator completed processing");
                 }
                 else
                 {
-                    Console.WriteLine("[Sora.Flow] DEBUG: No FlowOrchestrator found - message will be processed by DefaultFlowOrchestrator");
                     // DefaultFlowOrchestrator will handle it as a fallback
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Sora.Flow] ERROR: Failed to process FlowEntity message: {ex.Message}");
                 throw;
             }
         });
@@ -306,7 +295,6 @@ public static class ServiceCollectionExtensions
                                         // NOT the aggregation key value
                                         var sourceEntityId = src; // src is the SourceId from the StageRecord
                                         
-                                        Console.WriteLine($"[ExternalID] Processing {modelType.Name}: systemName='{systemName}', sourceEntityId='{sourceEntityId}'");
                                         
                                         if (!string.IsNullOrEmpty(systemName) && !string.IsNullOrEmpty(sourceEntityId) && sourceEntityId != "unknown")
                                         {
@@ -316,11 +304,9 @@ public static class ServiceCollectionExtensions
                                             {
                                                 externalIdList = new List<string?>();
                                                 canonical[externalIdKey] = externalIdList;
-                                                Console.WriteLine($"[ExternalID] ✅ CREATED new external ID key: {externalIdKey}");
                                             }
                                             
                                             externalIdList.Add(sourceEntityId);
-                                            Console.WriteLine($"[ExternalID] ✅ ADDED entity ID '{sourceEntityId}' to {externalIdKey} (total: {externalIdList.Count})");
                                             
                                             // Also add to lineage tracking
                                             if (!lineage.TryGetValue(externalIdKey, out var externalIdLineage))
@@ -337,7 +323,6 @@ public static class ServiceCollectionExtensions
                                         }
                                         else
                                         {
-                                            Console.WriteLine($"[ExternalID] ❌ SKIPPED: systemName='{systemName}', sourceEntityId='{sourceEntityId}' (empty or unknown)");
                                         }
                                     }
 
@@ -502,16 +487,13 @@ public static class ServiceCollectionExtensions
                                         modelType.GetProperty("ReferenceUlid")?.SetValue(rootEntity, refUlid);
                                     
                                     // DEBUG: Log materialized data
-                                    Console.WriteLine($"[DEBUG] Processing {modelType.Name} with {mutableModel.Count} properties:");
                                     foreach (var kvp in mutableModel)
                                     {
-                                        Console.WriteLine($"[DEBUG]   {kvp.Key} = {kvp.Value ?? "NULL"}");
                                     }
                                     
                                     // Handle different entity types differently
                                     if (typeof(IDynamicFlowEntity).IsAssignableFrom(modelType))
                                     {
-                                        Console.WriteLine($"[DEBUG] {modelType.Name} is DynamicFlowEntity - using Model property");
                                         // For DynamicFlowEntity<T>, build nested JSON object from dotted paths and set Model property
                                         var pathMap = new Dictionary<string, JToken?>(StringComparer.OrdinalIgnoreCase);
                                         foreach (var kvp in mutableModel)
@@ -538,7 +520,6 @@ public static class ServiceCollectionExtensions
                                     }
                                     else
                                     {
-                                        Console.WriteLine($"[DEBUG] {modelType.Name} is FlowEntity - setting properties directly");
                                         // For FlowEntity<T>, set properties directly from flat materialized dictionary
                                         foreach (var kvp in mutableModel)
                                         {
@@ -549,12 +530,10 @@ public static class ServiceCollectionExtensions
                                                           modelType.GetProperty(kvp.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                                                 if (prop != null && prop.CanWrite)
                                                 {
-                                                    Console.WriteLine($"[DEBUG]   Setting {prop.Name} = {kvp.Value ?? "NULL"} (from key: {kvp.Key})");
                                                     prop.SetValue(rootEntity, kvp.Value);
                                                 }
                                                 else
                                                 {
-                                                    Console.WriteLine($"[DEBUG]   Property {kvp.Key} not found or not writable on {modelType.Name}");
                                                 }
                                             }
                                         }
@@ -564,12 +543,9 @@ public static class ServiceCollectionExtensions
                                     try
                                     {
                                         var json = Newtonsoft.Json.JsonConvert.SerializeObject(rootEntity, Newtonsoft.Json.Formatting.Indented);
-                                        Console.WriteLine($"[DEBUG] Final {modelType.Name} before save:");
-                                        Console.WriteLine(json);
                                     }
                                     catch (Exception ex)
                                     {
-                                        Console.WriteLine($"[DEBUG] Could not serialize {modelType.Name}: {ex.Message}");
                                     }
                                     
                                     // Store the entity directly without DynamicFlowEntity wrapper
@@ -1105,7 +1081,6 @@ public static class ServiceCollectionExtensions
     /// </summary>
     private static string? GetSourceSystem(IDictionary<string, object?> sourceDict)
     {
-        Console.WriteLine($"[ExternalID] GetSourceSystem: sourceDict has {sourceDict.Count} keys: [{string.Join(", ", sourceDict.Keys)}]");
         
         // Try multiple possible keys for system name
         string[] systemKeys = { "envelope.system", "source.system", "system" };
@@ -1117,13 +1092,11 @@ public static class ServiceCollectionExtensions
                 var systemName = systemValue.ToString()?.Trim();
                 if (!string.IsNullOrWhiteSpace(systemName))
                 {
-                    Console.WriteLine($"[ExternalID] Found system name '{systemName}' from key '{key}'");
                     return systemName;
                 }
             }
         }
         
-        Console.WriteLine($"[ExternalID] No valid system key found in sourceDict (tried: {string.Join(", ", systemKeys)})");
         return null;
     }
 
@@ -1294,7 +1267,6 @@ public static class ServiceCollectionExtensions
                             type != defaultOrchestratorType &&  // Exclude the internal DefaultFlowOrchestrator
                             type.GetCustomAttributes(orchestratorAttributeType, inherit: true).Any())
                         {
-                            Console.WriteLine($"[Sora.Flow] DEBUG: Found user-defined FlowOrchestrator: {type.FullName}");
                             return true;
                         }
                     }
@@ -1306,13 +1278,11 @@ public static class ServiceCollectionExtensions
                 }
             }
             
-            Console.WriteLine("[Sora.Flow] DEBUG: No user-defined FlowOrchestrator found - background workers will not be registered");
             return false;
         }
         catch
         {
             // If detection fails, default to not registering workers (safer for adapters)
-            Console.WriteLine("[Sora.Flow] DEBUG: FlowOrchestrator detection failed - defaulting to no background workers");
             return false;
         }
     }

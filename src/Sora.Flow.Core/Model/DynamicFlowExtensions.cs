@@ -26,7 +26,6 @@ public static class DynamicFlowExtensions
     public static T ToDynamicFlowEntity<T>(this Dictionary<string, object?> pathValues)
         where T : class, IDynamicFlowEntity, new()
     {
-        Console.WriteLine($"[ToDynamicFlowEntity] Creating {typeof(T).Name} with {pathValues.Count} path values");
         var entity = new T();
         
         // Set Id if the entity has this property
@@ -41,7 +40,6 @@ public static class DynamicFlowExtensions
         if (modelProp != null && modelProp.CanWrite)
         {
             modelProp.SetValue(entity, new ExpandoObject());
-            Console.WriteLine($"[ToDynamicFlowEntity] Created ExpandoObject Model for {typeof(T).Name}");
         }
         
         // Add values to Model if it exists
@@ -53,7 +51,6 @@ public static class DynamicFlowExtensions
                 foreach (var (path, value) in pathValues.Where(kv => kv.Value != null))
                 {
                     SetValueByPath(model, path, value);
-                    Console.WriteLine($"[ToDynamicFlowEntity] Set path '{path}' = '{value}' in {typeof(T).Name}");
                 }
                 
                 // Clean up the Model to ensure MongoDB-compatible types
@@ -65,7 +62,6 @@ public static class DynamicFlowExtensions
                 
                 // Verify Model is still accessible after population and cleanup
                 var modelKeys = finalModel != null ? string.Join(", ", ((IDictionary<string, object?>)finalModel).Keys) : "null";
-                Console.WriteLine($"[ToDynamicFlowEntity] Final Model keys (after cleanup): {modelKeys}");
             }
         }
         

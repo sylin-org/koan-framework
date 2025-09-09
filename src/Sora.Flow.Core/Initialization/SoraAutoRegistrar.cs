@@ -6,8 +6,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Sora.Core;
 using Sora.Core.Extensions;
+using Sora.Core.Hosting.App;
 using Sora.Core.Hosting.Bootstrap;
 using Sora.Flow.Attributes;
 using Sora.Flow.Context;
@@ -106,11 +108,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     {
         var orchestrators = DiscoverFlowOrchestrators().ToList();
         
-        if (!orchestrators.Any())
-        {
-            // Register default orchestrator if none found
-            orchestrators.Add(typeof(DefaultFlowOrchestrator));
-        }
+        // Only register orchestrators if user-defined ones are found
+        // Do not automatically add DefaultFlowOrchestrator - orchestrators should be explicit
         
         // For now, we'll register one handler that finds the orchestrator dynamically
         // Later we can improve this to support multiple orchestrators
@@ -119,18 +118,15 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
             // Register the orchestrator service itself
             services.AddSingleton(orchestratorType);
             
+            // ALSO register as IFlowOrchestrator interface for discovery
+            services.AddSingleton<IFlowOrchestrator>(sp => (IFlowOrchestrator)sp.GetRequiredService(orchestratorType));
+            
             // Register as hosted service
             services.AddSingleton<IHostedService>(sp => (IHostedService)sp.GetRequiredService(orchestratorType));
         }
         
-        // Register a single handler for all orchestrators
-        // The handler will find all registered orchestrators and process the message
-        services.On<object>(async transportEnvelope =>
-        {
-            // This will be resolved at runtime when the message is processed
-            // We'll improve this architecture after getting the basics working
-            Console.WriteLine($"[SoraAutoRegistrar] Flow transport envelope received: {transportEnvelope}");
-        });
+        // Note: Orchestrator routing is now integrated into FlowMessagingInitializer
+        // rather than competing string handlers
     }
 
     private IEnumerable<Type> DiscoverFlowOrchestrators()

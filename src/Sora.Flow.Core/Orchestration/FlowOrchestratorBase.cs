@@ -453,29 +453,28 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
             
             // Set basic properties
             stageRecordType.GetProperty("Id")!.SetValue(record, Guid.NewGuid().ToString("n"));
-            stageRecordType.GetProperty("SourceId")!.SetValue(record, "flow-orchestrator");
+            
+            // Extract entity's native ID for SourceId - this preserves lineage for external ID generation
+            var entityId = ExtractEntityId(payload);
+            stageRecordType.GetProperty("SourceId")!.SetValue(record, entityId ?? source);
+            
             stageRecordType.GetProperty("OccurredAt")!.SetValue(record, DateTimeOffset.UtcNow);
             
             // CLEAN payload - model data only (no system/adapter contamination)
             // Handle DynamicFlowEntity objects by preserving the wrapper structure
             object dataToStore = payload;
-            Console.WriteLine($"[FlowOrchestrator] Processing payload type: {payload.GetType().Name}");
             if (payload is IDynamicFlowEntity dynamicEntity)
             {
-                Console.WriteLine($"[FlowOrchestrator] Found DynamicFlowEntity, Model type: {dynamicEntity.Model?.GetType().Name ?? "null"}");
                 if (dynamicEntity.Model != null)
                 {
                     // For DynamicFlowEntity, we need to preserve the wrapper structure
                     // but ensure the Model property is properly set
-                    Console.WriteLine($"[FlowOrchestrator] Keeping DynamicFlowEntity wrapper with Model data");
-                    Console.WriteLine($"[FlowOrchestrator] Model content keys: {string.Join(", ", ((IDictionary<string, object?>)dynamicEntity.Model).Keys)}");
                     
                     // Store the full DynamicFlowEntity wrapper to maintain structure for association worker
                     dataToStore = payload;
                 }
                 else
                 {
-                    Console.WriteLine($"[FlowOrchestrator] WARNING: DynamicFlowEntity.Model is null!");
                 }
             }
             stageRecordType.GetProperty("Data")!.SetValue(record, dataToStore);
@@ -688,6 +687,44 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
             // Convert EVERYTHING else to string representation to be 100% safe
             _ => value.ToString() ?? ""
         };
+    }
+
+    /// <summary>
+    /// Extracts the entity's native ID for SourceId preservation.
+    /// This ensures proper lineage tracking and external ID generation.
+    /// </summary>
+    private static string? ExtractEntityId(object payload)
+    {
+        try
+        {
+            // Try to get the Id property from the entity
+            var payloadType = payload.GetType();
+            var idProperty = payloadType.GetProperty("Id");
+            if (idProperty != null)
+            {
+                var idValue = idProperty.GetValue(payload);
+                return idValue?.ToString();
+            }
+            
+            // For DynamicFlowEntity, try to get the Id from the wrapper itself
+            if (payload is IDynamicFlowEntity dynamicEntity)
+            {
+                var dynamicType = dynamicEntity.GetType();
+                var dynamicIdProperty = dynamicType.GetProperty("Id");
+                if (dynamicIdProperty != null)
+                {
+                    var idValue = dynamicIdProperty.GetValue(dynamicEntity);
+                    return idValue?.ToString();
+                }
+            }
+            
+            return null;
+        }
+        catch
+        {
+            // If ID extraction fails, return null and fall back to source
+            return null;
+        }
     }
 
 }
