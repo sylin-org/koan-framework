@@ -74,9 +74,13 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
             {
                 await ProcessDynamicFlowEntity(envelope, model, source);
             }
-            else if (type.StartsWith("TransportEnvelope<") || type.StartsWith("DynamicTransportEnvelope<"))
+            else if (type.StartsWith("TransportEnvelope<"))
             {
                 await ProcessTransportEnvelope(envelope, model, source);
+            }
+            else if (type.StartsWith("DynamicTransportEnvelope<"))
+            {
+                await ProcessDynamicTransportEnvelope(envelope, model, source);
             }
             else
             {
@@ -164,6 +168,69 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
         
         // Write to intake with clean metadata separation
         await WriteToIntake(modelType, model, typedPayload, source, envelope.metadata);
+    }
+
+    protected virtual async Task ProcessDynamicTransportEnvelope(dynamic envelope, string model, string source)
+    {
+        Logger.LogDebug("Processing DynamicTransportEnvelope for {Model} from {Source}", model, source);
+        
+        // Extract flattened payload from dynamic transport envelope
+        var payload = envelope.payload;
+        
+        // Resolve model type
+        var modelType = FlowRegistry.ResolveModel(model);
+        if (modelType == null)
+        {
+            Logger.LogWarning("Could not resolve model type for: {Model}", model);
+            return;
+        }
+        
+        // Convert JObject payload to Dictionary<string, object?>
+        Dictionary<string, object?> pathValues;
+        if (payload is JObject jPayload)
+        {
+            pathValues = jPayload.ToObject<Dictionary<string, object?>>() ?? new Dictionary<string, object?>();
+        }
+        else if (payload is IDictionary<string, object?> dictPayload)
+        {
+            pathValues = new Dictionary<string, object?>(dictPayload);
+        }
+        else
+        {
+            Logger.LogWarning("Unexpected DynamicTransportEnvelope payload type {PayloadType} for model: {Model}", (object)payload.GetType().Name, (object)model);
+            return;
+        }
+        
+        Logger.LogDebug("DynamicTransportEnvelope path values count: {Count}, keys: {Keys}", 
+            pathValues.Count, string.Join(", ", pathValues.Keys));
+        
+        // Use the ToDynamicFlowEntity extension method to create proper DynamicFlowEntity
+        try
+        {
+            var extensionMethod = typeof(DynamicFlowExtensions)
+                .GetMethod("ToDynamicFlowEntity", new[] { typeof(Dictionary<string, object?>) })!
+                .MakeGenericMethod(modelType);
+            
+            var dynamicEntity = extensionMethod.Invoke(null, new object[] { pathValues });
+            
+            if (dynamicEntity is IDynamicFlowEntity entity)
+            {
+                var modelKeys = entity.Model != null ? string.Join(", ", ((IDictionary<string, object?>)entity.Model).Keys) : "null";
+                Logger.LogDebug("Created DynamicFlowEntity: {EntityType}, Model keys: {ModelKeys}", 
+                    dynamicEntity.GetType().Name, modelKeys);
+                
+                // Write the reconstructed DynamicFlowEntity to intake
+                await WriteToIntake(modelType, model, dynamicEntity, source, envelope.metadata);
+            }
+            else
+            {
+                Logger.LogWarning("Failed to create DynamicFlowEntity for model: {Model}", model);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error creating DynamicFlowEntity for model: {Model}", model);
+        }
     }
 
     protected virtual async Task WriteToIntake(Type modelType, string model, object payload, string source, dynamic? metadata = null)
@@ -390,7 +457,7 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
             stageRecordType.GetProperty("OccurredAt")!.SetValue(record, DateTimeOffset.UtcNow);
             
             // CLEAN payload - model data only (no system/adapter contamination)
-            // Handle DynamicFlowEntity objects by extracting the Model data
+            // Handle DynamicFlowEntity objects by preserving the wrapper structure
             object dataToStore = payload;
             Console.WriteLine($"[FlowOrchestrator] Processing payload type: {payload.GetType().Name}");
             if (payload is IDynamicFlowEntity dynamicEntity)
@@ -398,8 +465,17 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
                 Console.WriteLine($"[FlowOrchestrator] Found DynamicFlowEntity, Model type: {dynamicEntity.Model?.GetType().Name ?? "null"}");
                 if (dynamicEntity.Model != null)
                 {
-                    Console.WriteLine($"[FlowOrchestrator] Storing Model instead of wrapper");
-                    dataToStore = dynamicEntity.Model;
+                    // For DynamicFlowEntity, we need to preserve the wrapper structure
+                    // but ensure the Model property is properly set
+                    Console.WriteLine($"[FlowOrchestrator] Keeping DynamicFlowEntity wrapper with Model data");
+                    Console.WriteLine($"[FlowOrchestrator] Model content keys: {string.Join(", ", ((IDictionary<string, object?>)dynamicEntity.Model).Keys)}");
+                    
+                    // Store the full DynamicFlowEntity wrapper to maintain structure for association worker
+                    dataToStore = payload;
+                }
+                else
+                {
+                    Console.WriteLine($"[FlowOrchestrator] WARNING: DynamicFlowEntity.Model is null!");
                 }
             }
             stageRecordType.GetProperty("Data")!.SetValue(record, dataToStore);

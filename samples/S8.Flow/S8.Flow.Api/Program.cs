@@ -6,15 +6,17 @@ using S8.Flow.Shared;
 using Sora.Messaging;
 using S8.Flow.Api.Adapters;
 using Sora.Web.Swagger;
+using Sora.Flow.Attributes;
+using Sora.Flow.Core.Orchestration;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Sora framework with auto-configuration
 builder.Services.AddSora();
 
-// Initialize Flow transport handler  
-// Flow interceptors are registered automatically via AddSoraFlow()
-builder.Services.AddFlowTransportHandler();
+// Flow interceptors and orchestrator are registered automatically via AddSoraFlow()
+// All Flow entities now route through unified FlowOrchestrator - no separate transport handler needed
 
 // Container environment requirement
 if (!Sora.Core.SoraEnv.InContainer)
@@ -82,3 +84,19 @@ app.UseStaticFiles();
 app.UseSoraSwagger();
 
 app.Run();
+
+/// <summary>
+/// S8.Flow API orchestrator that processes Flow entity messages from adapters.
+/// This marks the API as the central orchestrator service that should run Flow background workers.
+/// </summary>
+[FlowOrchestrator]
+public class S8FlowOrchestrator : FlowOrchestratorBase
+{
+    public S8FlowOrchestrator(ILogger<S8FlowOrchestrator> logger, IServiceProvider serviceProvider)
+        : base(logger, serviceProvider)
+    {
+    }
+
+    // Inherits all processing logic from FlowOrchestratorBase
+    // Can override methods here for custom S8.Flow-specific processing if needed
+}

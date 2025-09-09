@@ -9,6 +9,7 @@ using Sora.Flow.Context;
 using Sora.Flow.Model;
 using Sora.Flow.Core.Messaging;
 using Sora.Messaging;
+using Sora.Messaging.Contracts;
 using System.Dynamic;
 using System.Linq;
 
@@ -40,39 +41,61 @@ public static class FlowEntityExtensions
     /// </summary>
     public static void RegisterFlowInterceptors()
     {
+        Console.WriteLine("[FlowEntityExtensions] DEBUG: Starting FlowEntityExtensions.RegisterFlowInterceptors()");
+        
         // Register interceptor for DynamicFlowEntity types using the IDynamicFlowEntity interface
+        Console.WriteLine("[FlowEntityExtensions] DEBUG: Registering IDynamicFlowEntity interface interceptor");
         MessagingInterceptors.RegisterForInterface<IDynamicFlowEntity>(entity =>
         {
+            Console.WriteLine($"[FlowEntityExtensions] DEBUG: IDynamicFlowEntity interceptor called for {entity.GetType().Name}");
             var envelope = CreateDynamicTransportEnvelope(entity);
-            return new FlowQueuedMessage(envelope);
+            Console.WriteLine($"[FlowEntityExtensions] DEBUG: Creating FlowQueuedMessage for DynamicFlowEntity to route to FlowOrchestrator");
+            return new FlowQueuedMessage(envelope); // Route to FlowEntity queue for unified processing
         });
         
         // For regular FlowEntity types, we need to discover and register each type individually
         // since they don't share a common interface
         var allFlowTypes = DiscoverAllFlowTypes();
+        Console.WriteLine($"[FlowEntityExtensions] DEBUG: Discovered {allFlowTypes.Count} Flow types");
         
         foreach (var flowType in allFlowTypes)
         {
+            Console.WriteLine($"[FlowEntityExtensions] DEBUG: Processing Flow type: {flowType.FullName}");
             var baseType = flowType.BaseType;
             if (baseType != null && baseType.IsGenericType)
             {
                 var genericDef = baseType.GetGenericTypeDefinition();
+                Console.WriteLine($"[FlowEntityExtensions] DEBUG: Base type: {baseType.FullName}, Generic def: {genericDef.FullName}");
                 
                 // Skip DynamicFlowEntity types (handled by interface registration above)
                 if (genericDef == typeof(DynamicFlowEntity<>))
+                {
+                    Console.WriteLine($"[FlowEntityExtensions] DEBUG: Skipping DynamicFlowEntity type: {flowType.Name}");
                     continue;
+                }
                     
                 // Register FlowEntity and FlowValueObject types
                 if (genericDef == typeof(FlowEntity<>) || genericDef == typeof(FlowValueObject<>))
                 {
+                    Console.WriteLine($"[FlowEntityExtensions] DEBUG: Registering FlowEntity/FlowValueObject interceptor for {flowType.Name}");
                     // Use reflection to call RegisterForType<T> with the specific type
                     var method = typeof(MessagingInterceptors).GetMethod("RegisterForType")!.MakeGenericMethod(flowType);
                     var delegateType = typeof(System.Func<,>).MakeGenericType(flowType, typeof(object));
                     var interceptor = System.Delegate.CreateDelegate(delegateType, typeof(FlowEntityExtensions).GetMethod("CreateFlowQueuedMessageGeneric")!.MakeGenericMethod(flowType));
                     method.Invoke(null, new object[] { interceptor });
+                    Console.WriteLine($"[FlowEntityExtensions] DEBUG: Successfully registered interceptor for {flowType.Name}");
+                }
+                else
+                {
+                    Console.WriteLine($"[FlowEntityExtensions] DEBUG: Skipping non-Flow type: {flowType.Name} (base: {genericDef.FullName})");
                 }
             }
+            else
+            {
+                Console.WriteLine($"[FlowEntityExtensions] DEBUG: Skipping type without generic base: {flowType.Name}");
+            }
         }
+        Console.WriteLine("[FlowEntityExtensions] DEBUG: Completed FlowEntityExtensions.RegisterFlowInterceptors()");
     }
     
     /// <summary>
@@ -91,7 +114,9 @@ public static class FlowEntityExtensions
     /// <typeparam name="T">The entity type</typeparam>
     public static object CreateFlowQueuedMessageGeneric<T>(T entity) where T : class
     {
+        Console.WriteLine($"[FlowEntityExtensions] DEBUG: CreateFlowQueuedMessageGeneric called for {typeof(T).Name}");
         var envelope = CreateTransportEnvelope(entity);
+        Console.WriteLine($"[FlowEntityExtensions] DEBUG: Created transport envelope, returning FlowQueuedMessage with queue: Sora.Flow.FlowEntity");
         return new FlowQueuedMessage(envelope);
     }
     
@@ -312,3 +337,4 @@ public static class FlowEntityExtensions
         return result;
     }
 }
+

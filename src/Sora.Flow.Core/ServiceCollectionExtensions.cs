@@ -18,6 +18,7 @@ using Sora.Flow.Model;
 using Sora.Flow.Diagnostics;
 using Sora.Flow.Options;
 using Sora.Flow.Runtime;
+using Sora.Flow.Core.Orchestration;
 using Sora.Data.Core.Naming;
 using System.Reflection;
 using Sora.Flow.Materialization;
@@ -117,23 +118,32 @@ public static class ServiceCollectionExtensions
         // Materialization engine
         services.TryAddSingleton<IFlowMaterializer, Materialization.FlowMaterializer>();
 
-        // Hosted workers (idempotent)
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelAssociationWorkerHostedService>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelProjectionWorkerHostedService>());
+        // Hosted workers - only register if FlowOrchestrator services are present
+        if (HasFlowOrchestrators())
+        {
+            Console.WriteLine("[Sora.Flow] DEBUG: FlowOrchestrator services detected - registering background workers");
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelAssociationWorkerHostedService>());
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelProjectionWorkerHostedService>());
+        }
+        else
+        {
+            Console.WriteLine("[Sora.Flow] DEBUG: No FlowOrchestrator services detected - skipping background workers");
+        }
 
         // Identity stamping and actions
         services.AddFlowActions();
 
         // Register FlowEntity message handler for "Sora.Flow.FlowEntity" queue
-        Console.WriteLine("[Sora.Flow] DEBUG: Registering FlowEntity message handler");
+        // This connects the queue to any registered FlowOrchestrator services
+        Console.WriteLine("[Sora.Flow] DEBUG: Registering FlowEntity message handler for orchestrator processing");
         services.On<string>(async (payload) =>
         {
             Console.WriteLine($"[Sora.Flow] DEBUG: FlowEntity message handler called with payload length: {payload?.Length ?? 0}");
             try
             {
-                // Get the FlowOrchestrator service and process the message
+                // Get any registered FlowOrchestrator service and process the message
                 var serviceProvider = Sora.Core.Hosting.App.AppHost.Current;
-                var orchestrator = serviceProvider?.GetService<Sora.Flow.Core.Orchestration.IFlowOrchestrator>();
+                var orchestrator = serviceProvider?.GetService<IFlowOrchestrator>();
                 if (orchestrator != null)
                 {
                     Console.WriteLine("[Sora.Flow] DEBUG: Found FlowOrchestrator, processing FlowEntity message");
@@ -142,7 +152,8 @@ public static class ServiceCollectionExtensions
                 }
                 else
                 {
-                    Console.WriteLine("[Sora.Flow] ERROR: FlowOrchestrator not found in service provider");
+                    Console.WriteLine("[Sora.Flow] DEBUG: No FlowOrchestrator found - message will be processed by DefaultFlowOrchestrator");
+                    // DefaultFlowOrchestrator will handle it as a fallback
                 }
             }
             catch (Exception ex)
@@ -1235,4 +1246,50 @@ public static class ServiceCollectionExtensions
         }
     }
     // Legacy workers removed
+    
+    /// <summary>
+    /// Checks if there are any USER-DEFINED classes with the [FlowOrchestrator] attribute in the current application domain.
+    /// Background workers should only run in orchestrator services, not in lightweight adapters.
+    /// The DefaultFlowOrchestrator does not count as it's an internal fallback.
+    /// </summary>
+    private static bool HasFlowOrchestrators()
+    {
+        try
+        {
+            var orchestratorAttributeType = typeof(Sora.Flow.Attributes.FlowOrchestratorAttribute);
+            var defaultOrchestratorType = typeof(Sora.Flow.Core.Orchestration.DefaultFlowOrchestrator);
+            
+            // Check all loaded assemblies for classes with [FlowOrchestrator]
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    foreach (var type in assembly.GetTypes())
+                    {
+                        if (type.IsClass && !type.IsAbstract && 
+                            type != defaultOrchestratorType &&  // Exclude the internal DefaultFlowOrchestrator
+                            type.GetCustomAttributes(orchestratorAttributeType, inherit: true).Any())
+                        {
+                            Console.WriteLine($"[Sora.Flow] DEBUG: Found user-defined FlowOrchestrator: {type.FullName}");
+                            return true;
+                        }
+                    }
+                }
+                catch (ReflectionTypeLoadException)
+                {
+                    // Skip assemblies that can't be loaded
+                    continue;
+                }
+            }
+            
+            Console.WriteLine("[Sora.Flow] DEBUG: No user-defined FlowOrchestrator found - background workers will not be registered");
+            return false;
+        }
+        catch
+        {
+            // If detection fails, default to not registering workers (safer for adapters)
+            Console.WriteLine("[Sora.Flow] DEBUG: FlowOrchestrator detection failed - defaulting to no background workers");
+            return false;
+        }
+    }
 }

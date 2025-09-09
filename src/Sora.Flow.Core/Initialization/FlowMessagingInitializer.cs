@@ -102,35 +102,10 @@ public static class FlowMessagingInitializer
     
     
     /// <summary>
-    /// Adds the Flow transport handler to the service collection.
-    /// This handler processes JSON strings from the "sora.flow:transport" category.
-    /// </summary>
-    public static IServiceCollection AddFlowTransportHandler(this IServiceCollection services)
-    {
-        // Register message handler for JSON strings (will filter for Flow transport)
-        services.On<string>(async json =>
-        {
-            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Received JSON string, length: {json.Length}");
-            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: JSON preview: {json.Substring(0, Math.Min(200, json.Length))}...");
-            
-            // Check if this is a Flow transport envelope by looking for our Type field
-            if (json.Contains("\"type\":\"TransportEnvelope<") || json.Contains("\"type\":\"DynamicTransportEnvelope<"))
-            {
-                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Flow transport envelope - processing into Flow pipeline");
-                await ProcessFlowTransportEnvelope(json);
-            }
-            else
-            {
-                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Not a Flow transport envelope, ignoring");
-            }
-        });
-        
-        return services;
-    }
-    
-    /// <summary>
     /// Processes a Flow transport envelope into the Flow pipeline stages.
     /// Handles both regular TransportEnvelope and DynamicTransportEnvelope types.
+    /// NOTE: This method is preserved for potential future use but is no longer called
+    /// since all Flow processing now routes through FlowOrchestrator.
     /// </summary>
     private static async Task ProcessFlowTransportEnvelope(string json)
     {
@@ -143,8 +118,16 @@ public static class FlowMessagingInitializer
             string source = envelope.source;
             object payload = envelope.payload;
             string? correlationId = envelope.metadata?.correlation_id;
+            string envelopeType = envelope.type ?? "";
             
-            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Processing {model} from {source}");
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Processing {model} from {source}, envelope type: {envelopeType}");
+            
+            // Special handling for DynamicFlowEntity types
+            if (envelopeType.Contains("DynamicTransportEnvelope<"))
+            {
+                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Converting DynamicTransportEnvelope payload to DynamicFlowEntity");
+                payload = ConvertDynamicPayloadToEntity(model, payload);
+            }
             
             // Get the IFlowActions service from the current service provider
             var serviceProvider = AppHost.Current;
@@ -166,17 +149,16 @@ public static class FlowMessagingInitializer
             
             Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Seeding {model} with referenceId {referenceId} - bypassing FlowActions");
             
-            // BYPASS FLOWACTIONS - Direct Flow pipeline integration
-            // Instead of calling FlowActions.SeedAsync() which creates FlowAction messages,
-            // directly invoke the FlowActionHandler logic to persist to MongoDB
+            // PROCESS WITH ORCHESTRATOR - Check for Flow.OnUpdate handlers first
+            // If orchestrator exists, process entity before seeding to intake
             try
             {
                 var modelType = Sora.Flow.Infrastructure.FlowRegistry.ResolveModel(model);
                 if (modelType != null)
                 {
                     Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Resolved model type {modelType.Name} for {model}");
-                    await DirectSeedToIntake(modelType, model, referenceId, payload, source, correlationId);
-                    Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Successfully seeded {model} directly to intake");
+                    await ProcessWithOrchestrator(modelType, model, referenceId, payload, source, correlationId);
+                    Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Successfully processed {model} through orchestrator pipeline");
                 }
                 else
                 {
@@ -201,6 +183,71 @@ public static class FlowMessagingInitializer
         {
             Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Failed to process Flow transport envelope: {ex.Message}");
             Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Stack trace: {ex.StackTrace}");
+        }
+    }
+    
+    /// <summary>
+    /// Converts a DynamicTransportEnvelope payload (dictionary with JSON paths) 
+    /// to a proper DynamicFlowEntity with ExpandoObject Model property.
+    /// </summary>
+    private static object ConvertDynamicPayloadToEntity(string model, object payload)
+    {
+        try
+        {
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: ConvertDynamicPayloadToEntity - model: {model}, payload type: {payload.GetType().Name}");
+            
+            // Get the model type for the DynamicFlowEntity
+            var modelType = Sora.Flow.Infrastructure.FlowRegistry.ResolveModel(model);
+            if (modelType == null)
+            {
+                Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Could not resolve model type for {model}");
+                return payload;
+            }
+            
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Resolved model type: {modelType.Name}");
+            
+            // Convert JObject payload to Dictionary<string, object?>
+            Dictionary<string, object?> pathValues;
+            if (payload is JObject jPayload)
+            {
+                pathValues = jPayload.ToObject<Dictionary<string, object?>>() ?? new Dictionary<string, object?>();
+            }
+            else if (payload is Dictionary<string, object?> dictPayload)
+            {
+                pathValues = dictPayload;
+            }
+            else
+            {
+                Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Unexpected payload type {payload.GetType().Name}");
+                return payload;
+            }
+            
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Path values count: {pathValues.Count}");
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Path values keys: {string.Join(", ", pathValues.Keys)}");
+            
+            // Use the ToDynamicFlowEntity extension method to create proper DynamicFlowEntity
+            var extensionMethod = typeof(DynamicFlowExtensions)
+                .GetMethod("ToDynamicFlowEntity", new[] { typeof(Dictionary<string, object?>) })!
+                .MakeGenericMethod(modelType);
+            
+            var dynamicEntity = extensionMethod.Invoke(null, new object[] { pathValues });
+            
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Created DynamicFlowEntity: {dynamicEntity?.GetType().Name}");
+            
+            // Verify Model property is set
+            if (dynamicEntity is IDynamicFlowEntity entity)
+            {
+                var modelKeys = entity.Model != null ? string.Join(", ", ((IDictionary<string, object?>)entity.Model).Keys) : "null";
+                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: DynamicFlowEntity.Model keys: {modelKeys}");
+            }
+            
+            return dynamicEntity ?? payload;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Failed to convert dynamic payload: {ex.Message}");
+            Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Stack trace: {ex.StackTrace}");
+            return payload;
         }
     }
     
@@ -308,6 +355,87 @@ public static class FlowMessagingInitializer
     }
     
     /// <summary>
+    /// Processes entity through orchestrator pipeline if Flow.OnUpdate handler exists,
+    /// then seeds to intake.
+    /// </summary>
+    private static async Task ProcessWithOrchestrator(Type modelType, string model, string referenceId, object payload, string source, string? correlationId)
+    {
+        try
+        {
+            // Check if there's a Flow.OnUpdate handler for this model type
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Checking for Flow.OnUpdate handler for {modelType.Name}");
+            var hasHandler = Sora.Flow.Core.Orchestration.Flow.HasHandler(modelType);
+            Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: HasHandler result: {hasHandler}");
+            if (hasHandler)
+            {
+                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Found Flow.OnUpdate handler for {modelType.Name}");
+                
+                // Deserialize payload to strongly-typed object
+                var typedPayload = ((JObject)payload).ToObject(modelType);
+                if (typedPayload is Sora.Data.Abstractions.IEntity<string> entity)
+                {
+                    Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Calling orchestrator for {modelType.Name}");
+                    
+                    // Call the orchestrator handler
+                    var handler = Sora.Flow.Core.Orchestration.Flow.GetHandler(modelType);
+                    if (handler != null)
+                    {
+                        // Create metadata for handler
+                        var updateMetadata = new Sora.Flow.Core.Orchestration.UpdateMetadata
+                        {
+                            SourceSystem = source ?? "unknown",
+                            SourceAdapter = source ?? "unknown",
+                            Timestamp = DateTimeOffset.UtcNow
+                        };
+                        
+                        // Use reflection to invoke the handler with ref parameter
+                        var method = typeof(FlowMessagingInitializer)
+                            .GetMethod(nameof(InvokeOrchestrator), BindingFlags.NonPublic | BindingFlags.Static)!
+                            .MakeGenericMethod(modelType);
+                        
+                        var result = await (Task<Sora.Flow.Core.Orchestration.UpdateResult>)method.Invoke(null, new object[] { handler, entity, null, updateMetadata })!;
+                        
+                        if (result.Action == Sora.Flow.Core.Orchestration.UpdateAction.Skip)
+                        {
+                            Console.Error.WriteLine($"[FlowMessagingInitializer] INFO: Orchestrator skipped {modelType.Name}: {result.Reason}");
+                            return; // Don't seed to intake
+                        }
+                        
+                        Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: Orchestrator processed {modelType.Name}: {result.Reason}");
+                        
+                        // Update payload with potentially modified entity
+                        payload = entity;
+                    }
+                }
+            }
+            else
+            {
+                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: No Flow.OnUpdate handler found for {modelType.Name}");
+            }
+            
+            // Proceed with seeding to intake (with potentially modified payload)
+            await DirectSeedToIntake(modelType, model, referenceId, payload, source, correlationId);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Failed to process {modelType.Name} with orchestrator: {ex.Message}");
+            Console.Error.WriteLine($"[FlowMessagingInitializer] ERROR: Stack trace: {ex.StackTrace}");
+            
+            // Fallback to direct seeding
+            await DirectSeedToIntake(modelType, model, referenceId, payload, source, correlationId);
+        }
+    }
+    
+    /// <summary>
+    /// Invoke orchestrator handler with proper generic typing and ref parameter.
+    /// </summary>
+    private static async Task<Sora.Flow.Core.Orchestration.UpdateResult> InvokeOrchestrator<T>(object handler, T proposed, T? current, Sora.Flow.Core.Orchestration.UpdateMetadata metadata) where T : class, Sora.Data.Abstractions.IEntity<string>
+    {
+        var typedHandler = (Sora.Flow.Core.Orchestration.UpdateHandler<T>)handler;
+        return await typedHandler(ref proposed, current, metadata);
+    }
+    
+    /// <summary>
     /// Directly seeds payload into Flow intake stage, bypassing FlowAction messaging.
     /// Replicates FlowActionHandler.HandleSeedAsync logic.
     /// </summary>
@@ -341,13 +469,22 @@ public static class FlowMessagingInitializer
     /// <summary>
     /// Converts payload to dictionary format using Sora.Core.Json for MongoDB-compatible types.
     /// Uses JObject approach to avoid JsonElement and ensure proper Newtonsoft.Json serialization.
+    /// Special handling for DynamicFlowEntity to preserve Model structure.
     /// </summary>
-    private static IDictionary<string, object?>? ToDict(object? payload)
+    private static object? ToDict(object? payload)
     {
         if (payload is null) return null;
         
         try
         {
+            // Special handling for DynamicFlowEntity - return the full entity
+            if (payload is IDynamicFlowEntity dynamicEntity)
+            {
+                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: ToDict - preserving DynamicFlowEntity structure");
+                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: ToDict - Model keys: {(dynamicEntity.Model != null ? string.Join(", ", ((IDictionary<string, object?>)dynamicEntity.Model).Keys) : "null")}");
+                return payload; // Return the full DynamicFlowEntity, not just a dictionary
+            }
+            
             // Use Sora.Core.Json extension which uses JsonDefaults.Settings (Newtonsoft.Json)
             var json = payload.ToJson();
             
