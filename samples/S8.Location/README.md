@@ -89,23 +89,25 @@ public class AgnosticLocation : Entity<AgnosticLocation>
 }
 ```
 
-### Resolution Pipeline
+### Flow Intake Interceptor Pattern
 
-1. **Normalize**: Convert address to uppercase, remove punctuation, compress whitespace
-2. **Hash**: Generate SHA512 of normalized address
-3. **Cache Check**: 95%+ hit rate eliminates expensive processing
-4. **AI Correction**: Use Ollama to standardize address format
-5. **Geocoding**: Google Maps API with OpenStreetMap fallback
-6. **Hierarchy Build**: Create country → state → locality → street → building chain
-7. **Cache Store**: Store SHA512 → ULID mapping for future lookups
+**Sora.Flow manages all orchestration** - no custom orchestrators needed:
 
-### Flow Processing Pattern
+1. **Adapters** → `location.Send()` → **Transport Envelope** → **Message Queue**
+2. **Sora.Flow.Core** → **Built-in orchestrator** consumes Flow entity messages
+3. **Flow Intake Pipeline** → Applies registered **FlowIntakeInterceptors**
+4. **LocationInterceptor** → Checks SHA512 signature:
+   - **Drop**: Already processed (has signature)
+   - **Park**: Needs resolution (no signature) with status "waiting_location_resolution"
+5. **LocationResolutionService** → Background service processes parked messages
 
-**Park → Resolve → Imprint → Promote**:
-1. **Park**: Set status to Parked, halt normal flow
-2. **Resolve**: Expensive AI/geocoding operations to get canonical ULID  
-3. **Imprint**: Set AgnosticLocationId on the Location entity
-4. **Promote**: Set status to Active, resume normal flow
+### Park → Resolve → Imprint → Promote Pattern
+
+**Automatic background processing**:
+1. **Park**: LocationInterceptor parks Location with "waiting_location_resolution" status
+2. **Resolve**: LocationResolutionService polls parked messages, resolves addresses to canonical IDs
+3. **Imprint**: Service adds SHA512 signature and sets AgnosticLocationId 
+4. **Promote**: Service sends healed Location back to Flow intake (bypasses interceptor)
 
 ### Source Adapters
 
@@ -162,10 +164,11 @@ samples/S8.Location/
 │   ├── Services/
 │   │   ├── IAddressResolutionService.cs # Resolution interface
 │   │   ├── AddressResolutionService.cs  # SHA512 + AI + geocoding
+│   │   ├── LocationResolutionService.cs # Background park → resolve → promote
 │   │   ├── IGeocodingService.cs         # Geocoding interface
 │   │   └── GoogleMapsGeocodingService.cs # Google Maps impl
-│   ├── Orchestration/
-│   │   └── LocationOrchestrator.cs      # [FlowOrchestrator] sequential processing
+│   ├── Interceptors/
+│   │   └── LocationInterceptor.cs       # Flow intake interceptor (SHA512 check)
 │   └── Options/
 │       └── LocationOptions.cs           # Configuration
 ├── S8.Location.Api/                     # REST API service
@@ -343,10 +346,10 @@ start.bat
 
 **Rationale**: Eliminates 95% of resolution calls, consistent results, collision-resistant
 
-### ADR-003: Sequential Orchestrator Processing
-**Decision**: Process all locations through single-threaded orchestrator
+### ADR-003: Flow Intake Interceptor Pattern
+**Decision**: Use Sora.Flow's built-in orchestration with FlowIntakeInterceptors
 
-**Rationale**: Eliminates race conditions, ensures consistent ordering, natural queue processing
+**Rationale**: Leverage framework capabilities, no custom orchestrators needed, cleaner separation of concerns
 
 ### ADR-004: Bidirectional Flow Pattern
 **Decision**: Park → Resolve → Imprint → Promote pattern

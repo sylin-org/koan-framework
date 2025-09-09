@@ -1,7 +1,9 @@
 using S8.Location.Core.Models;
 using S8.Location.Core.Interceptors;
+using S8.Location.Core.Orchestration;
 using S8.Location.Core.Services;
 using Sora.Data.Core;
+using Sora.Flow;
 using Sora.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,11 +11,17 @@ var builder = WebApplication.CreateBuilder(args);
 // Sora framework with auto-configuration
 builder.Services.AddSora();
 
+// Enable Flow pipeline for address processing
+builder.Services.AddSoraFlow();
+
+// Register Location orchestrator with Flow.OnUpdate handlers
+builder.Services.AddHostedService<LocationOrchestrator>();
+
 // Register Location services
 builder.Services.AddSingleton<IAddressResolutionService, AddressResolutionService>();
+builder.Services.AddHostedService<BackgroundResolutionService>();
 
-// Register Location interceptor
-LocationInterceptor.Register();
+// LocationInterceptor is auto-registered via ISoraAutoRegistrar pattern
 
 // Container environment requirement
 if (!Sora.Core.SoraEnv.InContainer)
@@ -35,9 +43,9 @@ app.Lifetime.ApplicationStarted.Register(async () =>
     {
         var testLocation = new Location 
         { 
-            Id = "test", 
-            Address = "123 Test Street, Test City, TS 12345",
-            Status = LocationStatus.Pending
+            Id = "startup-test-" + Guid.NewGuid().ToString("N").Substring(0, 8), 
+            Address = "123 Main Street, Springfield, IL 62701"
+            // Status removed - Flow pipeline tracks entity state
         };
         await testLocation.Save();
         

@@ -454,6 +454,14 @@ public static class DynamicFlowEntityExtensions
         foreach (var kvp in dict.ToList()) // ToList() to avoid modifying during iteration
         {
             var cleanedValue = ConvertJsonElementToClrType(kvp.Value);
+            
+            // Filter out null values to prevent BSON serialization issues
+            if (cleanedValue == null)
+            {
+                dict.Remove(kvp.Key);
+                continue;
+            }
+            
             if (cleanedValue != kvp.Value) // Only update if the value changed
             {
                 dict[kvp.Key] = cleanedValue;

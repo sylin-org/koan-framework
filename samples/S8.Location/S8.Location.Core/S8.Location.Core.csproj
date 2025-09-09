@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core Sora Framework -->
+    <ProjectReference Include="..\..\..\src\Sora.Core\Sora.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.Flow.Core\Sora.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.AI\Sora.AI.csproj" />
+    <ProjectReference Include="..\..\..\src\Sora.Ai.Provider.Ollama\Sora.Ai.Provider.Ollama.csproj" />
+    
+    <!-- External dependencies -->
+    <PackageReference Include="System.Text.Json" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
+  </ItemGroup>
+
+</Project>

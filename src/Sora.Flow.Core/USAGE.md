@@ -406,6 +406,98 @@ public async Task<IActionResult> GetParkedRecords()
 }
 ```
 
+### Healing Parked Records
+
+When you need to resolve parked records (e.g., after fixing data quality issues or resolving collisions), use the semantic `.HealAsync()` extension method:
+
+```csharp
+[HttpPost("admin/heal/{parkedId}")]
+public async Task<IActionResult> HealParkedRecord(string parkedId, 
+    [FromServices] IFlowActions flowActions)
+{
+    using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
+    {
+        var parkedRecord = await ParkedRecord<Contact>.Get(parkedId);
+        if (parkedRecord == null)
+            return NotFound();
+
+        try
+        {
+            // Option 1: Heal with resolved properties (merges with original data)
+            await parkedRecord.HealAsync(flowActions, new
+            {
+                Email = "corrected-email@example.com",
+                Phone = "+1-555-000-0000",
+                IsVerified = true
+            }, 
+            healingReason: "Manual correction after data quality review",
+            ct: HttpContext.RequestAborted);
+
+            return Ok(new { Message = "Record healed successfully" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
+}
+
+// Option 2: Background service healing with full control over data
+public class AddressResolutionService : BackgroundService
+{
+    private readonly IFlowActions _flowActions;
+    private readonly IGeocoder _geocoder;
+    
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await ProcessParkedAddresses(stoppingToken);
+            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+        }
+    }
+    
+    private async Task ProcessParkedAddresses(CancellationToken ct)
+    {
+        using var context = DataSetContext.With(FlowSets.StageShort(FlowSets.Parked));
+        var parkedRecords = await ParkedRecord<Location>.FirstPage(100, ct);
+        var waitingRecords = parkedRecords.Where(pr => pr.ReasonCode == "WAITING_ADDRESS_RESOLVE");
+        
+        foreach (var parkedRecord in waitingRecords)
+        {
+            try
+            {
+                var address = parkedRecord.Data?.TryGetValue("address", out var addr) == true ? 
+                             addr?.ToString() : null;
+                if (string.IsNullOrEmpty(address)) continue;
+                
+                // Resolve the address using external service
+                var geocoded = await _geocoder.GeocodeAsync(address, ct);
+                
+                // Heal with the resolved data using full data dictionary control
+                var resolvedData = new Dictionary<string, object?>(parkedRecord.Data!, StringComparer.OrdinalIgnoreCase)
+                {
+                    ["canonicalAddress"] = geocoded.FormattedAddress,
+                    ["latitude"] = geocoded.Latitude,
+                    ["longitude"] = geocoded.Longitude,
+                    ["confidence"] = geocoded.Confidence,
+                    ["resolved"] = true
+                };
+                
+                await parkedRecord.HealAsync(_flowActions, resolvedData, 
+                    healingReason: $"Address resolved via geocoding service", 
+                    ct: ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to heal parked record {Id}", parkedRecord.Id);
+                // Record remains parked for next cycle
+            }
+        }
+    }
+}
+```
+
 ## Projections and Views
 
 ### Canonical View
