@@ -58,17 +58,14 @@ public static class ServiceCollectionExtensions
         // Handle ExpandoObject directly (stored from DynamicFlowEntity.Model)
         if (payload is ExpandoObject expandoObj)
         {
-            Console.WriteLine($"[ExtractDict] Processing ExpandoObject with {((IDictionary<string, object>)expandoObj).Count} properties");
             return expandoObj as IDictionary<string, object?>;
         }
         
         // Handle DynamicFlowEntity objects - extract the Model property which contains the actual data
         if (payload is IDynamicFlowEntity dynamicEntity)
         {
-            Console.WriteLine($"[ExtractDict] Processing DynamicFlowEntity: {payload.GetType().Name}");
             if (dynamicEntity.Model is ExpandoObject expandoModel)
             {
-                Console.WriteLine($"[ExtractDict] Found ExpandoObject with {((IDictionary<string, object>)expandoModel).Count} properties");
                 return expandoModel as IDictionary<string, object?>;
             }
             else
@@ -81,7 +78,6 @@ public static class ServiceCollectionExtensions
         // Handle strongly-typed FlowEntity objects by converting to dictionary via JSON serialization
         try
         {
-            Console.WriteLine($"[ExtractDict] Processing FlowEntity via JSON: {payload.GetType().Name}");
             // Serialize the object to JSON, then deserialize to JObject to get consistent property handling
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
             var jObj = JObject.Parse(json);
@@ -90,13 +86,12 @@ public static class ServiceCollectionExtensions
             {
                 dict[prop.Name] = prop.Value?.ToObject<object?>();
             }
-            Console.WriteLine($"[ExtractDict] Extracted {dict.Count} properties from JSON");
             return dict;
         }
         catch (Exception ex)
         {
-            // Log the error but don't fail completely - this preserves existing error handling
-            Console.WriteLine($"[ExtractDict] Failed to convert {payload.GetType().Name} to dictionary: {ex.Message}");
+            // Log the error but don't fail completely - this preserves existing error handling  
+            Console.WriteLine($"[ExtractDict] ERROR: Failed to convert {payload.GetType().Name} to dictionary: {ex.Message}");
             return null;
         }
     }
@@ -307,15 +302,21 @@ public static class ServiceCollectionExtensions
                                         // NOT the aggregation key value
                                         var sourceEntityId = src; // src is the SourceId from the StageRecord
                                         
+                                        Console.WriteLine($"[ExternalID] Processing {modelType.Name}: systemName='{systemName}', sourceEntityId='{sourceEntityId}'");
+                                        
                                         if (!string.IsNullOrEmpty(systemName) && !string.IsNullOrEmpty(sourceEntityId) && sourceEntityId != "unknown")
                                         {
                                             var externalIdKey = $"identifier.external.{systemName}";
+                                            
                                             if (!canonical.TryGetValue(externalIdKey, out var externalIdList))
                                             {
                                                 externalIdList = new List<string?>();
                                                 canonical[externalIdKey] = externalIdList;
+                                                Console.WriteLine($"[ExternalID] ✅ CREATED new external ID key: {externalIdKey}");
                                             }
+                                            
                                             externalIdList.Add(sourceEntityId);
+                                            Console.WriteLine($"[ExternalID] ✅ ADDED entity ID '{sourceEntityId}' to {externalIdKey} (total: {externalIdList.Count})");
                                             
                                             // Also add to lineage tracking
                                             if (!lineage.TryGetValue(externalIdKey, out var externalIdLineage))
@@ -329,6 +330,10 @@ public static class ServiceCollectionExtensions
                                                 externalIdLineage[sourceEntityId] = sources;
                                             }
                                             sources.Add(src);
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine($"[ExternalID] ❌ SKIPPED: systemName='{systemName}', sourceEntityId='{sourceEntityId}' (empty or unknown)");
                                         }
                                     }
 
@@ -1096,10 +1101,25 @@ public static class ServiceCollectionExtensions
     /// </summary>
     private static string? GetSourceSystem(IDictionary<string, object?> sourceDict)
     {
-        if (sourceDict.TryGetValue(Constants.Envelope.System, out var systemValue))
+        Console.WriteLine($"[ExternalID] GetSourceSystem: sourceDict has {sourceDict.Count} keys: [{string.Join(", ", sourceDict.Keys)}]");
+        
+        // Try multiple possible keys for system name
+        string[] systemKeys = { "envelope.system", "source.system", "system" };
+        
+        foreach (var key in systemKeys)
         {
-            return systemValue?.ToString()?.Trim();
+            if (sourceDict.TryGetValue(key, out var systemValue) && systemValue != null)
+            {
+                var systemName = systemValue.ToString()?.Trim();
+                if (!string.IsNullOrWhiteSpace(systemName))
+                {
+                    Console.WriteLine($"[ExternalID] Found system name '{systemName}' from key '{key}'");
+                    return systemName;
+                }
+            }
         }
+        
+        Console.WriteLine($"[ExternalID] No valid system key found in sourceDict (tried: {string.Join(", ", systemKeys)})");
         return null;
     }
 
