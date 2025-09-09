@@ -53,8 +53,8 @@ public sealed class StageRecord<TModel> : Entity<StageRecord<TModel>>
     // ULID for the associated canonical entity (set post-Associate)
     [Index]
     public string? ReferenceUlid { get; set; }
-    // Use dictionary payload to avoid Mongo discriminator wrappers (_t/_v) on object
-    public Dictionary<string, object?>? Data { get; set; }
+    // Model data as strongly-typed object (MongoDB discriminators disabled via conventions)
+    public TModel? Data { get; set; }
     // Source metadata (system, adapter) separate from business data
     public Dictionary<string, object?>? Source { get; set; }
 }
@@ -74,7 +74,8 @@ public sealed class ParkedRecord<TModel> : Entity<ParkedRecord<TModel>>
     // Optional ULID reference for diagnostics
     [Index]
     public string? ReferenceUlid { get; set; }
-    public Dictionary<string, object?>? Data { get; set; }
+    // Model data as strongly-typed object (MongoDB discriminators disabled via conventions)  
+    public TModel? Data { get; set; }
     // Source metadata (system, adapter) separate from business data
     public Dictionary<string, object?>? Source { get; set; }
     public object? Evidence { get; set; }

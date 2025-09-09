@@ -53,7 +53,51 @@ public static class ServiceCollectionExtensions
             }
             return dict;
         }
-        return null;
+        
+        // Handle ExpandoObject directly (stored from DynamicFlowEntity.Model)
+        if (payload is ExpandoObject expandoObj)
+        {
+            Console.WriteLine($"[ExtractDict] Processing ExpandoObject with {((IDictionary<string, object>)expandoObj).Count} properties");
+            return expandoObj as IDictionary<string, object?>;
+        }
+        
+        // Handle DynamicFlowEntity objects - extract the Model property which contains the actual data
+        if (payload is IDynamicFlowEntity dynamicEntity)
+        {
+            Console.WriteLine($"[ExtractDict] Processing DynamicFlowEntity: {payload.GetType().Name}");
+            if (dynamicEntity.Model is ExpandoObject expandoModel)
+            {
+                Console.WriteLine($"[ExtractDict] Found ExpandoObject with {((IDictionary<string, object>)expandoModel).Count} properties");
+                return expandoModel as IDictionary<string, object?>;
+            }
+            else
+            {
+                Console.WriteLine($"[ExtractDict] Model is null or not ExpandoObject: {dynamicEntity.Model?.GetType().Name}");
+                return null;
+            }
+        }
+        
+        // Handle strongly-typed FlowEntity objects by converting to dictionary via JSON serialization
+        try
+        {
+            Console.WriteLine($"[ExtractDict] Processing FlowEntity via JSON: {payload.GetType().Name}");
+            // Serialize the object to JSON, then deserialize to JObject to get consistent property handling
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+            var jObj = JObject.Parse(json);
+            var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var prop in jObj.Properties())
+            {
+                dict[prop.Name] = prop.Value?.ToObject<object?>();
+            }
+            Console.WriteLine($"[ExtractDict] Extracted {dict.Count} properties from JSON");
+            return dict;
+        }
+        catch (Exception ex)
+        {
+            // Log the error but don't fail completely - this preserves existing error handling
+            Console.WriteLine($"[ExtractDict] Failed to convert {payload.GetType().Name} to dictionary: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>
@@ -79,6 +123,34 @@ public static class ServiceCollectionExtensions
 
         // Identity stamping and actions
         services.AddFlowActions();
+
+        // Register FlowEntity message handler for "Sora.Flow.FlowEntity" queue
+        Console.WriteLine("[Sora.Flow] DEBUG: Registering FlowEntity message handler");
+        services.On<string>(async (payload) =>
+        {
+            Console.WriteLine($"[Sora.Flow] DEBUG: FlowEntity message handler called with payload length: {payload?.Length ?? 0}");
+            try
+            {
+                // Get the FlowOrchestrator service and process the message
+                var serviceProvider = Sora.Core.Hosting.App.AppHost.Current;
+                var orchestrator = serviceProvider?.GetService<Sora.Flow.Core.Orchestration.IFlowOrchestrator>();
+                if (orchestrator != null)
+                {
+                    Console.WriteLine("[Sora.Flow] DEBUG: Found FlowOrchestrator, processing FlowEntity message");
+                    await orchestrator.ProcessFlowEntity(payload);
+                    Console.WriteLine("[Sora.Flow] DEBUG: FlowOrchestrator completed processing");
+                }
+                else
+                {
+                    Console.WriteLine("[Sora.Flow] ERROR: FlowOrchestrator not found in service provider");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Sora.Flow] ERROR: Failed to process FlowEntity message: {ex.Message}");
+                throw;
+            }
+        });
 
         return services;
     }

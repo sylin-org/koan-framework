@@ -4,6 +4,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Conventions;
 using Sora.Core;
 using Sora.Core.Modules;
 using Sora.Data.Abstractions;
@@ -18,7 +21,23 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Sora.Data.Mongo.Initialization.SoraAutoRegistrar");
-    logger?.Log(LogLevel.Debug, "Sora.Data.Mongo SoraAutoRegistrar loaded.");
+        logger?.Log(LogLevel.Debug, "Sora.Data.Mongo SoraAutoRegistrar loaded.");
+
+        // Configure MongoDB conventions globally at startup - disables _t discriminators
+        var pack = new ConventionPack
+        {
+            new IgnoreExtraElementsConvention(true)
+        };
+        ConventionRegistry.Register("SoraGlobalConventions", pack, _ => true);
+
+        // Disable discriminators by registering custom null discriminator convention
+        // This prevents _t/_v fields from being added to documents
+        BsonSerializer.RegisterDiscriminatorConvention(
+            typeof(object),
+            new NoDiscriminatorConvention());
+
+        // Note: Conventions handle null values, no custom serializer needed
+
         services.AddSoraOptions<MongoOptions>();
         services.AddSingleton<IConfigureOptions<MongoOptions>, MongoOptionsConfigurator>();
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
@@ -30,30 +49,30 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
     public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        
+
         // NEW: Decision logging for connection string resolution
         var connectionAttempts = new List<(string source, string connectionString, bool canConnect, string? error)>();
-        
+
         // Try configured connection strings first
         var configuredCs = Configuration.ReadFirst(cfg, null,
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
             Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
-            
+
         if (!string.IsNullOrWhiteSpace(configuredCs))
         {
             report.AddDiscovery("configuration", configuredCs);
             connectionAttempts.Add(("configuration", configuredCs, true, null)); // Assume configured strings work
         }
-        
+
         // Auto-discovery logic with decision logging
         var finalCs = configuredCs;
         if (string.IsNullOrWhiteSpace(finalCs))
         {
             var isProd = SoraEnv.IsProduction;
             var inContainer = SoraEnv.InContainer;
-            
+
             if (isProd)
             {
                 finalCs = MongoConstants.DefaultLocalUri;
@@ -76,7 +95,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
                 }
             }
         }
-        
+
         // Normalize connection string
         if (!string.IsNullOrWhiteSpace(finalCs) &&
             !finalCs.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) &&
@@ -84,13 +103,13 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         {
             finalCs = "mongodb://" + finalCs.Trim();
         }
-        
+
         // Log connection attempts
         foreach (var attempt in connectionAttempts)
         {
             report.AddConnectionAttempt("Data.Mongo", attempt.connectionString, attempt.canConnect, attempt.error);
         }
-        
+
         // Log provider election decision
         var availableProviders = DiscoverAvailableDataProviders();
         if (connectionAttempts.Any(a => a.canConnect))
@@ -101,7 +120,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         {
             report.AddDecision("Data", "InMemory", "no Mongo connection available", availableProviders);
         }
-        
+
         var o = new MongoOptions
         {
             ConnectionString = finalCs,
@@ -109,7 +128,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
                 Infrastructure.Constants.Configuration.Keys.Database,
                 Infrastructure.Constants.Configuration.Keys.AltDatabase)
         };
-        
+
         report.AddSetting("Database", o.Database);
         report.AddSetting("ConnectionString", finalCs, isSecret: true);
         // Announce schema capability per acceptance criteria
@@ -124,12 +143,12 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defSize.ToString());
         report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, maxSize.ToString());
     }
-    
+
     private static string[] DiscoverAvailableDataProviders()
     {
         // Scan loaded assemblies for other data providers
         var providers = new List<string> { "Mongo" }; // Always include self
-        
+
         var assemblies = AppDomain.CurrentDomain.GetAssemblies();
         foreach (var asm in assemblies)
         {
@@ -140,7 +159,19 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
                 providers.Add(providerName);
             }
         }
-        
+
         return providers.ToArray();
     }
 }
+
+/// <summary>
+/// Custom discriminator convention that disables discriminator serialization entirely.
+/// This prevents MongoDB from adding _t fields to documents.
+/// </summary>
+public class NoDiscriminatorConvention : IDiscriminatorConvention
+{
+    public string ElementName => "_t";
+    public Type GetActualType(MongoDB.Bson.IO.IBsonReader bsonReader, Type nominalType) => nominalType;
+    public MongoDB.Bson.BsonValue GetDiscriminator(Type nominalType, Type actualType) => null!;
+}
+

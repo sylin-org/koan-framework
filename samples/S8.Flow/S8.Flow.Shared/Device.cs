@@ -4,7 +4,6 @@ using Sora.Flow.Model;
 
 namespace S8.Flow.Shared;
 
-[FlowPolicy(ExternalIdPolicy = ExternalIdPolicy.AutoPopulate, ExternalIdKey = "serial")]
 public sealed class Device : FlowEntity<Device>
 {
     public string Inventory { get; set; } = default!;

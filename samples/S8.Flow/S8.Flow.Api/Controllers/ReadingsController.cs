@@ -110,21 +110,21 @@ public sealed class ReadingsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(reading.SensorKey)) return BadRequest("sensorKey is required");
 
-        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        var readingData = new Reading
         {
-            [Keys.Sensor.Key] = reading.SensorKey,
-            [Keys.Reading.Value] = reading.Value,   
-            [Keys.Reading.CapturedAt] = reading.CapturedAt.ToString("O"),
+            SensorKey = reading.SensorKey,
+            Value = reading.Value,
+            CapturedAt = reading.CapturedAt,
+            Unit = reading.Unit,
+            Source = reading.Source
         };
-        if (!string.IsNullOrWhiteSpace(reading.Unit)) payload[Keys.Sensor.Unit] = reading.Unit;
-        if (!string.IsNullOrWhiteSpace(reading.Source)) payload[Keys.Reading.Source] = reading.Source!;
 
         var typed = new StageRecord<Reading>
         {
             Id = Guid.NewGuid().ToString("n"),
             SourceId = reading.Source ?? FlowSampleConstants.Sources.Api,
             OccurredAt = reading.CapturedAt,
-            Data = payload,
+            Data = readingData,
             CorrelationId = reading.SensorKey
         };
         var setName = FlowSets.StageShort(FlowSets.Intake);
