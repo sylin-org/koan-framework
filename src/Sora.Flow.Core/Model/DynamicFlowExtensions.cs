@@ -26,6 +26,7 @@ public static class DynamicFlowExtensions
     public static T ToDynamicFlowEntity<T>(this Dictionary<string, object?> pathValues)
         where T : class, IDynamicFlowEntity, new()
     {
+        Console.WriteLine($"[ToDynamicFlowEntity] Creating {typeof(T).Name} with {pathValues.Count} path values");
         var entity = new T();
         
         // Set Id if the entity has this property
@@ -40,6 +41,7 @@ public static class DynamicFlowExtensions
         if (modelProp != null && modelProp.CanWrite)
         {
             modelProp.SetValue(entity, new ExpandoObject());
+            Console.WriteLine($"[ToDynamicFlowEntity] Created ExpandoObject Model for {typeof(T).Name}");
         }
         
         // Add values to Model if it exists
@@ -51,7 +53,19 @@ public static class DynamicFlowExtensions
                 foreach (var (path, value) in pathValues.Where(kv => kv.Value != null))
                 {
                     SetValueByPath(model, path, value);
+                    Console.WriteLine($"[ToDynamicFlowEntity] Set path '{path}' = '{value}' in {typeof(T).Name}");
                 }
+                
+                // Clean up the Model to ensure MongoDB-compatible types
+                var finalModel = modelProp.GetValue(entity) as ExpandoObject;
+                if (finalModel != null)
+                {
+                    DynamicFlowEntityExtensions.CleanExpandoObjectForMongoDB(finalModel);
+                }
+                
+                // Verify Model is still accessible after population and cleanup
+                var modelKeys = finalModel != null ? string.Join(", ", ((IDictionary<string, object?>)finalModel).Keys) : "null";
+                Console.WriteLine($"[ToDynamicFlowEntity] Final Model keys (after cleanup): {modelKeys}");
             }
         }
         
@@ -314,7 +328,7 @@ public static class DynamicFlowEntityExtensions
     /// <summary>
     /// Flattens an ExpandoObject back to JSON path notation (e.g., "identifier.code" = "MFG001")
     /// </summary>
-    private static Dictionary<string, object?> FlattenExpandoObject(ExpandoObject expando, string prefix = "")
+    public static Dictionary<string, object?> FlattenExpandoObject(ExpandoObject expando, string prefix = "")
     {
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         var dict = (IDictionary<string, object?>)expando;
@@ -359,11 +373,44 @@ public static class DynamicFlowEntityExtensions
     }
 
     /// <summary>
-    /// Converts JsonElement objects to proper .NET types for MongoDB serialization compatibility
+    /// Converts JsonElement objects and Newtonsoft.Json types to proper .NET types for MongoDB serialization compatibility
     /// </summary>
     private static object? ConvertJsonElementToClrType(object? value)
     {
         if (value is null) return null;
+
+        // Handle Newtonsoft.Json types that can't be serialized by MongoDB
+        if (value is JArray jArray)
+        {
+            return jArray.Select(token => ConvertJsonElementToClrType(token.ToObject<object>())).ToArray();
+        }
+        
+        if (value is JObject jObject)
+        {
+            // Inline ToExpando logic to avoid accessibility issues
+            var expando = new ExpandoObject();
+            var dict = (IDictionary<string, object?>)expando;
+            foreach (var property in jObject.Properties())
+            {
+                dict[property.Name] = property.Value.Type switch
+                {
+                    JTokenType.Object => ConvertJsonElementToClrType((JObject)property.Value),
+                    JTokenType.Array => ConvertJsonElementToClrType(property.Value.ToObject<object>()),
+                    _ => ((JValue)property.Value).Value
+                };
+            }
+            return expando;
+        }
+        
+        if (value is JValue jValue)
+        {
+            return jValue.Value;
+        }
+        
+        if (value is JToken jToken)
+        {
+            return ConvertJsonElementToClrType(jToken.ToObject<object>());
+        }
 
         // Handle JsonElement conversion
         if (value is JsonElement jsonElement)
@@ -398,5 +445,29 @@ public static class DynamicFlowEntityExtensions
         }
 
         return expando;
+    }
+    
+    /// <summary>
+    /// Recursively cleans an ExpandoObject in-place to ensure all values are MongoDB BSON compatible
+    /// Converts JArray, JObject, and other Newtonsoft.Json types to proper .NET types
+    /// </summary>
+    public static void CleanExpandoObjectForMongoDB(ExpandoObject expando)
+    {
+        var dict = (IDictionary<string, object?>)expando;
+        
+        foreach (var kvp in dict.ToList()) // ToList() to avoid modifying during iteration
+        {
+            var cleanedValue = ConvertJsonElementToClrType(kvp.Value);
+            if (cleanedValue != kvp.Value) // Only update if the value changed
+            {
+                dict[kvp.Key] = cleanedValue;
+            }
+            
+            // Recursively clean nested ExpandoObjects
+            if (cleanedValue is ExpandoObject nestedExpando)
+            {
+                CleanExpandoObjectForMongoDB(nestedExpando);
+            }
+        }
     }
 }

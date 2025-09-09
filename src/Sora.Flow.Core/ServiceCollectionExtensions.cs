@@ -66,7 +66,11 @@ public static class ServiceCollectionExtensions
         {
             if (dynamicEntity.Model is ExpandoObject expandoModel)
             {
-                return expandoModel as IDictionary<string, object?>;
+                // Use FlattenExpandoObject from DynamicFlowExtensions to convert nested structure
+                // to flattened dot-notation keys (e.g., "identifier.code", "identifier.name")
+                var flattened = Sora.Flow.Model.DynamicFlowEntityExtensions.FlattenExpandoObject(expandoModel);
+                Console.WriteLine($"[ExtractDict] Flattened DynamicFlowEntity Model to {flattened.Count} keys: [{string.Join(", ", flattened.Keys.Take(5))}...]");
+                return flattened;
             }
             else
             {
