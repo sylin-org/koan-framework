@@ -76,7 +76,7 @@ internal sealed class SchedulingOrchestrator : SoraFluentServiceBase
         Logger.LogInformation("Scheduling orchestrator stopped");
     }
     
-    [ServiceAction("trigger-task")]
+    [ServiceAction(Sora.Core.Actions.SoraServiceActions.Scheduling.TriggerTask)]
     public async Task TriggerTaskAction(string taskId, CancellationToken cancellationToken)
     {
         Logger.LogInformation("Manual task trigger requested for: {TaskId}", taskId);
@@ -93,7 +93,7 @@ internal sealed class SchedulingOrchestrator : SoraFluentServiceBase
         }
     }
     
-    [ServiceAction("list-tasks")]
+    [ServiceAction(Sora.Core.Actions.SoraServiceActions.Scheduling.ListTasks)]
     public async Task ListTasksAction(CancellationToken cancellationToken)
     {
         Logger.LogInformation("Listing all scheduled tasks:");

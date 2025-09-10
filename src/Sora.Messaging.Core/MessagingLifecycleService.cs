@@ -104,7 +104,7 @@ internal class MessagingLifecycleService : SoraFluentServiceBase
         }
     }
     
-    [ServiceAction("restart-messaging")]
+    [ServiceAction(Sora.Core.Actions.SoraServiceActions.Messaging.RestartMessaging)]
     public virtual async Task RestartMessagingAction(CancellationToken cancellationToken)
     {
         Logger.LogInformation("Manual messaging restart requested");

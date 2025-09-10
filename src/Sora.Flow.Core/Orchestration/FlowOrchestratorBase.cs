@@ -55,13 +55,13 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         await Task.Delay(Timeout.Infinite, cancellationToken);
     }
 
-    [ServiceAction("process-flow-entity", RequiresParameters = true, ParametersType = typeof(object))]
+    [ServiceAction(Sora.Core.Actions.SoraServiceActions.Flow.ProcessFlowEntity, RequiresParameters = true, ParametersType = typeof(object))]
     public virtual async Task ProcessFlowEntityAction(object transportEnvelope, CancellationToken cancellationToken)
     {
         await ProcessFlowEntity(transportEnvelope);
     }
 
-    [ServiceAction("trigger-processing")]
+    [ServiceAction(Sora.Core.Actions.SoraServiceActions.Flow.TriggerProcessing)]
     public virtual async Task TriggerProcessingAction(CancellationToken cancellationToken)
     {
         Logger.LogInformation("Manual processing trigger received");

@@ -4,6 +4,7 @@
 **Target Audience**: Developers, Architects, AI Agents  
 **Last Updated**: 2025-01-10  
 **Framework Version**: v0.3.0+
+**Implementation Status**: ✅ **IMPLEMENTED** - Fully integrated into Sora.Core
 
 ---
 
@@ -29,7 +30,7 @@ This document provides comprehensive reference information for **Sora Background
 
 ## 🧱 Core Components
 
-### Package: `Sora.BackgroundServices`
+### Package: `Sora.Core` (Background Services)
 
 #### Key Interfaces
 
@@ -82,21 +83,29 @@ public abstract class SoraBackgroundServiceBase : ISoraBackgroundService, IHealt
     public virtual Task<HealthReport> CheckAsync(CancellationToken cancellationToken = default);
 }
 
-// Base class for services supporting fluent API and events
-public abstract class SoraFluentServiceBase : SoraPokableServiceBase
+// **MAIN BASE CLASS** - Base class for services supporting fluent API and events
+// This is what most services inherit from in the current implementation
+public abstract class SoraFluentServiceBase : SoraBackgroundServiceBase
 {
-    // Action execution
-    public async Task ExecuteActionAsync(string actionName, object? parameters, CancellationToken cancellationToken);
+    protected SoraFluentServiceBase(ILogger logger, IConfiguration configuration)
+        : base(logger, configuration) { }
+
+    // Abstract method that concrete services implement
+    public abstract Task ExecuteCoreAsync(CancellationToken cancellationToken);
+    
+    // Final ExecuteAsync calls ExecuteCoreAsync - do not override
+    public sealed override Task ExecuteAsync(CancellationToken cancellationToken)
+        => ExecuteCoreAsync(cancellationToken);
     
     // Event emission
     protected async Task EmitEventAsync(string eventName, object? eventArgs = null);
     
-    // Event subscription
-    public IDisposable SubscribeToEvent(string eventName, Func<object?, Task> handler, bool once = false, Func<object?, bool>? filter = null);
+    // Action execution support (for fluent API)
+    public virtual async Task ExecuteActionAsync(string actionName, object? parameters, CancellationToken cancellationToken);
 }
 
 // Periodic service with pokeable capabilities
-public abstract class SoraPokablePeriodicServiceBase : SoraPokableServiceBase, ISoraPeriodicService
+public abstract class SoraPokablePeriodicServiceBase : SoraFluentServiceBase, ISoraPeriodicService
 {
     public abstract TimeSpan Period { get; }
     public virtual TimeSpan InitialDelay => TimeSpan.Zero;
@@ -167,6 +176,24 @@ public class ServiceEventAttribute : Attribute
     
     public ServiceEventAttribute(string name);
 }
+```
+
+### Constants for Actions and Events
+
+To eliminate magic strings, use the provided constants:
+
+```csharp
+// Event constants
+using Sora.Core.Events;
+[ServiceEvent(SoraServiceEvents.Flow.EntityProcessed)]
+[ServiceEvent(SoraServiceEvents.Health.ProbeScheduled)]
+[ServiceEvent(SoraServiceEvents.Outbox.Processed)]
+
+// Action constants  
+using Sora.Core.Actions;
+[ServiceAction(SoraServiceActions.Health.ForceProbe)]
+[ServiceAction(SoraServiceActions.Flow.TriggerProcessing)]
+[ServiceAction(SoraServiceActions.Outbox.ProcessBatch)]
 ```
 
 ---
@@ -242,12 +269,12 @@ public interface IServiceQueryBuilder
 
 ```csharp
 [SoraBackgroundService(Enabled = true, RunInProduction = true)]
-public class SystemHealthMonitor : SoraBackgroundServiceBase
+public class SystemHealthMonitor : SoraFluentServiceBase
 {
     public SystemHealthMonitor(ILogger<SystemHealthMonitor> logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
-    public override async Task ExecuteAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
     {
         using var periodicTimer = new PeriodicTimer(TimeSpan.FromMinutes(5));
         
@@ -294,20 +321,29 @@ public class DataCleanupService : SoraPeriodicServiceBase
 ### Fluent Service with Actions and Events
 
 ```csharp
-[ServiceEvent("TranslationStarted", EventArgsType = typeof(TranslationEventArgs))]
-[ServiceEvent("TranslationCompleted", EventArgsType = typeof(TranslationEventArgs))]
-[ServiceEvent("TranslationFailed", EventArgsType = typeof(TranslationErrorArgs))]
+using Sora.Core.Events;
+
+[SoraBackgroundService(RunInProduction = true)]
+[ServiceEvent(SoraServiceEvents.Translation.Started, EventArgsType = typeof(TranslationEventArgs))]
+[ServiceEvent(SoraServiceEvents.Translation.Completed, EventArgsType = typeof(TranslationEventArgs))]
+[ServiceEvent(SoraServiceEvents.Translation.Failed, EventArgsType = typeof(TranslationErrorArgs))]
 public class TranslationService : SoraFluentServiceBase
 {
     public TranslationService(ILogger<TranslationService> logger, IConfiguration configuration) 
         : base(logger, configuration) { }
+
+    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    {
+        // Main service loop - could listen for work or wait indefinitely
+        await Task.Delay(Timeout.Infinite, cancellationToken);
+    }
 
     [ServiceAction("translate", RequiresParameters = true, ParametersType = typeof(TranslationOptions))]
     public async Task TranslateAsync(TranslationOptions options, CancellationToken cancellationToken)
     {
         Logger.LogInformation("Starting translation from {From} to {To}", options.From, options.To);
         
-        await EmitEventAsync("TranslationStarted", new TranslationEventArgs 
+        await EmitEventAsync(SoraServiceEvents.Translation.Started, new TranslationEventArgs 
         { 
             FileId = options.FileId, 
             From = options.From, 
@@ -318,7 +354,7 @@ public class TranslationService : SoraFluentServiceBase
         {
             await DoTranslationWork(options, cancellationToken);
             
-            await EmitEventAsync("TranslationCompleted", new TranslationEventArgs 
+            await EmitEventAsync(SoraServiceEvents.Translation.Completed, new TranslationEventArgs 
             { 
                 FileId = options.FileId, 
                 From = options.From, 
@@ -327,7 +363,7 @@ public class TranslationService : SoraFluentServiceBase
         }
         catch (Exception ex)
         {
-            await EmitEventAsync("TranslationFailed", new TranslationErrorArgs 
+            await EmitEventAsync(SoraServiceEvents.Translation.Failed, new TranslationErrorArgs 
             { 
                 FileId = options.FileId, 
                 Error = ex.Message 
@@ -367,11 +403,11 @@ public record TranslationErrorArgs
 
 ```csharp
 [SoraStartupService(StartupOrder = 1, ContinueOnFailure = false, TimeoutSeconds = 60)]
-public class DatabaseMigrationService : SoraStartupServiceBase
+public class DatabaseMigrationService : SoraFluentServiceBase, ISoraStartupService
 {
     private readonly IDataContext _dataContext;
     
-    public override int StartupOrder => 1;
+    public int StartupOrder => 1;
 
     public DatabaseMigrationService(
         ILogger<DatabaseMigrationService> logger, 
@@ -382,7 +418,7 @@ public class DatabaseMigrationService : SoraStartupServiceBase
         _dataContext = dataContext;
     }
 
-    public override async Task ExecuteAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
     {
         Logger.LogInformation("Starting database migration...");
         await _dataContext.MigrateDatabaseAsync(cancellationToken);
@@ -756,8 +792,11 @@ public async Task Should_Handle_Translation_Workflow()
 
 ### 1. Installation
 
+**Background Services are included in Sora.Core** - no separate package needed:
+
 ```bash
-dotnet add package Sora.BackgroundServices
+dotnet add package Sora.Core
+# Background services are automatically available
 ```
 
 ### 2. Service Registration
@@ -794,6 +833,8 @@ public class MyFirstService : SoraBackgroundServiceBase
 ### 4. Add Fluent API Support
 
 ```csharp
+using Sora.Core.Events;
+
 [ServiceEvent("WorkCompleted")]
 public class MyFluentService : SoraFluentServiceBase
 {
@@ -808,7 +849,8 @@ public class MyFluentService : SoraFluentServiceBase
         await EmitEventAsync("WorkCompleted", new { CompletedAt = DateTimeOffset.UtcNow });
     }
 
-    public override async Task ExecuteAsync(CancellationToken cancellationToken)
+    // Override ExecuteCoreAsync, not ExecuteAsync
+    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
     {
         await Task.Delay(Timeout.Infinite, cancellationToken);
     }
@@ -841,6 +883,22 @@ await SoraServices<MyFluentService>
 3. **Graceful Cancellation**: Always respect cancellation tokens
 4. **Structured Logging**: Use structured logging for observability
 5. **Health Checks**: Implement meaningful health checks
+
+### Constructor Patterns
+
+**Important**: For services that need to be instantiated generically (like FlowOrchestratorBase), use `ILogger` instead of `ILogger<T>` to avoid generic type instantiation issues:
+
+```csharp
+// ✅ Correct - works with generic instantiation
+protected MyService(ILogger logger, IConfiguration configuration)
+    : base(logger, configuration)
+
+// ❌ Problematic - can cause generic instantiation errors
+protected MyService(ILogger<MyService> logger, IConfiguration configuration) 
+    : base(logger, configuration)
+```
+
+This pattern is used in FlowOrchestratorBase and should be followed when services are instantiated through reflection or generic mechanisms.
 
 ### Event Design
 
@@ -876,6 +934,258 @@ await SoraServices<MyFluentService>
 - **AI**: Background AI processing and workflows
 - **Storage**: File processing and media workflows
 - **Flow**: Data pipeline integration
+
+---
+
+## 🔍 Real-World Examples
+
+### Flow Orchestrator (Sora.Flow.Core)
+
+```csharp
+using Sora.Core.Events;
+using Sora.Core.BackgroundServices;
+
+[FlowOrchestrator]
+[SoraBackgroundService(RunInProduction = true)]
+[ServiceEvent(SoraServiceEvents.Flow.EntityProcessed, EventArgsType = typeof(FlowEntityProcessedEventArgs))]
+[ServiceEvent(SoraServiceEvents.Flow.EntityParked, EventArgsType = typeof(FlowEntityParkedEventArgs))]
+[ServiceEvent(SoraServiceEvents.Flow.EntityFailed, EventArgsType = typeof(FlowEntityFailedEventArgs))]
+public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchestrator
+{
+    protected readonly IServiceProvider ServiceProvider;
+
+    // NOTE: Constructor signature change - uses ILogger instead of ILogger<T> for generic instantiation
+    protected FlowOrchestratorBase(ILogger logger, IConfiguration configuration, IServiceProvider serviceProvider)
+        : base(logger, configuration)
+    {
+        ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        Configure();
+    }
+    
+    protected virtual void Configure() { }
+
+    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    {
+        // Auto-subscribe to "Sora.Flow.FlowEntity" queue
+        // Process flow entities with event emission
+        // Implementation details omitted for brevity
+    }
+
+    // Methods emit events using constants
+    protected async Task EmitEntityProcessedAsync(string entityId, string entityType)
+    {
+        await EmitEventAsync(SoraServiceEvents.Flow.EntityProcessed, 
+            new FlowEntityProcessedEventArgs { EntityId = entityId, EntityType = entityType });
+    }
+}
+```
+
+### Outbox Processor (Sora.Data.Cqrs)
+
+```csharp
+using Sora.Core.Events;
+using Sora.Core.Actions;
+
+[SoraBackgroundService(RunInProduction = true)]
+[ServiceEvent(SoraServiceEvents.Outbox.Processed, EventArgsType = typeof(OutboxProcessedEventArgs))]
+[ServiceEvent(SoraServiceEvents.Outbox.Failed, EventArgsType = typeof(OutboxFailedEventArgs))]
+internal sealed class OutboxProcessor : SoraFluentServiceBase
+{
+    private readonly IOutboxStore _outbox;
+    private readonly CqrsOptions _options;
+    private readonly ICqrsRouting _routing;
+    private readonly IServiceProvider _serviceProvider;
+
+    public OutboxProcessor(
+        ILogger<OutboxProcessor> logger, 
+        IConfiguration configuration,
+        IServiceProvider serviceProvider,
+        IOutboxStore outbox, 
+        IOptions<CqrsOptions> options)
+        : base(logger, configuration)
+    { 
+        _serviceProvider = serviceProvider;
+        _outbox = outbox; 
+        _options = options.Value; 
+        _routing = serviceProvider.GetRequiredService<ICqrsRouting>(); 
+    }
+
+    public override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    {
+        Logger.LogInformation("OutboxProcessor started - processing CQRS outbox entries");
+        
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                var batch = await _outbox.DequeueAsync(100, stoppingToken);
+                if (batch.Count == 0)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(500), stoppingToken);
+                    continue;
+                }
+
+                await ProcessBatch(batch, stoppingToken);
+                await EmitEventAsync(SoraServiceEvents.Outbox.Processed, 
+                    new OutboxProcessedEventArgs { ProcessedCount = batch.Count });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error processing outbox batch");
+                await EmitEventAsync(SoraServiceEvents.Outbox.Failed, 
+                    new OutboxFailedEventArgs { Error = ex.Message });
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+        }
+    }
+
+    [ServiceAction(SoraServiceActions.Outbox.ProcessBatch)]
+    public async Task ProcessBatchAsync(int? batchSize = null, CancellationToken cancellationToken = default)
+    {
+        var size = batchSize ?? 100;
+        var batch = await _outbox.DequeueAsync(size, cancellationToken);
+        await ProcessBatch(batch, cancellationToken);
+    }
+
+    private async Task ProcessBatch(List<OutboxEntry> batch, CancellationToken cancellationToken)
+    {
+        // Process batch logic
+    }
+}
+```
+
+### Health Probe Scheduler (Sora.Core)
+
+```csharp
+using Sora.Core.Events;
+using Sora.Core.Actions;
+
+[SoraBackgroundService(RunInProduction = true)]
+[ServiceEvent(SoraServiceEvents.Health.ProbeScheduled, EventArgsType = typeof(ProbeScheduledEventArgs))]
+[ServiceEvent(SoraServiceEvents.Health.ProbeBroadcast, EventArgsType = typeof(ProbeBroadcastEventArgs))]
+internal sealed class HealthProbeScheduler : SoraFluentServiceBase
+{
+    private readonly IHealthAggregator _agg;
+    private readonly HealthAggregatorOptions _opt;
+    private readonly IHostApplicationLifetime _lifetime;
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastInvited = new(StringComparer.OrdinalIgnoreCase);
+
+    public HealthProbeScheduler(
+        ILogger<HealthProbeScheduler> logger,
+        IConfiguration configuration,
+        IHealthAggregator agg,
+        HealthAggregatorOptions opt,
+        IHostApplicationLifetime lifetime)
+        : base(logger, configuration)
+    {
+        _agg = agg;
+        _opt = opt;
+        _lifetime = lifetime;
+    }
+
+    public override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
+    {
+        if (!_opt.Enabled)
+        {
+            Logger.LogInformation("Health aggregator disabled; scheduler not running.");
+            return;
+        }
+
+        // Wait for application to start
+        if (!_lifetime.ApplicationStarted.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+        }
+
+        Logger.LogInformation("Health probe scheduler starting. QuantizationWindow: {Window}ms", _opt.QuantizationWindow.TotalMilliseconds);
+
+        var quantizationWindow = TimeSpan.FromMilliseconds(Math.Max(1000, _opt.QuantizationWindow.TotalMilliseconds));
+        using var timer = new PeriodicTimer(quantizationWindow);
+
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            await ScheduleProbes(stoppingToken);
+        }
+    }
+
+    [ServiceAction(SoraServiceActions.Health.ForceProbe)]
+    public async Task ForceProbeAsync(CancellationToken cancellationToken = default)
+    {
+        Logger.LogInformation("Force probe requested - scheduling immediate health probes");
+        await ScheduleProbes(cancellationToken);
+        await EmitEventAsync(SoraServiceEvents.Health.ProbeBroadcast, 
+            new ProbeBroadcastEventArgs { Forced = true, Timestamp = DateTimeOffset.UtcNow });
+    }
+
+    private async Task ScheduleProbes(CancellationToken cancellationToken)
+    {
+        // Probe scheduling logic with event emission
+        await EmitEventAsync(SoraServiceEvents.Health.ProbeScheduled, 
+            new ProbeScheduledEventArgs { Timestamp = DateTimeOffset.UtcNow });
+    }
+}
+```
+
+### Messaging Lifecycle Service (Sora.Messaging.Core)
+
+```csharp
+using Sora.Core.Events;
+using Sora.Core.Actions;
+
+[SoraBackgroundService(RunInProduction = true)]
+[ServiceEvent(SoraServiceEvents.Messaging.Ready, EventArgsType = typeof(MessagingReadyEventArgs))]
+[ServiceEvent(SoraServiceEvents.Messaging.Failed, EventArgsType = typeof(MessagingFailedEventArgs))]
+internal class MessagingLifecycleService : SoraFluentServiceBase
+{
+    private readonly IMessagingService _messagingService;
+    private readonly IHostApplicationLifetime _lifetime;
+
+    public MessagingLifecycleService(
+        ILogger<MessagingLifecycleService> logger,
+        IConfiguration configuration,
+        IMessagingService messagingService,
+        IHostApplicationLifetime lifetime)
+        : base(logger, configuration)
+    {
+        _messagingService = messagingService;
+        _lifetime = lifetime;
+    }
+
+    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            Logger.LogInformation("Messaging lifecycle service starting...");
+            
+            await _messagingService.StartAsync(cancellationToken);
+            
+            await EmitEventAsync(SoraServiceEvents.Messaging.Ready, 
+                new MessagingReadyEventArgs { StartedAt = DateTimeOffset.UtcNow });
+                
+            Logger.LogInformation("Messaging service started successfully");
+
+            // Wait for application shutdown
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to start messaging service");
+            await EmitEventAsync(SoraServiceEvents.Messaging.Failed, 
+                new MessagingFailedEventArgs { Error = ex.Message });
+            throw;
+        }
+    }
+
+    [ServiceAction(SoraServiceActions.Messaging.RestartMessaging)]
+    public async Task RestartMessagingAsync(CancellationToken cancellationToken = default)
+    {
+        Logger.LogInformation("Restarting messaging service...");
+        await _messagingService.RestartAsync(cancellationToken);
+        await EmitEventAsync(SoraServiceEvents.Messaging.Ready, 
+            new MessagingReadyEventArgs { StartedAt = DateTimeOffset.UtcNow });
+    }
+}
+```
 
 ---
 

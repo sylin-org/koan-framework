@@ -13,7 +13,7 @@ namespace Sora.Core.Observability.Health;
 [SoraBackgroundService(RunInProduction = true)]
 [ServiceEvent(Sora.Core.Events.SoraServiceEvents.Health.ProbeScheduled, EventArgsType = typeof(ProbeScheduledEventArgs))]
 [ServiceEvent(Sora.Core.Events.SoraServiceEvents.Health.ProbeBroadcast, EventArgsType = typeof(ProbeBroadcastEventArgs))]
-internal sealed class HealthProbeScheduler : SoraBackgroundServiceBase
+internal sealed class HealthProbeScheduler : SoraFluentServiceBase
 {
     private readonly IHealthAggregator _agg;
     private readonly HealthAggregatorOptions _opt;
@@ -98,16 +98,25 @@ internal sealed class HealthProbeScheduler : SoraBackgroundServiceBase
                 {
                     _agg.RequestProbe(ProbeReason.TtlExpiry, component: null, stoppingToken);
                     Logger.LogDebug("Probe broadcast for {Count} components.", due.Count);
-
-                    Logger.LogInformation("ProbeBroadcast: {Count} components at {Time}", due.Count, DateTimeOffset.UtcNow);
+                    
+                    await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Health.ProbeBroadcast, new ProbeBroadcastEventArgs
+                    {
+                        ComponentCount = due.Count,
+                        BroadcastAt = DateTimeOffset.UtcNow
+                    });
                 }
                 else
                 {
                     foreach (var c in due)
                     {
                         _agg.RequestProbe(ProbeReason.TtlExpiry, component: c, stoppingToken);
-
-                        Logger.LogInformation("ProbeScheduled: {Component} reason={Reason} at {Time}", c, "TTL Expiry", DateTimeOffset.UtcNow);
+                        
+                        await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Health.ProbeScheduled, new ProbeScheduledEventArgs
+                        {
+                            Component = c,
+                            Reason = "TTL Expiry",
+                            ScheduledAt = DateTimeOffset.UtcNow
+                        });
                     }
                 }
 
@@ -130,7 +139,7 @@ internal sealed class HealthProbeScheduler : SoraBackgroundServiceBase
         Logger.LogInformation("Health aggregator scheduler stopped");
     }
 
-    [ServiceAction("force-probe")]
+    [ServiceAction(Sora.Core.Actions.SoraServiceActions.Health.ForceProbe)]
     public async Task ForceProbeAction(string? component, CancellationToken cancellationToken)
     {
         Logger.LogInformation("Manual health probe requested for component: {Component}", component ?? "ALL");
@@ -139,11 +148,20 @@ internal sealed class HealthProbeScheduler : SoraBackgroundServiceBase
 
         if (string.IsNullOrEmpty(component))
         {
-            Logger.LogInformation("ProbeBroadcast: manual at {Time}", DateTimeOffset.UtcNow);
+            await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Health.ProbeBroadcast, new ProbeBroadcastEventArgs
+            {
+                ComponentCount = 0, // Unknown count for manual broadcast
+                BroadcastAt = DateTimeOffset.UtcNow
+            });
         }
         else
         {
-            Logger.LogInformation("ProbeScheduled: {Component} reason={Reason} at {Time}", component, "Manual", DateTimeOffset.UtcNow);
+            await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Health.ProbeScheduled, new ProbeScheduledEventArgs
+            {
+                Component = component,
+                Reason = "Manual",
+                ScheduledAt = DateTimeOffset.UtcNow
+            });
         }
     }
 

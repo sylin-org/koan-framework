@@ -118,7 +118,7 @@ internal sealed class OutboxProcessor : SoraFluentServiceBase
         Logger.LogInformation("OutboxProcessor stopped");
     }
     
-    [ServiceAction("process-batch")]
+    [ServiceAction(Sora.Core.Actions.SoraServiceActions.Outbox.ProcessBatch)]
     public async Task ProcessBatchAction(int? batchSize, CancellationToken cancellationToken)
     {
         Logger.LogInformation("Manual outbox batch processing requested with batch size: {BatchSize}", batchSize ?? 100);
