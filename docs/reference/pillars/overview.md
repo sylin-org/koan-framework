@@ -1,4 +1,4 @@
-# REF_SORA_PILLARS_REFERENCE.md
+# Pillars Reference
 
 **Document Type**: Reference Documentation (REF)  
 **Target Audience**: Developers, Architects, AI Agents  

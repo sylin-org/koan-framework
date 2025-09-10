@@ -1,6 +1,6 @@
-# REF_SORA_FRAMEWORK_OVERVIEW.md
+# Sora Framework Overview
 
-**Document Type**: Reference Documentation (REF)  
+**Document Type**: Reference Documentation  
 **Target Audience**: Developers, Architects, AI Agents  
 **Last Updated**: 2025-01-10  
 **Framework Version**: v0.2.18+
@@ -9,17 +9,52 @@
 
 ## 🎯 What is Sora Framework?
 
-**Sora is a modular .NET backend framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.**
+**Build services like you're talking to your code, not fighting it.**
+
+Sora is a modular .NET backend framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
+
+Whether you're spinning up a quick prototype or scaling into enterprise-grade patterns, Sora keeps the path clear. Start with a three-file API. Add messaging, vector search, or AI when you're ready. Nothing more, nothing less.
 
 ### Core Philosophy
-
-Build services like you're talking to your code, not fighting it. Sora keeps the path clear whether you're spinning up a quick prototype or scaling into enterprise-grade patterns.
 
 **Key Principles:**
 - **Start Simple**: Build a real service in a single file
 - **Clear Structure**: Follow .NET conventions, not opinions  
 - **Honest Complexity**: Add what you need, skip what you don't
 - **Escape Hatches Everywhere**: Drop to raw SQL, write custom controllers, override behavior freely
+
+---
+
+## 🧱 From First Line to First Endpoint
+
+Let's start simple:
+
+```bash
+dotnet add package Sora.Core
+dotnet add package Sora.Web
+dotnet add package Sora.Data.Sqlite
+```
+
+Then:
+
+```csharp
+public class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+    public bool IsDone { get; set; }
+}
+
+[Route("api/[controller]")]
+public class TodosController : EntityController<Todo> { }
+```
+
+That's a full REST API:
+- `GET /api/todos`
+- `POST /api/todos`
+- `PUT /api/todos/{id}`
+- Health checks at `/health`
+
+It works. Right now. No ceremony.
 
 ---
 
@@ -58,7 +93,8 @@ Models are first-class citizens with static methods:
 ```csharp
 public class Todo : Entity<Todo>
 {
-    public static async Task<Todo[]> Recent() => await All().Where(t => t.Created > DateTime.Today.AddDays(-7));
+    public static async Task<Todo[]> Recent() => 
+        await All().Where(t => t.Created > DateTime.Today.AddDays(-7));
 }
 ```
 
@@ -153,139 +189,26 @@ public class Todo : Entity<Todo>
 
 ---
 
-## 🚀 Quick Start Example
+## 🌱 A Framework That Grows With You
 
-Here's how simple it is to get started:
+Sora isn't trying to impress you with magic. It earns trust by staying out of your way—until you need more.
 
-### 1. Installation
-```bash
-dotnet add package Sora.Core
-dotnet add package Sora.Web  
-dotnet add package Sora.Data.Sqlite
-```
+- Add AI? One line.
+- Need vector search? Drop in a package.
+- Ready for messaging? Plug it in.
+- CQRS? Recipes exist.
 
-### 2. Model Definition
-```csharp
-public class Todo : Entity<Todo>
-{
-    public string Title { get; set; } = "";
-    public bool IsDone { get; set; }
-    public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow;
-    
-    // Static methods are first-class
-    public static Task<Todo[]> Pending() => All().Where(t => !t.IsDone);
-    public static Task<Todo[]> Recent() => All().Where(t => t.Created > DateTimeOffset.UtcNow.AddDays(-7));
-}
-```
-
-### 3. Controller (Automatic REST API)
-```csharp
-[Route("api/[controller]")]
-public class TodosController : EntityController<Todo> 
-{ 
-    // Automatically provides:
-    // GET /api/todos
-    // POST /api/todos
-    // PUT /api/todos/{id}
-    // DELETE /api/todos/{id}
-}
-```
-
-### 4. Program.cs
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-
-// Single line adds all referenced Sora modules
-builder.Services.AddSora();
-
-var app = builder.Build();
-
-// Sora handles the pipeline setup
-await app.RunAsync();
-```
-
-That's a **complete, production-ready REST API** with:
-- SQLite database
-- Health checks at `/health`
-- Swagger UI at `/swagger` (in development)
-- Proper error handling and logging
-- Configuration management
-
----
-
-## 🎨 Usage Patterns
-
-### **Progressive Enhancement**
-Start minimal, add complexity only when needed:
+You never pay for complexity you didn't ask for.
 
 ```bash
-# Basic web API
-dotnet add package Sora.Web Sora.Data.Sqlite
-
-# Add AI capabilities  
-dotnet add package Sora.AI
-
-# Add messaging
-dotnet add package Sora.Messaging.RabbitMq
-
-# Add vector search
-dotnet add package Sora.Data.Weaviate
-
-# Add GraphQL alongside REST
-dotnet add package Sora.Web.GraphQl
+dotnet add package Sora.Web.Swagger           # Interactive docs
+dotnet add package Sora.AI                    # Local LLMs with Ollama
+dotnet add package Sora.Data.Weaviate         # Semantic search
+dotnet add package Sora.Messaging.RabbitMq    # Production messaging
+dotnet add package Sora.Web.GraphQl           # REST + GraphQL side-by-side
 ```
 
-### **Entity-First Development**
-Models drive the architecture:
-
-```csharp
-// 1. Define your model
-public class Product : Entity<Product>
-{
-    [AggregationKey] // For Flow pipeline
-    public string SKU { get; set; } = "";
-    
-    public string Name { get; set; } = "";
-    public decimal Price { get; set; }
-    
-    // Business logic stays with the model
-    public static Task<Product[]> OnSale() => 
-        All().Where(p => p.Price < p.OriginalPrice);
-}
-
-// 2. Get automatic REST API
-[Route("api/[controller]")]
-public class ProductsController : EntityController<Product> { }
-
-// 3. Get automatic GraphQL schema (if GraphQL package is referenced)
-// Schema auto-generated from Product model
-```
-
-### **Configuration-Driven Behavior**
-Sora respects configuration hierarchy:
-
-```json
-{
-  "Sora": {
-    "Data": {
-      "DefaultProvider": "Postgres",
-      "Sqlite": {
-        "ConnectionString": "Data Source=app.db"
-      }
-    },
-    "Web": {
-      "EnableSwagger": true,
-      "CorsOrigins": ["http://localhost:3000"]
-    },
-    "AI": {
-      "DefaultProvider": "Ollama",
-      "Budget": {
-        "MaxTokensPerRequest": 1000
-      }
-    }
-  }
-}
-```
+Everything integrates naturally. No glue scripts. No boilerplate.
 
 ---
 
@@ -358,14 +281,31 @@ Sora respects configuration hierarchy:
 
 ---
 
+## 🧪 Real Use, Not Just Hello World
+
+Sora is already being used to build:
+
+- Microservices with event sourcing and inbox/outbox patterns
+- Developer tools with built-in AI assistance
+- Internal apps with rapid UI prototyping and Swagger docs
+
+It's ready for you too.
+
+```csharp
+var todo = await new Todo { Title = "Learn Sora" }.Save();
+var todos = await Todo.Where(t => !t.IsDone);
+```
+
+---
+
 ## 📚 Next Steps
 
-1. **Get Started**: See `REF_SORA_GETTING_STARTED.md`
-2. **Authentication**: See `REF_SORA_AUTHENTICATION_GUIDE.md`
-3. **Explore Patterns**: See `REF_SORA_USAGE_PATTERNS.md`  
-4. **Deep Dive**: See pillar-specific REF documents
+1. **Get Started**: See [Getting Started Guide](getting-started.md)
+2. **Authentication**: See [Authentication Guide](../reference/pillars/authentication.md)
+3. **Explore Patterns**: See [Usage Patterns](../reference/architecture/patterns.md)  
+4. **Deep Dive**: See pillar-specific documentation in [/reference/pillars/](pillars/)
 5. **Samples**: Explore the `samples/` directory
-6. **Architecture**: Read `docs/architecture/principles.md`
+6. **Architecture**: Read [Architecture Principles](../architecture/principles.md)
 
 ---
 

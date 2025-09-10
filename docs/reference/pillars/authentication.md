@@ -1,4 +1,4 @@
-# REF_SORA_AUTHENTICATION_GUIDE.md
+# Authentication Guide
 
 **Document Type**: Reference Documentation (REF)  
 **Target Audience**: Developers, Security Engineers, AI Agents  
@@ -1002,6 +1002,6 @@ Sora's authentication system provides:
 ---
 
 **Next Steps**: 
-- See `REF_SORA_GETTING_STARTED.md` for basic authentication setup
-- See `REF_SORA_USAGE_PATTERNS.md` for authorization patterns
-- See `REF_SORA_ADVANCED_TOPICS.md` for custom authentication providers
+- See [Getting Started](../getting-started.md) for basic authentication setup
+- See [Usage Patterns](../architecture/patterns.md) for authorization patterns
+- See [Advanced Topics](../advanced-topics.md) for custom authentication providers

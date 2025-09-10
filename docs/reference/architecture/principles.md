@@ -1,4 +1,4 @@
-# REF_SORA_ARCHITECTURE_GUIDE.md
+# Architecture Guide
 
 **Document Type**: Reference Documentation (REF)  
 **Target Audience**: Architects, Senior Developers, AI Agents  

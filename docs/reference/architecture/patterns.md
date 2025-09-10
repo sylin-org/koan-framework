@@ -1,4 +1,4 @@
-# REF_SORA_USAGE_PATTERNS.md
+# Usage Patterns
 
 **Document Type**: Reference Documentation (REF)  
 **Target Audience**: Developers, AI Agents  

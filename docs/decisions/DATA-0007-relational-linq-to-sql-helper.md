@@ -72,4 +72,4 @@ Relational adapters benefit from LINQ predicates for ergonomics, but full LINQ p
 
 ## See also
 
-- Data Adapter Acceptance Criteria: ../support/08-data-adapter-acceptance-criteria.md
+- Data Adapter Acceptance Criteria: ../support/data-adapter-acceptance-criteria.md

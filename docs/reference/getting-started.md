@@ -1,4 +1,4 @@
-# REF_SORA_GETTING_STARTED.md
+# Getting Started
 
 **Document Type**: Reference Documentation (REF)  
 **Target Audience**: New Developers, AI Agents  
@@ -473,7 +473,7 @@ public class ExternalApiHealthCheck : IHealthContributor
 Now that you have a basic Sora application running:
 
 1. **Explore Samples**: Check the `samples/` directory for real-world examples
-2. **Read Usage Patterns**: See `REF_SORA_USAGE_PATTERNS.md`
+2. **Read Usage Patterns**: See [Usage Patterns](architecture/patterns.md)
 3. **Deep Dive**: Explore pillar-specific documentation
 4. **Join Community**: GitHub Discussions for questions
 

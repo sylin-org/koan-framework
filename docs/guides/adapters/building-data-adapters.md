@@ -39,6 +39,6 @@ Steps
    - Options/guardrails unit tests; repository happy‑path CRUD; Testcontainers integration with env opt‑in and Docker probing.
 
 References and templates
-- Acceptance criteria: support/08-data-adapter-acceptance-criteria.md
-- Template: support/08-data-adapter-template.md
-- Vector contracts (if applicable): guides/adapters/vector-search.md, support/09-vector-adapter-acceptance-criteria.md
+- Acceptance criteria: support/data-adapter-acceptance-criteria.md
+- Template: support/data-adapter-template.md
+- Vector contracts (if applicable): guides/adapters/vector-search.md, support/vector-adapter-acceptance-criteria.md

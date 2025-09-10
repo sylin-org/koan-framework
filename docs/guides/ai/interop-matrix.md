@@ -1,4 +1,4 @@
-# AI Interop Matrix (REST/SSE ↔ gRPC, OpenAI shim, MCP, AI-RPC)
+# AI Interop Matrix
 
 Purpose
 - Provide a concise mapping from Sora’s native REST + SSE endpoints to other AI protocol surfaces for teams that need interop.

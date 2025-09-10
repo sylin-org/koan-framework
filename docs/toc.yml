@@ -23,98 +23,194 @@
       href: engineering/flow-messaging-status.md
     - name: Flow Messaging Implementation Plan
       href: engineering/flow-messaging-implementation-plan.md
+
 - name: Architecture Principles
   href: architecture/principles.md
+
 - name: Reference
   items:
+    - name: Framework Overview
+      href: reference/framework-overview.md
+    - name: Getting Started
+      href: reference/getting-started.md
     - name: Data Access
       href: reference/data-access.md
+    - name: Instruction Execution
+      href: reference/instruction-execution.md
     - name: Web
       href: reference/web.md
-    - name: Web Capabilities (Moderation/Soft-delete/Audit)
-      href: reference/web-capabilities.md
-    - name: TechDocs (proposal)
-      href: reference/techdocs-proposal.md
-    - name: Storage
-      href: reference/storage.md
+    - name: Web Controller Capabilities
+      href: reference/web-controller-capabilities.md
     - name: Modules
       href: reference/modules.md
-    - name: Flow Messaging Architecture (Guide)
-      href: guides/flow/flow-messaging-architecture.md
-    - name: Flow & Messaging Capabilities
-      href: reference/flow-messaging-capabilities.md
-    - name: Recipes
-      href: reference/recipes.md
-    - name: Sora CLI
-      href: reference/sora-cli.md
-    - name: Web Authentication
-      href: reference/web-auth.md
-      homepage: reference/web-auth.md
-    - name: Messaging
-      href: reference/messaging.md
-      items:
-        - name: Primitives
-          href: reference/messaging-primitives.md
-        - name: Topology Lifecycle
-          href: reference/messaging-topology-lifecycle.md
-    - name: Flow Key Resolution (Troubleshooting)
-      href: support/troubleshooting/flow-key-resolution.md
-    - name: AI
-      href: reference/ai.md
-    - name: Flow
-      href: reference/flow.md
-      items:
-        - name: Bindings and canonical IDs
-          href: reference/flow-bindings-and-canonical-ids.md
-        - name: Materialization (policies and transformers)
-          href: reference/flow-materialization.md
-    - name: Orchestration
-      href: reference/orchestration.md
-    - name: Secrets
-      href: reference/secrets.md
+    - name: Configuration Patterns
+      href: reference/configuration-patterns.md
+    - name: CLI Reference
+      href: reference/cli-reference.md
     - name: JSON
       href: reference/json.md
-    - name: Working with Secrets
-      href: reference/working-with-secrets.md
-    - name: Config & Constants
-      href: reference/config-and-constants.md
     - name: Adapter Matrix
       href: reference/adapter-matrix.md
-- name: Modules
+    - name: Advanced Topics
+      href: reference/advanced-topics.md
+
+- name: Framework Pillars
   items:
-    - name: S8.Flow — IoT Monitor
-      href: modules/s8-flow-iot-monitor.md
-- name: Feature Catalog
-  href: feature-catalog.md
+    - name: AI Integration
+      href: reference/pillars/ai.md
+    - name: Authentication
+      href: reference/pillars/authentication.md
+    - name: Background Services
+      href: reference/pillars/backgroundservices.md
+    - name: Flow Pipeline
+      href: reference/pillars/flow-overview.md
+      items:
+        - name: Identity Mapping
+          href: reference/pillars/flow-identity-mapping.md
+        - name: Projections
+          href: reference/pillars/flow-projections.md
+        - name: Messaging
+          href: reference/pillars/flow-messaging.md
+    - name: Media Management
+      href: reference/pillars/media-overview.md
+    - name: Messaging
+      href: reference/pillars/messaging-overview.md
+      items:
+        - name: Contracts
+          href: reference/pillars/messaging-contracts.md
+        - name: Lifecycle
+          href: reference/pillars/messaging-lifecycle.md
+    - name: Orchestration
+      href: reference/pillars/orchestration-overview.md
+    - name: Recipes
+      href: reference/pillars/recipes-overview.md
+    - name: Secrets Management
+      href: reference/pillars/secrets-management.md
+    - name: Storage
+      href: reference/pillars/storage-overview.md
+    - name: Web Authentication
+      href: reference/pillars/web-authentication.md
+
+- name: Architecture & Design
+  items:
+    - name: Usage Patterns
+      href: reference/architecture/patterns.md
+    - name: Design Principles
+      href: reference/architecture/principles.md
+
 - name: Guides
   items:
     - name: Core
       href: guides/core/index.md
-    - name: Scheduling and Bootstrap
-      href: guides/scheduling-and-bootstrap.md
+      items:
+        - name: Composition and Profiles
+          href: guides/core/composition-and-profiles.md
+        - name: Core Contracts
+          href: guides/core/core-contracts.md
+        - name: Engineering Guardrails
+          href: guides/core/engineering-guardrails.md
+        - name: Executive Pitch
+          href: guides/core/executive-pitch.md
+        - name: Health Aggregator
+          href: guides/core/health-aggregator.md
+        - name: Health Aggregator Samples
+          href: guides/core/health-aggregator-samples.md
     - name: Data
       href: guides/data/index.md
+      items:
+        - name: Entity Patterns
+          href: guides/data/entity-patterns.md
+        - name: Entity Filtering and Query
+          href: guides/data/entity-filtering-and-query.md
+        - name: Working with Entity Data
+          href: guides/data/working-with-entity-data.md
+        - name: Vector Module and Facade
+          href: guides/data/vector-module-and-facade.md
+        - name: All Query Streaming and Pager
+          href: guides/data/all-query-streaming-and-pager.md
     - name: Web
       href: guides/web/index.md
     - name: Messaging
       href: guides/messaging/index.md
     - name: Adapters
       href: guides/adapters/index.md
-    - name: Building Data Adapters
-      href: guides/adapters/building-data-adapters.md
-    - name: Building Messaging Adapters
-      href: guides/adapters/building-messaging-adapters.md
-    - name: AI
       items:
-        - name: Overview
-          href: guides/ai/index.md
-        - name: Native AI Sora — Epic
-          href: guides/ai/native-ai-sora-epic.md
-        - name: Interop Matrix (REST/SSE ↔ gRPC/OpenAI/MCP/AI-RPC)
+        - name: Adapter Authoring Guide
+          href: guides/adapters/adapter-authoring-guide.md
+        - name: Building Data Adapters
+          href: guides/adapters/building-data-adapters.md
+        - name: Building Messaging Adapters
+          href: guides/adapters/building-messaging-adapters.md
+        - name: Postgres Adapter
+          href: guides/adapters/postgres-adapter.md
+        - name: SQL Server Adapter
+          href: guides/adapters/sqlserver-adapter.md
+        - name: Redis Adapter
+          href: guides/adapters/redis-adapter.md
+        - name: SQLite Logging and Governance
+          href: guides/adapters/sqlite-logging-and-governance.md
+        - name: Vector Search
+          href: guides/adapters/vector-search.md
+    - name: AI
+      href: guides/ai/index.md
+      items:
+        - name: Framework Integration
+          href: guides/ai/framework-integration.md
+        - name: Engine Facade
+          href: guides/ai/engine-facade.md
+        - name: Adapters and Multi-Service
+          href: guides/ai/adapters-and-multi-service.md
+        - name: Interop Matrix
           href: guides/ai/interop-matrix.md
+    - name: Flow
+      href: guides/flow/index.md
+      items:
+        - name: Flow Messaging Architecture
+          href: guides/flow/flow-messaging-architecture.md
+
 - name: Support
-  href: support/index.md
-- name: Decisions
-  href: decisions/index.md
+  href: support/README.md
+  items:
+    - name: Data Instructions
+      href: support/data-instructions.md
+    - name: Adapter Checklist
+      href: support/adapter-checklist.md
+    - name: Testing Guide
+      href: support/testing-guide.md
+    - name: Release Process
+      href: support/release-process.md
+    - name: Capability Matrix Endpoint
+      href: support/capability-matrix-endpoint.md
+    - name: Data Adapter Acceptance Criteria
+      href: support/data-adapter-acceptance-criteria.md
+    - name: Vector Adapter Acceptance Criteria
+      href: support/vector-adapter-acceptance-criteria.md
+    - name: Configuration Helper
+      href: support/configuration-helper.md
+    - name: NuGet Publish
+      href: support/nuget-publish.md
+    - name: Release Flow
+      href: support/release-flow.md
+    - name: Solution Filters
+      href: support/solution-filters.md
+    - name: Troubleshooting
+      href: support/troubleshooting/index.md
+      items:
+        - name: Flow Key Resolution
+          href: support/troubleshooting/flow-key-resolution.md
+        - name: Web Auth TestProvider Container Callback
+          href: support/troubleshooting/web-auth-testprovider-container-callback.md
+        - name: Web Auth TestProvider Double Prefix Authorize
+          href: support/troubleshooting/web-auth-testprovider-double-prefix-authorize.md
+
+- name: Architecture Decisions (ADRs)
+  href: decisions/README.md
+
+- name: Domain-Driven Design
+  href: ddd/index.md
+
 - name: API Reference
-  href: api/index.md
+  href: api/assemblies.md
+
+- name: Archive
+  href: archive/README.md

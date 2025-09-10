@@ -6,7 +6,7 @@ This guide defines Sora’s vector datasource signature and accessory elements. 
 
 See also:
 
-- Support: Vector Adapter Acceptance Criteria (docs/support/09-vector-adapter-acceptance-criteria.md)
+- Support: Vector Adapter Acceptance Criteria (docs/support/vector-adapter-acceptance-criteria.md)
 
 ## Contracts (proposed)
 

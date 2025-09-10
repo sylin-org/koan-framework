@@ -1,4 +1,4 @@
-# REF_SORA_ADVANCED_TOPICS.md
+# Advanced Topics
 
 **Document Type**: Reference Documentation (REF)  
 **Target Audience**: Senior Developers, Architects, AI Agents  

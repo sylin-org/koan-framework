@@ -9,8 +9,8 @@ Operational docs, environment setup, and troubleshooting.
 - CI/CD
   - Build, test, docs, versioning (see repo scripts and version.json)
 - Acceptance Criteria
-  - Data Adapters: 08-data-adapter-acceptance-criteria.md
-  - Vector Adapters: 09-vector-adapter-acceptance-criteria.md
+  - Data Adapters: data-adapter-acceptance-criteria.md
+  - Vector Adapters: vector-adapter-acceptance-criteria.md
 - Templates
-  - Data Adapter template: 08-data-adapter-template.md
-  - Vector Adapter template: 09-vector-adapter-template.md
+  - Data Adapter template: data-adapter-template.md
+  - Vector Adapter template: vector-adapter-template.md

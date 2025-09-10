@@ -5,14 +5,14 @@ Sora embraces DDD as a practical toolbox for building modular, evolvable systems
 Use these docs with the rest of Sora docs and ADRs. Each page maps DDD ideas to concrete Sora APIs and samples.
 
 Contents
-- 01-ubiquitous-language.md — Ubiquitous language and term mapping
-- 02-bounded-contexts-and-modules.md — Bounded contexts and modular composition
-- 03-tactical-design.md — Aggregates, repositories, services, invariants
-- 04-cqrs-and-eventing-in-sora.md — CQRS, outbox/inbox, messaging
-- 05-sample-walkthrough.md — Mapping S2/S3 samples to DDD
-- 06-testing.md — Testing aggregates and adapters
-- 07-anti-corruption-layer.md — ACL patterns at system boundaries
-- 08-cross-cutting-and-observability.md — Tracing/metrics, headers, policies
+- [ubiquitous-language.md](ubiquitous-language.md) — Ubiquitous language and term mapping
+- [bounded-contexts-and-modules.md](bounded-contexts-and-modules.md) — Bounded contexts and modular composition
+- [tactical-design.md](tactical-design.md) — Aggregates, repositories, services, invariants
+- [cqrs-and-eventing-in-sora.md](cqrs-and-eventing-in-sora.md) — CQRS, outbox/inbox, messaging
+- [sample-walkthrough.md](sample-walkthrough.md) — Mapping S2/S3 samples to DDD
+- [testing.md](testing.md) — Testing aggregates and adapters
+- [anti-corruption-layer.md](anti-corruption-layer.md) — ACL patterns at system boundaries
+- [cross-cutting-and-observability.md](cross-cutting-and-observability.md) — Tracing/metrics, headers, policies
 
 Related
 // removed tutorial link
