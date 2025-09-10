@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Sora.Flow.Attributes;
 
 namespace Sora.Flow.Core.Orchestration;
@@ -9,8 +10,8 @@ namespace Sora.Flow.Core.Orchestration;
 /// </summary>
 internal class DefaultFlowOrchestrator : FlowOrchestratorBase
 {
-    public DefaultFlowOrchestrator(ILogger<DefaultFlowOrchestrator> logger, IServiceProvider serviceProvider)
-        : base(logger, serviceProvider)
+    public DefaultFlowOrchestrator(ILogger<DefaultFlowOrchestrator> logger, IConfiguration configuration, IServiceProvider serviceProvider)
+        : base(logger, configuration, serviceProvider)
     {
     }
 

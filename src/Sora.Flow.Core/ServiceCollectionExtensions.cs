@@ -108,6 +108,10 @@ public static class ServiceCollectionExtensions
         // Install global naming policy for Flow entities
         services.AddSoraFlowNaming();
 
+        // Initialize Flow interceptor registry manager
+        var provider = services.BuildServiceProvider();
+        Sora.Flow.Core.Interceptors.FlowInterceptorRegistryManager.Initialize(provider);
+
         // Register MessagingInterceptors for Flow entities
         Extensions.FlowEntityExtensions.RegisterFlowInterceptors();
 
@@ -1102,9 +1106,9 @@ public static class ServiceCollectionExtensions
 
     /// <summary>
     /// Extracts the source entity ID from the data dictionary for external ID generation.
-    /// For strong-typed models: uses [Key] property value (typically "Id" from Entity<T>)
-    /// For dynamic models: uses "id" property (case-insensitive)
-    /// This is the source-specific ID (e.g., "D1", "S1") that should be stored in identifier.external.{source}
+    /// For strong-typed models: uses [Key] property value (typically "Id" from Entity&lt;T&gt;).
+    /// For dynamic models: uses an "id" property (case-insensitive).
+    /// Returns the source-specific ID (e.g., D1, S1) that is stored in identifier.external.&lt;source&gt;.
     /// </summary>
     private static string? GetSourceEntityId(IDictionary<string, object?> dict, Type modelType)
     {

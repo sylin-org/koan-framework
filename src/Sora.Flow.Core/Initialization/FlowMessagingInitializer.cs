@@ -291,7 +291,7 @@ public static class FlowMessagingInitializer
     
     /// <summary>
     /// Discovers all Flow entity types across all loaded assemblies.
-    /// Returns FlowEntity<T>, DynamicFlowEntity<T>, and FlowValueObject<T> types.
+    /// Returns FlowEntity&lt;T&gt;, DynamicFlowEntity&lt;T&gt;, and FlowValueObject&lt;T&gt; types.
     /// </summary>
     public static List<Type> DiscoverAllFlowTypes()
     {
@@ -426,7 +426,7 @@ public static class FlowMessagingInitializer
     }
     
     /// <summary>
-    /// Invoke orchestrator handler with proper generic typing and ref parameter.
+    /// Invokes a Flow.OnUpdate handler with proper generic typing and ref parameter semantics.
     /// </summary>
     private static async Task<Sora.Flow.Core.Orchestration.UpdateResult> InvokeOrchestrator<T>(object handler, T proposed, T? current, Sora.Flow.Core.Orchestration.UpdateMetadata metadata) where T : class, Sora.Data.Abstractions.IEntity<string>
     {

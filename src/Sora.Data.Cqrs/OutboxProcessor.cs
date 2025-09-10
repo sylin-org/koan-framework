@@ -1,8 +1,10 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Sora.Core.BackgroundServices;
 using Sora.Data.Core;
 
 namespace Sora.Data.Cqrs;
@@ -11,19 +13,34 @@ namespace Sora.Data.Cqrs;
 /// Background processor that drains the outbox and applies simple 1:1 projections when implicit CQRS is enabled.
 /// This mirrors Upsert/Delete events into the same entity repository resolved for reads.
 /// </summary>
-internal sealed class OutboxProcessor : BackgroundService
+[SoraBackgroundService(RunInProduction = true)]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Outbox.Processed, EventArgsType = typeof(OutboxProcessedEventArgs))]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Outbox.Failed, EventArgsType = typeof(OutboxFailedEventArgs))]
+internal sealed class OutboxProcessor : SoraFluentServiceBase
 {
-    private readonly IServiceProvider _sp;
-    private readonly ILogger<OutboxProcessor> _logger;
     private readonly IOutboxStore _outbox;
     private readonly CqrsOptions _options;
     private readonly ICqrsRouting _routing;
+    private readonly IServiceProvider _serviceProvider;
 
-    public OutboxProcessor(IServiceProvider sp, ILogger<OutboxProcessor> logger, IOutboxStore outbox, IOptions<CqrsOptions> options)
-    { _sp = sp; _logger = logger; _outbox = outbox; _options = options.Value; _routing = sp.GetRequiredService<ICqrsRouting>(); }
+    public OutboxProcessor(
+        ILogger<OutboxProcessor> logger, 
+        IConfiguration configuration,
+        IServiceProvider serviceProvider,
+        IOutboxStore outbox, 
+        IOptions<CqrsOptions> options)
+        : base(logger, configuration)
+    { 
+        _serviceProvider = serviceProvider;
+        _outbox = outbox; 
+        _options = options.Value; 
+        _routing = serviceProvider.GetRequiredService<ICqrsRouting>(); 
+    }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
     {
+        Logger.LogInformation("OutboxProcessor started - processing CQRS outbox entries");
+        
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -35,18 +52,45 @@ internal sealed class OutboxProcessor : BackgroundService
                     continue;
                 }
 
+                var processedCount = 0;
+                var failedCount = 0;
+
                 foreach (var entry in batch)
                 {
                     try
                     {
                         await ApplyProjectionAsync(entry, stoppingToken);
                         await _outbox.MarkProcessedAsync(entry.Id, stoppingToken);
+                        processedCount++;
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed processing outbox entry {Id} {Type} {Op}", entry.Id, entry.EntityType, entry.Operation);
+                        Logger.LogError(ex, "Failed processing outbox entry {Id} {Type} {Op}", entry.Id, entry.EntityType, entry.Operation);
+                        failedCount++;
+                        
+                        await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Outbox.Failed, new OutboxFailedEventArgs
+                        {
+                            EntryId = entry.Id,
+                            EntityType = entry.EntityType,
+                            Operation = entry.Operation,
+                            Error = ex.Message,
+                            FailedAt = DateTimeOffset.UtcNow,
+                            Exception = ex
+                        });
+                        
                         // Leave unmarked; it will retry on next loop.
                     }
+                }
+                
+                if (processedCount > 0)
+                {
+                    await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Outbox.Processed, new OutboxProcessedEventArgs
+                    {
+                        ProcessedCount = processedCount,
+                        FailedCount = failedCount,
+                        BatchSize = batch.Count,
+                        ProcessedAt = DateTimeOffset.UtcNow
+                    });
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -55,10 +99,48 @@ internal sealed class OutboxProcessor : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "OutboxProcessor loop error");
+                Logger.LogError(ex, "OutboxProcessor loop error");
+                
+                await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Outbox.Failed, new OutboxFailedEventArgs
+                {
+                    EntryId = "",
+                    EntityType = "System",
+                    Operation = "BatchProcess",
+                    Error = ex.Message,
+                    FailedAt = DateTimeOffset.UtcNow,
+                    Exception = ex
+                });
+                
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
         }
+        
+        Logger.LogInformation("OutboxProcessor stopped");
+    }
+    
+    [ServiceAction("process-batch")]
+    public async Task ProcessBatchAction(int? batchSize, CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("Manual outbox batch processing requested with batch size: {BatchSize}", batchSize ?? 100);
+        
+        var batch = await _outbox.DequeueAsync(batchSize ?? 100, cancellationToken);
+        var processedCount = 0;
+        
+        foreach (var entry in batch)
+        {
+            try
+            {
+                await ApplyProjectionAsync(entry, cancellationToken);
+                await _outbox.MarkProcessedAsync(entry.Id, cancellationToken);
+                processedCount++;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed processing outbox entry {Id} {Type} {Op} in manual batch", entry.Id, entry.EntityType, entry.Operation);
+            }
+        }
+        
+        Logger.LogInformation("Manual batch processing completed: {ProcessedCount}/{TotalCount}", processedCount, batch.Count);
     }
 
     private async Task ApplyProjectionAsync(OutboxEntry entry, CancellationToken ct)
@@ -67,14 +149,14 @@ internal sealed class OutboxProcessor : BackgroundService
         var entityType = Type.GetType(entry.EntityType, throwOnError: false);
         if (entityType is null)
         {
-            _logger.LogDebug("Unknown entity type '{Type}', skipping", entry.EntityType);
+            Logger.LogDebug("Unknown entity type '{Type}', skipping", entry.EntityType);
             return;
         }
         // Resolve key type via AggregateMetadata
         var idSpec = AggregateMetadata.GetIdSpec(entityType);
         if (idSpec is null)
         {
-            _logger.LogDebug("No Identifier on entity '{Type}', skipping", entry.EntityType);
+            Logger.LogDebug("No Identifier on entity '{Type}', skipping", entry.EntityType);
             return;
         }
         var keyType = idSpec.Prop.PropertyType;

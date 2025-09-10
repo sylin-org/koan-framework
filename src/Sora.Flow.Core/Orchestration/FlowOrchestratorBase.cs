@@ -1,7 +1,8 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
+using Sora.Core.BackgroundServices;
 using Sora.Core.Json;
 using Sora.Data.Core;
 using Sora.Flow.Attributes;
@@ -10,6 +11,7 @@ using Sora.Flow.Model;
 using Sora.Messaging;
 using Sora.Data.Abstractions;
 using Sora.Flow.Core.Interceptors;
+using Sora.Flow.Core.Infrastructure;
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -18,16 +20,20 @@ namespace Sora.Flow.Core.Orchestration;
 /// <summary>
 /// Base class for Flow orchestrators that process Flow entity messages from the dedicated queue.
 /// Provides type-safe deserialization and clean metadata separation.
+/// Now uses Sora Background Services for improved orchestration.
 /// </summary>
 [FlowOrchestrator]
-public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrator
+[SoraBackgroundService(RunInProduction = true)]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Flow.EntityProcessed, EventArgsType = typeof(FlowEntityProcessedEventArgs))]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Flow.EntityParked, EventArgsType = typeof(FlowEntityParkedEventArgs))]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Flow.EntityFailed, EventArgsType = typeof(FlowEntityFailedEventArgs))]
+public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchestrator
 {
-    protected readonly ILogger Logger;
     protected readonly IServiceProvider ServiceProvider;
 
-    protected FlowOrchestratorBase(ILogger logger, IServiceProvider serviceProvider)
+    protected FlowOrchestratorBase(ILogger logger, IConfiguration configuration, IServiceProvider serviceProvider)
+        : base(logger, configuration)
     {
-        Logger = logger ?? throw new ArgumentNullException(nameof(logger));
         ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         
         // Call Configure to register Flow.OnUpdate handlers
@@ -39,17 +45,27 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
     /// </summary>
     protected virtual void Configure() { }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
     {
         // Auto-subscribe to "Sora.Flow.FlowEntity" queue
         // This is handled by SoraAutoRegistrar during service registration
         Logger.LogInformation("FlowOrchestrator started and listening for Flow entity messages");
         
         // Keep the service running
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            await Task.Delay(1000, stoppingToken);
-        }
+        await Task.Delay(Timeout.Infinite, cancellationToken);
+    }
+
+    [ServiceAction("process-flow-entity", RequiresParameters = true, ParametersType = typeof(object))]
+    public virtual async Task ProcessFlowEntityAction(object transportEnvelope, CancellationToken cancellationToken)
+    {
+        await ProcessFlowEntity(transportEnvelope);
+    }
+
+    [ServiceAction("trigger-processing")]
+    public virtual async Task TriggerProcessingAction(CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("Manual processing trigger received");
+        // Could trigger additional processing here
     }
 
     public virtual async Task ProcessFlowEntity(object transportEnvelope)
@@ -86,10 +102,25 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
             {
                 Logger.LogWarning("Unknown Flow entity type: {Type}", type);
             }
+            
+            await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Flow.EntityProcessed, new FlowEntityProcessedEventArgs
+            {
+                Type = type,
+                Model = model,
+                Source = source,
+                ProcessedAt = DateTimeOffset.UtcNow
+            });
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error processing Flow entity transport envelope");
+            
+            await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Flow.EntityFailed, new FlowEntityFailedEventArgs
+            {
+                Error = ex.Message,
+                FailedAt = DateTimeOffset.UtcNow,
+                Exception = ex
+            });
         }
     }
 
@@ -239,25 +270,61 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
         {
             bool shouldPark = false;
             
-            // First, check for intake interceptors
+            // First, check for new fluent BeforeIntake interceptors
+            var registry = FlowInterceptorRegistryManager.GetFor(modelType);
+            if (registry?.HasBeforeIntakeNonGeneric() == true)
+            {
+                var actionResult = await registry.ExecuteBeforeIntakeNonGeneric(payload);
+                
+                if (actionResult is FlowIntakeAction action)
+                {
+                    Logger.LogDebug("BeforeIntake interceptor processed {Model}: Action={ActionType}, Reason={Reason}", 
+                        model, action.Action, action.Reason ?? "none");
+                    
+                    // Handle fluent interceptor actions
+                    switch (action.Action)
+                    {
+                        case FlowIntakeActionType.Drop:
+                            Logger.LogInformation("BeforeIntake interceptor requested DROP for {Model}: {Reason}", model, action.Reason);
+                            return;
+                        
+                        case FlowIntakeActionType.Park:
+                            Logger.LogInformation("BeforeIntake interceptor requested PARK for {Model}: {Reason}", model, action.Reason);
+                            if (metadata == null) metadata = new JObject();
+                            ((JObject)metadata)["parkingStatus"] = action.Reason;
+                            shouldPark = true;
+                            break;
+                            
+                        case FlowIntakeActionType.Continue:
+                            // Update payload if modified
+                            if (action.Entity != payload)
+                            {
+                                payload = action.Entity;
+                            }
+                            break;
+                    }
+                }
+            }
+            
+            // Legacy intake interceptors (for backward compatibility)
             if (FlowIntakeInterceptors.HasInterceptor(modelType))
             {
                 var result = FlowIntakeInterceptors.Intercept(payload);
                 payload = result.Payload;
                 
-                Logger.LogDebug("Intake interceptor processed {Model}: MustDrop={MustDrop}, ParkingStatus={ParkingStatus}", 
+                Logger.LogDebug("Legacy intake interceptor processed {Model}: MustDrop={MustDrop}, ParkingStatus={ParkingStatus}", 
                     model, result.MustDrop, result.ParkingStatus ?? "none");
                 
-                // Handle interceptor instructions
+                // Handle legacy interceptor instructions
                 if (result.MustDrop)
                 {
-                    Logger.LogInformation("Intake interceptor requested DROP for {Model} - skipping processing", model);
+                    Logger.LogInformation("Legacy intake interceptor requested DROP for {Model} - skipping processing", model);
                     return;
                 }
                 
                 if (!string.IsNullOrEmpty(result.ParkingStatus))
                 {
-                    // Interceptor wants to park this record - handle via default intake processing
+                    // Legacy interceptor wants to park this record
                     if (metadata == null)
                     {
                         metadata = new JObject();
@@ -596,6 +663,13 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
                 await task;
                 
                 Logger.LogInformation("Successfully parked {Model} with ReasonCode={ReasonCode} for background processing", model, reasonCode);
+                
+                await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Flow.EntityParked, new FlowEntityParkedEventArgs
+                {
+                    Model = model,
+                    ReasonCode = reasonCode,
+                    ParkedAt = DateTimeOffset.UtcNow
+                });
             }
         }
         catch (Exception ex)
@@ -726,5 +800,35 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
             return null;
         }
     }
+}
 
+/// <summary>
+/// Event args for when a Flow entity is successfully processed
+/// </summary>
+public record FlowEntityProcessedEventArgs
+{
+    public string Type { get; init; } = "";
+    public string Model { get; init; } = "";
+    public string Source { get; init; } = "";
+    public DateTimeOffset ProcessedAt { get; init; }
+}
+
+/// <summary>
+/// Event args for when a Flow entity is parked for later processing
+/// </summary>
+public record FlowEntityParkedEventArgs
+{
+    public string Model { get; init; } = "";
+    public string ReasonCode { get; init; } = "";
+    public DateTimeOffset ParkedAt { get; init; }
+}
+
+/// <summary>
+/// Event args for when Flow entity processing fails
+/// </summary>
+public record FlowEntityFailedEventArgs
+{
+    public string Error { get; init; } = "";
+    public DateTimeOffset FailedAt { get; init; }
+    public Exception? Exception { get; init; }
 }

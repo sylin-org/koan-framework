@@ -1,38 +1,61 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core;
+using Sora.Core.BackgroundServices;
 using Sora.Core.Observability.Health;
 
 namespace Sora.Scheduling;
 
-internal sealed class SchedulingOrchestrator(
-    IOptionsMonitor<SchedulingOptions> options,
-    IEnumerable<IScheduledTask> tasks,
-    Sora.Core.Observability.Health.IHealthAggregator health,
-    ILogger<SchedulingOrchestrator> logger,
-    IHostEnvironment env
-) : BackgroundService
+[SoraBackgroundService(RunInProduction = true)]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Scheduling.TaskExecuted, EventArgsType = typeof(TaskExecutedEventArgs))]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Scheduling.TaskFailed, EventArgsType = typeof(TaskFailedEventArgs))]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Scheduling.TaskTimeout, EventArgsType = typeof(TaskTimeoutEventArgs))]
+internal sealed class SchedulingOrchestrator : SoraFluentServiceBase
 {
+    private readonly IOptionsMonitor<SchedulingOptions> _options;
+    private readonly IEnumerable<IScheduledTask> _tasks;
+    private readonly Sora.Core.Observability.Health.IHealthAggregator _health;
+    private readonly IHostEnvironment _env;
     private readonly List<Runner> _runners = new();
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public SchedulingOrchestrator(
+        ILogger<SchedulingOrchestrator> logger,
+        IConfiguration configuration,
+        IOptionsMonitor<SchedulingOptions> options,
+        IEnumerable<IScheduledTask> tasks,
+        Sora.Core.Observability.Health.IHealthAggregator health,
+        IHostEnvironment env)
+        : base(logger, configuration)
+    {
+        _options = options;
+        _tasks = tasks;
+        _health = health;
+        _env = env;
+    }
+
+    public override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
     {
         await Task.Yield();
-        var opts = options.CurrentValue;
+        var opts = _options.CurrentValue;
         if (!opts.Enabled)
         {
-            logger.LogInformation("Scheduling disabled (env: {Env})", env.EnvironmentName);
+            Logger.LogInformation("Scheduling disabled (env: {Env})", _env.EnvironmentName);
             return;
         }
 
+        Logger.LogInformation("Starting scheduling orchestrator - building task runners");
+
         // Build runners
-        foreach (var t in tasks)
+        foreach (var t in _tasks)
         {
             var job = BuildJob(t, opts);
             if (job is null) continue;
             _runners.Add(job);
         }
+        
+        Logger.LogInformation("Scheduling orchestrator started with {RunnerCount} task runners", _runners.Count);
 
         // Start
         var startup = _runners.Where(r => r.OnStartup).ToList();
@@ -48,6 +71,36 @@ internal sealed class SchedulingOrchestrator(
                 _ = r.RunOnceAsync(stoppingToken);
 
             await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+        }
+        
+        Logger.LogInformation("Scheduling orchestrator stopped");
+    }
+    
+    [ServiceAction("trigger-task")]
+    public async Task TriggerTaskAction(string taskId, CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("Manual task trigger requested for: {TaskId}", taskId);
+        
+        var runner = _runners.FirstOrDefault(r => r.Id == taskId);
+        if (runner != null)
+        {
+            _ = runner.RunOnceAsync(cancellationToken);
+            Logger.LogInformation("Task {TaskId} triggered successfully", taskId);
+        }
+        else
+        {
+            Logger.LogWarning("Task {TaskId} not found in runners", taskId);
+        }
+    }
+    
+    [ServiceAction("list-tasks")]
+    public async Task ListTasksAction(CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("Listing all scheduled tasks:");
+        foreach (var runner in _runners)
+        {
+            Logger.LogInformation("Task: {TaskId}, OnStartup: {OnStartup}, NextRun: {NextRun}", 
+                runner.Id, runner.OnStartup, runner.NextRunUtc);
         }
     }
 
@@ -76,7 +129,7 @@ internal sealed class SchedulingOrchestrator(
 
         int maxConc = jobOpts?.MaxConcurrency ?? attr?.MaxConcurrency ?? (task is IHasMaxConcurrency mc ? mc.MaxConcurrency : 1);
 
-        return new Runner(task, health, id, onStartup, fixedDelay, critical, timeout, maxConc);
+        return new Runner(task, _health, id, onStartup, fixedDelay, critical, timeout, maxConc, this);
     }
 
     private sealed class Runner(
@@ -87,11 +140,13 @@ internal sealed class SchedulingOrchestrator(
         TimeSpan? fixedDelay,
         bool critical,
         TimeSpan? timeout,
-        int maxConcurrency
+        int maxConcurrency,
+        SchedulingOrchestrator orchestrator
     )
     {
         // Limit concurrent task executions according to maxConcurrency (default 1)
         private readonly SemaphoreSlim _gate = new(maxConcurrency <= 0 ? 1 : maxConcurrency, maxConcurrency <= 0 ? 1 : maxConcurrency);
+        public string Id { get; } = id;
         public bool OnStartup { get; } = onStartup;
         public DateTimeOffset? NextRunUtc { get; private set; } = fixedDelay is null ? null : DateTimeOffset.UtcNow + fixedDelay;
         private int _running;
@@ -116,18 +171,40 @@ internal sealed class SchedulingOrchestrator(
                     Interlocked.Increment(ref _success);
                     _lastError = null;
                     health.Push($"scheduling:task:{id}", Sora.Core.Observability.Health.HealthStatus.Healthy, message: "ok", ttl: TimeSpan.FromMinutes(5), facts: Facts("ok"));
+                    
+                    _ = orchestrator.EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Scheduling.TaskExecuted, new TaskExecutedEventArgs
+                    {
+                        TaskId = id,
+                        ExecutedAt = DateTimeOffset.UtcNow,
+                        Duration = TimeSpan.Zero // Could track actual duration
+                    });
                 }
                 catch (OperationCanceledException) when (runCt.IsCancellationRequested)
                 {
                     Interlocked.Increment(ref _fail);
                     _lastError = "timeout";
                     health.Push($"scheduling:task:{id}", Sora.Core.Observability.Health.HealthStatus.Unhealthy, message: "timeout", ttl: TimeSpan.FromMinutes(5), facts: Facts("timeout"));
+                    
+                    _ = orchestrator.EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Scheduling.TaskTimeout, new TaskTimeoutEventArgs
+                    {
+                        TaskId = id,
+                        TimeoutAt = DateTimeOffset.UtcNow,
+                        TimeoutDuration = timeout ?? TimeSpan.Zero
+                    });
                 }
                 catch (Exception ex)
                 {
                     Interlocked.Increment(ref _fail);
                     _lastError = ex.GetType().Name;
                     health.Push($"scheduling:task:{id}", Sora.Core.Observability.Health.HealthStatus.Unhealthy, message: ex.Message, ttl: TimeSpan.FromMinutes(5), facts: Facts("error"));
+                    
+                    _ = orchestrator.EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Scheduling.TaskFailed, new TaskFailedEventArgs
+                    {
+                        TaskId = id,
+                        Error = ex.Message,
+                        FailedAt = DateTimeOffset.UtcNow,
+                        Exception = ex
+                    });
                 }
                 finally
                 {

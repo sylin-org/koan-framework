@@ -9,6 +9,7 @@ using Sora.Web.Swagger;
 using Sora.Flow.Attributes;
 using Sora.Flow.Core.Orchestration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -92,8 +93,8 @@ app.Run();
 [FlowOrchestrator]
 public class S8FlowOrchestrator : FlowOrchestratorBase
 {
-    public S8FlowOrchestrator(ILogger<S8FlowOrchestrator> logger, IServiceProvider serviceProvider)
-        : base(logger, serviceProvider)
+    public S8FlowOrchestrator(ILogger<S8FlowOrchestrator> logger, IConfiguration configuration, IServiceProvider serviceProvider)
+        : base(logger, configuration, serviceProvider)
     {
     }
 

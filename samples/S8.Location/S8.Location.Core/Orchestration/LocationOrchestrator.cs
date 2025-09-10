@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Services;
@@ -20,8 +21,8 @@ namespace S8.Location.Core.Orchestration;
 [FlowOrchestrator]
 public class LocationOrchestrator : FlowOrchestratorBase
 {    
-    public LocationOrchestrator(IServiceProvider serviceProvider) 
-        : base(serviceProvider.GetRequiredService<ILogger<LocationOrchestrator>>(), serviceProvider)
+    public LocationOrchestrator(IServiceProvider serviceProvider, IConfiguration configuration) 
+        : base(serviceProvider.GetRequiredService<ILogger<LocationOrchestrator>>(), configuration, serviceProvider)
     {
     }
     

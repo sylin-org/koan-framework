@@ -87,8 +87,8 @@ public class BackgroundResolutionService : BackgroundService
                 {
                     if (parkedRecord.Data == null) continue;
                     
-                    // Extract address from the parked data
-                    var address = parkedRecord.Data.TryGetValue("address", out var addr) ? addr?.ToString() : null;
+                    // Extract address from the parked Location data
+                    var address = parkedRecord.Data.Address;
                     if (string.IsNullOrEmpty(address)) continue;
                     
                     _logger.LogDebug("[BackgroundResolutionService] Resolving address: {Address}", address);
@@ -98,14 +98,19 @@ public class BackgroundResolutionService : BackgroundService
                     
                     _logger.LogInformation("[BackgroundResolutionService] Resolved address to AgnosticLocationId: {AgnosticId}", agnosticLocationId);
                     
-                    // Heal the parked record using the semantic Flow extension method
-                    await parkedRecord.HealAsync(_flowActions, new
+                    // Create a dictionary payload with resolved AgnosticLocationId
+                    var healedLocationData = new Dictionary<string, object?>
                     {
-                        AgnosticLocationId = agnosticLocationId,
-                        Resolved = true
-                    }, 
-                    healingReason: $"Address resolved to canonical location {agnosticLocationId}", 
-                    ct: ct);
+                        ["Id"] = parkedRecord.Data.Id,
+                        ["Address"] = parkedRecord.Data.Address,
+                        ["AddressHash"] = parkedRecord.Data.AddressHash,
+                        ["AgnosticLocationId"] = agnosticLocationId
+                    };
+                    
+                    // Heal the parked record using the semantic Flow extension method
+                    await parkedRecord.HealAsync(_flowActions, healedLocationData, 
+                        healingReason: $"Address resolved to canonical location {agnosticLocationId}", 
+                        ct: ct);
                     
                     _logger.LogDebug("[BackgroundResolutionService] Successfully resolved and reinjected location {Id}", parkedRecord.Id);
                 }

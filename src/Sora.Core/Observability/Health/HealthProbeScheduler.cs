@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Sora.Core.BackgroundServices;
 using Sora.Core.Observability.Probes;
 using System.Collections.Concurrent;
 
@@ -8,31 +10,43 @@ namespace Sora.Core.Observability.Health;
 /// Hosted scheduler that invites contributors to publish status near TTL expiry.
 /// - Operates in quantized windows (QuantizationWindow)
 /// - Applies uniform jitter and coalesces probes within a bucket
-internal sealed class HealthProbeScheduler : BackgroundService
+[SoraBackgroundService(RunInProduction = true)]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Health.ProbeScheduled, EventArgsType = typeof(ProbeScheduledEventArgs))]
+[ServiceEvent(Sora.Core.Events.SoraServiceEvents.Health.ProbeBroadcast, EventArgsType = typeof(ProbeBroadcastEventArgs))]
+internal sealed class HealthProbeScheduler : SoraBackgroundServiceBase
 {
     private readonly IHealthAggregator _agg;
     private readonly HealthAggregatorOptions _opt;
-    private readonly ILogger<HealthProbeScheduler> _log;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastInvited = new(StringComparer.OrdinalIgnoreCase);
     private readonly Random _rng = new();
     private static readonly DateTimeOffset Epoch = DateTimeOffset.UnixEpoch;
 
-    public HealthProbeScheduler(IHealthAggregator agg, HealthAggregatorOptions opt, ILogger<HealthProbeScheduler> log, IHostApplicationLifetime lifetime)
-    { _agg = agg; _opt = opt; _log = log; _lifetime = lifetime; }
+    public HealthProbeScheduler(
+        ILogger<HealthProbeScheduler> logger,
+        IConfiguration configuration,
+        IHealthAggregator agg,
+        HealthAggregatorOptions opt,
+        IHostApplicationLifetime lifetime)
+        : base(logger, configuration)
+    {
+        _agg = agg;
+        _opt = opt;
+        _lifetime = lifetime;
+    }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public override async Task ExecuteCoreAsync(CancellationToken stoppingToken)
     {
         if (!_opt.Enabled)
         {
-            _log.LogInformation("Health aggregator disabled; scheduler not running.");
+            Logger.LogInformation("Health aggregator disabled; scheduler not running.");
             return;
         }
 
         // Defer scheduler start until the application has signaled ApplicationStarted
         if (!_lifetime.ApplicationStarted.IsCancellationRequested)
         {
-            _log.LogDebug("Health aggregator scheduler waiting for application start...");
+            Logger.LogDebug("Health aggregator scheduler waiting for application start...");
             try
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, _lifetime.ApplicationStarted);
@@ -45,7 +59,7 @@ internal sealed class HealthProbeScheduler : BackgroundService
         var win = _opt.Scheduler.QuantizationWindow;
         if (win <= TimeSpan.Zero) win = TimeSpan.FromSeconds(2);
 
-        _log.LogInformation("Health aggregator scheduler started. Window={Window} Jitter={Jitter}%", win, _opt.Scheduler.JitterPercent * 100);
+        Logger.LogInformation("Health aggregator scheduler started. Window={Window} Jitter={Jitter}%", win, _opt.Scheduler.JitterPercent * 100);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -83,13 +97,17 @@ internal sealed class HealthProbeScheduler : BackgroundService
                 if (due.Count >= _opt.Scheduler.BroadcastThreshold)
                 {
                     _agg.RequestProbe(ProbeReason.TtlExpiry, component: null, stoppingToken);
-                    _log.LogDebug("Probe broadcast for {Count} components.", due.Count);
+                    Logger.LogDebug("Probe broadcast for {Count} components.", due.Count);
+
+                    Logger.LogInformation("ProbeBroadcast: {Count} components at {Time}", due.Count, DateTimeOffset.UtcNow);
                 }
                 else
                 {
                     foreach (var c in due)
                     {
                         _agg.RequestProbe(ProbeReason.TtlExpiry, component: c, stoppingToken);
+
+                        Logger.LogInformation("ProbeScheduled: {Component} reason={Reason} at {Time}", c, "TTL Expiry", DateTimeOffset.UtcNow);
                     }
                 }
 
@@ -105,11 +123,28 @@ internal sealed class HealthProbeScheduler : BackgroundService
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "Health aggregator scheduler loop error");
+                Logger.LogWarning(ex, "Health aggregator scheduler loop error");
             }
         }
 
-        _log.LogInformation("Health aggregator scheduler stopped.");
+        Logger.LogInformation("Health aggregator scheduler stopped");
+    }
+
+    [ServiceAction("force-probe")]
+    public async Task ForceProbeAction(string? component, CancellationToken cancellationToken)
+    {
+        Logger.LogInformation("Manual health probe requested for component: {Component}", component ?? "ALL");
+
+        _agg.RequestProbe(ProbeReason.Manual, component: component, cancellationToken);
+
+        if (string.IsNullOrEmpty(component))
+        {
+            Logger.LogInformation("ProbeBroadcast: manual at {Time}", DateTimeOffset.UtcNow);
+        }
+        else
+        {
+            Logger.LogInformation("ProbeScheduled: {Component} reason={Reason} at {Time}", component, "Manual", DateTimeOffset.UtcNow);
+        }
     }
 
     private static TimeSpan ComputeRefreshLead(TimeSpan ttl, HealthAggregatorOptions opt)

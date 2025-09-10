@@ -7,6 +7,7 @@ using S8.Location.Core.Models;
 using S8.Location.Core.Options;
 using Sora.AI.Contracts;
 using Sora.Data.Core;
+using Sora.Core.Utilities.Ids;
 
 namespace S8.Location.Core.Services;
 
@@ -87,19 +88,13 @@ public class AddressResolutionService : IAddressResolutionService
                 geocodingResult.Coordinates!, 
                 ct);
             
-            // Generate canonical ID (leaf node of hierarchy)
-            var canonicalId = hierarchy.LastOrDefault()?.Id ?? Guid.NewGuid().ToString();
+            // Generate canonical ID (leaf node of hierarchy) using ULID
+            var canonicalId = hierarchy.LastOrDefault()?.Id ?? UlidId.New();
             
             // Step 5: Cache for future
             if (_options.Resolution.CacheEnabled)
             {
-                var cacheEntry = new ResolutionCache
-                {
-                    Id = sha512,
-                    CanonicalUlid = canonicalId,
-                    NormalizedAddress = normalized,
-                    ResolvedAt = DateTime.UtcNow
-                };
+                var cacheEntry = ResolutionCache.Create(sha512, normalized, canonicalId);
                 await Data<ResolutionCache, string>.UpsertAsync(cacheEntry, ct);
             }
             
@@ -170,23 +165,22 @@ public class AddressResolutionService : IAddressResolutionService
             }
             else
             {
-                // Create new location in hierarchy
-                currentLocation = new AgnosticLocation
+                // Create new location in hierarchy using the Create factory method
+                currentLocation = AgnosticLocation.Create(
+                    component.Type,
+                    component.Name,
+                    parentLocation?.Id,
+                    component.Type == LocationType.Building || component.Type == LocationType.Street 
+                        ? coordinates : null);
+                
+                // Set additional properties
+                currentLocation.Code = component.Code;
+                currentLocation.Metadata = new Dictionary<string, object>
                 {
-                    Id = GenerateULID(),
-                    ParentId = parentLocation?.Id,
-                    Type = component.Type,
-                    Name = component.Name,
-                    Code = component.Code,
-                    Coordinates = component.Type == LocationType.Building || component.Type == LocationType.Street 
-                        ? coordinates : null,
-                    Metadata = new Dictionary<string, object>
-                    {
-                        ["source"] = "address_resolution",
-                        ["original_address"] = formattedAddress,
-                        ["confidence"] = component.Confidence,
-                        ["country_context"] = component.CountryContext
-                    }
+                    ["source"] = "address_resolution",
+                    ["original_address"] = formattedAddress,
+                    ["confidence"] = component.Confidence,
+                    ["country_context"] = component.CountryContext
                 };
                 
                 await currentLocation.Save();
@@ -296,14 +290,11 @@ Return only valid JSON array, no explanation.";
         string? parentId, 
         CancellationToken ct)
     {
-        // Query for existing location with same type, name, and parent
-        var query = $"Type = '{component.Type}' AND Name = '{component.Name}'";
-        if (parentId != null)
-            query += $" AND ParentId = '{parentId}'";
-        else
-            query += " AND ParentId IS NULL";
-            
-        var existing = await AgnosticLocation.Query(query);
+        // Query for existing location with same type, name, and parent using LINQ expression
+        var existing = await Data<AgnosticLocation, string>.Query(loc => 
+            loc.Type == component.Type && 
+            loc.Name == component.Name && 
+            loc.ParentId == parentId, ct);
         return existing.FirstOrDefault();
     }
     
@@ -358,8 +349,8 @@ Return only valid JSON array, no explanation.";
     
     private string GenerateULID()
     {
-        // Generate ULID for deterministic, sortable IDs - use Guid as fallback if ULID not available
-        return Guid.NewGuid().ToString();
+        // Generate ULID for deterministic, sortable IDs with distributed system benefits
+        return UlidId.New();
     }
 }
 
