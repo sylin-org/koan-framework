@@ -52,7 +52,7 @@ internal class MessagingLifecycleService : SoraFluentServiceBase
             {
                 foreach (var kvp in allHandlers)
                 {
-                    Console.WriteLine($"[Messaging][Phase1] Handler registered: {kvp.Key.FullName ?? kvp.Key.Name}");
+                    Logger.LogInformation("Handler registered: {HandlerType}", kvp.Key.FullName ?? kvp.Key.Name);
                 }
             }
             catch { /* ignore diagnostics failures */ }

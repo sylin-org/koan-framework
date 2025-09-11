@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Sora.Core;
 
@@ -7,20 +8,37 @@ namespace Sora.Core;
 public static class SoraEnv
 {
     /// <summary>
-    /// Dumps the current environment snapshot to the console for diagnostics.
+    /// Dumps the current environment snapshot using proper logging.
     /// </summary>
-    public static void DumpSnapshot()
+    public static void DumpSnapshot(ILogger? logger = null)
     {
         var snap = Current;
-        Console.WriteLine("[SoraEnv][INFO] Environment snapshot:");
-        Console.WriteLine($"  EnvironmentName: {snap.EnvironmentName}");
-        Console.WriteLine($"  IsDevelopment: {snap.IsDevelopment}");
-        Console.WriteLine($"  IsProduction: {snap.IsProduction}");
-        Console.WriteLine($"  IsStaging: {snap.IsStaging}");
-        Console.WriteLine($"  InContainer: {snap.InContainer}");
-        Console.WriteLine($"  IsCi: {snap.IsCi}");
-        Console.WriteLine($"  AllowMagicInProduction: {snap.AllowMagicInProduction}");
-        Console.WriteLine($"  ProcessStart: {snap.ProcessStart:O}");
+        
+        if (logger != null)
+        {
+            logger.LogInformation("Environment snapshot:");
+            logger.LogInformation("EnvironmentName: {EnvironmentName}", snap.EnvironmentName);
+            logger.LogInformation("IsDevelopment: {IsDevelopment}", snap.IsDevelopment);
+            logger.LogInformation("IsProduction: {IsProduction}", snap.IsProduction);
+            logger.LogInformation("IsStaging: {IsStaging}", snap.IsStaging);
+            logger.LogInformation("InContainer: {InContainer}", snap.InContainer);
+            logger.LogInformation("IsCi: {IsCi}", snap.IsCi);
+            logger.LogInformation("AllowMagicInProduction: {AllowMagicInProduction}", snap.AllowMagicInProduction);
+            logger.LogInformation("ProcessStart: {ProcessStart:O}", snap.ProcessStart);
+        }
+        else
+        {
+            // Fallback to console output if no logger available
+            Console.WriteLine("[SoraEnv][INFO] Environment snapshot:");
+            Console.WriteLine($"  EnvironmentName: {snap.EnvironmentName}");
+            Console.WriteLine($"  IsDevelopment: {snap.IsDevelopment}");
+            Console.WriteLine($"  IsProduction: {snap.IsProduction}");
+            Console.WriteLine($"  IsStaging: {snap.IsStaging}");
+            Console.WriteLine($"  InContainer: {snap.InContainer}");
+            Console.WriteLine($"  IsCi: {snap.IsCi}");
+            Console.WriteLine($"  AllowMagicInProduction: {snap.AllowMagicInProduction}");
+            Console.WriteLine($"  ProcessStart: {snap.ProcessStart:O}");
+        }
     }
 
     private static readonly object _gate = new();

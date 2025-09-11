@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Sora.Core.Hosting.App;
 using Sora.Messaging.Contracts;
 
@@ -168,6 +169,17 @@ namespace Sora.Messaging
     public class HandlerRegistry
     {
         private readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Delegate> _handlers = new();
+        private readonly ILogger? _logger;
+        
+        public HandlerRegistry() 
+        {
+            _logger = null;
+        }
+        
+        public HandlerRegistry(ILogger logger)
+        {
+            _logger = logger;
+        }
         
         /// <summary>
         /// Adds a handler for the specified message type.
@@ -177,7 +189,15 @@ namespace Sora.Messaging
             var added = _handlers.TryAdd(messageType, handler);
             try
             {
-                Console.WriteLine($"[Messaging][Registry] {(added ? "Added" : "Skipped (exists)")}: {messageType.FullName ?? messageType.Name}");
+                var typeName = messageType.FullName ?? messageType.Name;
+                if (_logger != null)
+                {
+                    _logger.LogInformation("{Status}: {TypeName}", added ? "Added" : "Skipped (exists)", typeName);
+                }
+                else
+                {
+                    Console.WriteLine($"[Messaging][Registry] {(added ? "Added" : "Skipped (exists)")}: {typeName}");
+                }
             }
             catch { /* non-fatal */ }
         }

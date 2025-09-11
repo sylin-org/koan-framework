@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sora.Core.Observability.Health;
+using Sora.Core.Logging;
 using System.Reflection;
 
 namespace Sora.Core.BackgroundServices;
@@ -59,11 +60,11 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
     {
         if (!_options.Enabled)
         {
-            _logger.LogInformation("Sora Background Services disabled via configuration");
+            _logger.LogSoraServices("disabled via configuration");
             return;
         }
 
-        _logger.LogInformation("Sora Background Services Orchestrator starting...");
+        _logger.LogSoraServices("starting...");
 
         try
         {
@@ -72,11 +73,11 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
 
             // Discover all background services
             var backgroundServices = _serviceProvider.GetServices<ISoraBackgroundService>().ToList();
-            _logger.LogInformation("Discovered {ServiceCount} background services", backgroundServices.Count);
+            _logger.LogSoraServices($"discovered {backgroundServices.Count} background services");
 
             if (!backgroundServices.Any())
             {
-                _logger.LogInformation("No background services found");
+                _logger.LogSoraServices("no background services found");
                 await Task.Delay(Timeout.Infinite, stoppingToken);
                 return;
             }
@@ -98,9 +99,9 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
             }
 
             if (startedServices.Any())
-                _logger.LogInformation("Started background services: {ServiceNames}", string.Join(", ", startedServices));
+                _logger.LogSoraServices($"started: {string.Join(", ", startedServices)}");
             else
-                _logger.LogInformation("No background services were started");
+                _logger.LogSoraServices("none started");
 
             // Wait for cancellation
             await Task.Delay(Timeout.Infinite, stoppingToken);
@@ -153,7 +154,7 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
                 {
                     _logger.LogError("Startup service {ServiceName} timed out after {Timeout} seconds",
                         service.Name, _options.StartupTimeoutSeconds);
-                    
+
                     if (_options.FailFastOnStartupFailure)
                         throw new TimeoutException($"Startup service {service.Name} timed out");
                 }

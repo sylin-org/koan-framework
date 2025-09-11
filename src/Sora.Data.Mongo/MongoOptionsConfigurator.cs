@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -11,18 +12,15 @@ namespace Sora.Data.Mongo;
 /// </summary>
 // legacy initializer removed in favor of standardized auto-registrar
 
-internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigureOptions<MongoOptions>
+internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<MongoOptionsConfigurator> logger) : IConfigureOptions<MongoOptions>
 {
     public void Configure(MongoOptions options)
     {
-        void DebugLog(string msg)
-        {
-            try { Console.WriteLine($"[MongoDB][AUTO-DETECT] {msg}"); } catch { }
-        }
-        
-        DebugLog($"=== MongoDB Auto-Configuration Started ===");
-        DebugLog($"Environment: {SoraEnv.EnvironmentName}, InContainer: {SoraEnv.InContainer}, IsProduction: {SoraEnv.IsProduction}");
-        DebugLog($"Initial options - ConnectionString: '{options.ConnectionString}', Database: '{options.Database}'");
+        logger.LogInformation("MongoDB Auto-Configuration Started");
+        logger.LogInformation("Environment: {Environment}, InContainer: {InContainer}, IsProduction: {IsProduction}", 
+            SoraEnv.EnvironmentName, SoraEnv.InContainer, SoraEnv.IsProduction);
+        logger.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Database: '{Database}'", 
+            options.ConnectionString, options.Database);
         
         // Phase 1: Handle explicit configuration (highest priority)
         var explicitConnectionString = Configuration.ReadFirst(
@@ -35,22 +33,22 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
             
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            DebugLog($"Using explicit connection string from configuration: '{explicitConnectionString}'");
+            logger.LogInformation("Using explicit connection string from configuration: '{ConnectionString}'", explicitConnectionString);
             options.ConnectionString = explicitConnectionString;
         }
         else if (string.Equals(options.ConnectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
         {
-            DebugLog("Auto-detection mode activated - resolving MongoDB connection...");
-            options.ConnectionString = ResolveAutoConnection(DebugLog);
+            logger.LogInformation("Auto-detection mode activated - resolving MongoDB connection...");
+            options.ConnectionString = ResolveAutoConnection(logger);
         }
         else if (string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            DebugLog("No connection string provided - falling back to auto-detection");
-            options.ConnectionString = ResolveAutoConnection(DebugLog);
+            logger.LogInformation("No connection string provided - falling back to auto-detection");
+            options.ConnectionString = ResolveAutoConnection(logger);
         }
         else
         {
-            DebugLog($"Using pre-configured connection string: '{options.ConnectionString}'");
+            logger.LogInformation("Using pre-configured connection string: '{ConnectionString}'", options.ConnectionString);
         }
         // Configure other options
         options.Database = Configuration.ReadFirst(
@@ -73,37 +71,37 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
 
         // Final connection string normalization and logging
         options.ConnectionString = NormalizeConnectionString(options.ConnectionString);
-        DebugLog($"=== Final MongoDB Configuration ===");
-        DebugLog($"Connection: {options.ConnectionString}");
-        DebugLog($"Database: {options.Database}");
-        DebugLog($"=== MongoDB Auto-Configuration Complete ===");
+        logger.LogInformation("Final MongoDB Configuration");
+        logger.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
+        logger.LogInformation("Database: {Database}", options.Database);
+        logger.LogInformation("MongoDB Auto-Configuration Complete");
     }
 
-    private string ResolveAutoConnection(Action<string> debugLog)
+    private string ResolveAutoConnection(ILogger logger)
     {
         // Check if auto-detection is explicitly disabled first
         if (IsAutoDetectionDisabled())
         {
-            debugLog("Auto-detection disabled via configuration - using localhost");
+            logger.LogInformation("Auto-detection disabled via configuration - using localhost");
             return MongoConstants.DefaultLocalUri;
         }
 
         // Phase 1: Environment variable list (highest priority for auto-detection)
-        var envConnection = TryEnvironmentVariableList(debugLog);
+        var envConnection = TryEnvironmentVariableList(logger);
         if (!string.IsNullOrWhiteSpace(envConnection)) 
         {
             return envConnection;
         }
 
         // Phase 2: ConnectionStrings:Default fallback
-        var defaultConnection = TryDefaultConnectionString(debugLog);
+        var defaultConnection = TryDefaultConnectionString(logger);
         if (!string.IsNullOrWhiteSpace(defaultConnection)) 
         {
             return defaultConnection;
         }
 
         // Phase 3: Smart environment-based auto-detection
-        return ResolveByEnvironment(debugLog);
+        return ResolveByEnvironment(logger);
     }
 
     private bool IsAutoDetectionDisabled()
@@ -112,69 +110,69 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
                || Configuration.Read(config, "SORA_DATA_MONGO_DISABLE_AUTO_DETECTION", false);
     }
 
-    private string? TryEnvironmentVariableList(Action<string> debugLog)
+    private string? TryEnvironmentVariableList(ILogger logger)
     {
         try
         {
             var list = Environment.GetEnvironmentVariable(MongoConstants.EnvList);
             if (string.IsNullOrWhiteSpace(list))
             {
-                debugLog($"Environment variable {MongoConstants.EnvList} not set");
+                logger.LogInformation("Environment variable {EnvList} not set", MongoConstants.EnvList);
                 return null;
             }
 
-            debugLog($"Testing MongoDB URLs from {MongoConstants.EnvList}: {list}");
+            logger.LogInformation("Testing MongoDB URLs from {EnvList}: {List}", MongoConstants.EnvList, list);
             foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var candidate = part.Trim();
                 if (string.IsNullOrWhiteSpace(candidate)) continue;
                 
                 var normalized = NormalizeConnectionString(candidate);
-                debugLog($"  Testing: {normalized}");
+                logger.LogInformation("  Testing: {ConnectionString}", normalized);
                 
                 if (TryMongoPing(normalized, TimeSpan.FromMilliseconds(500)))
                 {
-                    debugLog($"  SUCCESS: {normalized} is reachable");
+                    logger.LogInformation("  SUCCESS: {ConnectionString} is reachable", normalized);
                     return normalized;
                 }
-                debugLog($"  Failed: {normalized} not reachable");
+                logger.LogInformation("  Failed: {ConnectionString} not reachable", normalized);
             }
-            debugLog("No URLs from environment variable were reachable");
+            logger.LogInformation("No URLs from environment variable were reachable");
         }
         catch (Exception ex)
         {
-            debugLog($"Error processing {MongoConstants.EnvList}: {ex.Message}");
+            logger.LogWarning(ex, "Error processing {EnvList}: {Message}", MongoConstants.EnvList, ex.Message);
         }
         return null;
     }
 
-    private string? TryDefaultConnectionString(Action<string> debugLog)
+    private string? TryDefaultConnectionString(ILogger logger)
     {
         var cs = Configuration.Read(config, Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, null);
         if (!string.IsNullOrWhiteSpace(cs))
         {
-            debugLog($"Found ConnectionStrings:Default = '{cs}'");
+            logger.LogInformation("Found ConnectionStrings:Default = '{ConnectionString}'", cs);
             return cs;
         }
-        debugLog("No ConnectionStrings:Default found");
+        logger.LogInformation("No ConnectionStrings:Default found");
         return null;
     }
 
-    private string ResolveByEnvironment(Action<string> debugLog)
+    private string ResolveByEnvironment(ILogger logger)
     {
         var isProd = SoraEnv.IsProduction;
         var inContainer = SoraEnv.InContainer;
 
-        debugLog($"Environment-based resolution: Production={isProd}, Container={inContainer}");
+        logger.LogInformation("Environment-based resolution: Production={Production}, Container={Container}", isProd, inContainer);
         
         if (isProd)
         {
-            debugLog($"🔒 Production environment: using secure default {MongoConstants.DefaultLocalUri}");
+            logger.LogInformation("Production environment: using secure default {DefaultUri}", MongoConstants.DefaultLocalUri);
             return MongoConstants.DefaultLocalUri;
         }
 
         // Development environment: try smart detection with connectivity testing
-        debugLog("Development environment: testing connectivity...");
+        logger.LogInformation("Development environment: testing connectivity...");
         
         var candidates = new[]
         {
@@ -184,19 +182,19 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config) : IConfigu
 
         foreach (var (uri, description) in candidates)
         {
-            debugLog($"  Testing {description}: {uri}");
+            logger.LogInformation("  Testing {Description}: {Uri}", description, uri);
             if (TryMongoPing(uri, TimeSpan.FromMilliseconds(500)))
             {
-                debugLog($"  SUCCESS: {description} is reachable");
+                logger.LogInformation("  SUCCESS: {Description} is reachable", description);
                 return uri;
             }
-            debugLog($"  Failed: {description} not reachable");
+            logger.LogInformation("  Failed: {Description} not reachable", description);
         }
 
         // Nothing reachable - choose intelligent fallback
         var fallback = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
         var reason = inContainer ? "container environment detected" : "bare metal environment detected";
-        debugLog($"No MongoDB reachable - intelligent fallback: {fallback} ({reason})");
+        logger.LogInformation("No MongoDB reachable - intelligent fallback: {Fallback} ({Reason})", fallback, reason);
         return fallback;
     }
 

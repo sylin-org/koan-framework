@@ -10,8 +10,19 @@ using Sora.Flow.Attributes;
 using Sora.Flow.Core.Orchestration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using Sora.Core.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure centralized Sora logging - replace ALL logging
+builder.Logging.ClearProviders()
+    .AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Error) // Hide port override noise  
+    .AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Error) // Hide startup noise
+    .AddFilter("Microsoft", LogLevel.Warning) // Reduce other Microsoft noise
+    .AddFilter("System", LogLevel.Warning)    // Reduce System noise
+    .AddFilter("Sora", LogLevel.Debug)        // Allow all Sora debug logs
+    .SetMinimumLevel(LogLevel.Information)    // Default to Info level
+    .AddSoraFormatter();
 
 // Sora framework with auto-configuration
 builder.Services.AddSora();
@@ -63,13 +74,13 @@ app.Lifetime.ApplicationStarted.Register(async () =>
         await setting.Save();
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
-        logger?.LogInformation("[API] Data provider test: AppSetting saved successfully");
+        logger?.LogSoraInit("Data provider test: AppSetting saved successfully");
     }
     catch (Exception ex)
     {
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
-        logger?.LogError(ex, "[API] Data provider test failed");
+        logger?.LogInformation("[sora:init] Data provider test failed: {Error}", ex.Message);
     }
 });
 

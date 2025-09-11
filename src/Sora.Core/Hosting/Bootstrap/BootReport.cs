@@ -80,98 +80,82 @@ public sealed class BootReport
 
     public string ToString(BootReportOptions options)
     {
+        return FormatWithSoraStyle(options);
+    }
+
+    private string FormatWithSoraStyle(BootReportOptions options)
+    {
         var sb = new StringBuilder();
+        var timestamp = DateTime.Now.ToString("HH:mm:ss");
         
+        // Framework header with version info
+        var coreModule = _modules.FirstOrDefault(m => m.Name.Contains("Core"));
+        var frameworkVersion = coreModule.Name != null ? (coreModule.Version ?? "unknown") : "unknown";
+        
+        var headerText = $"SORA FRAMEWORK v{frameworkVersion}";
+        var lineLength = 80;
+        var padding = new string('─', Math.Max(0, lineLength - headerText.Length - 4));
+        sb.AppendLine($"┌─ {headerText} {padding}");
+        sb.AppendLine($"│ Core: {frameworkVersion}");
+        
+        // Module hierarchy
+        foreach (var module in _modules.Where(m => !m.Name.Contains("Core")).OrderBy(m => m.Name))
+        {
+            sb.AppendLine($"│   ├─ {module.Name}: {module.Version ?? "unknown"}");
+        }
+        
+        if (_modules.Any(m => !m.Name.Contains("Core")))
+        {
+            var lastModule = _modules.Where(m => !m.Name.Contains("Core")).OrderBy(m => m.Name).LastOrDefault();
+            if (lastModule != default)
+            {
+                sb.AppendLine($"│   └─ {lastModule.Name}: {lastModule.Version ?? "unknown"}");
+            }
+        }
+        
+        // Startup phase
         if (options.ShowDecisions && _decisions.Any())
         {
-            // Show decisions first for better narrative flow
+            var startupText = "STARTUP";
+            var startupPadding = new string('─', Math.Max(0, lineLength - startupText.Length - 4));
+            sb.AppendLine($"├─ {startupText} {startupPadding}");
+            
             foreach (var decision in _decisions)
             {
-                FormatDecision(sb, decision, options);
-            }
-            if (_modules.Any()) sb.AppendLine(); // Separator between decisions and modules
-        }
-
-        // Show module summary
-        foreach (var m in _modules)
-        {
-            if (options.CompactMode)
-            {
-                // Compact: [Sora.Data.Mongo] loaded
-                sb.Append("[").Append(m.Name).Append("] loaded");
-                if (!string.IsNullOrWhiteSpace(m.Version)) sb.Append(" (").Append(m.Version).Append(")");
-                sb.AppendLine();
-            }
-            else
-            {
-                // Detailed: [Sora] module Sora.Data.Mongo 2.1.0: setting=value;
-                sb.Append("[Sora] module ").Append(m.Name);
-                if (!string.IsNullOrWhiteSpace(m.Version)) sb.Append(' ').Append(m.Version);
-                if (m.Settings.Count == 0 && m.Notes.Count == 0) { sb.AppendLine(); continue; }
-                sb.Append(':');
-                foreach (var s in m.Settings)
-                {
-                    sb.Append(' ').Append(s.Key).Append('=');
-                    sb.Append(s.Value);
-                    sb.Append(';');
-                }
-                foreach (var n in m.Notes)
-                {
-                    sb.Append(' ').Append(n);
-                }
-                sb.AppendLine();
+                FormatDecisionSoraStyle(sb, decision, timestamp, options);
             }
         }
+        
         return sb.ToString();
     }
 
-    private static void FormatDecision(StringBuilder sb, DecisionLogEntry decision, BootReportOptions options)
+    private static void FormatDecisionSoraStyle(StringBuilder sb, DecisionLogEntry decision, string timestamp, BootReportOptions options)
     {
         switch (decision.Type)
         {
             case DecisionType.ConnectionAttempt:
                 if (!options.ShowConnectionAttempts) return;
-                sb.Append("[Sora.").Append(decision.Category).Append("] connection attempt: ");
-                if (!string.IsNullOrEmpty(decision.ConnectionString))
-                {
-                    sb.Append(Sora.Core.Redaction.DeIdentify(decision.ConnectionString));
-                }
-                sb.Append(" (").Append(decision.Decision);
-                if (decision.Decision == "failed" && !string.IsNullOrEmpty(decision.Reason))
-                {
-                    sb.Append(": ").Append(decision.Reason);
-                }
-                sb.AppendLine(")");
+                var status = decision.Decision == "success" ? "✓" : "✗";
+                FormatLogLine(sb, "I", timestamp, "sora:discover", $"{decision.Category}: {Sora.Core.Redaction.DeIdentify(decision.ConnectionString ?? "")} {status}");
                 break;
 
             case DecisionType.ProviderElection:
-                sb.Append("[Sora.").Append(decision.Category).Append("] provider elected: ");
-                sb.Append(decision.Decision);
-                sb.Append(" (").Append(decision.Reason);
-                if (decision.Alternatives.Any())
-                {
-                    sb.Append(", available: ").Append(string.Join(", ", decision.Alternatives));
-                }
-                sb.AppendLine(")");
+                FormatLogLine(sb, "I", timestamp, "sora:modules", $"{decision.Category.ToLower()}→{decision.Decision}");
                 break;
 
             case DecisionType.Discovery:
                 if (!options.ShowDiscovery) return;
-                sb.Append("[Sora.").Append(decision.Category).Append("] ").Append(decision.Decision);
-                sb.Append(" (").Append(decision.Reason).AppendLine(")");
-                break;
-
-            case DecisionType.Decision:
-                sb.Append("[Sora.").Append(decision.Category).Append("] ").Append(decision.Decision);
-                sb.Append(" (").Append(decision.Reason);
-                if (decision.Alternatives.Any())
-                {
-                    sb.Append(", alternatives: ").Append(string.Join(", ", decision.Alternatives));
-                }
-                sb.AppendLine(")");
+                FormatLogLine(sb, "I", timestamp, "sora:discover", $"{decision.Category}: {decision.Decision}");
                 break;
         }
     }
+
+    private static void FormatLogLine(StringBuilder sb, string level, string timestamp, string context, string message)
+    {
+        var paddedContext = context.PadRight(15); // Consistent column width handled here
+        sb.AppendLine($"│ {level} {timestamp} {paddedContext} {message}");
+    }
+
 }
 
 // Supporting types for decision logging
