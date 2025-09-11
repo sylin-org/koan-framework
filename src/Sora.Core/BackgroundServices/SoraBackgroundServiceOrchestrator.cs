@@ -81,21 +81,26 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
                 return;
             }
 
+            var startedServices = new List<string>();
+
             // Start startup services first (in order)
             var startupServices = backgroundServices.OfType<ISoraStartupService>().ToList();
             if (startupServices.Any())
             {
-                await StartStartupServices(startupServices, stoppingToken);
+                startedServices.AddRange(await StartStartupServices(startupServices, stoppingToken));
             }
 
             // Start regular background services
             var regularServices = backgroundServices.Where(s => s is not ISoraStartupService).ToList();
             if (regularServices.Any())
             {
-                await StartBackgroundServices(regularServices, stoppingToken);
+                startedServices.AddRange(await StartBackgroundServices(regularServices, stoppingToken));
             }
 
-            _logger.LogInformation("All background services started successfully");
+            if (startedServices.Any())
+                _logger.LogInformation("Started background services: {ServiceNames}", string.Join(", ", startedServices));
+            else
+                _logger.LogInformation("No background services were started");
 
             // Wait for cancellation
             await Task.Delay(Timeout.Infinite, stoppingToken);
@@ -107,9 +112,10 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
         }
     }
 
-    private async Task StartStartupServices(IEnumerable<ISoraStartupService> startupServices, CancellationToken cancellationToken)
+    private async Task<List<string>> StartStartupServices(IEnumerable<ISoraStartupService> startupServices, CancellationToken cancellationToken)
     {
         var orderedServices = startupServices.OrderBy(s => s.StartupOrder).ToList();
+        var startedServices = new List<string>();
 
         foreach (var service in orderedServices)
         {
@@ -118,7 +124,7 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
 
             try
             {
-                _logger.LogInformation("Starting startup service: {ServiceName} (Order: {Order})",
+                _logger.LogTrace("Starting startup service: {ServiceName} (Order: {Order})",
                     service.Name, service.StartupOrder);
 
                 await service.IsReadyAsync(cancellationToken);
@@ -140,7 +146,8 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
                 try
                 {
                     await task;
-                    _logger.LogInformation("Startup service completed: {ServiceName}", service.Name);
+                    _logger.LogTrace("Startup service completed: {ServiceName}", service.Name);
+                    startedServices.Add(service.Name);
                 }
                 catch (OperationCanceledException) when (cts.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                 {
@@ -162,10 +169,12 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
                 }
             }
         }
+        return startedServices;
     }
 
-    private async Task StartBackgroundServices(IEnumerable<ISoraBackgroundService> services, CancellationToken cancellationToken)
+    private async Task<List<string>> StartBackgroundServices(IEnumerable<ISoraBackgroundService> services, CancellationToken cancellationToken)
     {
+        var startedServices = new List<string>();
         foreach (var service in services)
         {
             if (!ShouldStartService(service))
@@ -173,7 +182,7 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
 
             try
             {
-                _logger.LogInformation("Starting background service: {ServiceName}", service.Name);
+                _logger.LogTrace("Starting background service: {ServiceName}", service.Name);
 
                 await service.IsReadyAsync(cancellationToken);
 
@@ -188,7 +197,8 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
                     StartedAt = DateTimeOffset.UtcNow
                 });
 
-                _logger.LogInformation("Background service started: {ServiceName}", service.Name);
+                _logger.LogTrace("Background service started: {ServiceName}", service.Name);
+                startedServices.Add(service.Name);
             }
             catch (Exception ex)
             {
@@ -196,6 +206,7 @@ public class SoraBackgroundServiceOrchestrator : BackgroundService, IHealthContr
                 // Continue with other services
             }
         }
+        return startedServices;
     }
 
     private bool ShouldStartService(ISoraBackgroundService service)
