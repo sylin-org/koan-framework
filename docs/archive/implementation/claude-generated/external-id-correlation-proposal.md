@@ -25,7 +25,7 @@ Currently, different systems (BMS, OEM, etc.) may have data for the same physica
   "SourceId": "S1",
   "Data": {
     "deviceId": "D1",
-    "SensorId": "S1",
+    "SerialNumber": "S1",
     "code": "TEMP",
     "unit": "C",
     "id": "S1"
@@ -44,7 +44,7 @@ Currently, different systems (BMS, OEM, etc.) may have data for the same physica
   "_id": "canonical::K4JV48YABMVHQ1CHC7KC2S0330",
   "Model": {
     "deviceId": ["D1"],
-    "SensorId": ["S1"],
+    "SerialNumber": ["S1"],
     "code": ["TEMP"],
     "unit": ["C"],
     "id": ["S1"]
@@ -75,7 +75,7 @@ Enhance the canonical projection pipeline to automatically extract and populate 
   "_id": "canonical::K4JV48YABMVHQ1CHC7KC2S0330",
   "Model": {
     "deviceId": ["K4KDERR71A6AQN9ZRGV5ADPGG0"], // ✅ Canonical Device ULID (resolved from source "D1")
-    "SensorId": ["S1"],
+    "SerialNumber": ["S1"],
     "code": ["TEMP"],
     "unit": ["C"],
     "identifier": {
@@ -97,7 +97,7 @@ Enable fine-grained control per entity type with policy attributes:
 public class Sensor : FlowEntity<Sensor>
 {
     [AggregationKey]
-    public string SensorId{ get; set; } = default!;
+    public string SerialNumber{ get; set; } = default!;
     // Framework automatically creates: identifier.external.{source}:{id}
 }
 
