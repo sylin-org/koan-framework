@@ -85,7 +85,7 @@ public class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object
         }
 
         var json = value.ToString(Formatting.None);
-        _logger?.LogDebug("[JObjectSerializer] Serializing JObject: {Json}", json);
+        // _logger?.LogDebug("[JObjectSerializer] Serializing JObject: {Json}", json);
         
         try
         {
