@@ -1283,4 +1283,172 @@ public static class ServiceCollectionExtensions
             return false;
         }
     }
+
+    /// <summary>
+    /// Registers optimized Flow services with batch processing and parallel execution.
+    /// Use this instead of AddSoraFlow for high-performance scenarios.
+    /// </summary>
+    public static IServiceCollection AddSoraFlowOptimized(this IServiceCollection services)
+    {
+        // Add base Flow services first
+        services.AddSoraFlow();
+
+        // Register optimized services and infrastructure
+        // BatchDataAccessHelper is static, no registration needed
+        services.TryAddSingleton<Sora.Flow.Core.Services.AdaptiveBatchProcessor>();
+        services.TryAddSingleton<Sora.Flow.Core.Monitoring.FlowPerformanceMonitor>();
+
+        // Replace workers with optimized versions if orchestrators are present
+        if (HasFlowOrchestrators())
+        {
+            // Remove original workers and add optimized versions
+            var originalAssociationWorker = services.FirstOrDefault(s => 
+                s.ServiceType == typeof(IHostedService) && 
+                s.ImplementationType?.Name == "ModelAssociationWorkerHostedService");
+            if (originalAssociationWorker != null)
+            {
+                services.Remove(originalAssociationWorker);
+            }
+
+            var originalProjectionWorker = services.FirstOrDefault(s => 
+                s.ServiceType == typeof(IHostedService) && 
+                s.ImplementationType?.Name == "ModelProjectionWorkerHostedService");
+            if (originalProjectionWorker != null)
+            {
+                services.Remove(originalProjectionWorker);
+            }
+
+            // Add optimized workers
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, Sora.Flow.Core.Services.OptimizedModelAssociationWorker>());
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, Sora.Flow.Core.Services.OptimizedModelProjectionWorker>());
+
+            // Start performance monitoring
+            services.AddSingleton<IHostedService>(provider =>
+            {
+                var monitor = provider.GetRequiredService<Sora.Flow.Core.Monitoring.FlowPerformanceMonitor>();
+                monitor.StartPerformanceReporting(TimeSpan.FromMinutes(5));
+                return new PerformanceMonitoringService(monitor);
+            });
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Extension method to add Flow optimization configuration with feature flags.
+    /// </summary>
+    public static IServiceCollection AddSoraFlowWithOptimizations(
+        this IServiceCollection services,
+        Action<FlowOptimizationOptions>? configure = null)
+    {
+        var options = new FlowOptimizationOptions();
+        configure?.Invoke(options);
+
+        services.AddSingleton(options);
+
+        // Register base Flow services
+        services.AddSoraFlow();
+
+        // Register optimization infrastructure
+        if (options.Features.EnableBatchOperations)
+        {
+            // BatchDataAccessHelper is static, no registration needed
+        }
+
+        if (options.Features.EnableAdaptiveBatching)
+        {
+            services.TryAddSingleton<Sora.Flow.Core.Services.AdaptiveBatchProcessor>();
+        }
+
+        if (options.Features.EnablePerformanceMonitoring)
+        {
+            services.TryAddSingleton<Sora.Flow.Core.Monitoring.FlowPerformanceMonitor>();
+        }
+
+        // Register optimized workers based on feature flags
+        if (HasFlowOrchestrators() && options.Features.EnableParallelProcessing)
+        {
+            if (options.Features.UseOptimizedAssociationWorker)
+            {
+                // Remove original and add optimized
+                var originalAssociationWorker = services.FirstOrDefault(s => 
+                    s.ServiceType == typeof(IHostedService) && 
+                    s.ImplementationType?.Name == "ModelAssociationWorkerHostedService");
+                if (originalAssociationWorker != null)
+                {
+                    services.Remove(originalAssociationWorker);
+                    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, Sora.Flow.Core.Services.OptimizedModelAssociationWorker>());
+                }
+            }
+
+            if (options.Features.UseOptimizedProjectionWorker)
+            {
+                // Remove original and add optimized
+                var originalProjectionWorker = services.FirstOrDefault(s => 
+                    s.ServiceType == typeof(IHostedService) && 
+                    s.ImplementationType?.Name == "ModelProjectionWorkerHostedService");
+                if (originalProjectionWorker != null)
+                {
+                    services.Remove(originalProjectionWorker);
+                    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, Sora.Flow.Core.Services.OptimizedModelProjectionWorker>());
+                }
+            }
+        }
+
+        return services;
+    }
+}
+
+/// <summary>
+/// Configuration options for Flow optimizations with feature flags.
+/// </summary>
+public class FlowOptimizationOptions
+{
+    public FeatureFlags Features { get; set; } = new();
+    public PerformanceSettings Performance { get; set; } = new();
+
+    public class FeatureFlags
+    {
+        public bool EnableBatchOperations { get; set; } = true;
+        public bool EnableParallelProcessing { get; set; } = true;
+        public bool EnableAdaptiveBatching { get; set; } = true;
+        public bool EnablePerformanceMonitoring { get; set; } = true;
+
+        // Worker replacement flags
+        public bool UseOptimizedAssociationWorker { get; set; } = true;
+        public bool UseOptimizedProjectionWorker { get; set; } = true;
+    }
+
+    public class PerformanceSettings
+    {
+        public int DefaultBatchSize { get; set; } = 1000;
+        public int MaxBatchSize { get; set; } = 5000;
+        public int MinBatchSize { get; set; } = 50;
+        public int MaxConcurrency { get; set; } = Environment.ProcessorCount * 2;
+        public TimeSpan MonitoringInterval { get; set; } = TimeSpan.FromMinutes(5);
+    }
+}
+
+/// <summary>
+/// Hosted service wrapper for performance monitoring.
+/// </summary>
+internal class PerformanceMonitoringService : IHostedService
+{
+    private readonly Sora.Flow.Core.Monitoring.FlowPerformanceMonitor _monitor;
+
+    public PerformanceMonitoringService(Sora.Flow.Core.Monitoring.FlowPerformanceMonitor monitor)
+    {
+        _monitor = monitor;
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _monitor.StartPerformanceReporting(TimeSpan.FromMinutes(5), cancellationToken);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
 }

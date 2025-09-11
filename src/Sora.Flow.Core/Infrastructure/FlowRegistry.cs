@@ -11,6 +11,22 @@ using Sora.Flow.Model;
 
 namespace Sora.Flow.Infrastructure;
 
+/// <summary>
+/// Structure containing entity identification information for optimization scenarios.
+/// </summary>
+public struct EntityIdStructure
+{
+    public KeyComponent[] KeyComponents { get; set; }
+}
+
+/// <summary>
+/// Represents a key component for entity identification.
+/// </summary>
+public struct KeyComponent
+{
+    public string Path { get; set; }
+}
+
 public static class FlowRegistry
 {
     private static readonly ConcurrentDictionary<Type, string> s_modelNames = new();
@@ -214,6 +230,25 @@ public static class FlowRegistry
         // Use camelCase conversion to match CamelCasePropertyNamesContractResolver
         var camelCaseResolver = new CamelCasePropertyNamesContractResolver();
         return camelCaseResolver.GetResolvedPropertyName(property.Name);
+    }
+
+    /// <summary>
+    /// Gets entity identification structure for a model type, including key components for optimization.
+    /// </summary>
+    public static EntityIdStructure? GetEntityIdStructure(Type modelType)
+    {
+        try
+        {
+            var aggregationTags = GetAggregationTags(modelType);
+            if (aggregationTags.Length == 0) return null;
+
+            var keyComponents = aggregationTags.Select(tag => new KeyComponent { Path = tag }).ToArray();
+            return new EntityIdStructure { KeyComponents = keyComponents };
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static void Scan()

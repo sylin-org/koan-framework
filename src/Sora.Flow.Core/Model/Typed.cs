@@ -60,6 +60,28 @@ public sealed class StageRecord<TModel> : Entity<StageRecord<TModel>>
     public Dictionary<string, object?>? Source { get; set; }
 }
 
+// Keyed stage records (post-association with ownership)
+public sealed class KeyedRecord<TModel> : Entity<KeyedRecord<TModel>>
+{
+    [Index]
+    public string SourceId { get; set; } = default!;
+    [Index]
+    public DateTimeOffset OccurredAt { get; set; }
+    public string? PolicyVersion { get; set; }
+    [Index]
+    public string? CorrelationId { get; set; }
+    // ULID for the associated canonical entity
+    [Index]
+    public string? ReferenceUlid { get; set; }
+    // Model data as strongly-typed object
+    public TModel? Data { get; set; }
+    // Source metadata (system, adapter) separate from business data
+    public Dictionary<string, object?>? Source { get; set; }
+    // Owner reference ULIDs that this record is associated with
+    [Index]
+    public HashSet<string> Owners { get; set; } = new(StringComparer.Ordinal);
+}
+
 // Parked intake records (dead-letter with TTL) for later inspection/sweep
 public sealed class ParkedRecord<TModel> : Entity<ParkedRecord<TModel>>
 {
