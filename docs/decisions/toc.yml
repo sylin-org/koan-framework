@@ -42,6 +42,8 @@
           href: DATA-0070-external-id-correlation.md
         - name: Messaging envelope transformers
           href: DATA-0072-messaging-envelope-transformers.md
+        - name: Use JObject for Dynamic Entity Models
+          href: DATA-0073-jobject-for-dynamic-entities.md
         - name: Vector module split and clean separation
           href: DATA-0060-vector-module-split-and-clean-separation.md
     - name: Adapter role attributes and entity mapping
