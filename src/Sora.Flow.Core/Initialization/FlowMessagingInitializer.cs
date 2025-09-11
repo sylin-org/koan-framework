@@ -39,32 +39,30 @@ public static class FlowMessagingInitializer
     }
     
     /// <summary>
-    /// Flattens an ExpandoObject to a dictionary with JSON path keys.
+    /// Flattens a JObject to a dictionary with JSON path keys.
     /// </summary>
-    private static Dictionary<string, object?> FlattenExpandoToDictionary(ExpandoObject expando, string prefix = "")
+    private static Dictionary<string, object?> FlattenJObjectToDictionary(JObject jObject, string prefix = "")
     {
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        var dict = (IDictionary<string, object?>)expando;
-        
-        foreach (var kvp in dict)
+
+        foreach (var property in jObject.Properties())
         {
-            var currentPath = string.IsNullOrEmpty(prefix) ? kvp.Key : $"{prefix}.{kvp.Key}";
-            
-            if (kvp.Value is ExpandoObject nested)
+            var currentPath = string.IsNullOrEmpty(prefix) ? property.Name : $"{prefix}.{property.Name}";
+
+            if (property.Value is JObject nested)
             {
-                // Recursively flatten nested ExpandoObjects
-                var nestedFlattened = FlattenExpandoToDictionary(nested, currentPath);
+                var nestedFlattened = FlattenJObjectToDictionary(nested, currentPath);
                 foreach (var nestedKvp in nestedFlattened)
                 {
                     result[nestedKvp.Key] = nestedKvp.Value;
                 }
             }
-            else if (kvp.Value != null)
+            else if (property.Value.Type != JTokenType.Null)
             {
-                result[currentPath] = kvp.Value;
+                result[currentPath] = property.Value.ToObject<object>();
             }
         }
-        
+
         return result;
     }
     
@@ -188,7 +186,7 @@ public static class FlowMessagingInitializer
     
     /// <summary>
     /// Converts a DynamicTransportEnvelope payload (dictionary with JSON paths) 
-    /// to a proper DynamicFlowEntity with ExpandoObject Model property.
+    /// to a proper DynamicFlowEntity with JObject Model property.
     /// </summary>
     private static object ConvertDynamicPayloadToEntity(string model, object payload)
     {
@@ -237,7 +235,7 @@ public static class FlowMessagingInitializer
             // Verify Model property is set
             if (dynamicEntity is IDynamicFlowEntity entity)
             {
-                var modelKeys = entity.Model != null ? string.Join(", ", ((IDictionary<string, object?>)entity.Model).Keys) : "null";
+                var modelKeys = entity.Model != null ? string.Join(", ", entity.Model.Properties().Select(p => p.Name)) : "null";
                 Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: DynamicFlowEntity.Model keys: {modelKeys}");
             }
             
@@ -480,7 +478,7 @@ public static class FlowMessagingInitializer
             if (payload is IDynamicFlowEntity dynamicEntity)
             {
                 Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: ToDict - preserving DynamicFlowEntity structure");
-                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: ToDict - Model keys: {(dynamicEntity.Model != null ? string.Join(", ", ((IDictionary<string, object?>)dynamicEntity.Model).Keys) : "null")}");
+                Console.Error.WriteLine($"[FlowMessagingInitializer] DEBUG: ToDict - Model keys: {(dynamicEntity.Model != null ? string.Join(", ", dynamicEntity.Model.Properties().Select(p => p.Name)) : "null")}");
                 return payload; // Return the full DynamicFlowEntity, not just a dictionary
             }
             

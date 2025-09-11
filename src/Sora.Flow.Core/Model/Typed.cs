@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Dynamic;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using Sora.Data.Core;
 
 namespace Sora.Flow.Model;
@@ -20,14 +21,14 @@ public abstract class FlowValueObject<TVo> : Entity<TVo> where TVo : FlowValueOb
 // Base interface for DynamicFlowEntity types
 public interface IDynamicFlowEntity
 {
-    ExpandoObject? Model { get; set; }
+    JObject? Model { get; set; }
 }
 
 // Normalized transport/delta for a model: Id + dynamic data (JObject or dictionary)
 public class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>>, IDynamicFlowEntity
 {
-    // Nested JSON snapshot using ExpandoObject (document) + primitives/arrays for provider-friendly serialization
-    public ExpandoObject? Model { get; set; }
+    // Nested JSON snapshot using JObject (document) + primitives/arrays for provider-friendly serialization
+    public JObject? Model { get; set; }
 }
 
 // Per-reference policy state persisted alongside root entity

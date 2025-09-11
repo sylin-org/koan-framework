@@ -205,10 +205,8 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
     {
         Logger.LogDebug("Processing DynamicTransportEnvelope for {Model} from {Source}", model, source);
         
-        // Extract flattened payload from dynamic transport envelope
         var payload = envelope.payload;
         
-        // Resolve model type
         var modelType = FlowRegistry.ResolveModel(model);
         if (modelType == null)
         {
@@ -216,41 +214,40 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             return;
         }
         
-        // Convert JObject payload to Dictionary<string, object?>
-        Dictionary<string, object?> pathValues;
-        if (payload is JObject jPayload)
+        // Ensure we are working with a JObject
+        JObject? payloadJObject = payload as JObject;
+        if (payloadJObject == null)
         {
-            pathValues = jPayload.ToObject<Dictionary<string, object?>>() ?? new Dictionary<string, object?>();
+            if (payload is IDictionary<string, object> dictPayload)
+            {
+                payloadJObject = JObject.FromObject(dictPayload);
+            }
+            else
+            {
+                Logger.LogWarning("Unexpected DynamicTransportEnvelope payload type {PayloadType} for model: {Model}", (object)payload.GetType().Name, (object)model);
+                return;
+            }
         }
-        else if (payload is IDictionary<string, object?> dictPayload)
-        {
-            pathValues = new Dictionary<string, object?>(dictPayload);
-        }
-        else
-        {
-            Logger.LogWarning("Unexpected DynamicTransportEnvelope payload type {PayloadType} for model: {Model}", (object)payload.GetType().Name, (object)model);
-            return;
-        }
+        
+        var pathValues = payloadJObject;
         
         Logger.LogDebug("DynamicTransportEnvelope path values count: {Count}, keys: {Keys}", 
-            pathValues.Count, string.Join(", ", pathValues.Keys));
+            pathValues.Count, string.Join(", ", pathValues.Properties().Select(p => p.Name)));
         
-        // Use the ToDynamicFlowEntity extension method to create proper DynamicFlowEntity
         try
         {
             var extensionMethod = typeof(DynamicFlowExtensions)
-                .GetMethod("ToDynamicFlowEntity", new[] { typeof(Dictionary<string, object?>) })!
+                .GetMethod("ToDynamicFlowEntity", new[] { typeof(JObject) })!
                 .MakeGenericMethod(modelType);
             
             var dynamicEntity = extensionMethod.Invoke(null, new object[] { pathValues });
             
             if (dynamicEntity is IDynamicFlowEntity entity)
             {
-                var modelKeys = entity.Model != null ? string.Join(", ", ((IDictionary<string, object?>)entity.Model).Keys) : "null";
+                var modelKeys = entity.Model != null ? string.Join(", ", entity.Model.Properties().Select(p => p.Name)) : "null";
                 Logger.LogDebug("Created DynamicFlowEntity: {EntityType}, Model keys: {ModelKeys}", 
                     dynamicEntity.GetType().Name, modelKeys);
                 
-                // Write the reconstructed DynamicFlowEntity to intake
                 await WriteToIntake(modelType, model, dynamicEntity, source, envelope.metadata);
             }
             else

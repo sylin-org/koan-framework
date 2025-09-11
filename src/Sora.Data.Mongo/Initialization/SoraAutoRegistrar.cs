@@ -26,7 +26,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         // Configure MongoDB conventions globally at startup - disables _t discriminators
         var pack = new ConventionPack
         {
-            new IgnoreExtraElementsConvention(true)
+            new IgnoreExtraElementsConvention(true),
+            new NullBsonValueConvention()
         };
         ConventionRegistry.Register("SoraGlobalConventions", pack, _ => true);
 
@@ -35,6 +36,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         BsonSerializer.RegisterDiscriminatorConvention(
             typeof(object),
             new NoDiscriminatorConvention());
+
+        BsonSerializer.RegisterSerializationProvider(new JObjectSerializationProvider());
 
         // Note: Conventions handle null values, no custom serializer needed
 
@@ -54,7 +57,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         var connectionAttempts = new List<(string source, string connectionString, bool canConnect, string? error)>();
 
         // Try configured connection strings first
-        var configuredCs = Configuration.ReadFirst(cfg, null,
+        var configuredCs = Configuration.ReadFirst(cfg, string.Empty,
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
             Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
@@ -174,4 +177,20 @@ public class NoDiscriminatorConvention : IDiscriminatorConvention
     public Type GetActualType(MongoDB.Bson.IO.IBsonReader bsonReader, Type nominalType) => nominalType;
     public MongoDB.Bson.BsonValue GetDiscriminator(Type nominalType, Type actualType) => null!;
 }
+
+/// <summary>
+/// Convention to handle nulls for BsonValue properties globally.
+/// </summary>
+public class NullBsonValueConvention : IMemberMapConvention
+{
+    public string Name => "NullBsonValueConvention";
+    public void Apply(BsonMemberMap memberMap)
+    {
+        if (memberMap.MemberType == typeof(BsonValue))
+        {
+            memberMap.SetDefaultValue(BsonNull.Value);
+        }
+    }
+}
+
 

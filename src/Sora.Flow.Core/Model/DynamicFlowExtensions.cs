@@ -3,13 +3,7 @@ using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Sora.Core.Hosting.App;
 
 namespace Sora.Flow.Model;
 
@@ -28,41 +22,21 @@ public static class DynamicFlowExtensions
     {
         var entity = new T();
         
-        // Set Id if the entity has this property
         var idProp = typeof(T).GetProperty("Id");
         if (idProp != null && idProp.CanWrite)
         {
             idProp.SetValue(entity, Guid.NewGuid().ToString("n"));
         }
         
-        // Set Model if the entity has this property
         var modelProp = typeof(T).GetProperty("Model");
         if (modelProp != null && modelProp.CanWrite)
         {
-            modelProp.SetValue(entity, new ExpandoObject());
-        }
-        
-        // Add values to Model if it exists
-        if (modelProp != null)
-        {
-            var model = modelProp.GetValue(entity) as ExpandoObject;
-            if (model != null)
+            var model = new JObject();
+            foreach (var (path, value) in pathValues.Where(kv => kv.Value != null))
             {
-                foreach (var (path, value) in pathValues.Where(kv => kv.Value != null))
-                {
-                    SetValueByPath(model, path, value);
-                }
-                
-                // Clean up the Model to ensure MongoDB-compatible types
-                var finalModel = modelProp.GetValue(entity) as ExpandoObject;
-                if (finalModel != null)
-                {
-                    DynamicFlowEntityExtensions.CleanExpandoObjectForMongoDB(finalModel);
-                }
-                
-                // Verify Model is still accessible after population and cleanup
-                var modelKeys = finalModel != null ? string.Join(", ", ((IDictionary<string, object?>)finalModel).Keys) : "null";
+                SetValueByPath(model, path, value);
             }
+            modelProp.SetValue(entity, model);
         }
         
         return entity;
@@ -76,18 +50,16 @@ public static class DynamicFlowExtensions
     {
         var entity = new T();
         
-        // Set Id if the entity has this property
         var idProp = typeof(T).GetProperty("Id");
         if (idProp != null && idProp.CanWrite)
         {
             idProp.SetValue(entity, Guid.NewGuid().ToString("n"));
         }
         
-        // Set Model if the entity has this property
         var modelProp = typeof(T).GetProperty("Model");
         if (modelProp != null && modelProp.CanWrite)
         {
-            modelProp.SetValue(entity, nestedData.ToExpando());
+            modelProp.SetValue(entity, JObject.FromObject(nestedData));
         }
         
         return entity;
@@ -102,7 +74,7 @@ public static class DynamicFlowExtensions
         var modelProp = typeof(T).GetProperty("Model");
         if (modelProp != null)
         {
-            var model = modelProp.GetValue(entity) as ExpandoObject ?? new ExpandoObject();
+            var model = modelProp.GetValue(entity) as JObject ?? new JObject();
             if (value != null)
             {
                 SetValueByPath(model, path, value);
@@ -120,7 +92,7 @@ public static class DynamicFlowExtensions
         var modelProp = typeof(T).GetProperty("Model");
         if (modelProp == null) return default;
         
-        var model = modelProp.GetValue(entity) as ExpandoObject;
+        var model = modelProp.GetValue(entity) as JObject;
         if (model == null) return default;
         
         return GetValueByPath<TValue>(model, jsonPath);
@@ -134,7 +106,7 @@ public static class DynamicFlowExtensions
         var modelProp = typeof(T).GetProperty("Model");
         if (modelProp != null)
         {
-            var model = modelProp.GetValue(entity) as ExpandoObject ?? new ExpandoObject();
+            var model = modelProp.GetValue(entity) as JObject ?? new JObject();
             if (value != null)
             {
                 SetValueByPath(model, jsonPath, value);
@@ -162,93 +134,38 @@ public static class DynamicFlowExtensions
     
     // Private helper methods
     
-    private static void SetValueByPath(ExpandoObject expando, string path, object? value)
+    private static void SetValueByPath(JObject jObject, string path, object? value)
     {
         if (string.IsNullOrWhiteSpace(path) || value == null) return;
-        
-        var dict = (IDictionary<string, object?>)expando;
+
         var segments = path.Split('.');
-        
+        JToken token = jObject;
+
         for (int i = 0; i < segments.Length - 1; i++)
         {
             var segment = segments[i];
-            
-            if (!dict.ContainsKey(segment) || dict[segment] is not ExpandoObject)
+            if (token[segment] is not JObject)
             {
-                dict[segment] = new ExpandoObject();
+                token[segment] = new JObject();
             }
-            
-            dict = (IDictionary<string, object?>)dict[segment]!;
+            token = token[segment]!;
         }
-        
-        dict[segments[^1]] = value;
+
+        token[segments[^1]] = JToken.FromObject(value);
     }
-    
-    private static T? GetValueByPath<T>(ExpandoObject expando, string path)
+
+    private static T? GetValueByPath<T>(JObject jObject, string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return default;
-        
-        var dict = (IDictionary<string, object?>)expando;
-        var segments = path.Split('.');
-        
-        for (int i = 0; i < segments.Length - 1; i++)
-        {
-            var segment = segments[i];
-            
-            if (!dict.ContainsKey(segment) || dict[segment] is not ExpandoObject)
-            {
-                return default;
-            }
-            
-            dict = (IDictionary<string, object?>)dict[segment]!;
-        }
-        
-        if (dict.TryGetValue(segments[^1], out var value) && value is not null)
-        {
-            if (value is T typedValue)
-                return typedValue;
 
-            // Try conversion for common types when value is convertible
-            try
-            {
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
-            catch
-            {
-                return default;
-            }
-        }
-        
-        return default;
-    }
-    
-    private static ExpandoObject ToExpando(this object obj)
-    {
-        if (obj is ExpandoObject expando)
-            return expando;
-        
-        // Use JSON serialization for deep conversion
-        var json = JsonConvert.SerializeObject(obj);
-        var jObject = JObject.Parse(json);
-        return jObject.ToExpando();
-    }
-    
-    private static ExpandoObject ToExpando(this JObject jObject)
-    {
-        var expando = new ExpandoObject();
-        var dict = (IDictionary<string, object?>)expando;
-        
-        foreach (var property in jObject.Properties())
+        var token = jObject.SelectToken(path);
+
+        if (token != null)
         {
-            dict[property.Name] = property.Value.Type switch
-            {
-                JTokenType.Object => ((JObject)property.Value).ToExpando(),
-                JTokenType.Array => property.Value.ToObject<object>(),
-                _ => ((JValue)property.Value).Value
-            };
+            return token.ToObject<T>();
         }
-        
-        return expando;
+
+        return default;
     }
 }
 
@@ -265,53 +182,26 @@ public static class DynamicFlowEntityExtensions
         var modelProp = entity.GetType().GetProperty("Model");
         if (modelProp == null) return default;
         
-        var model = modelProp.GetValue(entity) as ExpandoObject;
+        var model = modelProp.GetValue(entity) as JObject;
         if (model == null) return default;
         
-        var dict = (IDictionary<string, object?>)model;
-        var segments = jsonPath.Split('.');
-        
-        for (int i = 0; i < segments.Length - 1; i++)
+        var token = model.SelectToken(jsonPath);
+        if (token != null)
         {
-            var segment = segments[i];
-            
-            if (!dict.ContainsKey(segment) || dict[segment] is not ExpandoObject)
-            {
-                return default;
-            }
-            
-            dict = (IDictionary<string, object?>)dict[segment]!;
-        }
-        
-        if (dict.TryGetValue(segments[^1], out var value) && value is not null)
-        {
-            if (value is T typedValue)
-                return typedValue;
-
-            try
-            {
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
-            catch
-            {
-                return default;
-            }
+            return token.ToObject<T>();
         }
         
         return default;
     }
-
 
     private static Dictionary<string, object?> BuildBagFromDynamicEntity<T>(T entity) where T : class, IDynamicFlowEntity
     {
         var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         if (entity is null) return dict;
 
-
-        // Extract all flattened paths from the ExpandoObject Model
-        if (entity.Model is ExpandoObject expando)
+        if (entity.Model is JObject jObject)
         {
-            var flattened = FlattenExpandoObject(expando);
+            var flattened = FlattenJObject(jObject);
             foreach (var kvp in flattened)
             {
                 dict[kvp.Key] = kvp.Value;
@@ -322,156 +212,30 @@ public static class DynamicFlowEntityExtensions
     }
 
     /// <summary>
-    /// Flattens an ExpandoObject back to JSON path notation (e.g., "identifier.code" = "MFG001")
+    /// Flattens a JObject back to JSON path notation (e.g., "identifier.code" = "MFG001")
     /// </summary>
-    public static Dictionary<string, object?> FlattenExpandoObject(ExpandoObject expando, string prefix = "")
+    public static Dictionary<string, object?> FlattenJObject(JObject jObject, string prefix = "")
     {
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        var dict = (IDictionary<string, object?>)expando;
-        
-        foreach (var kvp in dict)
-        {
-            var currentPath = string.IsNullOrEmpty(prefix) ? kvp.Key : $"{prefix}.{kvp.Key}";
 
-            if (kvp.Value is ExpandoObject nested)
+        foreach (var property in jObject.Properties())
+        {
+            var currentPath = string.IsNullOrEmpty(prefix) ? property.Name : $"{prefix}.{property.Name}";
+
+            if (property.Value is JObject nested)
             {
-                // Recursively flatten nested ExpandoObjects
-                var nestedFlattened = FlattenExpandoObject(nested, currentPath);
+                var nestedFlattened = FlattenJObject(nested, currentPath);
                 foreach (var nestedKvp in nestedFlattened)
                 {
                     result[nestedKvp.Key] = nestedKvp.Value;
                 }
             }
-            else if (kvp.Value != null)
+            else if (property.Value.Type != JTokenType.Null)
             {
-                // Convert JsonElement values to proper .NET types for MongoDB serialization
-                var convertedValue = ConvertJsonElementToClrType(kvp.Value);
-                if (convertedValue != null)
-                {
-                    // If conversion resulted in another ExpandoObject, recursively flatten it
-                    if (convertedValue is ExpandoObject convertedExpando)
-                    {
-                        var nestedFlattened = FlattenExpandoObject(convertedExpando, currentPath);
-                        foreach (var nestedKvp in nestedFlattened)
-                        {
-                            result[nestedKvp.Key] = nestedKvp.Value;
-                        }
-                    }
-                    else
-                    {
-                        result[currentPath] = convertedValue;
-                    }
-                }
+                result[currentPath] = property.Value.ToObject<object>();
             }
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// Converts JsonElement objects and Newtonsoft.Json types to proper .NET types for MongoDB serialization compatibility
-    /// </summary>
-    private static object? ConvertJsonElementToClrType(object? value)
-    {
-        if (value is null) return null;
-
-        // Handle Newtonsoft.Json types that can't be serialized by MongoDB
-        if (value is JArray jArray)
-        {
-            return jArray.Select(token => ConvertJsonElementToClrType(token.ToObject<object>())).ToArray();
-        }
-        
-        if (value is JObject jObject)
-        {
-            // Inline ToExpando logic to avoid accessibility issues
-            var expando = new ExpandoObject();
-            var dict = (IDictionary<string, object?>)expando;
-            foreach (var property in jObject.Properties())
-            {
-                dict[property.Name] = property.Value.Type switch
-                {
-                    JTokenType.Object => ConvertJsonElementToClrType((JObject)property.Value),
-                    JTokenType.Array => ConvertJsonElementToClrType(property.Value.ToObject<object>()),
-                    _ => ((JValue)property.Value).Value
-                };
-            }
-            return expando;
-        }
-        
-        if (value is JValue jValue)
-        {
-            return jValue.Value;
-        }
-        
-        if (value is JToken jToken)
-        {
-            return ConvertJsonElementToClrType(jToken.ToObject<object>());
-        }
-
-        // Handle JsonElement conversion
-        if (value is JsonElement jsonElement)
-        {
-            return jsonElement.ValueKind switch
-            {
-                JsonValueKind.String => jsonElement.GetString(),
-                JsonValueKind.Number => jsonElement.TryGetInt64(out var longVal) ? longVal : jsonElement.GetDouble(),
-                JsonValueKind.True => true,
-                JsonValueKind.False => false,
-                JsonValueKind.Null => null,
-                JsonValueKind.Array => jsonElement.EnumerateArray().Select(el => ConvertJsonElementToClrType(el)).ToArray(),
-                JsonValueKind.Object => ConvertJsonObjectToExpando(jsonElement),
-                _ => jsonElement.ToString()
-            };
-        }
-
-        return value;
-    }
-
-    /// <summary>
-    /// Converts a JsonElement object to an ExpandoObject
-    /// </summary>
-    private static ExpandoObject ConvertJsonObjectToExpando(JsonElement jsonElement)
-    {
-        var expando = new ExpandoObject();
-        var dict = (IDictionary<string, object?>)expando;
-
-        foreach (var property in jsonElement.EnumerateObject())
-        {
-            dict[property.Name] = ConvertJsonElementToClrType(property.Value);
-        }
-
-        return expando;
-    }
-    
-    /// <summary>
-    /// Recursively cleans an ExpandoObject in-place to ensure all values are MongoDB BSON compatible
-    /// Converts JArray, JObject, and other Newtonsoft.Json types to proper .NET types
-    /// </summary>
-    public static void CleanExpandoObjectForMongoDB(ExpandoObject expando)
-    {
-        var dict = (IDictionary<string, object?>)expando;
-        
-        foreach (var kvp in dict.ToList()) // ToList() to avoid modifying during iteration
-        {
-            var cleanedValue = ConvertJsonElementToClrType(kvp.Value);
-            
-            // Filter out null values to prevent BSON serialization issues
-            if (cleanedValue == null)
-            {
-                dict.Remove(kvp.Key);
-                continue;
-            }
-            
-            if (cleanedValue != kvp.Value) // Only update if the value changed
-            {
-                dict[kvp.Key] = cleanedValue;
-            }
-            
-            // Recursively clean nested ExpandoObjects
-            if (cleanedValue is ExpandoObject nestedExpando)
-            {
-                CleanExpandoObjectForMongoDB(nestedExpando);
-            }
-        }
     }
 }

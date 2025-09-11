@@ -55,20 +55,20 @@ public static class ServiceCollectionExtensions
             return dict;
         }
         
-        // Handle ExpandoObject directly (stored from DynamicFlowEntity.Model)
-        if (payload is ExpandoObject expandoObj)
+        // Handle JObject from DynamicFlowEntity.Model
+        if (payload is JObject jObjectPayload)
         {
-            return expandoObj as IDictionary<string, object?>;
+            return Sora.Flow.Model.DynamicFlowEntityExtensions.FlattenJObject(jObjectPayload);
         }
         
         // Handle DynamicFlowEntity objects - extract the Model property which contains the actual data
         if (payload is IDynamicFlowEntity dynamicEntity)
         {
-            if (dynamicEntity.Model is ExpandoObject expandoModel)
+            if (dynamicEntity.Model is JObject jObjectModel)
             {
-                // Use FlattenExpandoObject from DynamicFlowExtensions to convert nested structure
+                // Use FlattenJObject from DynamicFlowExtensions to convert nested structure
                 // to flattened dot-notation keys (e.g., "identifier.code", "identifier.name")
-                var flattened = Sora.Flow.Model.DynamicFlowEntityExtensions.FlattenExpandoObject(expandoModel);
+                var flattened = Sora.Flow.Model.DynamicFlowEntityExtensions.FlattenJObject(jObjectModel);
                 return flattened;
             }
             else
@@ -404,21 +404,8 @@ public static class ServiceCollectionExtensions
                                     ranges[kv.Key] = new JArray(dedup);
                                 }
                                 var canonicalExpanded = JsonPathMapper.Expand(ranges);
-                                // Convert to provider-safe nested object (Expando/primitives/arrays)
-                                static object? Plainify(object? token)
-                                {
-                                    if (token is null) return null;
-                                    if (token is Newtonsoft.Json.Linq.JValue jv) return jv.Value;
-                                    if (token is Newtonsoft.Json.Linq.JArray ja) return ja.Select(t => Plainify(t)).ToList();
-                                    if (token is Newtonsoft.Json.Linq.JObject jo)
-                                    {
-                                        IDictionary<string, object?> exp = new ExpandoObject();
-                                        foreach (var p in jo.Properties()) exp[p.Name] = Plainify(p.Value);
-                                        return (ExpandoObject)exp;
-                                    }
-                                    return token;
-                                }
-                                var canonicalView = Plainify(canonicalExpanded);
+                                // Convert to provider-safe nested object (JObject/primitives/arrays)
+                                var canonicalView = JObject.FromObject(canonicalExpanded);
                                 var lineageView = lineage.ToDictionary(
                                     kv => kv.Key,
                                     kv => kv.Value.ToDictionary(x => x.Key, x => x.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
@@ -505,22 +492,7 @@ public static class ServiceCollectionExtensions
                                             pathMap[kvp.Key] = kvp.Value is null ? JValue.CreateNull() : new JValue(kvp.Value);
                                         }
                                         var nested = JsonPathMapper.Expand(pathMap);
-                                        // Convert JObject to plain dictionary recursively for provider-safe serialization
-                                        static object? ToPlain(object? token)
-                                        {
-                                            if (token is null) return null;
-                                            if (token is JValue jv) return jv.Value;
-                                            if (token is JArray ja) return ja.Select(t => ToPlain(t)).ToList();
-                                            if (token is JObject jo)
-                                            {
-                                                IDictionary<string, object?> exp = new ExpandoObject();
-                                                foreach (var p in jo.Properties()) exp[p.Name] = ToPlain(p.Value);
-                                                return (ExpandoObject)exp;
-                                            }
-                                            return token;
-                                        }
-                                        var plain = ToPlain(nested) as ExpandoObject;
-                                        modelType.GetProperty("Model")!.SetValue(rootEntity, plain);
+                                        modelType.GetProperty("Model")!.SetValue(rootEntity, nested);
                                     }
                                     else
                                     {
