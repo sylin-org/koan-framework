@@ -288,7 +288,7 @@ public sealed class Sensor : FlowEntity<Sensor>
     public string DeviceId { get; set; } = default!;
 
     [AggregationTag(Keys.Sensor.Key)]
-    public string SensorId{ get; set; } = default!;
+    public string SerialNumber{ get; set; } = default!;
 
     public string Code { get; set; } = default!;
     public string Unit { get; set; } = default!;
@@ -310,7 +310,7 @@ var batch = new[]
         new Dictionary<string,string> { [ExternalSystems.Oem] = "OEM-00001" }),
 
     FlowSendItem.Of(
-        new Sensor { SensorId= "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
+        new Sensor { SerialNumber= "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
         // Include parent’s external ID to enable resolver to fill Sensor.DeviceId
         new Dictionary<string,string> { ["oem-device"] = "OEM-00001", ["oem-sensor"] = "S-00987" })
 };
@@ -395,7 +395,7 @@ public sealed class Sensor : FlowEntity<Sensor>
     public string DeviceId { get; set; } = default!;
 
     [AggregationTag(Keys.Sensor.Key)]
-    public string SensorId{ get; set; } = default!;
+    public string SerialNumber{ get; set; } = default!;
 
     public string Code { get; set; } = default!;
     public string Unit { get; set; } = default!;
@@ -417,7 +417,7 @@ var batch = new[]
         new Dictionary<string,string> { [ExternalSystems.Oem] = "OEM-00001" }),
 
     FlowSendItem.Of(
-        new Sensor { SensorId= "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
+        new Sensor { SerialNumber= "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
         // Include parent’s external ID to enable resolver to fill Sensor.DeviceId
         new Dictionary<string,string> { ["oem-device"] = "OEM-00001", ["oem-sensor"] = "S-00987" })
 };
@@ -471,7 +471,7 @@ await new Device { Inventory = "INV-123", Serial = "SN-ABC", Manufacturer = "Hit
 
 await new[]
 {
-    new Sensor { SensorId= "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" }
+    new Sensor { SerialNumber= "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" }
 }.Send(sourceId: "events", occurredAt: DateTimeOffset.UtcNow, ct: ct);
 ```
 
