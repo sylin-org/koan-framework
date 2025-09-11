@@ -27,7 +27,7 @@ This page defines how Sora Flow models declare binding hints, how OEM/source ide
 
 ### bindings and keys
 
-- Use a neutral key taxonomy via constants (no literals): `FlowBindingKeys.DeviceId`, `FlowBindingKeys.SensorId`, `FlowBindingKeys.EventTime`, `FlowBindingKeys.TenantId`, `FlowBindingKeys.PartitionKey`, `FlowBindingKeys.CorrelationId`.
+- Use a neutral key taxonomy via constants (no literals): `FlowBindingKeys.DeviceId`, `FlowBindingKeys.SerialNumber`, `FlowBindingKeys.EventTime`, `FlowBindingKeys.TenantId`, `FlowBindingKeys.PartitionKey`, `FlowBindingKeys.CorrelationId`.
 - Bindings are hints for:
   - Association (ReferenceKey): resolve parent/target canonical ID.
   - Partitioning (PartitionKey): sharding/time routing; provider decides how to map.
@@ -37,10 +37,10 @@ This page defines how Sora Flow models declare binding hints, how OEM/source ide
 
 - On aggregate upsert (e.g., `Sensor`), write `KeyIndex<T>` rows mapping `(namespace, sourceId[, composite]) → canonicalId`.
 - On VO ingest (e.g., `SensorReading`):
-  1) Persist `StageRecord<VO>` to `#flow.intake`.
-  2) Association worker resolves canonical ID using `KeyIndex` and VO bindings.
-  3) On hit, store VO with `SensorCanonicalId` (and denormalize `DeviceCanonicalId`). On miss, write `RejectionReport`.
-  4) Enqueue `ProjectionTask<Aggregate>` to update canonical views.
+  1. Persist `StageRecord<VO>` to `#flow.intake`.
+  2. Association worker resolves canonical ID using `KeyIndex` and VO bindings.
+  3. On hit, store VO with `SensorCanonicalId` (and denormalize `DeviceCanonicalId`). On miss, write `RejectionReport`.
+  4. Enqueue `ProjectionTask<Aggregate>` to update canonical views.
 
 ### lineage
 
@@ -50,13 +50,14 @@ This page defines how Sora Flow models declare binding hints, how OEM/source ide
 ### examples (production-safe)
 
 - Ingest a VO (typed statics shown):
+
   - `SensorReading.AllStream(ct)` → stream readings for batch jobs.
   - `SensorReading.QueryStream(x => x.SensorCanonicalId == id && x.EventTime >= from && x.EventTime < to, ct)` → range stream.
   - `Sensor.FirstPage(pageSize, ct)`; `Sensor.Page(cursor, pageSize, ct)` for aggregates.
 
 - Controllers (attribute-routed; no inline endpoints):
-  - `GET /models/sensor/views/canonical/{sensorId}` → canonical.
-  - `GET /models/sensorreading?sensorId&from&to` → stream/paged readings.
+  - `GET /models/sensor/views/canonical/{SerialNumber}` → canonical.
+  - `GET /models/sensorreading?SerialNumber&from&to` → stream/paged readings.
 
 ### edge cases
 
