@@ -12,7 +12,7 @@ public static class SampleData
     public static Dictionary<Device, List<Sensor>> CreateSampleData()
     {
         var data = new Dictionary<Device, List<Sensor>>();
-        
+
         for (int deviceNum = 1; deviceNum <= 5; deviceNum++)
         {
             var device = new Device
@@ -25,7 +25,7 @@ public static class SampleData
                 Kind = "TEST",
                 Code = $"TEST-{deviceNum}"
             };
-            
+
             var sensors = new List<Sensor>();
             for (int sensorNum = 1; sensorNum <= 5; sensorNum++)
             {
@@ -34,7 +34,7 @@ public static class SampleData
                 {
                     Id = $"S{globalSensorId}",
                     DeviceId = $"D{deviceNum}", // Parent reference
-                    SensorKey = $"S{globalSensorId}",
+                    SensorId = $"S{globalSensorId}",
                     Code = $"SENSOR{sensorNum}",
                     Unit = sensorNum switch
                     {
@@ -48,13 +48,13 @@ public static class SampleData
                 };
                 sensors.Add(sensor);
             }
-            
+
             data[device] = sensors;
         }
-        
+
         return data;
     }
-    
+
     /// <summary>
     /// Creates sample readings for random sensors
     /// </summary>
@@ -62,30 +62,30 @@ public static class SampleData
     {
         var readings = new List<Reading>();
         var random = new Random();
-        
+
         for (int i = 1; i <= count; i++)
         {
             var randomSensorId = random.Next(1, 26); // S1 to S25
             var reading = new Reading
             {
-                SensorKey = $"S{randomSensorId}",
+                SensorId = $"S{randomSensorId}",
                 Value = random.NextDouble() * 100,
                 CapturedAt = DateTimeOffset.UtcNow.AddMinutes(-random.Next(0, 60)),
                 Unit = "unit"
             };
             readings.Add(reading);
         }
-        
+
         return readings;
     }
-    
+
     /// <summary>
     /// Creates sample manufacturer entities with dynamic data structure
     /// </summary>
     public static List<Manufacturer> CreateSampleManufacturers()
     {
         var manufacturers = new List<Manufacturer>();
-        
+
         // Create manufacturers with BMS-specific data using JSON paths as keys
         var mfg1 = new Dictionary<string, object>
         {
@@ -98,7 +98,7 @@ public static class SampleData
             ["products.categories"] = new[] { "sensors", "actuators" }
         }.ToDynamicFlowEntity<Manufacturer>();
         manufacturers.Add(mfg1);
-        
+
         var mfg2 = new Dictionary<string, object>
         {
             ["identifier.code"] = "MFG002",
@@ -110,17 +110,17 @@ public static class SampleData
             ["products.categories"] = new[] { "controllers", "displays" }
         }.ToDynamicFlowEntity<Manufacturer>();
         manufacturers.Add(mfg2);
-        
+
         return manufacturers;
     }
-    
+
     /// <summary>
     /// Creates OEM-specific manufacturer data (support and certification info)
     /// </summary>
     public static List<Manufacturer> CreateOemManufacturers()
     {
         var manufacturers = new List<Manufacturer>();
-        
+
         // Create manufacturers with OEM-specific data using JSON paths as keys
         var mfg1 = new Dictionary<string, object>
         {
@@ -136,7 +136,7 @@ public static class SampleData
             ["warranty.extended"] = "5 years"
         }.ToDynamicFlowEntity<Manufacturer>();
         manufacturers.Add(mfg1);
-        
+
         var mfg2 = new Dictionary<string, object>
         {
             ["identifier.code"] = "MFG002",
@@ -151,7 +151,7 @@ public static class SampleData
             ["warranty.extended"] = "7 years"
         }.ToDynamicFlowEntity<Manufacturer>();
         manufacturers.Add(mfg2);
-        
+
         return manufacturers;
     }
 }

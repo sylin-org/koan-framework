@@ -7,6 +7,7 @@ This proposal outlines the implementation of a framework-level external ID corre
 ## Problem Statement
 
 ### Current State
+
 Currently, different systems (BMS, OEM, etc.) may have data for the same physical entity (e.g., a sensor) but with different native IDs, formats, and timing. While external identifier data exists in source entities, the framework lacks:
 
 1. **Automatic External ID Population**: No framework-level processing of external identifiers from source data into canonical models
@@ -17,13 +18,14 @@ Currently, different systems (BMS, OEM, etc.) may have data for the same physica
 ### Data Evidence
 
 **Current Keyed Entity** (has entity data but missing external ID structure):
+
 ```json
 {
   "_id": "112fabe4ce5743d6a6c5bf6d9fb11211",
   "SourceId": "S1",
   "Data": {
     "deviceId": "D1",
-    "sensorKey": "S1", 
+    "SensorId": "S1",
     "code": "TEMP",
     "unit": "C",
     "id": "S1"
@@ -36,12 +38,13 @@ Currently, different systems (BMS, OEM, etc.) may have data for the same physica
 ```
 
 **Current Canonical Model** (missing external ID correlation):
+
 ```json
 {
   "_id": "canonical::K4JV48YABMVHQ1CHC7KC2S0330",
   "Model": {
     "deviceId": ["D1"],
-    "sensorKey": ["S1"], 
+    "SensorId": ["S1"],
     "code": ["TEMP"],
     "unit": ["C"],
     "id": ["S1"]
@@ -51,6 +54,7 @@ Currently, different systems (BMS, OEM, etc.) may have data for the same physica
 ```
 
 **Manufacturer Data** (shows external ID patterns in source data):
+
 ```json
 {
   "identifier.external.bms": "BMS-MFG-001",
@@ -65,18 +69,19 @@ Currently, different systems (BMS, OEM, etc.) may have data for the same physica
 Enhance the canonical projection pipeline to automatically extract and populate external identifiers:
 
 **Target Canonical Structure**:
+
 ```json
 {
   "_id": "canonical::K4JV48YABMVHQ1CHC7KC2S0330",
   "Model": {
     "deviceId": ["K4KDERR71A6AQN9ZRGV5ADPGG0"], // ✅ Canonical Device ULID (resolved from source "D1")
-    "sensorKey": ["S1"],
-    "code": ["TEMP"], 
+    "SensorId": ["S1"],
+    "code": ["TEMP"],
     "unit": ["C"],
     "identifier": {
       "external": {
-        "oem": "S1",          // ✅ Auto-populated from Source + entity ID
-        "bms": "S1_BMS"       // ✅ When same sensor arrives from BMS
+        "oem": "S1", // ✅ Auto-populated from Source + entity ID
+        "bms": "S1_BMS" // ✅ When same sensor arrives from BMS
       }
     }
   }
@@ -89,24 +94,24 @@ Enable fine-grained control per entity type with policy attributes:
 
 ```csharp
 [FlowPolicy(ExternalIdPolicy = ExternalIdPolicy.AutoPopulate)]
-public class Sensor : FlowEntity<Sensor> 
+public class Sensor : FlowEntity<Sensor>
 {
     [AggregationKey]
-    public string SensorKey { get; set; } = default!;
+    public string SensorId{ get; set; } = default!;
     // Framework automatically creates: identifier.external.{source}:{id}
 }
 
-[FlowPolicy(ExternalIdPolicy = ExternalIdPolicy.AutoPopulate, 
+[FlowPolicy(ExternalIdPolicy = ExternalIdPolicy.AutoPopulate,
            ExternalIdKey = "identifier.code")]
 public class Manufacturer : DynamicFlowEntity<Manufacturer>
 {
     // Framework uses identifier.code value for external ID generation
 }
 
-public enum ExternalIdPolicy 
+public enum ExternalIdPolicy
 {
     AutoPopulate,     // Framework auto-generates external IDs (Default)
-    Manual,           // Developer explicitly provides external IDs  
+    Manual,           // Developer explicitly provides external IDs
     Disabled,         // No external ID tracking
     SourceOnly        // Only track source, not individual IDs
 }
@@ -121,7 +126,7 @@ Leverage existing `IdentityLink<T>` infrastructure with automatic index creation
 {
   "Id": "oem|oem|S1",
   "System": "oem",
-  "Adapter": "oem", 
+  "Adapter": "oem",
   "ExternalId": "S1",
   "ReferenceUlid": "K4JV48YABMVHQ1CHC7KC2S0330"
 }
@@ -132,7 +137,7 @@ Leverage existing `IdentityLink<T>` infrastructure with automatic index creation
 Enable efficient parent lookups across systems with canonical ULID resolution:
 
 ```csharp
-// Sensor entity from BMS system references deviceId: "bmsD1" 
+// Sensor entity from BMS system references deviceId: "bmsD1"
 // Framework automatically resolves:
 // 1. Look up external ID: "bms|bms|bmsD1" in IdentityLink → ReferenceUlid: "K4KDERR71A6AQN9ZRGV5ADPGG0"
 // 2. Replace source parent ID with canonical ULID in canonical model
@@ -145,6 +150,7 @@ Enable efficient parent lookups across systems with canonical ULID resolution:
 ### Current Implementation State (Updated 2025-01-07)
 
 **✅ FULLY IMPLEMENTED Components**:
+
 1. **IdentityLink<T> Model**: Complete external ID → ReferenceUlid mapping system (`src/Sora.Flow.Core/Model/Identity.cs:7`)
 2. **Canonical Projection Pipeline**: Enhanced with external ID auto-population (`src/Sora.Flow.Core/ServiceCollectionExtensions.cs:217-250`)
 3. **FlowRegistry**: GetExternalIdKeys method with policy-driven detection (`src/Sora.Flow.Core/Infrastructure/FlowRegistry.cs:106-119`)
@@ -159,6 +165,7 @@ Enable efficient parent lookups across systems with canonical ULID resolution:
 
 **🔄 Implementation Status**:
 The external ID correlation infrastructure is **FULLY FUNCTIONAL**. The system now:
+
 - ✅ Automatically populates `identifier.external.{source}` with source entity IDs (from [Key] property, NOT aggregation keys)
 - ✅ Strips source-specific 'id' fields from canonical and root models
 - ✅ Resolves ParentKey relationships via external ID lookups to canonical ULIDs
@@ -192,8 +199,8 @@ foreach (var r in all)
     var sourceMetadata = r.GetType().GetProperty("Source")!.GetValue(r);
     var dict = ExtractDict(payload);
     var sourceDict = ExtractDict(sourceMetadata);
-    
-    // ✅ NEW: Auto-populate external ID from source system + primary entity ID  
+
+    // ✅ NEW: Auto-populate external ID from source system + primary entity ID
     if (sourceDict != null && dict != null) {
         var systemName = GetSourceSystem(sourceDict); // Extract from Source.system
         var primaryId = GetPrimaryEntityId(dict, modelType); // Get aggregation key value
@@ -205,18 +212,20 @@ foreach (var r in all)
             canonical[externalIdKey].Add(primaryId);
         }
     }
-    
+
     // Process regular fields...
 }
 ```
 
 **Supporting Methods Needed**:
+
 - `GetSourceSystem(sourceDict)`: Extract system name from Source metadata
 - `GetPrimaryEntityId(dict, modelType)`: Get aggregation key value for external ID
 
 #### Phase 2: Policy Framework
 
 **New File**: `src/Sora.Flow.Core/Attributes/FlowPolicyAttribute.cs`
+
 ```csharp
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class FlowPolicyAttribute : Attribute
@@ -228,7 +237,7 @@ public sealed class FlowPolicyAttribute : Attribute
 public enum ExternalIdPolicy
 {
     AutoPopulate,
-    Manual, 
+    Manual,
     Disabled,
     SourceOnly
 }
@@ -238,7 +247,7 @@ public enum ExternalIdPolicy
 
 **File**: `src/Sora.Flow.Core/Infrastructure/FlowRegistry.cs`
 **Method**: `GetExternalIdKeys` (lines 104-108)
-**Current State**: Returns empty array with comment "vNext: rely on reserved identifier.external.* keys"
+**Current State**: Returns empty array with comment "vNext: rely on reserved identifier.external.\* keys"
 **Required Changes**:
 
 ```csharp
@@ -276,6 +285,7 @@ private static string GetDefaultAggregationKey(Type modelType)
 
 **File**: `src/Sora.Flow.Core/ServiceCollectionExtensions.cs`
 **Addition**: Automatic IdentityLink creation with proper indexing
+
 ```csharp
 // After canonical projection, create/update IdentityLink entries
 await CreateOrUpdateIdentityLinks(modelType, refUlid, externalIds, stoppingToken);
@@ -284,35 +294,42 @@ await CreateOrUpdateIdentityLinks(modelType, refUlid, externalIds, stoppingToken
 ## Benefits Analysis
 
 ### Cross-System Entity Correlation
+
 - **Before**: Sensor S1 from OEM and Sensor S1_BMS from BMS are separate entities
 - **After**: Both correlate to the same canonical entity with `identifier.external.oem: "S1"` and `identifier.external.bms: "S1_BMS"`
 
-### Efficient Parent Resolution  
+### Efficient Parent Resolution
+
 - **Before**: Parent lookups require expensive cross-system queries
 - **After**: O(1) parent resolution via indexed external ID lookups
 
 ### Timeline Consolidation
-- **Before**: OEM sends data at 5-minute intervals, BMS at 1-minute intervals - separate timelines  
+
+- **Before**: OEM sends data at 5-minute intervals, BMS at 1-minute intervals - separate timelines
 - **After**: Both data streams merge into single canonical entity timeline
 
 ### Zero-Config Developer Experience
+
 - **Before**: Developers must manually implement cross-system correlation
 - **After**: Framework automatically handles correlation with simple policy attribute
 
 ## Migration Strategy
 
 ### 1. Backward Compatibility
+
 - Existing entities without external ID policies continue working unchanged
 - New external ID fields are additive to canonical models
 - No breaking changes to existing API contracts
 
 ### 2. Gradual Rollout
+
 - **Phase 1**: Core external ID processing for new entities
-- **Phase 2**: Policy framework for fine-grained control  
+- **Phase 2**: Policy framework for fine-grained control
 - **Phase 3**: Enhanced indexing and performance optimization
 - **Phase 4**: Migration tooling for existing entities
 
 ### 3. Testing Strategy
+
 - Unit tests for external ID extraction logic
 - Integration tests for cross-system correlation scenarios
 - Performance tests for large-scale external ID lookups
@@ -321,17 +338,20 @@ await CreateOrUpdateIdentityLinks(modelType, refUlid, externalIds, stoppingToken
 ## Success Metrics
 
 ### Functional Metrics
+
 - ✅ External IDs automatically populated in canonical models
 - ✅ Cross-system entity correlation working (same physical entity, multiple systems)
 - ✅ Parent-child relationships resolved via external ID lookups
 - ✅ Zero-configuration experience for standard use cases
 
-### Performance Metrics  
+### Performance Metrics
+
 - ✅ O(1) external ID lookups via proper indexing
 - ✅ No performance regression in canonical projection pipeline
 - ✅ Efficient storage of external ID correlation data
 
 ### Developer Experience Metrics
+
 - ✅ Policy-driven configuration reduces boilerplate code
 - ✅ Clear documentation and examples for external ID correlation
 - ✅ Seamless migration path from existing implementations
@@ -343,8 +363,9 @@ await CreateOrUpdateIdentityLinks(modelType, refUlid, externalIds, stoppingToken
 **Low Effort (1-2 days)**: The external ID correlation infrastructure is **90% complete**. The primary gap is automatic external ID population in the canonical projection pipeline.
 
 **Core Implementation Requirements**:
+
 1. **Phase 1** (Essential): Add 10-15 lines of code to canonical projection loop for Source metadata processing
-2. **Phase 2** (Recommended): Create FlowPolicyAttribute class (~30 lines) for policy-driven configuration  
+2. **Phase 2** (Recommended): Create FlowPolicyAttribute class (~30 lines) for policy-driven configuration
 3. **Phase 3** (Enhancement): Update FlowRegistry.GetExternalIdKeys to support policy detection (~20 lines)
 4. **Phase 4** (Optional): Enhanced IdentityLink management automation
 
@@ -353,15 +374,18 @@ await CreateOrUpdateIdentityLinks(modelType, refUlid, externalIds, stoppingToken
 ### Development Priority
 
 **Immediate (Phase 1)**: ⭐⭐⭐
+
 - Add automatic `identifier.external.{system}` population from Source metadata during canonical projection
 - Enables cross-system entity correlation with minimal code changes
 - Leverages existing IdentityLink infrastructure completely
 
 **Short-term (Phase 2-3)**: ⭐⭐
+
 - FlowPolicy attribute system for fine-grained control
 - Enhanced FlowRegistry for policy-driven external ID key detection
 
 **Long-term (Phase 4)**: ⭐
+
 - Performance optimizations and enhanced indexing management
 
 ## Conclusion

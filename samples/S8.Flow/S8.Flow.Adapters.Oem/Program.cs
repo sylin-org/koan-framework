@@ -32,15 +32,15 @@ public sealed class OemPublisher : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _log.LogInformation("[OEM] Starting with simplified sample data");
-        
+
         // Get clean sample data
         var sampleData = SampleData.CreateSampleData();
-        _log.LogInformation("[OEM] Created {DeviceCount} devices with {SensorCount} sensors each", 
+        _log.LogInformation("[OEM] Created {DeviceCount} devices with {SensorCount} sensors each",
             sampleData.Count, sampleData.First().Value.Count);
 
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
-        
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -49,7 +49,7 @@ public sealed class OemPublisher : BackgroundService
                 if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromSeconds(30))
                 {
                     _log.LogInformation("[OEM] Sending complete dataset");
-                    
+
                     // Send manufacturers using clean dictionary approach (OEM-specific data)
                     var mfg1 = new Dictionary<string, object>
                     {
@@ -66,7 +66,7 @@ public sealed class OemPublisher : BackgroundService
                     };
                     _log.LogDebug("[OEM] Sending Manufacturer: {Code}", mfg1["identifier.code"]);
                     await mfg1.Send<Manufacturer>();
-                    
+
                     var mfg2 = new Dictionary<string, object>
                     {
                         ["identifier.code"] = "MFG002",
@@ -82,7 +82,7 @@ public sealed class OemPublisher : BackgroundService
                     };
                     _log.LogDebug("[OEM] Sending Manufacturer: {Code}", mfg2["identifier.code"]);
                     await mfg2.Send<Manufacturer>();
-                    
+
                     foreach (var (deviceTemplate, sensorsTemplate) in sampleData)
                     {
                         // Clone and adjust device for OEM
@@ -96,10 +96,10 @@ public sealed class OemPublisher : BackgroundService
                             Kind = deviceTemplate.Kind,
                             Code = deviceTemplate.Code
                         };
-                        
+
                         _log.LogDebug("[OEM] Sending Device: {DeviceId}", device.Id);
                         await device.Send(cancellationToken: stoppingToken);
-                        
+
                         // Send all sensors for this device
                         foreach (var sensorTemplate in sensorsTemplate)
                         {
@@ -107,33 +107,33 @@ public sealed class OemPublisher : BackgroundService
                             {
                                 Id = "oem" + sensorTemplate.Id, // oemS1, oemS2, etc.
                                 DeviceId = "oem" + sensorTemplate.DeviceId, // oemDX
-                                SensorKey = "oem" + sensorTemplate.SensorKey,
+                                SensorId = "oem" + sensorTemplate.SensorKey,
                                 Code = sensorTemplate.Code,
                                 Unit = sensorTemplate.Unit
                             };
-                            
-                            _log.LogDebug("[OEM] Sending Sensor: {SensorId} -> Device: {DeviceId}", 
+
+                            _log.LogDebug("[OEM] Sending Sensor: {SensorId} -> Device: {DeviceId}",
                                 sensor.Id, sensor.DeviceId);
                             await sensor.Send(cancellationToken: stoppingToken);
                         }
                     }
-                    
+
                     lastAnnounce = DateTimeOffset.UtcNow;
                     _log.LogInformation("[OEM] Complete dataset sent");
                 }
-                
+
                 // Send random readings
                 var readings = SampleData.CreateSampleReadings(5);
                 foreach (var readingTemplate in readings)
                 {
                     var reading = new Reading
                     {
-                        SensorKey = "oem" + readingTemplate.SensorKey,
+                        SensorId = "oem" + readingTemplate.SensorKey,
                         Value = readingTemplate.Value,
                         CapturedAt = readingTemplate.CapturedAt,
                         Unit = readingTemplate.Unit
                     };
-                    
+
                     _log.LogDebug("[OEM] Reading: {SensorKey} = {Value}", reading.SensorKey, reading.Value);
                     await reading.Send(cancellationToken: stoppingToken);
                 }
@@ -142,7 +142,7 @@ public sealed class OemPublisher : BackgroundService
             {
                 _log.LogWarning(ex, "[OEM] Error in publish loop");
             }
-            
+
             try { await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken); } catch (TaskCanceledException) { }
         }
     }

@@ -14,7 +14,7 @@ public sealed class Sensor : FlowEntity<Sensor>
 
     // Unique per device sensor identity: Inventory::Serial::SensorCode
     [AggregationKey]
-    public string SensorKey { get; set; } = default!;
+    public string SensorId { get; set; } = default!;
 
     // Optional metadata (not used for aggregation)
     public string Code { get; set; } = default!;

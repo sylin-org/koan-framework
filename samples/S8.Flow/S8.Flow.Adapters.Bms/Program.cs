@@ -44,15 +44,15 @@ public sealed class BmsPublisher : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         _log.LogInformation("[BMS] Starting with simplified sample data");
-        
+
         // Get clean sample data
         var sampleData = SampleData.CreateSampleData();
-        _log.LogInformation("[BMS] Created {DeviceCount} devices with {SensorCount} sensors each", 
+        _log.LogInformation("[BMS] Created {DeviceCount} devices with {SensorCount} sensors each",
             sampleData.Count, sampleData.First().Value.Count);
 
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
-        
+
         while (!ct.IsCancellationRequested)
         {
             try
@@ -61,7 +61,7 @@ public sealed class BmsPublisher : BackgroundService
                 if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromSeconds(30))
                 {
                     _log.LogInformation("[BMS] Sending complete dataset");
-                    
+
                     // Send manufacturers using clean dictionary approach
                     var mfg1 = new Dictionary<string, object>
                     {
@@ -75,7 +75,7 @@ public sealed class BmsPublisher : BackgroundService
                     };
                     _log.LogDebug("[BMS] Sending Manufacturer: {Code}", mfg1["identifier.code"]);
                     await mfg1.Send<Manufacturer>();
-                    
+
                     var mfg2 = new Dictionary<string, object>
                     {
                         ["identifier.code"] = "MFG002",
@@ -88,7 +88,7 @@ public sealed class BmsPublisher : BackgroundService
                     };
                     _log.LogDebug("[BMS] Sending Manufacturer: {Code}", mfg2["identifier.code"]);
                     await mfg2.Send<Manufacturer>();
-                    
+
                     foreach (var (deviceTemplate, sensorsTemplate) in sampleData)
                     {
                         // Clone and adjust device for BMS
@@ -102,10 +102,10 @@ public sealed class BmsPublisher : BackgroundService
                             Kind = deviceTemplate.Kind,
                             Code = deviceTemplate.Code
                         };
-                        
+
                         _log.LogDebug("[BMS] Sending Device: {DeviceId}", device.Id);
                         await device.Send();
-                        
+
                         // Send all sensors for this device
                         foreach (var sensorTemplate in sensorsTemplate)
                         {
@@ -113,33 +113,33 @@ public sealed class BmsPublisher : BackgroundService
                             {
                                 Id = "bms" + sensorTemplate.Id, // bmsS1, bmsS2, etc.
                                 DeviceId = "bms" + sensorTemplate.DeviceId, // bmsDX
-                                SensorKey = "bms" + sensorTemplate.SensorKey,
+                                SensorId = "bms" + sensorTemplate.SensorKey,
                                 Code = sensorTemplate.Code,
                                 Unit = sensorTemplate.Unit
                             };
-                            
-                            _log.LogDebug("[BMS] Sending Sensor: {SensorId} -> Device: {DeviceId}", 
+
+                            _log.LogDebug("[BMS] Sending Sensor: {SensorId} -> Device: {DeviceId}",
                                 sensor.Id, sensor.DeviceId);
                             await sensor.Send();
                         }
                     }
-                    
+
                     lastAnnounce = DateTimeOffset.UtcNow;
                     _log.LogInformation("[BMS] Complete dataset sent");
                 }
-                
+
                 // Send random readings
                 var readings = SampleData.CreateSampleReadings(5);
                 foreach (var readingTemplate in readings)
                 {
                     var reading = new Reading
                     {
-                        SensorKey = "bms" + readingTemplate.SensorKey,
+                        SensorId = "bms" + readingTemplate.SensorKey,
                         Value = readingTemplate.Value,
                         CapturedAt = readingTemplate.CapturedAt,
                         Unit = readingTemplate.Unit
                     };
-                    
+
                     _log.LogDebug("[BMS] Reading: {SensorKey} = {Value}", reading.SensorKey, reading.Value);
                     await reading.Send();
                 }
@@ -148,7 +148,7 @@ public sealed class BmsPublisher : BackgroundService
             {
                 _log.LogWarning(ex, "[BMS] Error in publish loop");
             }
-            
+
             try { await Task.Delay(TimeSpan.FromSeconds(10), ct); } catch (TaskCanceledException) { }
         }
     }

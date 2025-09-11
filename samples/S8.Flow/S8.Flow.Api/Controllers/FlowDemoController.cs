@@ -32,10 +32,11 @@ public class FlowDemoController : ControllerBase
         };
 
         // ✨ BEAUTIFUL: Routes through messaging → orchestrator → Flow intake
-    await device.Send();
-        
-        return Ok(new { 
-            message = "✅ Device sent via messaging-first Flow patterns!", 
+        await device.Send();
+
+        return Ok(new
+        {
+            message = "✅ Device sent via messaging-first Flow patterns!",
             device = device.Id,
             route = "Messaging → [FlowOrchestrator] → Flow Intake → Processing Pipeline"
         });
@@ -60,11 +61,12 @@ public class FlowDemoController : ControllerBase
         };
 
         // ✨ BEAUTIFUL: Send to specific target via messaging
-    // Targeted send is obsolete; use messaging pattern or document as not supported
-    await device.Send();
-        
-        return Ok(new { 
-            message = $"✅ Device sent to target '{target}' via messaging!", 
+        // Targeted send is obsolete; use messaging pattern or document as not supported
+        await device.Send();
+
+        return Ok(new
+        {
+            message = $"✅ Device sent to target '{target}' via messaging!",
             device = device.Id,
             target,
             route = $"Messaging → Target({target}) → Flow Processing"
@@ -80,7 +82,7 @@ public class FlowDemoController : ControllerBase
     {
         var reading = new Reading
         {
-            SensorKey = request?.SensorKey ?? "demo::sensor::temp",
+            SensorId = request?.SensorId ?? "demo::sensor::temp",
             Value = request?.Value ?? 25.5,
             CapturedAt = DateTimeOffset.UtcNow,
             Unit = request?.Unit ?? "°C",
@@ -88,10 +90,11 @@ public class FlowDemoController : ControllerBase
         };
 
         // ✨ BEAUTIFUL: Value objects route through messaging too
-    await reading.Send();
-        
-        return Ok(new { 
-            message = "✅ Reading sent via messaging-first Flow patterns!", 
+        await reading.Send();
+
+        return Ok(new
+        {
+            message = "✅ Reading sent via messaging-first Flow patterns!",
             reading = new { reading.SensorKey, reading.Value, reading.Unit },
             route = "Messaging → [FlowOrchestrator] → Flow Intake → Processing Pipeline"
         });
@@ -109,6 +112,6 @@ public record CreateDeviceRequest(
     string? Code = null);
 
 public record CreateReadingRequest(
-    string? SensorKey = null,
+    string? SensorId = null,
     double? Value = null,
     string? Unit = null);

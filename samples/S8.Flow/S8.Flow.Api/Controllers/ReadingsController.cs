@@ -108,11 +108,11 @@ public sealed class ReadingsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] SensorReading reading, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(reading.SensorKey)) return BadRequest("sensorKey is required");
+        if (string.IsNullOrWhiteSpace(reading.SensorKey)) return BadRequest("SensorIdis required");
 
         var readingData = new Reading
         {
-            SensorKey = reading.SensorKey,
+            SensorId = reading.SensorKey,
             Value = reading.Value,
             CapturedAt = reading.CapturedAt,
             Unit = reading.Unit,

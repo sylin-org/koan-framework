@@ -64,12 +64,12 @@ public static class SampleProfiles
         // Get device index for consistent sensor numbering
         var deviceIndex = Array.IndexOf(Fleet, d);
         var baseIndex = deviceIndex * 3; // 3 sensors per device
-        
+
         yield return new Sensor
         {
             Id = $"S{baseIndex + 1}",
             DeviceId = d.Id,
-            SensorKey = $"S{baseIndex + 1}",
+            SensorId = $"S{baseIndex + 1}",
             Code = SensorCodes.TEMP,
             Unit = Units.C,
         };
@@ -77,7 +77,7 @@ public static class SampleProfiles
         {
             Id = $"S{baseIndex + 2}",
             DeviceId = d.Id,
-            SensorKey = $"S{baseIndex + 2}",
+            SensorId = $"S{baseIndex + 2}",
             Code = SensorCodes.PWR,
             Unit = Units.Watt,
         };
@@ -85,7 +85,7 @@ public static class SampleProfiles
         {
             Id = $"S{baseIndex + 3}",
             DeviceId = d.Id,
-            SensorKey = $"S{baseIndex + 3}",
+            SensorId = $"S{baseIndex + 3}",
             Code = SensorCodes.COOLANT_PRESSURE,
             Unit = Units.KPa,
         };
@@ -97,12 +97,12 @@ public static class SampleProfiles
         // Use same sensor IDs as BMS to test merging capabilities
         var deviceIndex = Array.IndexOf(Fleet, d);
         var baseIndex = deviceIndex * 3; // 3 sensors per device
-        
+
         yield return new Sensor
         {
             Id = $"S{baseIndex + 1}",
             DeviceId = d.Id,
-            SensorKey = $"S{baseIndex + 1}",
+            SensorId = $"S{baseIndex + 1}",
             Code = SensorCodes.TEMP,
             Unit = Units.C,
         };
@@ -110,7 +110,7 @@ public static class SampleProfiles
         {
             Id = $"S{baseIndex + 2}",
             DeviceId = d.Id,
-            SensorKey = $"S{baseIndex + 2}",
+            SensorId = $"S{baseIndex + 2}",
             Code = SensorCodes.PWR,
             Unit = Units.Watt,
         };
@@ -118,7 +118,7 @@ public static class SampleProfiles
         {
             Id = $"S{baseIndex + 3}",
             DeviceId = d.Id,
-            SensorKey = $"S{baseIndex + 3}",
+            SensorId = $"S{baseIndex + 3}",
             Code = SensorCodes.COOLANT_PRESSURE,
             Unit = Units.KPa,
         };
@@ -127,7 +127,7 @@ public static class SampleProfiles
 
 public sealed class SensorReading
 {
-    public required string SensorKey { get; init; }
+    public required string SensorId { get; init; }
     public required double Value { get; init; }
     public required string Unit { get; init; }
     public DateTimeOffset CapturedAt { get; init; } = DateTimeOffset.UtcNow;

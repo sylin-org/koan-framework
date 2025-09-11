@@ -64,7 +64,7 @@ public static class AdapterSeeding
                 var sensor = new Sensor
                 {
                     Id = s.Id,
-                    SensorKey = s.SensorKey,
+                    SensorId = s.SensorKey,
                     DeviceId = s.DeviceId,
                     Code = s.Code,
                     Unit = s.Unit

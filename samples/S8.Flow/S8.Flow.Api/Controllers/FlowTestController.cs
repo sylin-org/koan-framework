@@ -61,7 +61,7 @@ public class FlowTestController : ControllerBase
 
             var sensor = new Sensor
             {
-                SensorKey = "test::device::temp",
+                SensorId = "test::device::temp",
                 Id = "test-device",
                 Code = "TEMP",
                 Unit = "°C"
@@ -69,7 +69,7 @@ public class FlowTestController : ControllerBase
 
             var reading = new Reading
             {
-                SensorKey = "test::device::temp",
+                SensorId = "test::device::temp",
                 Value = 25.5,
                 CapturedAt = DateTimeOffset.UtcNow,
                 Unit = "°C",
