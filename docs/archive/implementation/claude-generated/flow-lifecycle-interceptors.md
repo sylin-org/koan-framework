@@ -18,6 +18,7 @@
 ### The Problem We're Solving
 
 #### Current State Issues
+
 ```csharp
 // PROBLEM: Ambiguous timing and limited control
 FlowIntakeInterceptors.RegisterForType<Location>(async location =>
@@ -30,6 +31,7 @@ FlowIntakeInterceptors.RegisterForType<Location>(async location =>
 ```
 
 **Issues:**
+
 - **Semantic Ambiguity**: "IntakeInterceptors" suggests after intake, but fires before
 - **Limited Lifecycle Access**: Only one interception point per entity type
 - **Poor Developer Experience**: Unclear when code executes in pipeline
@@ -37,6 +39,7 @@ FlowIntakeInterceptors.RegisterForType<Location>(async location =>
 - **Naming Confusion**: Method names don't match actual execution timing
 
 #### Real-World Impact
+
 1. **S8.Location Confusion**: Developers unclear when hash collision detection should occur
 2. **Complex Scenarios Blocked**: Cannot implement post-association notifications or pre-projection enrichment
 3. **Framework Limitations**: Single interception point limits sophisticated orchestration patterns
@@ -48,14 +51,14 @@ FlowIntakeInterceptors.RegisterForType<Location>(async location =>
 // SOLUTION: Crystal clear timing and comprehensive control
 FlowInterceptors
   .For<Location>()
-    .BeforeIntake(async location => 
+    .BeforeIntake(async location =>
     {
         // Hash collision detection at optimal timing
         var hash = ComputeSHA512(NormalizeAddress(location.Address));
         location.AddressHash = hash;
-        
+
         var duplicate = await Data<ResolutionCache>.GetAsync(hash);
-        return duplicate != null 
+        return duplicate != null
             ? FlowIntakeActions.Drop(location)  // Already processed
             : FlowIntakeActions.Park(location, "WAITING_ADDRESS_RESOLVE");
     })
@@ -80,18 +83,20 @@ FlowInterceptors
 ### Current Interceptor System
 
 #### File Locations
+
 - **Core Implementation**: `src/Sora.Flow.Core/Interceptors/FlowIntakeInterceptors.cs`
 - **Registration Extensions**: `src/Sora.Flow.Core/ServiceCollectionExtensions.cs`
 - **Action Types**: `src/Sora.Flow.Core/Infrastructure/FlowIntakeActions.cs`
 
 #### Current API Surface
+
 ```csharp
 // Only available interception point
 public static class FlowIntakeInterceptors
 {
-    public static void RegisterForType<T>(Func<T, Task<FlowIntakeAction>> interceptor) 
+    public static void RegisterForType<T>(Func<T, Task<FlowIntakeAction>> interceptor)
         where T : IFlowEntity;
-    
+
     public static void RegisterForInterface<TInterface>(Func<TInterface, Task<FlowIntakeAction>> interceptor);
 }
 
@@ -105,6 +110,7 @@ public static class FlowIntakeActions
 ```
 
 #### Current Execution Flow
+
 ```mermaid
 graph LR
     A[Entity Submitted] --> B[FlowIntakeInterceptor]
@@ -119,6 +125,7 @@ graph LR
 ### Current Usage Patterns
 
 #### Example 1: S8.Location (Problematic)
+
 ```csharp
 // Current S8.Location implementation
 FlowIntakeInterceptors.RegisterForType<Models.Location>(location =>
@@ -130,6 +137,7 @@ FlowIntakeInterceptors.RegisterForType<Models.Location>(location =>
 ```
 
 #### Example 2: S8.Flow Device (Limited)
+
 ```csharp
 // Current S8.Flow implementation
 FlowIntakeInterceptors.RegisterForType<Device>(device =>
@@ -137,7 +145,7 @@ FlowIntakeInterceptors.RegisterForType<Device>(device =>
     // Can only validate/transform at one point
     if (string.IsNullOrEmpty(device.Serial))
         return FlowIntakeActions.Drop(device);
-        
+
     // Cannot react to successful association or enrich before projection
     return FlowIntakeActions.Continue(device);
 });
@@ -146,22 +154,26 @@ FlowIntakeInterceptors.RegisterForType<Device>(device =>
 ### Current Limitations Analysis
 
 #### 1. **Semantic Confusion**
+
 - Method name implies "after intake" but executes "before intake"
 - Developers must consult documentation to understand timing
 - Mental model mismatch causes implementation errors
 
 #### 2. **Single Interception Point**
+
 - Cannot implement pre-projection enrichment
 - Cannot react to association success/failure
 - Cannot perform post-keying validation
 - Complex orchestration patterns require workarounds
 
 #### 3. **Limited Action Vocabulary**
+
 - Only Continue/Drop/Park available
 - Cannot Skip, Defer, or Retry with different timing
 - No conditional action support
 
 #### 4. **Poor Extensibility**
+
 - Adding new pipeline stages requires new interceptor classes
 - No consistent pattern for lifecycle hooks
 - Framework growth hampered by API limitations
@@ -173,6 +185,7 @@ FlowIntakeInterceptors.RegisterForType<Device>(device =>
 ### Proposed Fluent Lifecycle API
 
 #### Core API Structure
+
 ```csharp
 // Primary entry point
 public static class FlowInterceptors
@@ -189,14 +202,14 @@ public class FlowInterceptorBuilder<T> where T : IFlowEntity
     public FlowInterceptorBuilder<T> BeforeAssociation(Func<T, Task<FlowStageAction>> interceptor);
     public FlowInterceptorBuilder<T> BeforeProjection(Func<T, Task<FlowStageAction>> interceptor);
     public FlowInterceptorBuilder<T> BeforeMaterialization(Func<T, Task<FlowStageAction>> interceptor);
-    
+
     // Post-stage interceptors (reactive, side-effects)
     public FlowInterceptorBuilder<T> AfterIntake(Func<T, Task<FlowStageAction>> interceptor);
     public FlowInterceptorBuilder<T> AfterKeying(Func<T, Task<FlowStageAction>> interceptor);
     public FlowInterceptorBuilder<T> AfterAssociation(Func<T, Task<FlowStageAction>> interceptor);
     public FlowInterceptorBuilder<T> AfterProjection(Func<T, Task<FlowStageAction>> interceptor);
     public FlowInterceptorBuilder<T> AfterMaterialization(Func<T, Task<FlowStageAction>> interceptor);
-    
+
     // Conditional interceptors
     public FlowInterceptorBuilder<T> OnAssociationSuccess(Func<T, Task<FlowStageAction>> interceptor);
     public FlowInterceptorBuilder<T> OnAssociationFailure(Func<T, Task<FlowStageAction>> interceptor);
@@ -205,6 +218,7 @@ public class FlowInterceptorBuilder<T> where T : IFlowEntity
 ```
 
 #### Enhanced Action Types
+
 ```csharp
 // Expanded action vocabulary for different stages
 public static class FlowIntakeActions
@@ -235,23 +249,23 @@ graph TD
     C -->|Continue| D[Write to Intake Collection]
     C -->|Park| E[Write to Parked Collection]
     C -->|Drop| F[Discard Entity]
-    
+
     D --> G[AfterIntake Interceptor]
     G --> H[BeforeKeying Interceptor]
     H --> I[Keying Stage]
     I --> J[AfterKeying Interceptor]
-    
+
     J --> K[BeforeAssociation Interceptor]
     K --> L[Association Stage]
     L --> M{Association Result}
     M -->|Success| N[OnAssociationSuccess]
     M -->|Failure| O[OnAssociationFailure]
-    
+
     N --> P[BeforeProjection Interceptor]
     O --> P
     P --> Q[Projection Stage]
     Q --> R[AfterProjection Interceptor]
-    
+
     R --> S[BeforeMaterialization Interceptor]
     S --> T[Materialization Stage]
     T --> U[AfterMaterialization Interceptor]
@@ -260,6 +274,7 @@ graph TD
 ### Enhanced Usage Patterns
 
 #### Example 1: S8.Location (Optimal Implementation)
+
 ```csharp
 FlowInterceptors
   .For<Location>()
@@ -268,17 +283,17 @@ FlowInterceptors
         // Validate and normalize
         if (string.IsNullOrWhiteSpace(location.Address))
             return FlowIntakeActions.Drop(location, "Empty address");
-            
+
         // Compute hash for collision detection
         var normalized = NormalizeAddress(location.Address);
         var hash = ComputeSHA512(normalized);
         location.AddressHash = hash;
-        
+
         // Check for duplicates (hash collision = already processed)
         var duplicate = await Data<ResolutionCache>.GetAsync(hash);
         if (duplicate != null)
             return FlowIntakeActions.Drop(location, $"Duplicate address hash: {hash}");
-            
+
         // New address - park for background resolution
         return FlowIntakeActions.Park(location, "WAITING_ADDRESS_RESOLVE");
     })
@@ -302,6 +317,7 @@ FlowInterceptors
 ```
 
 #### Example 2: Device Orchestration (Advanced Scenarios)
+
 ```csharp
 FlowInterceptors
   .For<Device>()
@@ -310,7 +326,7 @@ FlowInterceptors
         // Basic validation
         if (string.IsNullOrEmpty(device.Serial))
             return FlowIntakeActions.Drop(device, "Missing serial number");
-            
+
         // Generate external identity mappings
         device.ExternalIds["intake"] = Ulid.NewUlid().ToString();
         return FlowIntakeActions.Continue(device);
@@ -345,6 +361,7 @@ FlowInterceptors
 ```
 
 #### Example 3: Multi-Stage Validation Chain
+
 ```csharp
 FlowInterceptors
   .For<Sensor>()
@@ -352,17 +369,17 @@ FlowInterceptors
     {
         // Stage 1: Basic validation
         var validation = await ValidateBasicSensorData(sensor);
-        return validation.IsValid 
+        return validation.IsValid
             ? FlowIntakeActions.Continue(sensor)
             : FlowIntakeActions.Drop(sensor, validation.ErrorMessage);
     })
     .AfterKeying(async sensor =>
     {
         // Stage 2: Post-keying validation with external service
-        var keyValidation = await ValidateSensorKeys(sensor);
+        var keyValidation = await ValidateSerialNumbers(sensor);
         if (!keyValidation.IsValid)
             return FlowStageActions.Defer(sensor, TimeSpan.FromMinutes(5), "Key validation pending");
-            
+
         return FlowStageActions.Continue(sensor);
     })
     .BeforeAssociation(async sensor =>
@@ -371,7 +388,7 @@ FlowInterceptors
         var conflicts = await DetectAssociationConflicts(sensor);
         if (conflicts.Any())
             return FlowStageActions.Park(sensor, "ASSOCIATION_CONFLICTS", JsonSerializer.Serialize(conflicts));
-            
+
         return FlowStageActions.Continue(sensor);
     });
 ```
@@ -383,37 +400,41 @@ FlowInterceptors
 ### Phase 1: Core Infrastructure (Week 1-2)
 
 #### 1.1 Create Fluent Builder Classes
+
 **File**: `src/Sora.Flow.Core/Interceptors/FlowInterceptorBuilder.cs`
+
 ```csharp
 namespace Sora.Flow.Core.Interceptors;
 
 public class FlowInterceptorBuilder<T> where T : IFlowEntity
 {
     private readonly FlowInterceptorRegistry<T> _registry;
-    
+
     internal FlowInterceptorBuilder(FlowInterceptorRegistry<T> registry)
     {
         _registry = registry;
     }
-    
+
     public FlowInterceptorBuilder<T> BeforeIntake(Func<T, Task<FlowIntakeAction>> interceptor)
     {
         _registry.RegisterBeforeIntake(interceptor);
         return this;
     }
-    
+
     public FlowInterceptorBuilder<T> AfterIntake(Func<T, Task<FlowStageAction>> interceptor)
     {
         _registry.RegisterAfterIntake(interceptor);
         return this;
     }
-    
+
     // ... implement all lifecycle methods
 }
 ```
 
 #### 1.2 Create Registry System
+
 **File**: `src/Sora.Flow.Core/Interceptors/FlowInterceptorRegistry.cs`
+
 ```csharp
 namespace Sora.Flow.Core.Interceptors;
 
@@ -423,12 +444,12 @@ internal class FlowInterceptorRegistry<T> where T : IFlowEntity
     private readonly List<Func<T, Task<FlowStageAction>>> _afterIntake = new();
     private readonly List<Func<T, Task<FlowStageAction>>> _beforeKeying = new();
     // ... all lifecycle collections
-    
+
     public void RegisterBeforeIntake(Func<T, Task<FlowIntakeAction>> interceptor)
     {
         _beforeIntake.Add(interceptor);
     }
-    
+
     public async Task<FlowIntakeAction?> ExecuteBeforeIntake(T entity)
     {
         foreach (var interceptor in _beforeIntake)
@@ -438,38 +459,40 @@ internal class FlowInterceptorRegistry<T> where T : IFlowEntity
         }
         return null; // Continue with default behavior
     }
-    
+
     // ... implement all execution methods
 }
 ```
 
 #### 1.3 Create Enhanced Action Types
+
 **File**: `src/Sora.Flow.Core/Infrastructure/FlowStageActions.cs`
+
 ```csharp
 namespace Sora.Flow.Core.Infrastructure;
 
 public static class FlowStageActions
 {
-    public static FlowStageAction Continue(IFlowEntity entity) => 
+    public static FlowStageAction Continue(IFlowEntity entity) =>
         new FlowStageAction(FlowStageActionType.Continue, entity);
-    
-    public static FlowStageAction Skip(IFlowEntity entity, string reason = null) => 
+
+    public static FlowStageAction Skip(IFlowEntity entity, string reason = null) =>
         new FlowStageAction(FlowStageActionType.Skip, entity, reason);
-    
-    public static FlowStageAction Defer(IFlowEntity entity, TimeSpan delay, string reason = null) => 
+
+    public static FlowStageAction Defer(IFlowEntity entity, TimeSpan delay, string reason = null) =>
         new FlowStageAction(FlowStageActionType.Defer, entity, reason) { Delay = delay };
-    
-    public static FlowStageAction Retry(IFlowEntity entity, int maxAttempts, string reason = null) => 
+
+    public static FlowStageAction Retry(IFlowEntity entity, int maxAttempts, string reason = null) =>
         new FlowStageAction(FlowStageActionType.Retry, entity, reason) { MaxAttempts = maxAttempts };
-    
-    public static FlowStageAction Park(IFlowEntity entity, string reasonCode, string evidence = null) => 
+
+    public static FlowStageAction Park(IFlowEntity entity, string reasonCode, string evidence = null) =>
         new FlowStageAction(FlowStageActionType.Park, entity, reasonCode) { Evidence = evidence };
 }
 
 public enum FlowStageActionType
 {
     Continue,
-    Skip, 
+    Skip,
     Defer,
     Retry,
     Park,
@@ -485,7 +508,7 @@ public class FlowStageAction
     public int? MaxAttempts { get; set; }
     public string Evidence { get; set; }
     public bool ShouldStop => ActionType != FlowStageActionType.Continue;
-    
+
     public FlowStageAction(FlowStageActionType actionType, IFlowEntity entity, string reason = null)
     {
         ActionType = actionType;
@@ -498,46 +521,52 @@ public class FlowStageAction
 ### Phase 2: Pipeline Integration (Week 3-4)
 
 #### 2.1 Modify Pipeline Stages
+
 Each pipeline stage needs interceptor integration points:
 
 **File**: `src/Sora.Flow.Core/Pipeline/IntakeStage.cs` (Enhanced)
+
 ```csharp
 public async Task<StageResult> ProcessAsync<T>(T entity) where T : IFlowEntity
 {
     var registry = FlowInterceptorRegistry.GetFor<T>();
-    
+
     // Execute before-intake interceptors
     var beforeResult = await registry.ExecuteBeforeIntake(entity);
     if (beforeResult != null)
     {
         return HandleIntakeAction(beforeResult);
     }
-    
+
     // Perform standard intake processing
     var intakeResult = await StandardIntakeProcessing(entity);
-    
-    // Execute after-intake interceptors  
+
+    // Execute after-intake interceptors
     var afterResult = await registry.ExecuteAfterIntake(entity);
     if (afterResult != null)
     {
         return HandleStageAction(afterResult);
     }
-    
+
     return intakeResult;
 }
 ```
 
 #### 2.2 Create Stage Integration Points
+
 Each Flow stage needs interceptor hooks:
+
 - `KeyingStage.cs` → BeforeKeying/AfterKeying hooks
-- `AssociationStage.cs` → BeforeAssociation/AfterAssociation/OnSuccess/OnFailure hooks  
+- `AssociationStage.cs` → BeforeAssociation/AfterAssociation/OnSuccess/OnFailure hooks
 - `ProjectionStage.cs` → BeforeProjection/AfterProjection hooks
 - `MaterializationStage.cs` → BeforeMaterialization/AfterMaterialization hooks
 
 ### Phase 3: Migration and Compatibility (Week 5)
 
 #### 3.1 Create Migration Utilities
+
 **File**: `src/Sora.Flow.Core/Migration/FlowInterceptorMigration.cs`
+
 ```csharp
 namespace Sora.Flow.Core.Migration;
 
@@ -549,13 +578,13 @@ public static class FlowIntakeInterceptors
     {
         // Migrate to new API automatically
         FlowInterceptors.For<T>().BeforeIntake(interceptor);
-        
+
         // Log migration warning
         var logger = ServiceLocator.GetService<ILogger<FlowIntakeInterceptors>>();
         logger?.LogWarning("FlowIntakeInterceptors.RegisterForType is deprecated. " +
             "Use FlowInterceptors.For<{EntityType}>().BeforeIntake() instead.", typeof(T).Name);
     }
-    
+
     public static void RegisterForInterface<TInterface>(Func<TInterface, Task<FlowIntakeAction>> interceptor)
     {
         // Similar migration logic for interface-based registration
@@ -564,19 +593,22 @@ public static class FlowIntakeInterceptors
 ```
 
 #### 3.2 Update Documentation
-- **Migration Guide**: `FLOW_INTERCEPTOR_MIGRATION.md` 
+
+- **Migration Guide**: `FLOW_INTERCEPTOR_MIGRATION.md`
 - **API Reference**: Update all interceptor documentation
 - **Code Examples**: Update all samples to use new fluent API
 
 ### Phase 4: Sample Updates (Week 6)
 
 #### 4.1 Update S8.Location Implementation
+
 **File**: `samples/S8.Location/S8.Location.Core/Interceptors/LocationInterceptor.cs`
+
 ```csharp
 public void Initialize(IServiceCollection services)
 {
     Console.WriteLine("[LocationInterceptor] Registering lifecycle interceptors");
-    
+
     FlowInterceptors
       .For<Models.Location>()
         .BeforeIntake(async location =>
@@ -584,17 +616,17 @@ public void Initialize(IServiceCollection services)
             // Validation
             if (string.IsNullOrWhiteSpace(location.Address))
                 return FlowIntakeActions.Drop(location, "Empty address");
-            
+
             // Hash collision detection
             var normalized = _resolver.NormalizeAddress(location.Address);
             var hash = _resolver.ComputeSHA512(normalized);
             location.AddressHash = hash;
-            
+
             // Check for duplicates (collision = already processed)
             var duplicate = await Data<ResolutionCache>.GetAsync(hash);
             if (duplicate != null)
                 return FlowIntakeActions.Drop(location, $"Duplicate address hash: {hash}");
-            
+
             // New address - park for background resolution
             return FlowIntakeActions.Park(location, "WAITING_ADDRESS_RESOLVE");
         })
@@ -612,7 +644,9 @@ public void Initialize(IServiceCollection services)
 ```
 
 #### 4.2 Update S8.Flow Device Sample
+
 **File**: `samples/S8.Flow/S8.Flow.Shared/FlowConfiguration.cs`
+
 ```csharp
 public static void ConfigureInterceptors()
 {
@@ -629,7 +663,7 @@ public static void ConfigureInterceptors()
             Console.WriteLine($"Device {device.Serial} successfully associated");
             return FlowStageActions.Continue(device);
         });
-    
+
     FlowInterceptors
       .For<Sensor>()
         .BeforeIntake(async sensor =>
@@ -647,6 +681,7 @@ public static void ConfigureInterceptors()
 ### For Existing S8.Location Implementation
 
 #### Current Code (Before Migration)
+
 ```csharp
 // LocationInterceptor.cs - Current problematic implementation
 FlowIntakeInterceptors.RegisterForType<Models.Location>(location =>
@@ -656,13 +691,14 @@ FlowIntakeInterceptors.RegisterForType<Models.Location>(location =>
     {
         return FlowIntakeActions.Drop(location);
     }
-    
+
     // Park all new locations for background hash collision detection and resolution
     return FlowIntakeActions.Park(location, "WAITING_ADDRESS_RESOLVE");
 });
 ```
 
 #### Migrated Code (After Migration)
+
 ```csharp
 // LocationInterceptor.cs - Enhanced implementation with fluent API
 FlowInterceptors
@@ -672,12 +708,12 @@ FlowInterceptors
         // Enhanced validation
         if (string.IsNullOrWhiteSpace(location.Address))
             return FlowIntakeActions.Drop(location, "Empty address field");
-            
+
         // Hash collision detection (core requirement)
         var normalized = _addressResolver.NormalizeAddress(location.Address);
         var hash = _addressResolver.ComputeSHA512(normalized);
         location.AddressHash = hash;
-        
+
         // Check for hash collision (duplicate address)
         var existingCache = await Data<ResolutionCache>.GetAsync(hash);
         if (existingCache != null)
@@ -686,7 +722,7 @@ FlowInterceptors
             _logger.LogDebug("Dropping duplicate address with hash: {Hash}", hash);
             return FlowIntakeActions.Drop(location, $"Duplicate address hash: {hash}");
         }
-        
+
         // New unique address - park for background resolution
         _logger.LogDebug("Parking new address for resolution: {Address}", location.Address);
         return FlowIntakeActions.Park(location, "WAITING_ADDRESS_RESOLVE");
@@ -696,13 +732,13 @@ FlowInterceptors
         // Post-association processing - notify external systems
         if (!string.IsNullOrEmpty(location.AgnosticLocationId))
         {
-            _logger.LogInformation("Location successfully associated with canonical ID: {Id}", 
+            _logger.LogInformation("Location successfully associated with canonical ID: {Id}",
                 location.AgnosticLocationId);
-            
+
             // Trigger external system notifications
             await _notificationService.NotifyLocationResolved(location);
         }
-        
+
         return FlowStageActions.Continue(location);
     })
     .BeforeProjection(async location =>
@@ -710,7 +746,7 @@ FlowInterceptors
         // Enrich location before canonical projection
         location.Metadata["ProcessedAt"] = DateTimeOffset.UtcNow.ToString("O");
         location.Metadata["ProcessedBy"] = Environment.MachineName;
-        
+
         return FlowStageActions.Continue(location);
     });
 ```
@@ -718,6 +754,7 @@ FlowInterceptors
 ### For Existing S8.Flow Samples
 
 #### Device Interceptor Migration
+
 ```csharp
 // Before
 FlowIntakeInterceptors.RegisterForType<Device>(device =>
@@ -727,7 +764,7 @@ FlowIntakeInterceptors.RegisterForType<Device>(device =>
     return FlowIntakeActions.Continue(device);
 });
 
-// After  
+// After
 FlowInterceptors
   .For<Device>()
     .BeforeIntake(async device =>
@@ -746,6 +783,7 @@ FlowInterceptors
 ### Entity Model Updates
 
 #### ResolutionCache and AgnosticLocation Fixes
+
 ```csharp
 // Before (Current - Incorrect)
 public class ResolutionCache : Entity<ResolutionCache, string>
@@ -760,13 +798,13 @@ public class ResolutionCache : Entity<ResolutionCache>
     // ... other properties
 }
 
-public class AgnosticLocation : Entity<AgnosticLocation>  
+public class AgnosticLocation : Entity<AgnosticLocation>
 {
     // Entity<> already implements string Id property - use ULID
     public string? ParentId { get; set; }  // Self-referencing hierarchy
     public LocationType Type { get; set; }
     // ... other properties
-    
+
     // Use ULID for new instances
     public static AgnosticLocation Create(LocationType type, string name)
     {
@@ -786,31 +824,35 @@ public class AgnosticLocation : Entity<AgnosticLocation>
 ## 🎯 Success Criteria
 
 ### Functional Requirements
+
 ✅ **Crystal Clear Semantics**: BeforeIntake/AfterIntake methods clearly indicate execution timing  
 ✅ **Comprehensive Lifecycle Control**: All pipeline stages have before/after interceptor hooks  
 ✅ **Advanced Action Types**: Skip, Defer, Retry, Transform actions available beyond Continue/Drop/Park  
 ✅ **Conditional Interceptors**: OnAssociationSuccess/OnAssociationFailure for reactive patterns  
 ✅ **Fluent API**: Chainable methods for clean, readable interceptor registration  
-✅ **Backward Compatibility**: Migration path from existing FlowIntakeInterceptors API  
+✅ **Backward Compatibility**: Migration path from existing FlowIntakeInterceptors API
 
-### Performance Requirements  
+### Performance Requirements
+
 ✅ **No Performance Regression**: New API performs equivalent to current implementation  
 ✅ **Minimal Memory Overhead**: Registry system uses efficient storage for interceptor collections  
 ✅ **Async-First Design**: All interceptor methods support async/await patterns  
-✅ **Stage-Specific Execution**: Only registered interceptors execute, no unnecessary callback overhead  
+✅ **Stage-Specific Execution**: Only registered interceptors execute, no unnecessary callback overhead
 
 ### Developer Experience Requirements
+
 ✅ **Intuitive Naming**: Method names clearly indicate when they execute in pipeline  
 ✅ **IntelliSense Friendly**: Fluent API provides excellent IDE support with clear method signatures  
 ✅ **Comprehensive Documentation**: Each lifecycle method documented with timing and use cases  
 ✅ **Migration Warnings**: Deprecated methods provide clear guidance to new API  
-✅ **Example-Rich**: Samples demonstrate common patterns and advanced scenarios  
+✅ **Example-Rich**: Samples demonstrate common patterns and advanced scenarios
 
 ### Framework Integration Requirements
+
 ✅ **Consistent Patterns**: Lifecycle API follows existing Sora Framework conventions  
 ✅ **Auto-Registration**: Interceptors register automatically via ISoraAutoRegistrar pattern  
 ✅ **Service Integration**: Full dependency injection support for interceptor implementations  
-✅ **Error Handling**: Interceptor exceptions handled gracefully with appropriate logging  
+✅ **Error Handling**: Interceptor exceptions handled gracefully with appropriate logging
 
 ---
 
@@ -819,54 +861,58 @@ public class AgnosticLocation : Entity<AgnosticLocation>
 ### Core Architecture Components
 
 #### 1. **FlowInterceptorRegistry System**
+
 ```csharp
 // Central registry for all entity type interceptors
 internal static class FlowInterceptorRegistryManager
 {
     private static readonly ConcurrentDictionary<Type, IFlowInterceptorRegistry> _registries = new();
-    
+
     public static FlowInterceptorRegistry<T> GetFor<T>() where T : IFlowEntity
     {
-        return (FlowInterceptorRegistry<T>)_registries.GetOrAdd(typeof(T), 
+        return (FlowInterceptorRegistry<T>)_registries.GetOrAdd(typeof(T),
             _ => new FlowInterceptorRegistry<T>());
     }
 }
 ```
 
 #### 2. **Pipeline Stage Integration**
+
 Each pipeline stage follows this integration pattern:
+
 ```csharp
-public async Task<StageResult> ProcessEntityAsync<T>(T entity, StageContext context) 
+public async Task<StageResult> ProcessEntityAsync<T>(T entity, StageContext context)
     where T : IFlowEntity
 {
     var registry = FlowInterceptorRegistryManager.GetFor<T>();
-    
+
     // Execute before-stage interceptors
     var beforeResult = await registry.ExecuteBeforeStage(entity, context);
     if (beforeResult?.ShouldStop == true)
         return ConvertToStageResult(beforeResult);
-    
+
     // Execute stage processing
     var stageResult = await ProcessStageLogic(entity, context);
-    
+
     // Execute after-stage interceptors
     var afterResult = await registry.ExecuteAfterStage(entity, stageResult, context);
     if (afterResult?.ShouldStop == true)
         return ConvertToStageResult(afterResult);
-    
+
     return stageResult;
 }
 ```
 
 #### 3. **Conditional Interceptor Execution**
+
 ```csharp
-public async Task<StageResult> AssociationStageAsync<T>(T entity, StageContext context) 
+public async Task<StageResult> AssociationStageAsync<T>(T entity, StageContext context)
     where T : IFlowEntity
 {
     var registry = FlowInterceptorRegistryManager.GetFor<T>();
-    
+
     // ... standard before/processing/after pattern
-    
+
     // Conditional execution based on association result
     if (associationResult.IsSuccess)
     {
@@ -876,7 +922,7 @@ public async Task<StageResult> AssociationStageAsync<T>(T entity, StageContext c
     {
         await registry.ExecuteOnAssociationFailure(entity, associationResult.Error, context);
     }
-    
+
     return stageResult;
 }
 ```
@@ -884,9 +930,11 @@ public async Task<StageResult> AssociationStageAsync<T>(T entity, StageContext c
 ### Performance Optimization Strategies
 
 #### 1. **Lazy Registry Initialization**
+
 Registries are created only when first interceptor is registered, minimizing memory usage for entity types without interceptors.
 
 #### 2. **Efficient Interceptor Storage**
+
 ```csharp
 // Use arrays instead of lists for better performance
 private Func<T, Task<FlowStageAction>>[] _beforeIntake = Array.Empty<Func<T, Task<FlowStageAction>>>();
@@ -903,11 +951,13 @@ public void AddBeforeIntake(Func<T, Task<FlowStageAction>> interceptor)
 ```
 
 #### 3. **Stage-Aware Execution**
+
 Only execute interceptors for stages that actually have registered handlers, avoiding unnecessary async overhead.
 
 ### Error Handling and Resilience
 
 #### 1. **Interceptor Exception Handling**
+
 ```csharp
 public async Task<FlowStageAction?> ExecuteBeforeIntake(T entity)
 {
@@ -922,7 +972,7 @@ public async Task<FlowStageAction?> ExecuteBeforeIntake(T entity)
         catch (Exception ex)
         {
             _logger.LogError(ex, "Interceptor failed for entity type {EntityType}", typeof(T).Name);
-            
+
             // Continue with other interceptors, log failure
             // Could implement circuit breaker pattern here
         }
@@ -932,7 +982,9 @@ public async Task<FlowStageAction?> ExecuteBeforeIntake(T entity)
 ```
 
 #### 2. **Circuit Breaker Pattern**
+
 For production resilience, implement circuit breaker for consistently failing interceptors:
+
 ```csharp
 private readonly CircuitBreaker _circuitBreaker = new(
     failureThreshold: 5,
@@ -955,16 +1007,19 @@ public async Task<FlowStageAction?> ExecuteInterceptorSafely(Func<T, Task<FlowSt
 ### For Framework Users
 
 #### 1. **Precise Control Over Data Pipeline**
+
 - **Before**: Single interception point with ambiguous timing
 - **After**: Comprehensive lifecycle control with explicit stage timing
 - **Value**: Enables sophisticated data orchestration patterns previously impossible
 
-#### 2. **Crystal Clear Developer Experience**  
+#### 2. **Crystal Clear Developer Experience**
+
 - **Before**: Confusing method names requiring documentation consultation
 - **After**: Self-documenting API with intuitive naming
 - **Value**: Reduces learning curve and implementation errors
 
 #### 3. **Advanced Orchestration Scenarios**
+
 - **Before**: Complex workarounds for multi-stage processing
 - **After**: Natural support for conditional logic, enrichment, and side effects
 - **Value**: Enables enterprise-grade data processing patterns
@@ -972,11 +1027,13 @@ public async Task<FlowStageAction?> ExecuteInterceptorSafely(Func<T, Task<FlowSt
 ### For Framework Architecture
 
 #### 1. **Consistent Extension Pattern**
+
 - **Extensible**: Easy to add new pipeline stages with interceptor support
-- **Consistent**: Same fluent API pattern across all stages  
+- **Consistent**: Same fluent API pattern across all stages
 - **Future-Proof**: Architecture supports future Flow enhancements
 
 #### 2. **Performance and Scalability**
+
 - **Efficient**: Stage-aware execution prevents unnecessary overhead
 - **Scalable**: Registry pattern supports large numbers of entity types
 - **Resilient**: Error handling and circuit breaker patterns for production use
@@ -984,18 +1041,20 @@ public async Task<FlowStageAction?> ExecuteInterceptorSafely(Func<T, Task<FlowSt
 ### For S8.Location Sample Specifically
 
 #### 1. **Proper Hash Collision Detection**
+
 ```csharp
 // Before: No collision detection, everything parked
 return FlowIntakeActions.Park(location, "WAITING_ADDRESS_RESOLVE");
 
 // After: Intelligent collision detection at optimal timing
 var duplicate = await Data<ResolutionCache>.GetAsync(hash);
-return duplicate != null 
+return duplicate != null
     ? FlowIntakeActions.Drop(location, "Duplicate address")
     : FlowIntakeActions.Park(location, "WAITING_ADDRESS_RESOLVE");
 ```
 
 #### 2. **External System Integration**
+
 ```csharp
 // After: Clean post-association notifications
 .AfterAssociation(async location =>
@@ -1003,7 +1062,7 @@ return duplicate != null
     if (location.AgnosticLocationId != null)
     {
         await NotifyInventorySystem(location);
-        await NotifyHealthcareSystem(location);  
+        await NotifyHealthcareSystem(location);
     }
     return FlowStageActions.Continue(location);
 });
@@ -1016,17 +1075,20 @@ return duplicate != null
 ### Immediate Actions (Next Session)
 
 #### 1. **Begin Core Infrastructure Implementation**
+
 - [ ] Create `FlowInterceptorBuilder<T>` class with fluent methods
-- [ ] Implement `FlowInterceptorRegistry<T>` with lifecycle collections  
+- [ ] Implement `FlowInterceptorRegistry<T>` with lifecycle collections
 - [ ] Create enhanced `FlowStageActions` static class
 - [ ] Add registration management in `FlowInterceptorRegistryManager`
 
 #### 2. **Pipeline Integration Points**
+
 - [ ] Modify `IntakeStage` to call before/after interceptors
 - [ ] Update `AssociationStage` for success/failure conditional interceptors
 - [ ] Enhance `ProjectionStage` and `MaterializationStage` with hooks
 
 #### 3. **Migration Compatibility**
+
 - [ ] Create deprecated `FlowIntakeInterceptors` class with migration warnings
 - [ ] Implement automatic migration from old to new API
 - [ ] Update all framework documentation
@@ -1034,7 +1096,9 @@ return duplicate != null
 ### Week 1-2 Development Focus
 
 #### **Priority 1: S8.Location Fix**
+
 The most important immediate benefit is fixing S8.Location's hash collision detection:
+
 ```csharp
 // Target implementation for S8.Location
 FlowInterceptors
@@ -1044,15 +1108,16 @@ FlowInterceptors
         // Proper hash collision detection at intake
         var hash = ComputeSHA512(NormalizeAddress(location.Address));
         location.AddressHash = hash;
-        
+
         var duplicate = await Data<ResolutionCache>.GetAsync(hash);
-        return duplicate != null 
+        return duplicate != null
             ? FlowIntakeActions.Drop(location) // Collision = duplicate = drop
             : FlowIntakeActions.Park(location, "WAITING_ADDRESS_RESOLVE");
     });
 ```
 
-#### **Priority 2: Entity Model Corrections**  
+#### **Priority 2: Entity Model Corrections**
+
 ```csharp
 // Fix entity inheritance
 public class ResolutionCache : Entity<ResolutionCache>  // Remove <string>
@@ -1065,6 +1130,7 @@ Id = Ulid.NewUlid().ToString()  // Instead of Guid.NewGuid()
 ### Future Session Preparation
 
 #### **Commands to Check Progress**
+
 ```bash
 # Check if S8.Location is working with new interceptor pattern
 docker logs sora-s8-location-api-1 | grep -i "FlowInterceptors\|BeforeIntake\|hash collision"
@@ -1082,14 +1148,16 @@ docker exec s8-mongo mongosh s8 --eval "
 ```
 
 #### **Files to Monitor**
+
 - `samples/S8.Location/S8.Location.Core/Interceptors/LocationInterceptor.cs` - Main migration target
-- `samples/S8.Location/S8.Location.Core/Models/ResolutionCache.cs` - Entity fix  
+- `samples/S8.Location/S8.Location.Core/Models/ResolutionCache.cs` - Entity fix
 - `samples/S8.Location/S8.Location.Core/Models/AgnosticLocation.cs` - Entity fix
 - `src/Sora.Flow.Core/Interceptors/FlowInterceptorBuilder.cs` - New infrastructure
 
 #### **Success Indicators**
+
 - ✅ S8.Location drops duplicate addresses instead of parking everything
-- ✅ ResolutionCache and AgnosticLocation use proper Entity<> inheritance  
+- ✅ ResolutionCache and AgnosticLocation use proper Entity<> inheritance
 - ✅ New FlowInterceptors.For<Location>().BeforeIntake() syntax works
 - ✅ ULIDs generated instead of GUIDs for new entities
 - ✅ Background resolution service continues working with healed entities
@@ -1101,8 +1169,9 @@ docker exec s8-mongo mongosh s8 --eval "
 This CLD document establishes the comprehensive architecture for transforming Sora.Flow's interceptor system from a limited, ambiguous single-point API to a sophisticated, fluent lifecycle API that provides precise control over every stage of the data processing pipeline.
 
 **Key Outcomes:**
+
 1. **Crystal Clear Semantics**: BeforeIntake/AfterIntake removes all timing ambiguity
-2. **Comprehensive Control**: Full lifecycle coverage from intake to materialization  
+2. **Comprehensive Control**: Full lifecycle coverage from intake to materialization
 3. **Advanced Scenarios**: Conditional interceptors, enrichment, and side effects
 4. **Framework Maturity**: Enterprise-grade data orchestration capabilities
 5. **Perfect for S8.Location**: Enables proper hash collision detection at optimal timing
