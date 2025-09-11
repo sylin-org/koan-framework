@@ -30,6 +30,7 @@ using Sora.Flow.Monitoring;
 using Sora.Messaging;
 using Sora.Flow.Actions;
 using Microsoft.Extensions.Configuration;
+using Sora.Flow.Core.Services;
 
 namespace Sora.Flow;
 
@@ -123,6 +124,8 @@ public static class ServiceCollectionExtensions
         {
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelAssociationWorkerHostedService>());
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ModelProjectionWorkerHostedService>());
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ParentKeyResolutionService>());
+            services.TryAddSingleton<ParentKeyResolutionService>(); // For service poke access
         }
         else
         {
@@ -694,6 +697,24 @@ public static class ServiceCollectionExtensions
                                                 source = sourceSystem 
                                             }, 
                                             rec, modelType, intakeSet, stoppingToken);
+                                        
+                                        // Trigger ParentKeyResolutionService for immediate processing
+                                        _ = Task.Run(async () =>
+                                        {
+                                            try
+                                            {
+                                                var resolutionService = _sp.GetService<ParentKeyResolutionService>();
+                                                if (resolutionService != null)
+                                                {
+                                                    await resolutionService.TriggerResolutionAsync();
+                                                }
+                                            }
+                                            catch
+                                            {
+                                                // Fire and forget - don't fail the main processing loop
+                                            }
+                                        });
+                                        
                                         continue;
                                     }
                                 }
