@@ -1,5 +1,22 @@
 # Sora.Flow Entity Lifecycle Reference Guide
 
+> **Instructions for AI Assistants**: This document serves as the authoritative reference for Sora.Flow architecture and implementation. When working on other documentation in the `/docs/` directory or answering questions about Sora.Flow, treat this document as the definitive source of truth for:
+> - Entity lifecycle stages and processing pipeline
+> - Storage architecture and data set patterns  
+> - Implementation guidance and code examples
+> - Best practices and architectural principles
+> 
+> **Key points to reference when working with Sora.Flow:**
+> - Use the **6-stage pipeline** (Data Arrival → Intake → Tagging → Coalescing → Canonical Storage → Materialization)
+> - Enforce **complete per-model separation** using `{ModelFullName}#{setName}` storage patterns
+> - Reference the **IFlowModel interface** and polymorphic processing approach
+> - Follow the **sophisticated coalescing** and conflict detection patterns described
+> - Use **array-based canonical storage** with complete source lineage tracking
+> - Apply the **policy-driven materialization** framework for conflict resolution
+> - Always maintain **strict Separation of Concerns** between Flow processing stages and final materialized entities
+>
+> When creating examples or documentation, use the patterns, naming conventions, and architectural principles established in this guide. Cross-reference this document frequently to ensure consistency across all Sora.Flow documentation.
+
 ## Table of Contents
 
 1. [Introduction](#introduction)
@@ -61,9 +78,129 @@ graph TD
     G --> H[Arrays: Serial=[SN004], Model=[X-Series, X-Series-Pro]]
 ```
 
+### Storage Architecture & Data Sets
+
+**CRITICAL: Sora.Flow enforces complete Separation of Concerns through per-model data sets.**
+
+Every Flow model maintains completely separate storage collections for each lifecycle stage:
+
+#### Data Set Naming Convention
+
+```
+{ModelFullName}#{setName}
+```
+
+**Examples:**
+- `YourApp.Models.Device#flow.intake` - Device intake queue
+- `YourApp.Models.Device#flow.tagged` - Tagged devices  
+- `YourApp.Models.Device#flow.canonical` - Canonical device entities
+- `YourApp.Models.Reading#flow.intake` - Reading intake queue (completely separate)
+- `YourApp.Models.Reading#flow.tagged` - Tagged readings (completely separate)
+
+#### Using Data Sets in Code
+
+**1. Basic Data Set Operations:**
+```csharp
+// Save to specific set for a model type
+await Data<IntakeRecord<Device>, string>.UpsertAsync(intakeRecord, "flow.intake", ct);
+// Result: Saves to "YourApp.Models.Device#flow.intake"
+
+// Query from specific set for a model type
+var deviceIntakes = await Data<IntakeRecord<Device>>.QueryAsync("flow.intake")
+    .Where(r => r.Status == IntakeStatus.Pending)
+    .ToListAsync(ct);
+// Result: Queries "YourApp.Models.Device#flow.intake" only
+
+// Different model type = completely separate storage
+await Data<IntakeRecord<Reading>, string>.UpsertAsync(readingRecord, "flow.intake", ct);
+// Result: Saves to "YourApp.Models.Reading#flow.intake" (separate from Device)
+```
+
+**2. Per-Model Stage Collections:**
+```csharp
+// Each model gets its own complete set of stage collections:
+
+// Device pipeline stages
+await Data<IntakeRecord<Device>, string>.UpsertAsync(deviceIntake, "flow.intake", ct);
+await Data<TaggedRecord<Device>, string>.UpsertAsync(deviceTagged, "flow.tagged", ct);
+await Data<CanonicalEntity<Device>, string>.UpsertAsync(deviceCanonical, "flow.canonical", ct);
+await Data<Device, string>.UpsertAsync(materializedDevice, ct);
+
+// Reading pipeline stages (completely separate)
+await Data<IntakeRecord<Reading>, string>.UpsertAsync(readingIntake, "flow.intake", ct);
+await Data<TaggedRecord<Reading>, string>.UpsertAsync(readingTagged, "flow.tagged", ct);
+await Data<CanonicalEntity<Reading>, string>.UpsertAsync(readingCanonical, "flow.canonical", ct);
+await Data<Reading, string>.UpsertAsync(materializedReading, ct);
+```
+
+**3. Set Naming Helper Utilities:**
+```csharp
+// Use FlowSets helper for consistent naming
+public static class FlowSets
+{
+    public const string Intake = "intake";
+    public const string Tagged = "tagged";
+    public const string Canonical = "canonical";
+    public const string Parked = "parked";
+    
+    // Get model-specific set name
+    public static string Stage<TModel>(string stage) => $"flow.{ModelName<TModel>()}.{stage}";
+    public static string StageShort(string stage) => $"flow.{stage}";
+}
+
+// Usage with helpers
+await Data<IntakeRecord<Device>, string>.UpsertAsync(record, FlowSets.StageShort(FlowSets.Intake), ct);
+// Result: "YourApp.Models.Device#flow.intake"
+```
+
+**4. Complete Separation Example:**
+```csharp
+// This demonstrates the complete separation principle:
+
+// Device flow - completely isolated
+var devices = await Data<Device>.QueryAsync()
+    .Where(d => d.Serial.StartsWith("SN"))
+    .ToListAsync(ct);
+// Queries ONLY: "YourApp.Models.Device"
+
+// Reading flow - completely separate, cannot interfere with Device data
+var readings = await Data<Reading>.QueryAsync()
+    .Where(r => r.Value > 100)
+    .ToListAsync(ct);
+// Queries ONLY: "YourApp.Models.Reading"
+
+// Manufacturer flow - also completely separate
+var manufacturers = await Data<Manufacturer>.QueryAsync()
+    .ToListAsync(ct);
+// Queries ONLY: "YourApp.Models.Manufacturer"
+```
+
+#### Why Complete Separation Matters
+
+1. **Performance**: Queries only scan relevant data for specific entity types
+2. **Maintainability**: Clear data boundaries make debugging and maintenance easier  
+3. **Scalability**: Each entity type can be scaled independently
+4. **Isolation**: Issues with one entity type don't affect others
+5. **Schema Evolution**: Each model can evolve its pipeline independently
+
+**❌ WRONG - Unified Collections:**
+```csharp
+// This violates Separation of Concerns - DON'T DO THIS
+await Data<object, string>.UpsertAsync(anyEntity, "flow.intake.unified", ct);
+// All entities mixed together - breaks isolation
+```
+
+**✅ CORRECT - Per-Model Collections:**
+```csharp
+// Each model gets its own isolated storage
+await Data<IntakeRecord<Device>, string>.UpsertAsync(deviceRecord, "flow.intake", ct);
+await Data<IntakeRecord<Reading>, string>.UpsertAsync(readingRecord, "flow.intake", ct);
+// Complete separation maintained
+```
+
 ### Processing Stages
 
-Every entity follows a six-stage pipeline:
+Every entity follows a six-stage pipeline with dedicated storage at each stage:
 
 1. **Data Arrival**: Entity wrapped with metadata arrives in system
 2. **Intake Queue**: Raw data stored awaiting processing  
@@ -944,6 +1081,565 @@ public class DeviceValidationInterceptor : IFlowInterceptor
 - Use structured logging with correlation IDs
 - Log key processing milestones for debugging
 - Implement distributed tracing across service boundaries
+
+## Implementation Guide
+
+> **Status**: This section provides implementation hints for building the sophisticated 6-stage pipeline described in this proposal. The current Sora.Flow implementation provides a foundation but requires significant enhancement to achieve this vision.
+
+### Current Implementation Gaps
+
+**What exists today:**
+- ✅ Basic messaging infrastructure (`FlowEntityExtensions.Send()`)
+- ✅ Entity types (`FlowEntity<T>`, `DynamicFlowEntity<T>`, `FlowValueObject<T>`)
+- ✅ Simple intake processing (`FlowOrchestratorBase`)
+- ✅ Basic materialization (`FlowMaterializer`)
+- ✅ Storage models (`StageRecord<T>`, `KeyedRecord<T>`, `CanonicalProjection<T>`)
+
+**What needs to be built:**
+- ❌ `IFlowModel` interface and polymorphic processing
+- ❌ Sophisticated `CoalescingService` with conflict detection
+- ❌ `TaggedRecord<T>` and proper tagging stage
+- ❌ `CanonicalEntity<T>` with array-based properties
+- ❌ `PropertyValueArray` lineage tracking
+- ❌ Enhanced `MaterializationEngine` with policy framework
+
+### Implementation Strategy
+
+#### Phase 1: Foundation - IFlowModel Interface
+
+**Create the polymorphic foundation:**
+
+```csharp
+// src/Sora.Flow.Core/Abstractions/IFlowModel.cs
+public interface IFlowModel : IEntity<string>
+{
+    FlowModelType ModelType { get; }
+    string GetNativeId();
+    object GetModelData();
+    bool IsCanonical => ModelType != FlowModelType.ValueObject;
+}
+
+public enum FlowModelType
+{
+    Entity,        // FlowEntity<T> - canonical business objects  
+    DynamicEntity, // DynamicFlowEntity<T> - schema-flexible
+    ValueObject    // FlowValueObject<T> - non-canonical time-series
+}
+```
+
+**Update existing entity types:**
+
+```csharp
+// Modify existing FlowEntity<T>
+public abstract class FlowEntity<TModel> : Entity<TModel>, IFlowModel 
+    where TModel : FlowEntity<TModel>, new()
+{
+    public virtual FlowModelType ModelType => FlowModelType.Entity;
+    public virtual string GetNativeId() => Id;
+    public virtual object GetModelData() => this;
+}
+
+// Modify existing DynamicFlowEntity<T>  
+public class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>>, IFlowModel, IDynamicFlowEntity
+{
+    public JObject? Model { get; set; }
+    public virtual FlowModelType ModelType => FlowModelType.DynamicEntity;
+    public virtual string GetNativeId() => Id;
+    public virtual object GetModelData() => Model ?? new JObject();
+}
+
+// Modify existing FlowValueObject<T>
+public abstract class FlowValueObject<TVo> : Entity<TVo>, IFlowModel 
+    where TVo : FlowValueObject<TVo>, new()
+{
+    public virtual FlowModelType ModelType => FlowModelType.ValueObject;
+    public virtual string GetNativeId() => Id;
+    public virtual object GetModelData() => this;
+}
+```
+
+#### Phase 2: Storage Models - Enhanced Pipeline Types
+
+**Create the new storage models:**
+
+```csharp
+// src/Sora.Flow.Core/Model/PipelineTypes.cs
+
+// Replaces current StageRecord<T> with proper metadata separation
+public sealed class IntakeRecord<TModel> : Entity<IntakeRecord<TModel>> where TModel : IFlowModel
+{
+    public TModel EntityData { get; set; } = default!;
+    public string Source { get; set; } = default!;
+    public string NativeId { get; set; } = default!;
+    public Dictionary<string, object?>? Metadata { get; set; }
+    public DateTimeOffset ReceivedAt { get; set; } = DateTimeOffset.UtcNow;
+    [Index] public IntakeStatus Status { get; set; } = IntakeStatus.Pending;
+}
+
+// New tagging stage record
+public sealed class TaggedRecord<TModel> : Entity<TaggedRecord<TModel>> where TModel : IFlowModel
+{
+    public TModel EntityData { get; set; } = default!;
+    public string Source { get; set; } = default!;
+    public string NativeId { get; set; } = default!;
+    [Index] public string[] AggregationTags { get; set; } = Array.Empty<string>();
+    [Index] public TaggedStatus Status { get; set; } = TaggedStatus.ReadyForCoalescing;
+}
+
+// Enhanced canonical entity with array-based properties
+public sealed class CanonicalEntity<TModel> : Entity<CanonicalEntity<TModel>> where TModel : IFlowModel
+{
+    [Index] public string[] CorrelationKeys { get; set; } = Array.Empty<string>();
+    public Dictionary<string, PropertyValueArray> CanonicalProperties { get; set; } = new();
+    public EntityContribution<TModel>[] SourceContributions { get; set; } = Array.Empty<EntityContribution<TModel>>();
+    public TModel? MaterializedModel { get; set; }
+    public Dictionary<string, PropertyAttribution>? PropertySources { get; set; }
+    public DateTimeOffset LastMaterializedAt { get; set; }
+}
+
+// Property lineage tracking
+public sealed class PropertyValueArray
+{
+    public PropertyValue[] Values { get; set; } = Array.Empty<PropertyValue>();
+    
+    public sealed class PropertyValue
+    {
+        public object? Value { get; set; }
+        public string Source { get; set; } = default!;
+        public string NativeEntityId { get; set; } = default!;
+        public DateTimeOffset ReceivedAt { get; set; }
+    }
+}
+
+// Materialization attribution
+public sealed class PropertyAttribution
+{
+    public string Source { get; set; } = default!;
+    public string Policy { get; set; } = default!;
+    public DateTimeOffset ResolvedAt { get; set; }
+    public string[] AlternativeValues { get; set; } = Array.Empty<string>();
+    public string WinningReason { get; set; } = default!;
+}
+```
+
+#### Phase 3: Processing Services - Sophisticated Pipeline Logic
+
+**Build the core processing services:**
+
+```csharp
+// src/Sora.Flow.Core/Services/IntakeProcessor.cs
+public sealed class IntakeProcessor
+{
+    public async Task ProcessIntakeAsync<TModel>(IntakeRecord<TModel> intakeRecord, CancellationToken ct) 
+        where TModel : IFlowModel
+    {
+        // Extract dual aggregation keys using IFlowModel polymorphism
+        var aggregationTags = ExtractAggregationTags(intakeRecord);
+        
+        var taggedRecord = new TaggedRecord<TModel>
+        {
+            EntityData = intakeRecord.EntityData,
+            Source = intakeRecord.Source, 
+            NativeId = intakeRecord.NativeId,
+            AggregationTags = aggregationTags,
+            Status = TaggedStatus.ReadyForCoalescing
+        };
+        
+        await Data<TaggedRecord<TModel>, string>.UpsertAsync(taggedRecord, FlowSets.StageShort("tagged"), ct);
+        
+        // Signal next stage
+        await SignalCoalescingStage(taggedRecord.Id, ct);
+    }
+    
+    private string[] ExtractAggregationTags<TModel>(IntakeRecord<TModel> intakeRecord) where TModel : IFlowModel
+    {
+        var tags = new List<string>();
+        var flowModel = intakeRecord.EntityData;
+        
+        // Synthetic key: source + native ID (works for all types)
+        tags.Add(CorrelationKeyFormat.External(intakeRecord.Source, flowModel.GetNativeId()));
+        
+        // Property keys - type-specific extraction using polymorphism
+        var modelData = flowModel.GetModelData();
+        
+        switch (flowModel.ModelType)
+        {
+            case FlowModelType.Entity:
+            case FlowModelType.ValueObject:
+                tags.AddRange(ExtractFromTypedModel(modelData, flowModel.GetType()));
+                break;
+            case FlowModelType.DynamicEntity:
+                tags.AddRange(ExtractFromDynamicModel((JObject)modelData, flowModel.GetType()));
+                break;
+        }
+        
+        return tags.ToArray();
+    }
+}
+
+// src/Sora.Flow.Core/Services/CoalescingService.cs  
+public sealed class CoalescingService
+{
+    public async Task ProcessCoalescingAsync<TModel>(TaggedRecord<TModel> taggedRecord, CancellationToken ct)
+        where TModel : IFlowModel
+    {
+        // Check if entity participates in canonical storage
+        if (!taggedRecord.EntityData.IsCanonical)
+        {
+            // FlowValueObjects bypass coalescing
+            await ProcessValueObjectProjection(taggedRecord, ct);
+            return;
+        }
+        
+        // Sophisticated conflict detection logic
+        var result = await AnalyzeAndCoalesceAsync(taggedRecord, ct);
+        
+        switch (result.Action)
+        {
+            case CoalescingAction.CreateNew:
+                await CreateNewCanonical(taggedRecord, ct);
+                break;
+            case CoalescingAction.UpdateExisting:
+                await UpdateCanonical(result.CanonicalId!, taggedRecord, ct);
+                break;
+            case CoalescingAction.Reject:
+                await ParkForManualReview(taggedRecord, result.Reason, ct);
+                break;
+        }
+    }
+}
+```
+
+#### Phase 4: Data Access Patterns - Model Store Implementation
+
+**CRITICAL: Implement complete per-model separation using Sora.Data sets**
+
+Every single Flow operation must maintain complete model separation. Here's how to properly implement data access patterns:
+
+**Complete Per-Model Storage Pattern:**
+```csharp
+// Use Sora.Data's per-model storage with proper set naming
+public static class FlowDataAccess
+{
+    // Intake storage - each model type gets its own intake collection
+    public static async Task<string> SaveToIntakeAsync<TModel>(TModel entity, string source, CancellationToken ct)
+        where TModel : IFlowModel
+    {
+        var intakeRecord = new IntakeRecord<TModel>
+        {
+            Id = UlidId.New(),
+            EntityData = entity,
+            Source = source,
+            NativeId = entity.GetNativeId(),
+            ReceivedAt = DateTimeOffset.UtcNow,
+            Status = IntakeStatus.Pending
+        };
+        
+        // IMPORTANT: This creates "MyApp.Models.Device#flow.intake" for Device,
+        //            "MyApp.Models.Reading#flow.intake" for Reading, etc.
+        //            Each model type gets completely separate storage.
+        await Data<IntakeRecord<TModel>, string>.UpsertAsync(intakeRecord, FlowSets.StageShort("intake"), ct);
+        return intakeRecord.Id;
+    }
+    
+    // Tagged storage - completely separate per model type
+    public static async Task SaveTaggedAsync<TModel>(TaggedRecord<TModel> taggedRecord, CancellationToken ct)
+        where TModel : IFlowModel
+    {
+        // Creates separate collections: Device#flow.tagged, Reading#flow.tagged, etc.
+        await Data<TaggedRecord<TModel>, string>.UpsertAsync(taggedRecord, FlowSets.StageShort("tagged"), ct);
+    }
+    
+    // Canonical storage - completely separate per model type
+    public static async Task SaveCanonicalAsync<TModel>(CanonicalEntity<TModel> canonical, CancellationToken ct)
+        where TModel : IFlowModel
+    {
+        // Creates separate collections: Device#flow.canonical, Reading#flow.canonical, etc.
+        await Data<CanonicalEntity<TModel>, string>.UpsertAsync(canonical, FlowSets.StageShort("canonical"), ct);
+    }
+    
+    // Materialized storage - final entities stored in base model collections
+    public static async Task SaveMaterializedAsync<TModel>(TModel materializedEntity, CancellationToken ct) 
+        where TModel : IFlowModel
+    {
+        // Stores in base model collection: Device -> "YourApp.Models.Device", Reading -> "YourApp.Models.Reading"
+        await Data<TModel, string>.UpsertAsync(materializedEntity, ct);
+    }
+    
+    // Query helpers - each returns data for ONLY the specific model type
+    public static IQueryable<IntakeRecord<TModel>> QueryIntake<TModel>() where TModel : IFlowModel
+        => Data<IntakeRecord<TModel>>.QueryAsync(FlowSets.StageShort("intake"));
+        // Device queries only query Device#flow.intake, never Reading#flow.intake
+        
+    public static IQueryable<TaggedRecord<TModel>> QueryTagged<TModel>() where TModel : IFlowModel
+        => Data<TaggedRecord<TModel>>.QueryAsync(FlowSets.StageShort("tagged"));
+        // Reading queries only query Reading#flow.tagged, never Device#flow.tagged
+        
+    public static IQueryable<CanonicalEntity<TModel>> QueryCanonical<TModel>() where TModel : IFlowModel
+        => Data<CanonicalEntity<TModel>>.QueryAsync(FlowSets.StageShort("canonical"));
+        // Each model type has completely isolated canonical storage
+        
+    public static IQueryable<TModel> QueryMaterialized<TModel>() where TModel : IFlowModel
+        => Data<TModel>.QueryAsync();
+        // Final materialized entities stored in base model collections
+}
+```
+
+**Per-Model Set Usage Examples:**
+```csharp
+// Example 1: Device processing - uses only Device collections
+public class DeviceFlowProcessor
+{
+    public async Task ProcessDeviceIntake(Device device, CancellationToken ct)
+    {
+        // Saves to: "YourApp.Models.Device#flow.intake" ONLY
+        var intakeId = await FlowDataAccess.SaveToIntakeAsync(device, "bms-system", ct);
+        
+        // Queries from: "YourApp.Models.Device#flow.intake" ONLY  
+        var pendingDevices = await FlowDataAccess.QueryIntake<Device>()
+            .Where(i => i.Status == IntakeStatus.Pending)
+            .ToListAsync(ct);
+            
+        // This will NEVER see Reading intake records - complete isolation
+    }
+}
+
+// Example 2: Reading processing - completely separate from Device
+public class ReadingFlowProcessor  
+{
+    public async Task ProcessReadingIntake(Reading reading, CancellationToken ct)
+    {
+        // Saves to: "YourApp.Models.Reading#flow.intake" ONLY
+        var intakeId = await FlowDataAccess.SaveToIntakeAsync(reading, "sensor-system", ct);
+        
+        // Queries from: "YourApp.Models.Reading#flow.intake" ONLY
+        var pendingReadings = await FlowDataAccess.QueryIntake<Reading>()
+            .Where(i => i.ReceivedAt > DateTime.UtcNow.AddHours(-1))
+            .ToListAsync(ct);
+            
+        // This will NEVER see Device intake records - complete isolation
+    }
+}
+
+// Example 3: Complete separation demonstrated across all stages
+public class FlowSeparationExample
+{
+    public async Task DemonstrateCompleteSeparation(CancellationToken ct)
+    {
+        // Device flow pipeline - completely isolated
+        var deviceIntakes = await FlowDataAccess.QueryIntake<Device>().CountAsync(ct);
+        var deviceTagged = await FlowDataAccess.QueryTagged<Device>().CountAsync(ct); 
+        var deviceCanonical = await FlowDataAccess.QueryCanonical<Device>().CountAsync(ct);
+        var deviceMaterialized = await FlowDataAccess.QueryMaterialized<Device>().CountAsync(ct); // Queries "YourApp.Models.Device"
+        
+        // Reading flow pipeline - completely separate, cannot see Device data
+        var readingIntakes = await FlowDataAccess.QueryIntake<Reading>().CountAsync(ct);
+        var readingTagged = await FlowDataAccess.QueryTagged<Reading>().CountAsync(ct);
+        var readingCanonical = await FlowDataAccess.QueryCanonical<Reading>().CountAsync(ct);
+        var readingMaterialized = await FlowDataAccess.QueryMaterialized<Reading>().CountAsync(ct); // Queries "YourApp.Models.Reading"
+        
+        // Manufacturer flow pipeline - also completely separate
+        var mfgIntakes = await FlowDataAccess.QueryIntake<Manufacturer>().CountAsync(ct);
+        var mfgMaterialized = await FlowDataAccess.QueryMaterialized<Manufacturer>().CountAsync(ct); // Queries "YourApp.Models.Manufacturer"
+        
+        // Each model type maintains complete isolation across all stages
+    }
+}
+```
+
+**Set Naming Reference:**
+```csharp
+// All possible Flow sets for a model (e.g., Device):
+"YourApp.Models.Device#flow.intake"        // IntakeRecord<Device>
+"YourApp.Models.Device#flow.tagged"        // TaggedRecord<Device> 
+"YourApp.Models.Device#flow.canonical"     // CanonicalEntity<Device>
+"YourApp.Models.Device"  // Device (final resolved)
+"YourApp.Models.Device#flow.parked"        // ParkedRecord<Device>
+
+// Completely separate for Reading:
+"YourApp.Models.Reading#flow.intake"       // IntakeRecord<Reading>
+"YourApp.Models.Reading#flow.tagged"       // TaggedRecord<Reading>
+"YourApp.Models.Reading#flow.canonical"    // CanonicalEntity<Reading>  
+"YourApp.Models.Reading" // Reading (final resolved)
+"YourApp.Models.Reading#flow.parked"       // ParkedRecord<Reading>
+
+// And so on for every Flow model type...
+```
+
+**Why This Separation is Critical:**
+1. **Data Isolation**: Device issues cannot corrupt Reading data
+2. **Query Performance**: Searches only scan relevant model collections
+3. **Independent Scaling**: Each model type can scale separately
+4. **Clear Boundaries**: Easy debugging and maintenance
+5. **Schema Evolution**: Models evolve independently
+6. **Operational Safety**: Mistakes affect only one model type
+
+#### Phase 5: Policy Framework - Materialization Engine
+
+**Build sophisticated materialization with policy framework:**
+
+```csharp
+// src/Sora.Flow.Core/Materialization/PolicyFramework.cs
+public interface IPropertyTransformer  
+{
+    Task<MaterializationDecision> MaterializeAsync(
+        string modelName, 
+        string propertyPath,
+        IReadOnlyCollection<string?> values,
+        IReadOnlyDictionary<string, IReadOnlyCollection<string?>> allProperties,
+        CancellationToken ct);
+}
+
+public sealed class PolicyRegistry
+{
+    private readonly Dictionary<string, IPropertyTransformer> _policies = new();
+    
+    public void RegisterPolicy(string policyName, IPropertyTransformer transformer)
+        => _policies[policyName] = transformer;
+    
+    public IPropertyTransformer GetPolicy<TModel>(string propertyName)
+    {
+        var modelName = FlowSets.ModelName<TModel>();
+        var policyKey = $"{modelName}.{propertyName}";
+        
+        return _policies.TryGetValue(policyKey, out var policy) 
+            ? policy 
+            : _policies.GetValueOrDefault("default", new LastValueWinsPolicy());
+    }
+}
+
+// Built-in policies
+public sealed class LastValueWinsPolicy : IPropertyTransformer
+{
+    public Task<MaterializationDecision> MaterializeAsync(string modelName, string propertyPath, 
+        IReadOnlyCollection<string?> values, IReadOnlyDictionary<string, IReadOnlyCollection<string?>> allProperties, 
+        CancellationToken ct)
+    {
+        var result = new MaterializationDecision
+        {
+            Value = values.LastOrDefault(),
+            Policy = "LastValueWins"
+        };
+        return Task.FromResult(result);
+    }
+}
+
+public sealed class ConsensusPolicy : IPropertyTransformer
+{
+    public Task<MaterializationDecision> MaterializeAsync(string modelName, string propertyPath,
+        IReadOnlyCollection<string?> values, IReadOnlyDictionary<string, IReadOnlyCollection<string?>> allProperties,
+        CancellationToken ct)
+    {
+        var distinctValues = values.Where(v => !string.IsNullOrEmpty(v)).Distinct().ToArray();
+        
+        var result = new MaterializationDecision
+        {
+            Value = distinctValues.Length == 1 ? distinctValues[0] : null,
+            Policy = "Consensus",
+            WinningReason = distinctValues.Length == 1 ? "All sources agree" : "No consensus reached"
+        };
+        return Task.FromResult(result);
+    }
+}
+```
+
+#### Phase 6: Migration Strategy - Incremental Implementation
+
+**Migrate existing FlowOrchestratorBase incrementally:**
+
+```csharp
+// Phase 6a: Update FlowOrchestratorBase to use IFlowModel
+public class FlowOrchestratorBase
+{
+    // Replace multiple processing methods with unified approach
+    public virtual async Task ProcessFlowEntity(object transportEnvelope)
+    {
+        var envelope = ParseTransportEnvelope(transportEnvelope);
+        
+        // Deserialize to IFlowModel - handles all entity types uniformly
+        var flowModel = DeserializeToFlowModel(envelope);
+        
+        // Create intake record using IFlowModel
+        var intakeId = await FlowDataAccess.SaveToIntakeAsync(flowModel, envelope.Source, CancellationToken.None);
+        
+        // Signal intake processor
+        await SignalIntakeProcessor(intakeId, CancellationToken.None);
+    }
+    
+    private IFlowModel DeserializeToFlowModel(TransportEnvelope envelope)
+    {
+        var modelType = FlowRegistry.ResolveModel(envelope.ModelName);
+        var flowModel = JsonConvert.DeserializeObject(envelope.PayloadJson, modelType) as IFlowModel;
+        return flowModel ?? throw new InvalidOperationException($"Failed to deserialize {envelope.ModelName}");
+    }
+}
+
+// Phase 6b: Background service coordination
+public sealed class FlowPipelineCoordinator : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            // Process each pipeline stage
+            await ProcessIntakeStage(stoppingToken);
+            await ProcessTaggingStage(stoppingToken); 
+            await ProcessCoalescingStage(stoppingToken);
+            await ProcessMaterializationStage(stoppingToken);
+            
+            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+        }
+    }
+}
+```
+
+### Implementation Priorities
+
+**Phase 1 (Foundation)**: IFlowModel interface → enables polymorphic processing
+**Phase 2 (Storage)**: Enhanced storage models → enables sophisticated tracking
+**Phase 3 (Services)**: CoalescingService → enables conflict detection
+**Phase 4 (Access)**: Data access patterns → enables proper separation of concerns
+**Phase 5 (Policies)**: Materialization framework → enables configurable conflict resolution
+**Phase 6 (Migration)**: Incremental updates → preserves existing functionality
+
+### Testing Strategy
+
+```csharp
+// Integration tests for the complete pipeline
+[Test]
+public async Task CompleteFlowPipeline_MultiSourceDevice_ResolvesCorrectly()
+{
+    // Arrange - Send same device from two sources with conflicting data
+    var bmsDevice = new Device { Id = "bmsD4", Serial = "SN004", Model = "X-Series" };
+    var oemDevice = new Device { Id = "oemD4", Serial = "SN004", Model = "X-Series-Pro" };
+    
+    // Act - Send through pipeline
+    await bmsDevice.Send("bms");
+    await oemDevice.Send("oem");
+    
+    // Wait for processing
+    await WaitForPipelineCompletion(TimeSpan.FromSeconds(30));
+    
+    // Assert - Single materialized device with resolved conflicts
+    var materialized = await FlowDataAccess.QueryMaterialized<Device>()
+        .Where(d => d.Serial == "SN004")
+        .SingleAsync();
+        
+    Assert.AreEqual("SN004", materialized.Serial); // Consensus
+    Assert.AreEqual("X-Series-Pro", materialized.Model); // Last value wins
+    
+    // Assert - Complete audit trail preserved
+    var canonical = await FlowDataAccess.QueryCanonical<Device>()
+        .Where(c => c.CorrelationKeys.Contains("Serial:SN004"))
+        .SingleAsync();
+        
+    Assert.AreEqual(2, canonical.SourceContributions.Length);
+    Assert.Contains("bms", canonical.SourceContributions.Select(sc => sc.Source));
+    Assert.Contains("oem", canonical.SourceContributions.Select(sc => sc.Source));
+}
+```
+
+This implementation guide provides the roadmap for building the sophisticated entity lifecycle system described in this proposal while leveraging the existing Sora.Flow foundation.
 
 ## Conclusion
 
