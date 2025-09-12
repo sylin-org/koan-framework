@@ -9,11 +9,11 @@
 > **Key points to reference when working with Sora.Flow:**
 > - Use the **6-stage pipeline** (Data Arrival → Intake → Tagging → Coalescing → Canonical Storage → Materialization)
 > - Enforce **complete per-model separation** using `{ModelFullName}#{setName}` storage patterns
-> - Reference the **IFlowModel interface** and polymorphic processing approach
+> - Use **JObject throughout pipeline** - message envelope → JObject → query by path → deserialize only when needed
 > - Follow the **sophisticated coalescing** and conflict detection patterns described
 > - Use **array-based canonical storage** with complete source lineage tracking
 > - Apply the **policy-driven materialization** framework for conflict resolution
-> - Always maintain **strict Separation of Concerns** between Flow processing stages and final materialized entities
+> - **Preserve as JObject** to avoid database serialization issues, deserialize to FE/DFE/FVO types only at boundaries
 >
 > When creating examples or documentation, use the patterns, naming conventions, and architectural principles established in this guide. Cross-reference this document frequently to ensure consistency across all Sora.Flow documentation.
 
@@ -211,6 +211,17 @@ Every entity follows a six-stage pipeline with dedicated storage at each stage:
 
 ## Entity Types Deep Dive
 
+### JObject-First Processing Philosophy
+
+**CRITICAL: Sora.Flow uses JObject throughout the pipeline to avoid serialization issues and provide maximum flexibility.**
+
+The pipeline processes entities as JObject instances and only deserializes to strongly-typed entities when necessary (typically at materialization boundaries). This approach:
+
+- **Avoids database serialization issues** - JObject serializes cleanly to MongoDB/JSON stores
+- **Provides query flexibility** - Use JSON path queries to extract values without full deserialization  
+- **Handles schema evolution** - New properties don't break existing pipeline logic
+- **Supports mixed entity types** - Same pipeline code works for FE, DFE, and FVO without type switching
+
 ### 1. Flow Entities (FE) - Canonical Business Objects
 
 **Purpose**: Strongly-typed entities representing core business domain objects with stable schemas.
@@ -370,27 +381,30 @@ public sealed class Sensor : FlowEntity<Sensor>
 
 Entities arrive wrapped with metadata and are immediately stored in the intake queue:
 
-**Entity Intake Wrapper**:
+**Message Envelope → JObject Processing**:
 
 ```csharp
-public sealed class EntityIntakeWrapper<TModel>
+public sealed class FlowMessageEnvelope 
 {
-    public TModel Model { get; set; } = default!;           // The actual entity data
-    public string Source { get; set; } = default!;          // Source system identifier
-    public string NativeId { get; set; } = default!;        // Source system's ID for this entity
-    public Dictionary<string, object?>? Metadata { get; set; }  // Additional metadata
+    public string ModelName { get; set; } = default!;        // Entity type name ("Device")
+    public Type ModelType { get; set; } = default!;          // Actual .NET type for casting
+    public string Source { get; set; } = default!;           // Source system identifier  
+    public JObject PayloadJson { get; set; } = default!;     // Raw entity data as JObject
+    public Dictionary<string, object?>? Metadata { get; set; } // Additional metadata
     public DateTimeOffset ReceivedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 ```
 
-**Intake Queue Storage**:
+**Intake Queue Storage (JObject-based with Type Preservation)**:
 
 ```csharp
-public sealed class IntakeRecord<TModel> : Entity<IntakeRecord<TModel>>
+public sealed class IntakeRecord : Entity<IntakeRecord>
 {
-    public TModel EntityData { get; set; } = default!;
+    public string ModelName { get; set; } = default!;        // "Device", "Reading", etc.
+    public string ModelTypeName { get; set; } = default!;    // Full type name for casting: "MyApp.Models.Device"
+    public JObject EntityData { get; set; } = default!;      // Preserve as JObject - no serialization issues
     public string Source { get; set; } = default!;
-    public string NativeId { get; set; } = default!;
+    public string NativeId { get; set; } = default!;         // Extracted via JSON path query
     public Dictionary<string, object?>? Metadata { get; set; }
     public DateTimeOffset ReceivedAt { get; set; } = DateTimeOffset.UtcNow;
     [Index] public IntakeStatus Status { get; set; } = IntakeStatus.Pending;
@@ -401,45 +415,72 @@ public sealed class IntakeRecord<TModel> : Entity<IntakeRecord<TModel>>
 
 The intake processor extracts aggregation tags from entities without evaluating sameness:
 
-**Intake Processor**:
+**Intake Processor (JObject-based)**:
 
 ```csharp
-public sealed class IntakeProcessor<TModel>
+public sealed class IntakeProcessor
 {
     /// <summary>
-    /// Extract aggregation tags from entity for coalescing
+    /// Extract aggregation tags from JObject entity using JSON path queries
     /// </summary>
-    private string[] ExtractAggregationTags(IntakeRecord<TModel> intakeRecord)
+    private string[] ExtractAggregationTags(IntakeRecord intakeRecord)
     {
         var tags = new List<string>();
+        var entityJson = intakeRecord.EntityData;
         
-        // External key: source + native ID  
+        // External key: source + native ID (already extracted during intake)
         tags.Add(CorrelationKeyFormat.External(intakeRecord.Source, intakeRecord.NativeId));
         
-        // Property keys from [AggregationKey] attributes
-        var aggregationKeyProperties = typeof(TModel).GetProperties()
-            .Where(p => p.GetCustomAttribute<AggregationKeyAttribute>() != null);
-            
-        foreach (var prop in aggregationKeyProperties)
+        // Property keys from JSON path queries - works for FE, DFE, and FVO
+        var aggregationPaths = GetAggregationPaths(intakeRecord.ModelName);
+        
+        foreach (var path in aggregationPaths)
         {
-            var value = prop.GetValue(intakeRecord.EntityData)?.ToString();
+            // Use JSON path to extract values without full deserialization
+            var token = entityJson.SelectToken(path.JsonPath);
+            var value = token?.ToString();
+            
             if (!string.IsNullOrEmpty(value))
             {
-                tags.Add(CorrelationKeyFormat.Property(prop.Name, value));
+                tags.Add(CorrelationKeyFormat.Property(path.PropertyName, value));
             }
         }
         
         return tags.ToArray();
     }
+    
+    private AggregationPath[] GetAggregationPaths(string modelName)
+    {
+        // Define aggregation paths per model type
+        return modelName switch
+        {
+            "Device" => new[] 
+            {
+                new AggregationPath("Serial", "$.Serial"),
+                new AggregationPath("MacAddress", "$.MacAddress"),
+                new AggregationPath("ExternalId", "$.identifier.external.*") // Flexible path for any external ID
+            },
+            "Reading" => new[]
+            {
+                new AggregationPath("DeviceId", "$.DeviceId"),
+                new AggregationPath("SensorId", "$.SensorId")
+            },
+            _ => Array.Empty<AggregationPath>()
+        };
+    }
 }
+
+public record AggregationPath(string PropertyName, string JsonPath);
 ```
 
-**Tagged Record Result**:
+**Tagged Record Result (JObject-based with Type Preservation)**:
 
 ```csharp
-public sealed class TaggedRecord<TModel> : Entity<TaggedRecord<TModel>>
+public sealed class TaggedRecord : Entity<TaggedRecord>
 {
-    public TModel EntityData { get; set; } = default!;
+    public string ModelName { get; set; } = default!;        // "Device", "Reading", etc.
+    public string ModelTypeName { get; set; } = default!;    // Full type name for casting: "MyApp.Models.Device"
+    public JObject EntityData { get; set; } = default!;      // Keep as JObject throughout pipeline
     public string Source { get; set; } = default!;
     public string NativeId { get; set; } = default!;
     
@@ -460,17 +501,27 @@ The coalescing service determines if tagged entities represent the same business
 **Coalescing Logic with Sophisticated Conflict Detection**:
 
 ```csharp
-public sealed class CoalescingService<TModel>
+public sealed class CoalescingService
 {
     /// <summary>
-    /// Core coalescing logic with sophisticated conflict detection
+    /// Core coalescing logic with sophisticated conflict detection (JObject-based)
     /// </summary>
     private async Task<CoalescingResult> AnalyzeAndCoalesceAsync(
-        TaggedRecord<TModel> taggedRecord, 
+        TaggedRecord taggedRecord, 
         CancellationToken ct)
     {
+        // Check if this entity type participates in canonical storage
+        if (!IsCanonicalEntityType(taggedRecord.ModelName))
+        {
+            // FlowValueObjects bypass coalescing → direct to projections
+            return CoalescingResult.ProcessAsValueObject();
+        }
+        
         // Find canonical entities with matching aggregation tags
-        var matchingCanonicals = await FindMatchingCanonicalsAsync(taggedRecord.AggregationTags, ct);
+        var matchingCanonicals = await FindMatchingCanonicalsAsync(
+            taggedRecord.ModelName, 
+            taggedRecord.AggregationTags, 
+            ct);
         
         return matchingCanonicals.Count switch
         {
@@ -486,8 +537,8 @@ public sealed class CoalescingService<TModel>
     }
     
     private CoalescingResult AnalyzeMultipleMatches(
-        List<CanonicalEntity<TModel>> matchingCanonicals,
-        TaggedRecord<TModel> taggedRecord)
+        List<CanonicalEntity> matchingCanonicals,
+        TaggedRecord taggedRecord)
     {
         // Check if multiple canonicals are actually pointing to different entities
         var distinctCanonicalIds = matchingCanonicals.Select(c => c.Id).Distinct().ToArray();
@@ -510,6 +561,20 @@ public sealed class CoalescingService<TModel>
         // Some matches, no conflicts → merge into primary canonical
         var primaryCanonical = SelectPrimaryCanonical(matchingCanonicals);
         return CoalescingResult.UpdateExisting(primaryCanonical.Id);
+    }
+    
+    private bool IsCanonicalEntityType(string modelName)
+    {
+        // Define which entity types participate in canonical storage
+        return modelName switch
+        {
+            "Device" => true,      // FlowEntity - canonical
+            "Manufacturer" => true, // FlowEntity - canonical  
+            "Reading" => false,    // FlowValueObject - non-canonical
+            "Alert" => false,      // FlowValueObject - non-canonical
+            _ when modelName.StartsWith("Dynamic") => true, // DynamicFlowEntity - canonical
+            _ => true // Default to canonical for unknown types
+        };
     }
 }
 ```
@@ -535,15 +600,21 @@ public enum CoalescingAction
 
 Successfully coalesced entities are stored as canonical entities with array-based properties preserving complete lineage:
 
-**Canonical Entity with Array Properties**:
+**Canonical Entity with Array Properties (JObject-based)**:
 
 ```csharp
 /// <summary>
 /// Canonical entity with array-based properties for complete lineage tracking
+/// Uses JObject throughout to avoid serialization issues
 /// </summary>
-public sealed class CanonicalEntity<TModel> : Entity<CanonicalEntity<TModel>>
+public sealed class CanonicalEntity : Entity<CanonicalEntity>
 {
     // Id IS the canonical ULID
+    
+    /// <summary>
+    /// Entity type this canonical represents ("Device", "Manufacturer", etc.)
+    /// </summary>
+    [Index] public string ModelName { get; set; } = default!;
     
     /// <summary>
     /// All correlation keys that resolve to this canonical entity
@@ -552,19 +623,27 @@ public sealed class CanonicalEntity<TModel> : Entity<CanonicalEntity<TModel>>
     
     /// <summary>
     /// All properties as arrays tracking source lineage
-    /// Key: property name, Value: array of values from different sources
+    /// Key: property name, Value: JArray of values from different sources
+    /// Example: { "Serial": ["SN004"], "Model": ["X-Series", "X-Series-Pro"] }
     /// </summary>
-    public Dictionary<string, PropertyValueArray> CanonicalProperties { get; set; } = new();
+    public JObject CanonicalProperties { get; set; } = new();
     
     /// <summary>
-    /// All source contributions that built this canonical entity
+    /// All source contributions that built this canonical entity (as JObject)
     /// </summary>
-    public EntityContribution<TModel>[] SourceContributions { get; set; } = Array.Empty<EntityContribution<TModel>>();
+    public JArray SourceContributions { get; set; } = new();
     
     /// <summary>
-    /// Current materialized view (computed from arrays)
+    /// Current materialized view (as JObject - serialize cleanly)
     /// </summary>
-    public TModel? MaterializedModel { get; set; }
+    public JObject? MaterializedModel { get; set; }
+    
+    /// <summary>
+    /// Property resolution metadata
+    /// </summary>
+    public JObject? PropertySources { get; set; }
+    
+    public DateTimeOffset LastMaterializedAt { get; set; }
 }
 
 /// <summary>
@@ -589,50 +668,106 @@ public sealed class PropertyValueArray
 
 ### 5. Materialization Engine - Array to Single Value Resolution
 
-The materialization engine is triggered after successful coalescing and resolves property arrays into single materialized values:
+The materialization engine is triggered after successful coalescing and resolves property arrays into single materialized values. **This is where we cast back to strongly-typed entities:**
 
-**Materialization After Successful Coalescing**:
+**Materialization with Type Casting (JObject → Strongly-Typed Entity)**:
 
 ```csharp
-public sealed class MaterializationEngine<TModel>
+public sealed class MaterializationEngine
 {
     /// <summary>
-    /// Materialize canonical entity after coalescing update
+    /// Materialize canonical entity after coalescing update - cast to strongly-typed entity
     /// </summary>
     public async Task MaterializeCanonicalAsync(string canonicalId, CancellationToken ct = default)
     {
-        var canonical = await Data<CanonicalEntity<TModel>, string>.GetAsync(canonicalId, ct);
+        var canonical = await Data<CanonicalEntity, string>.GetAsync(canonicalId, ct);
+        if (canonical == null) return;
         
-        // Materialize each property using appropriate policies
-        var materializedModel = new TModel();
-        var propertyAttributions = new Dictionary<string, PropertyAttribution>();
+        // Get the .NET type for casting from preserved type information
+        var modelType = Type.GetType(canonical.ModelTypeName);
+        if (modelType == null) throw new InvalidOperationException($"Cannot resolve type: {canonical.ModelTypeName}");
         
-        foreach (var (propertyName, valueArray) in canonical.CanonicalProperties)
+        // Apply policies to resolve JObject properties to single values
+        var resolvedProperties = new JObject();
+        var propertyAttributions = new JObject();
+        
+        foreach (var (propertyName, valueArrayToken) in canonical.CanonicalProperties)
         {
-            // Apply materialization policy to resolve array to single value
-            var policy = _policyRegistry.GetPolicy<TModel>(propertyName);
-            var resolution = await policy.ResolveAsync(valueArray.Values, ct);
-            
-            // Set materialized value on the model
-            SetPropertyValue(materializedModel, propertyName, resolution.Value);
-            
-            // Track which source "won" and why
-            propertyAttributions[propertyName] = new PropertyAttribution
+            if (valueArrayToken is JArray valueArray && valueArray.Count > 0)
             {
-                Source = resolution.WinningSource,
-                Policy = resolution.PolicyName,
-                ResolvedAt = DateTimeOffset.UtcNow,
-                AlternativeValues = valueArray.Values.Select(v => v.Value?.ToString() ?? "").ToArray(),
-                WinningReason = resolution.Reason
-            };
+                // Apply materialization policy (Last, First, Consensus, etc.)
+                var policy = _policyRegistry.GetPolicy(canonical.ModelName, propertyName);
+                var resolution = await policy.ResolveAsync(canonical.ModelName, propertyName, 
+                    valueArray.Select(v => v.ToString()).ToArray(), ct);
+                
+                // Set resolved single value
+                resolvedProperties[propertyName] = JToken.FromObject(resolution.Value);
+                
+                // Track resolution metadata
+                propertyAttributions[propertyName] = JObject.FromObject(new
+                {
+                    Source = resolution.WinningSource,
+                    Policy = resolution.PolicyName,
+                    ResolvedAt = DateTimeOffset.UtcNow,
+                    AlternativeValues = valueArray.Select(v => v.ToString()).ToArray(),
+                    WinningReason = resolution.Reason
+                });
+            }
         }
         
-        // Update canonical with materialized result
-        canonical.MaterializedModel = materializedModel;
+        // Cast JObject back to strongly-typed entity using preserved type info
+        var materializedEntity = resolvedProperties.ToObject(modelType);
+        
+        // Ensure ID is set to canonical ULID
+        if (materializedEntity is IEntity<string> entityWithId)
+        {
+            entityWithId.Id = canonicalId;
+        }
+        
+        // Save strongly-typed entity to base model collection (no flow prefix)
+        await SaveMaterializedEntity(materializedEntity, modelType, ct);
+        
+        // Update canonical with materialization metadata
+        canonical.MaterializedModel = resolvedProperties;
         canonical.PropertySources = propertyAttributions;
         canonical.LastMaterializedAt = DateTimeOffset.UtcNow;
         
-        await canonical.Save(ct);
+        await Data<CanonicalEntity, string>.UpsertAsync(canonical, FlowSets.StageShort("canonical"), ct);
+    }
+    
+    private async Task SaveMaterializedEntity(object materializedEntity, Type modelType, CancellationToken ct)
+    {
+        // Use reflection to call Data<T, string>.UpsertAsync with the correct type
+        var dataType = typeof(Data<,>).MakeGenericType(modelType, typeof(string));
+        var upsertMethod = dataType.GetMethod("UpsertAsync", new[] { modelType, typeof(CancellationToken) });
+        
+        if (upsertMethod != null)
+        {
+            var task = (Task)upsertMethod.Invoke(null, new[] { materializedEntity, ct });
+            await task;
+        }
+    }
+}
+
+// Example usage - casting back to Device from JObject
+public class DeviceExample
+{
+    public async Task ProcessMaterializedDevice(string canonicalId, CancellationToken ct)
+    {
+        // Query materialized Device from base collection (strongly-typed)
+        var materializedDevice = await Data<Device>.QueryAsync()
+            .Where(d => d.Id == canonicalId)
+            .FirstOrDefaultAsync(ct);
+            
+        if (materializedDevice != null)
+        {
+            // Now you have a strongly-typed Device entity with resolved conflicts
+            Console.WriteLine($"Device Serial: {materializedDevice.Serial}");
+            Console.WriteLine($"Device Model: {materializedDevice.Model}");
+            
+            // Can use strongly-typed operations
+            await materializedDevice.Send("update-downstream-systems");
+        }
     }
 }
 ```
@@ -1096,66 +1231,112 @@ public class DeviceValidationInterceptor : IFlowInterceptor
 - ✅ Storage models (`StageRecord<T>`, `KeyedRecord<T>`, `CanonicalProjection<T>`)
 
 **What needs to be built:**
-- ❌ `IFlowModel` interface and polymorphic processing
+- ❌ **JObject-first pipeline** with JSON path queries for aggregation key extraction
 - ❌ Sophisticated `CoalescingService` with conflict detection
-- ❌ `TaggedRecord<T>` and proper tagging stage
-- ❌ `CanonicalEntity<T>` with array-based properties
-- ❌ `PropertyValueArray` lineage tracking
+- ❌ `TaggedRecord` and proper tagging stage (using JObject throughout)
+- ❌ `CanonicalEntity` with JObject-based array properties
+- ❌ JObject-based lineage tracking with clean serialization
 - ❌ Enhanced `MaterializationEngine` with policy framework
 
 ### Implementation Strategy
 
-#### Phase 1: Foundation - IFlowModel Interface
+#### Phase 1: Foundation - JObject-First Pipeline
 
-**Create the polymorphic foundation:**
+**Create JObject-based message processing:**
 
 ```csharp
-// src/Sora.Flow.Core/Abstractions/IFlowModel.cs
-public interface IFlowModel : IEntity<string>
+// src/Sora.Flow.Core/Pipeline/FlowMessageProcessor.cs
+public sealed class FlowMessageProcessor
 {
-    FlowModelType ModelType { get; }
-    string GetNativeId();
-    object GetModelData();
-    bool IsCanonical => ModelType != FlowModelType.ValueObject;
-}
-
-public enum FlowModelType
-{
-    Entity,        // FlowEntity<T> - canonical business objects  
-    DynamicEntity, // DynamicFlowEntity<T> - schema-flexible
-    ValueObject    // FlowValueObject<T> - non-canonical time-series
+    public async Task<string> ProcessMessageEnvelope(object messageEnvelope, CancellationToken ct)
+    {
+        // Convert any message envelope to JObject for uniform processing
+        var envelopeJson = messageEnvelope switch
+        {
+            JObject jobj => jobj,
+            string json => JObject.Parse(json),
+            _ => JObject.FromObject(messageEnvelope)
+        };
+        
+        // Extract metadata using JSON path queries
+        var modelName = envelopeJson.SelectToken("$.ModelName")?.ToString() ?? 
+                       envelopeJson.SelectToken("$.model")?.ToString() ??
+                       throw new InvalidOperationException("Cannot determine model type from envelope");
+                       
+        // CRITICAL: Preserve the .NET type information for later casting
+        var modelType = envelopeJson.SelectToken("$.ModelType")?.ToObject<Type>() ??
+                       FlowRegistry.ResolveModelType(modelName) ??
+                       throw new InvalidOperationException($"Cannot resolve .NET type for {modelName}");
+                       
+        var source = envelopeJson.SelectToken("$.Source")?.ToString() ?? 
+                    envelopeJson.SelectToken("$.source")?.ToString() ?? "unknown";
+                    
+        var payloadJson = envelopeJson.SelectToken("$.PayloadJson") as JObject ??
+                         envelopeJson.SelectToken("$.payload") as JObject ??
+                         envelopeJson; // Assume entire envelope is payload
+        
+        // Extract native ID using model-specific path
+        var nativeId = ExtractNativeId(modelName, payloadJson);
+        
+        // Create intake record using JObject throughout + preserve type info
+        var intakeRecord = new IntakeRecord
+        {
+            Id = UlidId.New(),
+            ModelName = modelName,
+            ModelTypeName = modelType.AssemblyQualifiedName, // Preserve for casting
+            EntityData = payloadJson, // Keep as JObject - no serialization issues
+            Source = source,
+            NativeId = nativeId,
+            ReceivedAt = DateTimeOffset.UtcNow,
+            Status = IntakeStatus.Pending
+        };
+        
+        // Save to model-specific intake collection
+        await Data<IntakeRecord, string>.UpsertAsync(intakeRecord, 
+            FlowSets.StageShort("intake"), ct);
+            
+        return intakeRecord.Id;
+    }
+    
+    private string ExtractNativeId(string modelName, JObject entityJson)
+    {
+        // Define native ID extraction paths per model type
+        var idPaths = modelName switch
+        {
+            "Device" => new[] { "$.Id", "$.DeviceId", "$.identifier.native" },
+            "Reading" => new[] { "$.Id", "$.ReadingId", "$.Timestamp" },
+            "Manufacturer" => new[] { "$.Id", "$.ManufacturerId", "$.Code" },
+            _ => new[] { "$.Id" }
+        };
+        
+        foreach (var path in idPaths)
+        {
+            var idToken = entityJson.SelectToken(path);
+            if (idToken != null && !string.IsNullOrEmpty(idToken.ToString()))
+            {
+                return idToken.ToString()!;
+            }
+        }
+        
+        throw new InvalidOperationException($"Cannot extract native ID for {modelName}");
+    }
 }
 ```
 
-**Update existing entity types:**
+**Key entity types remain unchanged** - no interface modifications needed:
 
 ```csharp
-// Modify existing FlowEntity<T>
-public abstract class FlowEntity<TModel> : Entity<TModel>, IFlowModel 
-    where TModel : FlowEntity<TModel>, new()
+// Existing entity types work as-is with JObject pipeline
+public abstract class FlowEntity<TModel> : Entity<TModel> 
+    where TModel : FlowEntity<TModel>, new() { }
+
+public class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>>, IDynamicFlowEntity
 {
-    public virtual FlowModelType ModelType => FlowModelType.Entity;
-    public virtual string GetNativeId() => Id;
-    public virtual object GetModelData() => this;
+    public JObject? Model { get; set; } // Already JObject-based
 }
 
-// Modify existing DynamicFlowEntity<T>  
-public class DynamicFlowEntity<TModel> : Entity<DynamicFlowEntity<TModel>>, IFlowModel, IDynamicFlowEntity
-{
-    public JObject? Model { get; set; }
-    public virtual FlowModelType ModelType => FlowModelType.DynamicEntity;
-    public virtual string GetNativeId() => Id;
-    public virtual object GetModelData() => Model ?? new JObject();
-}
-
-// Modify existing FlowValueObject<T>
-public abstract class FlowValueObject<TVo> : Entity<TVo>, IFlowModel 
-    where TVo : FlowValueObject<TVo>, new()
-{
-    public virtual FlowModelType ModelType => FlowModelType.ValueObject;
-    public virtual string GetNativeId() => Id;
-    public virtual object GetModelData() => this;
-}
+public abstract class FlowValueObject<TVo> : Entity<TVo> 
+    where TVo : FlowValueObject<TVo>, new() { }
 ```
 
 #### Phase 2: Storage Models - Enhanced Pipeline Types
