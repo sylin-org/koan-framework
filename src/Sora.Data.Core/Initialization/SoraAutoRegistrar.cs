@@ -13,8 +13,8 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // Core wiring is triggered by AddSora()/AddSoraDataCore via host code; nothing to do here.
-        // We intentionally avoid double-registering since AddSora() is the canonical entry point.
+        // Register the generic RelationshipEnricher for all Entity<> types
+        services.AddSingleton(typeof(Sora.Data.Core.Enrichment.IEntityEnricher<>), typeof(Sora.Data.Core.Enrichment.RelationshipEnricher<>));
     }
 
     public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
@@ -22,5 +22,25 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
         report.AddModule(ModuleName, ModuleVersion);
         var ensure = cfg.Read(Infrastructure.Constants.Configuration.Runtime.EnsureSchemaOnStart, true);
         report.AddSetting("EnsureSchemaOnStart", ensure.ToString());
+            // Report discovered relationships
+            var relMeta = new Sora.Data.Core.Relationships.RelationshipMetadataService();
+            var allTypes = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
+                .ToList();
+            foreach (var t in allTypes)
+            {
+                var parents = relMeta.GetParentRelationships(t);
+                if (parents.Count > 0)
+                {
+                    var parentList = string.Join(", ", parents.Select(p => $"{p.ParentType.Name} via {p.PropertyName}"));
+                    report.AddNote($"Entity {t.Name} parents: {parentList}");
+                }
+                var children = relMeta.GetChildRelationships(t);
+                if (children.Count > 0)
+                {
+                    var childList = string.Join(", ", children.Select(c => $"{c.ChildType.Name} via {c.PropertyName}"));
+                    report.AddNote($"Entity {t.Name} children: {childList}");
+                }
+            }
     }
 }
