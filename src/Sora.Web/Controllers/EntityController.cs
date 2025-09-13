@@ -118,45 +118,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> GetCollection(CancellationToken ct)
     {
         if (!CanRead) return Forbid();
-        // Debug: log all headers and query params to console
-        ILogger? log = null;
-        try {
-            log = HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("Sora.Web.EntityController.Debug");
-            var headerDump = string.Join(", ", Request.Headers.Select(h => $"{h.Key}={h.Value}"));
-            var queryDump = string.Join(", ", Request.Query.Select(q => $"{q.Key}={q.Value}"));
-            log?.LogInformation("ENTITY_DEBUG: GetCollection headers: {Headers}", headerDump);
-            log?.LogInformation("ENTITY_DEBUG: GetCollection query: {Query}", queryDump);
-        } catch {}
-
-        // Additional debug: log 'with' param and parent relationship discovery at top
-        var withParam = HttpContext.Request.Query.TryGetValue("with", out var wVal) ? wVal.ToString() : null;
-        log?.LogInformation("ENTITY_DEBUG: [TOP] with param raw value: {With}", withParam);
-        log?.LogInformation("ENTITY_DEBUG: [TOP] IsNullOrWhiteSpace(with): {Result}", string.IsNullOrWhiteSpace(withParam));
-        log?.LogInformation("ENTITY_DEBUG: [TOP] TEntity type: {Type}", typeof(TEntity).FullName);
-        Sora.Data.Core.Relationships.IRelationshipMetadata? relMeta = null;
-        IReadOnlyList<(string PropertyName, Type ParentType)>? parentRels = null;
-        try {
-            relMeta = HttpContext.RequestServices.GetService<Sora.Data.Core.Relationships.IRelationshipMetadata>();
-            parentRels = relMeta?.GetParentRelationships(typeof(TEntity));
-            log?.LogInformation("ENTITY_DEBUG: [TOP] Discovered parent relationships count: {Count}", parentRels?.Count ?? -1);
-            if (parentRels != null)
-                log?.LogInformation("ENTITY_DEBUG: [TOP] Parent relationship props: {Props}", string.Join(",", parentRels.Select(r => r.Item1)));
-        } catch (Exception ex) {
-            log?.LogError(ex, "ENTITY_DEBUG: [TOP] Error discovering parent relationships");
-        }
-
-        // Log before parent aggregation block
-        log?.LogInformation("ENTITY_DEBUG: [PRE-PARENT] About to check parent aggregation block. withParam={With} IsNullOrWhiteSpace={IsNullOrWhiteSpace}", withParam, string.IsNullOrWhiteSpace(withParam));
-        if (!string.IsNullOrWhiteSpace(withParam))
-        {
-            log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Entered parent aggregation block. withParam={With}", withParam);
-            try { Response.Headers["X-Debug-ParentBlock"] = "Entered"; } catch { }
-            // ...existing code...
-        }
-        else
-        {
-            log?.LogInformation("ENTITY_DEBUG: [POST-PARENT] Skipped parent aggregation block. withParam={With}", withParam);
-        }
+        // ...existing code...
         // Validate explicit negative page requests
         if (HttpContext.Request.Query.TryGetValue("page", out var _vp)
             && int.TryParse(_vp, out var _p)
