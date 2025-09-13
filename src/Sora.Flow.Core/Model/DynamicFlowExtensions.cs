@@ -21,13 +21,13 @@ public static class DynamicFlowExtensions
         where T : class, IDynamicFlowEntity, new()
     {
         var entity = new T();
-        
+
         var idProp = typeof(T).GetProperty("Id");
         if (idProp != null && idProp.CanWrite)
         {
             idProp.SetValue(entity, Guid.NewGuid().ToString("n"));
         }
-        
+
         var modelProp = typeof(T).GetProperty("Model");
         if (modelProp != null && modelProp.CanWrite)
         {
@@ -38,10 +38,10 @@ public static class DynamicFlowExtensions
             }
             modelProp.SetValue(entity, model);
         }
-        
+
         return entity;
     }
-    
+
     /// <summary>
     /// Converts a nested anonymous object or typed object to a DynamicFlowEntity.
     /// </summary>
@@ -49,22 +49,22 @@ public static class DynamicFlowExtensions
         where T : class, IDynamicFlowEntity, new()
     {
         var entity = new T();
-        
+
         var idProp = typeof(T).GetProperty("Id");
         if (idProp != null && idProp.CanWrite)
         {
             idProp.SetValue(entity, Guid.NewGuid().ToString("n"));
         }
-        
+
         var modelProp = typeof(T).GetProperty("Model");
         if (modelProp != null && modelProp.CanWrite)
         {
             modelProp.SetValue(entity, JObject.FromObject(nestedData));
         }
-        
+
         return entity;
     }
-    
+
     /// <summary>
     /// Fluent method to set a value at a JSON path.
     /// </summary>
@@ -83,7 +83,7 @@ public static class DynamicFlowExtensions
         }
         return entity;
     }
-    
+
     /// <summary>
     /// Gets a value from the entity by JSON path.
     /// </summary>
@@ -91,13 +91,13 @@ public static class DynamicFlowExtensions
     {
         var modelProp = typeof(T).GetProperty("Model");
         if (modelProp == null) return default;
-        
+
         var model = modelProp.GetValue(entity) as JObject;
         if (model == null) return default;
-        
+
         return GetValueByPath<TValue>(model, jsonPath);
     }
-    
+
     /// <summary>
     /// Sets a value in the entity by JSON path.
     /// </summary>
@@ -114,7 +114,7 @@ public static class DynamicFlowExtensions
             modelProp.SetValue(entity, model);
         }
     }
-    
+
     /// <summary>
     /// Extracts aggregation key values from the entity based on configured paths.
     /// </summary>
@@ -122,18 +122,18 @@ public static class DynamicFlowExtensions
         where T : class, IDynamicFlowEntity
     {
         var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        
+
         foreach (var key in aggregationKeys)
         {
             var value = entity.GetPathValue<T, object>(key);
             result[key] = value?.ToString();
         }
-        
+
         return result;
     }
-    
+
     // Private helper methods
-    
+
     private static void SetValueByPath(JObject jObject, string path, object? value)
     {
         if (string.IsNullOrWhiteSpace(path) || value == null) return;
@@ -177,20 +177,20 @@ public static class DynamicFlowEntityExtensions
     /// <summary>
     /// Gets a value from any DynamicFlowEntity by JSON path.
     /// </summary>
-    public static T? GetPathValue<T>(this object entity, string jsonPath) 
+    public static T? GetPathValue<T>(this object entity, string jsonPath)
     {
         var modelProp = entity.GetType().GetProperty("Model");
         if (modelProp == null) return default;
-        
+
         var model = modelProp.GetValue(entity) as JObject;
         if (model == null) return default;
-        
+
         var token = model.SelectToken(jsonPath);
         if (token != null)
         {
             return token.ToObject<T>();
         }
-        
+
         return default;
     }
 

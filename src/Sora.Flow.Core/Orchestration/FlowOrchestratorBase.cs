@@ -35,11 +35,11 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         : base(logger, configuration)
     {
         ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        
+
         // Call Configure to register Flow.OnUpdate handlers
         Configure();
     }
-    
+
     /// <summary>
     /// Override this method to configure Flow.OnUpdate handlers.
     /// </summary>
@@ -50,7 +50,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         // Auto-subscribe to "Sora.Flow.FlowEntity" queue
         // This is handled by SoraAutoRegistrar during service registration
         Logger.LogInformation("FlowOrchestrator started and listening for Flow entity messages");
-        
+
         // Keep the service running
         await Task.Delay(Timeout.Infinite, cancellationToken);
     }
@@ -74,13 +74,13 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         {
             // Deserialize the transport envelope
             dynamic envelope = JObject.Parse(transportEnvelope.ToString()!);
-            
+
             string type = envelope.type;
             string model = envelope.model;
             string source = envelope.source ?? "unknown";
-            
+
             Logger.LogDebug("Processing Flow entity: Type={Type}, Model={Model}, Source={Source}", type, model, source);
-            
+
             // Type-safe processing based on envelope type
             if (type.StartsWith("FlowEntity<") || type.StartsWith("FlowValueObject<"))
             {
@@ -102,7 +102,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             {
                 Logger.LogWarning("Unknown Flow entity type: {Type}", type);
             }
-            
+
             await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Flow.EntityProcessed, new FlowEntityProcessedEventArgs
             {
                 Type = type,
@@ -114,7 +114,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error processing Flow entity transport envelope");
-            
+
             await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Flow.EntityFailed, new FlowEntityFailedEventArgs
             {
                 Error = ex.Message,
@@ -128,7 +128,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
     {
         // Extract payload
         var payload = envelope.payload;
-        
+
         // Resolve model type
         var modelType = FlowRegistry.ResolveModel(model);
         if (modelType == null)
@@ -136,7 +136,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             Logger.LogWarning("Could not resolve model type for: {Model}", model);
             return;
         }
-        
+
         // Deserialize payload to strongly-typed object
         var typedPayload = ((JObject)payload).ToObject(modelType);
         if (typedPayload == null)
@@ -144,7 +144,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             Logger.LogWarning("Failed to deserialize payload for model: {Model}", model);
             return;
         }
-        
+
         // Write to intake with clean metadata separation
         await WriteToIntake(modelType, model, typedPayload, source, envelope.metadata);
     }
@@ -153,7 +153,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
     {
         // Extract flattened payload for dynamic entities
         var payload = envelope.payload;
-        
+
         // Resolve model type
         var modelType = FlowRegistry.ResolveModel(model);
         if (modelType == null)
@@ -161,7 +161,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             Logger.LogWarning("Could not resolve model type for: {Model}", model);
             return;
         }
-        
+
         // For dynamic entities, the payload is already flattened
         var flatPayload = ((JObject)payload).ToObject<Dictionary<string, object?>>();
         if (flatPayload == null)
@@ -169,7 +169,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             Logger.LogWarning("Failed to deserialize dynamic payload for model: {Model}", model);
             return;
         }
-        
+
         // Write to intake with clean metadata separation
         await WriteToIntake(modelType, model, flatPayload, source, envelope.metadata);
     }
@@ -178,7 +178,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
     {
         // Extract payload from transport envelope
         var payload = envelope.payload;
-        
+
         // Resolve model type
         var modelType = FlowRegistry.ResolveModel(model);
         if (modelType == null)
@@ -186,7 +186,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             Logger.LogWarning("Could not resolve model type for: {Model}", model);
             return;
         }
-        
+
         // For TransportEnvelope, deserialize payload to strongly-typed object
         var typedPayload = ((JObject)payload).ToObject(modelType);
         if (typedPayload == null)
@@ -194,9 +194,9 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             Logger.LogWarning("Failed to deserialize transport envelope payload for model: {Model}", model);
             return;
         }
-        
+
         Logger.LogDebug("Processing TransportEnvelope for {Model} from {Source}", model, source);
-        
+
         // Write to intake with clean metadata separation
         await WriteToIntake(modelType, model, typedPayload, source, envelope.metadata);
     }
@@ -204,16 +204,16 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
     protected virtual async Task ProcessDynamicTransportEnvelope(dynamic envelope, string model, string source)
     {
         Logger.LogDebug("Processing DynamicTransportEnvelope for {Model} from {Source}", model, source);
-        
+
         var payload = envelope.payload;
-        
+
         var modelType = FlowRegistry.ResolveModel(model);
         if (modelType == null)
         {
             Logger.LogWarning("Could not resolve model type for: {Model}", model);
             return;
         }
-        
+
         // Ensure we are working with a JObject
         JObject? payloadJObject = payload as JObject;
         if (payloadJObject == null)
@@ -228,26 +228,26 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 return;
             }
         }
-        
+
         var pathValues = payloadJObject;
-        
-        Logger.LogDebug("DynamicTransportEnvelope path values count: {Count}, keys: {Keys}", 
+
+        Logger.LogDebug("DynamicTransportEnvelope path values count: {Count}, keys: {Keys}",
             pathValues.Count, string.Join(", ", pathValues.Properties().Select(p => p.Name)));
-        
+
         try
         {
             var extensionMethod = typeof(DynamicFlowExtensions)
                 .GetMethod("ToDynamicFlowEntity", new[] { typeof(JObject) })!
                 .MakeGenericMethod(modelType);
-            
+
             var dynamicEntity = extensionMethod.Invoke(null, new object[] { pathValues });
-            
+
             if (dynamicEntity is IDynamicFlowEntity entity)
             {
                 var modelKeys = entity.Model != null ? string.Join(", ", entity.Model.Properties().Select(p => p.Name)) : "null";
-                Logger.LogDebug("Created DynamicFlowEntity: {EntityType}, Model keys: {ModelKeys}", 
+                Logger.LogDebug("Created DynamicFlowEntity: {EntityType}, Model keys: {ModelKeys}",
                     dynamicEntity.GetType().Name, modelKeys);
-                
+
                 await WriteToIntake(modelType, model, dynamicEntity, source, envelope.metadata);
             }
             else
@@ -266,32 +266,32 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         try
         {
             bool shouldPark = false;
-            
+
             // First, check for new fluent BeforeIntake interceptors
             var registry = FlowInterceptorRegistryManager.GetFor(modelType);
             if (registry?.HasBeforeIntakeNonGeneric() == true)
             {
                 var actionResult = await registry.ExecuteBeforeIntakeNonGeneric(payload);
-                
+
                 if (actionResult is FlowIntakeAction action)
                 {
-                    Logger.LogDebug("BeforeIntake interceptor processed {Model}: Action={ActionType}, Reason={Reason}", 
+                    Logger.LogDebug("BeforeIntake interceptor processed {Model}: Action={ActionType}, Reason={Reason}",
                         model, action.Action, action.Reason ?? "none");
-                    
+
                     // Handle fluent interceptor actions
                     switch (action.Action)
                     {
                         case FlowIntakeActionType.Drop:
                             Logger.LogInformation("BeforeIntake interceptor requested DROP for {Model}: {Reason}", model, action.Reason);
                             return;
-                        
+
                         case FlowIntakeActionType.Park:
                             Logger.LogInformation("BeforeIntake interceptor requested PARK for {Model}: {Reason}", model, action.Reason);
                             if (metadata == null) metadata = new JObject();
                             ((JObject)metadata)["parkingStatus"] = action.Reason;
                             shouldPark = true;
                             break;
-                            
+
                         case FlowIntakeActionType.Continue:
                             // Update payload if modified
                             if (action.Entity != payload)
@@ -302,23 +302,23 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                     }
                 }
             }
-            
+
             // Legacy intake interceptors (for backward compatibility)
             if (FlowIntakeInterceptors.HasInterceptor(modelType))
             {
                 var result = FlowIntakeInterceptors.Intercept(payload);
                 payload = result.Payload;
-                
-                Logger.LogDebug("Legacy intake interceptor processed {Model}: MustDrop={MustDrop}, ParkingStatus={ParkingStatus}", 
+
+                Logger.LogDebug("Legacy intake interceptor processed {Model}: MustDrop={MustDrop}, ParkingStatus={ParkingStatus}",
                     model, result.MustDrop, result.ParkingStatus ?? "none");
-                
+
                 // Handle legacy interceptor instructions
                 if (result.MustDrop)
                 {
                     Logger.LogInformation("Legacy intake interceptor requested DROP for {Model} - skipping processing", model);
                     return;
                 }
-                
+
                 if (!string.IsNullOrEmpty(result.ParkingStatus))
                 {
                     // Legacy interceptor wants to park this record
@@ -329,12 +329,12 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                     ((JObject)metadata)["parking.status"] = result.ParkingStatus;
                     ((JObject)metadata)["parking.reason"] = "interceptor";
                     shouldPark = true;
-                    
-                    Logger.LogDebug("Intake interceptor requested PARK for {Model} with status {ParkingStatus}", 
+
+                    Logger.LogDebug("Intake interceptor requested PARK for {Model} with status {ParkingStatus}",
                         model, result.ParkingStatus);
                 }
             }
-            
+
             // If parking was requested by interceptor, always use default intake processing
             // This ensures proper parking behavior regardless of Flow.OnUpdate handlers
             if (shouldPark)
@@ -342,14 +342,14 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 await WriteToIntakeDefault(modelType, model, payload, source, metadata);
                 return;
             }
-            
+
             // Check if there's a Flow.OnUpdate handler for this model type
             if (Flow.HasHandler(modelType) && payload is IEntity<string> entity)
             {
                 await ProcessWithFlowHandler(modelType, entity, source, metadata);
                 return;
             }
-            
+
             // Fall back to default intake processing
             await WriteToIntakeDefault(modelType, model, payload, source, metadata);
         }
@@ -358,7 +358,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             Logger.LogError(ex, "Error processing {Model} in WriteToIntake", model);
         }
     }
-    
+
     /// <summary>
     /// Process entity using registered Flow.OnUpdate handlers.
     /// </summary>
@@ -367,14 +367,14 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         try
         {
             Logger.LogDebug("Processing {Model} with Flow.OnUpdate handler", modelType.Name);
-            
+
             // Get current canonical entity from database (if exists)
             IEntity<string>? current = null;
             if (!string.IsNullOrEmpty(proposed.Id))
             {
                 current = await GetCurrentCanonical(modelType, proposed.Id);
             }
-            
+
             // Create metadata for handler
             var updateMetadata = new UpdateMetadata
             {
@@ -382,7 +382,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 SourceAdapter = source,
                 Timestamp = DateTimeOffset.UtcNow
             };
-            
+
             if (metadata != null)
             {
                 foreach (var prop in ((JObject)metadata).Properties())
@@ -390,7 +390,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                     updateMetadata.Properties[prop.Name] = prop.Value?.ToObject<object>() ?? "";
                 }
             }
-            
+
             // Get handler using reflection since we have Type, not T
             var handler = Flow.GetHandler(modelType);
             if (handler != null)
@@ -399,25 +399,25 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 var method = typeof(FlowOrchestratorBase)
                     .GetMethod(nameof(InvokeFlowHandler), BindingFlags.NonPublic | BindingFlags.Instance)!
                     .MakeGenericMethod(modelType);
-                
+
                 var result = await (Task<UpdateResult>)method.Invoke(this, new object[] { handler, proposed, current, updateMetadata })!;
-                
+
                 if (result.Action == UpdateAction.Skip)
                 {
                     Logger.LogInformation("Skipped {Model}: {Reason}", modelType.Name, result.Reason);
                     return;
                 }
-                
+
                 if (result.Action == UpdateAction.Defer)
                 {
                     Logger.LogInformation("Deferred {Model}: {Reason}", modelType.Name, result.Reason);
                     // TODO: Implement retry logic
                     return;
                 }
-                
+
                 Logger.LogDebug("Flow handler processed {Model}: {Reason}", modelType.Name, result.Reason);
             }
-            
+
             // Continue with normal flow processing - save the (possibly modified) entity
             await SaveEntityToCanonical(proposed);
         }
@@ -427,7 +427,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             throw;
         }
     }
-    
+
     /// <summary>
     /// Invoke Flow.OnUpdate handler with proper generic typing.
     /// </summary>
@@ -436,7 +436,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         var typedHandler = (UpdateHandler<T>)handler;
         return await typedHandler(ref proposed, current, metadata);
     }
-    
+
     /// <summary>
     /// Get current canonical entity from database.
     /// </summary>
@@ -451,7 +451,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             {
                 var task = (Task)getMethod.Invoke(null, new object[] { id })!;
                 await task;
-                
+
                 var result = task.GetType().GetProperty("Result")?.GetValue(task);
                 return result as IEntity<string>;
             }
@@ -460,10 +460,10 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         {
             Logger.LogDebug("Could not retrieve current canonical for {ModelType} {Id}: {Error}", modelType.Name, id, ex.Message);
         }
-        
+
         return null;
     }
-    
+
     /// <summary>
     /// Save entity to canonical collection.
     /// </summary>
@@ -486,7 +486,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             throw;
         }
     }
-    
+
     /// <summary>
     /// Default intake processing when no Flow.OnUpdate handler is registered.
     /// </summary>
@@ -503,27 +503,27 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                     parkingStatus = parkingToken?.ToString();
                 }
             }
-            
+
             if (!string.IsNullOrEmpty(parkingStatus))
             {
                 // Create ParkedRecord instead of StageRecord
                 await WriteToParked(modelType, model, payload, source, parkingStatus, metadata);
                 return;
             }
-            
+
             // Create StageRecord with CLEAN separation of payload and metadata
             var stageRecordType = typeof(StageRecord<>).MakeGenericType(modelType);
             var record = Activator.CreateInstance(stageRecordType)!;
-            
+
             // Set basic properties
             stageRecordType.GetProperty("Id")!.SetValue(record, Guid.NewGuid().ToString("n"));
-            
+
             // Extract entity's native ID for SourceId - this preserves lineage for external ID generation
             var entityId = ExtractEntityId(payload);
             stageRecordType.GetProperty("SourceId")!.SetValue(record, entityId ?? source);
-            
+
             stageRecordType.GetProperty("OccurredAt")!.SetValue(record, DateTimeOffset.UtcNow);
-            
+
             // CLEAN payload - model data only (no system/adapter contamination)
             // Handle DynamicFlowEntity objects by preserving the wrapper structure
             object dataToStore = payload;
@@ -533,7 +533,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 {
                     // For DynamicFlowEntity, we need to preserve the wrapper structure
                     // but ensure the Model property is properly set
-                    
+
                     // Store the full DynamicFlowEntity wrapper to maintain structure for association worker
                     dataToStore = payload;
                 }
@@ -542,7 +542,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 }
             }
             stageRecordType.GetProperty("Data")!.SetValue(record, dataToStore);
-            
+
             // SEPARATE metadata - source info for external ID composition
             var stageMetadata = new Dictionary<string, object>
             {
@@ -551,7 +551,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 ["transport.type"] = "flow-orchestrator",
                 ["transport.timestamp"] = DateTimeOffset.UtcNow
             };
-            
+
             // Add any additional metadata from envelope
             if (metadata is JObject jObj)
             {
@@ -568,12 +568,12 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                     }
                 }
             }
-            
+
             // Create a deeply cleaned dictionary with no null values for MongoDB serialization
             var cleanMetadata = DeepCleanMetadata(stageMetadata);
-            
+
             stageRecordType.GetProperty("Source")!.SetValue(record, cleanMetadata);
-            
+
             // Write to MongoDB intake using Data<,>.UpsertAsync
             var dataType = typeof(Data<,>).MakeGenericType(stageRecordType, typeof(string));
             var upsertMethod = dataType.GetMethod("UpsertAsync", new[] { stageRecordType, typeof(string), typeof(CancellationToken) });
@@ -601,7 +601,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             Logger.LogError(ex, "Error writing {Model} to intake", model);
         }
     }
-    
+
     /// <summary>
     /// Write a record to the parked collection for later resolution.
     /// </summary>
@@ -612,16 +612,16 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             // Create ParkedRecord<TModel>
             var parkedRecordType = typeof(ParkedRecord<>).MakeGenericType(modelType);
             var record = Activator.CreateInstance(parkedRecordType)!;
-            
+
             // Set basic properties
             parkedRecordType.GetProperty("Id")!.SetValue(record, Guid.NewGuid().ToString("n"));
             parkedRecordType.GetProperty("SourceId")!.SetValue(record, "flow-orchestrator");
             parkedRecordType.GetProperty("OccurredAt")!.SetValue(record, DateTimeOffset.UtcNow);
             parkedRecordType.GetProperty("ReasonCode")!.SetValue(record, reasonCode);
-            
+
             // Set payload directly as strongly-typed data
             parkedRecordType.GetProperty("Data")!.SetValue(record, payload);
-            
+
             // Set source metadata
             var sourceMetadata = new Dictionary<string, object?>
             {
@@ -630,7 +630,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 ["transport.type"] = "flow-orchestrator",
                 ["transport.timestamp"] = DateTimeOffset.UtcNow
             };
-            
+
             // Add envelope metadata
             if (metadata != null)
             {
@@ -646,11 +646,11 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                     }
                 }
             }
-            
+
             // Deep clean the metadata before setting
             var cleanSourceMetadata = DeepCleanMetadata(sourceMetadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value!));
             parkedRecordType.GetProperty("Source")!.SetValue(record, cleanSourceMetadata);
-            
+
             // Write to MongoDB parked collection 
             var dataType = typeof(Data<,>).MakeGenericType(parkedRecordType, typeof(string));
             var upsertMethod = dataType.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { parkedRecordType, typeof(string), typeof(CancellationToken) });
@@ -658,9 +658,9 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             {
                 var task = (Task)upsertMethod.Invoke(null, new object[] { record, FlowSets.StageShort(FlowSets.Parked), CancellationToken.None })!;
                 await task;
-                
+
                 Logger.LogInformation("Successfully parked {Model} with ReasonCode={ReasonCode} for background processing", model, reasonCode);
-                
+
                 await EmitEventAsync(Sora.Core.Events.SoraServiceEvents.Flow.EntityParked, new FlowEntityParkedEventArgs
                 {
                     Model = model,
@@ -675,7 +675,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             throw;
         }
     }
-    
+
     /// <summary>
     /// Safely converts JToken to primitive types that can be serialized by MongoDB without BsonValue issues.
     /// </summary>
@@ -696,7 +696,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             _ => null
         };
     }
-    
+
     /// <summary>
     /// Recursively converts JObject to Dictionary with only primitive MongoDB-safe types.
     /// </summary>
@@ -713,14 +713,14 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
         }
         return result;
     }
-    
+
     /// <summary>
     /// Deeply cleans metadata by removing all null values recursively to prevent MongoDB BSON serialization errors.
     /// </summary>
     private static Dictionary<string, object> DeepCleanMetadata(Dictionary<string, object> metadata)
     {
         var cleaned = new Dictionary<string, object>();
-        
+
         foreach (var kvp in metadata)
         {
             var cleanValue = CleanValue(kvp.Value);
@@ -729,10 +729,10 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 cleaned[kvp.Key] = cleanValue;
             }
         }
-        
+
         return cleaned;
     }
-    
+
     /// <summary>
     /// Recursively cleans individual values by removing nulls and converting EVERYTHING to MongoDB-safe primitive types.
     /// This prevents ANY BsonValue serialization issues by being extremely conservative.
@@ -741,7 +741,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
     {
         if (value == null)
             return null;
-            
+
         return value switch
         {
             // Only allow the most basic primitive types
@@ -754,7 +754,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
             DateTime dt => dt.ToString("O"),  // Convert to ISO string
             DateTimeOffset dto => dto.ToString("O"),  // Convert to ISO string
             Guid g => g.ToString(),  // Convert to string
-            
+
             // Convert EVERYTHING else to string representation to be 100% safe
             _ => value.ToString() ?? ""
         };
@@ -776,7 +776,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                 var idValue = idProperty.GetValue(payload);
                 return idValue?.ToString();
             }
-            
+
             // For DynamicFlowEntity, try to get the Id from the wrapper itself
             if (payload is IDynamicFlowEntity dynamicEntity)
             {
@@ -788,7 +788,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
                     return idValue?.ToString();
                 }
             }
-            
+
             return null;
         }
         catch

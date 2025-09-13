@@ -23,7 +23,7 @@ public class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object
         // so we need to handle the case where the logger is not available.
         _logger = (ILogger?)AppHost.Current?.GetService(typeof(ILogger<JObjectSerializer>));
     }
-    
+
     object IBsonSerializer<object>.Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
     {
         return Deserialize(context, args);
@@ -42,11 +42,11 @@ public class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object
             objectSerializer.Serialize(context, args, value);
         }
     }
-    
+
     public override JObject Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
     {
         var bsonReader = context.Reader;
-        
+
         // Use the driver's built-in serializer to read any BsonValue
         var bsonValue = BsonValueSerializer.Instance.Deserialize(context);
 
@@ -62,17 +62,17 @@ public class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object
             var json = bsonValue.AsBsonDocument.ToJson();
             return JObject.Parse(json);
         }
-        
+
         // If it's any other type (string, int, bool, etc.), it's a primitive.
         // The goal is to represent this primitive as a JObject.
         // We'll wrap it in a standard structure: { "value": <primitive> }
-        
+
         // BsonTypeMapper can convert the BsonValue to its corresponding .NET type.
         var dotNetValue = BsonTypeMapper.MapToDotNetValue(bsonValue);
 
         // JToken.FromObject can handle all primitive .NET types correctly.
         var jToken = JToken.FromObject(dotNetValue);
-        
+
         return new JObject { ["value"] = jToken };
     }
 
@@ -86,7 +86,7 @@ public class JObjectSerializer : SerializerBase<JObject>, IBsonSerializer<object
 
         var json = value.ToString(Formatting.None);
         // _logger?.LogDebug("[JObjectSerializer] Serializing JObject: {Json}", json);
-        
+
         try
         {
             var document = BsonSerializer.Deserialize<BsonDocument>(json);

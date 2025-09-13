@@ -12,7 +12,7 @@ namespace Sora.Data.Mongo.Initialization
             {
                 return new JObjectSerializer();
             }
-            
+
             // For properties of type object that might contain a JObject
             if (type == typeof(object))
             {
