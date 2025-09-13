@@ -107,7 +107,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
         var col = GetCollection();
         var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
         var result = await col.Find(filter).FirstOrDefaultAsync(ct);
-        _logger?.LogDebug("Mongo get {Entity} id={Id} found={Found}", typeof(TEntity).Name, id, result is not null);
+        // Removed verbose per-request get debug logging to reduce noise during parent aggregation lookups.
         return result;
     }
 

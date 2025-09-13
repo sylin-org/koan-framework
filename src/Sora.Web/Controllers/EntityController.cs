@@ -118,7 +118,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> GetCollection(CancellationToken ct)
     {
         if (!CanRead) return Forbid();
-        // ...existing code...
         // Validate explicit negative page requests
         if (HttpContext.Request.Query.TryGetValue("page", out var _vp)
             && int.TryParse(_vp, out var _p)
@@ -126,9 +125,14 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         {
             return BadRequest(new { error = "page must be >= 0" });
         }
+
+        // Repository + capabilities + options
         var repo = HttpContext.RequestServices.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>();
         var caps = Capabilities(repo);
         var opts = BuildOptions();
+        var withParam = HttpContext.Request.Query.TryGetValue("with", out var _w) ? _w.ToString() : null;
+        ILogger? log = null; // optional diagnostic (kept minimal, no spam)
+        try { log = HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("Sora.Web.EntityController"); } catch { }
 
         var ctx = new HookContext<TEntity> { Http = HttpContext, Services = HttpContext.RequestServices, Options = opts, Capabilities = caps, Ct = ct };
         var runner = GetRunner();
@@ -237,91 +241,65 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         }
         if (!await runner.AfterCollectionAsync(ctx, list)) return ctx.ShortCircuitResult!;
 
-        // Parent aggregation block: always execute after hooks and before response
-        log?.LogInformation("ENTITY_DEBUG: [PRE-PARENT] About to check parent aggregation block. withParam={With} IsNullOrWhiteSpace={IsNullOrWhiteSpace}", withParam, string.IsNullOrWhiteSpace(withParam));
+        // Parent aggregation (executed after hooks/pagination). If 'with' absent proceed with normal shaping.
         if (!string.IsNullOrWhiteSpace(withParam))
         {
-            log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Entered parent aggregation block. withParam={With}", withParam);
-            var parentKeys = withParam.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var relMetaInner = HttpContext.RequestServices.GetRequiredService<Sora.Data.Core.Relationships.IRelationshipMetadata>();
-            var parentRelsInner = relMetaInner.GetParentRelationships(typeof(TEntity));
-            log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] parentRels={ParentRels}", string.Join(',', parentRelsInner.Select(r => r.Item1)));
-            try { Response.Headers["X-Debug-With"] = withParam!; } catch { }
-            try { Response.Headers["X-Debug-ParentRels"] = parentRelsInner.Count.ToString(); } catch { }
-            log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Collection parent rel count={Count} entity={Entity}", parentRelsInner.Count, typeof(TEntity).Name);
+            var parentKeys = withParam.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                      .Select(k => k.Trim())
+                                      .ToList();
+            var relMeta = HttpContext.RequestServices.GetRequiredService<Sora.Data.Core.Relationships.IRelationshipMetadata>();
+            var parentRels = relMeta.GetParentRelationships(typeof(TEntity));
             var resultList = new List<Dictionary<string, object?>>();
             foreach (var model in list)
             {
-                log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Aggregating model: {Model}", model);
                 var parentDict = new Dictionary<string, object?>();
-                foreach (var (prop, parentType) in parentRelsInner)
+                foreach (var (prop, parentType) in parentRels)
                 {
-                    log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Checking prop={Prop} for parent aggregation", prop);
-                    if (parentKeys.Contains(prop, StringComparer.OrdinalIgnoreCase) || parentKeys.Contains("all", StringComparer.OrdinalIgnoreCase))
-                    {
-                        var parentId = typeof(TEntity).GetProperty(prop)?.GetValue(model);
-                        log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Found parentId={ParentId} for prop={Prop}", parentId, prop);
-                        if (parentId != null)
-                        {
-                            var dataType = typeof(Sora.Data.Core.Data<,>).MakeGenericType(parentType, typeof(string));
-                            var method = dataType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
-                                .FirstOrDefault(m => m.Name == "GetAsync"
-                                    && m.GetParameters().Length == 2
-                                    && m.GetParameters()[0].ParameterType == typeof(string)
-                                    && m.GetParameters()[1].ParameterType == typeof(System.Threading.CancellationToken));
-                            if (method != null)
-                            {
-                                log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Invoking GetAsync for parentType={ParentType} parentId={ParentId}", parentType.Name, parentId);
-                                var parentTask = (Task)method.Invoke(null, new object[] { parentId.ToString(), ct });
-                                await parentTask.ConfigureAwait(false);
-                                var parentResult = parentTask.GetType().GetProperty("Result")?.GetValue(parentTask);
-                                parentDict[prop] = parentResult;
-                                log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Aggregated parent for prop={Prop} id={ParentId}", prop, parentId);
-                            }
-                            else
-                            {
-                                log?.LogWarning($"ENTITY_DEBUG: [IN-PARENT] No static GetAsync(string, CancellationToken) found on Data<{parentType.Name}, string>");
-                            }
-                        }
-                        else
-                        {
-                            log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Missing parentId for prop={Prop} entity={Entity}", prop, typeof(TEntity).Name);
-                        }
-                    }
+                    bool include = parentKeys.Any(k =>
+                        string.Equals(k, prop, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(k, parentType.Name, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(k, parentType.FullName, StringComparison.OrdinalIgnoreCase)
+                    ) || parentKeys.Any(k => string.Equals(k, "all", StringComparison.OrdinalIgnoreCase));
+                    if (!include) continue;
+                    var parentId = typeof(TEntity).GetProperty(prop)?.GetValue(model);
+                    if (parentId is null) continue;
+                    var dataType = typeof(Sora.Data.Core.Data<,>).MakeGenericType(parentType, typeof(string));
+                    var method = dataType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                        .FirstOrDefault(m => m.Name == "GetAsync"
+                            && m.GetParameters().Length == 2
+                            && m.GetParameters()[0].ParameterType == typeof(string)
+                            && m.GetParameters()[1].ParameterType == typeof(System.Threading.CancellationToken));
+                    if (method == null) continue;
+                    var parentTask = (Task)method.Invoke(null, new object[] { parentId.ToString(), ct });
+                    await parentTask.ConfigureAwait(false);
+                    var parentResult = parentTask.GetType().GetProperty("Result")?.GetValue(parentTask);
+                    parentDict[prop] = parentResult;
                 }
                 var response = new Dictionary<string, object?>();
                 foreach (var p in typeof(TEntity).GetProperties())
                     response[p.Name] = p.GetValue(model);
                 response["_parent"] = parentDict;
-                var idVal = typeof(TEntity).GetProperty("Id")?.GetValue(model);
-                log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Aggregated collection model id={Id} parentKeys={ParentKeys}", idVal, string.Join(',', parentDict.Keys));
                 resultList.Add(response);
             }
             foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
-            log?.LogInformation("ENTITY_DEBUG: [IN-PARENT] Exiting collection aggregation entity={Entity} count={Count}", typeof(TEntity).Name, resultList.Count);
             return PrepareResponse(resultList);
         }
-        else
-        {
-            log?.LogInformation("ENTITY_DEBUG: [POST-PARENT] Skipped parent aggregation block. withParam={With}", withParam);
-            object payload = list;
-            // Shape mapping
-            if (string.Equals(opts.Shape, "map", StringComparison.OrdinalIgnoreCase))
-                payload = list.Select(i => new { key = (object?)((dynamic)i).Id, display = GetDisplay(i) }).ToList();
-            else if (string.Equals(opts.Shape, "dict", StringComparison.OrdinalIgnoreCase))
-                payload = list.ToDictionary(i => (object?)((dynamic)i).Id!, i => (object)GetDisplay(i));
 
-            // Accept/view selection echo
-            var accept = HttpContext.Request.Headers["Accept"].ToString();
-            if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
-            else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
+        // No parent aggregation: optional shape mapping then emit hook
+        object payload = list;
+        if (string.Equals(opts.Shape, "map", StringComparison.OrdinalIgnoreCase))
+            payload = list.Select(i => new { key = (object?)((dynamic)i).Id, display = GetDisplay(i) }).ToList();
+        else if (string.Equals(opts.Shape, "dict", StringComparison.OrdinalIgnoreCase))
+            payload = list.ToDictionary(i => (object?)((dynamic)i).Id!, i => (object)GetDisplay(i));
 
-            var (replaced, transformed) = await runner.EmitCollectionAsync(ctx, payload);
-            payload = transformed;
+        var accept = HttpContext.Request.Headers["Accept"].ToString();
+        if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
+        else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
 
-            foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
-            return PrepareResponse(payload);
-        }
+        var (replaced2, transformed2) = await runner.EmitCollectionAsync(ctx, payload);
+        payload = transformed2;
+        foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
+        return PrepareResponse(payload);
     }
 
     // POST /query accepts a JSON body with shape: { filter, page, size, sort, set, $options }

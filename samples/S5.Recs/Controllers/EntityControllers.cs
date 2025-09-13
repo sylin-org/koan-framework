@@ -44,14 +44,7 @@ public class LibraryEntryDocController : EntityController<LibraryEntryDoc, strin
 
 	public override async Task<IActionResult> GetCollection(CancellationToken ct)
 	{
-	var log = HttpContext.RequestServices.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("S5.Recs.Controllers.LibraryEntryDocController");
-	log?.LogInformation("LIBRARY_DEBUG: [A] Entered GetCollection for LibraryEntryDocController");
-	Response.Headers["X-Debug-Controller"] = nameof(LibraryEntryDocController);
-	Response.Headers["X-Debug-Assembly"] = GetType().Assembly.GetName().Name ?? "?";
-	log?.LogInformation("LIBRARY_DEBUG: [B] Before calling base.GetCollection");
-	var result = await base.GetCollection(ct);
-	log?.LogInformation("LIBRARY_DEBUG: [C] After calling base.GetCollection");
-	return result;
+	return await base.GetCollection(ct);
 	}
 }
 
