@@ -99,40 +99,29 @@ if (payload is IDynamicFlowEntity dynamicEntity)
 }
 ```
 
-### 3. Data Serialization Issues
-For MongoDB BSON serialization problems:
+### 3. Pipeline Architecture Issues
+For Sora.Flow pipeline debugging:
 
-#### Root Cause Analysis
-- **Examine ExpandoObject contents**: Dynamic entities often contain problematic null BsonValues
-- **Check JSON-to-CLR conversion**: Look for unconverted JsonElement or BsonValue objects
-- **Verify data cleaning**: Ensure CleanExpandoObjectForMongoDB removes problematic values
+#### Current State
+- **Serialization issues resolved**: MongoDB BSON serialization is now handled properly by the framework
+- **Focus on pipeline logic**: Debug entity processing stages and aggregation key resolution
+- **Monitor flow stages**: Track entities through Intake → Association → Projection → Materialization
 
-#### Solution Approach
-Rather than cleaning every problematic value, configure MongoDB serializer to be more tolerant:
+#### Debugging Approach
+Focus on pipeline stage transitions rather than serialization:
 
 ```csharp
-// Custom serializer for graceful null handling
-private class NullTolerantBsonValueSerializer : SerializerBase<BsonValue>
-{
-    public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, BsonValue value)
-    {
-        if (value == null)
-        {
-            context.Writer.WriteNull();
-        }
-        else
-        {
-            BsonValueSerializer.Instance.Serialize(context, args, value);
-        }
-    }
-}
+// Monitor pipeline stage transitions
+Logger.LogInformation("[DEBUG] Stage transition - {EntityType} moving from {FromStage} to {ToStage}", 
+    entityType.Name, fromStage, toStage);
 
-// Add conventions for flexible serialization
-var pack = new ConventionPack
-{
-    new IgnoreExtraElementsConvention(true),
-    new IgnoreIfNullConvention(true)
-};
+// Debug aggregation key extraction
+Logger.LogInformation("[DEBUG] Extracted aggregation keys for {EntityType}: {Keys}", 
+    entityType.Name, string.Join(", ", aggregationKeys));
+
+// Monitor entity correlation
+Logger.LogInformation("[DEBUG] Entity correlation - Found {MatchCount} matches for keys: {Keys}",
+    matches.Count, string.Join(", ", matchingKeys));
 ```
 
 ### 4. Container Development Workflow
@@ -145,4 +134,4 @@ var pack = new ConventionPack
 - **Test edge cases**: Ensure fix handles various data scenarios
 - **Document findings**: Add insights to debugging knowledge base
 
-This approach proved effective for resolving MongoDB BsonSerializationException issues in DynamicFlowEntity processing.
+This approach focuses on the actual pipeline logic rather than serialization concerns, which have been resolved.

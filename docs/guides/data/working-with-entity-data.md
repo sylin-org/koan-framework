@@ -284,11 +284,11 @@ Mark parent properties with `[ParentKey]` so the resolver can bind canonical ref
 public sealed class Sensor : FlowEntity<Sensor>
 {
     // Canonical Device ULID (filled by the resolver)
-    [ParentKey]
+    [Parent(typeof(Device))]
     public string DeviceId { get; set; } = default!;
 
     [AggregationTag(Keys.Sensor.Key)]
-    public string SerialNumber{ get; set; } = default!;
+    public string SerialNumber { get; set; } = default!;
 
     public string Code { get; set; } = default!;
     public string Unit { get; set; } = default!;
@@ -391,11 +391,11 @@ Mark parent properties with `[ParentKey]` so the resolver can bind canonical ref
 public sealed class Sensor : FlowEntity<Sensor>
 {
     // Canonical Device ULID (filled by the resolver)
-    [ParentKey(Keys.Device.Key)]
+    [Parent(typeof(Device))]
     public string DeviceId { get; set; } = default!;
 
     [AggregationTag(Keys.Sensor.Key)]
-    public string SerialNumber{ get; set; } = default!;
+    public string SerialNumber { get; set; } = default!;
 
     public string Code { get; set; } = default!;
     public string Unit { get; set; } = default!;

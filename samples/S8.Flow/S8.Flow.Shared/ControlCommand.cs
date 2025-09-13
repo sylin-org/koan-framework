@@ -7,7 +7,7 @@ namespace S8.Flow.Shared;
 // Parent association points at Sensor via the aggregation key in the payload.
 public sealed class ControlCommand : FlowValueObject<ControlCommand>
 {
-    [ParentKey(parent: typeof(Sensor), payloadPath: "SensorId")]
+    [Parent(typeof(Sensor))]
     public string SensorId { get; set; } = string.Empty;
 
     public string Verb { get; set; } = string.Empty;

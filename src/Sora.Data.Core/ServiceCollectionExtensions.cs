@@ -50,6 +50,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDataDiagnostics, DataDiagnostics>();
         // Decorate repositories registered as IDataRepository<,>
         services.TryDecorate(typeof(IDataRepository<,>), typeof(RepositoryFacade<,>));
+        // Relationship metadata scanning (ParentAttribute, etc.)
+        services.TryAddSingleton<Sora.Data.Core.Relationships.IRelationshipMetadata, Sora.Data.Core.Relationships.RelationshipMetadataService>();
         return services;
     }
 

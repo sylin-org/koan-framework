@@ -11,6 +11,9 @@ builder.Services.AddSora()
     .AsProxiedApi()
     .WithRateLimit();
 
+// Explicitly register parent relationship metadata service
+builder.Services.AddSingleton<Sora.Data.Core.Relationships.IRelationshipMetadata, Sora.Data.Core.Relationships.RelationshipMetadataService>();
+
 builder.Services.AddSoraObservability();
 // Ensure local data folders exist for offline/bootstrap flows
 Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.OfflineData))!);
