@@ -34,27 +34,8 @@ public sealed class FlowModelAttribute : Attribute
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public sealed class FlowIgnoreAttribute : Attribute { }
 
-// EntityLink and FlowValueObject attributes removed in favor of ParentKey with explicit parent typing.
-
-/// <summary>
-/// Marks a property as a link to a parent Flow entity. The value can be a canonical ULID, an aggregation key,
-/// or an external identifier value that will be resolved server-side using the message source (identifier.external.{source}).
-/// </summary>
-[AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
-public sealed class ParentKeyAttribute : Attribute
-{
-    public Type Parent { get; }
-    public string? Role { get; }
-    /// Optional key name/path in the intake payload dictionary used to extract the parent key. If null, uses property name.
-    public string? PayloadPath { get; }
-
-    public ParentKeyAttribute(Type parent, string? role = null, string? payloadPath = null)
-    {
-        Parent = parent ?? throw new ArgumentNullException(nameof(parent));
-        Role = string.IsNullOrWhiteSpace(role) ? null : role;
-        PayloadPath = string.IsNullOrWhiteSpace(payloadPath) ? null : payloadPath;
-    }
-}
+// EntityLink, FlowValueObject, and ParentKey attributes removed in favor of unified ParentAttribute from Sora.Data.Core.
+// Use [Parent(typeof(ParentType))] from Sora.Data.Core.Relationships namespace instead.
 
 /// <summary>
 /// Marks a class as a Flow orchestrator, enabling auto-registration and message processing

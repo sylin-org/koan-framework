@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Sora.Data.Abstractions;
 using Sora.Data.Core;
 using Sora.Data.Core.Model;
+using Sora.Data.Core.Extensions;
 using Sora.Web.Attributes;
 using Sora.Web.Filtering;
 using Sora.Web.Hooks;
@@ -241,48 +242,26 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         }
         if (!await runner.AfterCollectionAsync(ctx, list)) return ctx.ShortCircuitResult!;
 
-        // Parent aggregation (executed after hooks/pagination). If 'with' absent proceed with normal shaping.
-        if (!string.IsNullOrWhiteSpace(withParam))
+        // Relationship enrichment using new RelationshipGraph approach
+        if (!string.IsNullOrWhiteSpace(withParam) && withParam.Contains("all"))
         {
-            var parentKeys = withParam.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                                      .Select(k => k.Trim())
-                                      .ToList();
-            var relMeta = HttpContext.RequestServices.GetRequiredService<Sora.Data.Core.Relationships.IRelationshipMetadata>();
-            var parentRels = relMeta.GetParentRelationships(typeof(TEntity));
-            var resultList = new List<Dictionary<string, object?>>();
-            foreach (var model in list)
+            // Check if entities are compatible with relationship system
+            var enrichedResults = new List<object>();
+            foreach (var item in list)
             {
-                var parentDict = new Dictionary<string, object?>();
-                foreach (var (prop, parentType) in parentRels)
+                if (item is Entity<TEntity, TKey> entity)
                 {
-                    bool include = parentKeys.Any(k =>
-                        string.Equals(k, prop, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(k, parentType.Name, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(k, parentType.FullName, StringComparison.OrdinalIgnoreCase)
-                    ) || parentKeys.Any(k => string.Equals(k, "all", StringComparison.OrdinalIgnoreCase));
-                    if (!include) continue;
-                    var parentId = typeof(TEntity).GetProperty(prop)?.GetValue(model);
-                    if (parentId is null) continue;
-                    var dataType = typeof(Sora.Data.Core.Data<,>).MakeGenericType(parentType, typeof(string));
-                    var method = dataType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
-                        .FirstOrDefault(m => m.Name == "GetAsync"
-                            && m.GetParameters().Length == 2
-                            && m.GetParameters()[0].ParameterType == typeof(string)
-                            && m.GetParameters()[1].ParameterType == typeof(System.Threading.CancellationToken));
-                    if (method == null) continue;
-                    var parentTask = (Task)method.Invoke(null, new object[] { parentId.ToString(), ct });
-                    await parentTask.ConfigureAwait(false);
-                    var parentResult = parentTask.GetType().GetProperty("Result")?.GetValue(parentTask);
-                    parentDict[prop] = parentResult;
+                    var enriched = await entity.GetRelatives(ct);
+                    enrichedResults.Add(enriched);
                 }
-                var response = new Dictionary<string, object?>();
-                foreach (var p in typeof(TEntity).GetProperties())
-                    response[p.Name] = p.GetValue(model);
-                response["_parent"] = parentDict;
-                resultList.Add(response);
+                else
+                {
+                    enrichedResults.Add(item); // Fall back to original entity if not compatible
+                }
             }
+
             foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
-            return PrepareResponse(resultList);
+            return PrepareResponse(enrichedResults);
         }
 
         // No parent aggregation: optional shape mapping then emit hook
@@ -376,69 +355,28 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         }
 
         if (!await runner.AfterCollectionAsync(ctx, list)) return ctx.ShortCircuitResult!;
-        // Parent relationship aggregation for collections
+
+        // Relationship enrichment using new RelationshipGraph approach
         var with = HttpContext.Request.Query.TryGetValue("with", out var wVal) ? wVal.ToString() : null;
-        ILogger? log = null;
-        try { log = HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("Sora.Web.EntityController.ParentDebug"); } catch { }
-        log?.LogInformation("PARENT_DEBUG: [A] with param raw value: {With}", with);
-        log?.LogInformation("PARENT_DEBUG: [B] IsNullOrWhiteSpace(with): {Result}", string.IsNullOrWhiteSpace(with));
-        if (!string.IsNullOrWhiteSpace(with))
+        if (!string.IsNullOrWhiteSpace(with) && with.Contains("all"))
         {
-            log?.LogInformation("PARENT_DEBUG: [C] Entered parent aggregation block for entity={Entity} with={With}", typeof(TEntity).Name, with);
-            var parentKeys = with.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            log?.LogInformation("PARENT_DEBUG: [D] parentKeys={ParentKeys}", string.Join(',', parentKeys));
-            var relMeta = HttpContext.RequestServices.GetRequiredService<Sora.Data.Core.Relationships.IRelationshipMetadata>();
-            log?.LogInformation("PARENT_DEBUG: [E] Got relMeta instance: {Type}", relMeta?.GetType().FullName);
-            var parentRels = relMeta.GetParentRelationships(typeof(TEntity));
-            log?.LogInformation("PARENT_DEBUG: [F] parentRels={ParentRels}", string.Join(',', parentRels.Select(r => r.Item1)));
-            if (parentRels.Count == 0)
+            // Check if entities are compatible with relationship system
+            var enrichedResults = new List<object>();
+            foreach (var item in list)
             {
-                log?.LogWarning("PARENT_DEBUG: [G] No parent relationships discovered for entity={Entity}. Check model annotations and DI registration.", typeof(TEntity).Name);
-            }
-            try { Response.Headers["X-Debug-With"] = with!; } catch { }
-            try { Response.Headers["X-Debug-ParentRels"] = parentRels.Count.ToString(); } catch { }
-            log?.LogInformation("PARENT_DEBUG: [H] Collection parent rel count={Count} entity={Entity}", parentRels.Count, typeof(TEntity).Name);
-            var resultList = new List<Dictionary<string, object?>>();
-            foreach (var model in list)
-            {
-                log?.LogInformation("PARENT_DEBUG: [I] Aggregating model: {Model}", model);
-                var parentDict = new Dictionary<string, object?>();
-                foreach (var (prop, parentType) in parentRels)
+                if (item is Entity<TEntity, TKey> entity)
                 {
-                    log?.LogInformation("PARENT_DEBUG: [J] Checking prop={Prop} for parent aggregation", prop);
-                    if (parentKeys.Contains(prop, StringComparer.OrdinalIgnoreCase) || parentKeys.Contains("all", StringComparer.OrdinalIgnoreCase))
-                    {
-                        var parentId = typeof(TEntity).GetProperty(prop)?.GetValue(model);
-                        log?.LogInformation("PARENT_DEBUG: [K] Found parentId={ParentId} for prop={Prop}", parentId, prop);
-                        if (parentId != null)
-                        {
-                            var method = typeof(Sora.Data.Core.Data<,>)
-                                .MakeGenericType(parentType, typeof(string))
-                                .GetMethod("GetAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                            log?.LogInformation("PARENT_DEBUG: [L] Invoking GetAsync for parentType={ParentType} parentId={ParentId}", parentType.Name, parentId);
-                            var parentTask = (Task)method.Invoke(null, new object[] { parentId.ToString(), ct });
-                            await parentTask.ConfigureAwait(false);
-                            var parentResult = parentTask.GetType().GetProperty("Result")?.GetValue(parentTask);
-                            parentDict[prop] = parentResult;
-                            log?.LogInformation("PARENT_DEBUG: [M] Aggregated parent for prop={Prop} id={ParentId}", prop, parentId);
-                        }
-                        else
-                        {
-                            log?.LogInformation("PARENT_DEBUG: [N] Missing parentId for prop={Prop} entity={Entity}", prop, typeof(TEntity).Name);
-                        }
-                    }
+                    var enriched = await entity.GetRelatives(ct);
+                    enrichedResults.Add(enriched);
                 }
-                var response = new Dictionary<string, object?>();
-                foreach (var p in typeof(TEntity).GetProperties())
-                    response[p.Name] = p.GetValue(model);
-                response["_parent"] = parentDict;
-                var idVal = typeof(TEntity).GetProperty("Id")?.GetValue(model);
-                log?.LogInformation("PARENT_DEBUG: [O] Aggregated collection model id={Id} parentKeys={ParentKeys}", idVal, string.Join(',', parentDict.Keys));
-                resultList.Add(response);
+                else
+                {
+                    enrichedResults.Add(item); // Fall back to original entity if not compatible
+                }
             }
+
             foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
-            log?.LogInformation("PARENT_DEBUG: [P] Exiting collection aggregation entity={Entity} count={Count}", typeof(TEntity).Name, resultList.Count);
-            return PrepareResponse(resultList);
+            return PrepareResponse(enrichedResults);
         }
         var (replaced, transformed) = await runner.EmitCollectionAsync(ctx, list);
         foreach (var kv in ctx.ResponseHeaders) Response.Headers[kv.Key] = kv.Value;
@@ -493,48 +431,15 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         if (!string.IsNullOrWhiteSpace(opts.View)) Response.Headers["Sora-View"] = opts.View!;
         else if (!string.IsNullOrWhiteSpace(accept)) Response.Headers["Sora-View"] = ParseViewFromAccept(accept) ?? "full";
 
-        // Parent relationship aggregation
+        // Relationship enrichment using new RelationshipGraph approach
         var with = HttpContext.Request.Query.TryGetValue("with", out var wVal) ? wVal.ToString() : null;
-        if (!string.IsNullOrWhiteSpace(with))
+        if (!string.IsNullOrWhiteSpace(with) && with.Contains("all"))
         {
-            try { Response.Headers["X-Debug-With"] = with!; } catch { }
-            ILogger? log = null; try { log = HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("Sora.Web.EntityController.ParentDebug"); } catch { }
-            log?.LogInformation("PARENT_DEBUG: Enter single aggregation entity={Entity} id={Id} with={With}", typeof(TEntity).Name, idStr, with);
-            var parentKeys = with.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var relMeta = HttpContext.RequestServices.GetRequiredService<Sora.Data.Core.Relationships.IRelationshipMetadata>();
-            var parentRels = relMeta.GetParentRelationships(typeof(TEntity));
-            try { Response.Headers["X-Debug-ParentRels"] = parentRels.Count.ToString(); } catch { }
-            log?.LogInformation("PARENT_DEBUG: Single parent rel count={Count} entity={Entity}", parentRels.Count, typeof(TEntity).Name);
-            var parentDict = new Dictionary<string, object?>();
-            foreach (var (prop, parentType) in parentRels)
+            if (model is Entity<TEntity, TKey> entity)
             {
-                if (parentKeys.Contains(prop, StringComparer.OrdinalIgnoreCase) || parentKeys.Contains("all", StringComparer.OrdinalIgnoreCase))
-                {
-                    var parentId = typeof(TEntity).GetProperty(prop)?.GetValue(model);
-                    if (parentId != null)
-                    {
-                        // Use reflection to invoke Data<TParent, string>.GetAsync for parent lookup
-                        var method = typeof(Sora.Data.Core.Data<,>)
-                            .MakeGenericType(parentType, typeof(string))
-                            .GetMethod("GetAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                        var parentTask = (Task)method.Invoke(null, new object[] { parentId.ToString(), ct });
-                        await parentTask.ConfigureAwait(false);
-                        var parentResult = parentTask.GetType().GetProperty("Result")?.GetValue(parentTask);
-                        parentDict[prop] = parentResult;
-                        log?.LogInformation("PARENT_DEBUG: Single aggregated parent prop={Prop} entity={Entity}", prop, typeof(TEntity).Name);
-                    }
-                    else
-                    {
-                        log?.LogInformation("PARENT_DEBUG: Single missing parentId for prop={Prop} entity={Entity}", prop, typeof(TEntity).Name);
-                    }
-                }
+                var enriched = await entity.GetRelatives(ct);
+                return PrepareResponse(enriched);
             }
-            var response = new Dictionary<string, object?>();
-            foreach (var p in typeof(TEntity).GetProperties())
-                response[p.Name] = p.GetValue(model);
-            response["_parent"] = parentDict;
-            log?.LogInformation("PARENT_DEBUG: Exiting single aggregation entity={Entity} id={Id} parentKeys={ParentKeys}", typeof(TEntity).Name, idStr, string.Join(',', parentDict.Keys));
-            return PrepareResponse(response);
         }
 
         var (replaced, transformed) = await runner.EmitModelAsync(ctx, model);

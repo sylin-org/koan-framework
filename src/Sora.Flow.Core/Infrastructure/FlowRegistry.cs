@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using Sora.Flow.Attributes;
 using Sora.Flow.Model;
+using Sora.Data.Core.Relationships;
 
 namespace Sora.Flow.Infrastructure;
 
@@ -94,22 +95,22 @@ public static class FlowRegistry
             var bt = type.BaseType;
             if (bt is null || !bt.IsGenericType || bt.GetGenericTypeDefinition() != typeof(FlowValueObject<>)) return null;
             
-            // Determine parent via first [ParentKey(parent: ...)]
+            // Determine parent via first [Parent(typeof(...))]
             foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
-                var pk = p.GetCustomAttribute<ParentKeyAttribute>(inherit: true);
-                if (pk is null || pk.Parent is null) continue;
-                
+                var pk = p.GetCustomAttribute<ParentAttribute>(inherit: true);
+                if (pk is null || pk.ParentType is null) continue;
+
                 // Find the [Key] property on the parent type
-                var parentKeyProperty = pk.Parent.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                var parentKeyProperty = pk.ParentType.GetProperties(BindingFlags.Instance | BindingFlags.Public)
                     .FirstOrDefault(prop => prop.GetCustomAttribute<KeyAttribute>(inherit: true) != null);
-                
+
                 if (parentKeyProperty == null)
-                    throw new InvalidOperationException($"Parent type {pk.Parent.Name} has no [Key] property for ParentKey resolution");
-                
-                var path = string.IsNullOrWhiteSpace(pk.PayloadPath) ? GetJsonPropertyName(p) : pk.PayloadPath;
+                    throw new InvalidOperationException($"Parent type {pk.ParentType.Name} has no [Key] property for ParentKey resolution");
+
+                var path = GetJsonPropertyName(p); // Use property name as path since PayloadPath is no longer supported
                 if (string.IsNullOrWhiteSpace(path)) continue;
-                return (pk.Parent, path);
+                return (pk.ParentType, path);
             }
             return null;
         });
@@ -129,22 +130,22 @@ public static class FlowRegistry
             var bt = type.BaseType;
             if (bt is null || !bt.IsGenericType || bt.GetGenericTypeDefinition() != typeof(FlowEntity<>)) return null;
             
-            // Determine parent via first [ParentKey(parent: ...)]
+            // Determine parent via first [Parent(typeof(...))]
             foreach (var p in type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
-                var pk = p.GetCustomAttribute<ParentKeyAttribute>(inherit: true);
-                if (pk is null || pk.Parent is null) continue;
-                
+                var pk = p.GetCustomAttribute<ParentAttribute>(inherit: true);
+                if (pk is null || pk.ParentType is null) continue;
+
                 // Find the [Key] property on the parent type
-                var parentKeyProperty = pk.Parent.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                var parentKeyProperty = pk.ParentType.GetProperties(BindingFlags.Instance | BindingFlags.Public)
                     .FirstOrDefault(prop => prop.GetCustomAttribute<KeyAttribute>(inherit: true) != null);
-                
+
                 if (parentKeyProperty == null)
-                    throw new InvalidOperationException($"Parent type {pk.Parent.Name} has no [Key] property for ParentKey resolution");
-                
-                var path = string.IsNullOrWhiteSpace(pk.PayloadPath) ? GetJsonPropertyName(p) : pk.PayloadPath;
+                    throw new InvalidOperationException($"Parent type {pk.ParentType.Name} has no [Key] property for ParentKey resolution");
+
+                var path = GetJsonPropertyName(p); // Use property name as path since PayloadPath is no longer supported
                 if (string.IsNullOrWhiteSpace(path)) continue;
-                return (pk.Parent, path);
+                return (pk.ParentType, path);
             }
             return null;
         });

@@ -1,13 +1,64 @@
-# S1.Web — Minimal API + AngularJS sample
+# S1.Web — Sora Framework Relationship System Demo
 
-This sample showcases Sora.Web’s generic EntityController with a tiny AngularJS UI backed by the JSON data adapter.
+This enhanced S1 sample demonstrates the new relationship system in Sora Framework, showcasing instance-based relationship navigation, batch loading, and streaming capabilities, along with a minimal AngularJS UI.
 
+## Entity Relationships
+
+The sample includes a hierarchical entity structure:
+
+```
+User (1) ──────┐
+               ├──> Todo (N) ──> TodoItem (N)
+Category (1) ──┘
+```
+
+### Entities & Relationships
+
+- **User**: Represents users who create todos
+- **Category**: Organizes todos into categories (Work, Personal, etc.)
+- **Todo**: Main todo items with relationships to User and Category
+- **TodoItem**: Sub-tasks within a todo
+
+## API Endpoints
+
+### Standard CRUD Operations
 - Health endpoint: GET /api/health
-- CRUD base route: api/todo
+- CRUD base routes: /api/todo, /api/users, /api/categories, /api/todoitems
 - Bulk ops: POST /api/todo/bulk and DELETE /api/todo/bulk
-- Clear all: DELETE /api/todo/clear
-- Seed: POST /api/todo/seed/{count}
+- Clear all: DELETE /api/todo/clear-all
 - Pagination headers: X-Total-Count, X-Page, X-Page-Size, X-Total-Pages, plus RFC 5988 Link
+
+### Relationship System Features
+- **Seeding with relationships**: POST /api/todo/seed-with-relationships
+- **Relationship demo**: GET /api/todo/relationship-demo/{id}
+- **Streaming demo**: GET /api/todo/streaming-demo
+- **Entity enrichment**: GET /api/todo?with=all (new RelationshipGraph format)
+
+## Quick Testing Guide
+
+### 1. Setup Data with Relationships
+```bash
+# Create users
+POST /api/users/seed/5
+
+# Create categories
+POST /api/categories/seed
+
+# Create interconnected todos and todo items
+POST /api/todo/seed-with-relationships
+```
+
+### 2. Test New Relationship Features
+```bash
+# Get enriched todos with RelationshipGraph format
+GET /api/todo?with=all
+
+# Comprehensive relationship navigation demo
+GET /api/todo/relationship-demo/{id}
+
+# Batch loading and streaming performance demo
+GET /api/todo/streaming-demo
+```
 
 ## Run locally
 
