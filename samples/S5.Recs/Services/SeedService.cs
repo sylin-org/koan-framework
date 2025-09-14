@@ -147,10 +147,35 @@ internal sealed class SeedService : ISeedService
         try
         {
             var docs = await AnimeDoc.All(ct);
-            var counts = CountTags(ExtractTags(docs));
+            var extractedTags = ExtractTags(docs);
+
+            // Apply preemptive filtering during rebuild
+            var flaggedTags = new List<string>();
+            var cleanTags = new List<string>();
+
+            foreach (var tag in extractedTags)
+            {
+                if (Infrastructure.PreemptiveTagFilter.ShouldCensor(tag))
+                {
+                    flaggedTags.Add(tag);
+                }
+                else
+                {
+                    cleanTags.Add(tag);
+                }
+            }
+
+            // Auto-add flagged tags to censor list
+            if (flaggedTags.Count > 0)
+            {
+                await AutoCensorTagsAsync(flaggedTags, ct);
+                _logger?.LogInformation("Preemptive filter auto-censored {Count} tags during catalog rebuild", flaggedTags.Count);
+            }
+
+            var counts = CountTags(cleanTags);
             var tagDocs = BuildTagDocs(counts);
             var n = await TagStatDoc.UpsertMany(tagDocs, ct);
-            _logger?.LogInformation("Rebuilt tag catalog: {Count} tags", counts.Count);
+            _logger?.LogInformation("Rebuilt tag catalog: {Count} tags ({Censored} preemptively filtered)", counts.Count, flaggedTags.Count);
             return n;
         }
         catch (Exception ex)
@@ -311,10 +336,66 @@ internal sealed class SeedService : ISeedService
 
     private async Task CatalogTagsAsync(List<Anime> items, CancellationToken ct)
     {
-        var counts = CountTags(ExtractTags(items));
+        var extractedTags = ExtractTags(items);
+
+        // Apply preemptive filtering - automatically censor flagged tags
+        var flaggedTags = new List<string>();
+        var cleanTags = new List<string>();
+
+        foreach (var tag in extractedTags)
+        {
+            if (Infrastructure.PreemptiveTagFilter.ShouldCensor(tag))
+            {
+                flaggedTags.Add(tag);
+            }
+            else
+            {
+                cleanTags.Add(tag);
+            }
+        }
+
+        // Auto-add flagged tags to censor list
+        if (flaggedTags.Count > 0)
+        {
+            await AutoCensorTagsAsync(flaggedTags, ct);
+            _logger?.LogInformation("Preemptive filter auto-censored {Count} tags during import", flaggedTags.Count);
+        }
+
+        // Only catalog clean tags
+        var counts = CountTags(cleanTags);
         var docs = BuildTagDocs(counts);
         await TagStatDoc.UpsertMany(docs, ct);
-        _logger?.LogInformation("Tag catalog updated with {Count} tags", counts.Count);
+        _logger?.LogInformation("Tag catalog updated with {Count} tags ({Censored} preemptively filtered)", counts.Count, flaggedTags.Count);
+    }
+
+    private async Task AutoCensorTagsAsync(List<string> tags, CancellationToken ct)
+    {
+        try
+        {
+            var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct) ?? new Models.CensorTagsDoc { Id = "recs:censor-tags" };
+            var existingTags = new HashSet<string>(doc.Tags ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+
+            var newlyAdded = 0;
+            foreach (var tag in tags)
+            {
+                if (existingTags.Add(tag.Trim()))
+                {
+                    newlyAdded++;
+                }
+            }
+
+            if (newlyAdded > 0)
+            {
+                doc.Tags = existingTags.OrderBy(s => s).ToList();
+                doc.UpdatedAt = DateTimeOffset.UtcNow;
+                await Models.CensorTagsDoc.UpsertMany(new[] { doc }, ct);
+                _logger?.LogInformation("Auto-added {NewCount} new tags to censor list via preemptive filter", newlyAdded);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to auto-censor tags via preemptive filter: {Message}", ex.Message);
+        }
     }
 
     private async Task CatalogGenresAsync(List<Anime> items, CancellationToken ct)

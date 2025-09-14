@@ -130,9 +130,166 @@
     await refresh();
   }
 
+  // Tag Browser functionality for Censor management
+  let allTagsForCensor = [];
+  let censoredTags = [];
+  let censorTagsSortMode = 'popularity';
+
+  async function loadTagsForCensor(){
+    try{
+      // Use admin endpoint to get ALL tags including censored ones
+      const url = '/admin/tags/all?sort=popularity';
+      const r = await fetch(url);
+      if(!r.ok) throw new Error('Failed to fetch all tags');
+      const list = await r.json();
+      allTagsForCensor = Array.isArray(list) ? list : [];
+      renderCensorTagsBrowser();
+    }catch{
+      // Fallback: try to show something
+      const browser = document.getElementById('censorTagsBrowser');
+      if(browser) browser.innerHTML = '<div class="text-sm text-red-400">Failed to load tags</div>';
+    }
+  }
+
+  function renderCensorTagsBrowser(){
+    const browser = document.getElementById('censorTagsBrowser');
+    if(!browser) return;
+
+    const q = (document.getElementById('censorTagsSearch')?.value || '').toLowerCase();
+    let items = [...allTagsForCensor];
+
+    // Filter by search
+    if(q){ items = items.filter(x => (x.tag||'').toLowerCase().includes(q)); }
+
+    // Sort
+    if(censorTagsSortMode === 'alpha'){
+      items.sort((a,b)=> (a.tag||'').localeCompare(b.tag||''));
+    } else {
+      items.sort((a,b)=> (b.count||0)-(a.count||0) || (a.tag||'').localeCompare(b.tag||''));
+    }
+
+    // Create case-insensitive lookup set for censored tags
+    const censoredTagsLower = new Set(censoredTags.map(t => t.toLowerCase()));
+
+    browser.innerHTML = items.map(x=>{
+      const isCensored = censoredTagsLower.has((x.tag||'').toLowerCase());
+      const cls = isCensored
+        ? 'px-2 py-1 text-xs rounded-full border border-red-500 bg-red-600 text-white hover:bg-red-700'
+        : 'px-2 py-1 text-xs rounded-full border border-slate-700 bg-slate-800 text-gray-300 hover:bg-slate-700';
+      return `<button type="button" data-tag="${x.tag}" class="${cls}">${x.tag} <span class="text-gray-400">(${x.count})</span></button>`;
+    }).join('');
+
+    // Add click handlers
+    browser.querySelectorAll('button[data-tag]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tag = btn.getAttribute('data-tag');
+        await toggleCensorTag(tag);
+      });
+    });
+  }
+
+  async function toggleCensorTag(tag){
+    // Use case-insensitive comparison to match backend behavior
+    const isCurrentlyCensored = censoredTags.some(t => t.toLowerCase() === tag.toLowerCase());
+    try{
+      if(isCurrentlyCensored){
+        // Remove from censor
+        const r = await fetch((window.S5Const?.ENDPOINTS?.ADMIN_TAGS_CENSOR_REMOVE)||'/admin/tags/censor/remove', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ tag })
+        });
+        if(!r.ok) throw 0;
+        window.showToast && showToast(`Removed "${tag}" from censor list`, 'success');
+      } else {
+        // Add to censor
+        const r = await fetch((window.S5Const?.ENDPOINTS?.ADMIN_TAGS_CENSOR_ADD)||'/admin/tags/censor/add', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ text: tag })
+        });
+        if(!r.ok) throw 0;
+        window.showToast && showToast(`Added "${tag}" to censor list`, 'success');
+      }
+      await refreshCensorData();
+    }catch{
+      window.showToast && showToast(`Failed to toggle "${tag}"`, 'error');
+    }
+  }
+
+  async function refreshCensorData(){
+    // Refresh the main censor list
+    await initCensorAdmin();
+    // Re-render the browser to update button states
+    renderCensorTagsBrowser();
+  }
+
+  function initCensorTagsBrowser(){
+    const popBtn = document.getElementById('censorTagsSortPopularityBtn');
+    const alphaBtn = document.getElementById('censorTagsSortAlphaBtn');
+    const searchInput = document.getElementById('censorTagsSearch');
+
+    function setMode(mode){
+      censorTagsSortMode = mode;
+      if(popBtn && alphaBtn){
+        if(mode === 'popularity'){
+          popBtn.className = 'px-2 py-1 text-xs text-white bg-red-600 rounded transition-colors';
+          alphaBtn.className = 'px-2 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors';
+        } else {
+          alphaBtn.className = 'px-2 py-1 text-xs text-white bg-red-600 rounded transition-colors';
+          popBtn.className = 'px-2 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors';
+        }
+      }
+      renderCensorTagsBrowser();
+    }
+
+    if(popBtn) popBtn.addEventListener('click', () => setMode('popularity'));
+    if(alphaBtn) alphaBtn.addEventListener('click', () => setMode('alpha'));
+
+    if(searchInput){
+      searchInput.addEventListener('input', () => {
+        renderCensorTagsBrowser();
+      });
+    }
+
+    // Manual input toggle
+    const toggleBtn = document.getElementById('btnToggleManualInput');
+    const section = document.getElementById('manualInputSection');
+    const chevron = document.getElementById('manualInputChevron');
+
+    if(toggleBtn && section){
+      toggleBtn.addEventListener('click', () => {
+        const isHidden = section.classList.contains('hidden');
+        if(isHidden){
+          section.classList.remove('hidden');
+          if(chevron) chevron.style.transform = 'rotate(90deg)';
+        } else {
+          section.classList.add('hidden');
+          if(chevron) chevron.style.transform = 'rotate(0deg)';
+        }
+      });
+    }
+  }
+
+  // Override the existing initCensorAdmin to also track censored tags
+  const originalInitCensorAdmin = initCensorAdmin;
+  initCensorAdmin = async function(){
+    await originalInitCensorAdmin();
+
+    // Load current censor list
+    try{
+      const r = await fetch((window.S5Const?.ENDPOINTS?.ADMIN_TAGS_CENSOR)||'/admin/tags/censor');
+      if(r.ok){
+        const data = await r.json();
+        censoredTags = data.tags || [];
+        renderCensorTagsBrowser();
+      }
+    }catch{}
+  };
+
   // Bootstrap
   document.addEventListener('DOMContentLoaded', () => {
-  loadStats(); loadHealth(); loadTagsCount(); loadAggregates(); loadObservability(); bindSettings(); loadRecsSettings(); initCensorAdmin();
+  loadStats(); loadHealth(); loadTagsCount(); loadAggregates(); loadObservability(); bindSettings(); loadRecsSettings(); initCensorAdmin(); loadTagsForCensor(); initCensorTagsBrowser();
     // Initialize Import limit from constants to avoid magic number in HTML
     const defLim = (window.S5Const && window.S5Const.ADMIN && typeof window.S5Const.ADMIN.IMPORT_DEFAULT_LIMIT === 'number') ? window.S5Const.ADMIN.IMPORT_DEFAULT_LIMIT : 200;
     const limEl = document.getElementById('importLimit');

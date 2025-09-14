@@ -124,18 +124,55 @@
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-white">Tag Censor</h3>
         </div>
-        <p class="text-sm text-gray-400 mb-3">Paste comma or line separated tags to censor. These will be excluded from the tag catalog.</p>
-        <div class="mb-3">
-          <textarea id="censorInput" class="w-full bg-slate-800 text-white rounded px-3 py-2 h-28 border border-slate-700" placeholder="Example: nsfw, hentai\necchi\nsmut"></textarea>
+
+        <!-- Tag Browser Section -->
+        <div class="mb-6">
+          <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-300 font-medium">Browse & Toggle Tags</span>
+              <div class="flex bg-slate-800 rounded-lg p-1" role="group" aria-label="Tag sort mode">
+                <button id="censorTagsSortPopularityBtn" class="px-2 py-1 text-xs text-white bg-red-600 rounded transition-colors" type="button">Popularity</button>
+                <button id="censorTagsSortAlphaBtn" class="px-2 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors" type="button">A–Z</button>
+              </div>
+            </div>
+            <input id="censorTagsSearch" placeholder="Search tags..." class="bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 text-sm w-full md:w-64" />
+          </div>
+          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div class="text-xs text-gray-400 mb-3">Click tags to add/remove from censor list. Censored tags appear in red.</div>
+            <div id="censorTagsBrowser" class="flex flex-wrap gap-2 max-h-64 overflow-y-auto scroll-dark">
+              <div class="text-sm text-gray-400">Loading tags...</div>
+            </div>
+          </div>
         </div>
+
+        <!-- Manual Input Section (Collapsed by default) -->
+        <div class="mb-4">
+          <button id="btnToggleManualInput" class="text-sm text-gray-400 hover:text-white mb-3 flex items-center">
+            <i class="fas fa-chevron-right mr-2 transition-transform" id="manualInputChevron"></i>
+            Manual Input (Advanced)
+          </button>
+          <div id="manualInputSection" class="hidden">
+            <p class="text-sm text-gray-400 mb-3">Paste comma or line separated tags to censor. These will be excluded from the tag catalog.</p>
+            <div class="mb-3">
+              <textarea id="censorInput" class="w-full bg-slate-800 text-white rounded px-3 py-2 h-28 border border-slate-700" placeholder="Example: nsfw, hentai
+ecchi
+smut"></textarea>
+            </div>
+            <div class="flex items-center gap-2 mb-4">
+              <button id="btnCensorAdd" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><i class="fas fa-plus mr-2"></i>Add to list</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Current Censor List Actions -->
         <div class="flex items-center gap-2 mb-4">
-          <button id="btnCensorAdd" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><i class="fas fa-plus mr-2"></i>Add to list</button>
           <button id="btnCensorCopy" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-200 rounded-lg border border-slate-700"><i class="fas fa-copy mr-2"></i>Copy list</button>
           <button id="btnCensorClear" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-200 rounded-lg border border-slate-700"><i class="fas fa-trash mr-2"></i>Clear list</button>
         </div>
+
         <div class="text-sm text-gray-300">
           <div class="flex items-center">
-            <span class="font-medium">Current list</span>
+            <span class="font-medium">Current censor list</span>
             <span class="ml-1">(<span id="censorCount">0</span>)</span>
             <button id="btnCensorToggle" class="ml-3 px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-gray-200 rounded border border-slate-700" aria-expanded="false" aria-controls="censorListContainer">Show</button>
           </div>
