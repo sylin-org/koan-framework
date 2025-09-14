@@ -342,7 +342,7 @@ internal sealed class RecsService : IRecsService
         // Update profile preferences using simple EWMA over genres and tags
         var a = await AnimeDoc.Get(animeId, ct);
         if (a is null) return;
-        var profile = await UserProfileDoc.Get(userId, ct) ?? new UserProfileDoc { Id = userId };
+        var profile = await UserProfileDoc.Get(userId, ct) ?? new UserProfileDoc { Id = userId, UserId = userId };
         const double alpha = 0.3; // smoothing factor
         void Nudge(string key, double target)
         {
