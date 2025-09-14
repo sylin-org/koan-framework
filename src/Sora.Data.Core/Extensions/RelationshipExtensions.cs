@@ -28,14 +28,45 @@ public static class RelationshipExtensions
         var entityList = entities.ToList();
         if (entityList.Count == 0) return new List<RelationshipGraph<TEntity>>().AsReadOnly();
 
-        var enrichedResults = new List<RelationshipGraph<TEntity>>();
+        var metadata = entityList[0].GetRelationshipService();
+        var batchLoader = new BatchRelationshipLoader();
+
+        // Batch load parents
+        var parentMap = await batchLoader.LoadParentsBatch<TEntity, TKey>(entityList, metadata, ct);
+        // Batch load children
+        var childMap = await batchLoader.LoadChildrenBatch<TEntity, TKey>(entityList, metadata, ct);
+
+        var results = new List<RelationshipGraph<TEntity>>();
         foreach (var entity in entityList)
         {
-            var enriched = await entity.GetRelatives(ct);
-            enrichedResults.Add(enriched);
+            var graph = new RelationshipGraph<TEntity>
+            {
+                Entity = entity,
+                Parents = new Dictionary<string, object?>(),
+                Children = new Dictionary<string, Dictionary<string, IReadOnlyList<object>>>()
+            };
+            foreach (var ((propertyName, parentType), parentDict) in parentMap)
+            {
+                var id = typeof(TEntity).GetProperty(propertyName)?.GetValue(entity);
+                if (id != null && parentDict.TryGetValue(id, out var parent))
+                {
+                    graph.Parents[propertyName] = parent;
+                }
+            }
+            foreach (var ((referenceProperty, childType), childDict) in childMap)
+            {
+                var id = entity.Id;
+                if (childDict.TryGetValue(id, out var children))
+                {
+                    var typeName = childType.Name;
+                    if (!graph.Children.ContainsKey(typeName))
+                        graph.Children[typeName] = new Dictionary<string, IReadOnlyList<object>>();
+                    graph.Children[typeName][referenceProperty] = children;
+                }
+            }
+            results.Add(graph);
         }
-
-        return enrichedResults.AsReadOnly();
+        return results.AsReadOnly();
     }
 
     /// <summary>
@@ -48,10 +79,24 @@ public static class RelationshipExtensions
         where TEntity : Entity<TEntity, TKey>, IEntity<TKey>
         where TKey : notnull
     {
+        var batch = new List<TEntity>();
+        const int batchSize = 100;
         await foreach (var entity in entities.WithCancellation(ct))
         {
-            var enriched = await entity.GetRelatives(ct);
-            yield return enriched;
+            batch.Add(entity);
+            if (batch.Count >= batchSize)
+            {
+                var enrichedBatch = await RelationshipExtensions.Relatives<TEntity, TKey>(batch, ct);
+                foreach (var enriched in enrichedBatch)
+                    yield return enriched;
+                batch.Clear();
+            }
+        }
+        if (batch.Count > 0)
+        {
+            var enrichedBatch = await RelationshipExtensions.Relatives<TEntity, TKey>(batch, ct);
+            foreach (var enriched in enrichedBatch)
+                yield return enriched;
         }
     }
 
