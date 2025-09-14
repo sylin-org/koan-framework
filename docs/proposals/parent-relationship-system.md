@@ -393,7 +393,7 @@ docs/reference/flow-entity-lifecycle-guide.md       # Update examples
 **Breaking Change**:
 - ✅ Replace `_parent` format with RelationshipGraph structure
 - ✅ Update EntityController to use instance methods
-- ✅ Add selective enrichment based on ?with=relatives parameter
+- ✅ Add selective enrichment based on ?with=all parameter
 - ✅ Support streaming endpoints with enrichment
 
 **New API Endpoints**:
@@ -479,9 +479,9 @@ var enriched = await sensor.GetRelatives();
 - **Memory Usage**: Mitigated by configurable relationship batch sizes and streaming support
 
 ### Migration Risks
-- **Breaking Changes**: Mitigated by compatibility bridge and gradual migration approach
-- **Feature Regression**: Mitigated by comprehensive testing and parallel execution
-- **Rollback Plan**: Bridge can fallback to original Flow implementation if needed
+- **Breaking Changes**: Direct replacement approach requires coordinated migration but eliminates complexity
+- **Feature Regression**: Mitigated by comprehensive testing and validation of semantic methods
+- **Rollback Plan**: Clean git revert possible due to direct replacement approach
 
 ## Conclusion
 
