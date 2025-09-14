@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using S5.Recs.Models;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
+using System.Net;
 
 namespace S5.Recs.Providers;
 
@@ -91,53 +92,79 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
                 var media = pageEl["media"] as JArray;
                 if (media is not null)
                 {
+                    int skipped = 0;
                     foreach (var m in media)
                     {
-                        var id = m["id"]?.Value<int>().ToString() ?? "";
-                        var title = m["title"]?["english"]?.Value<string>()
-                                    ?? m["title"]?["romaji"]?.Value<string>()
-                                    ?? m["title"]?["native"]?.Value<string>()
-                                    ?? $"AniList {id}";
-                        var episodes = m["episodes"]?.Value<int?>();
-                        var genres = m["genres"] is JArray gArr ? gArr.Select(x => x?.Value<string>() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() : Array.Empty<string>();
-                        var desc = m["description"]?.Value<string>();
-                        var synopsis = string.IsNullOrWhiteSpace(desc) ? null : Regex.Replace(desc!, "<.*?>", string.Empty).Replace("\n", " ").Trim();
+                        // Robust ID extraction
+                        var idTok = m["id"];
+                        if (idTok?.Type != JTokenType.Integer)
+                        {
+                            skipped++; continue;
+                        }
+                        var rawId = idTok.Value<int>();
+                        var id = $"anilist:{rawId}";
 
-                        // Optional titles and synonyms
+                        // Titles (fallback chain)
                         string? tEn = m["title"]?["english"]?.Value<string>();
                         string? tRo = m["title"]?["romaji"]?.Value<string>();
                         string? tNa = m["title"]?["native"]?.Value<string>();
+                        var title = tEn ?? tRo ?? tNa ?? $"AniList {rawId}";
+
+                        // Episodes (nullable)
+                        var episodes = ToNullableInt(m["episodes"]);
+
+                        // Arrays (genres, synonyms, tags) with filtering
+                        var genres = m["genres"] is JArray gArr
+                            ? gArr.Select(x => x?.Value<string>() ?? string.Empty).Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
+                            : Array.Empty<string>();
                         var synonyms = m["synonyms"] is JArray syn
-                            ? syn.Select(x => x?.Value<string>() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+                            ? syn.Select(x => x?.Value<string>() ?? string.Empty).Where(NotNullOrWhite).Select(NormalizeTokenString).ToArray()
                             : Array.Empty<string>();
-                        // Tags
                         var tags = m["tags"] is JArray tg
-                            ? tg.Select(x => x?["name"]?.Value<string>() ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+                            ? tg.Select(x => x?["name"]?.Value<string>() ?? string.Empty).Where(NotNullOrWhite).Select(NormalizeTokenString).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
                             : Array.Empty<string>();
+
+                        // Description cleanup: HTML decode then strip tags
+                        var descRaw = m["description"]?.Value<string>();
+                        string? synopsis = null;
+                        if (!string.IsNullOrWhiteSpace(descRaw))
+                        {
+                            var decoded = WebUtility.HtmlDecode(descRaw);
+                            var stripped = Regex.Replace(decoded, "<.*?>", string.Empty);
+                            synopsis = string.IsNullOrWhiteSpace(stripped) ? null : stripped.Replace("\n", " ").Trim();
+                        }
+
+                        // Popularity normalization (defensive)
+                        double popularity = 0.0;
+                        var avgTok = m["averageScore"];
+                        if (avgTok?.Type == JTokenType.Integer)
+                        {
+                            popularity = Math.Clamp(avgTok.Value<int>() / 100.0, 0.0, 1.0);
+                        }
+                        else
+                        {
+                            var popTok = m["popularity"];
+                            if (popTok?.Type == JTokenType.Integer)
+                            {
+                                var pVal = popTok.Value<int>();
+                                popularity = Math.Clamp(Math.Log10(Math.Max(1, pVal)) / 5.0, 0.0, 1.0);
+                            }
+                        }
 
                         // Images
                         string? cover = null, banner = null, color = null;
                         if (m["coverImage"] is JObject ci)
                         {
-                            cover = ci["large"]?.Value<string>() ?? (ci["extraLarge"]?.Value<string>() ?? (ci["medium"]?.Value<string>()));
+                            cover = ci["large"]?.Value<string>()
+                                ?? ci["extraLarge"]?.Value<string>()
+                                ?? ci["medium"]?.Value<string>();
                             color = ci["color"]?.Value<string>();
                         }
                         banner = m["bannerImage"]?.Value<string>();
 
-                        double popularity = 0.0;
-                        if (m["averageScore"] != null)
-                        {
-                            popularity = Math.Clamp((m["averageScore"]!.Value<int>()) / 100.0, 0.0, 1.0);
-                        }
-                        else if (m["popularity"] != null)
-                        {
-                            var p = m["popularity"]!.Value<int>();
-                            popularity = Math.Clamp(Math.Log10(Math.Max(1, p)) / 5.0, 0.0, 1.0);
-                        }
-
                         list.Add(new Anime
                         {
-                            Id = $"anilist:{id}",
+                            Id = id,
                             Title = title!,
                             TitleEnglish = tEn,
                             TitleRomaji = tRo,
@@ -155,6 +182,8 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
 
                         if (list.Count >= limit) break;
                     }
+                    if (skipped > 0)
+                        logger?.LogDebug("AniList page {Page}: skipped {Skipped} malformed media entries", pageNum, skipped);
                 }
 
                 logger?.LogInformation("AniList page {Page} fetched. Accumulated: {Count}/{Limit}", pageNum, list.Count, limit);
@@ -214,5 +243,31 @@ internal sealed class AniListAnimeProvider(IHttpClientFactory httpFactory, ILogg
     private static async Task<string> SafeReadBodyAsync(HttpResponseMessage res, CancellationToken ct)
     {
         try { return await res.Content.ReadAsStringAsync(ct); } catch { return string.Empty; }
+    }
+
+    // Helper: safe nullable int extraction
+    private static int? ToNullableInt(JToken? t)
+    {
+        if (t is null) return null;
+        if (t.Type == JTokenType.Integer)
+        {
+            try { return t.Value<int>(); } catch { return null; }
+        }
+        // Some AniList numeric fields might arrive as strings; attempt parse
+        if (t.Type == JTokenType.String)
+        {
+            var s = t.Value<string>();
+            if (int.TryParse(s, out var v)) return v;
+        }
+        return null;
+    }
+
+    private static bool NotNullOrWhite(string s) => !string.IsNullOrWhiteSpace(s);
+
+    private static string NormalizeTokenString(string s)
+    {
+        var trimmed = s.Trim();
+        // Collapse internal whitespace
+    return Regex.Replace(trimmed, "\\s+", " ");
     }
 }
