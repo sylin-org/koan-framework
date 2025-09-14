@@ -10,7 +10,7 @@ This directory contains architectural proposals for the Instance-Based Relations
 
 **Key Features**:
 - **Semantic Methods**: `model.GetParent()`, `model.GetChildren()` with cardinality validation
-- **Clean Streaming**: `Data<Order>.AllStream().Relatives()` syntax for batch operations
+- **Clean Streaming**: `Data<Order, string>.AllStream().Relatives()` syntax for batch operations
 - **Selective Enrichment**: Only requested entities get `RelationshipGraph` format
 - **Direct Migration**: Remove `ParentKeyAttribute` entirely - no compatibility bridge
 
