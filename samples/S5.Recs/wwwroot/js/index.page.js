@@ -123,6 +123,30 @@
     // Dual-range sliders initialization + hook into scheduleApply from inside
     initDualRangeControls(scheduleApply);
 
+    // Filter chips event handlers
+    const activeFiltersContainer = Dom.$('activeFiltersContainer');
+    if (activeFiltersContainer) {
+      activeFiltersContainer.addEventListener('click', (e) => {
+        // Handle individual chip removal
+        const removeBtn = e.target.closest('[data-remove-filter]');
+        if (removeBtn) {
+          const filterType = removeBtn.getAttribute('data-remove-filter');
+          if (window.S5Filters && S5Filters.clearFilter) {
+            S5Filters.clearFilter(filterType);
+          }
+          return;
+        }
+
+        // Handle clear all button
+        if (e.target.closest('#clearAllFilters')) {
+          if (window.S5Filters && S5Filters.clearAllFilters) {
+            S5Filters.clearAllFilters();
+          }
+          return;
+        }
+      });
+    }
+
     // Outside clicks close menus (admin only)
     document.addEventListener('click', (e) => {
       const adminClickedInside = e.target.closest('#adminMenu') || e.target.closest('#adminButton');
@@ -444,21 +468,36 @@
   }
 
   // Search & filters
-  async function handleGlobalSearch(e){
+  window.handleGlobalSearch = async function(e){
     const query = e.target.value;
-    if(!query || query.trim().length===0){ 
-      if(window.currentView==='forYou' || window.currentView==='freeBrowsing'){ 
-        window.currentRecsTopK = PAGE_SIZE; 
-      } 
-      Dom.$('moreBtn')?.classList.add('hidden'); 
-      loadContentForTab(window.currentTab); 
-      return; 
+    if(!query || query.trim().length===0){
+      if(window.currentView==='forYou' || window.currentView==='freeBrowsing'){
+        window.currentRecsTopK = PAGE_SIZE;
+      }
+      Dom.$('moreBtn')?.classList.add('hidden');
+
+      // Update filter chips to remove search
+      if (window.S5Filters && S5Filters.updateFilterChips) {
+        const currentFilters = S5Filters.getActiveFilters();
+        delete currentFilters.search; // Remove search from active filters
+        S5Filters.updateFilterChips(currentFilters);
+      }
+
+      loadContentForTab(window.currentTab);
+      return;
     }
     if(window.currentView==='library'){
       window.filteredData = (window.S5Filters && S5Filters.search) ? S5Filters.search(window.animeData, query) : window.animeData;
-  // Respect current sort on search within library
-  if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayAnime(window.filteredData); }
-  return;
+
+      // Update filter chips to include search query
+      if (window.S5Filters && S5Filters.updateFilterChips) {
+        const currentFilters = S5Filters.getActiveFilters();
+        S5Filters.updateFilterChips({ ...currentFilters, search: query });
+      }
+
+      // Respect current sort on search within library
+      if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayAnime(window.filteredData); }
+      return;
     }
     try{
       window.currentRecsTopK = PAGE_SIZE;
@@ -473,9 +512,17 @@
     const genre = Dom.val('genreFilter');
     const episode = Dom.val('episodeFilter');
     const { ratingMin, ratingMax, yearMin, yearMax } = readDualRangeValues();
+    const search = Dom.val('globalSearch');
+
     window.filteredData = (window.S5Filters && S5Filters.filter)
       ? S5Filters.filter(window.animeData, { genre, episode, ratingMin, ratingMax, yearMin, yearMax })
       : [...window.animeData];
+
+    // Update filter chips
+    if (window.S5Filters && S5Filters.updateFilterChips) {
+      S5Filters.updateFilterChips({ genre, episode, ratingMin, ratingMax, yearMin, yearMax, search });
+    }
+
     applySortAndFilters();
   };
   window.applySortAndFilters = function(){
@@ -509,10 +556,394 @@
   };
 
   // Actions
-  window.openQuickRate = async function(animeId, rating){ if(!window.currentUserId) return; try{ await (window.S5Api && window.S5Api.postRate ? window.S5Api.postRate(window.currentUserId, animeId, rating) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast(`Rated ${rating}★`, 'success'); }catch{ showToast('Failed to rate', 'error'); } };
-  window.toggleFavorite = async function(animeId){ if(!window.currentUserId) return; try{ await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, animeId, { favorite:true }) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast('Added to favorites', 'success'); }catch{ showToast('Failed to update favorites', 'error'); } };
-  window.markWatched = async function(animeId){ if(!window.currentUserId) return; try{ await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, animeId, { watched:true }) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast('Marked as watched', 'success'); }catch{ showToast('Failed to mark watched', 'error'); } };
-  window.markDropped = async function(animeId){ if(!window.currentUserId) return; try{ await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, animeId, { dropped:true }) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast('Dropped from list', 'success'); }catch{ showToast('Failed to update entry', 'error'); } };
+  window.openQuickRate = async function(animeId, rating){ if(!window.currentUserId) { showToast('Please log in to rate anime', 'error'); return; } try{ await (window.S5Api && window.S5Api.postRate ? window.S5Api.postRate(window.currentUserId, animeId, rating) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast(`Rated ${rating}★`, 'success'); }catch{ showToast('Failed to rate', 'error'); } };
+  window.toggleFavorite = async function(animeId){
+    if(!window.currentUserId) { showToast('Please log in to manage favorites', 'error'); return; }
+    const entry = window.libraryByAnimeId[animeId];
+    const newFavState = !(entry && entry.favorite);
+    try{
+      await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, animeId, { favorite: newFavState }) : null);
+      await refreshLibraryState();
+      if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} }
+      if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); }
+      showToast(newFavState ? 'Added to favorites' : 'Removed from favorites', 'success');
+    }catch{ showToast('Failed to update favorites', 'error'); }
+  };
+
+  window.markWatched = async function(animeId){ if(!window.currentUserId) { showToast('Please log in to manage your list', 'error'); return; } try{ await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, animeId, { watched:true }) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast('Marked as watched', 'success'); }catch{ showToast('Failed to mark watched', 'error'); } };
+  window.markDropped = async function(animeId){ if(!window.currentUserId) { showToast('Please log in to manage your list', 'error'); return; } try{ await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, animeId, { dropped:true }) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast('Dropped from list', 'success'); }catch{ showToast('Failed to update entry', 'error'); } };
+
+  // Status dropdown management
+  let currentStatusDropdown = null;
+
+  window.toggleStatusDropdown = function(animeId, buttonElement) {
+    if (!window.currentUserId) {
+      showToast('Please log in to manage your list', 'error');
+      return;
+    }
+
+    // Close existing dropdown
+    if (currentStatusDropdown) {
+      // Clean up any existing rating panels first
+      document.querySelectorAll('.status-rating-panel').forEach(panel => {
+        panel.classList.remove('show');
+        if (panel.parentNode === document.body) {
+          panel.remove();
+        }
+      });
+      currentStatusDropdown.remove();
+      currentStatusDropdown = null;
+    }
+
+    // Get current entry state
+    const entry = window.libraryByAnimeId[animeId];
+    const isWatched = !!(entry && entry.watched);
+    const isDropped = !!(entry && entry.dropped);
+    const inList = !!entry;
+
+    // Create dropdown
+    const dropdown = document.createElement('div');
+    dropdown.className = 'status-dropdown';
+
+    const statusOptions = [
+      { key: 'add', label: 'Add to List', icon: 'fa-plus', active: !inList },
+      { key: 'plan', label: 'Plan to Watch', icon: 'fa-play-circle', active: inList && !isWatched && !isDropped },
+      { key: 'watching', label: 'Watching', icon: 'fa-play-circle', active: false, hasRating: true },
+      { key: 'completed', label: 'Completed', icon: 'fa-check-circle', active: isWatched, hasRating: true },
+      { key: 'dropped', label: 'Dropped', icon: 'fa-times-circle', active: isDropped, hasRating: true },
+      { key: 'remove', label: 'Remove from List', icon: 'fa-trash', active: false }
+    ];
+
+    // Get current user rating for this anime
+    const currentRating = entry?.rating || 0;
+
+    dropdown.innerHTML = statusOptions.map(option => {
+      let itemHtml = `<button class="status-dropdown-item ${option.active ? 'active' : ''}" data-status="${option.key}" data-anime-id="${animeId}">
+        <i class="fas ${option.icon}"></i>
+        ${option.label}`;
+
+      // Add rating panel for watch status items
+      if (option.hasRating) {
+        itemHtml += `
+          <div class="status-rating-panel" data-rating-panel="${option.key}">
+            <div class="status-rating-header">Rate & ${option.label}</div>
+            <div class="status-rating-stars">
+              ${[1, 2, 3, 4, 5].map(rating =>
+                `<i class="fas fa-star status-rating-star ${rating <= currentRating ? 'active' : ''}"
+                   data-rating="${rating}"
+                   data-status="${option.key}"
+                   data-anime-id="${animeId}"
+                   title="${rating} star${rating !== 1 ? 's' : ''}"></i>`
+              ).join('')}
+            </div>
+          </div>`;
+      }
+
+      itemHtml += `</button>`;
+      return itemHtml;
+    }).join('');
+
+    // Position dropdown relative to button but append to body to avoid clipping
+    const buttonRect = buttonElement.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.zIndex = '9999';
+
+    // Smart positioning to avoid going off-screen
+    let top = buttonRect.bottom + 4;
+    let left = buttonRect.left;
+
+    // Check if dropdown would go off the right edge
+    const dropdownWidth = 160; // min-width from CSS
+    if (left + dropdownWidth > window.innerWidth) {
+      left = buttonRect.right - dropdownWidth;
+    }
+
+    // Check if dropdown would go off the bottom edge
+    const dropdownHeight = statusOptions.length * 40; // approximate height
+    if (top + dropdownHeight > window.innerHeight) {
+      top = buttonRect.top - dropdownHeight - 4; // Show above button instead
+    }
+
+    dropdown.style.top = `${top}px`;
+    dropdown.style.left = `${left}px`;
+
+    // Append to body to avoid container clipping
+    document.body.appendChild(dropdown);
+
+    // Show dropdown with animation
+    setTimeout(() => dropdown.classList.add('show'), 10);
+
+    // Helper function to clean up rating panels
+    const cleanupRatingPanels = () => {
+      document.querySelectorAll('.status-rating-panel').forEach(panel => {
+        panel.classList.remove('show');
+        if (panel.parentNode === document.body) {
+          panel.remove();
+        }
+      });
+    };
+
+    // Add hover logic for rating panels
+    let currentRatingPanel = null;
+    let hideTimeout = null;
+
+    // Comprehensive cleanup function for all event handlers
+    const cleanupDropdown = () => {
+      cleanupRatingPanels();
+      if (currentStatusDropdown) {
+        currentStatusDropdown.remove();
+        currentStatusDropdown = null;
+      }
+    };
+
+    // Store handlers for cleanup
+    let closeHandler, clickHandler, scrollHandler;
+
+    // Close dropdown on scroll to avoid positioning issues
+    scrollHandler = () => {
+      cleanupDropdown();
+      document.removeEventListener('click', closeHandler);
+      document.removeEventListener('click', clickHandler);
+      document.removeEventListener('scroll', scrollHandler, true);
+    };
+
+    dropdown.addEventListener('mouseover', (e) => {
+      const item = e.target.closest('.status-dropdown-item');
+      if (item) {
+        const panel = item.querySelector('.status-rating-panel');
+        if (panel) {
+          // Clear hide timeout
+          if (hideTimeout) {
+            clearTimeout(hideTimeout);
+            hideTimeout = null;
+          }
+
+          // Always clean up all existing rating panels first
+          cleanupRatingPanels();
+          currentRatingPanel = null;
+
+          // Clone the panel to avoid DOM issues
+          const clonedPanel = panel.cloneNode(true);
+
+          // Position cloned panel next to the item using fixed positioning
+          const itemRect = item.getBoundingClientRect();
+          clonedPanel.style.position = 'fixed';
+          clonedPanel.style.top = `${itemRect.top}px`;
+          clonedPanel.style.left = `${itemRect.right + 4}px`;
+          clonedPanel.style.zIndex = '10001';
+
+          // Append to body to ensure proper layering
+          document.body.appendChild(clonedPanel);
+
+          // Show this panel
+          currentRatingPanel = clonedPanel;
+          setTimeout(() => clonedPanel.classList.add('show'), 50);
+        }
+      }
+    });
+
+    dropdown.addEventListener('mouseleave', (e) => {
+      // Only hide if we're truly leaving both dropdown and any visible rating panels
+      const relatedTarget = e.relatedTarget;
+      const isGoingToPanel = relatedTarget && (
+        dropdown.contains(relatedTarget) ||
+        relatedTarget.closest('.status-rating-panel')
+      );
+
+      if (!isGoingToPanel) {
+        hideTimeout = setTimeout(() => {
+          cleanupRatingPanels();
+          currentRatingPanel = null;
+        }, 150);
+      }
+    });
+
+    // Handle rating panel hover to keep them visible
+    document.addEventListener('mouseover', (e) => {
+      const panel = e.target.closest('.status-rating-panel');
+      if (panel && panel.classList.contains('show')) {
+        // Clear any pending hide timeout when hovering over a rating panel
+        if (hideTimeout) {
+          clearTimeout(hideTimeout);
+          hideTimeout = null;
+        }
+      }
+    });
+
+    document.addEventListener('mouseleave', (e) => {
+      const panel = e.target.closest('.status-rating-panel');
+      if (panel && panel.classList.contains('show')) {
+        // Hide panel when leaving it and not going back to dropdown
+        const relatedTarget = e.relatedTarget;
+        const isGoingToDropdown = relatedTarget && dropdown.contains(relatedTarget);
+
+        if (!isGoingToDropdown) {
+          hideTimeout = setTimeout(() => {
+            panel.classList.remove('show');
+            currentRatingPanel = null;
+          }, 150);
+        }
+      }
+    });
+
+    // Star hover effects within rating panels
+    dropdown.addEventListener('mouseover', (e) => {
+      const star = e.target.closest('.status-rating-star');
+      if (!star) return;
+
+      const panel = star.closest('.status-rating-panel');
+      if (!panel) return;
+
+      const rating = parseInt(star.getAttribute('data-rating'), 10);
+      const stars = panel.querySelectorAll('.status-rating-star');
+
+      stars.forEach(s => {
+        const starRating = parseInt(s.getAttribute('data-rating'), 10);
+        s.classList.toggle('hover', starRating <= rating);
+      });
+    });
+
+    dropdown.addEventListener('mouseout', (e) => {
+      const panel = e.target.closest('.status-rating-panel');
+      if (panel && !panel.contains(e.relatedTarget)) {
+        // Clear hover effects when leaving the panel
+        panel.querySelectorAll('.status-rating-star.hover').forEach(s => s.classList.remove('hover'));
+      }
+    });
+
+    // Handle clicks on both dropdown and rating panels (using event delegation on document)
+    clickHandler = async (e) => {
+      // Check if clicking on a rating star first
+      const star = e.target.closest('.status-rating-star');
+      if (star) {
+        const rating = parseInt(star.getAttribute('data-rating'), 10);
+        const status = star.getAttribute('data-status');
+        const animeId = star.getAttribute('data-anime-id');
+
+        try {
+          // Set both status and rating
+          let statusUpdate = {};
+
+          switch (status) {
+            case 'watching':
+              statusUpdate = { watched: false, dropped: false };
+              showToast(`Added to Watching with ${rating}★ rating`, 'success');
+              break;
+            case 'completed':
+              statusUpdate = { watched: true, dropped: false };
+              showToast(`Marked as Completed with ${rating}★ rating`, 'success');
+              break;
+            case 'dropped':
+              statusUpdate = { watched: false, dropped: true };
+              showToast(`Marked as Dropped with ${rating}★ rating`, 'success');
+              break;
+          }
+
+          // Update library entry with status
+          await window.S5Api.putLibrary(window.currentUserId, animeId, statusUpdate);
+          // Set rating
+          await window.S5Api.postRate(window.currentUserId, animeId, rating);
+
+          await refreshLibraryState();
+          if (typeof loadUserStats === 'function') {
+            try { await loadUserStats(); } catch {}
+          }
+          if (window.currentView === 'library') {
+            await loadLibrary();
+          } else {
+            if (status === 'completed' || status === 'dropped') {
+              removeCardFromForYou(animeId);
+            }
+          }
+
+        } catch {
+          showToast('Failed to update status and rating', 'error');
+        }
+
+        // Close dropdown
+        cleanupDropdown();
+        document.removeEventListener('click', clickHandler);
+        document.removeEventListener('scroll', scrollHandler, true);
+        return;
+      }
+
+      // Handle regular status item clicks (not on rating stars) - only if it's in our dropdown
+      const item = e.target.closest('.status-dropdown-item');
+      if (!item || !dropdown.contains(item)) return;
+
+      const status = item.getAttribute('data-status');
+      const animeId = item.getAttribute('data-anime-id');
+
+      try {
+        switch (status) {
+          case 'add':
+          case 'plan':
+            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: false, dropped: false });
+            showToast('Added to Plan to Watch', 'success');
+            break;
+          case 'watching':
+            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: false, dropped: false });
+            showToast('Added to Watching', 'success');
+            break;
+          case 'completed':
+            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: true, dropped: false });
+            showToast('Marked as Completed', 'success');
+            break;
+          case 'dropped':
+            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: false, dropped: true });
+            showToast('Marked as Dropped', 'success');
+            break;
+          case 'remove':
+            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: false, dropped: false, favorite: false });
+            showToast('Removed from list', 'success');
+            break;
+        }
+
+        await refreshLibraryState();
+        if (typeof loadUserStats === 'function') {
+          try { await loadUserStats(); } catch {}
+        }
+        if (window.currentView === 'library') {
+          await loadLibrary();
+        } else {
+          if (status === 'completed' || status === 'dropped') {
+            removeCardFromForYou(animeId);
+          }
+        }
+
+      } catch {
+        showToast('Failed to update status', 'error');
+      }
+
+      // Close dropdown
+      cleanupDropdown();
+      document.removeEventListener('click', clickHandler);
+      document.removeEventListener('scroll', scrollHandler, true);
+    };
+
+    // Add click handler to document to catch both dropdown and rating panel clicks
+    document.addEventListener('click', clickHandler);
+
+    currentStatusDropdown = dropdown;
+
+    // Close dropdown when clicking outside
+    closeHandler = (e) => {
+      if (!dropdown.contains(e.target) && !buttonElement.contains(e.target)) {
+        cleanupDropdown();
+        document.removeEventListener('click', closeHandler);
+        document.removeEventListener('click', clickHandler);
+        document.removeEventListener('scroll', scrollHandler, true);
+      }
+    };
+
+    // Add scroll listener (using capture to catch all scroll events)
+    document.addEventListener('scroll', scrollHandler, true);
+
+    // Delay adding the close handler to prevent immediate closing
+    setTimeout(() => {
+      document.addEventListener('click', closeHandler);
+    }, 10);
+  };
 
   async function loadWatchlist(){
     if(!window.currentUserId){ displayAnime([]); return; }

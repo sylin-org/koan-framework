@@ -11,6 +11,158 @@
 .chip--dark:hover { background-color: #334155; }
 .chip--active { background-color: #9333ea; color: #fff; }
 
+/* Mobile-first touch targets (minimum 44px for accessibility) */
+.touch-target-44 {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Filter chips */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #374151;
+  color: #e5e7eb;
+  border: 1px solid #4b5563;
+  border-radius: 16px;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover {
+  background: #4b5563;
+  border-color: #6b7280;
+}
+
+.filter-chip .remove-btn {
+  padding: 0;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.filter-chip .remove-btn:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+}
+
+/* Status dropdown menu */
+.status-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 160px;
+  background: #1e293b;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.status-dropdown.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+.status-dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #e5e7eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.status-dropdown-item:hover {
+  background-color: #374151;
+}
+
+.status-dropdown-item.active {
+  background-color: #4f46e5;
+  color: white;
+}
+
+.status-dropdown-item i {
+  margin-right: 8px;
+  width: 16px;
+}
+
+/* Rating side panel for status dropdown */
+.status-dropdown-item {
+  position: relative;
+}
+
+.status-rating-panel {
+  position: fixed; /* Use fixed positioning to overlay properly */
+  min-width: 140px;
+  background: #1e293b;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  z-index: 10001;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+  padding: 8px;
+}
+
+.status-rating-panel.show {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: all;
+}
+
+.status-rating-header {
+  display: none; /* Hidden per user request */
+}
+
+.status-rating-stars {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.status-rating-star {
+  color: #4b5563;
+  cursor: pointer;
+  font-size: 16px;
+  transition: color 0.15s ease;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.status-rating-star:hover,
+.status-rating-star.hover {
+  color: #fbbf24;
+}
+
+.status-rating-star.active {
+  color: #f59e0b;
+}
+
 /* Weight-sensitive selected tag styles */
 .chip--sel-low { background-color: #2563eb; color: #fff; }
 .chip--sel-mid { background-color: #9333ea; color: #fff; }

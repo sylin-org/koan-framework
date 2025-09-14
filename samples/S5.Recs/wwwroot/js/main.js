@@ -6,14 +6,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!grid) return;
 
   grid.addEventListener('click', (e) => {
-    // Action buttons (rate/favorite/watched/dropped) take precedence
+    // Action buttons (rate/favorite/watched/dropped/status) take precedence
     const act = e.target.closest('[data-action]');
     if (act) {
       const action = act.getAttribute('data-action');
       const id = act.getAttribute('data-id');
       if (!id) return;
       e.preventDefault();
-      if (action === 'favorite' && window.toggleFavorite) {
+      if (action === 'status' && window.toggleStatusDropdown) {
+        window.toggleStatusDropdown(id, act);
+      } else if (action === 'favorite' && window.toggleFavorite) {
         window.toggleFavorite(id);
       } else if (action === 'watched' && window.markWatched) {
         window.markWatched(id);

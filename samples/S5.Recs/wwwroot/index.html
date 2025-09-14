@@ -264,6 +264,19 @@
       </div>
     </div>
 
+    <!-- Active Filters -->
+    <div id="activeFiltersContainer" class="mb-4 hidden">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-sm font-medium text-gray-400">Active filters:</span>
+        <div id="activeFilterChips" class="flex flex-wrap gap-2">
+          <!-- Filter chips will be populated here -->
+        </div>
+        <button id="clearAllFilters" class="text-xs text-purple-400 hover:text-purple-300 ml-2 px-2 py-1 rounded hover:bg-purple-900/20 transition-colors">
+          <i class="fas fa-times mr-1"></i>Clear all
+        </button>
+      </div>
+    </div>
+
     <!-- Content Grid -->
     <div id="animeGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
       <!-- Anime cards will be populated here -->
