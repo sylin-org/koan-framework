@@ -6,25 +6,26 @@
   let currentUserId = null;
   let authState = { isAuthenticated: false, me: null };
   let currentTab = 'discover';
-  let animeData = [];
+  let mediaData = [];
   let filteredData = [];
   let currentView = 'forYou';
   let currentLayout = 'grid';
-  let libraryByAnimeId = {};
+  let libraryByMediaId = {};
   const PAGE_SIZE = (window.S5Config && window.S5Config.PAGE_SIZE) || 100;
   let currentRecsTopK = PAGE_SIZE;
   let currentLibraryPage = 1;
   let selectedPreferredTags = window.selectedPreferredTags || [];
-  let recsSettings = { 
-    preferTagsWeight: (window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2, 
-    maxPreferredTags: (window.S5Const?.RECS?.DEFAULT_MAX_PREFERRED_TAGS) ?? 3, 
-    diversityWeight: (window.S5Const?.RECS?.DEFAULT_DIVERSITY_WEIGHT) ?? 0.1 
+  let currentMediaType = 'all';
+  let recsSettings = {
+    preferTagsWeight: (window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2,
+    maxPreferredTags: (window.S5Const?.RECS?.DEFAULT_MAX_PREFERRED_TAGS) ?? 3,
+    diversityWeight: (window.S5Const?.RECS?.DEFAULT_DIVERSITY_WEIGHT) ?? 0.1
   };
 
   // Expose for other modules relying on globals
   Object.assign(window, {
-    currentUserId, currentTab, animeData, filteredData, currentView, currentLayout,
-    libraryByAnimeId, PAGE_SIZE, currentRecsTopK, currentLibraryPage, selectedPreferredTags, recsSettings
+    currentUserId, currentTab, mediaData, filteredData, currentView, currentLayout,
+    libraryByMediaId, PAGE_SIZE, currentRecsTopK, currentLibraryPage, selectedPreferredTags, currentMediaType, recsSettings
   });
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -43,6 +44,8 @@
     if(window.S5Tags && S5Tags.loadTags){ S5Tags.loadTags().then(()=> S5Tags.renderPreferredChips && S5Tags.renderPreferredChips()); }
   // Populate Genre filter from backend catalog
   populateGenres();
+  // Populate Media Type toggles from backend catalog
+  populateMediaTypes();
   setupEventListeners();
   });
 
@@ -160,6 +163,18 @@
     // Login/Logout buttons if present in layout
     Dom.on('loginBtn', 'click', openLogin);
     Dom.on('logoutBtn', 'click', doLogout);
+
+    // Media Type toggles
+    const mediaTypeContainer = Dom.$('mediaTypeToggles');
+    if (mediaTypeContainer) {
+      mediaTypeContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-media-type]');
+        if (!btn) return;
+
+        const mediaType = btn.getAttribute('data-media-type');
+        setMediaType(mediaType);
+      });
+    }
   }
 
   async function ensureAuthState(){
@@ -267,6 +282,37 @@
     }catch{}
   }
 
+  async function populateMediaTypes(){
+    try{
+      if(!(window.S5Api && typeof window.S5Api.getMediaTypes==='function')) return;
+      const items = await window.S5Api.getMediaTypes(); // [{ id, name, ... }]
+      const container = document.getElementById('mediaTypeToggles'); if(!container) return;
+
+      // Clear existing buttons
+      container.innerHTML = '';
+
+      // Add "All" button first
+      const allBtn = document.createElement('button');
+      allBtn.className = 'px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg font-medium transition-colors';
+      allBtn.textContent = 'All';
+      allBtn.setAttribute('data-media-type', 'all');
+      container.appendChild(allBtn);
+
+      // Add buttons for each media type
+      (items||[]).forEach(item=>{
+        if(!item || !item.name) return;
+        const btn = document.createElement('button');
+        btn.className = 'px-3 py-1.5 text-sm bg-slate-800 text-gray-300 hover:bg-slate-700 hover:text-white rounded-lg font-medium transition-colors';
+        btn.textContent = item.name;
+        btn.setAttribute('data-media-type', item.id || item.name);
+        container.appendChild(btn);
+      });
+
+      // Set current selection
+      window.currentMediaType = 'all';
+    }catch{}
+  }
+
   // Menus
   window.toggleAdminMenu = function(){ Dom.$('adminMenu')?.classList.toggle('hidden'); };
 
@@ -290,18 +336,72 @@
   return parseFloat(Dom.$('preferWeight')?.value || String(window.recsSettings?.preferTagsWeight ?? ((window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2)));
   };
 
+  // Media Type selection
+  window.setMediaType = function(mediaType){
+    window.currentMediaType = mediaType;
+    console.log('[S5] setMediaType →', mediaType);
+
+    // Update button styles
+    const container = Dom.$('mediaTypeToggles');
+    if (container) {
+      const buttons = container.querySelectorAll('[data-media-type]');
+      buttons.forEach(btn => {
+        const isActive = btn.getAttribute('data-media-type') === mediaType;
+        if (isActive) {
+          btn.className = 'px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg font-medium transition-colors';
+        } else {
+          btn.className = 'px-3 py-1.5 text-sm bg-slate-800 text-gray-300 hover:bg-slate-700 hover:text-white rounded-lg font-medium transition-colors';
+        }
+      });
+    }
+
+    // Apply filter and reload data
+    applyMediaTypeFilter();
+  };
+
+  async function applyMediaTypeFilter(){
+    // For recommendation views, we need to re-fetch with the media type filter
+    if(window.currentView === 'forYou'){
+      window.currentRecsTopK = PAGE_SIZE;
+      await window.loadAnimeData();
+    } else if(window.currentView === 'freeBrowsing'){
+      window.currentRecsTopK = PAGE_SIZE;
+      await window.loadFreeBrowsingData();
+    } else {
+      // For library view, apply client-side filtering
+      applyClientSideMediaTypeFilter();
+    }
+  }
+
+  function applyClientSideMediaTypeFilter(){
+    if(!window.mediaData || window.currentMediaType === 'all'){
+      window.filteredData = [...window.mediaData];
+    } else {
+      window.filteredData = window.mediaData.filter(item => {
+        // Assuming media objects have a mediaTypeId or similar field
+        return item.mediaTypeId === window.currentMediaType || item.type === window.currentMediaType;
+      });
+    }
+
+    if (typeof window.applySortAndFilters === 'function') {
+      window.applySortAndFilters();
+    } else {
+      displayMedia(window.filteredData);
+    }
+  }
+
   // Library cache
   async function refreshLibraryState(){
-    if(!window.currentUserId){ window.libraryByAnimeId = {}; return; }
+    if(!window.currentUserId){ window.libraryByMediaId = {}; return; }
   console.log('[S5] refreshLibraryState: fetching for user', window.currentUserId);
     try{
   const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page:1, pageSize:(window.S5Const?.LIBRARY?.PAGE_SIZE) ?? 500 }) : null);
-      if(!data){ window.libraryByAnimeId = {}; return; }
+      if(!data){ window.libraryByMediaId = {}; return; }
       const map = {};
-      for(const e of (data.items||[])) map[e.animeId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt };
-  window.libraryByAnimeId = map;
-  console.log('[S5] refreshLibraryState: cached entries', Object.keys(window.libraryByAnimeId).length);
-    }catch{ window.libraryByAnimeId = {}; }
+      for(const e of (data.items||[])) map[e.mediaId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt };
+  window.libraryByMediaId = map;
+  console.log('[S5] refreshLibraryState: cached entries', Object.keys(window.libraryByMediaId).length);
+    }catch{ window.libraryByMediaId = {}; }
   }
   window.refreshLibraryState = refreshLibraryState;
 
@@ -344,30 +444,30 @@
 
   // Data loading
   window.loadAnimeData = async function(){
-  if(!window.currentUserId){ console.warn('[S5] loadAnimeData: no userId'); displayAnime([]); return; }
+  if(!window.currentUserId){ console.warn('[S5] loadAnimeData: no userId'); displayMedia([]); return; }
     try{
       console.log('[S5] loadAnimeData → recs query', { userId: window.currentUserId, topK: window.currentRecsTopK });
       const recs = await fetchRecommendations({ text: '', topK: window.currentRecsTopK });
-  window.animeData = recs; window.filteredData = [...window.animeData];
+  window.mediaData = recs; window.filteredData = [...window.mediaData];
   // Apply current sort selection after loading
   if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); }
-  else { displayAnime(window.filteredData); }
+  else { displayMedia(window.filteredData); }
       const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
       console.log('[S5] loadAnimeData → results', window.filteredData.length);
-    }catch{ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load recommendations', 'error'); }
+    }catch{ displayMedia([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load recommendations', 'error'); }
   };
 
   window.loadFreeBrowsingData = async function(){
     try{
   console.log('[S5] loadFreeBrowsingData → recs query', { topK: window.currentRecsTopK, ignoreUserPreferences: true });
   const recs = await fetchRecommendations({ text: '', topK: window.currentRecsTopK, ignoreUserPreferences: true });
-  window.animeData = recs; window.filteredData = [...window.animeData];
+  window.mediaData = recs; window.filteredData = [...window.mediaData];
   // Apply current sort selection after loading
   if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); }
-  else { displayAnime(window.filteredData); }
+  else { displayMedia(window.filteredData); }
       const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
   console.log('[S5] loadFreeBrowsingData → results', window.filteredData.length);
-    }catch{ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load content', 'error'); }
+    }catch{ displayMedia([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load content', 'error'); }
   };
 
   window.fetchRecommendations = async function({ text, topK = PAGE_SIZE, ignoreUserPreferences = false }){
@@ -391,73 +491,95 @@
       console.warn('[S5] fetchRecommendations: No userId for personalized query');
       return [];
     }
-    const body = { 
-      text: text || '', 
-      topK, 
+    // Include media type filter if set
+    const mediaTypeFilter = window.currentMediaType && window.currentMediaType !== 'all' ? window.currentMediaType : null;
+
+    const body = {
+      text: text || '',
+      topK,
       sort,
-      filters: { 
-        genres, 
-        episodesMax, 
-        spoilerSafe: true, 
-        preferTags, 
-        preferWeight: weight 
-      }, 
+      filters: {
+        genres,
+        episodesMax,
+        spoilerSafe: true,
+        preferTags,
+        preferWeight: weight,
+        mediaType: mediaTypeFilter
+      },
       userId
     };
     const data = await (window.S5Api && window.S5Api.recsQuery ? window.S5Api.recsQuery(body) : null) || { items: [] };
     const items = Array.isArray(data.items) ? data.items : [];
-    const mapped = items.map(it => mapItemToAnime(it));
+    const mapped = items.map(it => mapItemToMedia(it));
     // In free browsing mode, don't filter out library items since user preferences are ignored
     if (ignoreUserPreferences) {
       return mapped;
     }
-    return mapped.filter(a => !window.libraryByAnimeId[a.id]);
+    return mapped.filter(a => !window.libraryByMediaId[a.id]);
   };
 
-  function mapItemToAnime(item){
-  const a = item.anime || item;
+  function mapItemToMedia(item){
+  const a = item.media || item;
   const score = typeof item.score === 'number' ? item.score : (typeof a.popularity === 'number' ? a.popularity : ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7));
   const stars = (window.S5Const?.RATING?.STARS) ?? 5;
   const minR = (window.S5Const?.RATING?.MIN) ?? 0;
   const maxR = (window.S5Const?.RATING?.MAX) ?? 5;
   const roundTo = (window.S5Const?.RATING?.ROUND_TO) ?? 10;
   const computedRating = Math.max(minR, Math.min(maxR, Math.round(score * stars * roundTo) / roundTo));
-    return { id:a.id, title: a.titleEnglish || a.title || a.titleRomaji || a.titleNative || 'Untitled', englishTitle:a.titleEnglish||'', coverUrl:a.coverUrl||'', backdrop:a.bannerUrl||a.coverUrl||'', rating:computedRating, popularity:a.popularity||0, episodes:a.episodes||0, type:a.type||'TV', year:a.year||'', status:a.status||'', studio:a.studio||'', source:a.source||'', synopsis:a.synopsis||'', genres: Array.isArray(a.genres)? a.genres : (Array.isArray(a.tags)? a.tags: []) };
+
+  // Extract media type from mediaTypeId
+  const getTypeFromMediaTypeId = (mediaTypeId) => {
+    if (!mediaTypeId) return 'TV';
+    const typeMap = {
+      'media-anime': 'Anime',
+      'media-manga': 'Manga',
+      'media-movie': 'Movie',
+      'media-tv': 'TV',
+      'media-book': 'Book',
+      'media-game': 'Game',
+      'media-music': 'Music'
+    };
+    return typeMap[mediaTypeId] || mediaTypeId.replace('media-', '').replace(/^./, c => c.toUpperCase());
+  };
+
+  const mediaType = a.type || getTypeFromMediaTypeId(a.mediaTypeId) || 'TV';
+
+    return { id:a.id, title: a.titleEnglish || a.title || a.titleRomaji || a.titleNative || 'Untitled', englishTitle:a.titleEnglish||'', coverUrl:a.coverUrl||'', backdrop:a.bannerUrl||a.coverUrl||'', rating:computedRating, popularity:a.popularity||0, episodes:a.episodes||0, type:mediaType, mediaTypeId:a.mediaTypeId, year:a.year||'', status:a.status||'', studio:a.studio||'', source:a.source||'', synopsis:a.synopsis||'', genres: Array.isArray(a.genres)? a.genres : (Array.isArray(a.tags)? a.tags: []) };
   }
 
   function loadContentForTab(tab){
     switch(tab){
-      case 'trending': window.filteredData = window.animeData.sort((a,b)=>(b.popularity||0)-(a.popularity||0)).slice(0, ((window.S5Const && window.S5Const.UI && typeof window.S5Const.UI.PREVIEW_SECTION_COUNT === 'number') ? window.S5Const.UI.PREVIEW_SECTION_COUNT : 24)); break;
-      case 'top-rated': window.filteredData = window.animeData.sort((a,b)=> b.rating-a.rating).slice(0, ((window.S5Const && window.S5Const.UI && typeof window.S5Const.UI.PREVIEW_SECTION_COUNT === 'number') ? window.S5Const.UI.PREVIEW_SECTION_COUNT : 24)); break;
+      case 'trending': window.filteredData = window.mediaData.sort((a,b)=>(b.popularity||0)-(a.popularity||0)).slice(0, ((window.S5Const && window.S5Const.UI && typeof window.S5Const.UI.PREVIEW_SECTION_COUNT === 'number') ? window.S5Const.UI.PREVIEW_SECTION_COUNT : 24)); break;
+      case 'top-rated': window.filteredData = window.mediaData.sort((a,b)=> b.rating-a.rating).slice(0, ((window.S5Const && window.S5Const.UI && typeof window.S5Const.UI.PREVIEW_SECTION_COUNT === 'number') ? window.S5Const.UI.PREVIEW_SECTION_COUNT : 24)); break;
       case 'watchlist': loadWatchlist(); return;
-      default: displayAnime(window.animeData); return;
+      default: displayMedia(window.mediaData); return;
     }
-    displayAnime(window.filteredData);
+    displayMedia(window.filteredData);
   }
 
   // Display
-  function displayAnime(list){
-    const grid = Dom.$('animeGrid'); const loading = Dom.$('loadingState'); const empty = Dom.$('emptyState');
+  function displayMedia(list){
+    const grid = Dom.$('mediaGrid'); const loading = Dom.$('loadingState'); const empty = Dom.$('emptyState');
     loading.style.display = 'none';
     if(!list || list.length===0){ grid.classList.add('hidden'); empty.classList.remove('hidden'); Dom.text('resultCount', (window.S5Const?.TEXT?.NO_RESULTS) || 'No results'); return; }
     grid.classList.remove('hidden'); empty.classList.add('hidden');
     const tp = (window.S5Const?.TEXT?.RESULTS_PREFIX) || 'Showing ';
     const ts = (window.S5Const?.TEXT?.RESULTS_SUFFIX) || ' results';
     Dom.text('resultCount', `${tp}${list.length}${ts}`);
-    const state = { libraryByAnimeId: window.libraryByAnimeId, selectedPreferredTags: window.selectedPreferredTags };
-  if(window.currentLayout==='list'){ grid.className = 'space-y-4'; grid.innerHTML = list.map(a=>window.S5Cards.createAnimeListItem(a, state)).join(''); }
-  else { grid.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6'; grid.innerHTML = list.map(a=>window.S5Cards.createAnimeCard(a, state)).join(''); }
+    const state = { libraryByMediaId: window.libraryByMediaId, selectedPreferredTags: window.selectedPreferredTags };
+  if(window.currentLayout==='list'){ grid.className = 'space-y-4'; grid.innerHTML = list.map(a=>window.S5Cards.createMediaListItem(a, state)).join(''); }
+  else { grid.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6'; grid.innerHTML = list.map(a=>window.S5Cards.createMediaCard(a, state)).join(''); }
   // After rendering, apply highlight based on selected tags
   requestAnimationFrame(highlightCardsByPreferredTags);
   }
-  window.displayAnime = displayAnime;
+  window.displayMedia = displayMedia;
   // Highlight cards/list rows that match any selected preferred tags
   function highlightCardsByPreferredTags(){
     try{
       const tags = Array.isArray(window.selectedPreferredTags) ? window.selectedPreferredTags : [];
       const on = tags.length > 0;
       const ringCls = 'ring-2 ring-purple-500/60 ring-offset-1 ring-offset-slate-900';
-      const cards = document.querySelectorAll('#animeGrid [data-anime-id]');
+      const cards = document.querySelectorAll('#mediaGrid [data-media-id]');
       cards.forEach(el => {
         const gs = (el.getAttribute('data-genres') || '').split('|').filter(Boolean);
         const match = on && gs.some(g => tags.includes(g));
@@ -487,7 +609,7 @@
       return;
     }
     if(window.currentView==='library'){
-      window.filteredData = (window.S5Filters && S5Filters.search) ? S5Filters.search(window.animeData, query) : window.animeData;
+      window.filteredData = (window.S5Filters && S5Filters.search) ? S5Filters.search(window.mediaData, query) : window.mediaData;
 
       // Update filter chips to include search query
       if (window.S5Filters && S5Filters.updateFilterChips) {
@@ -496,15 +618,15 @@
       }
 
       // Respect current sort on search within library
-      if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayAnime(window.filteredData); }
+      if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayMedia(window.filteredData); }
       return;
     }
     try{
       window.currentRecsTopK = PAGE_SIZE;
       const isFreeBrowsing = window.currentView === 'freeBrowsing';
       const recs = await window.fetchRecommendations({ text: query, topK: window.currentRecsTopK, ignoreUserPreferences: isFreeBrowsing });
-  window.animeData = recs; window.filteredData = [...window.animeData];
-  if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayAnime(window.filteredData); }
+  window.mediaData = recs; window.filteredData = [...window.mediaData];
+  if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayMedia(window.filteredData); }
       const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
     }catch{ Dom.$('moreBtn')?.classList.add('hidden'); showToast('Search failed', 'error'); }
   }
@@ -515,8 +637,8 @@
     const search = Dom.val('globalSearch');
 
     window.filteredData = (window.S5Filters && S5Filters.filter)
-      ? S5Filters.filter(window.animeData, { genre, episode, ratingMin, ratingMax, yearMin, yearMax })
-      : [...window.animeData];
+      ? S5Filters.filter(window.mediaData, { genre, episode, ratingMin, ratingMax, yearMin, yearMax })
+      : [...window.mediaData];
 
     // Update filter chips
     if (window.S5Filters && S5Filters.updateFilterChips) {
@@ -531,7 +653,7 @@
     if (window.currentView === 'library') {
       window.filteredData = (window.S5Filters && S5Filters.sort) ? S5Filters.sort(window.filteredData, sortBy) : [...window.filteredData];
     }
-    displayAnime(window.filteredData);
+    displayMedia(window.filteredData);
   };
   window.clearFilters = function(){ Dom.clearValues(['genreFilter','episodeFilter']); resetDualRangeValues(); window.applyFilters(); };
   // Override for dual-range: reset to extremes
@@ -546,37 +668,37 @@
   // Filters panel is always visible now; no toggle.
 
   // View state
-  window.setViewMode = function(mode){ const gridBtn=Dom.$('gridViewBtn'); const listBtn=Dom.$('listViewBtn'); if(mode==='grid'){ gridBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; listBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } else { listBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; gridBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } window.currentLayout = mode; displayAnime(window.filteredData); };
+  window.setViewMode = function(mode){ const gridBtn=Dom.$('gridViewBtn'); const listBtn=Dom.$('listViewBtn'); if(mode==='grid'){ gridBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; listBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } else { listBtn.className='px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors'; gridBtn.className='px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors'; } window.currentLayout = mode; displayMedia(window.filteredData); };
   // (removed duplicate setViewSource; gated async version above is authoritative)
 
   // Navigation
-  window.openDetails = function(animeId){
+  window.openMediaDetails = function(mediaId){
     const d = (window.S5Const && window.S5Const.PATHS && window.S5Const.PATHS.DETAILS) || 'details.html';
-    window.location.href = `${d}?id=${encodeURIComponent(animeId)}`;
+    window.location.href = `${d}?id=${encodeURIComponent(mediaId)}`;
   };
 
   // Actions
-  window.openQuickRate = async function(animeId, rating){ if(!window.currentUserId) { showToast('Please log in to rate anime', 'error'); return; } try{ await (window.S5Api && window.S5Api.postRate ? window.S5Api.postRate(window.currentUserId, animeId, rating) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast(`Rated ${rating}★`, 'success'); }catch{ showToast('Failed to rate', 'error'); } };
-  window.toggleFavorite = async function(animeId){
+  window.openQuickRate = async function(mediaId, rating){ if(!window.currentUserId) { showToast('Please log in to rate media', 'error'); return; } try{ await (window.S5Api && window.S5Api.postRate ? window.S5Api.postRate(window.currentUserId, mediaId, rating) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(mediaId); } showToast(`Rated ${rating}★`, 'success'); }catch{ showToast('Failed to rate', 'error'); } };
+  window.toggleFavorite = async function(mediaId){
     if(!window.currentUserId) { showToast('Please log in to manage favorites', 'error'); return; }
-    const entry = window.libraryByAnimeId[animeId];
+    const entry = window.libraryByMediaId[mediaId];
     const newFavState = !(entry && entry.favorite);
     try{
-      await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, animeId, { favorite: newFavState }) : null);
+      await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, mediaId, { favorite: newFavState }) : null);
       await refreshLibraryState();
       if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} }
-      if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); }
+      if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(mediaId); }
       showToast(newFavState ? 'Added to favorites' : 'Removed from favorites', 'success');
     }catch{ showToast('Failed to update favorites', 'error'); }
   };
 
-  window.markWatched = async function(animeId){ if(!window.currentUserId) { showToast('Please log in to manage your list', 'error'); return; } try{ await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, animeId, { watched:true }) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast('Marked as watched', 'success'); }catch{ showToast('Failed to mark watched', 'error'); } };
-  window.markDropped = async function(animeId){ if(!window.currentUserId) { showToast('Please log in to manage your list', 'error'); return; } try{ await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, animeId, { dropped:true }) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(animeId); } showToast('Dropped from list', 'success'); }catch{ showToast('Failed to update entry', 'error'); } };
+  window.markWatched = async function(mediaId){ if(!window.currentUserId) { showToast('Please log in to manage your list', 'error'); return; } try{ await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, mediaId, { watched:true }) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(mediaId); } showToast('Marked as watched', 'success'); }catch{ showToast('Failed to mark watched', 'error'); } };
+  window.markDropped = async function(mediaId){ if(!window.currentUserId) { showToast('Please log in to manage your list', 'error'); return; } try{ await (window.S5Api && window.S5Api.putLibrary ? window.S5Api.putLibrary(window.currentUserId, mediaId, { dropped:true }) : null); await refreshLibraryState(); if(typeof loadUserStats === 'function'){ try{ await loadUserStats(); }catch{} } if(window.currentView==='library'){ await loadLibrary(); } else { removeCardFromForYou(mediaId); } showToast('Dropped from list', 'success'); }catch{ showToast('Failed to update entry', 'error'); } };
 
   // Status dropdown management
   let currentStatusDropdown = null;
 
-  window.toggleStatusDropdown = function(animeId, buttonElement) {
+  window.toggleStatusDropdown = function(mediaId, buttonElement) {
     if (!window.currentUserId) {
       showToast('Please log in to manage your list', 'error');
       return;
@@ -596,7 +718,7 @@
     }
 
     // Get current entry state
-    const entry = window.libraryByAnimeId[animeId];
+    const entry = window.libraryByMediaId[mediaId];
     const isWatched = !!(entry && entry.watched);
     const isDropped = !!(entry && entry.dropped);
     const inList = !!entry;
@@ -614,11 +736,11 @@
       { key: 'remove', label: 'Remove from List', icon: 'fa-trash', active: false }
     ];
 
-    // Get current user rating for this anime
+    // Get current user rating for this media
     const currentRating = entry?.rating || 0;
 
     dropdown.innerHTML = statusOptions.map(option => {
-      let itemHtml = `<button class="status-dropdown-item ${option.active ? 'active' : ''}" data-status="${option.key}" data-anime-id="${animeId}">
+      let itemHtml = `<button class="status-dropdown-item ${option.active ? 'active' : ''}" data-status="${option.key}" data-media-id="${mediaId}">
         <i class="fas ${option.icon}"></i>
         ${option.label}`;
 
@@ -632,7 +754,7 @@
                 `<i class="fas fa-star status-rating-star ${rating <= currentRating ? 'active' : ''}"
                    data-rating="${rating}"
                    data-status="${option.key}"
-                   data-anime-id="${animeId}"
+                   data-media-id="${mediaId}"
                    title="${rating} star${rating !== 1 ? 's' : ''}"></i>`
               ).join('')}
             </div>
@@ -818,7 +940,7 @@
       if (star) {
         const rating = parseInt(star.getAttribute('data-rating'), 10);
         const status = star.getAttribute('data-status');
-        const animeId = star.getAttribute('data-anime-id');
+        const mediaId = star.getAttribute('data-media-id');
 
         try {
           // Set both status and rating
@@ -840,9 +962,9 @@
           }
 
           // Update library entry with status
-          await window.S5Api.putLibrary(window.currentUserId, animeId, statusUpdate);
+          await window.S5Api.putLibrary(window.currentUserId, mediaId, statusUpdate);
           // Set rating
-          await window.S5Api.postRate(window.currentUserId, animeId, rating);
+          await window.S5Api.postRate(window.currentUserId, mediaId, rating);
 
           await refreshLibraryState();
           if (typeof loadUserStats === 'function') {
@@ -852,7 +974,7 @@
             await loadLibrary();
           } else {
             if (status === 'completed' || status === 'dropped') {
-              removeCardFromForYou(animeId);
+              removeCardFromForYou(mediaId);
             }
           }
 
@@ -872,29 +994,29 @@
       if (!item || !dropdown.contains(item)) return;
 
       const status = item.getAttribute('data-status');
-      const animeId = item.getAttribute('data-anime-id');
+      const mediaId = item.getAttribute('data-media-id');
 
       try {
         switch (status) {
           case 'add':
           case 'plan':
-            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: false, dropped: false });
+            await window.S5Api.putLibrary(window.currentUserId, mediaId, { watched: false, dropped: false });
             showToast('Added to Plan to Watch', 'success');
             break;
           case 'watching':
-            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: false, dropped: false });
+            await window.S5Api.putLibrary(window.currentUserId, mediaId, { watched: false, dropped: false });
             showToast('Added to Watching', 'success');
             break;
           case 'completed':
-            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: true, dropped: false });
+            await window.S5Api.putLibrary(window.currentUserId, mediaId, { watched: true, dropped: false });
             showToast('Marked as Completed', 'success');
             break;
           case 'dropped':
-            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: false, dropped: true });
+            await window.S5Api.putLibrary(window.currentUserId, mediaId, { watched: false, dropped: true });
             showToast('Marked as Dropped', 'success');
             break;
           case 'remove':
-            await window.S5Api.putLibrary(window.currentUserId, animeId, { watched: false, dropped: false, favorite: false });
+            await window.S5Api.putLibrary(window.currentUserId, mediaId, { watched: false, dropped: false, favorite: false });
             showToast('Removed from list', 'success');
             break;
         }
@@ -907,7 +1029,7 @@
           await loadLibrary();
         } else {
           if (status === 'completed' || status === 'dropped') {
-            removeCardFromForYou(animeId);
+            removeCardFromForYou(mediaId);
           }
         }
 
@@ -946,13 +1068,13 @@
   };
 
   async function loadWatchlist(){
-    if(!window.currentUserId){ displayAnime([]); return; }
-    try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { status:'watched', sort:'updatedAt', page:1, pageSize:(window.S5Const?.LIBRARY?.WATCHLIST_PAGE_SIZE) ?? 100 }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.animeId).filter(Boolean); if(ids.length===0){ displayAnime([]); return; } const arr = await (window.S5Api && window.S5Api.getAnimeByIds ? window.S5Api.getAnimeByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToAnime({ anime: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); displayAnime(mapped); }catch{ displayAnime([]); showToast('Failed to load watchlist', 'error'); }
+    if(!window.currentUserId){ displayMedia([]); return; }
+    try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { status:'watched', sort:'updatedAt', page:1, pageSize:(window.S5Const?.LIBRARY?.WATCHLIST_PAGE_SIZE) ?? 100 }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.mediaId).filter(Boolean); if(ids.length===0){ displayMedia([]); return; } const arr = await (window.S5Api && window.S5Api.getMediaByIds ? window.S5Api.getMediaByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToMedia({ media: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); displayMedia(mapped); }catch{ displayMedia([]); showToast('Failed to load watchlist', 'error'); }
   }
   async function loadLibrary(){
-    if(!window.currentUserId){ displayAnime([]); return; }
+    if(!window.currentUserId){ displayMedia([]); return; }
   console.log('[S5] loadLibrary: page', window.currentLibraryPage);
-  try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page: window.currentLibraryPage, pageSize: PAGE_SIZE }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.animeId).filter(Boolean); if(window.currentLibraryPage===1 && ids.length===0){ displayAnime([]); Dom.$('moreBtn')?.classList.add('hidden'); return; } const arr = await (window.S5Api && window.S5Api.getAnimeByIds ? window.S5Api.getAnimeByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToAnime({ anime: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); if(window.currentLibraryPage===1){ window.animeData = mapped; } else { const seen = new Set(window.animeData.map(x=>x.id)); for(const m of mapped){ if(!seen.has(m.id)) window.animeData.push(m); } } window.filteredData = [...window.animeData]; for(const e of (data.items||[])){ window.libraryByAnimeId[e.animeId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt }; } if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayAnime(window.filteredData); } const btn = Dom.$('moreBtn'); if(btn){ if((data.items||[]).length === PAGE_SIZE) btn.classList.remove('hidden'); else btn.classList.add('hidden'); } }catch{ displayAnime([]); showToast('Failed to load library', 'error'); }
+  try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page: window.currentLibraryPage, pageSize: PAGE_SIZE }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.mediaId).filter(Boolean); if(window.currentLibraryPage===1 && ids.length===0){ displayMedia([]); Dom.$('moreBtn')?.classList.add('hidden'); return; } const arr = await (window.S5Api && window.S5Api.getMediaByIds ? window.S5Api.getMediaByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToMedia({ media: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); if(window.currentLibraryPage===1){ window.mediaData = mapped; } else { const seen = new Set(window.mediaData.map(x=>x.id)); for(const m of mapped){ if(!seen.has(m.id)) window.mediaData.push(m); } } window.filteredData = [...window.mediaData]; for(const e of (data.items||[])){ window.libraryByMediaId[e.mediaId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt }; } if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayMedia(window.filteredData); } const btn = Dom.$('moreBtn'); if(btn){ if((data.items||[]).length === PAGE_SIZE) btn.classList.remove('hidden'); else btn.classList.add('hidden'); } }catch{ displayMedia([]); showToast('Failed to load library', 'error'); }
   console.log('[S5] loadLibrary: done, items', (window.filteredData||[]).length);
     const tp = (window.S5Const?.TEXT?.RESULTS_PREFIX) || 'Showing ';
     const ts = (window.S5Const?.TEXT?.RESULTS_SUFFIX) || ' results';
@@ -975,13 +1097,13 @@
     } 
   };
 
-  window.removeCardFromForYou = function(animeId){ 
+  window.removeCardFromForYou = function(mediaId){ 
     // Only remove cards from "For You" mode, not from "Free Browsing" or "Library"
     if(window.currentView!=='forYou') return; 
-    window.animeData = window.animeData.filter(a=>a.id!==animeId); 
-    window.filteredData = window.filteredData.filter(a=>a.id!==animeId); 
-    const grid = Dom.$('animeGrid'); 
-    const card = grid?.querySelector(`[data-anime-id="${CSS.escape(String(animeId))}"]`); 
+    window.mediaData = window.mediaData.filter(a=>a.id!==mediaId); 
+    window.filteredData = window.filteredData.filter(a=>a.id!==mediaId); 
+    const grid = Dom.$('mediaGrid'); 
+    const card = grid?.querySelector(`[data-media-id="${CSS.escape(String(mediaId))}"]`); 
     if(card){ 
       card.style.transition=`opacity ${(window.S5Const?.UI?.REMOVE_CARD_TRANSITION_MS) ?? 250}ms ease-out, transform ${(window.S5Const?.UI?.REMOVE_CARD_TRANSITION_MS) ?? 250}ms ease-out`; 
       card.style.opacity='0'; 
@@ -998,7 +1120,7 @@
         } 
       }, (window.S5Const?.UI?.REMOVE_CARD_TIMEOUT_MS) ?? 260); 
     } else { 
-      displayAnime(window.filteredData); 
+      displayMedia(window.filteredData); 
     } 
   };
 })();
