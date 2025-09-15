@@ -103,7 +103,6 @@ internal sealed class OllamaAdapter : IAiAdapter
         {
             // Ollama embeddings API expects 'prompt' as the input field
             var body = new { model, prompt = input };
-            _logger?.LogDebug("Ollama: POST {Path} model={Model} input.len={Len}", Infrastructure.Constants.Api.EmbeddingsPath, model, input?.Length ?? 0);
             var payload = JsonConvert.SerializeObject(body);
             using var resp = await _http.PostAsync(Infrastructure.Constants.Api.EmbeddingsPath, new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode)

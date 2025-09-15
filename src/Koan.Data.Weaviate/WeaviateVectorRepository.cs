@@ -40,7 +40,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         if (_schemaEnsured) return;
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.index.ensureCreated");
         var cls = ClassName;
-        _logger?.LogDebug("Weaviate: ensure schema base={Base} class={Class}", _http.BaseAddress, cls);
+        _logger?.LogDebug("Weaviate: ensure schema base={Base} class={Class} (resolved from {EntityType})", _http.BaseAddress, cls, typeof(TEntity).Name);
         // Probe class
         var probe = await _http.GetAsync($"/v1/schema/{Uri.EscapeDataString(cls)}", ct);
         _logger?.LogDebug("Weaviate: GET /v1/schema/{Class} -> {Status}", cls, (int)probe.StatusCode);
@@ -60,8 +60,11 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                 new { name = "docId", dataType = new[] { "text" } }
             }
         };
-        _logger?.LogDebug("Weaviate: POST /v1/schema/classes for class {Class}", cls);
-    var create = await _http.PostAsync("/v1/schema/classes", new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json"), ct);
+        var bodyJson = JsonConvert.SerializeObject(body, Formatting.Indented);
+        _logger?.LogDebug("Weaviate: POST /v1/schema/classes for class {Class}. Schema body: {Body}", cls, bodyJson);
+    var create = await _http.PostAsync("/v1/schema/classes", new StringContent(bodyJson, System.Text.Encoding.UTF8, "application/json"), ct);
+        var createResponse = await create.Content.ReadAsStringAsync(ct);
+        _logger?.LogDebug("Weaviate: schema creation response ({Status}): {Response}", (int)create.StatusCode, createResponse);
         if (!create.IsSuccessStatusCode)
         {
             // Fallback for older Weaviate versions that require POST /v1/schema
@@ -83,7 +86,56 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                 throw new InvalidOperationException($"Weaviate ensure schema failed: {(int)create.StatusCode} {create.ReasonPhrase} {txt}");
             }
         }
+
+        // Wait for schema to be fully available
+        await WaitForSchemaReadyAsync(cls, ct);
         _schemaEnsured = true;
+    }
+
+    private async Task WaitForSchemaReadyAsync(string className, CancellationToken ct)
+    {
+        const int maxAttempts = 10;
+        const int delayMs = 50;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                // Check if schema is queryable (more reliable than just checking existence)
+                var checkUrl = $"/v1/schema/{Uri.EscapeDataString(className)}";
+                var response = await _http.GetAsync(checkUrl, ct);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync(ct);
+                    _logger?.LogDebug("Weaviate: readiness check response for {Class}: {Content}", className, content);
+                    // Ensure response contains actual schema data
+                    if (!string.IsNullOrWhiteSpace(content) && content.Contains(className))
+                    {
+                        _logger?.LogDebug("Weaviate: schema {Class} confirmed ready after {Attempts} attempts", className, attempt);
+                        return;
+                    }
+                }
+
+                _logger?.LogDebug("Weaviate: schema {Class} not ready, attempt {Attempt}/{MaxAttempts}", className, attempt, maxAttempts);
+
+                if (attempt < maxAttempts)
+                {
+                    await Task.Delay(delayMs, ct);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Weaviate: schema readiness check failed, attempt {Attempt}/{MaxAttempts}", attempt, maxAttempts);
+                if (attempt < maxAttempts)
+                {
+                    await Task.Delay(delayMs, ct);
+                }
+            }
+        }
+
+        _logger?.LogWarning("Weaviate: schema {Class} readiness check timed out after {MaxAttempts} attempts", className, maxAttempts);
+        // Don't throw - let the subsequent operations handle any remaining timing issues
     }
 
     // Upsert single vector using /v1/objects
@@ -95,52 +147,69 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         // Weaviate requires UUID ids; derive a deterministic UUID from the entity id (namespaced by class) for stable mapping
         var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
         // Persist minimal properties including original doc id for reverse lookup
-        var obj = new Dictionary<string, object?>
+        // POST object includes class in payload
+        var postObj = new Dictionary<string, object?>
         {
             ["class"] = ClassName,
             ["id"] = uuid.ToString(),
             ["properties"] = new { docId = id!.ToString() },
             ["vector"] = embedding,
         };
-        var putUrl = $"/v1/objects/{Uri.EscapeDataString(uuid.ToString())}";
-        _logger?.LogDebug("Weaviate: PUT {Url} class={Class} id={Id} uuid={Uuid} vecDim={Dim}", putUrl, ClassName, id, uuid, embedding.Length);
-    var resp = await _http.PutAsync(putUrl, new StringContent(JsonConvert.SerializeObject(obj), System.Text.Encoding.UTF8, "application/json"), ct);
-        if (!resp.IsSuccessStatusCode)
+        // PUT object includes class (some Weaviate versions require it in both URL and payload)
+        var putObj = new Dictionary<string, object?>
         {
-            var body = await resp.Content.ReadAsStringAsync(ct);
-            // Some deployments return 404/405 for create-via-PUT; some buggy builds return 500 "no object with id ..."
-            var missingOnPut = resp.StatusCode == HttpStatusCode.NotFound
-                               || resp.StatusCode == HttpStatusCode.MethodNotAllowed
-                               || (resp.StatusCode == HttpStatusCode.InternalServerError && body.Contains("no object with id", StringComparison.OrdinalIgnoreCase));
-            if (missingOnPut)
+            ["class"] = ClassName,
+            ["id"] = uuid.ToString(),
+            ["properties"] = new { docId = id!.ToString() },
+            ["vector"] = embedding,
+        };
+        var putUrl = $"/v1/objects/{Uri.EscapeDataString(ClassName)}/{Uri.EscapeDataString(uuid.ToString())}";
+        var postObjJson = JsonConvert.SerializeObject(postObj);
+        var putObjJson = JsonConvert.SerializeObject(putObj);
+        // For proper upsert: try POST first (create), then PUT if object already exists
+        var postResp = await _http.PostAsync("/v1/objects", new StringContent(postObjJson, System.Text.Encoding.UTF8, "application/json"), ct);
+        if (postResp.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var postBody = await postResp.Content.ReadAsStringAsync(ct);
+
+        // Check for schema timing issue on POST
+        if (postBody.Contains("non-existing index", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger?.LogDebug("Weaviate: schema not ready, retrying POST after schema wait");
+            await WaitForSchemaReadyAsync(ClassName, ct);
+            // Retry the POST once more
+            var retryPost = await _http.PostAsync("/v1/objects", new StringContent(postObjJson, System.Text.Encoding.UTF8, "application/json"), ct);
+            if (retryPost.IsSuccessStatusCode)
             {
-                _logger?.LogDebug("Weaviate: PUT failed ({Status}); retrying POST /v1/objects", (int)resp.StatusCode);
-                var post = await _http.PostAsync("/v1/objects", new StringContent(JsonConvert.SerializeObject(obj), System.Text.Encoding.UTF8, "application/json"), ct);
-                if (!post.IsSuccessStatusCode)
-                {
-                    var ptxt = await post.Content.ReadAsStringAsync(ct);
-                    // If POST says already exists, attempt a final PUT update (race or concurrent create)
-                    if ((int)post.StatusCode == 422 && ptxt.Contains("already exists", StringComparison.OrdinalIgnoreCase))
-                    {
-                        _logger?.LogDebug("Weaviate: POST reported existing object; retrying final PUT to update {Url}", putUrl);
-                        var put2 = await _http.PutAsync(putUrl, new StringContent(JsonConvert.SerializeObject(obj), System.Text.Encoding.UTF8, "application/json"), ct);
-                        if (!put2.IsSuccessStatusCode)
-                        {
-                            var p2txt = await put2.Content.ReadAsStringAsync(ct);
-                            _logger?.LogDebug("Weaviate: upsert (final PUT) failed ({Status}) {Body}", (int)put2.StatusCode, p2txt);
-                            throw new InvalidOperationException($"Weaviate upsert failed: {(int)put2.StatusCode} {put2.ReasonPhrase} {p2txt}");
-                        }
-                        return;
-                    }
-                    _logger?.LogDebug("Weaviate: upsert (POST fallback) failed ({Status}) {Body}", (int)post.StatusCode, ptxt);
-                    throw new InvalidOperationException($"Weaviate upsert failed: {(int)post.StatusCode} {post.ReasonPhrase} {ptxt}");
-                }
                 return;
             }
-            // If a POST was previously created and PUT still reports an error, surface the body for triage
-            _logger?.LogDebug("Weaviate: upsert (PUT) failed ({Status}) {Body}", (int)resp.StatusCode, body);
-            throw new InvalidOperationException($"Weaviate upsert failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+            var retryPostBody = await retryPost.Content.ReadAsStringAsync(ct);
+            _logger?.LogWarning("Weaviate: POST retry failed ({Status}) {Body}", (int)retryPost.StatusCode, retryPostBody);
+            // Continue to PUT attempt below
+            postBody = retryPostBody;
         }
+
+        // If POST failed because object already exists, try PUT for update
+        if (postResp.StatusCode == HttpStatusCode.UnprocessableEntity ||
+            postBody.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+        {
+            var putResp = await _http.PutAsync(putUrl, new StringContent(putObjJson, System.Text.Encoding.UTF8, "application/json"), ct);
+            if (putResp.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var putBody = await putResp.Content.ReadAsStringAsync(ct);
+            _logger?.LogError("Weaviate: PUT update failed ({Status}) {Body}", (int)putResp.StatusCode, putBody);
+            throw new InvalidOperationException($"Weaviate upsert failed on both POST and PUT: POST={postResp.StatusCode} {postBody}, PUT={putResp.StatusCode} {putBody}");
+        }
+
+        // POST failed for other reasons
+        _logger?.LogError("Weaviate: POST create failed ({Status}) {Body}", (int)postResp.StatusCode, postBody);
+        throw new InvalidOperationException($"Weaviate upsert failed: {(int)postResp.StatusCode} {postResp.ReasonPhrase} {postBody}");
     }
 
     public async Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
