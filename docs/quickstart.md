@@ -1,29 +1,29 @@
-# 5-Minute Sora Quickstart
+# 5-Minute Koan Quickstart
 
-Get a Sora API running in 5 minutes or less.
+Get a Koan API running in 5 minutes or less.
 
 ## Prerequisites
 - .NET 9 SDK
 
-## Create Your First Sora API
+## Create Your First Koan API
 
 ### 1. Create Project
 ```bash
-mkdir my-sora-app && cd my-sora-app
+mkdir my-Koan-app && cd my-Koan-app
 dotnet new web
 ```
 
 ### 2. Add Packages
 ```bash
-dotnet add package Sora.Core
-dotnet add package Sora.Web
-dotnet add package Sora.Data.Sqlite
+dotnet add package Koan.Core
+dotnet add package Koan.Web
+dotnet add package Koan.Data.Sqlite
 ```
 
 ### 3. Create Model
 ```csharp
 // Models/Todo.cs
-using Sora.Core;
+using Koan.Core;
 
 public class Todo : Entity<Todo>
 {
@@ -37,7 +37,7 @@ public class Todo : Entity<Todo>
 ```csharp
 // Controllers/TodosController.cs
 using Microsoft.AspNetCore.Mvc;
-using Sora.Web;
+using Koan.Web;
 
 [Route("api/[controller]")]
 public class TodosController : EntityController<Todo> { }
@@ -47,8 +47,8 @@ public class TodosController : EntityController<Todo> { }
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Sora services
-builder.Services.AddSora();
+// Add Koan services
+builder.Services.AddKoan();
 
 var app = builder.Build();
 
@@ -73,7 +73,7 @@ dotnet run
 # Create a todo
 curl -X POST https://localhost:5001/api/todos \
   -H "Content-Type: application/json" \
-  -d '{"title": "Learn Sora", "isDone": false}'
+  -d '{"title": "Learn Koan", "isDone": false}'
 
 # Get all todos
 curl https://localhost:5001/api/todos

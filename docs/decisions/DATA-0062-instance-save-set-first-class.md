@@ -1,4 +1,4 @@
-﻿---
+---
 id: DATA-0062
 slug: DATA-0062-instance-save-set-first-class
 domain: DATA
@@ -11,7 +11,7 @@ title: Instance Save(set) is first-class; Data<TEntity,TKey>.Upsert(..., set) is
 
 ## Context
 
-- Sora already supports logical entity "sets" that route to parallel physical stores by suffixing the storage name with `#<set>` (see DATA-0030 and `StorageNameRegistry`).
+- Koan already supports logical entity "sets" that route to parallel physical stores by suffixing the storage name with `#<set>` (see DATA-0030 and `StorageNameRegistry`).
 - Today, set-targeted operations are exposed primarily via the generic facade (`Data<TEntity,TKey>.UpsertAsync(entity, set)`, `GetAsync(id, set)`, etc.). While functional, it isn't the most ergonomic path for application code that works with instances.
 - We want a natural, entity-centric developer experience: `model.Save("Audit")`, `models.Save("Moderation")` — without forcing consumers to hop to the static facade.
 
@@ -42,7 +42,7 @@ Optional (recommended) enhancements
 
 ## Implementation notes
 
-- Add overloads in `src/Sora.Data.Core/AggregateExtensions.cs`:
+- Add overloads in `src/Koan.Data.Core/AggregateExtensions.cs`:
   - Each overload should `using var _ = Data<TEntity,TKey>.WithSet(set);` then call the corresponding repository method.
   - Provide bulk variants: `Save(this IEnumerable<TEntity> models, string set, ...)` for both generic and string-keyed entities.
 - Do not change `Entity<TEntity,TKey>` static helpers in this ADR; keep the stance that instance Save(set) is the first-class path for writes. Static set-aware operations remain available on `Data<TEntity,TKey>`.
@@ -60,4 +60,4 @@ Optional (recommended) enhancements
 
 - DATA-0030 — Entity sets routing and storage suffixing
 - ARCH-0040 — Config and constants naming
-- `Sora.Data.Core.DataSetContext`, `Sora.Data.Core.Configuration.StorageNameRegistry`
+- `Koan.Data.Core.DataSetContext`, `Koan.Data.Core.Configuration.StorageNameRegistry`

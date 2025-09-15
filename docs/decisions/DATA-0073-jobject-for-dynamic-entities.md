@@ -6,7 +6,7 @@
 
 ## Context and Problem Statement
 
-When processing dynamic entities within `Sora.Flow.Core`, the system encountered critical serialization errors at the data persistence layer. Specifically, `MongoDB.Bson.BsonSerializationException` and `System.FormatException` were thrown when attempting to serialize or deserialize models based on `System.Dynamic.ExpandoObject`.
+When processing dynamic entities within `Koan.Flow.Core`, the system encountered critical serialization errors at the data persistence layer. Specifically, `MongoDB.Bson.BsonSerializationException` and `System.FormatException` were thrown when attempting to serialize or deserialize models based on `System.Dynamic.ExpandoObject`.
 
 The root cause was traced to the inherent limitations of the default MongoDB C# driver serializers when handling the dynamic nature of `ExpandoObject`, especially when the object contained non-standard or primitive BSON types that could not be cleanly mapped to a dictionary representation. This led to unpredictable runtime failures, particularly when data was passed through messaging systems and its shape was not strictly controlled.
 
@@ -28,9 +28,9 @@ Chosen option: "Switch to `Newtonsoft.Json.Linq.JObject`".
 
 This decision was implemented by:
 
-1.  **Creating a Custom `JObjectSerializer`**: A new serializer (`Sora.Data.Mongo.Initialization.JObjectSerializer`) was created to handle the serialization and deserialization of `JObject` to and from BSON. This serializer is designed to be robust, correctly handling both BSON documents and primitive types by wrapping primitives in a standard `{"value": ...}` structure.
+1.  **Creating a Custom `JObjectSerializer`**: A new serializer (`Koan.Data.Mongo.Initialization.JObjectSerializer`) was created to handle the serialization and deserialization of `JObject` to and from BSON. This serializer is designed to be robust, correctly handling both BSON documents and primitive types by wrapping primitives in a standard `{"value": ...}` structure.
 2.  **Creating a `JObjectSerializationProvider`**: A corresponding `IBsonSerializationProvider` was created to register the custom serializer with the MongoDB driver for types `JObject` and `object`.
-3.  **Refactoring Core Components**: All instances of `ExpandoObject` in `Sora.Flow.Core` were replaced with `JObject`. This included `IDynamicFlowEntity`, `DynamicFlowEntity<TModel>`, and various extension methods.
+3.  **Refactoring Core Components**: All instances of `ExpandoObject` in `Koan.Flow.Core` were replaced with `JObject`. This included `IDynamicFlowEntity`, `DynamicFlowEntity<TModel>`, and various extension methods.
 4.  **Updating Orchestration Logic**: The `FlowOrchestratorBase` was updated to materialize incoming message payloads directly into `JObject`, ensuring that the model is treated consistently throughout the processing pipeline.
 
 ### Positive Consequences
@@ -44,6 +44,6 @@ This decision was implemented by:
 - **Refactoring Effort**: This was a significant refactoring that touched multiple projects and required careful testing to ensure correctness.
 - **Dependency on `Newtonsoft.Json`**: This change further solidifies the project's dependency on `Newtonsoft.Json` for dynamic object modeling.
 
-## ADR-0053: `sora-flow` pillar, entity-first and auto-registrar
+## ADR-0053: `Koan-flow` pillar, entity-first and auto-registrar
 
 This decision aligns with the principles of `ARCH-0053`, which emphasizes an entity-first approach. By choosing a robust representation for our dynamic entities (`JObject`), we ensure that the entity model is reliable and can be handled consistently by the underlying infrastructure, including the auto-registrar and persistence layers.

@@ -1,4 +1,4 @@
-﻿---
+---
 id: MEDIA-0002
 slug: s6-social-creator-and-htmx-ui
 domain: media
@@ -21,7 +21,7 @@ Decision
   - Pipelines compose general image actions (resize, text overlay, format) to export common social formats.
 - UI technology: adopt htmx for progressive enhancement; serve fragments from MVC controllers; static shell via wwwroot.
 - Orchestration-first posture: centralize pipelines and action registration in Media; keep sample controllers thin; one class per file, controllers-only for HTTP.
-- Create a new reusable project for image actions: Sora.Media.Actions.Image (ImageSharp or System.Drawing-based to start), exposing code@version actions:
+- Create a new reusable project for image actions: Koan.Media.Actions.Image (ImageSharp or System.Drawing-based to start), exposing code@version actions:
   - image/thumbnail@v1, image/resize@v1, image/format@v1, image/overlay@v1, image/text@v1
 - MVP: start with thumbnail + format; expand with overlay/text and export presets.
 
@@ -32,14 +32,14 @@ Scope
   - Task execution and status polling (MVP in-memory)
   - Static UI shell + htmx; HTML/JS/CSS per-component separation
   - Media streaming fallback for non-presign providers
-- Add a new library: src/Sora.Media.Actions.Image (initially thumbnail + format); integrate later with a central task registry.
+- Add a new library: src/Koan.Media.Actions.Image (initially thumbnail + format); integrate later with a central task registry.
 
 Consequences
 
 - Demonstrates Media + Storage end-to-end with real-world flows and clean SoC.
 - Sets a pattern for future pipelines and tasks with derivation keys and idempotency.
 - htmx allows server-led UI without a complex frontend toolchain.
-- Short-term: a simple, in-memory task runner in the sample; long-term: move orchestration into Sora.Media.Core.
+- Short-term: a simple, in-memory task runner in the sample; long-term: move orchestration into Koan.Media.Core.
 
 Implementation notes
 
@@ -51,8 +51,8 @@ Implementation notes
 
 Follow-ups
 
-- Implement MediaTaskRegistry + PipelineRunner in Sora.Media.Core.
-- Port the sample’s thumbnail action to Sora.Media.Actions.Image and wire through the registry.
+- Implement MediaTaskRegistry + PipelineRunner in Koan.Media.Core.
+- Port the sample’s thumbnail action to Koan.Media.Actions.Image and wire through the registry.
 - Add export presets (post, story, linkedin) using composed actions.
 
 References

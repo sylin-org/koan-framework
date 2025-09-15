@@ -5,9 +5,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S8.Location.Core.Models;
 using S8.Location.Core.Options;
-using Sora.AI.Contracts;
-using Sora.Data.Core;
-using Sora.Core.Utilities.Ids;
+using Koan.AI.Contracts;
+using Koan.Data.Core;
+
 
 namespace S8.Location.Core.Services;
 
@@ -31,10 +31,10 @@ public class AddressResolutionService : IAddressResolutionService
     {
         // Step 1: Normalize address for consistent hashing
         var normalized = NormalizeAddress(address);
-        
+
         // Step 2: Generate deterministic hash
         var sha512 = ComputeSHA512(normalized);
-        
+
         // Step 3: Check cache
         if (_options.Resolution.CacheEnabled)
         {
@@ -45,16 +45,16 @@ public class AddressResolutionService : IAddressResolutionService
                 return cached.CanonicalUlid;
             }
         }
-        
+
         // Step 4: Perform expensive resolution
         _logger.LogInformation("Resolving new address: {Address}", address);
-        
+
         try
         {
-            // AI correction using Sora.AI static resolver
-            var ai = Sora.AI.Ai.TryResolve();
+            // AI correction using Koan.AI static resolver
+            var ai = Koan.AI.Ai.TryResolve();
             string aiCorrected = address; // fallback to original if AI not available
-            
+
             if (ai != null)
             {
                 try
@@ -72,32 +72,32 @@ public class AddressResolutionService : IAddressResolutionService
             {
                 _logger.LogDebug("AI service not available, using original address");
             }
-            
+
             // Geocoding
             var geocodingResult = await _geocoding.GeocodeAsync(aiCorrected, ct);
             if (!geocodingResult.Success)
             {
-                _logger.LogWarning("Geocoding failed for {Address}: {Error}", 
+                _logger.LogWarning("Geocoding failed for {Address}: {Error}",
                     aiCorrected, geocodingResult.ErrorMessage);
                 throw new InvalidOperationException($"Geocoding failed: {geocodingResult.ErrorMessage}");
             }
-            
+
             // Create hierarchical structure
             var hierarchy = await BuildLocationHierarchy(
-                geocodingResult.FormattedAddress ?? aiCorrected, 
-                geocodingResult.Coordinates!, 
+                geocodingResult.FormattedAddress ?? aiCorrected,
+                geocodingResult.Coordinates!,
                 ct);
-            
+
             // Generate canonical ID (leaf node of hierarchy) using ULID
-            var canonicalId = hierarchy.LastOrDefault()?.Id ?? UlidId.New();
-            
+            var canonicalId = hierarchy.LastOrDefault()?.Id ?? Guid.CreateVersion7().ToString();
+
             // Step 5: Cache for future
             if (_options.Resolution.CacheEnabled)
             {
                 var cacheEntry = ResolutionCache.Create(sha512, normalized, canonicalId);
                 await Data<ResolutionCache, string>.UpsertAsync(cacheEntry, ct);
             }
-            
+
             return canonicalId;
         }
         catch (Exception ex)
@@ -110,20 +110,20 @@ public class AddressResolutionService : IAddressResolutionService
     public string NormalizeAddress(string address)
     {
         var rules = _options.Resolution.NormalizationRules;
-        
+
         var normalized = address.Trim();
-        
+
         if (rules.CaseMode == "Upper")
             normalized = normalized.ToUpperInvariant();
         else if (rules.CaseMode == "Lower")
             normalized = normalized.ToLowerInvariant();
-            
+
         if (rules.RemovePunctuation)
             normalized = Regex.Replace(normalized, @"[^\w\s]", " ");
-            
+
         if (rules.CompressWhitespace)
             normalized = Regex.Replace(normalized, @"\s+", " ");
-            
+
         return normalized.Trim();
     }
 
@@ -136,31 +136,31 @@ public class AddressResolutionService : IAddressResolutionService
     }
 
     private async Task<List<AgnosticLocation>> BuildLocationHierarchy(
-        string formattedAddress, 
-        GeoCoordinate coordinates, 
+        string formattedAddress,
+        GeoCoordinate coordinates,
         CancellationToken ct)
     {
         var hierarchy = new List<AgnosticLocation>();
-        
+
         // Parse address components using AI for intelligent regional parsing
         var addressComponents = await ParseAddressComponents(formattedAddress, coordinates, ct);
-        
-        _logger.LogDebug("Parsed {Count} address components for {Address}", 
+
+        _logger.LogDebug("Parsed {Count} address components for {Address}",
             addressComponents.Count, formattedAddress);
-        
+
         // Build hierarchy from broadest to most specific
         AgnosticLocation? parentLocation = null;
-        
+
         foreach (var component in addressComponents.OrderBy(c => GetHierarchyOrder(c.Type)))
         {
             // Check if this component already exists to avoid duplicates
             var existingLocation = await FindExistingLocation(component, parentLocation?.Id, ct);
-            
+
             AgnosticLocation currentLocation;
             if (existingLocation != null)
             {
                 currentLocation = existingLocation;
-                _logger.LogDebug("Found existing {Type}: {Name} ({Id})", 
+                _logger.LogDebug("Found existing {Type}: {Name} ({Id})",
                     component.Type, component.Name, currentLocation.Id);
             }
             else
@@ -170,9 +170,9 @@ public class AddressResolutionService : IAddressResolutionService
                     component.Type,
                     component.Name,
                     parentLocation?.Id,
-                    component.Type == LocationType.Building || component.Type == LocationType.Street 
+                    component.Type == LocationType.Building || component.Type == LocationType.Street
                         ? coordinates : null);
-                
+
                 // Set additional properties
                 currentLocation.Code = component.Code;
                 currentLocation.Metadata = new Dictionary<string, object>
@@ -182,29 +182,29 @@ public class AddressResolutionService : IAddressResolutionService
                     ["confidence"] = component.Confidence,
                     ["country_context"] = component.CountryContext
                 };
-                
+
                 await currentLocation.Save();
-                
-                _logger.LogInformation("Created new {Type}: {Name} ({Id})", 
+
+                _logger.LogInformation("Created new {Type}: {Name} ({Id})",
                     component.Type, component.Name, currentLocation.Id);
             }
-            
+
             hierarchy.Add(currentLocation);
             parentLocation = currentLocation;
         }
-        
+
         return hierarchy;
     }
-    
+
     private async Task<List<AddressComponent>> ParseAddressComponents(
-        string formattedAddress, 
-        GeoCoordinate coordinates, 
+        string formattedAddress,
+        GeoCoordinate coordinates,
         CancellationToken ct)
     {
         var components = new List<AddressComponent>();
-        
+
         // Use AI to intelligently parse address based on regional patterns
-        var ai = Sora.AI.Ai.TryResolve();
+        var ai = Koan.AI.Ai.TryResolve();
         if (ai != null)
         {
             try
@@ -228,9 +228,9 @@ Consider regional variations:
 Return only valid JSON array, no explanation.";
 
                 var aiResponse = await ai.PromptAsync(prompt, _options.Ai.Model, null, ct);
-                components = System.Text.Json.JsonSerializer.Deserialize<List<AddressComponent>>(aiResponse) 
+                components = System.Text.Json.JsonSerializer.Deserialize<List<AddressComponent>>(aiResponse)
                            ?? new List<AddressComponent>();
-                           
+
                 _logger.LogDebug("AI parsed {Count} components from address", components.Count);
             }
             catch (Exception ex)
@@ -238,24 +238,24 @@ Return only valid JSON array, no explanation.";
                 _logger.LogWarning(ex, "AI address parsing failed, using fallback parsing");
             }
         }
-        
+
         // Fallback: simple parsing if AI is unavailable
         if (components.Count == 0)
         {
             components = FallbackAddressParsing(formattedAddress, coordinates);
         }
-        
+
         return components;
     }
-    
+
     private List<AddressComponent> FallbackAddressParsing(string address, GeoCoordinate coordinates)
     {
         // Simple fallback parsing - basic street address
         var components = new List<AddressComponent>();
-        
+
         // Detect country from coordinates (very basic)
         var countryContext = DetectCountryFromCoordinates(coordinates);
-        
+
         // Create basic hierarchy: Country → Locality → Street
         components.Add(new AddressComponent
         {
@@ -265,7 +265,7 @@ Return only valid JSON array, no explanation.";
             Confidence = "medium",
             CountryContext = countryContext
         });
-        
+
         components.Add(new AddressComponent
         {
             Type = LocationType.Locality,
@@ -273,7 +273,7 @@ Return only valid JSON array, no explanation.";
             Confidence = "low",
             CountryContext = countryContext
         });
-        
+
         components.Add(new AddressComponent
         {
             Type = LocationType.Street,
@@ -281,23 +281,23 @@ Return only valid JSON array, no explanation.";
             Confidence = "medium",
             CountryContext = countryContext
         });
-        
+
         return components;
     }
-    
+
     private async Task<AgnosticLocation?> FindExistingLocation(
-        AddressComponent component, 
-        string? parentId, 
+        AddressComponent component,
+        string? parentId,
         CancellationToken ct)
     {
         // Query for existing location with same type, name, and parent using LINQ expression
-        var existing = await Data<AgnosticLocation, string>.Query(loc => 
-            loc.Type == component.Type && 
-            loc.Name == component.Name && 
+        var existing = await Data<AgnosticLocation, string>.Query(loc =>
+            loc.Type == component.Type &&
+            loc.Name == component.Name &&
             loc.ParentId == parentId, ct);
         return existing.FirstOrDefault();
     }
-    
+
     private int GetHierarchyOrder(LocationType type) => type switch
     {
         LocationType.Country => 1,
@@ -314,43 +314,43 @@ Return only valid JSON array, no explanation.";
         LocationType.Building => 7,
         _ => 999
     };
-    
+
     private string DetectCountryFromCoordinates(GeoCoordinate coordinates)
     {
         // Very basic country detection from coordinates - in production use proper reverse geocoding
-        if (coordinates.Latitude >= 24 && coordinates.Latitude <= 49 && 
+        if (coordinates.Latitude >= 24 && coordinates.Latitude <= 49 &&
             coordinates.Longitude >= -125 && coordinates.Longitude <= -66)
             return "United States";
-        if (coordinates.Latitude >= 45 && coordinates.Latitude <= 83 && 
+        if (coordinates.Latitude >= 45 && coordinates.Latitude <= 83 &&
             coordinates.Longitude >= -141 && coordinates.Longitude <= -52)
             return "Canada";
-        if (coordinates.Latitude >= -34 && coordinates.Latitude <= 5 && 
+        if (coordinates.Latitude >= -34 && coordinates.Latitude <= 5 &&
             coordinates.Longitude >= -74 && coordinates.Longitude <= -34)
             return "Brazil";
-        if (coordinates.Latitude >= 31 && coordinates.Latitude <= 46 && 
+        if (coordinates.Latitude >= 31 && coordinates.Latitude <= 46 &&
             coordinates.Longitude >= 130 && coordinates.Longitude <= 146)
             return "Japan";
-        if (coordinates.Latitude >= -44 && coordinates.Latitude <= -9 && 
+        if (coordinates.Latitude >= -44 && coordinates.Latitude <= -9 &&
             coordinates.Longitude >= 113 && coordinates.Longitude <= 154)
             return "Australia";
-            
+
         return "Unknown";
     }
-    
+
     private string GetCountryCode(string countryName) => countryName switch
     {
         "United States" => "US",
-        "Canada" => "CA", 
+        "Canada" => "CA",
         "Brazil" => "BR",
         "Japan" => "JP",
         "Australia" => "AU",
         _ => ""
     };
-    
+
     private string GenerateULID()
     {
         // Generate ULID for deterministic, sortable IDs with distributed system benefits
-        return UlidId.New();
+        return Guid.CreateVersion7().ToString();
     }
 }
 

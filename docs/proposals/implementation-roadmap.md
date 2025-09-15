@@ -15,7 +15,7 @@
 
 #### Day 1-3: Entity Base Class Enhancement
 ```bash
-# Update: src/Sora.Data.Core/Model/Entity.cs
+# Update: src/Koan.Data.Core/Model/Entity.cs
 ```
 **Tasks**:
 - [ ] Add semantic single parent methods: `GetParent()`, `GetParent<T>()`
@@ -40,7 +40,7 @@ public async Task<object> GetParent(CancellationToken ct = default)
 
 #### Day 4-5: Enhanced RelationshipMetadataService
 ```bash
-# Update: src/Sora.Data.Core/Relationships/RelationshipMetadataService.cs
+# Update: src/Koan.Data.Core/Relationships/RelationshipMetadataService.cs
 ```
 **Tasks**:
 - [ ] Add cardinality validation methods: `HasSingleParent()`, `HasSingleChildType()`
@@ -52,7 +52,7 @@ public async Task<object> GetParent(CancellationToken ct = default)
 
 #### Day 1-3: Streaming Extension Methods
 ```bash
-# Create: src/Sora.Data.Core/Extensions/RelationshipExtensions.cs
+# Create: src/Koan.Data.Core/Extensions/RelationshipExtensions.cs
 ```
 **Tasks**:
 - [ ] Implement `Relatives()` extension for `IEnumerable<T>`
@@ -76,7 +76,7 @@ public static async IAsyncEnumerable<RelationshipGraph<TEntity>> Relatives<TEnti
 
 #### Day 4-5: RelationshipGraph Response Type
 ```bash
-# Create: src/Sora.Data.Core/Model/RelationshipGraph.cs
+# Create: src/Koan.Data.Core/Model/RelationshipGraph.cs
 ```
 **Tasks**:
 - [ ] Define `RelationshipGraph<TEntity>` with proper child grouping structure
@@ -89,8 +89,8 @@ public static async IAsyncEnumerable<RelationshipGraph<TEntity>> Relatives<TEnti
 
 #### Day 1-2: Flow Module Updates
 ```bash
-# DELETE: src/Sora.Flow.Core/Attributes/FlowAttributes.cs (ParentKeyAttribute)
-# UPDATE: src/Sora.Flow.Core/Infrastructure/FlowRegistry.cs
+# DELETE: src/Koan.Flow.Core/Attributes/FlowAttributes.cs (ParentKeyAttribute)
+# UPDATE: src/Koan.Flow.Core/Infrastructure/FlowRegistry.cs
 ```
 **Tasks**:
 - [ ] Remove `ParentKeyAttribute` class entirely from FlowAttributes.cs
@@ -106,13 +106,13 @@ var pk = p.GetCustomAttribute<ParentKeyAttribute>(inherit: true);
 if (pk != null) { var parentType = pk.Parent; }
 
 // AFTER:
-var pk = p.GetCustomAttribute<Sora.Data.Core.Relationships.ParentAttribute>(inherit: true);
+var pk = p.GetCustomAttribute<Koan.Data.Core.Relationships.ParentAttribute>(inherit: true);
 if (pk != null) { var parentType = pk.ParentType; }
 ```
 
 #### Day 3-4: ParentKeyResolutionService Migration
 ```bash
-# UPDATE: src/Sora.Flow.Core/Services/ParentKeyResolutionService.cs
+# UPDATE: src/Koan.Flow.Core/Services/ParentKeyResolutionService.cs
 ```
 **Tasks**:
 - [ ] Replace static resolution with instance-based methods where possible
@@ -137,7 +137,7 @@ if (pk != null) { var parentType = pk.ParentType; }
 
 #### Day 1-2: EntityController Enhancement
 ```bash
-# UPDATE: src/Sora.Web/Controllers/EntityController.cs
+# UPDATE: src/Koan.Web/Controllers/EntityController.cs
 ```
 **Tasks**:
 - [ ] Replace `_parent` response format with `RelationshipGraph<T>`

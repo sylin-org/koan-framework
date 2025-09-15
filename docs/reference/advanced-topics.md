@@ -7,9 +7,9 @@
 
 ---
 
-## 🚀 Sora Framework Advanced Topics
+## 🚀 Koan Framework Advanced Topics
 
-This document covers advanced patterns, extensibility, performance optimization, and production deployment considerations for the Sora Framework.
+This document covers advanced patterns, extensibility, performance optimization, and production deployment considerations for the Koan Framework.
 
 ---
 
@@ -20,7 +20,7 @@ This document covers advanced patterns, extensibility, performance optimization,
 Create modules that auto-discover and register themselves:
 
 ```csharp
-public class MyCustomModule : ISoraAutoRegistrar
+public class MyCustomModule : IKoanAutoRegistrar
 {
     public string ModuleName => "MyCompany.CustomModule";
     public string? ModuleVersion => Assembly.GetExecutingAssembly().GetName().Version?.ToString();
@@ -316,7 +316,7 @@ public class CustomLLMProvider : IAiProvider
 }
 
 // Auto-registrar for custom AI provider
-public class CustomAiAutoRegistrar : ISoraAutoRegistrar
+public class CustomAiAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "MyCompany.AI.CustomLLM";
     public string? ModuleVersion => "1.0.0";
@@ -344,7 +344,7 @@ public class CustomAiAutoRegistrar : ISoraAutoRegistrar
 Implement sophisticated data transformation logic:
 
 ```csharp
-public class AdvancedProductInterceptor : ISoraAutoRegistrar
+public class AdvancedProductInterceptor : IKoanAutoRegistrar
 {
     public string ModuleName => "ProductFlow.AdvancedInterceptors";
     public string? ModuleVersion => "1.0.0";
@@ -1975,4 +1975,4 @@ public class OrderService
 }
 ```
 
-This comprehensive advanced topics guide covers the sophisticated patterns and techniques needed for building enterprise-grade applications with the Sora Framework. Each section provides production-ready code examples and architectural guidance for scaling Sora applications to meet complex requirements.
+This comprehensive advanced topics guide covers the sophisticated patterns and techniques needed for building enterprise-grade applications with the Koan Framework. Each section provides production-ready code examples and architectural guidance for scaling Koan applications to meet complex requirements.

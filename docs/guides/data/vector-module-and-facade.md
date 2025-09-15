@@ -1,14 +1,14 @@
-# Vector module and facade (Sora.Data.Vector)
+# Vector module and facade (Koan.Data.Vector)
 
-This guide explains the new vector module split and how to use vector features via Sora.Data.Vector.
+This guide explains the new vector module split and how to use vector features via Koan.Data.Vector.
 
 ## Package split
 
-- Contracts live in Sora.Data.Vector.Abstractions (IVectorSearchRepository, IVectorAdapterFactory, VectorCapabilities, VectorQueryOptions/Result/Match, VectorEmbeddingAttribute, VectorAdapterAttribute).
-- Implementation and helpers move to Sora.Data.Vector:
-  - AddSoraDataVector(IServiceCollection)
+- Contracts live in Koan.Data.Vector.Abstractions (IVectorSearchRepository, IVectorAdapterFactory, VectorCapabilities, VectorQueryOptions/Result/Match, VectorEmbeddingAttribute, VectorAdapterAttribute).
+- Implementation and helpers move to Koan.Data.Vector:
+  - AddKoanDataVector(IServiceCollection)
   - IVectorService (resolution/caching)
-  - VectorDefaultsOptions (Sora:Data:VectorDefaults:DefaultProvider)
+  - VectorDefaultsOptions (Koan:Data:VectorDefaults:DefaultProvider)
   - Facades: Vector<TEntity> (preferred) and VectorData<TEntity, TKey>/VectorData<TEntity>
   - Orchestration: SaveWithVector and SaveManyWithVector with VectorEntity<TEntity>
 
@@ -16,7 +16,7 @@ This guide explains the new vector module split and how to use vector features v
 
 Bind default vector provider:
 
-- Sora:Data:VectorDefaults:DefaultProvider = "weaviate" (example)
+- Koan:Data:VectorDefaults:DefaultProvider = "weaviate" (example)
 
 ## Usage
 
@@ -37,4 +37,4 @@ Bind default vector provider:
 
 ## Samples
 
-- S5.Recs sample updated to call Sora.Data.Vector facade for seeding and querying.
+- S5.Recs sample updated to call Koan.Data.Vector facade for seeding and querying.

@@ -1,6 +1,6 @@
-using Sora.Data.Abstractions;
-using Sora.Data.Core.Model;
-using Sora.Data.Core.Relationships;
+using Koan.Data.Abstractions;
+using Koan.Data.Core.Model;
+using Koan.Data.Core.Relationships;
 
 namespace S1.Web;
 

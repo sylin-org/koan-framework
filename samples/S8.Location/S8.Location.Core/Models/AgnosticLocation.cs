@@ -1,6 +1,6 @@
-using Sora.Data.Core.Model;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Core.Utilities.Ids;
+using Koan.Data.Core.Model;
+using Koan.Data.Abstractions.Annotations;
+
 
 namespace S8.Location.Core.Models;
 
@@ -15,25 +15,25 @@ public class AgnosticLocation : Entity<AgnosticLocation>
 {
     /// <summary>Parent location ID for hierarchical structure (null for root level)</summary>
     public string? ParentId { get; set; }
-    
+
     /// <summary>Type of location in the hierarchy</summary>
     public LocationType Type { get; set; }
-    
+
     /// <summary>Display name of this location</summary>
     public string Name { get; set; } = "";
-    
+
     /// <summary>Optional code (ISO country codes, state abbreviations, etc.)</summary>
     public string? Code { get; set; }
-    
+
     /// <summary>Geographic coordinates if available</summary>
     public GeoCoordinate? Coordinates { get; set; }
-    
+
     /// <summary>Additional metadata for extensibility</summary>
     public Dictionary<string, object> Metadata { get; set; } = new();
-    
+
     /// <summary>Computed full address path (Country > State > City > Street > Building)</summary>
     public string FullAddress { get; set; } = "";
-    
+
     /// <summary>
     /// Create a new AgnosticLocation with ULID and proper hierarchy
     /// </summary>
@@ -46,7 +46,7 @@ public class AgnosticLocation : Entity<AgnosticLocation>
     {
         return new AgnosticLocation
         {
-            Id = UlidId.New(), // Use ULID for distributed system benefits
+            Id = Guid.CreateVersion7().ToString(), // Use ULID for distributed system benefits
             Type = type,
             Name = name,
             ParentId = parentId,

@@ -13,7 +13,7 @@ The current Flow messaging system has inconsistent routing mechanisms that preve
    - FlowEntity/DynamicFlowEntity objects are sent via `.Send()`
    - `MessagingInterceptors` transform objects into transport envelopes (JSON)
    - **Multiple routing paths**: 
-     - Regular FlowEntity → `FlowQueuedMessage` → `"Sora.Flow.FlowEntity"` queue
+     - Regular FlowEntity → `FlowQueuedMessage` → `"Koan.Flow.FlowEntity"` queue
      - DynamicFlowEntity → `StringQueuedMessage` → `"System.String"` queue (attempted fix)
 
 2. **Orchestrator Side**:
@@ -67,7 +67,7 @@ Implement the unified generic string handler architecture to replace the current
 
 #### Phase 2: Simplify Message Interceptors ✅ **COMPLETED**
 - [x] **Remove FlowQueuedMessage/StringQueuedMessage**: Eliminated `StringQueuedMessage` class entirely
-- [x] **Unified interceptor**: All Flow entities now route through `FlowQueuedMessage` to `"Sora.Flow.FlowEntity"` queue
+- [x] **Unified interceptor**: All Flow entities now route through `FlowQueuedMessage` to `"Koan.Flow.FlowEntity"` queue
 - [x] **Single queue routing**: Consistent routing through orchestrator queue instead of separate string queue
 
 #### Phase 3: Enhanced DynamicFlowEntity Support ✅ **COMPLETED**
@@ -99,20 +99,20 @@ This architecture provides a clean, consistent, and extensible foundation for Fl
 ### Key Files and Components
 
 #### Core Flow Messaging Files
-- **`src/Sora.Flow.Core/Initialization/FlowMessagingInitializer.cs`**: Current String handler registration, needs conversion to generic handler
-- **`src/Sora.Flow.Core/Extensions/FlowEntityExtensions.cs`**: Message interceptor registration, contains broken StringQueuedMessage
-- **`src/Sora.Flow.Core/Messaging/FlowQueuedMessage.cs`**: Routes to "Sora.Flow.FlowEntity" queue - to be removed
-- **`src/Sora.Flow.Core/ServiceCollectionExtensions.cs`**: Contains `.On<>()` handler registrations and ExtractDict logic
+- **`src/Koan.Flow.Core/Initialization/FlowMessagingInitializer.cs`**: Current String handler registration, needs conversion to generic handler
+- **`src/Koan.Flow.Core/Extensions/FlowEntityExtensions.cs`**: Message interceptor registration, contains broken StringQueuedMessage
+- **`src/Koan.Flow.Core/Messaging/FlowQueuedMessage.cs`**: Routes to "Koan.Flow.FlowEntity" queue - to be removed
+- **`src/Koan.Flow.Core/ServiceCollectionExtensions.cs`**: Contains `.On<>()` handler registrations and ExtractDict logic
 
 #### DynamicFlowEntity Support Files
-- **`src/Sora.Flow.Core/Model/DynamicFlowExtensions.cs`**: ExpandoObject manipulation and path-based operations
-- **`src/Sora.Flow.Core/Model/Typed.cs`**: DynamicFlowEntity<T> definition and IDynamicFlowEntity interface
-- **`src/Sora.Flow.Core/Model/DynamicTransportEnvelope.cs`**: Envelope structure for DynamicFlowEntity messages
+- **`src/Koan.Flow.Core/Model/DynamicFlowExtensions.cs`**: ExpandoObject manipulation and path-based operations
+- **`src/Koan.Flow.Core/Model/Typed.cs`**: DynamicFlowEntity<T> definition and IDynamicFlowEntity interface
+- **`src/Koan.Flow.Core/Model/DynamicTransportEnvelope.cs`**: Envelope structure for DynamicFlowEntity messages
 
 #### Sample Data and Testing
 - **`samples/S8.Flow/S8.Flow.Shared/SampleData.cs`**: Contains test Manufacturer data using `ToDynamicFlowEntity<T>()`
 - **`samples/S8.Flow/S8.Flow.Shared/Manufacturer.cs`**: DynamicFlowEntity<Manufacturer> model
-- **Container logs**: `docker logs sora-s8-flow-api-1` and `docker logs sora-s8-flow-adapter-bms-1`
+- **Container logs**: `docker logs Koan-s8-flow-api-1` and `docker logs Koan-s8-flow-adapter-bms-1`
 
 ### Current Message Flow Analysis
 
@@ -168,7 +168,7 @@ services.On<string>(async json => {
 #### Failed Orchestrator Routing
 ```
 [RabbitMQ] Consumer created for String on queue System.String  // ✅ Queue exists
-[Sora.Flow] DEBUG: FlowEntity message handler called with payload length: 477  // ❌ Wrong handler
+[Koan.Flow] DEBUG: FlowEntity message handler called with payload length: 477  // ❌ Wrong handler
 ```
 
 #### Database Evidence
@@ -196,53 +196,53 @@ services.On<string>(async json => {
 
 #### Prerequisites
 - **Docker Desktop** running on Windows
-- **Git repository** at `F:\Replica\NAS\Files\repo\github\sora-framework`
+- **Git repository** at `F:\Replica\NAS\Files\repo\github\Koan-framework`
 - **S8.Flow sample project** with MongoDB and RabbitMQ containers
 
 #### Starting the Stack
 ```bash
 # Navigate to S8.Flow sample directory
-cd "F:\Replica\NAS\Files\repo\github\sora-framework\samples\S8.Flow"
+cd "F:\Replica\NAS\Files\repo\github\Koan-framework\samples\S8.Flow"
 
 # Clean rebuild (recommended after code changes)
-docker compose -p sora-s8-flow -f S8.Compose/docker-compose.yml build --no-cache
+docker compose -p Koan-s8-flow -f S8.Compose/docker-compose.yml build --no-cache
 
 # Start all containers (MongoDB, RabbitMQ, API, Adapters)
-docker compose -p sora-s8-flow -f S8.Compose/docker-compose.yml up -d
+docker compose -p Koan-s8-flow -f S8.Compose/docker-compose.yml up -d
 
 # Verify all containers are running
-docker ps | grep sora-s8-flow
+docker ps | grep Koan-s8-flow
 ```
 
 Expected containers:
 - `s8-mongo` - MongoDB database
 - `s8-rabbitmq` - RabbitMQ message broker  
-- `sora-s8-flow-api-1` - Main orchestrator API
-- `sora-s8-flow-adapter-bms-1` - BMS adapter (sends Manufacturer data)
-- `sora-s8-flow-adapter-oem-1` - OEM adapter (sends Manufacturer data)
+- `Koan-s8-flow-api-1` - Main orchestrator API
+- `Koan-s8-flow-adapter-bms-1` - BMS adapter (sends Manufacturer data)
+- `Koan-s8-flow-adapter-oem-1` - OEM adapter (sends Manufacturer data)
 
 #### Debugging Commands
 
 ##### 1. Container Health Check
 ```bash
 # Check container status
-docker ps | grep sora-s8-flow
+docker ps | grep Koan-s8-flow
 
 # Check if containers are healthy (wait 30 seconds after startup)
-docker compose -p sora-s8-flow -f S8.Compose/docker-compose.yml ps
+docker compose -p Koan-s8-flow -f S8.Compose/docker-compose.yml ps
 ```
 
 ##### 2. Real-time Log Monitoring  
 ```bash
 # API orchestrator logs (main processing)
-docker logs -f sora-s8-flow-api-1
+docker logs -f Koan-s8-flow-api-1
 
 # BMS adapter logs (DynamicFlowEntity creation)
-docker logs -f sora-s8-flow-adapter-bms-1
+docker logs -f Koan-s8-flow-adapter-bms-1
 
 # Filter for specific debug patterns
-docker logs sora-s8-flow-api-1 | grep -i "FlowMessagingInitializer\|STRING.*HANDLER\|DynamicTransportEnvelope"
-docker logs sora-s8-flow-adapter-bms-1 | grep -i "StringQueuedMessage\|ToDynamicFlowEntity\|Manufacturer"
+docker logs Koan-s8-flow-api-1 | grep -i "FlowMessagingInitializer\|STRING.*HANDLER\|DynamicTransportEnvelope"
+docker logs Koan-s8-flow-adapter-bms-1 | grep -i "StringQueuedMessage\|ToDynamicFlowEntity\|Manufacturer"
 ```
 
 ##### 3. Database State Inspection
@@ -293,7 +293,7 @@ Data: {
 #### 🔴 **Problem Indicators (Current Broken State)**
 ```bash
 # In API logs - Wrong handler receiving DynamicFlowEntity
-[Sora.Flow] DEBUG: FlowEntity message handler called with payload length: 477
+[Koan.Flow] DEBUG: FlowEntity message handler called with payload length: 477
 [FlowOrchestrator] Found DynamicFlowEntity, Model type: null
 [FlowOrchestrator] WARNING: DynamicFlowEntity.Model is null!
 
@@ -354,19 +354,19 @@ docker system df
 docker system prune  # If needed
 
 # Rebuild from scratch
-docker compose -p sora-s8-flow -f S8.Compose/docker-compose.yml down
-docker compose -p sora-s8-flow -f S8.Compose/docker-compose.yml build --no-cache
+docker compose -p Koan-s8-flow -f S8.Compose/docker-compose.yml down
+docker compose -p Koan-s8-flow -f S8.Compose/docker-compose.yml build --no-cache
 ```
 
 #### No Messages Being Generated
 ```bash
 # Adapters should generate messages every 10-15 seconds
 # Check if adapters are running and healthy
-docker logs sora-s8-flow-adapter-bms-1 --tail 20
+docker logs Koan-s8-flow-adapter-bms-1 --tail 20
 
 # Should see periodic Manufacturer creation messages
 # If not, restart adapters
-docker restart sora-s8-flow-adapter-bms-1
+docker restart Koan-s8-flow-adapter-bms-1
 ```
 
 #### Database Connection Issues
@@ -375,7 +375,7 @@ docker restart sora-s8-flow-adapter-bms-1
 docker exec s8-mongo mongosh --eval "db.runCommand('ping')"
 
 # Check database access from API
-docker logs sora-s8-flow-api-1 | grep -i "mongo\|database\|connection"
+docker logs Koan-s8-flow-api-1 | grep -i "mongo\|database\|connection"
 ```
 
 This debugging guide provides a systematic approach to identify issues, track implementation progress, and validate the fix.
@@ -422,8 +422,8 @@ This debugging guide provides a systematic approach to identify issues, track im
 
 ### Related Documentation
 - **CLD_ORCHESTRATOR_BIDIRECTIONAL_PATTERN.md**: Context on Flow orchestration patterns
-- **CLD_SORA_MCP_INTEGRATION_PLAN.md**: Related messaging architecture 
-- **src/Sora.Flow.Core/USAGE.md**: Flow framework usage patterns
+- **CLD_Koan_MCP_INTEGRATION_PLAN.md**: Related messaging architecture 
+- **src/Koan.Flow.Core/USAGE.md**: Flow framework usage patterns
 
 ### Key Classes and Interfaces
 ```csharp
@@ -436,7 +436,7 @@ class TransportEnvelope<T> { string Model, Type, Source; T Payload; }
 class DynamicTransportEnvelope<T> { string Model, Type, Source; Dictionary<string,object> Payload; }
 
 // Current problem classes (to be removed/modified)
-class FlowQueuedMessage : IQueuedMessage { QueueName = "Sora.Flow.FlowEntity"; }
+class FlowQueuedMessage : IQueuedMessage { QueueName = "Koan.Flow.FlowEntity"; }
 class StringQueuedMessage : IQueuedMessage { QueueName = "System.String"; }
 ```
 
@@ -461,7 +461,7 @@ The primary issue - **DynamicFlowEntity messages being parked as "NO_KEYS"** - w
 - **No More Routing Conflicts**: Eliminated competing string handlers and inconsistent queue routing
 
 #### ✅ **Architectural Improvements**
-1. **Unified Message Flow**: `Adapter → FlowQueuedMessage → "Sora.Flow.FlowEntity" queue → FlowOrchestrator`
+1. **Unified Message Flow**: `Adapter → FlowQueuedMessage → "Koan.Flow.FlowEntity" queue → FlowOrchestrator`
 2. **Smart Service Detection**: Background workers only run on services with user-defined `[FlowOrchestrator]` classes
 3. **Adapter Isolation**: Lightweight adapters operate cleanly without data service dependencies
 4. **Clean Code**: Removed obsolete `StringQueuedMessage` class and competing handler registrations
@@ -473,7 +473,7 @@ The original plan called for routing all Flow messages through a single `System.
 
 #### **Actual Implementation**: Unified FlowOrchestrator Architecture  
 Instead, we implemented a more elegant solution:
-- **Single Queue**: All Flow entities route to `"Sora.Flow.FlowEntity"` queue
+- **Single Queue**: All Flow entities route to `"Koan.Flow.FlowEntity"` queue
 - **Orchestrator-Based**: Processing handled by `FlowOrchestratorBase` with type-specific methods
 - **Cleaner Abstraction**: No generic string parsing needed - direct object processing
 
@@ -489,10 +489,10 @@ Instead, we implemented a more elegant solution:
 ```csharp
 // OLD: Competing routing paths
 DynamicFlowEntity → StringQueuedMessage → "System.String" → FlowMessagingInitializer (BROKEN)
-FlowEntity       → FlowQueuedMessage   → "Sora.Flow.FlowEntity" → FlowOrchestrator (WORKED)
+FlowEntity       → FlowQueuedMessage   → "Koan.Flow.FlowEntity" → FlowOrchestrator (WORKED)
 
 // NEW: Unified routing path  
-ALL Flow Entities → FlowQueuedMessage → "Sora.Flow.FlowEntity" → FlowOrchestrator (WORKS)
+ALL Flow Entities → FlowQueuedMessage → "Koan.Flow.FlowEntity" → FlowOrchestrator (WORKS)
 ```
 
 #### **Critical Code Changes**
@@ -524,9 +524,9 @@ configured as a type that is allowed to be serialized for this instance of Objec
 #### **Evidence of Success**
 ```bash
 # ✅ Routing Success - Messages reach orchestrator
-[Sora.Flow] DEBUG: FlowEntity message handler called with payload length: 312
-[Sora.Flow] DEBUG: Found FlowOrchestrator, processing FlowEntity message
-[Sora.Flow] DEBUG: FlowOrchestrator completed processing
+[Koan.Flow] DEBUG: FlowEntity message handler called with payload length: 312
+[Koan.Flow] DEBUG: Found FlowOrchestrator, processing FlowEntity message
+[Koan.Flow] DEBUG: FlowOrchestrator completed processing
 
 # ✅ Model Reconstruction Success - ExpandoObjects created
 [S8FlowOrchestrator] Processing DynamicTransportEnvelope for Manufacturer

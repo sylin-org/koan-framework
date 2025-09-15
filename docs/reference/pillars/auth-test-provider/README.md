@@ -1,9 +1,9 @@
-﻿---
-title: Sora.Web.Auth.TestProvider — README
+---
+title: Koan.Web.Auth.TestProvider — README
 description: Development-only OAuth-like TestProvider for local sign-in flows with roles/permissions/custom claims.
 ---
 
-Sora.Web.Auth.TestProvider is a development-only identity provider to simulate sign-in flows locally. It issues short-lived auth codes and bearer tokens, exposes a simple login UI, and lets developers inject roles, permissions, and custom claims for testing authorization.
+Koan.Web.Auth.TestProvider is a development-only identity provider to simulate sign-in flows locally. It issues short-lived auth codes and bearer tokens, exposes a simple login UI, and lets developers inject roles, permissions, and custom claims for testing authorization.
 
 Highlights
 - Supports Authorization Code flow for local scenarios (no refresh tokens).
@@ -13,10 +13,10 @@ Highlights
 
 Minimal setup
 1) Reference the project and add MVC controllers:
-  - ProjectReference → src/Sora.Web.Auth.TestProvider/Sora.Web.Auth.TestProvider.csproj
-  - services.AddControllers().AddApplicationPart(typeof(Sora.Web.Auth.TestProvider.Controllers.StaticController).Assembly)
+  - ProjectReference → src/Koan.Web.Auth.TestProvider/Koan.Web.Auth.TestProvider.csproj
+  - services.AddControllers().AddApplicationPart(typeof(Koan.Web.Auth.TestProvider.Controllers.StaticController).Assembly)
 2) Map the TestProvider controller routes (honors RouteBase from options):
-  - app.MapSoraTestProviderEndpoints(); // requires using Sora.Web.Auth.TestProvider.Extensions
+  - app.MapKoanTestProviderEndpoints(); // requires using Koan.Web.Auth.TestProvider.Extensions
 3) Configure options (at minimum AllowedRedirectUris and ClientId):
 
 Inputs/Outputs (contract)
@@ -32,9 +32,9 @@ Examples
 
 Notes
 - PKCE: when code_challenge_method is supplied, only S256 is accepted.
-- Endpoint base is configurable via Sora:Web:Auth:TestProvider:RouteBase (default "/.testoauth").
+- Endpoint base is configurable via Koan:Web:Auth:TestProvider:RouteBase (default "/.testoauth").
 - The login UI is served at {RouteBase}/login.html and forwards to authorize.
-- Central logout in Sora.Web.Auth clears the TestProvider dev cookie to avoid silent re-login.
+- Central logout in Koan.Web.Auth clears the TestProvider dev cookie to avoid silent re-login.
 
 See also
 - Reference: Web Authentication — docs/reference/web-auth.md

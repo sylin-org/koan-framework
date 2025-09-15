@@ -1,4 +1,4 @@
-# Sora Framework Overview
+# Koan Framework Overview
 
 **Document Type**: Reference Documentation  
 **Target Audience**: Developers, Architects, AI Agents  
@@ -7,13 +7,13 @@
 
 ---
 
-## 🎯 What is Sora Framework?
+## 🎯 What is Koan Framework?
 
 **Build services like you're talking to your code, not fighting it.**
 
-Sora is a modular .NET backend framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
+Koan is a modular .NET backend framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
 
-Whether you're spinning up a quick prototype or scaling into enterprise-grade patterns, Sora keeps the path clear. Start with a three-file API. Add messaging, vector search, or AI when you're ready. Nothing more, nothing less.
+Whether you're spinning up a quick prototype or scaling into enterprise-grade patterns, Koan keeps the path clear. Start with a three-file API. Add messaging, vector search, or AI when you're ready. Nothing more, nothing less.
 
 ### Core Philosophy
 
@@ -30,9 +30,9 @@ Whether you're spinning up a quick prototype or scaling into enterprise-grade pa
 Let's start simple:
 
 ```bash
-dotnet add package Sora.Core
-dotnet add package Sora.Web
-dotnet add package Sora.Data.Sqlite
+dotnet add package Koan.Core
+dotnet add package Koan.Web
+dotnet add package Koan.Data.Sqlite
 ```
 
 Then:
@@ -60,7 +60,7 @@ It works. Right now. No ceremony.
 
 ## 🏗️ Architecture Overview
 
-Sora follows a **modular, composition-based architecture** with the following design principles:
+Koan follows a **modular, composition-based architecture** with the following design principles:
 
 ### 1. **Pillars Architecture**
 Each pillar is an independent module that works standalone or composes with others:
@@ -76,10 +76,10 @@ Each pillar is an independent module that works standalone or composes with othe
 ```
 
 ### 2. **Auto-Registration Pattern**
-Sora uses `ISoraAutoRegistrar` for zero-config module discovery:
+Koan uses `IKoanAutoRegistrar` for zero-config module discovery:
 ```csharp
 // Modules auto-register themselves
-services.AddSora(); // Discovers and loads all referenced Sora modules
+services.AddKoan(); // Discovers and loads all referenced Koan modules
 ```
 
 ### 3. **Configuration Hierarchy**
@@ -105,9 +105,9 @@ public class Todo : Entity<Todo>
 ### **Core** - Foundation Layer
 - **Purpose**: Unified runtime, secure defaults, health checks, observability
 - **Key Features**:
-  - Auto-registration pipeline (`ISoraAutoRegistrar`)
+  - Auto-registration pipeline (`IKoanAutoRegistrar`)
   - Health/readiness endpoints (`/health`, `/health/live`, `/health/ready`)
-  - Configuration helpers (`SoraEnv`, `Sora.Core.Configuration.Read`)
+  - Configuration helpers (`KoanEnv`, `Koan.Core.Configuration.Read`)
   - OpenTelemetry integration (opt-in)
   - Boot reports with module discovery
 
@@ -116,7 +116,7 @@ public class Todo : Entity<Todo>
 - **Key Features**:
   - Adapter-agnostic persistence with pushdown-first performance
   - Production-ready adapters: Postgres, SQL Server, SQLite, MongoDB, Redis, JSON file
-  - Vector module (`Sora.Data.Vector`) with multi-provider support
+  - Vector module (`Koan.Data.Vector`) with multi-provider support
   - CQRS patterns with outbox support
   - Safe Direct escape hatch for raw SQL
 
@@ -185,13 +185,13 @@ public class Todo : Entity<Todo>
   - Docker/Podman adapter support
   - Compose v2 export with profile-aware behavior
   - Readiness semantics and endpoint hints
-  - Single-binary distribution (`Sora.exe`)
+  - Single-binary distribution (`Koan.exe`)
 
 ---
 
 ## 🌱 A Framework That Grows With You
 
-Sora isn't trying to impress you with magic. It earns trust by staying out of your way—until you need more.
+Koan isn't trying to impress you with magic. It earns trust by staying out of your way—until you need more.
 
 - Add AI? One line.
 - Need vector search? Drop in a package.
@@ -201,11 +201,11 @@ Sora isn't trying to impress you with magic. It earns trust by staying out of yo
 You never pay for complexity you didn't ask for.
 
 ```bash
-dotnet add package Sora.Web.Swagger           # Interactive docs
-dotnet add package Sora.AI                    # Local LLMs with Ollama
-dotnet add package Sora.Data.Weaviate         # Semantic search
-dotnet add package Sora.Messaging.RabbitMq    # Production messaging
-dotnet add package Sora.Web.GraphQl           # REST + GraphQL side-by-side
+dotnet add package Koan.Web.Swagger           # Interactive docs
+dotnet add package Koan.AI                    # Local LLMs with Ollama
+dotnet add package Koan.Data.Weaviate         # Semantic search
+dotnet add package Koan.Messaging.RabbitMq    # Production messaging
+dotnet add package Koan.Web.GraphQl           # REST + GraphQL side-by-side
 ```
 
 Everything integrates naturally. No glue scripts. No boilerplate.
@@ -225,7 +225,7 @@ Everything integrates naturally. No glue scripts. No boilerplate.
 
 ### Observability
 - **Health checks** with detailed status
-- **OpenTelemetry integration** (opt-in via `AddSoraObservability()`)
+- **OpenTelemetry integration** (opt-in via `AddKoanObservability()`)
 - **Structured logging** with event IDs
 - **Boot reports** (redacted in production)
 
@@ -259,7 +259,7 @@ Everything integrates naturally. No glue scripts. No boilerplate.
 
 ---
 
-## 💡 Why Choose Sora?
+## 💡 Why Choose Koan?
 
 ### For Developers
 - **Minimal Friction**: Real service in a single file
@@ -283,7 +283,7 @@ Everything integrates naturally. No glue scripts. No boilerplate.
 
 ## 🧪 Real Use, Not Just Hello World
 
-Sora is already being used to build:
+Koan is already being used to build:
 
 - Microservices with event sourcing and inbox/outbox patterns
 - Developer tools with built-in AI assistance
@@ -292,7 +292,7 @@ Sora is already being used to build:
 It's ready for you too.
 
 ```csharp
-var todo = await new Todo { Title = "Learn Sora" }.Save();
+var todo = await new Todo { Title = "Learn Koan" }.Save();
 var todos = await Todo.Where(t => !t.IsDone);
 ```
 
@@ -309,4 +309,4 @@ var todos = await Todo.Where(t => !t.IsDone);
 
 ---
 
-**The Sora Framework: Build services like you're talking to your code, not fighting it.**
+**The Koan Framework: Build services like you're talking to your code, not fighting it.**

@@ -17,8 +17,8 @@ Multiple outbox implementations (in-memory, Mongo, etc.) need consistent option 
 ## Decision
 
 - Standardize on a shared helper: `OutboxConfig`.
-  - Options binding: `services.BindOutboxOptions<TOptions>("<Adapter>")` binds `Sora:Cqrs:Outbox:<Adapter>`.
-  - Connection string precedence: inline > `Sora:Data:Sources:{name}:{provider}:ConnectionString` > `ConnectionStrings:{name}`.
+  - Options binding: `services.BindOutboxOptions<TOptions>("<Adapter>")` binds `Koan:Cqrs:Outbox:<Adapter>`.
+  - Connection string precedence: inline > `Koan:Data:Sources:{name}:{provider}:ConnectionString` > `ConnectionStrings:{name}`.
 - Default outbox store is `InMemoryOutboxStore` registered by the CQRS module; applications can override by registering another `IOutboxStore` (e.g., Mongo).
 - Durable providers (e.g., Mongo) must:
   - Use `OutboxConfig.BindOutboxOptions` for options.

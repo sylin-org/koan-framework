@@ -4,7 +4,7 @@ This repository includes a mix of unit tests and integration tests. Some integra
 
 - Redis integration tests
 
-  - Use an existing REDIS instance if any of these env vars are set: `SORA_REDIS__CONNECTION_STRING`, `REDIS_URL`, or `REDIS_CONNECTION_STRING`.
+  - Use an existing REDIS instance if any of these env vars are set: `Koan_REDIS__CONNECTION_STRING`, `REDIS_URL`, or `REDIS_CONNECTION_STRING`.
   - Otherwise, they will attempt to start a temporary Docker container (`redis:7-alpine`). On platforms where Docker attach/hijack is unavailable, they will automatically skip.
 
 - Weaviate integration tests
@@ -15,9 +15,9 @@ This repository includes a mix of unit tests and integration tests. Some integra
 - S4 Web integration tests (GraphQL)
   - These are disabled by default to avoid optional dependency churn. Enable them explicitly by setting the environment variable:
     - Windows PowerShell:
-      - `$env:SORA_ENABLE_S4_TESTS = '1'`
+      - `$env:Koan_ENABLE_S4_TESTS = '1'`
     - Bash:
-      - `export SORA_ENABLE_S4_TESTS=1`
+      - `export Koan_ENABLE_S4_TESTS=1`
 
 Notes
 

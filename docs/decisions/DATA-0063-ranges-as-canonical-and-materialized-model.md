@@ -1,4 +1,4 @@
-﻿---
+---
 id: DATA-0063
 slug: ranges-as-canonical-and-materialized-model
 domain: Data
@@ -16,7 +16,7 @@ Current canonical is a transport-normalized store (facts), not the business mode
 - Canonical becomes "ranges": model-shaped JSON with arrays for each attribute (policy-free, lossless).
 - Add "materialized": single-valued per attribute, resolved via policies (First/Last/Custom), stamped with metadata.
 - Derivation order: intake → keyed → facts/patch merge → ranges → materialized (+ analytics).
-- Reuse Sora.Core.Json: JsonPathMapper for flatten/expand, JsonMerge for layering, canonical JSON helpers.
+- Reuse Koan.Core.Json: JsonPathMapper for flatten/expand, JsonMerge for layering, canonical JSON helpers.
 
 ## Scope
 

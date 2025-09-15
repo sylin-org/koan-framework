@@ -1,7 +1,7 @@
-# Sora Framework — Executive Pitch
+# Koan Framework — Executive Pitch
 
 ## Executive summary
-Sora is a modern .NET framework that makes building reliable, cloud‑ready services fast and predictable without hidden magic. It preserves a zero‑scaffolding developer experience while enforcing clean composition, strong observability, and modular, opt‑in capabilities (Data, Messaging, Webhooks, AI). The result: production‑grade services that are easy to understand, implement, and run.
+Koan is a modern .NET framework that makes building reliable, cloud‑ready services fast and predictable without hidden magic. It preserves a zero‑scaffolding developer experience while enforcing clean composition, strong observability, and modular, opt‑in capabilities (Data, Messaging, Webhooks, AI). The result: production‑grade services that are easy to understand, implement, and run.
 
 Why it matters: teams ship consistent services quickly, integrate with enterprise systems safely, and adopt AI and event‑driven patterns at their own pace—without re‑architecting.
 
@@ -24,7 +24,7 @@ Why it matters: teams ship consistent services quickly, integrate with enterpris
 ---
 
 ## For Enterprise Architecture
-Sora creates a predictable substrate that reduces divergence and long‑term maintenance risk.
+Koan creates a predictable substrate that reduces divergence and long‑term maintenance risk.
 
 Key specifics
 - Deterministic composition: explicit DI; discovery is opt‑in and Development‑only; explicit config always wins.
@@ -43,7 +43,7 @@ Benefits
 - Lower TCO via shared tooling, patterns, and docs
 
 ## For Enterprise Integration
-Sora focuses on reliable, traceable connectivity in and out of the enterprise.
+Koan focuses on reliable, traceable connectivity in and out of the enterprise.
 
 Key specifics
 - Messaging & CQRS: IBus providers (RabbitMQ first, Azure Service Bus next), Command/Query/Event buses, outbox, idempotency keys, retries/backoff, DLQ, consumer groups with round‑robin dispatch.
@@ -60,7 +60,7 @@ Benefits
 - Future‑proofed data connectivity (relational, document, vector)
 
 ## For Development Teams
-Sora emphasizes a legible, low‑ceremony workflow that scales with needs.
+Koan emphasizes a legible, low‑ceremony workflow that scales with needs.
 
 Key specifics
 - Zero‑scaffolding experience: AddDefaults/UseDefaults; minimal API mappers for CRUD/query/batch; explicit modules when you need more.
@@ -88,6 +88,6 @@ Benefits
 - DX: WSL‑first dev, Testcontainers, templates, S0–S7 samples
 
 ## Call to action
-- Pilot Sora on a new service using the Standard profile (Core+Web+Data) and S1/S2 samples as a blueprint.
+- Pilot Koan on a new service using the Standard profile (Core+Web+Data) and S1/S2 samples as a blueprint.
 - Expand to messaging/webhooks/AI as use‑cases demand; the path is prepared.
-- Institutionalize Sora with shared adapters and policies so teams move faster, safer, and with less rework.
+- Institutionalize Koan with shared adapters and policies so teams move faster, safer, and with less rework.

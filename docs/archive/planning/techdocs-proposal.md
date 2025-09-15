@@ -1,18 +1,18 @@
-﻿---
+---
 ## Summary
 
-S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Sora capabilities with a clear role-based permission model. It emphasizes clean, controller-based HTTP APIs, first-class data-access statics, deny-by-default capability enforcement, Postgres storage (FTS + pgvector), and AI-assisted authoring via an adapter-friendly abstraction. The UI is minimal (single-page, static) to keep attention on Sora's server-side design, testability, and ops posture. **No live collaboration features** — this is a focused demo of Sora's modular architecture.
+S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koan capabilities with a clear role-based permission model. It emphasizes clean, controller-based HTTP APIs, first-class data-access statics, deny-by-default capability enforcement, Postgres storage (FTS + pgvector), and AI-assisted authoring via an adapter-friendly abstraction. The UI is minimal (single-page, static) to keep attention on Koan's server-side design, testability, and ops posture. **No live collaboration features** — this is a focused demo of Koan's modular architecture.
 
 ### Role model
 - **Readers**: All users can view published content, search, and browse collections.
 - **Authors**: Can create drafts, edit their own content, submit for moderation, and use AI assists.
 - **Moderators**: Can approve/reject/return submissions, manage any content, perform soft-delete/restore, and access audit trails.le: S7 TechDocs (realigned) — Proposal: Postgres, AI, Vector
-description: A focused, no-collab initial release to demonstrate Sora’s modular capabilities using Postgres storage, full-text + vector search, and AI-assisted authoring.
+description: A focused, no-collab initial release to demonstrate Koan’s modular capabilities using Postgres storage, full-text + vector search, and AI-assisted authoring.
 ---
 
 ## Summary
 
-S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Sora capabilities. It emphasizes clean, controller-based HTTP APIs, first-class data-access statics, deny-by-default capability enforcement, Postgres storage (FTS + pgvector), and AI-assisted authoring via an adapter-friendly abstraction. The UI is minimal (single-page, static) to keep attention on Sora’s server-side design, testability, and ops posture.
+S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koan capabilities. It emphasizes clean, controller-based HTTP APIs, first-class data-access statics, deny-by-default capability enforcement, Postgres storage (FTS + pgvector), and AI-assisted authoring via an adapter-friendly abstraction. The UI is minimal (single-page, static) to keep attention on Koan’s server-side design, testability, and ops posture.
 
 ## Scope and non-goals
 
@@ -25,7 +25,7 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Sor
 - Not in scope (explicit exclusions):
   - Real-time collaboration (live co-editing, presence indicators, operational transforms, CRDTs).
   - Comments/annotations, complex multi-step approval workflows, WYSIWYG authoring.
-  - External identity providers (using Sora.Web.Auth.TestProvider only).
+  - External identity providers (using Koan.Web.Auth.TestProvider only).
 
 ## Contract (service-level)
 
@@ -67,7 +67,7 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Sor
 - AI assists (adapter-agnostic)
   - Tag inference, title/summary, outline/TOC, readability/quality checks with suggestions.
   - Batch/offline enrichment for backlog; on-demand assist for active drafts.
-  - Pluggable provider (e.g., local Ollama) behind Sora AI abstraction; prompts and safety rules centralized.
+  - Pluggable provider (e.g., local Ollama) behind Koan AI abstraction; prompts and safety rules centralized.
 - UI
   - Minimal, static SPA under the API (e.g., /ui) with list/search/view and simple authoring forms.
   - No real-time features: no live co-editing, presence indicators, or collaborative cursors.
@@ -88,7 +88,7 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Sor
     - audits(id, entity_type, entity_id, operation, snapshot_json, created_at, created_by)
     - embeddings(id, entity_type, entity_id, vector, dim, model, created_at)
     - users(id, username, email, roles[], created_at) -- roles: ["Reader"], ["Reader", "Author"], ["Reader", "Author", "Moderator"]
-    - user_sessions(id, user_id, token_hash, expires_at, created_at) -- managed by Sora.Web.Auth.TestProvider
+    - user_sessions(id, user_id, token_hash, expires_at, created_at) -- managed by Koan.Web.Auth.TestProvider
   - Views/materializations
     - latest_item_versions view for fast “current content” reads.
   - Indexing
@@ -130,7 +130,7 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Sor
 
 - Security
 
-  - Auth: Sora.Web.Auth.TestProvider (as used in S5) for demo authentication with role-based claims.
+  - Auth: Koan.Web.Auth.TestProvider (as used in S5) for demo authentication with role-based claims.
   - Role hierarchy: Reader (baseline) ⊆ Author ⊆ Moderator (additive permissions).
   - Content ownership: Authors can edit their own drafts; Moderators can edit any content.
   - Capability enforcement: publish/approve restricted to Moderators; draft creation/editing to Authors+; viewing to all Readers.
@@ -174,7 +174,7 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Sor
 
 - Phase 0: Foundations (1–2 days)
   - Postgres schema and extensions provisioned; migrations committed.
-  - Sora.Web.Auth.TestProvider integration (following S5 pattern); role-based claims.
+  - Koan.Web.Auth.TestProvider integration (following S5 pattern); role-based claims.
   - Constants/options scaffolding; health endpoints; deny-by-default capabilities wired.
 - Phase 1: MVP (3–5 days)
   - CRUD for collections/items/versions; draft → submit → approve → publish flow.
@@ -211,4 +211,4 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Sor
 - Data access patterns: /docs/guides/data/all-query-streaming-and-pager.md, /docs/decisions/DATA-0061-data-access-pagination-and-streaming.md
 - Web API conventions: /docs/api/web-http-api.md, /docs/decisions/WEB-0035-entitycontroller-transformers.md
 - Storage reference: /docs/reference/storage.md; AI reference: /docs/reference/ai.md
-- Authentication pattern: samples/S5.Recs (Sora.Web.Auth.TestProvider usage example)
+- Authentication pattern: samples/S5.Recs (Koan.Web.Auth.TestProvider usage example)

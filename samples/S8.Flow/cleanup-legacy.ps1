@@ -4,16 +4,16 @@ param(
 )
 
 $collections = @(
-  'Sora.Flow.Model.CanonicalProjectionView#canonical',
-  'Sora.Flow.Model.KeyIndex',
-  'Sora.Flow.Model.LineageProjectionView#lineage',
-  'Sora.Flow.Model.PolicyBundle',
-  'Sora.Flow.Model.ProjectionTask',
-  'Sora.Flow.Model.Record#intake',
-  'Sora.Flow.Model.Record#keyed',
-  'Sora.Flow.Model.Record#standardized',
-  'Sora.Flow.Model.ReferenceItem',
-  'Sora.Flow.Model.RejectionReport',
+  'Koan.Flow.Model.CanonicalProjectionView#canonical',
+  'Koan.Flow.Model.KeyIndex',
+  'Koan.Flow.Model.LineageProjectionView#lineage',
+  'Koan.Flow.Model.PolicyBundle',
+  'Koan.Flow.Model.ProjectionTask',
+  'Koan.Flow.Model.Record#intake',
+  'Koan.Flow.Model.Record#keyed',
+  'Koan.Flow.Model.Record#standardized',
+  'Koan.Flow.Model.ReferenceItem',
+  'Koan.Flow.Model.RejectionReport',
   'S8.Flow.Shared.Device#flow.device.intake'
 )
 

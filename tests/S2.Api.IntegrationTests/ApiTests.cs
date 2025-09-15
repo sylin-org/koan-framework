@@ -27,7 +27,7 @@ public class ApiTests : IClassFixture<MongoFixture>
                 {
                     ["DOTNET_ENVIRONMENT"] = "Development",
                     ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                    ["Sora:Data:Mongo:Database"] = "s2test"
+                    ["Koan:Data:Mongo:Database"] = "s2test"
                 });
             });
         });

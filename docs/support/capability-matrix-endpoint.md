@@ -1,8 +1,8 @@
-# Capability Matrix Endpoint (Sora.Web)
+# Capability Matrix Endpoint (Koan.Web)
 
 Goal: Expose a simple JSON endpoint (via MVC controller) to inspect registered aggregates, their default provider, and declared capabilities.
 
-Route: GET /.well-known/sora/capabilities (configurable via SoraWebOptions in future)
+Route: GET /.well-known/Koan/capabilities (configurable via KoanWebOptions in future)
 
 Shape:
 {

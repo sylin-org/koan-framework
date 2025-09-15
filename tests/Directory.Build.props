@@ -3,7 +3,7 @@
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <_Temp>$(TEMP)</_Temp>
     <_Temp Condition="'$(_Temp)' == ''">$(TMP)</_Temp>
-    <_BaseTestOut Condition="'$(_Temp)' != ''">$(_Temp)\sora-framework-tests\$(MSBuildProjectName)\</_BaseTestOut>
+    <_BaseTestOut Condition="'$(_Temp)' != ''">$(_Temp)\Koan-framework-tests\$(MSBuildProjectName)\</_BaseTestOut>
     <BaseOutputPath Condition="'$(_BaseTestOut)' != ''">$(_BaseTestOut)bin\</BaseOutputPath>
     <BaseIntermediateOutputPath Condition="'$(_BaseTestOut)' != ''">$(_BaseTestOut)obj\</BaseIntermediateOutputPath>
   </PropertyGroup>

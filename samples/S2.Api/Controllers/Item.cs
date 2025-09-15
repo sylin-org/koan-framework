@@ -1,5 +1,5 @@
-using Sora.Data.Abstractions;
-using Sora.Data.Core.Model;
+using Koan.Data.Abstractions;
+using Koan.Data.Core.Model;
 
 namespace S2.Api.Controllers;
 

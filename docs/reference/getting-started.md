@@ -7,9 +7,9 @@
 
 ---
 
-## 🚀 Getting Started with Sora Framework
+## 🚀 Getting Started with Koan Framework
 
-This guide will take you from zero to a running Sora application in under 10 minutes.
+This guide will take you from zero to a running Koan application in under 10 minutes.
 
 ---
 
@@ -25,23 +25,23 @@ This guide will take you from zero to a running Sora application in under 10 min
 
 ### 1. Create New Project
 ```bash
-mkdir my-sora-app
-cd my-sora-app
+mkdir my-Koan-app
+cd my-Koan-app
 dotnet new web
 ```
 
-### 2. Add Sora Packages
+### 2. Add Koan Packages
 ```bash
 # Core packages for a basic web API
-dotnet add package Sora.Core
-dotnet add package Sora.Web
-dotnet add package Sora.Data.Sqlite
+dotnet add package Koan.Core
+dotnet add package Koan.Web
+dotnet add package Koan.Data.Sqlite
 ```
 
 ### 3. Create Your First Model
 ```csharp
 // Models/Todo.cs
-using Sora.Core;
+using Koan.Core;
 
 namespace MyApp.Models;
 
@@ -64,7 +64,7 @@ public class Todo : Entity<Todo>
 ```csharp
 // Controllers/TodosController.cs
 using Microsoft.AspNetCore.Mvc;
-using Sora.Web;
+using Koan.Web;
 using MyApp.Models;
 
 namespace MyApp.Controllers;
@@ -91,16 +91,16 @@ public class TodosController : EntityController<Todo>
 ### 5. Configure Application
 ```csharp
 // Program.cs
-using Sora.Core;
+using Koan.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Single line adds all referenced Sora modules
-builder.Services.AddSora();
+// Single line adds all referenced Koan modules
+builder.Services.AddKoan();
 
 var app = builder.Build();
 
-// Sora configures the pipeline automatically
+// Koan configures the pipeline automatically
 await app.RunAsync();
 ```
 
@@ -129,7 +129,7 @@ curl http://localhost:5000/api/todos
 # Create a todo
 curl -X POST http://localhost:5000/api/todos \
   -H "Content-Type: application/json" \
-  -d '{"title": "Learn Sora Framework", "isCompleted": false}'
+  -d '{"title": "Learn Koan Framework", "isCompleted": false}'
 
 # Get pending todos
 curl http://localhost:5000/api/todos/pending
@@ -144,8 +144,8 @@ curl http://localhost:5000/health
 
 ### Add AI Capabilities
 ```bash
-dotnet add package Sora.AI
-dotnet add package Sora.AI.Provider.Ollama
+dotnet add package Koan.AI
+dotnet add package Koan.AI.Provider.Ollama
 ```
 
 ```csharp
@@ -174,7 +174,7 @@ public class AiController : ControllerBase
 
 ### Add Messaging
 ```bash
-dotnet add package Sora.Messaging.RabbitMq
+dotnet add package Koan.Messaging.RabbitMq
 ```
 
 ```csharp
@@ -198,8 +198,8 @@ await new Todo { Title = "Background task" }.Send();
 
 ### Add Vector Search
 ```bash
-dotnet add package Sora.Data.Vector
-dotnet add package Sora.Data.Redis  # Vector provider
+dotnet add package Koan.Data.Vector
+dotnet add package Koan.Data.Redis  # Vector provider
 ```
 
 ```csharp
@@ -221,7 +221,7 @@ public class Document : Entity<Document>
 
 ### Add GraphQL
 ```bash
-dotnet add package Sora.Web.GraphQl
+dotnet add package Koan.Web.GraphQl
 ```
 
 GraphQL schema is auto-generated from your models - no additional code needed!
@@ -230,11 +230,11 @@ GraphQL schema is auto-generated from your models - no additional code needed!
 
 ## 🔧 Configuration
 
-Sora follows .NET configuration patterns with intelligent defaults:
+Koan follows .NET configuration patterns with intelligent defaults:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Data": {
       "DefaultProvider": "Sqlite",
       "Sqlite": {
@@ -260,28 +260,28 @@ Sora follows .NET configuration patterns with intelligent defaults:
 
 Environment variables work too:
 ```bash
-export SORA__DATA__DEFAULTPROVIDER=Postgres
-export SORA__DATA__POSTGRES__CONNECTIONSTRING="Host=localhost;Database=myapp"
+export Koan__DATA__DEFAULTPROVIDER=Postgres
+export Koan__DATA__POSTGRES__CONNECTIONSTRING="Host=localhost;Database=myapp"
 ```
 
 ---
 
 ## 🐳 Local Development with Dependencies
 
-Use the Sora CLI for local development dependencies:
+Use the Koan CLI for local development dependencies:
 
-### 1. Install Sora CLI
+### 1. Install Koan CLI
 ```bash
-# If in the Sora repo
+# If in the Koan repo
 ./scripts/cli-all.ps1
 
 # Or download from releases
-# Adds 'Sora.exe' to your PATH
+# Adds 'Koan.exe' to your PATH
 ```
 
 ### 2. Create Orchestration Descriptor
 ```yaml
-# sora.orchestration.yml
+# Koan.orchestration.yml
 dependencies:
   postgres:
     provider: docker
@@ -307,23 +307,23 @@ dependencies:
 ### 3. Start Dependencies
 ```bash
 # Export compose file and start services
-Sora export compose --profile Local
-Sora up --profile Local --timeout 300
+Koan export compose --profile Local
+Koan up --profile Local --timeout 300
 
 # Check status
-Sora status
+Koan status
 
 # View logs
-Sora logs
+Koan logs
 
 # Stop when done
-Sora down
+Koan down
 ```
 
 ### 4. Update Configuration
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Data": {
       "DefaultProvider": "Postgres",
       "Postgres": {
@@ -414,7 +414,7 @@ public class OrderProcessor : BackgroundService
 
 ## 📊 Health and Monitoring
 
-Sora includes comprehensive health checks:
+Koan includes comprehensive health checks:
 
 ### Built-in Endpoints
 - `GET /health` - Overall health
@@ -458,8 +458,8 @@ public class ExternalApiHealthCheck : IHealthContributor
 - ❌ Don't use generic facades unless necessary: `Data<Todo>.All()`
 
 ### 3. Configuration
-- ✅ Use `Sora:` prefix in appsettings.json
-- ✅ Use environment variables: `SORA__DATA__DEFAULTPROVIDER`
+- ✅ Use `Koan:` prefix in appsettings.json
+- ✅ Use environment variables: `Koan__DATA__DEFAULTPROVIDER`
 - ❌ Don't hardcode connection strings
 
 ### 4. Dependencies
@@ -470,7 +470,7 @@ public class ExternalApiHealthCheck : IHealthContributor
 
 ## 📖 What's Next?
 
-Now that you have a basic Sora application running:
+Now that you have a basic Koan application running:
 
 1. **Explore Samples**: Check the `samples/` directory for real-world examples
 2. **Read Usage Patterns**: See [Usage Patterns](architecture/patterns.md)
@@ -487,4 +487,4 @@ Now that you have a basic Sora application running:
 
 ---
 
-**Welcome to Sora! Build services like you're talking to your code, not fighting it.**
+**Welcome to Koan! Build services like you're talking to your code, not fighting it.**

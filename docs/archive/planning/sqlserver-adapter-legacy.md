@@ -1,6 +1,6 @@
 # SQL Server Adapter
 
-This guide covers how to use Sora's SQL Server data adapter. It mirrors the relational semantics used by the SQLite adapter, with JSON-based storage, projection pushdown, and governance controls.
+This guide covers how to use Koan's SQL Server data adapter. It mirrors the relational semantics used by the SQLite adapter, with JSON-based storage, projection pushdown, and governance controls.
 
 ## Capabilities
 
@@ -13,11 +13,11 @@ This guide covers how to use Sora's SQL Server data adapter. It mirrors the rela
 
 ## Package & registration
 
-The adapter lives in `src/Sora.Data.SqlServer`. To enable it in DI:
+The adapter lives in `src/Koan.Data.SqlServer`. To enable it in DI:
 
 ```csharp
-services.AddSoraCore();
-services.AddSoraDataCore();
+services.AddKoanCore();
+services.AddKoanDataCore();
 services.AddSqlServerAdapter();
 ```
 
@@ -25,24 +25,24 @@ services.AddSqlServerAdapter();
 
 Use any of the keys below (first-win) to configure the connection and paging:
 
-- Sora:Data:SqlServer:ConnectionString
-- Sora:Data:Sources:Default:sqlserver:ConnectionString
+- Koan:Data:SqlServer:ConnectionString
+- Koan:Data:Sources:Default:sqlserver:ConnectionString
 - ConnectionStrings:SqlServer
 - ConnectionStrings:Default
 
 Optional settings:
 
-- Sora:Data:SqlServer:DefaultPageSize (default 50)
-- Sora:Data:SqlServer:MaxPageSize (default 200)
-- Sora:Data:SqlServer:DdlPolicy (NoDdl | Validate | AutoCreate; default AutoCreate)
-- Sora:Data:SqlServer:SchemaMatchingMode (Relaxed | Strict; default Relaxed)
-- Sora:AllowMagicInProduction (bool; allows DDL when production)
+- Koan:Data:SqlServer:DefaultPageSize (default 50)
+- Koan:Data:SqlServer:MaxPageSize (default 200)
+- Koan:Data:SqlServer:DdlPolicy (NoDdl | Validate | AutoCreate; default AutoCreate)
+- Koan:Data:SqlServer:SchemaMatchingMode (Relaxed | Strict; default Relaxed)
+- Koan:AllowMagicInProduction (bool; allows DDL when production)
 
 Example (appsettings.json):
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Data": {
       "SqlServer": {
         "ConnectionString": "Server=localhost,1433;User Id=sa;Password=yourStrong(!)Password;TrustServerCertificate=True;Encrypt=False",
@@ -111,20 +111,20 @@ See also:
 
 ## Testing
 
-The test project `tests/Sora.Data.SqlServer.Tests` uses Testcontainers to start SQL Server automatically if a connection string is not provided by environment variables.
+The test project `tests/Koan.Data.SqlServer.Tests` uses Testcontainers to start SQL Server automatically if a connection string is not provided by environment variables.
 
-- Env keys checked: `SORA_SQLSERVER__CONNECTION_STRING` or `ConnectionStrings__SqlServer`
+- Env keys checked: `Koan_SQLSERVER__CONNECTION_STRING` or `ConnectionStrings__SqlServer`
 - Fallback container image: `mcr.microsoft.com/mssql/server:2022-latest` with password `yourStrong(!)Password` and host port 14333
 
 Run tests:
 
 ```pwsh
 # Option A: Let tests start a container
-dotnet test tests/Sora.Data.SqlServer.Tests/Sora.Data.SqlServer.Tests.csproj -c Debug
+dotnet test tests/Koan.Data.SqlServer.Tests/Koan.Data.SqlServer.Tests.csproj -c Debug
 
 # Option B: Use an existing SQL Server
-$env:SORA_SQLSERVER__CONNECTION_STRING = "Server=localhost,1433;User Id=sa;Password=yourStrong(!)Password;TrustServerCertificate=True;Encrypt=False"
-dotnet test tests/Sora.Data.SqlServer.Tests/Sora.Data.SqlServer.Tests.csproj -c Debug
+$env:Koan_SQLSERVER__CONNECTION_STRING = "Server=localhost,1433;User Id=sa;Password=yourStrong(!)Password;TrustServerCertificate=True;Encrypt=False"
+dotnet test tests/Koan.Data.SqlServer.Tests/Koan.Data.SqlServer.Tests.csproj -c Debug
 ```
 
 ## Notes

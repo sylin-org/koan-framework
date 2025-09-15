@@ -55,15 +55,15 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:4914
       # MongoDB Configuration
-      Sora__Data__Mongo__Database: s8location
-      SORA_DATA_MONGO_DATABASE: s8location
+      Koan__Data__Mongo__Database: s8location
+      Koan_DATA_MONGO_DATABASE: s8location
       # RabbitMQ Configuration
-      SORA_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
+      Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
       # AI Configuration
-      Sora__Ai__Services__Ollama__0__Id: "ollama"
-      Sora__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
-      Sora__Ai__Services__Ollama__0__DefaultModel: "llama3.1:8b"
-      Sora__Ai__Services__Ollama__0__Enabled: "true"
+      Koan__Ai__Services__Ollama__0__Id: "ollama"
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Koan__Ai__Services__Ollama__0__DefaultModel: "llama3.1:8b"
+      Koan__Ai__Services__Ollama__0__Enabled: "true"
       # Location-specific configuration
       S8__Location__Resolution__CacheEnabled: "true"
       S8__Location__Geocoding__GoogleMapsApiKey: "${GOOGLE_MAPS_API_KEY:-}"
@@ -84,8 +84,8 @@ services:
       dockerfile: samples/S8.Location/S8.Location.Adapters.Inventory/Dockerfile
     container_name: s8-location-adapter-inventory
     environment:
-      SORA_DATA_MONGO_DATABASE: s8location
-      SORA_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
+      Koan_DATA_MONGO_DATABASE: s8location
+      Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
       DOTNET_ENVIRONMENT: Development
     depends_on:
       mongo:
@@ -99,8 +99,8 @@ services:
       dockerfile: samples/S8.Location/S8.Location.Adapters.Healthcare/Dockerfile
     container_name: s8-location-adapter-healthcare
     environment:
-      SORA_DATA_MONGO_DATABASE: s8location
-      SORA_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
+      Koan_DATA_MONGO_DATABASE: s8location
+      Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
       DOTNET_ENVIRONMENT: Development
     depends_on:
       mongo:

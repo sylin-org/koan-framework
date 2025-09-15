@@ -1,11 +1,11 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SixLabors.ImageSharp;
-using Sora.Core;
+using Koan.Core;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -26,12 +26,12 @@ public sealed class MediaTransformTests
             {
                 var dict = new Dictionary<string, string?>
                 {
-                    ["Sora:Storage:Profiles:local:Provider"] = "local",
-                    ["Sora:Storage:Profiles:local:Container"] = "media",
-                    ["Sora:Storage:Profiles:default:Provider"] = "local",
-                    ["Sora:Storage:Profiles:default:Container"] = "media",
-                    ["Sora:Storage:DefaultProfile"] = "local",
-                    ["Sora:Storage:Providers:local:BasePath"] = Path.Combine(Path.GetTempPath(), "sora-s6-tests")
+                    ["Koan:Storage:Profiles:local:Provider"] = "local",
+                    ["Koan:Storage:Profiles:local:Container"] = "media",
+                    ["Koan:Storage:Profiles:default:Provider"] = "local",
+                    ["Koan:Storage:Profiles:default:Container"] = "media",
+                    ["Koan:Storage:DefaultProfile"] = "local",
+                    ["Koan:Storage:Providers:local:BasePath"] = Path.Combine(Path.GetTempPath(), "Koan-s6-tests")
                 };
                 cfg.AddInMemoryCollection(dict!);
             });
@@ -82,12 +82,12 @@ public sealed class MediaTransformTests
         public AppHostHostedService(IServiceProvider sp) => _sp = sp;
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            Sora.Core.Hosting.App.AppHost.Current = _sp;
+            Koan.Core.Hosting.App.AppHost.Current = _sp;
             return Task.CompletedTask;
         }
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            if (ReferenceEquals(Sora.Core.Hosting.App.AppHost.Current, _sp)) Sora.Core.Hosting.App.AppHost.Current = null;
+            if (ReferenceEquals(Koan.Core.Hosting.App.AppHost.Current, _sp)) Koan.Core.Hosting.App.AppHost.Current = null;
             return Task.CompletedTask;
         }
     }

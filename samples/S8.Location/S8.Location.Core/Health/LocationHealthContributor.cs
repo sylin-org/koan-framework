@@ -3,9 +3,9 @@ using Microsoft.Extensions.Options;
 using S8.Location.Core.Models;
 using S8.Location.Core.Options;
 using S8.Location.Core.Services;
-using Sora.Core;
-using Sora.Core.Observability.Health;
-using Sora.Data.Core;
+using Koan.Core;
+using Koan.Core.Observability.Health;
+using Koan.Data.Core;
 
 namespace S8.Location.Core.Health;
 

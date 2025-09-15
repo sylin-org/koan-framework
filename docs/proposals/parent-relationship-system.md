@@ -1,11 +1,11 @@
-# Sora Framework: Universal Instance-Based Relationship System
+# Koan Framework: Universal Instance-Based Relationship System
 **RFC: Instance-Based Semantic Relationships with Streaming Support**
 
 ## Executive Summary
 
 **Objective**: Replace Flow-specific `ParentKeyAttribute` with universal instance-based relationship methods that provide semantic validation and high-performance streaming operations.
 
-**Impact**: All Sora modules gain intuitive relationship navigation through instance methods like `model.GetParent()`, `model.GetChildren()`, and `stream.Relatives()`.
+**Impact**: All Koan modules gain intuitive relationship navigation through instance methods like `model.GetParent()`, `model.GetChildren()`, and `stream.Relatives()`.
 
 **Breaking Change**: Direct replacement of `ParentKeyAttribute` with `ParentAttribute` - no compatibility bridge.
 
@@ -23,7 +23,7 @@ var parent = await SomeStaticResolutionService.ResolveParent(...);
 
 ### Target: Universal Instance-Based Relationships
 ```csharp
-// Works across ALL Sora modules with semantic validation
+// Works across ALL Koan modules with semantic validation
 [Parent(typeof(Sensor))]
 public string SensorId { get; set; }
 
@@ -67,7 +67,7 @@ await foreach (var enriched in Data<Reading, string>.AllStream().Relatives())
 
 ### Core Components
 
-#### 1. ParentAttribute (Sora.Data.Core)
+#### 1. ParentAttribute (Koan.Data.Core)
 ```csharp
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
 public sealed class ParentAttribute : Attribute
@@ -361,14 +361,14 @@ private async Task<Dictionary<string, object?>> LoadAllParents(IEnumerable<TEnti
 **Critical Path**:
 ```bash
 # Week 1: Core Entity Methods
-src/Sora.Data.Core/Model/Entity.cs
+src/Koan.Data.Core/Model/Entity.cs
   - GetParent() / GetParent<T>() with validation
   - GetChildren() / GetChildren<T>() with validation
   - GetParents() / GetChildren<T>(propertyName) explicit methods
   - GetRelatives() enrichment method
 
 # Week 2: Extensions and Performance
-src/Sora.Data.Core/Extensions/RelationshipExtensions.cs
+src/Koan.Data.Core/Extensions/RelationshipExtensions.cs
   - Relatives() extension for IEnumerable<T>
   - Relatives() extension for IAsyncEnumerable<T>
   - Batch loading optimizations with child type discovery
@@ -383,9 +383,9 @@ src/Sora.Data.Core/Extensions/RelationshipExtensions.cs
 
 **Critical Files**:
 ```bash
-src/Sora.Flow.Core/Attributes/FlowAttributes.cs     # DELETE ParentKeyAttribute
-src/Sora.Flow.Core/Infrastructure/FlowRegistry.cs   # Use ParentAttribute
-src/Sora.Flow.Core/Services/ParentKeyResolutionService.cs  # Use instance methods
+src/Koan.Flow.Core/Attributes/FlowAttributes.cs     # DELETE ParentKeyAttribute
+src/Koan.Flow.Core/Infrastructure/FlowRegistry.cs   # Use ParentAttribute
+src/Koan.Flow.Core/Services/ParentKeyResolutionService.cs  # Use instance methods
 docs/reference/flow-entity-lifecycle-guide.md       # Update examples
 ```
 
@@ -426,7 +426,7 @@ public sealed class ParentKeyAttribute : Attribute { ... }
 var pk = p.GetCustomAttribute<ParentKeyAttribute>(inherit: true);
 
 // AFTER:
-var pk = p.GetCustomAttribute<Sora.Data.Core.Relationships.ParentAttribute>(inherit: true);
+var pk = p.GetCustomAttribute<Koan.Data.Core.Relationships.ParentAttribute>(inherit: true);
 if (pk != null)
 {
     var parentType = pk.ParentType; // Adapt property name
@@ -462,7 +462,7 @@ var enriched = await sensor.GetRelatives();
 - **Semantic Validation**: Backend validates cardinality with descriptive error messages
 - **Streaming Performance**: High-performance batch operations with `.Relatives()` syntax
 - **Selective Enrichment**: Only requested entities get enriched format (no recursive loading)
-- **Clean Architecture**: Single relationship system across all Sora modules
+- **Clean Architecture**: Single relationship system across all Koan modules
 
 ### Developer Experience Metrics
 - **Migration Time**: Flow project migration ≤ 2 hours (direct replacement)
@@ -487,7 +487,7 @@ var enriched = await sensor.GetRelatives();
 
 This unified parent relationship system delivers:
 
-1. **Cross-Module Consistency**: All Sora modules can use parent relationships
+1. **Cross-Module Consistency**: All Koan modules can use parent relationships
 2. **Enhanced REST APIs**: GraphQL-like querying without GraphQL complexity
 3. **Performance Optimization**: Provider-specific relationship loading strategies
 4. **Clean Architecture**: Proper separation of concerns with performance escape hatches

@@ -1,6 +1,6 @@
-# Sora Support Documentation
+# Koan Support Documentation
 
-This directory contains practical guides to help maintain and evolve Sora as a standalone framework.
+This directory contains practical guides to help maintain and evolve Koan as a standalone framework.
 
 ## Core Support Guides
 

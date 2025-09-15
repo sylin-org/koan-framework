@@ -1,6 +1,6 @@
-using Sora.Data.Core.Model;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Core.Utilities.Ids;
+using Koan.Data.Core.Model;
+using Koan.Data.Abstractions.Annotations;
+
 
 namespace S8.Location.Core.Models;
 
@@ -14,13 +14,13 @@ public class ResolutionCache : Entity<ResolutionCache>
 {
     /// <summary>Reference to the canonical AgnosticLocation ID (ULID)</summary>
     public string CanonicalUlid { get; set; } = "";
-    
+
     /// <summary>The normalized address text that was resolved</summary>
     public string NormalizedAddress { get; set; } = "";
-    
+
     /// <summary>When this address was first resolved</summary>
     public DateTime ResolvedAt { get; set; } = DateTime.UtcNow;
-    
+
     /// <summary>
     /// Create a new resolution cache entry with ULID for the canonical location
     /// </summary>

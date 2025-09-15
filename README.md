@@ -1,14 +1,14 @@
-# Sora Framework
+# Koan Framework
 
 **Build services like you're talking to your code, not fighting it.**
 
-Sora is a modular .NET backend framework for developers who value clarity, comfort, and the ability to grow. Whether you're spinning up a quick prototype or scaling into enterprise-grade patterns, Sora keeps the path clear.
+Koan is a modular .NET backend framework for developers who value clarity, comfort, and the ability to grow. Whether you're spinning up a quick prototype or scaling into enterprise-grade patterns, Koan keeps the path clear.
 
 ## 🚀 Quick Start
 
 ```bash
 # Create project
-dotnet new web && dotnet add package Sora.Core Sora.Web Sora.Data.Sqlite
+dotnet new web && dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
 
 # Add model
 echo 'public class Todo : Entity<Todo> { public string Title { get; set; } = ""; }' > Todo.cs
@@ -57,10 +57,10 @@ dotnet run
 ./scripts/cli-all.ps1
 
 # Export Docker Compose for local dependencies
-Sora export compose --profile Local
+Koan export compose --profile Local
 
 # Run dependencies with health checks
-Sora up --profile Local --timeout 300
+Koan up --profile Local --timeout 300
 ```
 
 ## 📦 Requirements

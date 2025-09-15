@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using S8.Flow.Shared;
-using Sora.Flow.Extensions;
-using Sora.Messaging;
+using Koan.Flow.Extensions;
+using Koan.Messaging;
 
 namespace S8.Flow.Api.Controllers;
 
@@ -80,8 +80,8 @@ public class FlowTestController : ControllerBase
             {
                 status = "✅ Successfully created Flow entities",
                 device = new { device.Id, device.Manufacturer, device.Model },
-                sensor = new { sensor.SensorKey, sensor.Code, sensor.Unit },
-                reading = new { reading.SensorKey, reading.Value, reading.Unit },
+                sensor = new { sensor.SensorId, sensor.Code, sensor.Unit },
+                reading = new { reading.SensorId, reading.Value, reading.Unit },
                 message = "Entities created successfully - Flow model types are working"
             });
         }
@@ -140,7 +140,7 @@ public class FlowTestController : ControllerBase
                 {
                     check_messaging = "Ensure a messaging provider (RabbitMQ, Redis, etc.) is configured",
                     check_orchestrator = "Verify [FlowOrchestrator] attribute is present on assembly",
-                    check_autoregistration = "Check that Sora auto-registration is working"
+                    check_autoregistration = "Check that Koan auto-registration is working"
                 }
             });
         }

@@ -1,4 +1,4 @@
-﻿---
+---
 id: STOR-0007
 slug: STOR-0007-storage-dx-helpers
 domain: storage
@@ -16,7 +16,7 @@ Decision
 
 Rationale
 
-- Consistent with Sora’s terse method naming and DX focus while preserving async behavior.
+- Consistent with Koan’s terse method naming and DX focus while preserving async behavior.
 - Encourages default routing usage without boilerplate.
 
 Follow-ups

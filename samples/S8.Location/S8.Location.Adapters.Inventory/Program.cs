@@ -2,15 +2,15 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using S8.Location.Core.Models;
-using Sora.Core;
-using Sora.Core.Hosting;
-using Sora.Data.Core;
-using Sora.Flow.Attributes;
-using Sora.Messaging;
+using Koan.Core;
+using Koan.Core.Hosting;
+using Koan.Data.Core;
+using Koan.Flow.Attributes;
+using Koan.Messaging;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-if (!SoraEnv.InContainer)
+if (!KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Location.Adapters.Inventory is container-only. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -20,8 +20,8 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Sora framework with auto-configuration
-builder.Services.AddSora();
+// Koan framework with auto-configuration
+builder.Services.AddKoan();
 
 var app = builder.Build();
 await app.RunAsync();

@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-This document describes the refined architecture for S8.Location, implementing a canonical location storage system using Sora.Flow's orchestrator pattern with bidirectional flow, SHA512-based deduplication, and sequential processing to eliminate race conditions.
+This document describes the refined architecture for S8.Location, implementing a canonical location storage system using Koan.Flow's orchestrator pattern with bidirectional flow, SHA512-based deduplication, and sequential processing to eliminate race conditions.
 
 ### Key Architecture Decisions
 - **Single FlowEntity Model**: `Location : FlowEntity<Location>` with minimal properties
@@ -407,7 +407,7 @@ Monthly cost for 1M addresses: ~$250 (vs $5000 without caching)
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Location": {
       "Orchestrator": {
         "ProcessingMode": "Sequential",
@@ -509,7 +509,7 @@ This architecture achieves the core objective of canonical location storage thro
 4. **Traceability**: External identity preservation maintains source attribution
 5. **Cost-Effectiveness**: 95% reduction in AI/geocoding costs
 
-The Orchestrator Bidirectional Pattern with SHA512 deduplication represents a production-ready solution that leverages Sora.Flow's native capabilities while maintaining elegant simplicity.
+The Orchestrator Bidirectional Pattern with SHA512 deduplication represents a production-ready solution that leverages Koan.Flow's native capabilities while maintaining elegant simplicity.
 
 ---
 

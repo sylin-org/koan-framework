@@ -1,13 +1,13 @@
-﻿# ADR: Proactive Sora.* Assembly Loading for Zero-Config Adapter Auto-Registration
+# ADR: Proactive Koan.* Assembly Loading for Zero-Config Adapter Auto-Registration
 
 ## Status
 Accepted
 
 ## Context
-Sora Framework's core engineering principle is zero-config, safe auto-registration of all referenced adapters (e.g., Sqlite, Mongo, JSON) without explicit registration. In minimal test setups, adapter assemblies may not be loaded into the AppDomain before DI is built, causing auto-registration to fail. This breaks the zero-config promise and leads to inconsistent developer experience between tests and real applications.
+Koan Framework's core engineering principle is zero-config, safe auto-registration of all referenced adapters (e.g., Sqlite, Mongo, JSON) without explicit registration. In minimal test setups, adapter assemblies may not be loaded into the AppDomain before DI is built, causing auto-registration to fail. This breaks the zero-config promise and leads to inconsistent developer experience between tests and real applications.
 
 ## Decision
-Sora.Core's AppBootstrapper will proactively load all referenced Sora.* assemblies from the base directory before running `InitializeModules`. This guarantees that all ISoraAutoRegistrar and ISoraInitializer implementations are discovered and invoked, regardless of runtime context or usage pattern.
+Koan.Core's AppBootstrapper will proactively load all referenced Koan.* assemblies from the base directory before running `InitializeModules`. This guarantees that all IKoanAutoRegistrar and IKoanInitializer implementations are discovered and invoked, regardless of runtime context or usage pattern.
 
 ## Consequences
 - Zero-config adapter auto-registration is guaranteed in all contexts (apps, tests, samples).
@@ -16,7 +16,7 @@ Sora.Core's AppBootstrapper will proactively load all referenced Sora.* assembli
 - Slight increase in startup time due to additional assembly loads, but outweighed by DX and reliability benefits.
 
 ## Implementation
-- Update AppBootstrapper to scan the base directory for Sora.*.dll files and load any not already present in the AppDomain before invoking InitializeModules.
+- Update AppBootstrapper to scan the base directory for Koan.*.dll files and load any not already present in the AppDomain before invoking InitializeModules.
 - Document this behavior in engineering and data access guides.
 
 ## Edge Cases

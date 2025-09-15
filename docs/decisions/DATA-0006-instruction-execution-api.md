@@ -81,7 +81,7 @@ This preserves SoC: the entity stays a POCO; the execution capability is optiona
 
 ## Contract sketch
 
-- Abstractions (Sora.Data.Abstractions)
+- Abstractions (Koan.Data.Abstractions)
   - record Instruction(string Name, object? Payload = null,
     IReadOnlyDictionary<string, object?>? Parameters = null,
     IReadOnlyDictionary<string, object?>? Options = null);
@@ -95,7 +95,7 @@ This preserves SoC: the entity stays a POCO; the execution capability is optiona
       public static Task<TResult> Execute<TEntity, TResult>(this IDataService data, Instruction instruction, CancellationToken ct = default) where TEntity : class;
     }
 
-- Provider opt-in (e.g., Sora.Data.Sqlite)
+- Provider opt-in (e.g., Koan.Data.Sqlite)
   - SqliteRepository<TEntity,TKey> : IInstructionExecutor<TEntity>
     - Supports relational.* instruction names; throws for unknown names.
 
@@ -115,7 +115,7 @@ This preserves SoC: the entity stays a POCO; the execution capability is optiona
 ## Migration and rollout
 
 - Phase 1 (relational/SQLite):
-  - Add abstractions to Sora.Data.Abstractions and extension in Sora.Data.Core.
+  - Add abstractions to Koan.Data.Abstractions and extension in Koan.Data.Core.
   - Implement minimal handlers in Sqlite: nonquery, scalar, schema.ensureCreated.
   - Add tests.
 - Phase 2 (document/vector):

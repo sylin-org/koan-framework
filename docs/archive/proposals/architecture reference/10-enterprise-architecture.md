@@ -6,14 +6,14 @@ Objectives
 - Local‑first with production parity; optional PII/Compliance
 
 Decisions and constraints
-- Primary store: MongoDB (single instance); Sora Entity<> namespace defines collection names
+- Primary store: MongoDB (single instance); Koan Entity<> namespace defines collection names
 - Messaging: RabbitMQ default in dev; queues per stage; DLQ patterns
 - Policies: DB‑backed PolicyBundle with file fallback; hot reload; versioned
 - Orchestration: workflow‑lite (e.g., Dapr Workflow)
 - Observability: OpenTelemetry across all services
 
 Capabilities
-- Adapters (Sora, .NET 9) → IntakeRecord (REST/MQ)
+- Adapters (Koan, .NET 9) → IntakeRecord (REST/MQ)
 - Standardization (parsing, healing) → StandardizedRecord
 - Keying (derive AggregationKeys) → KeyedRecord
 - Association (KeyIndex invariants) → ReferenceItem and ProjectionTask; Diagnostics on rejects

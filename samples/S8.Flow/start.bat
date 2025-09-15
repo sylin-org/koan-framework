@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 setlocal enableextensions
 REM Ensure we run from the script's directory
 set "SCRIPT_DIR=%~dp0"
@@ -6,7 +6,7 @@ pushd "%SCRIPT_DIR%"
 
 REM Use the compose file living under S8.Compose
 set COMPOSE_FILE=S8.Compose\docker-compose.yml
-set PROJECT_NAME=sora-s8-flow
+set PROJECT_NAME=Koan-s8-flow
 set API_URL=http://localhost:4903
 
 where docker >nul 2>nul

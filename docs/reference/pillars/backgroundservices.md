@@ -4,19 +4,19 @@
 **Target Audience**: Developers, Architects, AI Agents  
 **Last Updated**: 2025-01-10  
 **Framework Version**: v0.3.0+
-**Implementation Status**: ✅ **IMPLEMENTED** - Fully integrated into Sora.Core
+**Implementation Status**: ✅ **IMPLEMENTED** - Fully integrated into Koan.Core
 
 ---
 
-## 🏗️ Sora Background Services Reference
+## 🏗️ Koan Background Services Reference
 
-This document provides comprehensive reference information for **Sora Background Services**, a pillar that enables elegant background service development with auto-discovery, fluent APIs, and seamless integration with the Sora Framework ecosystem.
+This document provides comprehensive reference information for **Koan Background Services**, a pillar that enables elegant background service development with auto-discovery, fluent APIs, and seamless integration with the Koan Framework ecosystem.
 
 ---
 
 ## 🎯 Overview
 
-**Sora Background Services** standardizes background service patterns with exceptional developer experience. Services are automatically discovered, registered, and managed with minimal scaffolding, while providing powerful "poking" capabilities for real-time responsiveness.
+**Koan Background Services** standardizes background service patterns with exceptional developer experience. Services are automatically discovered, registered, and managed with minimal scaffolding, while providing powerful "poking" capabilities for real-time responsiveness.
 
 ### Core Philosophy
 
@@ -24,19 +24,19 @@ This document provides comprehensive reference information for **Sora Background
 - **Fluent Communication**: Beautiful, chainable APIs for service interaction  
 - **Event-Driven**: Rich event subscription and emission patterns
 - **Responsive**: Services can be "poked" to respond immediately to external events
-- **Sora-Aligned**: Follows all framework architectural principles
+- **Koan-Aligned**: Follows all framework architectural principles
 
 ---
 
 ## 🧱 Core Components
 
-### Package: `Sora.Core` (Background Services)
+### Package: `Koan.Core` (Background Services)
 
 #### Key Interfaces
 
 ```csharp
 // Primary interface for background services
-public interface ISoraBackgroundService
+public interface IKoanBackgroundService
 {
     string Name { get; }
     Task ExecuteAsync(CancellationToken cancellationToken);
@@ -44,14 +44,14 @@ public interface ISoraBackgroundService
 }
 
 // Services that can be triggered on-demand
-public interface ISoraPokableService : ISoraBackgroundService
+public interface IKoanPokableService : IKoanBackgroundService
 {
     Task HandleCommandAsync(ServiceCommand command, CancellationToken cancellationToken = default);
     IReadOnlyCollection<Type> SupportedCommands { get; }
 }
 
 // Periodic execution pattern
-public interface ISoraPeriodicService : ISoraBackgroundService
+public interface IKoanPeriodicService : IKoanBackgroundService
 {
     TimeSpan Period { get; }
     TimeSpan InitialDelay => TimeSpan.Zero;
@@ -59,7 +59,7 @@ public interface ISoraPeriodicService : ISoraBackgroundService
 }
 
 // Startup services with execution order
-public interface ISoraStartupService : ISoraBackgroundService
+public interface IKoanStartupService : IKoanBackgroundService
 {
     int StartupOrder { get; }
 }
@@ -69,12 +69,12 @@ public interface ISoraStartupService : ISoraBackgroundService
 
 ```csharp
 // Standard base class with health checks and logging
-public abstract class SoraBackgroundServiceBase : ISoraBackgroundService, IHealthContributor
+public abstract class KoanBackgroundServiceBase : IKoanBackgroundService, IHealthContributor
 {
     protected readonly ILogger Logger;
     protected readonly IConfiguration Configuration;
 
-    protected SoraBackgroundServiceBase(ILogger logger, IConfiguration configuration);
+    protected KoanBackgroundServiceBase(ILogger logger, IConfiguration configuration);
 
     public virtual string Name => GetType().Name;
     public virtual bool IsCritical => false;
@@ -85,9 +85,9 @@ public abstract class SoraBackgroundServiceBase : ISoraBackgroundService, IHealt
 
 // **MAIN BASE CLASS** - Base class for services supporting fluent API and events
 // This is what most services inherit from in the current implementation
-public abstract class SoraFluentServiceBase : SoraBackgroundServiceBase
+public abstract class KoanFluentServiceBase : KoanBackgroundServiceBase
 {
-    protected SoraFluentServiceBase(ILogger logger, IConfiguration configuration)
+    protected KoanFluentServiceBase(ILogger logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
     // Abstract method that concrete services implement
@@ -105,7 +105,7 @@ public abstract class SoraFluentServiceBase : SoraBackgroundServiceBase
 }
 
 // Periodic service with pokeable capabilities
-public abstract class SoraPokablePeriodicServiceBase : SoraFluentServiceBase, ISoraPeriodicService
+public abstract class KoanPokablePeriodicServiceBase : KoanFluentServiceBase, IKoanPeriodicService
 {
     public abstract TimeSpan Period { get; }
     public virtual TimeSpan InitialDelay => TimeSpan.Zero;
@@ -125,7 +125,7 @@ public abstract class SoraPokablePeriodicServiceBase : SoraFluentServiceBase, IS
 
 ```csharp
 [AttributeUsage(AttributeTargets.Class)]
-public class SoraBackgroundServiceAttribute : Attribute
+public class KoanBackgroundServiceAttribute : Attribute
 {
     public bool Enabled { get; set; } = true;
     public string? ConfigurationSection { get; set; }
@@ -137,7 +137,7 @@ public class SoraBackgroundServiceAttribute : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Class)]
-public class SoraPeriodicServiceAttribute : SoraBackgroundServiceAttribute
+public class KoanPeriodicServiceAttribute : KoanBackgroundServiceAttribute
 {
     public int IntervalSeconds { get; set; } = 60;
     public int InitialDelaySeconds { get; set; } = 0;
@@ -145,7 +145,7 @@ public class SoraPeriodicServiceAttribute : SoraBackgroundServiceAttribute
 }
 
 [AttributeUsage(AttributeTargets.Class)]
-public class SoraStartupServiceAttribute : SoraBackgroundServiceAttribute
+public class KoanStartupServiceAttribute : KoanBackgroundServiceAttribute
 {
     public int StartupOrder { get; set; } = 100;
     public bool ContinueOnFailure { get; set; } = false;
@@ -184,16 +184,16 @@ To eliminate magic strings, use the provided constants:
 
 ```csharp
 // Event constants
-using Sora.Core.Events;
-[ServiceEvent(SoraServiceEvents.Flow.EntityProcessed)]
-[ServiceEvent(SoraServiceEvents.Health.ProbeScheduled)]
-[ServiceEvent(SoraServiceEvents.Outbox.Processed)]
+using Koan.Core.Events;
+[ServiceEvent(KoanServiceEvents.Flow.EntityProcessed)]
+[ServiceEvent(KoanServiceEvents.Health.ProbeScheduled)]
+[ServiceEvent(KoanServiceEvents.Outbox.Processed)]
 
 // Action constants  
-using Sora.Core.Actions;
-[ServiceAction(SoraServiceActions.Health.ForceProbe)]
-[ServiceAction(SoraServiceActions.Flow.TriggerProcessing)]
-[ServiceAction(SoraServiceActions.Outbox.ProcessBatch)]
+using Koan.Core.Actions;
+[ServiceAction(KoanServiceActions.Health.ForceProbe)]
+[ServiceAction(KoanServiceActions.Flow.TriggerProcessing)]
+[ServiceAction(KoanServiceActions.Outbox.ProcessBatch)]
 ```
 
 ---
@@ -204,7 +204,7 @@ using Sora.Core.Actions;
 
 ```csharp
 // Main fluent API entry point
-public static class SoraServices<T> where T : ISoraBackgroundService
+public static class KoanServices<T> where T : IKoanBackgroundService
 {
     // Execute service actions
     public static IServiceActionBuilder Do(string action, object? parameters = null);
@@ -221,7 +221,7 @@ public static class SoraServices<T> where T : ISoraBackgroundService
 
 ```csharp
 // Unified builder supporting method chaining
-public interface IServiceBuilder<T> where T : ISoraBackgroundService
+public interface IServiceBuilder<T> where T : IKoanBackgroundService
 {
     IServiceActionBuilder Do(string action, object? parameters = null);
     IServiceEventBuilder On(string eventName);
@@ -268,8 +268,8 @@ public interface IServiceQueryBuilder
 ### Basic Background Service
 
 ```csharp
-[SoraBackgroundService(Enabled = true, RunInProduction = true)]
-public class SystemHealthMonitor : SoraFluentServiceBase
+[KoanBackgroundService(Enabled = true, RunInProduction = true)]
+public class SystemHealthMonitor : KoanFluentServiceBase
 {
     public SystemHealthMonitor(ILogger<SystemHealthMonitor> logger, IConfiguration configuration)
         : base(logger, configuration) { }
@@ -295,8 +295,8 @@ public class SystemHealthMonitor : SoraFluentServiceBase
 ### Periodic Service
 
 ```csharp
-[SoraPeriodicService(IntervalSeconds = 3600, RunOnStartup = true)]
-public class DataCleanupService : SoraPeriodicServiceBase
+[KoanPeriodicService(IntervalSeconds = 3600, RunOnStartup = true)]
+public class DataCleanupService : KoanPeriodicServiceBase
 {
     public override TimeSpan Period => TimeSpan.FromHours(1);
     public override bool RunOnStartup => true;
@@ -321,13 +321,13 @@ public class DataCleanupService : SoraPeriodicServiceBase
 ### Fluent Service with Actions and Events
 
 ```csharp
-using Sora.Core.Events;
+using Koan.Core.Events;
 
-[SoraBackgroundService(RunInProduction = true)]
-[ServiceEvent(SoraServiceEvents.Translation.Started, EventArgsType = typeof(TranslationEventArgs))]
-[ServiceEvent(SoraServiceEvents.Translation.Completed, EventArgsType = typeof(TranslationEventArgs))]
-[ServiceEvent(SoraServiceEvents.Translation.Failed, EventArgsType = typeof(TranslationErrorArgs))]
-public class TranslationService : SoraFluentServiceBase
+[KoanBackgroundService(RunInProduction = true)]
+[ServiceEvent(KoanServiceEvents.Translation.Started, EventArgsType = typeof(TranslationEventArgs))]
+[ServiceEvent(KoanServiceEvents.Translation.Completed, EventArgsType = typeof(TranslationEventArgs))]
+[ServiceEvent(KoanServiceEvents.Translation.Failed, EventArgsType = typeof(TranslationErrorArgs))]
+public class TranslationService : KoanFluentServiceBase
 {
     public TranslationService(ILogger<TranslationService> logger, IConfiguration configuration) 
         : base(logger, configuration) { }
@@ -343,7 +343,7 @@ public class TranslationService : SoraFluentServiceBase
     {
         Logger.LogInformation("Starting translation from {From} to {To}", options.From, options.To);
         
-        await EmitEventAsync(SoraServiceEvents.Translation.Started, new TranslationEventArgs 
+        await EmitEventAsync(KoanServiceEvents.Translation.Started, new TranslationEventArgs 
         { 
             FileId = options.FileId, 
             From = options.From, 
@@ -354,7 +354,7 @@ public class TranslationService : SoraFluentServiceBase
         {
             await DoTranslationWork(options, cancellationToken);
             
-            await EmitEventAsync(SoraServiceEvents.Translation.Completed, new TranslationEventArgs 
+            await EmitEventAsync(KoanServiceEvents.Translation.Completed, new TranslationEventArgs 
             { 
                 FileId = options.FileId, 
                 From = options.From, 
@@ -363,7 +363,7 @@ public class TranslationService : SoraFluentServiceBase
         }
         catch (Exception ex)
         {
-            await EmitEventAsync(SoraServiceEvents.Translation.Failed, new TranslationErrorArgs 
+            await EmitEventAsync(KoanServiceEvents.Translation.Failed, new TranslationErrorArgs 
             { 
                 FileId = options.FileId, 
                 Error = ex.Message 
@@ -402,8 +402,8 @@ public record TranslationErrorArgs
 ### Startup Service
 
 ```csharp
-[SoraStartupService(StartupOrder = 1, ContinueOnFailure = false, TimeoutSeconds = 60)]
-public class DatabaseMigrationService : SoraFluentServiceBase, ISoraStartupService
+[KoanStartupService(StartupOrder = 1, ContinueOnFailure = false, TimeoutSeconds = 60)]
+public class DatabaseMigrationService : KoanFluentServiceBase, IKoanStartupService
 {
     private readonly IDataContext _dataContext;
     
@@ -440,14 +440,14 @@ public class DatabaseMigrationService : SoraFluentServiceBase, ISoraStartupServi
 
 ```csharp
 // Execute single action
-await SoraServices<TranslationService>
+await KoanServices<TranslationService>
     .Do("translate", new TranslationOptions("file.txt", "auto", "pt-BR"))
     .WithPriority(10)
     .WithTimeout(TimeSpan.FromMinutes(30))
     .ExecuteAsync();
 
 // Execute multiple actions in sequence
-await SoraServices<DataSyncService>
+await KoanServices<DataSyncService>
     .Do("sync-source", new SyncOptions("users", DateTime.Today))
     .Do("validate-data")
     .Do("generate-report", new ReportOptions("daily"))
@@ -458,7 +458,7 @@ await SoraServices<DataSyncService>
 
 ```csharp
 // Multiple event subscriptions in one chain
-await SoraServices<TranslationService>
+await KoanServices<TranslationService>
     .On("TranslationCompleted").Do<TranslationEventArgs>(async args => 
         await SendNotificationEmail(args.FileId, "Translation completed!"))
     .On("TranslationFailed").Do<TranslationErrorArgs>(async args => 
@@ -466,7 +466,7 @@ await SoraServices<TranslationService>
     .SubscribeAsync();
 
 // Event subscriptions with filters and configuration
-await SoraServices<ImageProcessingService>
+await KoanServices<ImageProcessingService>
     .On("ProcessingStarted").Do(async () => 
         await LogActivity("Image processing started"))
     .On("ProcessingProgress")
@@ -486,7 +486,7 @@ await SoraServices<ImageProcessingService>
 
 ```csharp
 // Execute actions and set up event subscriptions together
-await SoraServices<DataSyncService>
+await KoanServices<DataSyncService>
     .Do("sync-source", new SyncOptions("users", DateTime.Today))
     .On("SyncCompleted").Do<SyncEventArgs>(async args =>
         await LogSyncSuccess(args.Source, args.RecordCount))
@@ -507,7 +507,7 @@ public class FileController : ControllerBase
         var fileId = await SaveFileAsync(file);
 
         // Immediately trigger translation service
-        await SoraServices<TranslationService>
+        await KoanServices<TranslationService>
             .Do("translate", new TranslationOptions(fileId, "auto", targetLanguage))
             .WithPriority(10)
             .ExecuteAsync();
@@ -523,7 +523,7 @@ public class WebhookController : ControllerBase
     [HttpPost("data-changed")]
     public async Task<IActionResult> OnDataChanged([FromBody] DataChangeNotification notification)
     {
-        await SoraServices<DataSyncService>
+        await KoanServices<DataSyncService>
             .Do("sync-source", new SyncOptions(notification.Source, notification.Since))
             .WithPriority(8)
             .ExecuteAsync();
@@ -537,28 +537,28 @@ public class WebhookController : ControllerBase
 
 ```csharp
 // Complex workflow with multiple service coordination
-public class WorkflowOrchestrator : SoraFluentServiceBase
+public class WorkflowOrchestrator : KoanFluentServiceBase
 {
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // Set up file processing workflow
-        await SoraServices<FileProcessingService>
+        await KoanServices<FileProcessingService>
             .On("FileUploaded").Do<FileUploadedArgs>(async args => 
             {
-                await SoraServices<TranslationService>
+                await KoanServices<TranslationService>
                     .Do("translate", new TranslationOptions(args.FileId, "auto", "en"))
                     .ExecuteAsync();
             })
             .On("FileProcessed").Do<FileProcessedArgs>(async args =>
             {
-                await SoraServices<ImageProcessingService>
+                await KoanServices<ImageProcessingService>
                     .Do("generate-thumbnail", new ThumbnailOptions(args.FileId, 200, 200))
                     .ExecuteAsync();
             })
             .SubscribeAsync();
 
         // Handle translation results
-        await SoraServices<TranslationService>
+        await KoanServices<TranslationService>
             .On("TranslationCompleted").Do<TranslationEventArgs>(async args =>
                 await EmitEventAsync("WorkflowStepCompleted", args))
             .On("TranslationFailed").Do<TranslationErrorArgs>(async args =>
@@ -630,7 +630,7 @@ public class ServiceCommandController : ControllerBase
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "BackgroundServices": {
       "Enabled": true,
       "StartupTimeoutSeconds": 120,
@@ -670,9 +670,9 @@ public class ServiceCommandController : ControllerBase
 ### Configuration Options Classes
 
 ```csharp
-public class SoraBackgroundServiceOptions
+public class KoanBackgroundServiceOptions
 {
-    public const string SectionName = "Sora:BackgroundServices";
+    public const string SectionName = "Koan:BackgroundServices";
     
     public bool Enabled { get; set; } = true;
     public int StartupTimeoutSeconds { get; set; } = 120;
@@ -694,7 +694,7 @@ public class ServiceConfiguration
 
 ## 🔍 Health Check Integration
 
-All background services automatically contribute to Sora's health check system:
+All background services automatically contribute to Koan's health check system:
 
 ### Built-in Health Endpoints
 
@@ -705,7 +705,7 @@ All background services automatically contribute to Sora's health check system:
 ### Custom Health Checks
 
 ```csharp
-public class CustomBackgroundService : SoraBackgroundServiceBase
+public class CustomBackgroundService : KoanBackgroundServiceBase
 {
     public override async Task<HealthReport> CheckAsync(CancellationToken cancellationToken = default)
     {
@@ -734,26 +734,26 @@ public class CustomBackgroundService : SoraBackgroundServiceBase
 
 ```csharp
 // Query service information
-var status = await SoraServices<TranslationService>
+var status = await KoanServices<TranslationService>
     .Query()
     .GetStatusAsync();
 
-var health = await SoraServices<TranslationService>
+var health = await KoanServices<TranslationService>
     .Query()
     .GetHealthAsync();
 
-var info = await SoraServices<TranslationService>
+var info = await KoanServices<TranslationService>
     .Query()
     .GetInfoAsync();
 ```
 
 ### Distributed Service Communication
 
-Services can communicate across process boundaries using Sora's messaging system:
+Services can communicate across process boundaries using Koan's messaging system:
 
 ```csharp
 // Automatically works both in-process and distributed
-await SoraServices<RemoteTranslationService>
+await KoanServices<RemoteTranslationService>
     .Do("translate", options)
     .ExecuteAsync(); // Routes via message bus if service is remote
 ```
@@ -768,13 +768,13 @@ public async Task Should_Handle_Translation_Workflow()
     var failedEvents = new List<TranslationErrorArgs>();
 
     // Set up event capture
-    var subscription = await SoraServices<TranslationService>
+    var subscription = await KoanServices<TranslationService>
         .On("TranslationCompleted").Do<TranslationEventArgs>(async args => completedEvents.Add(args))
         .On("TranslationFailed").Do<TranslationErrorArgs>(async args => failedEvents.Add(args))
         .SubscribeAsync();
 
     // Execute action
-    await SoraServices<TranslationService>
+    await KoanServices<TranslationService>
         .Do("translate", new TranslationOptions("test.txt", "en", "pt-BR"))
         .ExecuteAsync();
 
@@ -792,10 +792,10 @@ public async Task Should_Handle_Translation_Workflow()
 
 ### 1. Installation
 
-**Background Services are included in Sora.Core** - no separate package needed:
+**Background Services are included in Koan.Core** - no separate package needed:
 
 ```bash
-dotnet add package Sora.Core
+dotnet add package Koan.Core
 # Background services are automatically available
 ```
 
@@ -805,21 +805,21 @@ Services are automatically discovered and registered when you call:
 
 ```csharp
 // Program.cs
-builder.Services.AddSora(); // Discovers and registers all background services
+builder.Services.AddKoan(); // Discovers and registers all background services
 ```
 
 ### 3. Create Your First Service
 
 ```csharp
-[SoraBackgroundService]
-public class MyFirstService : SoraBackgroundServiceBase
+[KoanBackgroundService]
+public class MyFirstService : KoanBackgroundServiceBase
 {
     public MyFirstService(ILogger<MyFirstService> logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
     public override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        Logger.LogInformation("My first Sora background service is running!");
+        Logger.LogInformation("My first Koan background service is running!");
         
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
         while (await timer.WaitForNextTickAsync(cancellationToken))
@@ -833,10 +833,10 @@ public class MyFirstService : SoraBackgroundServiceBase
 ### 4. Add Fluent API Support
 
 ```csharp
-using Sora.Core.Events;
+using Koan.Core.Events;
 
 [ServiceEvent("WorkCompleted")]
-public class MyFluentService : SoraFluentServiceBase
+public class MyFluentService : KoanFluentServiceBase
 {
     public MyFluentService(ILogger<MyFluentService> logger, IConfiguration configuration)
         : base(logger, configuration) { }
@@ -861,12 +861,12 @@ public class MyFluentService : SoraFluentServiceBase
 
 ```csharp
 // Trigger work
-await SoraServices<MyFluentService>
+await KoanServices<MyFluentService>
     .Do("do-work")
     .ExecuteAsync();
 
 // Subscribe to events
-await SoraServices<MyFluentService>
+await KoanServices<MyFluentService>
     .On("WorkCompleted").Do(async () => 
         Logger.LogInformation("Work was completed!"))
     .SubscribeAsync();
@@ -925,7 +925,7 @@ This pattern is used in FlowOrchestratorBase and should be followed when service
 
 ## 🎯 Architecture Integration
 
-**Sora Background Services** integrates seamlessly with other Sora pillars:
+**Koan Background Services** integrates seamlessly with other Koan pillars:
 
 - **Core**: Auto-registration, health checks, configuration
 - **Web**: HTTP endpoints for service control
@@ -939,18 +939,18 @@ This pattern is used in FlowOrchestratorBase and should be followed when service
 
 ## 🔍 Real-World Examples
 
-### Flow Orchestrator (Sora.Flow.Core)
+### Flow Orchestrator (Koan.Flow.Core)
 
 ```csharp
-using Sora.Core.Events;
-using Sora.Core.BackgroundServices;
+using Koan.Core.Events;
+using Koan.Core.BackgroundServices;
 
 [FlowOrchestrator]
-[SoraBackgroundService(RunInProduction = true)]
-[ServiceEvent(SoraServiceEvents.Flow.EntityProcessed, EventArgsType = typeof(FlowEntityProcessedEventArgs))]
-[ServiceEvent(SoraServiceEvents.Flow.EntityParked, EventArgsType = typeof(FlowEntityParkedEventArgs))]
-[ServiceEvent(SoraServiceEvents.Flow.EntityFailed, EventArgsType = typeof(FlowEntityFailedEventArgs))]
-public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchestrator
+[KoanBackgroundService(RunInProduction = true)]
+[ServiceEvent(KoanServiceEvents.Flow.EntityProcessed, EventArgsType = typeof(FlowEntityProcessedEventArgs))]
+[ServiceEvent(KoanServiceEvents.Flow.EntityParked, EventArgsType = typeof(FlowEntityParkedEventArgs))]
+[ServiceEvent(KoanServiceEvents.Flow.EntityFailed, EventArgsType = typeof(FlowEntityFailedEventArgs))]
+public abstract class FlowOrchestratorBase : KoanFluentServiceBase, IFlowOrchestrator
 {
     protected readonly IServiceProvider ServiceProvider;
 
@@ -966,7 +966,7 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
 
     public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
     {
-        // Auto-subscribe to "Sora.Flow.FlowEntity" queue
+        // Auto-subscribe to "Koan.Flow.FlowEntity" queue
         // Process flow entities with event emission
         // Implementation details omitted for brevity
     }
@@ -974,22 +974,22 @@ public abstract class FlowOrchestratorBase : SoraFluentServiceBase, IFlowOrchest
     // Methods emit events using constants
     protected async Task EmitEntityProcessedAsync(string entityId, string entityType)
     {
-        await EmitEventAsync(SoraServiceEvents.Flow.EntityProcessed, 
+        await EmitEventAsync(KoanServiceEvents.Flow.EntityProcessed, 
             new FlowEntityProcessedEventArgs { EntityId = entityId, EntityType = entityType });
     }
 }
 ```
 
-### Outbox Processor (Sora.Data.Cqrs)
+### Outbox Processor (Koan.Data.Cqrs)
 
 ```csharp
-using Sora.Core.Events;
-using Sora.Core.Actions;
+using Koan.Core.Events;
+using Koan.Core.Actions;
 
-[SoraBackgroundService(RunInProduction = true)]
-[ServiceEvent(SoraServiceEvents.Outbox.Processed, EventArgsType = typeof(OutboxProcessedEventArgs))]
-[ServiceEvent(SoraServiceEvents.Outbox.Failed, EventArgsType = typeof(OutboxFailedEventArgs))]
-internal sealed class OutboxProcessor : SoraFluentServiceBase
+[KoanBackgroundService(RunInProduction = true)]
+[ServiceEvent(KoanServiceEvents.Outbox.Processed, EventArgsType = typeof(OutboxProcessedEventArgs))]
+[ServiceEvent(KoanServiceEvents.Outbox.Failed, EventArgsType = typeof(OutboxFailedEventArgs))]
+internal sealed class OutboxProcessor : KoanFluentServiceBase
 {
     private readonly IOutboxStore _outbox;
     private readonly CqrsOptions _options;
@@ -1026,20 +1026,20 @@ internal sealed class OutboxProcessor : SoraFluentServiceBase
                 }
 
                 await ProcessBatch(batch, stoppingToken);
-                await EmitEventAsync(SoraServiceEvents.Outbox.Processed, 
+                await EmitEventAsync(KoanServiceEvents.Outbox.Processed, 
                     new OutboxProcessedEventArgs { ProcessedCount = batch.Count });
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error processing outbox batch");
-                await EmitEventAsync(SoraServiceEvents.Outbox.Failed, 
+                await EmitEventAsync(KoanServiceEvents.Outbox.Failed, 
                     new OutboxFailedEventArgs { Error = ex.Message });
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
     }
 
-    [ServiceAction(SoraServiceActions.Outbox.ProcessBatch)]
+    [ServiceAction(KoanServiceActions.Outbox.ProcessBatch)]
     public async Task ProcessBatchAsync(int? batchSize = null, CancellationToken cancellationToken = default)
     {
         var size = batchSize ?? 100;
@@ -1054,16 +1054,16 @@ internal sealed class OutboxProcessor : SoraFluentServiceBase
 }
 ```
 
-### Health Probe Scheduler (Sora.Core)
+### Health Probe Scheduler (Koan.Core)
 
 ```csharp
-using Sora.Core.Events;
-using Sora.Core.Actions;
+using Koan.Core.Events;
+using Koan.Core.Actions;
 
-[SoraBackgroundService(RunInProduction = true)]
-[ServiceEvent(SoraServiceEvents.Health.ProbeScheduled, EventArgsType = typeof(ProbeScheduledEventArgs))]
-[ServiceEvent(SoraServiceEvents.Health.ProbeBroadcast, EventArgsType = typeof(ProbeBroadcastEventArgs))]
-internal sealed class HealthProbeScheduler : SoraFluentServiceBase
+[KoanBackgroundService(RunInProduction = true)]
+[ServiceEvent(KoanServiceEvents.Health.ProbeScheduled, EventArgsType = typeof(ProbeScheduledEventArgs))]
+[ServiceEvent(KoanServiceEvents.Health.ProbeBroadcast, EventArgsType = typeof(ProbeBroadcastEventArgs))]
+internal sealed class HealthProbeScheduler : KoanFluentServiceBase
 {
     private readonly IHealthAggregator _agg;
     private readonly HealthAggregatorOptions _opt;
@@ -1108,34 +1108,34 @@ internal sealed class HealthProbeScheduler : SoraFluentServiceBase
         }
     }
 
-    [ServiceAction(SoraServiceActions.Health.ForceProbe)]
+    [ServiceAction(KoanServiceActions.Health.ForceProbe)]
     public async Task ForceProbeAsync(CancellationToken cancellationToken = default)
     {
         Logger.LogInformation("Force probe requested - scheduling immediate health probes");
         await ScheduleProbes(cancellationToken);
-        await EmitEventAsync(SoraServiceEvents.Health.ProbeBroadcast, 
+        await EmitEventAsync(KoanServiceEvents.Health.ProbeBroadcast, 
             new ProbeBroadcastEventArgs { Forced = true, Timestamp = DateTimeOffset.UtcNow });
     }
 
     private async Task ScheduleProbes(CancellationToken cancellationToken)
     {
         // Probe scheduling logic with event emission
-        await EmitEventAsync(SoraServiceEvents.Health.ProbeScheduled, 
+        await EmitEventAsync(KoanServiceEvents.Health.ProbeScheduled, 
             new ProbeScheduledEventArgs { Timestamp = DateTimeOffset.UtcNow });
     }
 }
 ```
 
-### Messaging Lifecycle Service (Sora.Messaging.Core)
+### Messaging Lifecycle Service (Koan.Messaging.Core)
 
 ```csharp
-using Sora.Core.Events;
-using Sora.Core.Actions;
+using Koan.Core.Events;
+using Koan.Core.Actions;
 
-[SoraBackgroundService(RunInProduction = true)]
-[ServiceEvent(SoraServiceEvents.Messaging.Ready, EventArgsType = typeof(MessagingReadyEventArgs))]
-[ServiceEvent(SoraServiceEvents.Messaging.Failed, EventArgsType = typeof(MessagingFailedEventArgs))]
-internal class MessagingLifecycleService : SoraFluentServiceBase
+[KoanBackgroundService(RunInProduction = true)]
+[ServiceEvent(KoanServiceEvents.Messaging.Ready, EventArgsType = typeof(MessagingReadyEventArgs))]
+[ServiceEvent(KoanServiceEvents.Messaging.Failed, EventArgsType = typeof(MessagingFailedEventArgs))]
+internal class MessagingLifecycleService : KoanFluentServiceBase
 {
     private readonly IMessagingService _messagingService;
     private readonly IHostApplicationLifetime _lifetime;
@@ -1159,7 +1159,7 @@ internal class MessagingLifecycleService : SoraFluentServiceBase
             
             await _messagingService.StartAsync(cancellationToken);
             
-            await EmitEventAsync(SoraServiceEvents.Messaging.Ready, 
+            await EmitEventAsync(KoanServiceEvents.Messaging.Ready, 
                 new MessagingReadyEventArgs { StartedAt = DateTimeOffset.UtcNow });
                 
             Logger.LogInformation("Messaging service started successfully");
@@ -1170,18 +1170,18 @@ internal class MessagingLifecycleService : SoraFluentServiceBase
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to start messaging service");
-            await EmitEventAsync(SoraServiceEvents.Messaging.Failed, 
+            await EmitEventAsync(KoanServiceEvents.Messaging.Failed, 
                 new MessagingFailedEventArgs { Error = ex.Message });
             throw;
         }
     }
 
-    [ServiceAction(SoraServiceActions.Messaging.RestartMessaging)]
+    [ServiceAction(KoanServiceActions.Messaging.RestartMessaging)]
     public async Task RestartMessagingAsync(CancellationToken cancellationToken = default)
     {
         Logger.LogInformation("Restarting messaging service...");
         await _messagingService.RestartAsync(cancellationToken);
-        await EmitEventAsync(SoraServiceEvents.Messaging.Ready, 
+        await EmitEventAsync(KoanServiceEvents.Messaging.Ready, 
             new MessagingReadyEventArgs { StartedAt = DateTimeOffset.UtcNow });
     }
 }
@@ -1192,10 +1192,10 @@ internal class MessagingLifecycleService : SoraFluentServiceBase
 ## 📚 Next Steps
 
 1. **Explore Samples**: Check the `samples/` directory for complete examples
-2. **Integration Patterns**: See how services integrate with other Sora pillars
+2. **Integration Patterns**: See how services integrate with other Koan pillars
 3. **Production Deployment**: Learn about scaling and monitoring patterns
 4. **Advanced Scenarios**: Explore distributed service communication
 
 ---
 
-**Sora Background Services: Elegant background processing with exceptional developer experience.**
+**Koan Background Services: Elegant background processing with exceptional developer experience.**

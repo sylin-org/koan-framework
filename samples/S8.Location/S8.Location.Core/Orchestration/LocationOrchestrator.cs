@@ -3,13 +3,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Services;
-using Sora.Flow;
-using Sora.Flow.Core.Orchestration;
-using Sora.Flow.Attributes;
+using Koan.Flow;
+using Koan.Flow.Core.Orchestration;
+using Koan.Flow.Attributes;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using static Sora.Flow.Core.Orchestration.Update;
+using static Koan.Flow.Core.Orchestration.Update;
 
 namespace S8.Location.Core.Orchestration;
 

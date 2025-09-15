@@ -1,4 +1,4 @@
-﻿---
+---
 id: WEB-0050
 slug: s8-flow-iot-sample-and-sse-monitor
 domain: Web
@@ -9,7 +9,7 @@ title: S8 Flow IoT sample with multi-key aggregation, namespaced tags, and SSE m
 
 ## Context
 
-We want a sample (S8) that demonstrates Sora Flow’s ingest → associate → project pipeline on an IoT scenario with multiple device kinds and multiple adapters producing different payload shapes. Devices are identified by inventory number and serial number. We also want a live UI “monitor” and a firehose view, ideally via Server‑Sent Events (SSE) as a reusable Sora module.
+We want a sample (S8) that demonstrates Koan Flow’s ingest → associate → project pipeline on an IoT scenario with multiple device kinds and multiple adapters producing different payload shapes. Devices are identified by inventory number and serial number. We also want a live UI “monitor” and a firehose view, ideally via Server‑Sent Events (SSE) as a reusable Koan module.
 
 ## Decision
 
@@ -21,13 +21,13 @@ We want a sample (S8) that demonstrates Sora Flow’s ingest → associate → p
 - Configure FlowOptions.AggregationTags = [device.identifier.inventory, device.identifier.serial].
 - Implement two thin adapters with divergent shapes (BMS batched multi-sensor; OEM single-reading), emitting fake but consistent data for multiple devices across at least two kinds (e.g., MRI and CT), plus optional Cryo.
 - Materialize domain JSON to Mongo (fallback JSON provider): DeviceDoc, SensorDoc, ReadingDoc.
-- Add a reusable SSE module (Sora.Web.Sse) and expose SSE endpoints for firehose, flow events, and adapter health.
+- Add a reusable SSE module (Koan.Web.Sse) and expose SSE endpoints for firehose, flow events, and adapter health.
 - Build a Lit-based monitor UI (device dashboard, firehose, adapter health) under wwwroot behind controllers only.
 
 ## Scope
 
 - Sample projects: S8.Flow.Shared (constants), S8.Flow.Api (host, adapters, materializers, controllers, wwwroot).
-- Module: Sora.Web.Sse with in-memory broadcaster; optional Dapr-backed broadcaster later.
+- Module: Koan.Web.Sse with in-memory broadcaster; optional Dapr-backed broadcaster later.
 - Demonstrate conflict handling: NO_KEYS, MULTI_OWNER_COLLISION, KEY_OWNER_MISMATCH via adapter toggles.
 
 ## Consequences

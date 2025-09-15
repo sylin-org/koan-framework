@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
-using Sora.Data.Core;
-using Sora.Web.Attributes;
-using Sora.Web.Controllers;
+using Koan.Data.Core;
+using Koan.Web.Attributes;
+using Koan.Web.Controllers;
 
 namespace S1.Web;
 
 [Route("api/categories")]
-[SoraDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
+[KoanDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
 public sealed class CategoryController : EntityController<Category>
 {
     [HttpPost("seed")]

@@ -1,11 +1,11 @@
-﻿---
+---
 title: Recipes — intention-driven bootstrap bundles
-description: How to create and use Sora Recipes for health/telemetry/reliability wiring with predictable configuration layering.
+description: How to create and use Koan Recipes for health/telemetry/reliability wiring with predictable configuration layering.
 ---
 
 # Recipes — intention-driven bootstrap bundles
 
-This page explains how to create and use Recipes: small, composable packages that apply best-practice operational wiring (health checks, telemetry, reliability, workers) on top of referenced Sora modules.
+This page explains how to create and use Recipes: small, composable packages that apply best-practice operational wiring (health checks, telemetry, reliability, workers) on top of referenced Koan modules.
 
 Lead contract
 - Inputs: referenced modules, configuration (appsettings/env), optional recipe selection (code or config).
@@ -16,12 +16,12 @@ Lead contract
 ## Activation — three ways
 
 1) Reference = intent (zero code)
-- Add a package named `Sora.Recipe.*` (or `<Org>.Sora.Recipe.*`). The recipe self-registers.
+- Add a package named `Koan.Recipe.*` (or `<Org>.Koan.Recipe.*`). The recipe self-registers.
 - Default behavior: all discovered recipes apply unless filtered by configuration.
 
 2) Config-only selection
-- Set `Sora:Recipes:Active` to a comma-separated list: `"observability,research-institute"`.
-- Use `Sora:Recipes:AllowOverrides` to globally allow forced overrides (default false).
+- Set `Koan:Recipes:Active` to a comma-separated list: `"observability,research-institute"`.
+- Use `Koan:Recipes:AllowOverrides` to globally allow forced overrides (default false).
 
 3) Explicit code registration
 - `services.AddRecipe<ResearchInstituteRecipe>();`
@@ -55,7 +55,7 @@ EventIds (as implemented)
 
 Notes
 - Logs are emitted during bootstrap using the framework logger if available; otherwise a safe null logger is used to avoid building a provider at this stage.
-- Dry-run: set `Sora:Recipes:DryRun=true` to log decisions without mutating DI (dev-only).
+- Dry-run: set `Koan:Recipes:DryRun=true` to log decisions without mutating DI (dev-only).
 
 ## Capability gating
 
@@ -67,7 +67,7 @@ Helpers (available to recipes)
 
 Example
 ```csharp
-// Within ISoraRecipe.Apply
+// Within IKoanRecipe.Apply
 if (services.ServiceExists<IMongoClient>() || services.OptionsConfigured<MongoOptions>())
 {
   // Add health checks or OTEL enrichers for Mongo
@@ -78,15 +78,15 @@ if (services.ServiceExists<IMongoClient>() || services.OptionsConfigured<MongoOp
 
 Project file
 - Reference your providers and a recipe package:
-  - `Sora.Data.Mongo`, `Sora.Web.Diagnostics`, `Sora.Recipe.Observability`
+  - `Koan.Data.Mongo`, `Koan.Web.Diagnostics`, `Koan.Recipe.Observability`
 
 Program.cs
-// Reference-only activation (no code needed beyond AddSora)
-builder.Services.AddSora();
+// Reference-only activation (no code needed beyond AddKoan)
+builder.Services.AddKoan();
 
 appsettings.json
 {
-  "Sora": {
+  "Koan": {
     "Data": { "Mongo": { "ConnectionString": "mongodb://localhost:27017", "Database": "app" } },
     "Recipes": { "Active": "observability" }
   }
@@ -98,7 +98,7 @@ Outcome
 ## Typical recipe structure (authoring)
 
 Contract
-public interface ISoraRecipe {
+public interface IKoanRecipe {
   string Name { get; }
   int Order { get; }
   bool ShouldApply(IConfiguration cfg, IHostEnvironment env);
@@ -106,14 +106,14 @@ public interface ISoraRecipe {
 }
 
 Authoring checklist
-- Namespace: `Sora.Recipe.<Name>`.
+- Namespace: `Koan.Recipe.<Name>`.
 - Single public recipe class per package.
 - Apply health checks, telemetry, reliability policies; no inline endpoints.
 - Use options layering helpers (see below) to set defaults without clobbering user config.
 
 ## Options layering helpers (recommended)
 
-Use Sora.Core options helpers to express intent without memorizing Configure/PostConfigure ordering:
+Use Koan.Core options helpers to express intent without memorizing Configure/PostConfigure ordering:
 - WithProviderDefaults(Action<TOptions>)
 - WithRecipeDefaults(Action<TOptions>)
 - BindFromConfiguration(IConfigurationSection)
@@ -124,7 +124,7 @@ Example (MongoOptions)
 services.AddOptions<MongoOptions>()
   .WithProviderDefaults(o => o.TimeoutMs ??= 3000)
   .WithRecipeDefaults(o => o.MaxConnections ??= 100)
-  .BindFromConfiguration(cfg.GetSection("Sora:Data:Mongo"))
+  .BindFromConfiguration(cfg.GetSection("Koan:Data:Mongo"))
   .WithCodeOverrides(o => o.Database ??= "app")
   .WithRecipeForcedOverrides(o => o.TimeoutMs = Math.Min(o.TimeoutMs ?? 3000, 2000));
 
@@ -142,12 +142,12 @@ Multiple recipes
 - Compose via `Order`; last writer wins. Emit Conflict(1004) when a later recipe changes a previously set value.
 
 Forced overrides
-- Global gate: `Sora:Recipes:AllowOverrides=true`
-- Per-recipe: `Sora:Recipes:<RecipeName>:ForceOverrides=true`
+- Global gate: `Koan:Recipes:AllowOverrides=true`
+- Per-recipe: `Koan:Recipes:<RecipeName>:ForceOverrides=true`
 - Apply only via `WithRecipeForcedOverridesIfEnabled`; emit your own warn/info logs if you change values (avoid leaking secrets).
 
 Development troubleshooting
-- Set `Sora:Recipes:DryRun=true` to preview which recipes would apply and why.
+- Set `Koan:Recipes:DryRun=true` to preview which recipes would apply and why.
 - Optional dev-only endpoint can dump the list of applied recipes and option sources (no secrets).
 
 ## Full example — “research-institute” bundle
@@ -157,10 +157,10 @@ Scenario
 
 Activation
 // Code (optional):
-builder.Services.AddSora().AddRecipe("research-institute");
+builder.Services.AddKoan().AddRecipe("research-institute");
 
 // Or config-only:
-// "Sora:Recipes:Active": "research-institute"
+// "Koan:Recipes:Active": "research-institute"
 
 What the recipe does (Apply)
 - HealthChecks: Mongo, RabbitMQ, Weaviate, AI endpoint.

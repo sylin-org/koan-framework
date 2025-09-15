@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  <Description>Relational data support for Koan: EF Core integration and common helpers for SQL databases.</Description>
+  <PackageTags>$(CommonPackageTags);data;relational;efcore;sql</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+</Project>

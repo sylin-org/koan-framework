@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Logging;
-using Sora.Flow.Extensions;
-using Sora.Messaging;
+using Koan.Flow.Extensions;
+using Koan.Messaging;
 
 namespace S8.Flow.Shared;
 
@@ -64,7 +64,7 @@ public static class AdapterSeeding
                 var sensor = new Sensor
                 {
                     Id = s.Id,
-                    SensorId = s.SensorKey,
+                    SensorId = s.SensorId,
                     DeviceId = s.DeviceId,
                     Code = s.Code,
                     Unit = s.Unit

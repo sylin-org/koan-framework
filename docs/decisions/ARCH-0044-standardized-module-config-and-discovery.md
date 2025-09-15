@@ -1,4 +1,4 @@
-﻿---
+---
 id: ARCH-0044
 slug: standardized-module-config-and-discovery
 domain: Architecture
@@ -9,16 +9,16 @@ title: Standardized module configuration, dev defaults, and auto-discovery
 
 ## Context
 
-Configuration and initialization patterns across Sora modules have diverged. We want a single, beginner-friendly approach that preserves Separation of Concerns (SoC), improves DX, and supports “just works” development defaults without surprising Production behavior.
+Configuration and initialization patterns across Koan modules have diverged. We want a single, beginner-friendly approach that preserves Separation of Concerns (SoC), improves DX, and supports “just works” development defaults without surprising Production behavior.
 
 ## Decision
 
 Golden path for all modules (library-first, opt-in):
 
 1) Keys and aliases
-- Key scheme: `Sora:<Area>:<ModuleName>:<Alias>:<Property>` (e.g., `Sora:Data:Postgres:Default:ConnectionString`).
+- Key scheme: `Koan:<Area>:<ModuleName>:<Alias>:<Property>` (e.g., `Koan:Data:Postgres:Default:ConnectionString`).
 - Default alias is `"Default"`; additional aliases allowed (e.g., `Reporting`).
-- Env var mapping uses `SORA__...` prefix (e.g., `SORA__DATA__POSTGRES__DEFAULT__CONNECTIONSTRING`).
+- Env var mapping uses `Koan__...` prefix (e.g., `Koan__DATA__POSTGRES__DEFAULT__CONNECTIONSTRING`).
 
 2) Options + validation (typed, strict in Production)
 - Each module defines an `Options` class with a public `BindPath` constant, sensible dev defaults for non-critical values, and DataAnnotations.
@@ -26,12 +26,12 @@ Golden path for all modules (library-first, opt-in):
 - Failure modes: Production → required keys missing cause startup failure; Development/CI → warn + allow safe defaults.
 
 3) Single DI entrypoint per module
-- `services.AddSora<Module>(IConfiguration config, string alias = "Default", Action<Options>? postConfigure = null)`
+- `services.AddKoan<Module>(IConfiguration config, string alias = "Default", Action<Options>? postConfigure = null)`
 - The extension binds named options from `<BindPath>:<alias>`, registers validators, health checks, and keyed client/factory instances for the alias.
 - Business code consumes `IOptionsMonitor<T>` or keyed clients; it never accesses `IConfiguration` directly.
 
-4) SoraEnv as runtime accessor
-- Modules use `SoraEnv` for environment/profile flags, container detection, and app directories (no direct `Environment.*`).
+4) KoanEnv as runtime accessor
+- Modules use `KoanEnv` for environment/profile flags, container detection, and app directories (no direct `Environment.*`).
 
 5) Development defaults and auto-discovery
 - All modules should provide a Development “default that just works”.
@@ -43,8 +43,8 @@ Golden path for all modules (library-first, opt-in):
 - Discovery is disabled in Production by default. It is enabled in Development and CI by default, with opt-outs available.
 
 6) Discovery knobs and logging
-- Global switches (env): `SORA__DISCOVERY__DISABLED`, `SORA__DISCOVERY__TOTALMS`, `SORA__DISCOVERY__PROBEMS`.
-- Per-module/per-alias overrides allowed (e.g., `SORA__DATA__POSTGRES__DISCOVERY__TOTALMS`, `SORA__DATA__POSTGRES__REPORTING__DISCOVERY__PROBEMS`).
+- Global switches (env): `Koan__DISCOVERY__DISABLED`, `Koan__DISCOVERY__TOTALMS`, `Koan__DISCOVERY__PROBEMS`.
+- Per-module/per-alias overrides allowed (e.g., `Koan__DATA__POSTGRES__DISCOVERY__TOTALMS`, `Koan__DATA__POSTGRES__REPORTING__DISCOVERY__PROBEMS`).
 - Defaults (Development/CI): total budget 3000 ms; per-probe 300 ms. Production discovery remains disabled by default.
 - Log a concise info message on success (host:port, source) and a single warn on failure (tried endpoints, total time). Redact secrets.
 
@@ -54,7 +54,7 @@ Golden path for all modules (library-first, opt-in):
 - If discovery succeeds but auth fails, mark `Unhealthy` with an actionable message.
 
 8) SQLite dev fallback
-- When suitable, provide an opt-in Development fallback (e.g., SQLite) with predictable data path from `SoraEnv.DataDir`, and safe PRAGMAs (WAL, foreign_keys=ON, synchronous=NORMAL). No auto-migrate in Production.
+- When suitable, provide an opt-in Development fallback (e.g., SQLite) with predictable data path from `KoanEnv.DataDir`, and safe PRAGMAs (WAL, foreign_keys=ON, synchronous=NORMAL). No auto-migrate in Production.
 
 ## Scope
 In-scope: Data, Messaging, Vector, AI, and Web modules. Out-of-scope now: multitenancy overlays (reserved for future ADR).
@@ -64,7 +64,7 @@ Positive: Consistency, quick start, safer Production posture, and cleaner SoC bo
 Trade-offs: Slight increase in module scaffolding (Options/Constants/Extension/HealthCheck), mitigated by templates.
 
 ## Implementation notes
-- Provide a Roslyn analyzer to discourage raw `Environment.*` and magic config keys in modules; prefer `SoraEnv` and `Constants`.
+- Provide a Roslyn analyzer to discourage raw `Environment.*` and magic config keys in modules; prefer `KoanEnv` and `Constants`.
 - Add a “Tiny Module” template with copy-paste scaffolding.
 - Update docs with a module author checklist and examples (Options, Constants, Extension, HealthCheck).
 

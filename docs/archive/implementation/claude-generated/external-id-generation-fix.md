@@ -5,7 +5,7 @@
 **Date**: September 9, 2025  
 **Status**: ✅ **RESOLVED**  
 **Priority**: **CRITICAL** - Data lineage broken  
-**Environment**: Sora Framework Flow messaging system  
+**Environment**: Koan Framework Flow messaging system  
 **Commit**: `502384a` - fix(Flow): resolve external ID generation with proper system name extraction
 
 ### Problem Description
@@ -304,7 +304,7 @@ Required fields in StageRecord.Source:
 ## Technical Details
 
 ### Files Modified
-- `src/Sora.Flow.Core/ServiceCollectionExtensions.cs` - Enhanced `GetSourceSystem()` method
+- `src/Koan.Flow.Core/ServiceCollectionExtensions.cs` - Enhanced `GetSourceSystem()` method
 
 ### Key Changes
 ```diff
@@ -341,10 +341,10 @@ Required fields in StageRecord.Source:
 ### Verification Commands
 ```bash
 # Check for successful external ID generation
-docker logs sora-s8-flow-api-1 | grep -E "Found system name|✅.*identifier.external"
+docker logs Koan-s8-flow-api-1 | grep -E "Found system name|✅.*identifier.external"
 
 # Monitor external ID creation in real-time
-docker logs sora-s8-flow-api-1 --tail 50 -f | grep "ExternalID"
+docker logs Koan-s8-flow-api-1 --tail 50 -f | grep "ExternalID"
 ```
 
 ### Expected Output
@@ -371,7 +371,7 @@ The external ID generation regression was successfully resolved through systemat
 - ✅ **Canonical views complete** with proper `identifier.external.{system}` fields
 - ✅ **Future-proof implementation** handles metadata format variations
 
-This fix ensures the Sora Framework Flow system maintains complete data lineage tracking, enabling proper entity traceability across distributed systems.
+This fix ensures the Koan Framework Flow system maintains complete data lineage tracking, enabling proper entity traceability across distributed systems.
 
 ---
 

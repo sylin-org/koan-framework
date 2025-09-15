@@ -1,37 +1,37 @@
-name: sora-s5-recs
+name: koan-s5-recs
 services:
   api:
     build:
       context: ../../..
       dockerfile: samples/S5.Recs/Dockerfile
-    image: sora-s5-recs:dev
+    image: koan-s5-recs:dev
     ports:
       - "5084:5084"
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
       ASPNETCORE_URLS: "http://+:5084"
-      Sora__Web__ExposeObservabilitySnapshot: "true"
-      Sora__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
-      Sora__Data__Mongo__Database: "sora"
-      Sora__Data__Weaviate__Endpoint: "http://weaviate:8080"
-      Sora__Ai__AutoDiscoveryEnabled: "true"
-      Sora__Ai__AllowDiscoveryInNonDev: "true"
-      SORA_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
+      Koan__Web__ExposeObservabilitySnapshot: "true"
+      Koan__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
+      Koan__Data__Mongo__Database: "Koan"
+      Koan__Data__Weaviate__Endpoint: "http://weaviate:8080"
+      Koan__Ai__AutoDiscoveryEnabled: "true"
+      Koan__Ai__AllowDiscoveryInNonDev: "true"
+      Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
       # Explicit Ollama service registration (Production-safe)
-      Sora__Ai__Services__Ollama__0__Id: "ollama"
-      Sora__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
-      Sora__Ai__Services__Ollama__0__DefaultModel: "all-minilm"
+      Koan__Ai__Services__Ollama__0__Id: "ollama"
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Koan__Ai__Services__Ollama__0__DefaultModel: "all-minilm"
   # Disable explicit registration in dev so discovery picks a single best endpoint (host-first)
-      Sora__Ai__Services__Ollama__0__Enabled: "false"
+      Koan__Ai__Services__Ollama__0__Enabled: "false"
   # Readiness: require the embedding model to be present
-      Sora__Ai__Ollama__RequiredModels__0: "all-minilm"
+      Koan__Ai__Ollama__RequiredModels__0: "all-minilm"
     volumes:
       - ../data:/app/data
     depends_on:
       - mongo
       - weaviate
   mongo:
-    image: mongo:7
+    image: mongo:latest
     volumes:
       - ../data/mongo:/data/db
     ports:

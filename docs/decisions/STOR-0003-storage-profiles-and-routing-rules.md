@@ -1,4 +1,4 @@
-﻿---
+---
 id: STOR-0003
 slug: STOR-0003-storage-profiles-and-routing-rules
 domain: STOR
@@ -37,7 +37,7 @@ Consequences
 Implementation notes
 
 - Keep rule evaluation allocation-free and fast; precompile regex/patterns.
-- Provide options binding: Sora:Storage:Profiles[] and Sora:Storage:Rules[].
+- Provide options binding: Koan:Storage:Profiles[] and Koan:Storage:Rules[].
 - Expose minimal metrics: rule hit counts per profile.
 
 References

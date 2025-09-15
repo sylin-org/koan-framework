@@ -1,12 +1,12 @@
-# Sora Framework Documentation
+# Koan Framework Documentation
 
 **Build services like you're talking to your code, not fighting it.**
 
-Welcome to the complete Sora Framework documentation. This guide will help you build modern .NET backend services with clarity, comfort, and the ability to grow.
+Welcome to the complete Koan Framework documentation. This guide will help you build modern .NET backend services with clarity, comfort, and the ability to grow.
 
 ## 🚀 Getting Started
 
-- **[5-Minute Quickstart](quickstart.md)** - Get a Sora API running in 5 minutes
+- **[5-Minute Quickstart](quickstart.md)** - Get a Koan API running in 5 minutes
 - **[Complete Getting Started Guide](reference/getting-started.md)** - Full step-by-step walkthrough
 - **[Framework Overview](reference/framework-overview.md)** - Architecture, philosophy, and capabilities
 
@@ -82,7 +82,7 @@ Welcome to the complete Sora Framework documentation. This guide will help you b
 
 ## 🎯 Quick Navigation by Role
 
-### **New to Sora?**
+### **New to Koan?**
 1. [5-Minute Quickstart](quickstart.md)
 2. [Framework Overview](reference/framework-overview.md)
 3. [Getting Started Guide](reference/getting-started.md)

@@ -1,15 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Sora.Web.Attributes;
-using Sora.Web.Controllers;
-using Sora.Flow.Model;
+using Microsoft.AspNetCore.Mvc;
+using Koan.Web.Attributes;
+using Koan.Web.Controllers;
+using Koan.Flow.Model;
 using S8.Flow.Shared;
-using Sora.Data.Core;
+using Koan.Data.Core;
 
 namespace S8.Flow.Api.Controllers;
 
 [ApiController]
 [Route("api/devices")]
-[SoraDataBehavior(MustPaginate = true, DefaultPageSize = 20, MaxPageSize = 200)]
+[KoanDataBehavior(MustPaginate = true, DefaultPageSize = 20, MaxPageSize = 200)]
 public sealed class DevicesController : EntityController<DynamicFlowEntity<Device>>
 {
 }

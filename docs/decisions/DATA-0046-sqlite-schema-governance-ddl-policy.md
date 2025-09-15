@@ -23,16 +23,16 @@ We introduced a projection-by-default storage model for SQLite: base table `[Id,
   - `Relaxed` (default): tolerate model/table drift and report Degraded health (future work).
   - `Strict`: treat drift as Unhealthy (future work).
 - Introduce `ReadOnlyAttribute` on aggregates. If present, adapters must not attempt DDL regardless of policy.
-- Production safety: only allow DDL in Production when the global `Sora:AllowMagicInProduction` flag is set (or adapter option `AllowProductionDdl` is true).
+- Production safety: only allow DDL in Production when the global `Koan:AllowMagicInProduction` flag is set (or adapter option `AllowProductionDdl` is true).
 
 ## Implementation
 
 - `SqliteOptions` now includes `DdlPolicy`, `SchemaMatching`, and `AllowProductionDdl`.
-- `SqliteOptionsConfigurator` reads `Sora:Data:Sqlite:DdlPolicy` and `:SchemaMatchingMode` (alt keys supported) and the magic flag.
+- `SqliteOptionsConfigurator` reads `Koan:Data:Sqlite:DdlPolicy` and `:SchemaMatchingMode` (alt keys supported) and the magic flag.
 - `SqliteRepository.EnsureTable(SqliteConnection)` gates all CREATE/ALTER operations according to:
   - Policy must be `AutoCreate`.
   - Entity must not be annotated with `[ReadOnly]`.
-  - If `SoraEnv.IsProduction` then either `SoraEnv.AllowMagicInProduction` or `AllowProductionDdl` must be true.
+  - If `KoanEnv.IsProduction` then either `KoanEnv.AllowMagicInProduction` or `AllowProductionDdl` must be true.
   - Otherwise, if table exists, return; if missing, no-op (callers may receive runtime errors until provisioned out-of-band).
 - Instruction helpers (`data.ensureCreated`, `relational.schema.ensureCreated`, and SQL helpers) call `TryEnsureTableWithGovernance` rather than unconditional `EnsureTable`.
 

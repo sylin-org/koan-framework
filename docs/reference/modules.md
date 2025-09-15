@@ -1,6 +1,6 @@
-﻿---
+---
 title: Modules Index
-description: Index of per-project companion docs (README and TECHNICAL) across Sora modules.
+description: Index of per-project companion docs (README and TECHNICAL) across Koan modules.
 ---
 
 This index links to project-scoped companion docs as per ADR ARCH-0042. Each project exposes:
@@ -10,54 +10,54 @@ This index links to project-scoped companion docs as per ADR ARCH-0042. Each pro
 
 Data
 
-- Sora.Data.Core — [README](../modules/Sora.Data.Core/README.md) · [TECHNICAL](../modules/Sora.Data.Core/TECHNICAL.md)
-- Sora.Data.Cqrs — [README](../modules/Sora.Data.Cqrs/README.md) · [TECHNICAL](../modules/Sora.Data.Cqrs/TECHNICAL.md)
-- Sora.Data.Cqrs.Outbox.Mongo — [README](../modules/Sora.Data.Cqrs.Outbox.Mongo/README.md) · [TECHNICAL](../modules/Sora.Data.Cqrs.Outbox.Mongo/TECHNICAL.md)
-- Sora.Data.Abstractions — [README](../modules/Sora.Data.Abstractions/README.md) · [TECHNICAL](../modules/Sora.Data.Abstractions/TECHNICAL.md)
-- Sora.Data.Direct — [README](../modules/Sora.Data.Direct/README.md) · [TECHNICAL](../modules/Sora.Data.Direct/TECHNICAL.md)
-- Sora.Data.Relational — [README](../modules/Sora.Data.Relational/README.md) · [TECHNICAL](../modules/Sora.Data.Relational/TECHNICAL.md)
-- Sora.Data.Sqlite — [README](../modules/Sora.Data.Sqlite/README.md) · [TECHNICAL](../modules/Sora.Data.Sqlite/TECHNICAL.md)
-- Sora.Data.SqlServer — [README](../modules/Sora.Data.SqlServer/README.md) · [TECHNICAL](../modules/Sora.Data.SqlServer/TECHNICAL.md)
-- Sora.Data.Postgres — [README](../modules/Sora.Data.Postgres/README.md) · [TECHNICAL](../modules/Sora.Data.Postgres/TECHNICAL.md)
-- Sora.Data.Mongo — [README](../modules/Sora.Data.Mongo/README.md) · [TECHNICAL](../modules/Sora.Data.Mongo/TECHNICAL.md)
-- Sora.Data.Json — [README](../modules/Sora.Data.Json/README.md) · [TECHNICAL](../modules/Sora.Data.Json/TECHNICAL.md)
-- Sora.Data.Vector — [README](../modules/Sora.Data.Vector/README.md) · [TECHNICAL](../modules/Sora.Data.Vector/TECHNICAL.md)
-- Sora.Data.Vector.Abstractions — [README](../modules/Sora.Data.Vector.Abstractions/README.md) · [TECHNICAL](../modules/Sora.Data.Vector.Abstractions/TECHNICAL.md)
-- Sora.Data.Weaviate — [README](../modules/Sora.Data.Weaviate/README.md) · [TECHNICAL](../modules/Sora.Data.Weaviate/TECHNICAL.md)
+- Koan.Data.Core — [README](../modules/Koan.Data.Core/README.md) · [TECHNICAL](../modules/Koan.Data.Core/TECHNICAL.md)
+- Koan.Data.Cqrs — [README](../modules/Koan.Data.Cqrs/README.md) · [TECHNICAL](../modules/Koan.Data.Cqrs/TECHNICAL.md)
+- Koan.Data.Cqrs.Outbox.Mongo — [README](../modules/Koan.Data.Cqrs.Outbox.Mongo/README.md) · [TECHNICAL](../modules/Koan.Data.Cqrs.Outbox.Mongo/TECHNICAL.md)
+- Koan.Data.Abstractions — [README](../modules/Koan.Data.Abstractions/README.md) · [TECHNICAL](../modules/Koan.Data.Abstractions/TECHNICAL.md)
+- Koan.Data.Direct — [README](../modules/Koan.Data.Direct/README.md) · [TECHNICAL](../modules/Koan.Data.Direct/TECHNICAL.md)
+- Koan.Data.Relational — [README](../modules/Koan.Data.Relational/README.md) · [TECHNICAL](../modules/Koan.Data.Relational/TECHNICAL.md)
+- Koan.Data.Sqlite — [README](../modules/Koan.Data.Sqlite/README.md) · [TECHNICAL](../modules/Koan.Data.Sqlite/TECHNICAL.md)
+- Koan.Data.SqlServer — [README](../modules/Koan.Data.SqlServer/README.md) · [TECHNICAL](../modules/Koan.Data.SqlServer/TECHNICAL.md)
+- Koan.Data.Postgres — [README](../modules/Koan.Data.Postgres/README.md) · [TECHNICAL](../modules/Koan.Data.Postgres/TECHNICAL.md)
+- Koan.Data.Mongo — [README](../modules/Koan.Data.Mongo/README.md) · [TECHNICAL](../modules/Koan.Data.Mongo/TECHNICAL.md)
+- Koan.Data.Json — [README](../modules/Koan.Data.Json/README.md) · [TECHNICAL](../modules/Koan.Data.Json/TECHNICAL.md)
+- Koan.Data.Vector — [README](../modules/Koan.Data.Vector/README.md) · [TECHNICAL](../modules/Koan.Data.Vector/TECHNICAL.md)
+- Koan.Data.Vector.Abstractions — [README](../modules/Koan.Data.Vector.Abstractions/README.md) · [TECHNICAL](../modules/Koan.Data.Vector.Abstractions/TECHNICAL.md)
+- Koan.Data.Weaviate — [README](../modules/Koan.Data.Weaviate/README.md) · [TECHNICAL](../modules/Koan.Data.Weaviate/TECHNICAL.md)
 
 Messaging
 
-- Sora.Messaging.Core — [README](../modules/Sora.Messaging.Core/README.md) · [TECHNICAL](../modules/Sora.Messaging.Core/TECHNICAL.md)
-- Sora.Messaging.Abstractions — [README](../modules/Sora.Messaging.Abstractions/README.md) · [TECHNICAL](../modules/Sora.Messaging.Abstractions/TECHNICAL.md)
-- Sora.Messaging.RabbitMq — [README](../modules/Sora.Messaging.RabbitMq/README.md) · [TECHNICAL](../modules/Sora.Messaging.RabbitMq/TECHNICAL.md)
-- Sora.Messaging.Inbox.Http — [README](../modules/Sora.Messaging.Inbox.Http/README.md) · [TECHNICAL](../modules/Sora.Messaging.Inbox.Http/TECHNICAL.md)
-- Sora.Messaging.Inbox.InMemory — [README](../modules/Sora.Messaging.Inbox.InMemory/README.md) · [TECHNICAL](../modules/Sora.Messaging.Inbox.InMemory/TECHNICAL.md)
-- Sora.Service.Inbox.Redis — [README](../modules/Sora.Service.Inbox.Redis/README.md) · [TECHNICAL](../modules/Sora.Service.Inbox.Redis/TECHNICAL.md)
+- Koan.Messaging.Core — [README](../modules/Koan.Messaging.Core/README.md) · [TECHNICAL](../modules/Koan.Messaging.Core/TECHNICAL.md)
+- Koan.Messaging.Abstractions — [README](../modules/Koan.Messaging.Abstractions/README.md) · [TECHNICAL](../modules/Koan.Messaging.Abstractions/TECHNICAL.md)
+- Koan.Messaging.RabbitMq — [README](../modules/Koan.Messaging.RabbitMq/README.md) · [TECHNICAL](../modules/Koan.Messaging.RabbitMq/TECHNICAL.md)
+- Koan.Messaging.Inbox.Http — [README](../modules/Koan.Messaging.Inbox.Http/README.md) · [TECHNICAL](../modules/Koan.Messaging.Inbox.Http/TECHNICAL.md)
+- Koan.Messaging.Inbox.InMemory — [README](../modules/Koan.Messaging.Inbox.InMemory/README.md) · [TECHNICAL](../modules/Koan.Messaging.Inbox.InMemory/TECHNICAL.md)
+- Koan.Service.Inbox.Redis — [README](../modules/Koan.Service.Inbox.Redis/README.md) · [TECHNICAL](../modules/Koan.Service.Inbox.Redis/TECHNICAL.md)
 
 Web
 
-- Sora.Web — [README](../modules/Sora.Web/README.md) · [TECHNICAL](../modules/Sora.Web/TECHNICAL.md)
-- Sora.Web.Transformers — [README](../modules/Sora.Web.Transformers/README.md) · [TECHNICAL](../modules/Sora.Web.Transformers/TECHNICAL.md)
-- Sora.Web.Swagger — [README](../modules/Sora.Web.Swagger/README.md) · [TECHNICAL](../modules/Sora.Web.Swagger/TECHNICAL.md)
-- Sora.Web.GraphQl — [README](../modules/Sora.Web.GraphQl/README.md) · [TECHNICAL](../modules/Sora.Web.GraphQl/TECHNICAL.md)
-- Sora.Web.Auth — [README](../modules/Sora.Web.Auth/README.md) · [TECHNICAL](../modules/Sora.Web.Auth/TECHNICAL.md)
-- Sora.Web.Auth.Discord — [README](../modules/Sora.Web.Auth.Discord/README.md) · [TECHNICAL](../modules/Sora.Web.Auth.Discord/TECHNICAL.md)
-- Sora.Web.Auth.Google — [README](../modules/Sora.Web.Auth.Google/README.md) · [TECHNICAL](../modules/Sora.Web.Auth.Google/TECHNICAL.md)
-- Sora.Web.Auth.Microsoft — [README](../modules/Sora.Web.Auth.Microsoft/README.md) · [TECHNICAL](../modules/Sora.Web.Auth.Microsoft/TECHNICAL.md)
-- Sora.Web.Auth.Oidc — [README](../modules/Sora.Web.Auth.Oidc/README.md) · [TECHNICAL](../modules/Sora.Web.Auth.Oidc/TECHNICAL.md)
-- Sora.Web.Auth.TestProvider — [README](../modules/Sora.Web.Auth.TestProvider/README.md) · [TECHNICAL](../modules/Sora.Web.Auth.TestProvider/TECHNICAL.md)
+- Koan.Web — [README](../modules/Koan.Web/README.md) · [TECHNICAL](../modules/Koan.Web/TECHNICAL.md)
+- Koan.Web.Transformers — [README](../modules/Koan.Web.Transformers/README.md) · [TECHNICAL](../modules/Koan.Web.Transformers/TECHNICAL.md)
+- Koan.Web.Swagger — [README](../modules/Koan.Web.Swagger/README.md) · [TECHNICAL](../modules/Koan.Web.Swagger/TECHNICAL.md)
+- Koan.Web.GraphQl — [README](../modules/Koan.Web.GraphQl/README.md) · [TECHNICAL](../modules/Koan.Web.GraphQl/TECHNICAL.md)
+- Koan.Web.Auth — [README](../modules/Koan.Web.Auth/README.md) · [TECHNICAL](../modules/Koan.Web.Auth/TECHNICAL.md)
+- Koan.Web.Auth.Discord — [README](../modules/Koan.Web.Auth.Discord/README.md) · [TECHNICAL](../modules/Koan.Web.Auth.Discord/TECHNICAL.md)
+- Koan.Web.Auth.Google — [README](../modules/Koan.Web.Auth.Google/README.md) · [TECHNICAL](../modules/Koan.Web.Auth.Google/TECHNICAL.md)
+- Koan.Web.Auth.Microsoft — [README](../modules/Koan.Web.Auth.Microsoft/README.md) · [TECHNICAL](../modules/Koan.Web.Auth.Microsoft/TECHNICAL.md)
+- Koan.Web.Auth.Oidc — [README](../modules/Koan.Web.Auth.Oidc/README.md) · [TECHNICAL](../modules/Koan.Web.Auth.Oidc/TECHNICAL.md)
+- Koan.Web.Auth.TestProvider — [README](../modules/Koan.Web.Auth.TestProvider/README.md) · [TECHNICAL](../modules/Koan.Web.Auth.TestProvider/TECHNICAL.md)
 
 AI
 
-- Sora.AI — [README](../modules/Sora.AI/README.md) · [TECHNICAL](../modules/Sora.AI/TECHNICAL.md)
-- Sora.AI.Contracts — [README](../modules/Sora.AI.Contracts/README.md) · [TECHNICAL](../modules/Sora.AI.Contracts/TECHNICAL.md)
-- Sora.AI.Web — [README](../modules/Sora.AI.Web/README.md) · [TECHNICAL](../modules/Sora.AI.Web/TECHNICAL.md)
-- Sora.Ai.Provider.Ollama — [README](../modules/Sora.Ai.Provider.Ollama/README.md) · [TECHNICAL](../modules/Sora.Ai.Provider.Ollama/TECHNICAL.md)
+- Koan.AI — [README](../modules/Koan.AI/README.md) · [TECHNICAL](../modules/Koan.AI/TECHNICAL.md)
+- Koan.AI.Contracts — [README](../modules/Koan.AI.Contracts/README.md) · [TECHNICAL](../modules/Koan.AI.Contracts/TECHNICAL.md)
+- Koan.AI.Web — [README](../modules/Koan.AI.Web/README.md) · [TECHNICAL](../modules/Koan.AI.Web/TECHNICAL.md)
+- Koan.Ai.Provider.Ollama — [README](../modules/Koan.Ai.Provider.Ollama/README.md) · [TECHNICAL](../modules/Koan.Ai.Provider.Ollama/TECHNICAL.md)
 
 Scheduling
 
-- Sora.Scheduling — [README](../modules/Sora.Scheduling/README.md) · [TECHNICAL](../modules/Sora.Scheduling/TECHNICAL.md)
+- Koan.Scheduling — [README](../modules/Koan.Scheduling/README.md) · [TECHNICAL](../modules/Koan.Scheduling/TECHNICAL.md)
 
 Core
 
-- Sora.Core — [README](../modules/Sora.Core/README.md) · [TECHNICAL](../modules/Sora.Core/TECHNICAL.md)
+- Koan.Core — [README](../modules/Koan.Core/README.md) · [TECHNICAL](../modules/Koan.Core/TECHNICAL.md)

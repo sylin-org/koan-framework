@@ -2,15 +2,15 @@
 
 Status: Accepted
 Date: 2025-08-19
-Owners: Sora AI
+Owners: Koan AI
 
 ## Context
 
-Sora needs a single, simple entrypoint for user prompts that remains stable whether a single provider or multiple routed providers are configured. We also need a first-class augmentation model (RAG, system prompts, moderation, tools, budgeting) that composes cleanly, is testable, and preserves SSE semantics.
+Koan needs a single, simple entrypoint for user prompts that remains stable whether a single provider or multiple routed providers are configured. We also need a first-class augmentation model (RAG, system prompts, moderation, tools, budgeting) that composes cleanly, is testable, and preserves SSE semantics.
 
 ## Decision
 
-Provide a single interface (IAi) as the application-facing entrypoint with typed requests and optional streaming. Introduce an augmentation pipeline with well-defined phases and DI-driven composition. Offer an optional static facade (Sora.Ai) that forwards to DI for ergonomic one-liners without bypassing lifetimes.
+Provide a single interface (IAi) as the application-facing entrypoint with typed requests and optional streaming. Introduce an augmentation pipeline with well-defined phases and DI-driven composition. Offer an optional static facade (Koan.Ai) that forwards to DI for ergonomic one-liners without bypassing lifetimes.
 
 ### Entrypoint interface (IAi)
 - Methods
@@ -26,7 +26,7 @@ Provide a single interface (IAi) as the application-facing entrypoint with typed
 
 Decision summary
 - Adopt IAi as the canonical entrypoint for chat/stream/embeddings.
-- Adopt an optional static facade Sora.Ai that resolves IAi via DI (with AsyncLocal override for tests).
+- Adopt an optional static facade Koan.Ai that resolves IAi via DI (with AsyncLocal override for tests).
 - Adopt a modular augmentation pipeline with the phases listed below.
 
 ### Core DTOs
@@ -65,7 +65,7 @@ Decision summary
 
 ### Configuration and usage
 - DI
-  - services.AddSora();  // auto-wires AddAi, providers, router, and reads Sora:Ai config
+  - services.AddKoan();  // auto-wires AddAi, providers, router, and reads Koan:Ai config
   - services.AddAi().UseRag().UseSystemPrompt("default").UseModeration().UseTools();
 - Per-request
   - AiPromptOptions { Profile?: string, Use?: string[] (e.g., ["rag","moderation"]) }
@@ -79,7 +79,7 @@ Decision summary
 
 Rationale
 - A single entrypoint keeps usage stable as backends and routing change; augmentations remain composable and testable.
-- The static facade provides memorability (Sora.Ai.Prompt) while preserving DI lifetimes and testability.
+- The static facade provides memorability (Koan.Ai.Prompt) while preserving DI lifetimes and testability.
 
 Alternatives considered
 - Only DI (no static facade): maximally pure but less ergonomic for top-level/UI code.
@@ -94,25 +94,25 @@ Versioning and compatibility
 - Contracts align with AI-0002 (API and SSE); router flow aligns with AI-0009.
 - Telemetry: IAi emits spans around augmentations and provider calls with tokens/latency.
 
-## Optional static facade: Sora.Ai
+## Optional static facade: Koan.Ai
 
 To provide a mnemonic one-liner, expose a thin, stateless static facade that forwards to the DI-provisioned IAi.
 
 API (facade)
-- class Sora.Ai
+- class Koan.Ai
   - static Task<AiChatResponse> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
   - static IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
   - static Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
 
 Resolution and scoping
-- Internally resolves IAi from SoraEnv.ServiceProvider (see ARCH-0039).
+- Internally resolves IAi from KoanEnv.ServiceProvider (see ARCH-0039).
 - Uses the current scope when available (ASP.NET request); otherwise creates a short-lived scope.
-- Throws an instructive InvalidOperationException if IAi isn’t registered (e.g., “AI not configured; call services.AddSora() or AddAi()”).
+- Throws an instructive InvalidOperationException if IAi isn’t registered (e.g., “AI not configured; call services.AddKoan() or AddAi()”).
 
 Overrides and testing
 - Provide an AsyncLocal<IAi?> override used when set (highest precedence) for tests or ad-hoc scenarios.
-- Helpers: using Sora.Ai.With(IAi custom) to set override within a disposable scope; do not expose global mutable singletons.
-- Guidance: prefer constructor-injected IAi in libraries/services; use Sora.Ai facade in app/UI code for ergonomics.
+- Helpers: using Koan.Ai.With(IAi custom) to set override within a disposable scope; do not expose global mutable singletons.
+- Guidance: prefer constructor-injected IAi in libraries/services; use Koan.Ai facade in app/UI code for ergonomics.
 
 Performance and safety
 - Stateless facade; resolves IAi via delegate cached per ServiceProvider instance to minimize overhead.
@@ -120,5 +120,5 @@ Performance and safety
 - No hidden state; honors DI lifetimes and ambient request scope.
 
 Example
-- var text = (await Sora.Ai.Prompt("Hey!", model: "llama3.1:8b")).Text;
-- await foreach (var chunk in Sora.Ai.Stream("Explain RAG simply")) { /* write to SSE */ }
+- var text = (await Koan.Ai.Prompt("Hey!", model: "llama3.1:8b")).Text;
+- await foreach (var chunk in Koan.Ai.Stream("Explain RAG simply")) { /* write to SSE */ }

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Implement clean Flow messaging architecture at the Sora.Messaging/Sora.Flow framework level for improved developer experience and maintainability.
+Implement clean Flow messaging architecture at the Koan.Messaging/Koan.Flow framework level for improved developer experience and maintainability.
 
 ## Architectural Improvements
 
@@ -13,6 +13,6 @@ Implement clean Flow messaging architecture at the Sora.Messaging/Sora.Flow fram
 
 ## Rationale
 
-Addresses lost adapter context, complex auto-handler magic, poor developer experience, and inconsistency with Sora patterns.
+Addresses lost adapter context, complex auto-handler magic, poor developer experience, and inconsistency with Koan patterns.
 
 See also: [Flow Messaging Status](../engineering/flow-messaging-status.md), [Messaging Architecture Guide](../guides/flow/flow-messaging-architecture.md).

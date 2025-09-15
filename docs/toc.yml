@@ -17,8 +17,8 @@
       href: engineering/orchestration-adapter-authoring.md
     - name: Orchestration manifest generator
       href: engineering/orchestration-manifest-generator.md
-    - name: SoraService authoring (DX quick guide)
-      href: engineering/sora-service-authoring.md
+    - name: KoanService authoring (DX quick guide)
+      href: engineering/Koan-service-authoring.md
     - name: Flow Messaging Status
       href: engineering/flow-messaging-status.md
     - name: Flow Messaging Implementation Plan

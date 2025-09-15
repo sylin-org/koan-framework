@@ -10,8 +10,8 @@ Accepted next steps (code-first, testable):
 - Ensure `CancellationToken` flows through repositories, batch, and instruction execution.
 - Acceptance: A test cancels mid-query/batch and asserts TaskCanceledException.
 
-3) Capability matrix endpoint (Sora.Web)
-- GET `/.well-known/sora/capabilities` returns aggregates, key type, default provider, and query/write capability flags.
+3) Capability matrix endpoint (Koan.Web)
+- GET `/.well-known/Koan/capabilities` returns aggregates, key type, default provider, and query/write capability flags.
 - Acceptance: Unit test for shape; manual smoke via sample S1.
 
 4) Transactional batch semantics

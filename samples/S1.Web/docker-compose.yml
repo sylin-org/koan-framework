@@ -1,6 +1,6 @@
 services:
   s1:
-    container_name: sora-s1
+    container_name: Koan-s1
     build:
       context: ../..
       dockerfile: samples/S1.Web/Dockerfile

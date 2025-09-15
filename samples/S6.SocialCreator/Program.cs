@@ -1,16 +1,16 @@
-using Sora.Data.Core;
+using Koan.Data.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Sora bootstrap
-builder.Services.AddSora();
+// Koan bootstrap
+builder.Services.AddKoan();
 
 var app = builder.Build();
 
-// Ensure controllers are mapped (Sora.Web may disable AutoMapControllers via config)
+// Ensure controllers are mapped (Koan.Web may disable AutoMapControllers via config)
 app.MapControllers();
 
-// Static files and default files are enabled by Sora.Web
+// Static files and default files are enabled by Koan.Web
 app.Run();
 
 // Expose Program for WebApplicationFactory in integration tests

@@ -9,10 +9,10 @@
     <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="9.0.0" />
   </ItemGroup>
   <ItemGroup>
-  <ProjectReference Include="..\..\src\Sora.Data.Sqlite\Sora.Data.Sqlite.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Data.Json\Sora.Data.Json.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Web.Extensions\Sora.Web.Extensions.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Data.Sqlite\Koan.Data.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Data.Json\Koan.Data.Json.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
 
   </ItemGroup>
 </Project>

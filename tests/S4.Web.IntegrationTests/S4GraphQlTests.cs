@@ -15,7 +15,7 @@ namespace S4.Web.IntegrationTests;
 public sealed class S4GraphQlTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
-    private static bool ShouldRun() => string.Equals(Environment.GetEnvironmentVariable("SORA_ENABLE_S4_TESTS"), "1");
+    private static bool ShouldRun() => string.Equals(Environment.GetEnvironmentVariable("Koan_ENABLE_S4_TESTS"), "1");
 
     public S4GraphQlTests(WebApplicationFactory<Program> factory)
     {
@@ -37,7 +37,7 @@ public sealed class S4GraphQlTests : IClassFixture<WebApplicationFactory<Program
     public async Task items_query_and_upsert_should_work()
     {
         if (!ShouldRun()) return; // gated in local/dev to avoid external deps
-        Sora.Data.Core.TestHooks.ResetDataConfigs();
+        Koan.Data.Core.TestHooks.ResetDataConfigs();
         var client = _factory.CreateClient();
 
         // clear existing via REST helper
@@ -68,7 +68,7 @@ public sealed class S4GraphQlTests : IClassFixture<WebApplicationFactory<Program
     public async Task filter_query_should_return_subset()
     {
         if (!ShouldRun()) return; // gated in local/dev to avoid external deps
-        Sora.Data.Core.TestHooks.ResetDataConfigs();
+        Koan.Data.Core.TestHooks.ResetDataConfigs();
         var client = _factory.CreateClient();
         await client.DeleteAsync("/api/items/clear");
         // seed 3 items via REST helper

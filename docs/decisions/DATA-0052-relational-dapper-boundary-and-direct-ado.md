@@ -19,7 +19,7 @@ title: Constrain Dapper to relational adapters; Direct uses ADO.NET + Newtonsoft
 ## Decision
 
 - Scope Dapper strictly to relational adapters for their internal SQL execution paths.
-- Refactor Direct (Sora.Data.Direct) to use pure ADO.NET with parameterized commands, and Newtonsoft.Json for mapping.
+- Refactor Direct (Koan.Data.Direct) to use pure ADO.NET with parameterized commands, and Newtonsoft.Json for mapping.
 - Keep Direct adapter-agnostic; when source is an entity hint and no explicit connection override is provided, delegate to adapter instruction executors per ADR-0051 (using InstructionSql helpers and reflection to call DataServiceExecuteExtensions).
 - Provide a neutral results shape for `relational.sql.query`: `IReadOnlyList<Dictionary<string, object?>>` so the call pattern is uniform across providers.
 

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Framework-level implementation for Flow messaging in Sora.Messaging/Sora.Flow to provide clean developer experience and dedicated queue routing.
+Framework-level implementation for Flow messaging in Koan.Messaging/Koan.Flow to provide clean developer experience and dedicated queue routing.
 
 ## Requirements & Gaps
 
@@ -15,7 +15,7 @@ Framework-level implementation for Flow messaging in Sora.Messaging/Sora.Flow to
 
 ## Phased Implementation
 
-- Phase 1: Sora.Messaging enhancement.
+- Phase 1: Koan.Messaging enhancement.
 - Phase 2: Queue architecture refactor.
 - Phase 3: Orchestrator pattern implementation.
 - Phase 4: Metadata handling improvements.

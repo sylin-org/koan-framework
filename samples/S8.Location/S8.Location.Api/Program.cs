@@ -2,17 +2,17 @@ using S8.Location.Core.Models;
 using S8.Location.Core.Interceptors;
 using S8.Location.Core.Orchestration;
 using S8.Location.Core.Services;
-using Sora.Data.Core;
-using Sora.Flow;
-using Sora.Web.Swagger;
+using Koan.Data.Core;
+using Koan.Flow;
+using Koan.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Sora framework with auto-configuration
-builder.Services.AddSora();
+// Koan framework with auto-configuration
+builder.Services.AddKoan();
 
 // Enable Flow pipeline for address processing
-builder.Services.AddSoraFlow();
+builder.Services.AddKoanFlow();
 
 // Register Location orchestrator with Flow.OnUpdate handlers
 builder.Services.AddHostedService<LocationOrchestrator>();
@@ -21,10 +21,10 @@ builder.Services.AddHostedService<LocationOrchestrator>();
 builder.Services.AddSingleton<IAddressResolutionService, AddressResolutionService>();
 builder.Services.AddHostedService<BackgroundResolutionService>();
 
-// LocationInterceptor is auto-registered via ISoraAutoRegistrar pattern
+// LocationInterceptor is auto-registered via IKoanAutoRegistrar pattern
 
 // Container environment requirement
-if (!Sora.Core.SoraEnv.InContainer)
+if (!Koan.Core.KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Location.Api requires container environment. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -32,7 +32,7 @@ if (!Sora.Core.SoraEnv.InContainer)
 
 builder.Services.AddControllers();
 builder.Services.AddRouting();
-builder.Services.AddSoraSwagger(builder.Configuration);
+builder.Services.AddKoanSwagger(builder.Configuration);
 
 var app = builder.Build();
 
@@ -69,6 +69,6 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.UseSoraSwagger();
+app.UseKoanSwagger();
 
 app.Run();

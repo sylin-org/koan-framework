@@ -24,16 +24,16 @@ Notes:
 
 ## Tracing (OpenTelemetry)
 
-The adapter also adds Activity events under ActivitySource "Sora.Data.Sqlite" at similar points, so you can capture them via OpenTelemetry without enabling logs.
+The adapter also adds Activity events under ActivitySource "Koan.Data.Sqlite" at similar points, so you can capture them via OpenTelemetry without enabling logs.
 
 ## DDL governance (policy + environment)
 
 DDL is allowed only when all are true:
 - Policy = AutoCreate, and
 - Entity is not [ReadOnly], and
-- Not running in Production, unless a magic flag is enabled (Sora:AllowMagicInProduction=true) or adapter option AllowProductionDdl=true.
+- Not running in Production, unless a magic flag is enabled (Koan:AllowMagicInProduction=true) or adapter option AllowProductionDdl=true.
 
-The adapter reads the magic flag from IConfiguration and SoraEnv to support tests and dev servers reliably.
+The adapter reads the magic flag from IConfiguration and KoanEnv to support tests and dev servers reliably.
 
 ## Quick enable for dev server
 
@@ -48,14 +48,14 @@ builder.Logging.SetMinimumLevel(LogLevel.Debug);
 2) To allow DDL while running with ASPNETCORE_ENVIRONMENT=Production in a dev shell, set:
 
 ```powershell
-$env:Sora__AllowMagicInProduction = "true"
+$env:Koan__AllowMagicInProduction = "true"
 ```
 
 Or set in appsettings:
 
 ```json
 {
-  "Sora": { "AllowMagicInProduction": true }
+  "Koan": { "AllowMagicInProduction": true }
 }
 ```
 
@@ -63,7 +63,7 @@ Or set in appsettings:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Data": {
       "Sqlite": { "SchemaMatchingMode": "Strict" }
     }
@@ -73,6 +73,6 @@ Or set in appsettings:
 
 ## Observability tips
 
-- To troubleshoot table creation: filter by EventId >= 1000 and Source "Sora.Data.Sqlite".
+- To troubleshoot table creation: filter by EventId >= 1000 and Source "Koan.Data.Sqlite".
 - To assert on drift in tests, use the instruction `relational.schema.validate` which returns a dictionary with Provider, Table, TableExists, MissingColumns, Policy, DdlAllowed, MatchingMode, and State.
 

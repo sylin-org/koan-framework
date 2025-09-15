@@ -2,7 +2,7 @@
 <html lang="en" ng-app="s1app">
 <head>
   <meta charset="utf-8">
-  <title>S1 Web • Sora</title>
+  <title>S1 Web • Koan</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-normalize@2/modern-normalize.min.css">
   <link rel="stylesheet" href="/styles.css">
@@ -152,7 +152,7 @@
     </div>
   </div>
 
-  <div class="footer">Sora Framework sample • S1.Web</div>
+  <div class="footer">Koan Framework sample • S1.Web</div>
 </div>
 <script>
 angular.module('s1app', [])
@@ -163,18 +163,18 @@ angular.module('s1app', [])
   svc.clear = function() { svc.entries.length = 0; };
   return svc;
 })
-// Interceptor to capture API requests to /api/* and /.well-known/sora/*
+// Interceptor to capture API requests to /api/* and /.well-known/Koan/*
 .config(function($httpProvider) {
   $httpProvider.interceptors.push(function($q, requestLog) {
     return {
       request: function(cfg) {
-  if (typeof cfg.url === 'string' && (cfg.url.indexOf('/api/') === 0 || cfg.url.indexOf('/.well-known/sora/') === 0)) {
-          cfg._sora_meta = { t0: Date.now(), method: (cfg.method||'GET').toUpperCase(), url: cfg.url };
+  if (typeof cfg.url === 'string' && (cfg.url.indexOf('/api/') === 0 || cfg.url.indexOf('/.well-known/Koan/') === 0)) {
+          cfg._Koan_meta = { t0: Date.now(), method: (cfg.method||'GET').toUpperCase(), url: cfg.url };
         }
         return cfg;
       },
       response: function(res) {
-        var m = res.config && res.config._sora_meta;
+        var m = res.config && res.config._Koan_meta;
         if (m) {
           requestLog.add({ ts: new Date(), method: m.method, url: m.url, status: res.status, ms: Date.now() - m.t0 });
         }
@@ -182,7 +182,7 @@ angular.module('s1app', [])
       },
       responseError: function(err) {
         var res = err && err.config ? err : null;
-        var m = res && res.config && res.config._sora_meta;
+        var m = res && res.config && res.config._Koan_meta;
         if (m) {
           var status = (err && err.status) || 0;
           requestLog.add({ ts: new Date(), method: m.method, url: m.url, status: status, ms: Date.now() - m.t0 });
@@ -197,7 +197,7 @@ angular.module('s1app', [])
   vm.todos = [];
   vm.check = function() { $http.get('/health').then(function(r){ vm.health = r.data; }); };
   vm.caps = null; vm.capsLoading = false;
-  vm.loadCaps = function(){ vm.capsLoading = true; $http.get('/.well-known/sora/capabilities').then(function(r){ vm.caps = r.data; }).finally(function(){ vm.capsLoading = false; }); };
+  vm.loadCaps = function(){ vm.capsLoading = true; $http.get('/.well-known/Koan/capabilities').then(function(r){ vm.caps = r.data; }).finally(function(){ vm.capsLoading = false; }); };
   vm.requests = requestLog.entries;
   vm.clearRequests = function(){ requestLog.clear(); };
   vm.page = 1; vm.size = 10; vm.total = 0; vm.totalPages = 0;

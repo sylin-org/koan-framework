@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.start.bat)",
+      "Bash(cat:*)",
+      "Bash(cmd.exe /c start.bat)",
+      "Bash(docker compose:*)",
+      "Bash(start.bat)",
+      "Bash(cmd:*)",
+      "Read(//f/Replica/NAS/Files/repo/github/Koan-framework/src/Koan.Data.Core/**)",
+      "Bash(docker logs:*)",
+      "Bash(curl:*)",
+      "Bash(start \"MediaHub Multi-Media Application\" http://localhost:5084)",
+      "Bash(docker exec:*)",
+      "Read(//f/Replica/NAS/Files/repo/github/Koan-framework/src/**)",
+      "WebFetch(domain:github.com)",
+      "Bash(docker-compose:*)",
+      "Bash(docker restart:*)",
+      "Read(//f/Replica/NAS/Files/repo/github/Koan-framework/**)",
+      "Bash(find:*)",
+      "Bash(powershell:*)",
+      "Bash(docker ps:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

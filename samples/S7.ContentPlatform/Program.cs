@@ -1,22 +1,22 @@
-﻿using Sora.Core.Observability;
-using Sora.Data.Core;
-using Sora.Messaging;
-using Sora.Web.Extensions;
-using Sora.Web.Extensions.GenericControllers;
-using Sora.Web.Swagger;
+using Koan.Core.Observability;
+using Koan.Data.Core;
+using Koan.Messaging;
+using Koan.Web.Extensions;
+using Koan.Web.Extensions.GenericControllers;
+using Koan.Web.Swagger;
 using S7.ContentPlatform.Models;
-using Sora.Web.Extensions.Authorization;
-using Sora.Web.Extensions.Policies;
+using Koan.Web.Extensions.Authorization;
+using Koan.Web.Extensions.Policies;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSora()
+builder.Services.AddKoan()
     .AsWebApi()
     .AsProxiedApi()
     .WithRateLimit();
 
-// Optional: enable OpenTelemetry based on config/env (Sora:Observability or OTEL_* env vars)
-builder.Services.AddSoraObservability();
+// Optional: enable OpenTelemetry based on config/env (Koan:Observability or OTEL_* env vars)
+builder.Services.AddKoanObservability();
 
 // Wire messaging core for diagnostics surface
 builder.Services.AddMessagingCore();
@@ -37,40 +37,40 @@ builder.Services.AddCapabilityAuthorization(opts =>
     {
         Moderation = new ModerationPolicy
         {
-            DraftCreate = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationAuthor,
-            DraftUpdate = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationAuthor,
-            DraftGet = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationAuthor,
-            Submit = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationAuthor,
-            Withdraw = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationAuthor,
-            Queue = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationReviewer,
-            Approve = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationPublisher,
-            Reject = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationReviewer,
-            Return = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationReviewer,
+            DraftCreate = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationAuthor,
+            DraftUpdate = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationAuthor,
+            DraftGet = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationAuthor,
+            Submit = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationAuthor,
+            Withdraw = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationAuthor,
+            Queue = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationReviewer,
+            Approve = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationPublisher,
+            Reject = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationReviewer,
+            Return = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationReviewer,
         },
         SoftDelete = new SoftDeletePolicy
         {
-            ListDeleted = Sora.Web.Extensions.Policies.SoraWebPolicyNames.SoftDeleteActor,
-            Delete = Sora.Web.Extensions.Policies.SoraWebPolicyNames.SoftDeleteActor,
-            DeleteMany = Sora.Web.Extensions.Policies.SoraWebPolicyNames.SoftDeleteActor,
-            Restore = Sora.Web.Extensions.Policies.SoraWebPolicyNames.SoftDeleteActor,
-            RestoreMany = Sora.Web.Extensions.Policies.SoraWebPolicyNames.SoftDeleteActor,
+            ListDeleted = Koan.Web.Extensions.Policies.KoanWebPolicyNames.SoftDeleteActor,
+            Delete = Koan.Web.Extensions.Policies.KoanWebPolicyNames.SoftDeleteActor,
+            DeleteMany = Koan.Web.Extensions.Policies.KoanWebPolicyNames.SoftDeleteActor,
+            Restore = Koan.Web.Extensions.Policies.KoanWebPolicyNames.SoftDeleteActor,
+            RestoreMany = Koan.Web.Extensions.Policies.KoanWebPolicyNames.SoftDeleteActor,
         },
         Audit = new AuditPolicy
         {
-            Snapshot = Sora.Web.Extensions.Policies.SoraWebPolicyNames.AuditActor,
-            List = Sora.Web.Extensions.Policies.SoraWebPolicyNames.AuditActor,
-            Revert = Sora.Web.Extensions.Policies.SoraWebPolicyNames.AuditActor,
+            Snapshot = Koan.Web.Extensions.Policies.KoanWebPolicyNames.AuditActor,
+            List = Koan.Web.Extensions.Policies.KoanWebPolicyNames.AuditActor,
+            Revert = Koan.Web.Extensions.Policies.KoanWebPolicyNames.AuditActor,
         }
     };
 
     opts.Entities[typeof(Article).Name] = new CapabilityPolicy
     {
-        Moderation = new ModerationPolicy { Approve = Sora.Web.Extensions.Policies.SoraWebPolicyNames.ModerationPublisher }
+        Moderation = new ModerationPolicy { Approve = Koan.Web.Extensions.Policies.KoanWebPolicyNames.ModerationPublisher }
     };
 });
 
 // Map the simple role-based policies to roles for demo purposes
-builder.Services.AddSoraWebCapabilityPolicies(p =>
+builder.Services.AddKoanWebCapabilityPolicies(p =>
 {
     p.ModerationAuthorRole = "author";
     p.ModerationReviewerRole = "reviewer";
@@ -81,8 +81,8 @@ builder.Services.AddSoraWebCapabilityPolicies(p =>
 
 var app = builder.Build();
 
-// Enable Swagger UI per policy: Dev by default; in non-dev only when Sora__Web__Swagger__Enabled=true or SORA_MAGIC_ENABLE_SWAGGER=true
-app.UseSoraSwagger();
+// Enable Swagger UI per policy: Dev by default; in non-dev only when Koan__Web__Swagger__Enabled=true or Koan_MAGIC_ENABLE_SWAGGER=true
+app.UseKoanSwagger();
 
 // Ensure local data folder exists for providers that default to ./data
 if (app.Environment.IsDevelopment())

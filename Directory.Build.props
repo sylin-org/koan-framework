@@ -9,13 +9,13 @@
   <!-- SourceLink/Repo metadata -->
   <PublishRepositoryUrl>true</PublishRepositoryUrl>
   <EmbedUntrackedSources>true</EmbedUntrackedSources>
-  <!-- NuGet package IDs: publish under Sylin.Sora.* while keeping code namespaces as Sora.* -->
+  <!-- NuGet package IDs: publish under Sylin.Koan.* while keeping code namespaces as Koan.* -->
   <PackageId Condition="'$(IsPackable)' == 'true' and '$(PackageId)' == ''">Sylin.$(AssemblyName)</PackageId>
   <!-- Common NuGet package metadata -->
   <Authors>Sylin Labs</Authors>
   <Company>Sylin Labs</Company>
-  <PackageProjectUrl>https://github.com/sylin-labs/sora-framework</PackageProjectUrl>
-  <RepositoryUrl>https://github.com/sylin-labs/sora-framework.git</RepositoryUrl>
+  <PackageProjectUrl>https://github.com/sylin-labs/Koan-framework</PackageProjectUrl>
+  <RepositoryUrl>https://github.com/sylin-labs/Koan-framework.git</RepositoryUrl>
   <RepositoryType>git</RepositoryType>
   <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -24,9 +24,9 @@
   <!-- Prefer a README.md in the project folder; fall back to repo root README.md -->
   <PackageReadmeFile Condition="Exists('$(MSBuildProjectDirectory)\README.md')">README.md</PackageReadmeFile>
   <PackageReadmeFile Condition="'$(PackageReadmeFile)' == '' and Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
-    <PackageReleaseNotes>See release notes: https://github.com/sylin-labs/sora-framework/releases</PackageReleaseNotes>
+    <PackageReleaseNotes>See release notes: https://github.com/sylin-labs/Koan-framework/releases</PackageReleaseNotes>
     <!-- Common tags; projects can append by using $(CommonPackageTags) in their PackageTags -->
-    <CommonPackageTags>sora;framework;modular;dotnet;aspnetcore;cqrs;ddd;messaging;data;opentelemetry</CommonPackageTags>
+    <CommonPackageTags>Koan;framework;modular;dotnet;aspnetcore;cqrs;ddd;messaging;data;opentelemetry</CommonPackageTags>
 
   <!-- Baseline language/features across the repo -->
   <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
@@ -50,10 +50,10 @@
   </ItemGroup>
   <!-- Attach in-repo Roslyn generators to all projects for local builds -->
   <ItemGroup>
-    <ProjectReference Include="$(MSBuildThisFileDirectory)src\Sora.Orchestration.Generators\Sora.Orchestration.Generators.csproj"
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
-                      Condition="Exists('$(MSBuildThisFileDirectory)src\Sora.Orchestration.Generators\Sora.Orchestration.Generators.csproj') and '$(MSBuildProjectName)' != 'Sora.Orchestration.Generators'" />
+                      Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj') and '$(MSBuildProjectName)' != 'Koan.Orchestration.Generators'" />
   </ItemGroup>
   <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)icon.png')">
     <PackageIcon>icon.png</PackageIcon>

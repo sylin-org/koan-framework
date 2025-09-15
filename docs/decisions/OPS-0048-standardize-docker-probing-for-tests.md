@@ -15,7 +15,7 @@ Several integration tests rely on Docker via Testcontainers. On Windows, some en
 
 ## Decision
 
-- Introduce a shared testing utility `Sora.Testing.DockerEnvironment` to probe Docker availability and produce a stable endpoint string.
+- Introduce a shared testing utility `Koan.Testing.DockerEnvironment` to probe Docker availability and produce a stable endpoint string.
 - Probe priority:
   1) Use `DOCKER_HOST` if set and reachable.
   2) Platform default (Windows: `npipe://./pipe/docker_engine`; Linux/macOS: `unix:///var/run/docker.sock`).

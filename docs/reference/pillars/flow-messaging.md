@@ -1,4 +1,4 @@
-﻿## Flow & Messaging Capabilities (Inventory)
+## Flow & Messaging Capabilities (Inventory)
 
 Contract (summary)
 
@@ -11,7 +11,7 @@ Contract (summary)
 
 - Send API: `await entity.Send()` (envelope + queue routing automatic).
 - Interceptors: Type/interface registration; returns envelope or `IQueuedMessage`.
-- Queue Routing: `FlowQueuedMessage` targets `Sora.Flow.FlowEntity` queue.
+- Queue Routing: `FlowQueuedMessage` targets `Koan.Flow.FlowEntity` queue.
 - Descriptor Transformers: Legacy `MessagingTransformers.Register(descriptor, fn)` (avoid for Flow entities; keep for generic adaptation).
 - Handler Registration: `services.On<string>(...)` for envelope JSON; future: strongly typed orchestrator handlers.
 

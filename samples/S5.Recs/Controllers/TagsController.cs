@@ -25,8 +25,8 @@ public class TagsController : ControllerBase
         if (string.Equals(sort, "alpha", StringComparison.OrdinalIgnoreCase) || string.Equals(sort, "name", StringComparison.OrdinalIgnoreCase))
             q = q.OrderBy(t => t.Tag);
         else
-            q = q.OrderByDescending(t => t.AnimeCount).ThenBy(t => t.Tag);
+            q = q.OrderByDescending(t => t.MediaCount).ThenBy(t => t.Tag);
         if (top.HasValue && top.Value > 0) q = q.Take(top.Value);
-        return Ok(q.Select(t => new { tag = t.Tag, count = t.AnimeCount }));
+        return Ok(q.Select(t => new { tag = t.Tag, count = t.MediaCount }));
     }
 }

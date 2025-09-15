@@ -11,7 +11,7 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $here
 try {
   $composeFile = "S8.Compose/docker-compose.yml"
-  $project = "sora-s8-flow"
+  $project = "Koan-s8-flow"
   $apiUrl = "http://localhost:4903"
 
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {

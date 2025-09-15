@@ -13,11 +13,11 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:5064
       ConnectionStrings__Default: mongodb://mongo:27017
-      Sora__Data__Mongo__Database: s4
+      Koan__Data__Mongo__Database: s4
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_ENVIRONMENT: Development
-      Sora__Web__IsProxiedApi: "true"
-      Sora__Web__Swagger__Enabled: "true"
+      Koan__Web__IsProxiedApi: "true"
+      Koan__Web__Swagger__Enabled: "true"
     depends_on:
       mongo:
         condition: service_healthy

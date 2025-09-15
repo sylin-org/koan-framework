@@ -9,9 +9,9 @@
 
 ## Executive Summary
 
-The S8.Location sample project demonstrates a canonical location standardization system using SHA512 deduplication and the orchestrator bidirectional pattern. However, the current implementation contains several critical architectural issues that prevent proper operation and diverge from Sora Framework best practices.
+The S8.Location sample project demonstrates a canonical location standardization system using SHA512 deduplication and the orchestrator bidirectional pattern. However, the current implementation contains several critical architectural issues that prevent proper operation and diverge from Koan Framework best practices.
 
-**Key Finding**: The implementation attempts to use non-existent APIs and patterns from an older version of Sora.Flow, resulting in a system that cannot function as designed.
+**Key Finding**: The implementation attempts to use non-existent APIs and patterns from an older version of Koan.Flow, resulting in a system that cannot function as designed.
 
 ---
 
@@ -37,7 +37,7 @@ The S8.Location sample project demonstrates a canonical location standardization
 **File**: `src/samples/S8.Location/S8.Location.Core/Interceptors/LocationInterceptor.cs:32-86`
 
 **Problem Details**:
-- Line 32: `FlowInterceptors.For<Models.Location>()` - This fluent API doesn't exist in Sora.Flow.Core
+- Line 32: `FlowInterceptors.For<Models.Location>()` - This fluent API doesn't exist in Koan.Flow.Core
 - Line 44: `services.BuildServiceProvider().GetService<T>()` - Anti-pattern that creates new service provider
 - Hash collision detection drops duplicates instead of retrieving cached canonical IDs
 - Should implement `IFlowIntakeInterceptor<Location>` interface
@@ -48,7 +48,7 @@ The S8.Location sample project demonstrates a canonical location standardization
 
 **Issue**: Missing service registrations and incorrect lifecycle management.
 
-**File**: `src/samples/S8.Location/S8.Location.Core/Initialization/SoraAutoRegistrar.cs:20-34`
+**File**: `src/samples/S8.Location/S8.Location.Core/Initialization/KoanAutoRegistrar.cs:20-34`
 
 **Problem Details**:
 - `BackgroundResolutionService` never registered as hosted service
@@ -66,7 +66,7 @@ The S8.Location sample project demonstrates a canonical location standardization
 
 **Problem Details**:
 - Raw SQL string concatenation: `"Address LIKE '%{address}%'"` - SQL injection vulnerable
-- Direct Entity method calls instead of proper Sora.Data patterns
+- Direct Entity method calls instead of proper Koan.Data patterns
 - Missing proper pagination and filtering capabilities
 - No proper async enumeration
 
@@ -118,7 +118,7 @@ The S8.Location sample project demonstrates a canonical location standardization
 
 ### Flow Pipeline Breakdown
 
-The implementation misunderstands Sora.Flow's lifecycle:
+The implementation misunderstands Koan.Flow's lifecycle:
 
 - **Expected**: FlowEntity → Intake Interceptor → Park/Continue → Orchestrator → Canonical
 - **Actual**: FlowEntity → Registration Failure → No Processing
@@ -177,11 +177,11 @@ public class LocationIntakeInterceptor : IFlowIntakeInterceptor<Location>
 
 #### 1.2 Fix Service Registration
 
-**Current** (`SoraAutoRegistrar.cs`):
+**Current** (`KoanAutoRegistrar.cs`):
 ```csharp
 public void Initialize(IServiceCollection services)
 {
-    services.AddSoraOptions<LocationOptions>();
+    services.AddKoanOptions<LocationOptions>();
     services.AddHttpClient();
     services.AddSingleton<IAddressResolutionService, AddressResolutionService>();
     services.AddSingleton<IGeocodingService, GoogleMapsGeocodingService>();
@@ -194,7 +194,7 @@ public void Initialize(IServiceCollection services)
 public void Initialize(IServiceCollection services)
 {
     // Configuration
-    services.AddSoraOptions<LocationOptions>();
+    services.AddKoanOptions<LocationOptions>();
     services.AddHttpClient();
     
     // Core services (scoped for proper DI)
@@ -343,12 +343,12 @@ public async Task<HealthCheckResult> CheckAsync(CancellationToken ct)
 
 ### Sprint 1: Critical Infrastructure (3-5 days)
 1. **Day 1-2**: Replace `LocationInterceptor` with proper `IFlowIntakeInterceptor<Location>`
-2. **Day 2-3**: Fix service registration in `SoraAutoRegistrar`  
+2. **Day 2-3**: Fix service registration in `KoanAutoRegistrar`  
 3. **Day 3-4**: Restructure `BackgroundResolutionService` with proper Flow integration
 4. **Day 4-5**: Test basic park → resolve → promote flow
 
 ### Sprint 2: Data Layer and Security (2-3 days)
-1. **Day 1**: Replace raw SQL queries with Sora.Data patterns
+1. **Day 1**: Replace raw SQL queries with Koan.Data patterns
 2. **Day 1-2**: Implement proper pagination and filtering
 3. **Day 2-3**: Add comprehensive input validation and security hardening
 
@@ -417,4 +417,4 @@ public async Task<HealthCheckResult> CheckAsync(CancellationToken ct)
 
 **Document Status**: Ready for Implementation  
 **Approval Required**: Architecture Team Sign-off on Flow Integration Approach  
-**Dependencies**: Sora.Flow.Core v0.2.18+ patterns and interfaces
+**Dependencies**: Koan.Flow.Core v0.2.18+ patterns and interfaces

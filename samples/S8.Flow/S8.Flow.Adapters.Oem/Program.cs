@@ -1,23 +1,23 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Sora.Messaging;
+using Koan.Messaging;
 using S8.Flow.Shared;
-using Sora.Flow.Attributes;
-using Sora.Flow.Model;
-using Sora.Flow.Extensions;
-using Sora.Data.Core;
+using Koan.Flow.Attributes;
+using Koan.Flow.Model;
+using Koan.Flow.Extensions;
+using Koan.Data.Core;
 using System.Collections.Generic;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 
-if (!Sora.Core.SoraEnv.InContainer)
+if (!Koan.Core.KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Flow.Adapters.Oem is container-only. Use samples/S8.Compose/docker-compose.yml.");
     return;
 }
 
-builder.Services.AddSora();
+builder.Services.AddKoan();
 
 var app = builder.Build();
 await app.RunAsync();
@@ -107,7 +107,7 @@ public sealed class OemPublisher : BackgroundService
                             {
                                 Id = "oem" + sensorTemplate.Id, // oemS1, oemS2, etc.
                                 DeviceId = "oem" + sensorTemplate.DeviceId, // oemDX
-                                SensorId = "oem" + sensorTemplate.SensorKey,
+                                SensorId = "oem" + sensorTemplate.SensorId,
                                 Code = sensorTemplate.Code,
                                 Unit = sensorTemplate.Unit
                             };
@@ -128,13 +128,13 @@ public sealed class OemPublisher : BackgroundService
                 {
                     var reading = new Reading
                     {
-                        SensorId = "oem" + readingTemplate.SensorKey,
+                        SensorId = "oem" + readingTemplate.SensorId,
                         Value = readingTemplate.Value,
                         CapturedAt = readingTemplate.CapturedAt,
                         Unit = readingTemplate.Unit
                     };
 
-                    _log.LogDebug("[OEM] Reading: {SensorKey} = {Value}", reading.SensorKey, reading.Value);
+                    _log.LogDebug("[OEM] Reading: {SensorId} = {Value}", reading.SensorId, reading.Value);
                     await reading.Send(cancellationToken: stoppingToken);
                 }
             }

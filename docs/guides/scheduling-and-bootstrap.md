@@ -4,12 +4,12 @@ This guide shows how to schedule simple jobs and how the Bootstrap preset works.
 
 ## Quick start
 
-1. Add the module package (placeholder): `Sora.Scheduling`.
+1. Add the module package (placeholder): `Koan.Scheduling`.
 2. Enable scheduling (Dev default on, Prod default off):
 
 appsettings.Development.json
 {
-"Sora": {
+"Koan": {
 "Scheduling": {
 "Enabled": true,
 "ReadinessGate": true
@@ -77,7 +77,7 @@ Override via config:
 
 appsettings.json
 {
-"Sora": {
+"Koan": {
 "Scheduling": {
 "Jobs": {
 "sync-external": {
@@ -96,7 +96,7 @@ Use the preset to run environment bring-up tasks.
 
 appsettings.Development.json
 {
-"Sora": {
+"Koan": {
 "Scheduling": {
 "Enabled": true,
 "Jobs": {
@@ -120,7 +120,7 @@ The Bootstrap runner maps task keys to provider-specific operations when those p
 ## Health and well-known
 
 - Health contributors: one per task and one for the orchestrator.
-- /.well-known/sora/scheduling (when observability is exposed) returns enabled, readinessGate, capabilities, and a compact tasks snapshot.
+- /.well-known/Koan/scheduling (when observability is exposed) returns enabled, readinessGate, capabilities, and a compact tasks snapshot.
 
 ## Error handling & best practices
 

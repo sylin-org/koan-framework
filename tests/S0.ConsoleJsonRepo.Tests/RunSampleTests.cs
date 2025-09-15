@@ -12,7 +12,7 @@ public class RunSampleTests
     {
         var root = FindRepoRoot();
         var project = Path.Combine(root, "samples", "S0.ConsoleJsonRepo", "S0.ConsoleJsonRepo.csproj");
-        var tmp = Path.Combine(Path.GetTempPath(), "sora-s0-tests", Guid.NewGuid().ToString("n"));
+        var tmp = Path.Combine(Path.GetTempPath(), "Koan-s0-tests", Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(tmp);
 
         var psi = new ProcessStartInfo("dotnet", $"run --project \"{project}\" \"{tmp}\"")
@@ -47,9 +47,9 @@ public class RunSampleTests
     private static string FindRepoRoot([CallerFilePath] string? thisFile = null)
     {
         var dir = Path.GetDirectoryName(thisFile!) ?? Directory.GetCurrentDirectory();
-        while (!File.Exists(Path.Combine(dir, "Sora.sln")))
+        while (!File.Exists(Path.Combine(dir, "Koan.sln")))
         {
-            dir = Directory.GetParent(dir)?.FullName ?? throw new DirectoryNotFoundException("Could not locate Sora.sln");
+            dir = Directory.GetParent(dir)?.FullName ?? throw new DirectoryNotFoundException("Could not locate Koan.sln");
         }
         return dir;
     }

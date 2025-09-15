@@ -1,4 +1,4 @@
-﻿## Messaging Primitives (Contract)
+## Messaging Primitives (Contract)
 
 Inputs / Concepts:
 - Message types implementing marker interfaces or annotated with `[Message]`.
@@ -41,7 +41,7 @@ Alias comes from `[Message(Alias=.., Version=1)]` (version suffix only when enab
 
 ### Standard Headers
 See ADR MESS-0070. Set automatically unless already present (user-supplied headers win):
-`x-sora-kind`, `x-correlation-id`, `x-trace-id`, `x-command-target`, `x-retry-count`, `x-flow-adapter`, `x-flow-event-alias`.
+`x-Koan-kind`, `x-correlation-id`, `x-trace-id`, `x-command-target`, `x-retry-count`, `x-flow-adapter`, `x-flow-event-alias`.
 
 ### Handler Registration
 ```csharp

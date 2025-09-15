@@ -5,7 +5,7 @@ set "SCRIPT_DIR=%~dp0"
 pushd "%SCRIPT_DIR%"
 
 set COMPOSE_FILE=docker\compose.yml
-set PROJECT_NAME=sora-s7-techdocs
+set PROJECT_NAME=koan-s7-techdocs
 set API_URL=http://localhost:5087
 set SWAGGER=%API_URL%/swagger/index.html
 set TESTPROVIDER_LOGIN=%API_URL%/.testoauth/login.html

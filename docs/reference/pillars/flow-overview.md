@@ -1,14 +1,14 @@
-﻿# Sora.Flow — Model-typed pipeline (ingest → standardize → key → associate → project)
+# Koan.Flow — Model-typed pipeline (ingest → standardize → key → associate → project)
 
 Contract (at a glance) — see also: [Bindings and canonical IDs](./flow-bindings-and-canonical-ids.md) and ADR [FLOW-0105](../decisions/FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md)
-- Inputs: Normalized deltas (patch-like) per model over HTTP/MQ; options under Sora:Flow.
+- Inputs: Normalized deltas (patch-like) per model over HTTP/MQ; options under Koan:Flow.
 - Outputs: Per-model canonical projections and lineage; processed hot-stage records; diagnostics.
 - Error modes: Rejections with reason/evidence; DLQs; readiness/health.
 - Success: Deltas accepted, keyed and associated; projection tasks drained; canonical and lineage are queryable.
 
 Minimal boot and auto-registration
-- Generic hosts (adapters): `builder.Services.AddSora();` — the Core host binder sets `AppHost`/`SoraEnv` automatically and Flow auto-registers `[FlowAdapter]` `BackgroundService`s. See ADR [FLOW-0106](../decisions/FLOW-0106-adapter-auto-scan-and-minimal-boot.md).
-- Web hosts (APIs): Turnkey is ON by default — referencing `Sora.Flow.Web` auto-adds `AddSoraFlow()` unless disabled via `Sora:Flow:AutoRegister=false`. It's idempotent, so explicit calls are safe. Typical: `builder.Services.AddSora(); app.UseSora();`
+- Generic hosts (adapters): `builder.Services.AddKoan();` — the Core host binder sets `AppHost`/`KoanEnv` automatically and Flow auto-registers `[FlowAdapter]` `BackgroundService`s. See ADR [FLOW-0106](../decisions/FLOW-0106-adapter-auto-scan-and-minimal-boot.md).
+- Web hosts (APIs): Turnkey is ON by default — referencing `Koan.Flow.Web` auto-adds `AddKoanFlow()` unless disabled via `Koan:Flow:AutoRegister=false`. It's idempotent, so explicit calls are safe. Typical: `builder.Services.AddKoan(); app.UseKoan();`
 
 Core types (first-class statics)
 - FlowEntity<TModel> : Entity<TModel> — TModel is the canonical shape (e.g., Device)
@@ -38,32 +38,32 @@ Hot → processed
 - After successful projection, move records out of hot sets (intake/standardized/keyed) to processed (copy+delete) and/or apply TTLs. This reduces seek time on hot collections.
 
 Messaging (per-model isolation)
-- Exchanges/routing keys per model, e.g., sora.flow.device (or routing keys flow.device.intake). Queues are provisioned per group+model. DLQs per stage remain: flow.{stage}.dlq.{model}.
+- Exchanges/routing keys per model, e.g., Koan.flow.device (or routing keys flow.device.intake). Queues are provisioned per group+model. DLQs per stage remain: flow.{stage}.dlq.{model}.
 
 Routes (controllers)
 - GET /models/{model}/views/{view}
 - GET /models/{model}/views/{view}/{referenceId}
 - Legacy /views/* may be absent in new apps. Controllers resolve {model} to the registered type and query CanonicalProjection<TModel>/LineageProjection<TModel> against FlowSets.View<TModel>(view).
 
-Options (Sora:Flow)
+Options (Koan:Flow)
 
-Adapter auto-start configuration (Sora:Flow:Adapters)
+Adapter auto-start configuration (Koan:Flow:Adapters)
 - AutoStart (bool): default true when running in containers; false otherwise.
 - Include (string[]): optional whitelist of adapters by `"system:adapter"`.
 - Exclude (string[]): optional blacklist of adapters by `"system:adapter"`.
 
 Example
 {
-  "Sora": { "Flow": { "Adapters": { "AutoStart": true, "Include": ["oem:publisher"], "Exclude": [] } } }
+  "Koan": { "Flow": { "Adapters": { "AutoStart": true, "Include": ["oem:publisher"], "Exclude": [] } } }
 }
 
 Turnkey Flow runtime (web) — opt-out gate
-- Key: `Sora:Flow:AutoRegister` (bool). Default: `true`.
-- Behavior: When true, `Sora.Flow.Web` auto-calls `AddSoraFlow()` during module registration if it hasn't already been added. When false, nothing is added; call `AddSoraFlow()` explicitly in `Program.cs`.
+- Key: `Koan:Flow:AutoRegister` (bool). Default: `true`.
+- Behavior: When true, `Koan.Flow.Web` auto-calls `AddKoanFlow()` during module registration if it hasn't already been added. When false, nothing is added; call `AddKoanFlow()` explicitly in `Program.cs`.
 
 Example (disable turnkey)
 {
-  "Sora": { "Flow": { "AutoRegister": false } }
+  "Koan": { "Flow": { "AutoRegister": false } }
 }
 
 Indexing and search
@@ -103,10 +103,10 @@ The ingestion resolver maintains an ExternalId index `(entityKey, system, extern
 - Canonical: Nested range → values object aligned to root snapshot. Each leaf path expands from dotted tags into nested objects and stores value arrays preserving insertion order (diagnostics-first; not a materialized single value).
 - Lineage: tag → value → [sources] map; null values are skipped.
 
-- Reference `Sora.Flow.Runtime.Dapr` to prefer the Dapr runtime.
+- Reference `Koan.Flow.Runtime.Dapr` to prefer the Dapr runtime.
 ## Dapr runtime provider
 
-When `Sora.Flow.Runtime.Dapr` is referenced, the Dapr-backed runtime replaces the default provider automatically via AutoRegistrar.
+When `Koan.Flow.Runtime.Dapr` is referenced, the Dapr-backed runtime replaces the default provider automatically via AutoRegistrar.
 
 Minimal configuration hints
 - DAPR_HTTP_PORT / DAPR_GRPC_PORT
@@ -127,7 +127,7 @@ Notes
 Contract (at a glance)
 - Inputs: discovered `FlowEntity<T>` models; optional adapter metadata via `[FlowAdapter]`.
 - Outputs: generic HTTP controllers for roots and views; monitor hooks; action sender/receiver.
-- Defaults: auto-registered via SoraAutoRegistrar; route prefix `/api/flow`; verbs: seed/report/ping.
+- Defaults: auto-registered via KoanAutoRegistrar; route prefix `/api/flow`; verbs: seed/report/ping.
 
 Controllers
 - `FlowEntityController<TModel>` extends the base Entity controller for `DynamicFlowEntity<TModel>` and adds:
@@ -153,6 +153,6 @@ Actions
 - Correlated by `CorrelationId`, model-qualified.
 
 Options
-- Toggle auto-registration: `Sora:Flow:AutoRegister`.
+- Toggle auto-registration: `Koan:Flow:AutoRegister`.
 - Override route prefix/paging; extend verbs.
 

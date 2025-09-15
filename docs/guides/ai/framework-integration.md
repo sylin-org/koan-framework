@@ -1,6 +1,6 @@
-# Native AI Sora — Epic
+# Native AI Koan — Epic
 
-A cross-cutting initiative to bring native AI capabilities to Sora with the same principles as the rest of the framework: controller-only HTTP, sane defaults, auto-setup, discovery via capability flags, and strong observability. This epic moves from in-app library mode to optional sidecar and central proxy/connector, compounding value at each step.
+A cross-cutting initiative to bring native AI capabilities to Koan with the same principles as the rest of the framework: controller-only HTTP, sane defaults, auto-setup, discovery via capability flags, and strong observability. This epic moves from in-app library mode to optional sidecar and central proxy/connector, compounding value at each step.
 
 ## Goals
 
@@ -22,7 +22,7 @@ Focus on strategic fundamentals that unblock later work and reduce churn.
 
 - API contract & schemas
   - Define request/response DTOs for `/ai/chat`, `/ai/embed`, `/ai/rag/query` and error shapes (ProblemDetails) with examples.
-  - Pin header contracts (Sora-AI-Provider, Sora-AI-Model, Sora-AI-Streaming, Sora-Session-Id, Sora-Tenant/Project) and SSE event format (event names, data frames, termination semantics).
+  - Pin header contracts (Koan-AI-Provider, Koan-AI-Model, Koan-AI-Streaming, Koan-Session-Id, Koan-Tenant/Project) and SSE event format (event names, data frames, termination semantics).
 - Protocol surfaces
   - Draft gRPC proto mirroring the core endpoints for internal S2S; generate C# server/client; keep behind feature flag.
   - Define scope for OpenAI-compatible shim (subset, stability window) to minimize compatibility churn.
@@ -43,28 +43,28 @@ Outcome: stable surface area, internal protocol ready, safe defaults for RAG and
 
 - Epic A: Core & Providers
   - Features: Contracts, options, constants; OpenAI + Ollama providers; tokenizer/cost; boot report.
-  - Deliverables: Sora.AI.Core, Providers.OpenAI/Local, unit/integration tests, docs.
+  - Deliverables: Koan.AI.Core, Providers.OpenAI/Local, unit/integration tests, docs.
 - Epic W: Web & Protocols
   - Features: REST controllers with SSE; schemas; gRPC internal surface; OpenAI-compatible shim; optional adapters for MCP (Model Context Protocol) and AI-RPC for interoperability.
-  - Deliverables: Sora.Web.AI, gRPC proto + server, OpenAPI spec, examples.
+  - Deliverables: Koan.Web.AI, gRPC proto + server, OpenAPI spec, examples.
 - Epic V: Vector & RAG
   - Features: Redis vector + cache; pgvector fast-follow; RAG defaults, ingestion, citations; migration utils.
-  - Deliverables: Sora.Data.Vector.Redis/pgvector, S5.AI.Rag sample, probe scripts.
+  - Deliverables: Koan.Data.Vector.Redis/pgvector, S5.AI.Rag sample, probe scripts.
 - Epic G: Observability & Governance
   - Features: OTel metrics/spans; budgets; moderation/redaction; model allow-lists; SSE SLOs.
   - Deliverables: meters, dashboards, policies, tests.
 - Epic P: Proxy/Connector & Tenancy
   - Features: Sidecar proxy; central proxy with quotas; secrets provider; admin APIs.
-  - Deliverables: Sora.Web.AI.Proxy, tenancy headers, usage accounting, key management adapters.
+  - Deliverables: Koan.Web.AI.Proxy, tenancy headers, usage accounting, key management adapters.
 - Epic RU: Platform Ramp-up
   - Features: Redis core cache/session; MySQL relational adapter; CouchDB adapter (optional).
-  - Deliverables: Sora.Caching.Redis, Sora.Data.Relational.MySql, Sora.Data.CouchDb.
+  - Deliverables: Koan.Caching.Redis, Koan.Data.Relational.MySql, Koan.Data.CouchDb.
 - Epic E: Messaging & Tools
   - Features: MQ transformers; safe tool registry; audited function calling.
   - Deliverables: handlers, registry, tests, docs.
  - Epic X (On-ramp Priority): Data Bridge & Replication
    - Features: Entity snapshot export/import, CDC via Debezium/Kafka, AI-aware vector indexing, virtualization (composed reads), scheduled materialization, diff/reconcile, connectors interop.
-   - Deliverables: Sora.Data.Transfer, Sora.Data.Replication, Sora.Web.Transfer, guides and probes.
+   - Deliverables: Koan.Data.Transfer, Koan.Data.Replication, Koan.Web.Transfer, guides and probes.
 
 ---
 
@@ -91,8 +91,8 @@ Each story is a contained deliverable with clear acceptance criteria; stories bu
 ### Story A1: AI Core Contracts and Options
 
 - Deliverables
-  - Sora.AI.Core: contracts (IChatCompletion, IEmbedding, IToolCall, IVectorStore), AiOptions, capability flags.
-  - Constants for headers/keys/tags (Sora-AI-Provider, Sora-AI-Model, Sora-Vector-Provider, ai.* OTel tags).
+  - Koan.AI.Core: contracts (IChatCompletion, IEmbedding, IToolCall, IVectorStore), AiOptions, capability flags.
+  - Constants for headers/keys/tags (Koan-AI-Provider, Koan-AI-Model, Koan-Vector-Provider, ai.* OTel tags).
 - Acceptance Criteria
   - NuGet package builds; unit tests for options binding and capability serialization.
   - Docs section describing contracts and headers.
@@ -100,7 +100,7 @@ Each story is a contained deliverable with clear acceptance criteria; stories bu
 #### Milestones & Deliverables
 
 - Code
-  - New project: `src/Sora.AI.Core/` with interfaces, `AiOptions`, `AiCapabilityFlags`, `AiErrorKind`, and DI extension `AddSoraAI()`.
+  - New project: `src/Koan.AI.Core/` with interfaces, `AiOptions`, `AiCapabilityFlags`, `AiErrorKind`, and DI extension `AddKoanAI()`.
   - Constants: `Infrastructure/AiConstants.cs` (headers, env keys, default models), `Infrastructure/AiTelemetry.cs` (activity names, tags, metric names).
   - Result types: `AiUsage` (tokens/cost), `AiMessage`, `AiToolDefinition`, `AiToolCall`.
 - Docs
@@ -124,7 +124,7 @@ Note: Incorporate tokenizer interfaces and cost estimator hooks here; include pr
 #### Milestones & Deliverables
 
 - Code
-  - `Sora.AI.Providers.OpenAI` and `Sora.AI.Providers.Local` (Ollama) adapters with `HttpClientFactory`, timeouts, retry/backoff (transient only), and SSE/stream chunk parser.
+  - `Koan.AI.Providers.OpenAI` and `Koan.AI.Providers.Local` (Ollama) adapters with `HttpClientFactory`, timeouts, retry/backoff (transient only), and SSE/stream chunk parser.
   - Provider capability detection (max tokens, tool support) and mapping to `AiCapabilityFlags`.
   - Boot reporter contributor to append AI section (safe/redacted).
 - Docs
@@ -139,7 +139,7 @@ Note: Provider tokenization wired to A1’s tokenizer abstraction; add retry pol
 ### Story A3: Web AI Controllers
 
 - Deliverables
-  - Sora.Web.AI: controllers only: POST /ai/chat (SSE), POST /ai/embed, GET /ai/models.
+  - Koan.Web.AI: controllers only: POST /ai/chat (SSE), POST /ai/embed, GET /ai/models.
   - Minimal TinyAI template that wires DI and env options.
 - Acceptance Criteria
   - Endpoints function in a sample app; OpenAPI appears with schemas; no inline endpoints.
@@ -149,7 +149,7 @@ Note: Provider tokenization wired to A1’s tokenizer abstraction; add retry pol
 - Code
   - Controllers: `ChatController` (POST /ai/chat with SSE), `EmbeddingsController` (POST /ai/embed), `ModelsController` (GET /ai/models).
   - SSE utility for proper flush/backpressure; request validators (budget/model allow-list hooks).
-  - DI wiring extension `AddSoraWebAI()`; OpenAPI schema annotations; problem details mapping for AI errors.
+  - DI wiring extension `AddKoanWebAI()`; OpenAPI schema annotations; problem details mapping for AI errors.
 - Docs
   - Endpoint reference with request/response examples; SSE client examples; model override via headers.
 - Tests
@@ -189,8 +189,8 @@ Note: Controllers must strictly follow Story A0 schemas; SSE event framing must 
   - 3) CouchDB adapter → optional for teams with Couch; Mongo already supported.
 - Deliverables
   - Redis Core: namespaced cache/session APIs with TTL, connection health, and DI options; boot report integration.
-  - MySQL Adapter: `Sora.Data.MySql` with capability flags, DDL policy adherence, pushdown-first queries, Direct escape hatch.
-  - CouchDB Adapter: `Sora.Data.CouchDb` with capability discovery, health checks, and basic CRUD/query parity with Mongo adapter where sensible.
+  - MySQL Adapter: `Koan.Data.MySql` with capability flags, DDL policy adherence, pushdown-first queries, Direct escape hatch.
+  - CouchDB Adapter: `Koan.Data.CouchDb` with capability discovery, health checks, and basic CRUD/query parity with Mongo adapter where sensible.
 - Acceptance Criteria
   - Redis: cache get/set with TTL, session store API, health/readiness green; perf sanity on small payloads.
   - MySQL: CRUD + paging pushdown; entity mapping parity; Direct API works with parameterized queries.
@@ -199,15 +199,15 @@ Note: Controllers must strictly follow Story A0 schemas; SSE event framing must 
 #### Milestones & Deliverables
 
 - Code
-  - `Sora.Data.Redis` (or `Sora.Caching.Redis`):
+  - `Koan.Data.Redis` (or `Koan.Caching.Redis`):
     - Cache service with namespacing (tenant/project/model), TTL, serialization strategy, and bulk operations.
     - Session store interface with sliding/absolute expirations (to back AI session memory pre-Vector).
     - Health checks, metrics (hits/misses, latency), boot report contributor.
-  - `Sora.Data.MySql`:
+  - `Koan.Data.MySql`:
     - Relational adapter integrating with existing relational toolkit and LINQ translator; discovery of server version and feature flags (window functions, CTE support).
     - DDL policy compliance; naming conventions; transaction and batch support.
     - Direct ADO boundary with parameterization and tracing tags (db.system=mysql).
-  - `Sora.Data.CouchDb`:
+  - `Koan.Data.CouchDb`:
     - Client wiring with HTTP auth/TLS; database bootstrap/health; CRUD and query-by-view.
     - Capability flags (attachments, partitioning, mango query support if enabled).
     - Consistent telemetry tags (db.system=couchdb) and error normalization.
@@ -227,7 +227,7 @@ Note: Controllers must strictly follow Story A0 schemas; SSE event framing must 
 #### Milestones & Deliverables
 
 - Code
-  - `ActivitySource` and `Meter` registration in `Sora.AI.Core`; counters/gauges for tokens (prompt/completion/total), estimated cost, and request counts.
+  - `ActivitySource` and `Meter` registration in `Koan.AI.Core`; counters/gauges for tokens (prompt/completion/total), estimated cost, and request counts.
   - Prompt hashing utility (SHA-256) and redaction policy; transcript persistence interface (disabled by default).
 - Docs
   - How to view metrics (OTel/Prom); privacy posture; enabling transcript storage and risks.
@@ -241,7 +241,7 @@ Note: Add tokenization accuracy gauges and cost estimation error bounds to dashb
 ### Story V1: Redis Vector + Cache (Redis-first)
 
 - Deliverables
-  - Sora.Data.Vector.Redis with capability negotiation (dims, metric, HNSW).
+  - Koan.Data.Vector.Redis with capability negotiation (dims, metric, HNSW).
   - Embedding pipeline with batch/retry and cache hooks; prompt/response cache (TTL) in Redis.
 - Acceptance Criteria
   - Upsert/query/delete work; P95 < 100ms on small corpora; cache hit ratio observed in sample.
@@ -249,7 +249,7 @@ Note: Add tokenization accuracy gauges and cost estimation error bounds to dashb
 #### Milestones & Deliverables
 
 - Code
-  - `Sora.Data.Vector.Redis`: index bootstrap (HNSW), capability detection (metric, dims), health checks, upsert/query/delete/search-with-metadata, pagination.
+  - `Koan.Data.Vector.Redis`: index bootstrap (HNSW), capability detection (metric, dims), health checks, upsert/query/delete/search-with-metadata, pagination.
   - Embedding pipeline service with batch/retry and backpressure; validation of vector dimensions.
   - AI cache: prompt→response cache with TTL, namespacing (tenant/project/model), and invalidation hooks.
 - Docs
@@ -264,7 +264,7 @@ Note: Add Redis guardrails: memory cap guidance, persistence (RDB/AOF) recommend
 ### Story V1.1: pgvector Adapter (fast-follow)
 
 - Deliverables
-  - `Sora.Data.Vector.Postgres` (pgvector) with capability detection, migrations/bootstrap, parity query API.
+  - `Koan.Data.Vector.Postgres` (pgvector) with capability detection, migrations/bootstrap, parity query API.
   - Perf and recall parity tests vs. Redis adapter on sample corpora; connection resiliency and pooling guidance.
 - Acceptance Criteria
   - Env swap from Redis to pgvector without code changes; parity tests pass thresholds; boot report surfaces pgvector capabilities.
@@ -315,7 +315,7 @@ Note: Budget enforcement must integrate with SSE termination correctly; include 
 ### Story P1: Sidecar Proxy (single-tenant)
 
 - Deliverables
-  - Sora.Web.AI.Proxy service project with same controllers; optional OpenAI-compatible route shape.
+  - Koan.Web.AI.Proxy service project with same controllers; optional OpenAI-compatible route shape.
   - Env routing with fallback (local → hosted); shared Redis cache/memory/vector.
 - Acceptance Criteria
   - Existing sample switches to proxy via base URL/env only; latency overhead within acceptable bounds.
@@ -323,7 +323,7 @@ Note: Budget enforcement must integrate with SSE termination correctly; include 
 #### Milestones & Deliverables
 
 - Code
-  - New service: `src/Sora.Web.AI.Proxy/` exposing same controllers; optional OpenAI-compatible shim endpoints.
+  - New service: `src/Koan.Web.AI.Proxy/` exposing same controllers; optional OpenAI-compatible shim endpoints.
   - Env-based routing and fallback (local → hosted); connection pooling; SSE passthrough with minimal buffering.
   - Health/readiness endpoints; containerfile and sample compose profile.
 - Docs
@@ -338,7 +338,7 @@ Note: Add secrets provider integration for keys; route selection policy exposed 
 ### Story T1: Multi-tenant Central Proxy
 
 - Deliverables
-  - Tenant/project headers (Sora-Tenant, Sora-Project); usage accounting; quotas/rate limits.
+  - Tenant/project headers (Koan-Tenant, Koan-Project); usage accounting; quotas/rate limits.
   - Admin APIs for model catalogs and usage; dashboards via OTel/Prom.
 - Acceptance Criteria
   - Two apps share proxy with isolated quotas; admin sees per-tenant metrics.
@@ -361,7 +361,7 @@ Note: Include per-tenant secret scoping and rotation guidance; document on-behal
 ### Story V2: Weaviate Adapter + Migration
 
 - Deliverables
-  - Sora.Data.Vector.Weaviate with capability discovery; TLS/auth.
+  - Koan.Data.Vector.Weaviate with capability discovery; TLS/auth.
   - Migration utility Redis ↔ Weaviate (ids/vectors/metadata).
 - Acceptance Criteria
   - Env swap without code changes; migration preserves recall within tolerance on sample set.
@@ -369,7 +369,7 @@ Note: Include per-tenant secret scoping and rotation guidance; document on-behal
 #### Milestones & Deliverables
 
 - Code
-  - `Sora.Data.Vector.Weaviate` with capability discovery, TLS/auth, collection bootstrap; parity query API.
+  - `Koan.Data.Vector.Weaviate` with capability discovery, TLS/auth, collection bootstrap; parity query API.
   - Migration utility: export/import Redis ↔ Weaviate (ids, vectors, metadata) with resumable batches.
 - Docs
   - Adapter configuration; feature comparison vs. Redis; migration guide with checksums/recall validation.
@@ -402,7 +402,7 @@ Note: Include per-tenant secret scoping and rotation guidance; document on-behal
 
 ## AI-adjacent stack alignment (formats, servers, knowledge)
 
-This section aligns external protocols/formats with Sora plans. Items are tagged as Coming Soon (CS) or Future (F).
+This section aligns external protocols/formats with Koan plans. Items are tagged as Coming Soon (CS) or Future (F).
 
 - Data & Storage
   - Parquet (CS): add to D5 materialization; optional in D1 export (fast-follow).
@@ -434,7 +434,7 @@ This section aligns external protocols/formats with Sora plans. Items are tagged
 ### Story D0: Transfer Contracts & Headers
 
 - Deliverables
-  - Contracts: `EntityChange` (op, keys, version, payload), `TransferJob` (source, sink, format, compression, status), error/ProblemDetails, and constants for headers (Sora-Change-Seq, Sora-Transfer-JobId, Sora-Transfer-Format).
+  - Contracts: `EntityChange` (op, keys, version, payload), `TransferJob` (source, sink, format, compression, status), error/ProblemDetails, and constants for headers (Koan-Change-Seq, Koan-Transfer-JobId, Koan-Transfer-Format).
   - Policy hooks: projection/redaction rules, PII flags.
 - Acceptance Criteria
   - DTOs and headers documented; OpenAPI examples; unit tests for serialization and policy application.
@@ -442,7 +442,7 @@ This section aligns external protocols/formats with Sora plans. Items are tagged
 ### Story D1: Snapshot Export/Import (JSONL/CSV + FS/S3/Blob)
 
 - Deliverables
-  - `Sora.Data.Transfer` services and `Sora.Web.Transfer` controllers: POST /transfer/export, POST /transfer/import.
+  - `Koan.Data.Transfer` services and `Koan.Web.Transfer` controllers: POST /transfer/export, POST /transfer/import.
   - Formats: JSONL first, CSV; compression (gzip); optional encryption; presigned URL support.
   - Manifests: counts, checksums, schema version.
 - Acceptance Criteria
@@ -467,7 +467,7 @@ This section aligns external protocols/formats with Sora plans. Items are tagged
 ### Story D4: Virtualization (Composite Reads)
 
 - Deliverables
-  - Virtual EntitySet definition referencing multiple sources; pushdown where possible; in-memory fallback signaled via `Sora-InMemory-Paging` header.
+  - Virtual EntitySet definition referencing multiple sources; pushdown where possible; in-memory fallback signaled via `Koan-InMemory-Paging` header.
   - Controller exposure using standard filter/paging semantics.
 - Acceptance Criteria
   - Union/join scenarios return consistent Entity shape; fallback header emitted when used; perf within documented bounds.
@@ -497,7 +497,7 @@ This section aligns external protocols/formats with Sora plans. Items are tagged
 ### Story D8: Connectors Interop Guides (Airbyte/Singer/dbt/Kafka Connect)
 
 - Deliverables
-  - Guides and shims for ingesting via Airbyte/Singer into Sora JSON store; dbt using Sora exports as sources; Kafka Connect examples.
+  - Guides and shims for ingesting via Airbyte/Singer into Koan JSON store; dbt using Koan exports as sources; Kafka Connect examples.
 - Acceptance Criteria
   - Example pipelines run using provided configs; docs include troubleshooting and capability notes.
 
@@ -530,7 +530,7 @@ Note: E1 (Messaging Transformers) ties into D2 by enriching changes in-flight; D
 ## Cross-cutting Quality Plan
 
 - Capability discovery surfaced via headers and boot report; consistent constants across web/messaging/data.
-- Security: RBAC reuse from Sora Web; secrets never logged; redact-by-default; no transcript persistence unless configured.
+- Security: RBAC reuse from Koan Web; secrets never logged; redact-by-default; no transcript persistence unless configured.
 - Tests: unit for options/contracts; integration for providers; perf checks for Redis vector; record/replay harness for LLM calls.
 - Docs-first: each story updates guides and adds ADRs where architecture shifts.
 

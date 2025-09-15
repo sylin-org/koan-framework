@@ -1,37 +1,37 @@
 using S8.Flow.Api.Entities;
-using Sora.Data.Core;
-using Sora.Flow.Initialization;
-using Sora.Flow.Options;
+using Koan.Data.Core;
+using Koan.Flow.Initialization;
+using Koan.Flow.Options;
 using S8.Flow.Shared;
-using Sora.Messaging;
+using Koan.Messaging;
 using S8.Flow.Api.Adapters;
-using Sora.Web.Swagger;
-using Sora.Flow.Attributes;
-using Sora.Flow.Core.Orchestration;
+using Koan.Web.Swagger;
+using Koan.Flow.Attributes;
+using Koan.Flow.Core.Orchestration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
-using Sora.Core.Logging;
+using Koan.Core.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure centralized Sora logging - replace ALL logging
+// Configure centralized Koan logging - replace ALL logging
 builder.Logging.ClearProviders()
     .AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Error) // Hide port override noise  
     .AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Error) // Hide startup noise
     .AddFilter("Microsoft", LogLevel.Warning) // Reduce other Microsoft noise
     .AddFilter("System", LogLevel.Warning)    // Reduce System noise
-    .AddFilter("Sora", LogLevel.Debug)        // Allow all Sora debug logs
+    .AddFilter("Koan", LogLevel.Debug)        // Allow all Koan debug logs
     .SetMinimumLevel(LogLevel.Information)    // Default to Info level
-    .AddSoraFormatter();
+    .AddKoanFormatter();
 
-// Sora framework with auto-configuration
-builder.Services.AddSora();
+// Koan framework with auto-configuration
+builder.Services.AddKoan();
 
-// Flow interceptors and orchestrator are registered automatically via AddSoraFlow()
+// Flow interceptors and orchestrator are registered automatically via AddKoanFlow()
 // All Flow entities now route through unified FlowOrchestrator - no separate transport handler needed
 
 // Container environment requirement
-if (!Sora.Core.SoraEnv.InContainer)
+if (!Koan.Core.KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Flow.Api requires container environment. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -40,7 +40,7 @@ if (!Sora.Core.SoraEnv.InContainer)
 builder.Services.Configure<FlowOptions>(o =>
 {
     // Default tags act as fallback when model has no AggregationKey attributes.
-    // Our Sensor model carries [AggregationKey] on SensorKey, so this isn't required,
+    // Our Sensor model carries [AggregationKey] on SensorId, so this isn't required,
     // but we keep a conservative default for other models.
     o.AggregationTags = new[] { Keys.Sensor.Key };
     // Enable purge for VO-heavy workloads and keep keyed retention modest by default
@@ -53,7 +53,7 @@ builder.Services.Configure<FlowOptions>(o =>
 
 builder.Services.AddControllers();
 builder.Services.AddRouting();
-builder.Services.AddSoraSwagger(builder.Configuration);
+builder.Services.AddKoanSwagger(builder.Configuration);
 
 // That's it! No complex Flow orchestrator setup needed.
 // Messages sent via .Send() will be automatically routed to handlers above.
@@ -74,13 +74,13 @@ app.Lifetime.ApplicationStarted.Register(async () =>
         await setting.Save();
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
-        logger?.LogSoraInit("Data provider test: AppSetting saved successfully");
+        logger?.LogKoanInit("Data provider test: AppSetting saved successfully");
     }
     catch (Exception ex)
     {
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
-        logger?.LogInformation("[sora:init] Data provider test failed: {Error}", ex.Message);
+        logger?.LogInformation("[Koan:init] Data provider test failed: {Error}", ex.Message);
     }
 });
 
@@ -93,7 +93,7 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.UseSoraSwagger();
+app.UseKoanSwagger();
 
 app.Run();
 

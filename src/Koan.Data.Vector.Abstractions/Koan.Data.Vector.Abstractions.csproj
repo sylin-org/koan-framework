@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Koan vector contracts (providers depend on this package only)</Description>
+  <PackageTags>$(CommonPackageTags);data;vector;abstractions;contracts</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

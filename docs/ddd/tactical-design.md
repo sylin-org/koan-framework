@@ -1,4 +1,4 @@
-# Tactical Design with Sora
+# Tactical Design with Koan
 
 Aggregates & Entities
 - Choose aggregate boundaries around invariants (what must be consistent together?).
@@ -7,7 +7,7 @@ Aggregates & Entities
 
 Repositories
 - Use `Data<TEntity, TKey>` or explicit repositories. Keep ad-hoc queries outside aggregates.
-- For queries, favor storage pushdown. Sora flags in-memory paging via `Sora-InMemory-Paging`.
+- For queries, favor storage pushdown. Koan flags in-memory paging via `Koan-InMemory-Paging`.
 - Use `Count()`/`CountAsync` for totals; avoid loading full sets to count.
 
 Services
@@ -23,7 +23,7 @@ Concurrency & IDs
 - IDs: use deterministic or generated IDs per aggregate; keep stable across contexts.
 
 Specifications & Filters
-- Model intent as domain specs; translate to Sora filters for pushdown when feasible.
+- Model intent as domain specs; translate to Koan filters for pushdown when feasible.
 
 Pitfalls
 - Anemic domain model: push rules into aggregates/VOs.

@@ -3,7 +3,7 @@
 This spec describes the default projection policy and how adapters consume it.
 
 ## Scope
-- Central ProjectionResolver in Sora.Data.Core.
+- Central ProjectionResolver in Koan.Data.Core.
 - Adapter behaviors for SQLite (generated columns + JSON1 pushdown).
 
 ## ProjectionResolver

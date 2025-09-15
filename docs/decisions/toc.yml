@@ -14,8 +14,8 @@
       href: ARCH-0040-config-and-constants-naming.md
     - name: DDD docs and glossary
       href: ARCH-0034-ddd-documentation-and-glossary.md
-    - name: SoraEnv static runtime
-      href: ARCH-0039-soraenv-static-runtime.md
+    - name: KoanEnv static runtime
+      href: ARCH-0039-Koanenv-static-runtime.md
     - name: Docs posture — instructions over tutorials
       href: ARCH-0041-docs-posture-instructions-over-tutorials.md
     - name: Recipes — intention-driven bootstrap and layered config

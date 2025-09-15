@@ -2,13 +2,13 @@
 
 ## Overview
 
-Sora Flow system orchestrates entities through intake, association, keying, and projection stages. Messaging is handled via Sora.Messaging with strong-typed models, transformers, and interceptors.
+Koan Flow system orchestrates entities through intake, association, keying, and projection stages. Messaging is handled via Koan.Messaging with strong-typed models, transformers, and interceptors.
 
 ## Key Components
 
 - Messaging System: RabbitMQ provider, `services.On<T>(handler)`, `message.Send()`, MessagingInterceptors (preferred) and legacy MessagingTransformers.
 - Flow Entities: `FlowEntity<T>` (aggregates/value objects), aggregation tags, canonical projections, external ID correlation.
-- Queue Routing: Interceptors wrap entities into `FlowQueuedMessage` → dedicated `Sora.Flow.FlowEntity` queue.
+- Queue Routing: Interceptors wrap entities into `FlowQueuedMessage` → dedicated `Koan.Flow.FlowEntity` queue.
 - Transport Envelopes: `TransportEnvelope<T>` / `DynamicTransportEnvelope<T>` separate metadata from payload.
 
 ## Capability Matrix (concise)
@@ -29,7 +29,7 @@ Use interceptors for type-safe wrapping. Transformers remain for descriptor-base
 
 ## Implementation Details
 
-- Dedicated queue: All Flow entity envelopes land on `Sora.Flow.FlowEntity` (single consumption locus; orchestrator fan-out inside Flow runtime).
+- Dedicated queue: All Flow entity envelopes land on `Koan.Flow.FlowEntity` (single consumption locus; orchestrator fan-out inside Flow runtime).
 - Queue provisioning: Treated like a workload queue; scaling guidance TBD (will reference backpressure metrics once implemented).
 - Orchestrator pattern: `[FlowOrchestrator]` (planned hardening) discovers processing components.
 - Metadata separation: Source/system kept in envelope metadata; model payload remains pure.
@@ -46,7 +46,7 @@ Use interceptors for type-safe wrapping. Transformers remain for descriptor-base
 
 Until dedicated metrics ship:
 
-- Monitor queue depth of `Sora.Flow.FlowEntity`; trigger scale-out when sustained depth > (ingest rate \* 2m).
+- Monitor queue depth of `Koan.Flow.FlowEntity`; trigger scale-out when sustained depth > (ingest rate \* 2m).
 - Track average envelope processing latency (intake → materialized) via application logs; aim < 1s p95 in dev workloads.
 - If parked item ratio (`PARENT_NOT_FOUND` / total) > 5% over 10m window, investigate parent resolution lag or missing correlation policies.
 - Avoid consumer over-scaling past point where Mongo (or target store) write IOPS saturate; prioritize balanced concurrency.

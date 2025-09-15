@@ -30,11 +30,11 @@
 ## 1. Messaging Infrastructure Gaps
 
 ### 1.1 IQueuedMessage Interface (CRITICAL)
-**Location**: `src/Sora.Messaging.Core/Contracts/IQueuedMessage.cs`
+**Location**: `src/Koan.Messaging.Core/Contracts/IQueuedMessage.cs`
 **Status**: Missing - FlowQueuedMessage references non-existent interface
 **Required Implementation**:
 ```csharp
-namespace Sora.Messaging.Contracts;
+namespace Koan.Messaging.Contracts;
 
 public interface IQueuedMessage
 {
@@ -44,7 +44,7 @@ public interface IQueuedMessage
 ```
 
 ### 1.2 MessagingExtensions Queue Routing (CRITICAL)
-**Location**: `src/Sora.Messaging.Core/MessagingExtensions.cs`
+**Location**: `src/Koan.Messaging.Core/MessagingExtensions.cs`
 **Status**: Missing - Messages still route to default queue
 **Required Changes**:
 ```csharp
@@ -66,7 +66,7 @@ public static async Task Send<T>(this T message, ...) where T : class
 ```
 
 ### 1.3 RabbitMQ Provider Enhancement (CRITICAL)
-**Location**: `src/Sora.Messaging.RabbitMq/RabbitMqProvider.cs`
+**Location**: `src/Koan.Messaging.RabbitMq/RabbitMqProvider.cs`
 **Status**: Missing SendToQueueAsync method
 **Required Implementation**:
 ```csharp
@@ -84,34 +84,34 @@ public async Task SendToQueueAsync<T>(string queueName, T message, CancellationT
 ## 2. Flow Orchestrator Pattern
 
 ### 2.1 FlowOrchestratorBase Class
-**Location**: `src/Sora.Flow.Core/Orchestration/FlowOrchestratorBase.cs`
+**Location**: `src/Koan.Flow.Core/Orchestration/FlowOrchestratorBase.cs`
 **Status**: Not implemented
 **Purpose**: Provide base class for Flow entity orchestration
 **Required Features**:
-- Auto-subscribe to "Sora.Flow.FlowEntity" queue
+- Auto-subscribe to "Koan.Flow.FlowEntity" queue
 - Type-safe deserialization based on envelope type
 - Direct intake writing with metadata separation
 - Support for FlowEntity, DynamicFlowEntity, and FlowValueObject
 
 ### 2.2 FlowOrchestrator Attribute
-**Location**: `src/Sora.Flow.Core/Attributes/FlowOrchestratorAttribute.cs`
+**Location**: `src/Koan.Flow.Core/Attributes/FlowOrchestratorAttribute.cs`
 **Status**: Not implemented
 **Purpose**: Mark classes as Flow orchestrators for auto-discovery
 
-### 2.3 Auto-Discovery in SoraAutoRegistrar
-**Location**: `src/Sora.Flow.Core/Initialization/SoraAutoRegistrar.cs`
+### 2.3 Auto-Discovery in KoanAutoRegistrar
+**Location**: `src/Koan.Flow.Core/Initialization/KoanAutoRegistrar.cs`
 **Status**: Not implemented
 **Purpose**: Automatically discover and register [FlowOrchestrator] classes
 
 ### 2.4 DefaultFlowOrchestrator
-**Location**: `src/Sora.Flow.Core/Orchestration/DefaultFlowOrchestrator.cs`
+**Location**: `src/Koan.Flow.Core/Orchestration/DefaultFlowOrchestrator.cs`
 **Status**: Not implemented
 **Purpose**: Provide zero-config orchestration for simple scenarios
 
 ## 3. Queue Provisioning
 
 ### 3.1 Flow Queue Provider
-**Location**: `src/Sora.Flow.Core/Infrastructure/FlowQueueProvider.cs`
+**Location**: `src/Koan.Flow.Core/Infrastructure/FlowQueueProvider.cs`
 **Status**: Not implemented
 **Purpose**: Define Flow-specific queues
 **Implementation Approach**:
@@ -127,19 +127,19 @@ public class FlowQueueProvider : IFlowQueueProvider
     {
         return new[]
         {
-            "Sora.Flow.FlowEntity",
-            "Sora.Flow.FlowValueObject",
-            "Sora.Flow.FlowCommand"
+            "Koan.Flow.FlowEntity",
+            "Koan.Flow.FlowValueObject",
+            "Koan.Flow.FlowCommand"
         };
     }
 }
 ```
 
 ### 3.2 Queue Provisioner Hosted Service
-**Location**: `src/Sora.Flow.Core/Infrastructure/FlowQueueProvisioner.cs`
+**Location**: `src/Koan.Flow.Core/Infrastructure/FlowQueueProvisioner.cs`
 **Status**: Not implemented
 **Purpose**: Auto-provision Flow queues at startup
-**Registration**: Add to AddSoraFlow() in ServiceCollectionExtensions
+**Registration**: Add to AddKoanFlow() in ServiceCollectionExtensions
 
 ## Implementation Priority
 
@@ -163,7 +163,7 @@ public class FlowQueueProvider : IFlowQueueProvider
 ## Testing Requirements
 
 ### Integration Tests Needed
-1. Verify messages route to "Sora.Flow.FlowEntity" queue
+1. Verify messages route to "Koan.Flow.FlowEntity" queue
 2. Test cross-system parent-child resolution
 3. Confirm external IDs contain source IDs (e.g., "D1") not aggregation keys
 4. Validate canonical models have no 'id' field
@@ -178,16 +178,16 @@ public class FlowQueueProvider : IFlowQueueProvider
 ## Architecture Notes
 
 ### Why These Gaps Exist
-The Flow framework implementation focused on the complex business logic (external ID correlation, parent resolution) first. The remaining gaps are in the messaging infrastructure layer, which is simpler but requires careful integration with existing Sora.Messaging components.
+The Flow framework implementation focused on the complex business logic (external ID correlation, parent resolution) first. The remaining gaps are in the messaging infrastructure layer, which is simpler but requires careful integration with existing Koan.Messaging components.
 
 ### Design Decisions
-1. **IQueuedMessage at Sora.Messaging level**: Enables any Sora component to use queue routing, not just Flow
+1. **IQueuedMessage at Koan.Messaging level**: Enables any Koan component to use queue routing, not just Flow
 2. **Queue provisioning in Flow module**: Flow owns its queue definitions and lifecycle
 3. **Orchestrator pattern**: Provides clean separation between message handling and Flow processing
 4. **Direct MongoDB integration**: Reduces latency by eliminating extra messaging hops
 
 ## Success Criteria
-- [ ] Flow entities route to dedicated "Sora.Flow.FlowEntity" queue
+- [ ] Flow entities route to dedicated "Koan.Flow.FlowEntity" queue
 - [ ] External IDs correctly populated with source entity IDs
 - [ ] ParentKey relationships resolved across systems
 - [ ] No source 'id' fields in canonical models

@@ -1,16 +1,16 @@
-# Sora.Flow + Sora.Messaging Integration Refactoring Proposal
+# Koan.Flow + Koan.Messaging Integration Refactoring Proposal
 
 ## Current State Analysis
 - ❌ **BROKEN**: `entity.Send()` bypasses messaging system entirely
-- ❌ **MISSING**: No bridge between Sora.Messaging and Sora.Flow  
+- ❌ **MISSING**: No bridge between Koan.Messaging and Koan.Flow  
 - ❌ **INCOMPLETE**: No orchestrator pattern implementation
 - ✅ **WORKING**: Flow intake system and processing pipeline
 - ✅ **WORKING**: Auto-discovery of Flow types
-- ✅ **WORKING**: Sora.Messaging typed and named message patterns
+- ✅ **WORKING**: Koan.Messaging typed and named message patterns
 
 ## Target Architecture
 ```
-Clients/Adapters → Sora.Messaging → [FlowOrchestrator] → Sora.Flow.Intake → Processing Pipeline
+Clients/Adapters → Koan.Messaging → [FlowOrchestrator] → Koan.Flow.Intake → Processing Pipeline
                                 ↕
                             Bidirectional messaging with adapters
 ```
@@ -32,7 +32,7 @@ Clients/Adapters → Sora.Messaging → [FlowOrchestrator] → Sora.Flow.Intake 
 - [ ] **2.5** Create `entity.SendToFlowIntake()` for direct Flow routing (internal use)
 
 ### Phase 3: Orchestrator Auto-Registration
-- [ ] **3.1** Enhance `Sora.Flow.Core.SoraAutoRegistrar` to detect `[FlowOrchestrator]` assemblies
+- [ ] **3.1** Enhance `Koan.Flow.Core.KoanAutoRegistrar` to detect `[FlowOrchestrator]` assemblies
 - [ ] **3.2** Auto-discover `FlowEntity<>` and `FlowValueObject<>` types in orchestrator assemblies
 - [ ] **3.3** Auto-register message handlers: `services.On<T>(entity => entity.SendToFlowIntake())`
 - [ ] **3.4** Handle both typed messages and named messages ("seed", etc.)
@@ -95,7 +95,7 @@ Clients/Adapters → Sora.Messaging → [FlowOrchestrator] → Sora.Flow.Intake 
 - ✅ Both broadcast and targeted messaging work correctly
 - ✅ No breaking changes to existing Flow functionality
 - ✅ Zero-config experience with escape hatches for customization
-- ✅ Complete integration between Sora.Messaging and Sora.Flow
+- ✅ Complete integration between Koan.Messaging and Koan.Flow
 
 ## Implementation Priority
 **Start with Phase 1-2** to establish foundation and fix the broken `entity.Send()` implementation. This unblocks the core messaging-first architecture before building orchestrator features.
@@ -108,7 +108,7 @@ Clients/Adapters → Sora.Messaging → [FlowOrchestrator] → Sora.Flow.Intake 
 await device.Send(); // ❌ Goes direct to Flow intake
 
 // Fixed implementation (uses messaging):
-await device.Send(); // ✅ Goes through Sora.Messaging
+await device.Send(); // ✅ Goes through Koan.Messaging
 await device.SendTo("bms:simulator"); // ✅ Targeted messaging
 
 // Flow-specific command syntax:

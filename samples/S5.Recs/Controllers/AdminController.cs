@@ -5,15 +5,34 @@ using S5.Recs.Services;
 namespace S5.Recs.Controllers;
 
 [ApiController]
-[Route(Constants.Routes.Admin)] // Sora guideline: controllers define routes
-public class AdminController(ISeedService seeder, ILogger<AdminController> _logger, IEnumerable<Providers.IAnimeProvider> providers) : ControllerBase
+[Route(Constants.Routes.Admin)] // Koan guideline: controllers define routes
+public class AdminController(ISeedService seeder, ILogger<AdminController> _logger, IEnumerable<Providers.IMediaProvider> providers) : ControllerBase
 {
 
     [HttpPost("seed/start")]
     public IActionResult StartSeed([FromBody] SeedRequest req)
     {
-        var id = seeder.StartAsync(req.Source, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
-        return Ok(new { jobId = id });
+        try
+        {
+            // Require MediaType to be explicitly provided
+            if (string.IsNullOrWhiteSpace(req.MediaType))
+            {
+                return BadRequest(new { error = "MediaType is required. Please specify a media type or 'all' to import all types." });
+            }
+
+            var id = seeder.StartAsync(req.Source, req.MediaType, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
+            return Ok(new { jobId = id });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("import is already in progress"))
+        {
+            return Conflict(new { error = ex.Message, isImportInProgress = seeder.IsImportInProgress });
+        }
+    }
+
+    [HttpGet("seed/status")]
+    public IActionResult GetImportStatus()
+    {
+        return Ok(new { isImportInProgress = seeder.IsImportInProgress });
     }
 
     // Censor tags admin
@@ -107,8 +126,8 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpGet("stats")]
     public IActionResult GetStats()
     {
-        var (anime, contentPieces, vectors) = seeder.GetStatsAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
-        return Ok(new { anime, contentPieces, vectors });
+        var (media, contentPieces, vectors) = seeder.GetStatsAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
+        return Ok(new { media, contentPieces, vectors });
     }
 
     [HttpGet("providers")]
@@ -139,8 +158,8 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         if (string.Equals(sort, "alpha", StringComparison.OrdinalIgnoreCase) || string.Equals(sort, "name", StringComparison.OrdinalIgnoreCase))
             q = q.OrderBy(t => t.Tag);
         else
-            q = q.OrderByDescending(t => t.AnimeCount).ThenBy(t => t.Tag);
-        return Ok(q.Select(t => new { tag = t.Tag, count = t.AnimeCount }));
+            q = q.OrderByDescending(t => t.MediaCount).ThenBy(t => t.Tag);
+        return Ok(q.Select(t => new { tag = t.Tag, count = t.MediaCount }));
     }
 
     [HttpGet("tags/censor/hashes")] // Generate MD5 hashes for preemptive filtering
@@ -206,7 +225,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     public IActionResult StartVectorOnly([FromBody] VectorOnlyRequest req)
     {
         // Responsibility: AdminController builds the list; SeedService just upserts vectors for the provided items.
-        var all = Models.AnimeDoc.All(HttpContext.RequestAborted).Result.ToList();
+        var all = Models.Media.All(HttpContext.RequestAborted).Result.ToList();
 
         _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})", all.Count, req.Limit);
 

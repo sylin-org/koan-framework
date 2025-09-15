@@ -1,4 +1,4 @@
-﻿# Soft-delete visibility and fetch behavior
+# Soft-delete visibility and fetch behavior
 
 Preferred (set move):
 - Soft delete moves items from root to the `deleted` set. Baseline reads (root) naturally exclude deleted items; no extra filters are required.
@@ -25,7 +25,7 @@ Visibility:
 # Module placement and separation of concerns
 
 Place capability controllers, DTOs, policies, and constants in a dedicated web module to preserve separation of concerns:
-- Project: `Sora.Web.Extensions`
+- Project: `Koan.Web.Extensions`
 - Structure:
 	- Controllers/Moderation/EntityModerationController.cs
 	- Controllers/SoftDelete/EntitySoftDeleteController.cs
@@ -40,7 +40,7 @@ title: Entity capabilities — short endpoints (moderation, soft-delete, audit) 
 
 # Context
 
-EntityController provides a consistent CRUD surface for domain entities. Sora supports “sets” (root, backup, moderation, deleted, audit, etc.) routed via the `set` query parameter. Several cross-cutting capabilities need concise, discoverable HTTP endpoints that semantically build on the baseline without inventing parallel APIs or path-encoded sets.
+EntityController provides a consistent CRUD surface for domain entities. Koan supports “sets” (root, backup, moderation, deleted, audit, etc.) routed via the `set` query parameter. Several cross-cutting capabilities need concise, discoverable HTTP endpoints that semantically build on the baseline without inventing parallel APIs or path-encoded sets.
 
 Capabilities in scope: moderation, soft delete, and audit browse/revert.
 
@@ -144,12 +144,12 @@ Policy scaffolding
 - Apps wire these with role/claim requirements in their auth setup and can override per-route via attributes.
 	- Infrastructure/CapabilityRoutes.cs and CapabilitySets.cs (constants)
 	- Contracts/ModerationOptions.cs, SoftDeleteOptions.cs, RejectOptions.cs, BulkOperation.cs
-- Dependencies: reference `Sora.Web` and `Sora.Data.Core`; avoid coupling back from Sora.Web to the extensions module.
+- Dependencies: reference `Koan.Web` and `Koan.Data.Core`; avoid coupling back from Koan.Web to the extensions module.
 
 # Scope
 - Applies to generic capability controllers and sample typed controllers. Does not remove or change baseline CRUD endpoints.
 - Consumes existing set routing (`DataSetContext`, storage-name suffixing) and first-class model statics.
- - Implementation resides in `Sora.Web.Extensions` to keep the base web module lean and focused.
+ - Implementation resides in `Koan.Web.Extensions` to keep the base web module lean and focused.
 
 # Consequences
 - Uniform, terse URLs for common transitions. Discoverability via short subresources.

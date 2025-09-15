@@ -5,14 +5,14 @@ REM Start S1.Web in Docker (build + run)
 set "HOST_PORT=%~1"
 if "%HOST_PORT%"=="" set "HOST_PORT=5044"
 
-REM Move to Sora root (this script is in Sora\samples\S1.Web)
+REM Move to Koan root (this script is in Koan\samples\S1.Web)
 pushd "%~dp0\..\.."
 
 REM Ensure data directory exists (bind-mounted)
 if not exist "samples\S1.Web\data" mkdir "samples\S1.Web\data" >nul 2>nul
 
-echo Building image 'sora-s1:latest'...
-docker build -f samples\S1.Web\Dockerfile -t sora-s1:latest .
+echo Building image 'Koan-s1:latest'...
+docker build -f samples\S1.Web\Dockerfile -t Koan-s1:latest .
 if errorlevel 1 (
   echo Build failed.
   popd
@@ -20,10 +20,10 @@ if errorlevel 1 (
 )
 
 REM Stop/remove any existing container with the same name
-docker rm -f sora-s1 >nul 2>nul
+docker rm -f Koan-s1 >nul 2>nul
 
 echo Starting container on http://localhost:%HOST_PORT% ...
-docker run --rm -d --name sora-s1 -p %HOST_PORT%:5044 -v "%CD%\samples\S1.Web\data:/app/data" sora-s1:latest
+docker run --rm -d --name Koan-s1 -p %HOST_PORT%:5044 -v "%CD%\samples\S1.Web\data:/app/data" Koan-s1:latest
 if errorlevel 1 (
   echo Run failed.
   popd

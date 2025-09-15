@@ -4,10 +4,10 @@ Cross-cutting policies
 - Logging, headers, and rate-limiters layered in web hosting (see ADR 0011).
 - Security, validation, and error handling applied at edges.
 
-Observability in Sora
-- Use `AddSoraObservability` for tracing/metrics; configure OTLP exporter.
-- `Sora-Trace-Id` response header correlates logs and traces.
-- Snapshot endpoint: `/.well-known/sora/observability` exposes safe runtime status.
+Observability in Koan
+- Use `AddKoanObservability` for tracing/metrics; configure OTLP exporter.
+- `Koan-Trace-Id` response header correlates logs and traces.
+- Snapshot endpoint: `/.well-known/Koan/observability` exposes safe runtime status.
 
 Tips
 - Start with a local OTEL collector (see `samples/S2.Compose/otel-collector-config.yaml`).

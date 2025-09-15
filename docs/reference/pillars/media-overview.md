@@ -4,14 +4,14 @@ What
 - First-class media handling: upload, download, variants/derivatives, pipelines/tasks, ancestry.
 
 Why
-- Enterprise-grade media with low ceremony and consistent semantics; integrates with Sora.Storage for placement and URLs.
+- Enterprise-grade media with low ceremony and consistent semantics; integrates with Koan.Storage for placement and URLs.
 
 Key concepts
 - MediaObject<T>: model with static methods — Upload, Get, Open, Url, Ensure, RunTask, Derivatives, Ancestors, Descendants.
 - Derivatives: first-class media linked to source via SourceMediaId + RelationshipType; idempotent by DerivationKey.
 - Named tasks: code@version; registered per model; args allowed; DescribeTask exposes schema.
 - Task tracking: TaskId, statuses, step timeline; GetTask and SSE StreamTask.
-- Storage integration: placement via Sora.Storage profiles; tags/metadata can influence routing; presigned URLs and CDN-friendly headers.
+- Storage integration: placement via Koan.Storage profiles; tags/metadata can influence routing; presigned URLs and CDN-friendly headers.
 
 HTTP endpoints (controller-based)
 ## HTTP media bytes endpoint (reference)
@@ -48,8 +48,8 @@ Examples
 	- Response: 416 Range Not Satisfiable; Content-Range: bytes */<total>.
 
 Implementation notes
-- Controller: MediaContentController<TEntity> (Sora.Media.Web) — attribute-routed, controller-based as per Sora guardrails.
-- IO and storage semantics live in StorageEntity<TEntity> (Sora.Storage.Model); controllers defer to model statics like OpenRead/OpenReadRange/Head.
+- Controller: MediaContentController<TEntity> (Koan.Media.Web) — attribute-routed, controller-based as per Koan guardrails.
+- IO and storage semantics live in StorageEntity<TEntity> (Koan.Storage.Model); controllers defer to model statics like OpenRead/OpenReadRange/Head.
 - Content type is resolved from storage stat (preferred) or file extension fallback.
 - Last-Modified is normalized to seconds for If-Modified-Since comparisons.
 
@@ -59,7 +59,7 @@ Edge cases
 - ETag emission depends on provider support; Local provider now emits a lightweight ETag based on LastWriteTimeUtc and Length (hex), which changes whenever the file changes.
 
 Options
-- MediaContentOptions (Sora.Media.Web):
+- MediaContentOptions (Koan.Media.Web):
 	- EnableCacheControl: default true.
 	- Public: default true.
 	- MaxAge: default 1 hour.
@@ -68,5 +68,5 @@ Options
 See also
 - decisions/MEDIA-0001-media-pillar-baseline-and-storage-integration.md
 - reference/storage.md
- - src/Sora.Media.Web/README.md
- - src/Sora.Media.Web/TECHNICAL.md
+ - src/Koan.Media.Web/README.md
+ - src/Koan.Media.Web/TECHNICAL.md

@@ -2,7 +2,7 @@
 
 Status: Proposed
 Date: 2025-08-19
-Owners: Sora Web
+Owners: Koan Web
 
 ## Context
 
@@ -11,7 +11,7 @@ Surface stability reduces churn. We need request/response DTOs, headers, and str
 ## Decision
 
 - Endpoints: /ai/chat, /ai/embed, /ai/rag/query; ProblemDetails for errors.
-- Headers: Sora-AI-Provider, Sora-AI-Model, Sora-AI-Streaming, Sora-Session-Id, Sora-Tenant, Sora-Project.
+- Headers: Koan-AI-Provider, Koan-AI-Model, Koan-AI-Streaming, Koan-Session-Id, Koan-Tenant, Koan-Project.
 - SSE: event names (token, tool, end), heartbeat frames, explicit termination; JSON lines for event data.
 
 ## Consequences

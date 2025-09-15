@@ -1,6 +1,6 @@
-# S1.Web — Sora Framework Relationship System Demo
+# S1.Web — Koan Framework Relationship System Demo
 
-This enhanced S1 sample demonstrates the new relationship system in Sora Framework, showcasing instance-based relationship navigation, batch loading, and streaming capabilities, along with a minimal AngularJS UI.
+This enhanced S1 sample demonstrates the new relationship system in Koan Framework, showcasing instance-based relationship navigation, batch loading, and streaming capabilities, along with a minimal AngularJS UI.
 
 ## Entity Relationships
 
@@ -80,7 +80,7 @@ Alternatively:
 
 ```powershell
 # From repo root
-dotnet run --project "Sora/samples/S1.Web/S1.Web.csproj" --urls "http://localhost:5044"
+dotnet run --project "Koan/samples/S1.Web/S1.Web.csproj" --urls "http://localhost:5044"
 ```
 
 Then browse to the root (index.html is served via static files). The UI supports CRUD, seeding, and server-side pagination with navigation buttons.
@@ -111,10 +111,10 @@ Manual Docker:
 
 ```powershell
 # From repo root
-# Use Sora folder as build context so .dockerignore applies
-docker build -f Sora/samples/S1.Web/Dockerfile -t sora-s1:latest Sora
+# Use Koan folder as build context so .dockerignore applies
+docker build -f Koan/samples/S1.Web/Dockerfile -t Koan-s1:latest Koan
 
-docker run --rm -p 5044:5044 -v ${PWD}/Sora/samples/S1.Web/data:/app/data sora-s1:latest
+docker run --rm -p 5044:5044 -v ${PWD}/Koan/samples/S1.Web/data:/app/data Koan-s1:latest
 ```
 
 Manual Compose:
@@ -126,11 +126,11 @@ HOST_PORT=5081 docker compose up -d --build
 ```
 
 - App listens on port 5044 inside the container; mapped to your chosen host port.
-- Data is persisted to Sora/samples/S1.Web/data/ via a bind mount.
+- Data is persisted to Koan/samples/S1.Web/data/ via a bind mount.
 
 ## Notes
 
-- Program.cs is intentionally minimal; Sora.Web self-wires controllers, static files, secure headers, and /api/health via a startup filter. Adjust via `SoraWebOptions`.
+- Program.cs is intentionally minimal; Koan.Web self-wires controllers, static files, secure headers, and /api/health via a startup filter. Adjust via `KoanWebOptions`.
 - Application policy (ProblemDetails, Rate Limiting) is configured in the app (see `Program.cs`).
 - JSON adapter persists under ./data by default; safe for dev.
 - For demo pagination, the controller emits headers and Link relations; the UI reads them to enable navigation.

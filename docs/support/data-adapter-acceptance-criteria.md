@@ -1,6 +1,6 @@
 ## Testing and Compliance
 
-This document defines testable acceptance criteria that all Sora Data adapters must meet. It complements the authoring checklist and testing guide with normative MUST/SHOULD/MAY language, and ties behavior to provider capabilities.
+This document defines testable acceptance criteria that all Koan Data adapters must meet. It complements the authoring checklist and testing guide with normative MUST/SHOULD/MAY language, and ties behavior to provider capabilities.
 
 ## Integration tests: local-first, container-fallback (gold standard)
 
@@ -15,40 +15,40 @@ Adapters and fixtures implement this consistently:
 - PostgreSQL
 
   - Local detection order:
-    - Use an explicit connection string if provided: `SORA_POSTGRES__CONNECTION_STRING` or `ConnectionStrings__Postgres`.
+    - Use an explicit connection string if provided: `Koan_POSTGRES__CONNECTION_STRING` or `ConnectionStrings__Postgres`.
     - Otherwise use standard PG env vars: `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`.
-    - Otherwise probe `localhost` ports 5432/5433/5434 and attempt common credentials (`postgres`, current OS user) across DBs (`sora`, `postgres`). Short timeouts (≈3s) ensure fast failures.
+    - Otherwise probe `localhost` ports 5432/5433/5434 and attempt common credentials (`postgres`, current OS user) across DBs (`Koan`, `postgres`). Short timeouts (≈3s) ensure fast failures.
   - Container fallback:
     - Image: `postgres:16-alpine`, bound to host port 54329.
-    - Environment: `POSTGRES_PASSWORD=postgres`, `POSTGRES_DB=sora`.
-    - Uses `DotNet.Testcontainers` and Sora.Testing `DockerEnvironment` to locate a working Docker endpoint; sets `TESTCONTAINERS_RYUK_DISABLED=true` to avoid reaper issues on Windows.
+    - Environment: `POSTGRES_PASSWORD=postgres`, `POSTGRES_DB=Koan`.
+    - Uses `DotNet.Testcontainers` and Koan.Testing `DockerEnvironment` to locate a working Docker endpoint; sets `TESTCONTAINERS_RYUK_DISABLED=true` to avoid reaper issues on Windows.
 
 - SQL Server
 - SQL Server
 
   - Local detection order:
-    - Use an explicit connection string if provided: `SORA_SQLSERVER__CONNECTION_STRING` or `ConnectionStrings__SqlServer`.
+    - Use an explicit connection string if provided: `Koan_SQLSERVER__CONNECTION_STRING` or `ConnectionStrings__SqlServer`.
     - On Windows, a LocalDB instance (`(localdb)\\MSSQLLocalDB`) may be probed by creating a temporary database for fast local feedback. Do not rely on pre-installed SQL Express instances in CI — prefer containerized SQL Server for reproducible tests.
   - Container fallback (recommended for CI and when LocalDB is unavailable):
     - Image: `mcr.microsoft.com/mssql/server:2022-latest`, bound to host port 14333 (or dynamically mapped where preferred).
     - Environment: `ACCEPT_EULA=Y`, `MSSQL_SA_PASSWORD=yourStrong(!)Password` (use a secure secret in CI).
     - Connection string should include `TrustServerCertificate=True` and a short connect timeout for fast failure.
-    - Uses `DotNet.Testcontainers` and Sora.Testing `DockerEnvironment` to start the container; set `TESTCONTAINERS_RYUK_DISABLED=true` on Windows CI runners when needed.
+    - Uses `DotNet.Testcontainers` and Koan.Testing `DockerEnvironment` to start the container; set `TESTCONTAINERS_RYUK_DISABLED=true` on Windows CI runners when needed.
 
 - Redis
-  - Local detection: use `SORA_REDIS__CONNECTION_STRING`, `REDIS_URL`, or `REDIS_CONNECTION_STRING` if provided.
+  - Local detection: use `Koan_REDIS__CONNECTION_STRING`, `REDIS_URL`, or `REDIS_CONNECTION_STRING` if provided.
   - Container fallback: `redis:7-alpine` with a dynamically mapped host port; `TESTCONTAINERS_RYUK_DISABLED=true` applied.
 
 Notes and tips
 
-- Docker endpoint probing: Sora.Testing `DockerEnvironment` checks common endpoints per OS (Windows named pipe, Unix socket, localhost:2375) and honors `DOCKER_HOST` when set.
+- Docker endpoint probing: Koan.Testing `DockerEnvironment` checks common endpoints per OS (Windows named pipe, Unix socket, localhost:2375) and honors `DOCKER_HOST` when set.
 - Skips: When no local service and no Docker are available, fixtures set `SkipTests = true`; tests early-return so CI can still run without hard failures in restricted environments.
 - Override behavior: Prefer explicit connection strings via the env vars above to force tests to use a specific instance.
 - Cleanup: Containers are disposed by the fixtures. LocalDB test databases are dropped on teardown; other local instances are left untouched.
 
 # Data Adapter Acceptance Criteria
 
-This document defines testable acceptance criteria that all Sora Data adapters must meet. It complements the authoring checklist and testing guide with normative MUST/SHOULD/MAY language, and ties behavior to provider capabilities.
+This document defines testable acceptance criteria that all Koan Data adapters must meet. It complements the authoring checklist and testing guide with normative MUST/SHOULD/MAY language, and ties behavior to provider capabilities.
 
 Scope: Adapters implementing repositories for entities (`IEntity<TKey>`) across Relational, Document, and similar stores.
 
@@ -120,7 +120,7 @@ If the backing database does not expose native bulk operations:
 ## 7) Storage naming and schema
 
 - MUST resolve physical names via `StorageNameRegistry` and the provider’s `INamingDefaultsProvider`; do not implement parallel naming logic inside repositories (see decisions 0017, 0018, 0030).
-- Relational adapters MUST delegate schema validation/creation and materialization to the shared orchestrator in `Sora.Data.Relational` (do not inline custom ensure/validate logic in adapters). Providers MUST implement small primitives (DDL executor and feature flags) consumed by the orchestrator.
+- Relational adapters MUST delegate schema validation/creation and materialization to the shared orchestrator in `Koan.Data.Relational` (do not inline custom ensure/validate logic in adapters). Providers MUST implement small primitives (DDL executor and feature flags) consumed by the orchestrator.
 - Relational adapters SHOULD use the shared relational schema toolkit to generate/apply schema and indexes.
 - MUST honor DataAnnotations where feasible: Required, DefaultValue, MaxLength, and Index. Where the store cannot enforce a constraint, MUST preserve data fidelity and document the limitation.
 - MUST explicitly announce whether the adapter can create or migrate schema, and expose an idempotent ensure-created path when supported. If schema creation/migration is not supported or not permitted in the environment, MUST return a clear NotSupported response.
@@ -136,7 +136,7 @@ If the backing database does not expose native bulk operations:
 
 Relational-specific:
 
-- MUST route `relational.schema.validate`, `relational.schema.ensureCreated`, and related schema/migration instructions to the `Sora.Data.Relational` orchestrator. The orchestrator determines the concrete shape (JSON-first vs. materialized) and uses provider primitives to apply it.
+- MUST route `relational.schema.validate`, `relational.schema.ensureCreated`, and related schema/migration instructions to the `Koan.Data.Relational` orchestrator. The orchestrator determines the concrete shape (JSON-first vs. materialized) and uses provider primitives to apply it.
 
 ## 9) Diagnostics, health, and observability
 
@@ -146,14 +146,14 @@ Relational-specific:
 
 ## 10) Options, configuration, and defaults
 
-- MUST bind options from configuration sections named consistently (`Sora:Data:<Adapter>` or provider-specific sections) using provided helpers.
+- MUST bind options from configuration sections named consistently (`Koan:Data:<Adapter>` or provider-specific sections) using provided helpers.
 - MUST provide sane dev defaults (e.g., SQLite file path; Mongo default host per decision 0043), and respect environment overrides.
 - MUST fail fast with actionable messages when critical configuration is missing.
 - MUST provide paging guardrails:
   - `DefaultPageSize` (applied when the caller does not specify paging) and `MaxPageSize` (an upper bound), with clear documentation of their defaults.
-  - A production safety policy to disable or strictly limit in-memory filtering/paging (fallbacks). Respect the platform-level `Sora:AllowMagicInProduction` if applicable; adapters MAY also expose a provider-specific override.
+  - A production safety policy to disable or strictly limit in-memory filtering/paging (fallbacks). Respect the platform-level `Koan:AllowMagicInProduction` if applicable; adapters MAY also expose a provider-specific override.
 
-Relational materialization options and overrides (centralized in `Sora.Data.Relational`):
+Relational materialization options and overrides (centralized in `Koan.Data.Relational`):
 
 - MUST support a `MaterializationPolicy` option with values:
   - `None` (default): new tables are created as `Id + Json` only; no computed/physical projection columns unless explicitly requested.
@@ -166,7 +166,7 @@ Relational materialization options and overrides (centralized in `Sora.Data.Rela
 
 ## 11) Error semantics and safety
 
-- MUST translate provider-specific errors to meaningful exceptions/results that align with Sora contracts (e.g., not-found vs concurrency vs validation).
+- MUST translate provider-specific errors to meaningful exceptions/results that align with Koan contracts (e.g., not-found vs concurrency vs validation).
 - MUST avoid partial writes in atomic batch mode; in best-effort mode, MUST report per-item outcomes and accurate counts.
 - MUST ensure all external inputs are validated/parameterized before execution.
 
@@ -217,14 +217,14 @@ Use this checklist in PRs for new or updated adapters. All MUST items are requir
 
 Relational-only (materialization & orchestration):
 
-- [ ] Adapter delegates schema/materialization to `Sora.Data.Relational` orchestrator (no inline ensure/validate logic)
+- [ ] Adapter delegates schema/materialization to `Koan.Data.Relational` orchestrator (no inline ensure/validate logic)
 - [ ] Provider implements required primitives (DDL executor, feature flags) consumed by the orchestrator
 - [ ] Materialization options bound (`MaterializationPolicy`, `ProbeOnStartup`, `FailOnMismatch`) and respected alongside `DdlPolicy`/`SchemaMatching`
 - [ ] Acceptance tests cover policy shapes, probing, failure/degraded paths, and instruction routing
 
 ## 14) Relational schema orchestration and materialization (normative)
 
-This section formalizes relational schema/materialization behavior managed by `Sora.Data.Relational`.
+This section formalizes relational schema/materialization behavior managed by `Koan.Data.Relational`.
 
 - Central orchestration:
 
@@ -255,7 +255,7 @@ This section formalizes relational schema/materialization behavior managed by `S
   - MUST: Providers route these to the orchestrator rather than reimplementing logic.
 
 - Production safety:
-  - MUST: Respect platform-level `Sora:AllowMagicInProduction` and provider overrides before performing DDL in production.
+  - MUST: Respect platform-level `Koan:AllowMagicInProduction` and provider overrides before performing DDL in production.
   - MUST NOT: Perform destructive changes by default; destructive operations require explicit, narrowly scoped opt-ins.
 
 — End —

@@ -15,25 +15,25 @@ We need a simple, toggleable way to run environment setup and recurring jobs ("b
 
 ## Decision
 
-1. Unify under a single scheduling core (module: `Sora.Scheduling`). Bootstrap is a first-class scheduled job preset (runner = `bootstrap`).
-2. Auto-register via `ISoraAutoRegistrar`:
+1. Unify under a single scheduling core (module: `Koan.Scheduling`). Bootstrap is a first-class scheduled job preset (runner = `bootstrap`).
+2. Auto-register via `IKoanAutoRegistrar`:
    - Add `SchedulingOrchestrator` (HostedService),
-   - Bind `Sora:Scheduling` options (env-aware defaults),
+   - Bind `Koan:Scheduling` options (env-aware defaults),
    - Register health contributors and in-memory lock/store (dev-safe).
 3. Contracts (simple-first, composable):
    - Required: `IScheduledTask { string Id; Task RunAsync(CancellationToken); }`
    - Optional policies: `IOnStartup`, `IFixedDelay`, `ICronScheduled`, `IHasTimeout`, `IIsCritical`, `IHasMaxConcurrency`, `IProvidesLock`, `IAllowedWindows`, `IHealthFacts`.
    - Optional attribute sugar: `[Scheduled(...)]` for defaults; config overrides attributes.
 4. Readiness gating policy:
-   - If `Sora:Scheduling:ReadinessGate=true`, any failing/timeout critical task keeps `/health/ready` Unhealthy (503) until success or timeout.
+   - If `Koan:Scheduling:ReadinessGate=true`, any failing/timeout critical task keeps `/health/ready` Unhealthy (503) until success or timeout.
 5. Health + capabilities surface:
    - Per-task: `scheduling:task:{id}` with compact facts (triggers, next/last run, counters, lastError, critical, timezone, lock).
    - Orchestrator: `scheduling:orchestrator` summary.
    - Capabilities flags (Startup, FixedDelay, Cron, Windows, Misfire, Jitter, MaxConcurrency, DistributedLock, RunOnce, ReadinessGate, AttributeDiscovery, ConfigOverrides).
-6. Well-known endpoint integration (in `Sora.Web`):
-   - Add `GET /.well-known/sora/scheduling` (guarded by the same exposure policy as Observability) to expose enabled, readinessGate, defaults, capabilities, and a compact jobs snapshot.
+6. Well-known endpoint integration (in `Koan.Web`):
+   - Add `GET /.well-known/Koan/scheduling` (guarded by the same exposure policy as Observability) to expose enabled, readinessGate, defaults, capabilities, and a compact jobs snapshot.
 7. Bootstrap as a schedule:
-   - Provide `BootstrapJobRunner` composing `IBootstrapTask` items (ensure models, ensure vector indexes, schema, seed-if-empty). Config-first: `Sora:Scheduling:Jobs` with `Runner: "bootstrap"`.
+   - Provide `BootstrapJobRunner` composing `IBootstrapTask` items (ensure models, ensure vector indexes, schema, seed-if-empty). Config-first: `Koan:Scheduling:Jobs` with `Runner: "bootstrap"`.
 
 ## Consequences
 
@@ -52,7 +52,7 @@ Negative / risks:
 ## Alternatives considered
 
 - Separate Bootstrap module: clearer naming, but duplicates scheduling mechanics; unifying reduces surface area.
-- Heavyweight schedulers (Quartz): powerful but too much for Sora’s goals; a light, focused core fits better.
+- Heavyweight schedulers (Quartz): powerful but too much for Koan’s goals; a light, focused core fits better.
 
 ## Rollout
 

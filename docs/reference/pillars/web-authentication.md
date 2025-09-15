@@ -1,12 +1,12 @@
-﻿# Web Authentication (Sora.Web.Auth)
+# Web Authentication (Koan.Web.Auth)
 
-This page defines the contracts, options, and wiring patterns for Sora.Web.Auth (OIDC, OAuth2, SAML) with provider discovery, sign-in, and account linking. Provider adapters (Google, Microsoft, Discord, generic OIDC) are separate thin modules that self-register defaults via `IAuthProviderContributor`; the core centralizes behavior and composition.
+This page defines the contracts, options, and wiring patterns for Koan.Web.Auth (OIDC, OAuth2, SAML) with provider discovery, sign-in, and account linking. Provider adapters (Google, Microsoft, Discord, generic OIDC) are separate thin modules that self-register defaults via `IAuthProviderContributor`; the core centralizes behavior and composition.
 
 See also: WEB-0043 (multi-protocol auth), ARCH-0040 (constants), WEB-0035 (controllers + transformers), OPS-0015 (config fallback). For a high-level capability overview, see Feature Catalog → Web.Auth under `../../feature-catalog.md`.
 
 ## Contract (at a glance)
 
-- Inputs: HTTP requests to controller routes; configuration under `Sora:Web:Auth:*` and per-provider under `Sora:Web:Auth:Providers:{id}:*`.
+- Inputs: HTTP requests to controller routes; configuration under `Koan:Web:Auth:*` and per-provider under `Koan:Web:Auth:Providers:{id}:*`.
 - Outputs: Redirects to IdP (challenge), authenticated session on callback; JSON payloads for discovery and profile.
 - Error modes: ProblemDetails (400/401/404/429) for misconfig, disabled providers, invalid state/nonce, replay, rate limits.
 - Success criteria: Provider discovery returns enabled providers; challenge redirects; callback creates or resumes a user session; linking/unlinking enforces policy and audits.
@@ -43,7 +43,7 @@ ProviderDescriptor shape (stable):
 
 ## Options
 
-Root: `Sora:Web:Auth`
+Root: `Koan:Web:Auth`
 - ReturnUrl:
   - DefaultPath: "/"
   - AllowList: []
@@ -57,7 +57,7 @@ Root: `Sora:Web:Auth`
 - ReConsent:
   - ForceOnLink: false
 
-Per provider: `Sora:Web:Auth:Providers:{id}`
+Per provider: `Koan:Web:Auth:Providers:{id}`
 - Common: { Type: `oidc|oauth2|saml`, DisplayName, Icon }
 - OIDC: { Authority, ClientId, ClientSecret|SecretRef, Scopes[], CallbackPath? }
 - OAuth2 (Discord): { AuthorizationEndpoint, TokenEndpoint, UserInfoEndpoint?, ClientId, ClientSecret|SecretRef, Scopes[], CallbackPath? }
@@ -67,20 +67,20 @@ Secrets: default config; optional secret-store adapters (Azure Key Vault, AWS Se
 
 ### Settings composition and minimal overrides
 
-- Adapters provide sane defaults (protocol `Type`, endpoints, scopes, icons). You can specify only the minimum credentials, and Sora composes final settings by overlaying your values on top of adapter defaults. Defaults are contributed by adapter modules, not hard-coded in the core.
+- Adapters provide sane defaults (protocol `Type`, endpoints, scopes, icons). You can specify only the minimum credentials, and Koan composes final settings by overlaying your values on top of adapter defaults. Defaults are contributed by adapter modules, not hard-coded in the core.
 - Precedence: adapter defaults ← app defaults (if any) ← appsettings.json ← appsettings.{Environment}.json ← environment variables; `SecretRef` resolves last.
 - Missing required keys after composition produce a clear ProblemDetails error at startup or first use.
 
 Production gating
 
-- In Production, providers contributed only by adapters (no explicit `Sora:Web:Auth:Providers:{id}` entry) are disabled by default unless one of the following is set:
-  - `Sora:Web:Auth:AllowDynamicProvidersInProduction=true`, or
-  - `Sora:AllowMagicInProduction=true`.
+- In Production, providers contributed only by adapters (no explicit `Koan:Web:Auth:Providers:{id}` entry) are disabled by default unless one of the following is set:
+  - `Koan:Web:Auth:AllowDynamicProvidersInProduction=true`, or
+  - `Koan:AllowMagicInProduction=true`.
 - In Development, adapter defaults are active by default for fast starts.
 
 Minimal Discord example (only credentials provided):
 ```
-"Sora:Web:Auth:Providers:discord": {
+"Koan:Web:Auth:Providers:discord": {
   "ClientId": "${DISCORD_CLIENT_ID}",
   "ClientSecret": "${DISCORD_CLIENT_SECRET}"
 }
@@ -96,7 +96,7 @@ Note: routes live in controllers; the following shows options snapshots and expe
 appsettings.json
 ```
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "Providers": {
@@ -119,7 +119,7 @@ Behavior:
 ### 2) Microsoft (OIDC) — minimal (adapter provides defaults)
 
 ```
-"Sora:Web:Auth:Providers:microsoft": {
+"Koan:Web:Auth:Providers:microsoft": {
   "ClientId": "${MS_CLIENT_ID}",
   "ClientSecret": "${MS_CLIENT_SECRET}"
 }
@@ -130,7 +130,7 @@ Behavior: adapter supplies `Type=oidc`, common authority and scopes; you may ove
 ### 3) Discord (OAuth2) — minimal (adapter provides defaults)
 
 ```
-"Sora:Web:Auth:Providers:discord": {
+"Koan:Web:Auth:Providers:discord": {
   "ClientId": "${DISCORD_CLIENT_ID}",
   "ClientSecret": "${DISCORD_CLIENT_SECRET}"
 }
@@ -140,7 +140,7 @@ Behavior: adapter supplies `Type=oauth2`, Authorization/Token/UserInfo endpoints
 
 Optional override (e.g., add scopes):
 ```
-"Sora:Web:Auth:Providers:discord": {
+"Koan:Web:Auth:Providers:discord": {
   "ClientId": "${DISCORD_CLIENT_ID}",
   "ClientSecret": "${DISCORD_CLIENT_SECRET}",
   "Scopes": ["identify","email","guilds"]
@@ -150,7 +150,7 @@ Optional override (e.g., add scopes):
 ### 4) Generic OIDC (no wrapper) — minimal required fields
 
 ```
-"Sora:Web:Auth:Providers:my-oidc": {
+"Koan:Web:Auth:Providers:my-oidc": {
   "Type": "oidc",
   "Authority": "https://idp.example.com",
   "ClientId": "${OIDC_CLIENT_ID}",
@@ -164,7 +164,7 @@ Note: generic OIDC has no adapter defaults for Authority; you must provide it.
 ### 5) Add SAML (enterprise IdP)
 
 ```
-"Sora:Web:Auth:Providers:corp-saml": {
+"Koan:Web:Auth:Providers:corp-saml": {
   "Type": "saml",
   "EntityId": "https://yourapp.example.com/auth/corp-saml/saml/metadata",
   "IdpMetadataUrl": "https://idp.example.com/metadata",
@@ -200,7 +200,7 @@ Define providers `google`, `microsoft`, `discord`, `corp-saml` as above. Discove
 - Start login with `GET /auth/{provider}/challenge?return={relative-path}`; server sets state/return cookies and redirects to the IdP.
 - Complete login at `GET /auth/{provider}/callback?code=...&state=...`; on success, cookie session is established and a local redirect is performed.
 - Logout via `GET|POST /auth/logout?return=/`.
-- Return URL policy: only relative paths or configured allow-list prefixes are accepted; configure under `Sora:Web:Auth:ReturnUrl:{ DefaultPath, AllowList[] }`.
+- Return URL policy: only relative paths or configured allow-list prefixes are accepted; configure under `Koan:Web:Auth:ReturnUrl:{ DefaultPath, AllowList[] }`.
 
 ### Prompt and re-authentication
 
@@ -221,7 +221,7 @@ Challenge query parameters
 - UI guidance (samples): sample UIs may add `&prompt=login` to challenge URLs to encourage an explicit form the first time after logout; providers may still choose to bypass the form when a remembered session exists.
 
 Redirect whitelist and PKCE
-- Configure `Sora:Web:Auth:TestProvider:AllowedRedirectUris` to allow redirects. Absolute entries must match exactly; relative entries must start with `/` and match the redirect path exactly.
+- Configure `Koan:Web:Auth:TestProvider:AllowedRedirectUris` to allow redirects. Absolute entries must match exactly; relative entries must start with `/` and match the redirect path exactly.
 - When `code_challenge_method` is provided to authorize, only `S256` is accepted.
 
 ## Examples: Discovery and profile payloads

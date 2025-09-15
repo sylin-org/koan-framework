@@ -1,4 +1,4 @@
-﻿---
+---
 id: ARCH-0047
 slug: orchestration-hosting-and-exporters-as-pluggable-adapters
 domain: Architecture
@@ -9,7 +9,7 @@ title: Orchestration — Hosting providers and Exporters as pluggable adapters
 
 ## Context
 
-Sora aims to offer first-class orchestration with a library-first, intention-driven model: reference = intent, recipes amplify behavior, and configuration remains authoritative. We need a simple, DX-first way to bring up local dependencies and export portable artifacts without binding to a specific environment.
+Koan aims to offer first-class orchestration with a library-first, intention-driven model: reference = intent, recipes amplify behavior, and configuration remains authoritative. We need a simple, DX-first way to bring up local dependencies and export portable artifacts without binding to a specific environment.
 
 Key drivers
 - DX: one-command start, meaningful defaults, explainable decisions, safe by default.
@@ -22,13 +22,13 @@ We will introduce a small orchestration SPI and treat hosting runtimes and artif
 
 - Hosting providers (runtimes): Docker and Podman as first-class adapters selected by availability and preference.
 - Artifact exporters: Compose (v1), Helm (vNext), Azure Container Apps/Bicep (vNext) as separate pluggable exporters.
-- Core orchestrator builds a deterministic Plan from adapter/recipe-contributed service descriptors (image, env, ports, volumes, health, depends_on) gated by Sora:* options and profiles.
-- A lightweight CLI ("sora") provides dev init/up/down/logs/status/doctor and export commands with verbosity flags.
+- Core orchestrator builds a deterministic Plan from adapter/recipe-contributed service descriptors (image, env, ports, volumes, health, depends_on) gated by Koan:* options and profiles.
+- A lightweight CLI ("Koan") provides dev init/up/down/logs/status/doctor and export commands with verbosity flags.
 
 Defaults (approved)
 - Windows-first provider order: Docker → Podman; override via --engine.
 - Compose is the initial export; Helm/ACA follow.
-- Profiles via SORA_ENV (local|ci|staging|prod), default = local.
+- Profiles via Koan_ENV (local|ci|staging|prod), default = local.
 - Heavy AI (e.g., Ollama) is opt-in (profile/flag/config); SQLite is never containerized.
 - Named volumes by default (avoid bind mounts) for cross-engine behavior.
 
@@ -42,7 +42,7 @@ In scope
 Out of scope (this ADR)
 - Helm and ACA exporter details (follow-up ADRs if needed).
 - Secret management; exporters only reference external secrets by name.
-- Owning cluster lifecycle; Sora only generates artifacts and runs local stacks.
+- Owning cluster lifecycle; Koan only generates artifacts and runs local stacks.
 
 ## Consequences
 
@@ -65,7 +65,7 @@ Contracts
 
 Planner and selection
 - Deterministic activation: explicit config → ON; recipe with config → ON; package presence alone is a hint (requires minimal config to activate).
-- Provider precedence configurable (Sora:Orchestration:PreferredProviders); override with --engine.
+- Provider precedence configurable (Koan:Orchestration:PreferredProviders); override with --engine.
 
 DX and safety
 - Readiness gates are honored; ports auto-avoid conflicts with clear messages; sensitive values are redacted in outputs.
@@ -74,7 +74,7 @@ DX and safety
 ## Follow-ups
 - Implement Compose exporter, Docker provider, Podman provider (Windows-first), and CLI (Phase 1).
 - Add Helm exporter and ACA/Bicep exporter (Phase 3).
-- Add Policy Packs (warn-only by default) and CLI scaffolds (sora new …) later.
+- Add Policy Packs (warn-only by default) and CLI scaffolds (Koan new …) later.
 
 ## References
 - ARCH-0046 — Recipes: intention-driven bootstrap and layered config

@@ -58,7 +58,7 @@
           <div>
             <span>S8 Location Processing System</span>
             <span class="mx-2">•</span>
-            <span>Built with Sora Framework</span>
+            <span>Built with Koan Framework</span>
           </div>
           <div class="flex items-center space-x-4">
             <span>Version 1.0.0</span>

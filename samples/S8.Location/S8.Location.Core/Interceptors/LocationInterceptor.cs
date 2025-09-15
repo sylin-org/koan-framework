@@ -4,11 +4,11 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Models;
 using S8.Location.Core.Services;
-using Sora.Flow.Core.Interceptors;
-using Sora.Flow.Core.Infrastructure;
-using Sora.Core.Hosting.Bootstrap;
-using Sora.Core;
-using Sora.Data.Core;
+using Koan.Flow.Core.Interceptors;
+using Koan.Flow.Core.Infrastructure;
+using Koan.Core.Hosting.Bootstrap;
+using Koan.Core;
+using Koan.Data.Core;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -19,7 +19,7 @@ namespace S8.Location.Core.Interceptors;
 /// Auto-registrar that configures Location intake interceptors using the new fluent lifecycle API
 /// for proper hash collision detection and intelligent parking decisions.
 /// </summary>
-public class LocationInterceptor : ISoraAutoRegistrar
+public class LocationInterceptor : IKoanAutoRegistrar
 {
     public string ModuleName => "S8.Location.Core.Interceptors";
     public string? ModuleVersion => GetType().Assembly.GetName().Version?.ToString();

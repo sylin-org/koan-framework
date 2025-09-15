@@ -23,12 +23,12 @@ samples/S8.Location/
 
 ### 1. Self-Registration Pattern
 ```csharp
-// S8.Location.Core/Initialization/SoraAutoRegistrar.cs
-public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
+// S8.Location.Core/Initialization/KoanAutoRegistrar.cs
+public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
     public void Initialize(IServiceCollection services)
     {
-        services.AddSoraOptions<LocationOptions>();
+        services.AddKoanOptions<LocationOptions>();
         services.AddScoped<IAddressResolutionService, AddressResolutionService>();
         // ... automatic discovery and registration
     }
@@ -156,7 +156,7 @@ docker logs s8-location-adapter-healthcare
 
 ### Stop Stack
 ```bash
-docker compose -p sora-s8-location down
+docker compose -p Koan-s8-location down
 ```
 
 ---
@@ -166,12 +166,12 @@ docker compose -p sora-s8-location down
 ### Environment Variables
 ```bash
 # Core Framework
-SORA_DATA_MONGO_DATABASE=s8location
-SORA_MESSAGING_RABBITMQ_CONNECTIONSTRING=amqp://guest:guest@rabbitmq:5672
+Koan_DATA_MONGO_DATABASE=s8location
+Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING=amqp://guest:guest@rabbitmq:5672
 
 # AI Integration
-SORA_AI_SERVICES_OLLAMA_0_BASEURL=http://ollama:11434
-SORA_AI_SERVICES_OLLAMA_0_DEFAULTMODEL=llama3.1:8b
+Koan_AI_SERVICES_OLLAMA_0_BASEURL=http://ollama:11434
+Koan_AI_SERVICES_OLLAMA_0_DEFAULTMODEL=llama3.1:8b
 
 # Location-Specific
 S8_LOCATION_RESOLUTION_CACHEENABLED=true
@@ -214,20 +214,20 @@ GOOGLE_MAPS_API_KEY=your_key_here
 
 ## Integration Points
 
-### Sora.Data
+### Koan.Data
 - `Entity<T>` base class with MongoDB via `[Storage]` attributes
 - Automatic CRUD: `Location.Get()`, `Location.All()`, `location.Save()`
 
-### Sora.Flow  
+### Koan.Flow  
 - `FlowEntity<T>` adds messaging: `await location.Send()`
 - `[FlowOrchestrator]` automatic discovery and registration
 - Identity.external space for source system correlation
 
-### Sora.Messaging
+### Koan.Messaging
 - RabbitMQ integration with automatic envelope wrapping
 - Convention-based queue naming with `.transport` suffix
 
-### Sora.AI
+### Koan.AI
 - Ollama integration for address correction
 - `IAi.PromptAsync()` for standardizing address formats
 

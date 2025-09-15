@@ -30,7 +30,7 @@ OpenTelemetry (optional):
     - Uncomment the entire `otel-collector` service section at the bottom.
     - In the `api.environment` block, uncomment `OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"`.
   - Bring the stack up; the collector will receive exports and print them to its logs (debug exporter).
-  - API responses also include a `Sora-Trace-Id` header for quick correlation.
+  - API responses also include a `Koan-Trace-Id` header for quick correlation.
 
 WSL2 tips (optional):
 - If using WSL2 with Docker Desktop integration:
@@ -43,5 +43,5 @@ Status:
 
 Config keys:
 - ConnectionStrings__Default (mongodb connection string)
-- Sora__Data__Mongo__Database (db name)
+- Koan__Data__Mongo__Database (db name)
  - OTEL_EXPORTER_OTLP_ENDPOINT (OTLP gRPC endpoint), OTEL_EXPORTER_OTLP_HEADERS (optional)

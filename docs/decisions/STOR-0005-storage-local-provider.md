@@ -1,4 +1,4 @@
-﻿---
+---
 id: STOR-0005
 slug: STOR-0005-storage-local-provider
 domain: STOR
@@ -14,7 +14,7 @@ Context
 
 Decision
 
-- Implement Sora.Storage.Local (LocalStorageProvider) as part of the initial release.
+- Implement Koan.Storage.Local (LocalStorageProvider) as part of the initial release.
 - Capabilities
   - SupportsSequentialStream = true
   - SupportsSeek/Range = true (for regular files)

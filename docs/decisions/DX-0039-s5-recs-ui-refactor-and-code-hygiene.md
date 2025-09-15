@@ -1,4 +1,4 @@
-﻿---
+---
 id: DX-0039
 slug: DX-0039-s5-recs-ui-refactor-and-code-hygiene
 domain: DX
@@ -47,7 +47,7 @@ Adopt a lightweight modular structure and UI componentization for S5.Recs’ fro
 - Add keyboard affordances (`role="button"`, `tabindex="0"`, Enter/Space to open details).
 - Use `loading="lazy"` on images; keep page responsive with PAGE_SIZE=100.
 
-This preserves the sample’s simplicity while aligning with Sora conventions: separation of concerns, no magic values, and predictable structure.
+This preserves the sample’s simplicity while aligning with Koan conventions: separation of concerns, no magic values, and predictable structure.
 
 ## Scope
 
@@ -80,7 +80,7 @@ Operational
 - Keep `mapItemToAnime` in `api.js` or a dedicated mapper to normalize server variation.
 - Maintain existing endpoints and payloads; no server changes needed.
 - Use a tiny `escapeHtml` helper; prefer node creation for user content (title/synopsis/tags).
-- Follow Sora docs: no empty placeholders; avoid duplication; constants in one place.
+- Follow Koan docs: no empty placeholders; avoid duplication; constants in one place.
 
 ## Follow-ups
 

@@ -30,5 +30,5 @@ pwsh -File ./scripts/pack-and-push.ps1 -Version 0.2.0 -Push -Source 'https://api
 
 Notes
 - Package IDs default to `Sylin.<AssemblyName>` for packable projects; override per project via `<PackageId>`.
-- Meta packages (`packaging/Sora.nuspec`, `packaging/Sora.App.nuspec`) are tokenized and CI sets their version and dependency ranges.
+- Meta packages (`packaging/Koan.nuspec`, `packaging/Koan.App.nuspec`) are tokenized and CI sets their version and dependency ranges.
 - Use tags `vX.Y.Z` for public releases; NB.GV reads from `version.json` and the tag to derive `NuGetPackageVersion`.

@@ -1,7 +1,7 @@
 # Flow Framework-Level Implementation Plan
 
 ## Executive Summary
-The Flow messaging architecture requires framework-level implementation at Sora.Messaging/Sora.Flow to provide a clean developer experience with dedicated queue routing and orchestrator pattern. This document outlines the comprehensive implementation plan for zero-config Flow messaging.
+The Flow messaging architecture requires framework-level implementation at Koan.Messaging/Koan.Flow to provide a clean developer experience with dedicated queue routing and orchestrator pattern. This document outlines the comprehensive implementation plan for zero-config Flow messaging.
 
 ## Requirements vs Current Implementation Gap Analysis
 
@@ -9,7 +9,7 @@ The Flow messaging architecture requires framework-level implementation at Sora.
 1. **Strong-typed models** with `[FlowAdapter]` source detection
 2. **entity.Send()** on FlowEntity<> models  
 3. **MessagingInterceptors** wrap in transport envelope with source/type/payload
-4. **Dedicated "Sora.Flow.FlowEntity" queue** for all Flow entities
+4. **Dedicated "Koan.Flow.FlowEntity" queue** for all Flow entities
 5. **[FlowOrchestrator]** receives and deserializes by type
 6. **Metadata separation** - source info never merged into model payload
 
@@ -17,7 +17,7 @@ The Flow messaging architecture requires framework-level implementation at Sora.
 
 #### 1. Queue Architecture Gap
 **Current**: Using "System.String" queue for all JSON messages
-**Required**: Dedicated "Sora.Flow.FlowEntity" queue  
+**Required**: Dedicated "Koan.Flow.FlowEntity" queue  
 **Impact**: No clear separation, mixed traffic
 
 #### 2. Orchestrator Pattern Missing  
@@ -32,16 +32,16 @@ The Flow messaging architecture requires framework-level implementation at Sora.
 
 #### 4. Framework vs User Code
 **Current**: Implementation scattered across user samples
-**Required**: Framework-level implementation in Sora.Messaging/Sora.Flow
+**Required**: Framework-level implementation in Koan.Messaging/Koan.Flow
 **Impact**: Poor developer experience, code duplication
 
 ## Framework Implementation Phases
 
-### Phase 1: Sora.Messaging Enhancement (8 hours)
+### Phase 1: Koan.Messaging Enhancement (8 hours)
 
 #### Task 1.1: IQueuedMessage Interface
 ```csharp
-// File: src/Sora.Messaging.Core/Contracts/IQueuedMessage.cs
+// File: src/Koan.Messaging.Core/Contracts/IQueuedMessage.cs
 public interface IQueuedMessage
 {
     string QueueName { get; }
@@ -51,7 +51,7 @@ public interface IQueuedMessage
 
 #### Task 1.2: Enhanced MessagingExtensions.Send()
 ```csharp
-// File: src/Sora.Messaging.Core/MessagingExtensions.cs
+// File: src/Koan.Messaging.Core/MessagingExtensions.cs
 public static async Task Send<T>(this T message, ...) where T : class
 {
     var intercepted = MessagingInterceptors.Intercept(transformed);
@@ -71,7 +71,7 @@ public static async Task Send<T>(this T message, ...) where T : class
 
 #### Task 1.3: RabbitMQ Provider Enhancement  
 ```csharp
-// File: src/Sora.Messaging.RabbitMq/RabbitMqProvider.cs
+// File: src/Koan.Messaging.RabbitMq/RabbitMqProvider.cs
 public async Task SendToQueueAsync<T>(string queueName, T message, CancellationToken ct)
 {
     // Direct queue routing implementation
@@ -84,13 +84,13 @@ public async Task SendToQueueAsync<T>(string queueName, T message, CancellationT
 
 #### Task 2.1: FlowOrchestrator Base Class
 ```csharp
-// File: src/Sora.Flow.Core/Orchestration/FlowOrchestratorBase.cs
+// File: src/Koan.Flow.Core/Orchestration/FlowOrchestratorBase.cs
 [FlowOrchestrator]
 public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrator
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        // Auto-subscribe to "Sora.Flow.FlowEntity" queue
+        // Auto-subscribe to "Koan.Flow.FlowEntity" queue
         await SubscribeToFlowQueue(ct);
     }
     
@@ -132,7 +132,7 @@ public abstract class FlowOrchestratorBase : BackgroundService, IFlowOrchestrato
 
 #### Task 2.2: Default Orchestrator Implementation
 ```csharp
-// File: src/Sora.Flow.Core/Orchestration/DefaultFlowOrchestrator.cs
+// File: src/Koan.Flow.Core/Orchestration/DefaultFlowOrchestrator.cs
 [FlowOrchestrator]
 internal class DefaultFlowOrchestrator : FlowOrchestratorBase
 {
@@ -148,12 +148,12 @@ internal class DefaultFlowOrchestrator : FlowOrchestratorBase
 }
 ```
 
-#### Task 2.3: Auto-Discovery in SoraAutoRegistrar
+#### Task 2.3: Auto-Discovery in KoanAutoRegistrar
 ```csharp
-// File: src/Sora.Flow.Core/Initialization/SoraAutoRegistrar.cs
+// File: src/Koan.Flow.Core/Initialization/KoanAutoRegistrar.cs
 public void Initialize(IServiceCollection services)
 {
-    services.AddSoraFlow();
+    services.AddKoanFlow();
     RegisterFlowAdapters(services);
     
     // NEW: Auto-discover orchestrators
@@ -176,7 +176,7 @@ private void RegisterFlowOrchestrators(IServiceCollection services)
         services.AddSingleton<IHostedService>(sp => 
             (IHostedService)sp.GetRequiredService(orchestratorType));
         
-        // Auto-configure "Sora.Flow.FlowEntity" queue handler
+        // Auto-configure "Koan.Flow.FlowEntity" queue handler
         services.On<FlowTransportEnvelope>(async envelope =>
         {
             var orchestrator = sp.GetRequiredService(orchestratorType) as IFlowOrchestrator;
@@ -208,10 +208,10 @@ if (_messageCount % 100 == 0)
 #### Task 3.2: Monitor RabbitMQ
 ```bash
 # Check queue depths
-docker exec sora-rabbitmq rabbitmqctl list_queues name messages_ready messages_unacknowledged
+docker exec Koan-rabbitmq rabbitmqctl list_queues name messages_ready messages_unacknowledged
 
 # Monitor exchange rates
-docker exec sora-rabbitmq rabbitmqctl list_exchanges
+docker exec Koan-rabbitmq rabbitmqctl list_exchanges
 ```
 
 ### Phase 4: Documentation (Optional, 1 hour)
@@ -336,4 +336,4 @@ The new architecture provides:
 - 100% adapter context preservation
 - Zero configuration requirements
 
-This implementation exceeds the original proposal by leveraging Sora's patterns more effectively.
+This implementation exceeds the original proposal by leveraging Koan's patterns more effectively.

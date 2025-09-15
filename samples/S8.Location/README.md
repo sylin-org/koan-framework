@@ -2,7 +2,7 @@
 
 **Project Status**: Implementation Ready  
 **Architecture**: CLD Orchestrator Bidirectional Pattern with SHA512 Deduplication  
-**Framework**: Sora Framework with Flow, Data, Messaging, and AI integration
+**Framework**: Koan Framework with Flow, Data, Messaging, and AI integration
 
 ---
 
@@ -91,10 +91,10 @@ public class AgnosticLocation : Entity<AgnosticLocation>
 
 ### Flow Intake Interceptor Pattern
 
-**Sora.Flow manages all orchestration** - no custom orchestrators needed:
+**Koan.Flow manages all orchestration** - no custom orchestrators needed:
 
 1. **Adapters** → `location.Send()` → **Transport Envelope** → **Message Queue**
-2. **Sora.Flow.Core** → **Built-in orchestrator** consumes Flow entity messages
+2. **Koan.Flow.Core** → **Built-in orchestrator** consumes Flow entity messages
 3. **Flow Intake Pipeline** → Applies registered **FlowIntakeInterceptors**
 4. **LocationInterceptor** → Checks SHA512 signature:
    - **Drop**: Already processed (has signature)
@@ -155,7 +155,7 @@ Monthly cost for 1M addresses: ~$250 (vs $5000 without caching)
 samples/S8.Location/
 ├── S8.Location.Core/                    # Core domain logic
 │   ├── Initialization/
-│   │   └── SoraAutoRegistrar.cs         # Self-registration
+│   │   └── KoanAutoRegistrar.cs         # Self-registration
 │   ├── Models/
 │   │   ├── Location.cs                  # FlowEntity<Location>
 │   │   ├── AgnosticLocation.cs          # Canonical storage
@@ -200,7 +200,7 @@ samples/S8.Location/
 - Create sequential orchestrator
 
 ### Phase 2: Resolution Pipeline (2 days)
-- Integrate Sora.AI (Ollama) for address correction
+- Integrate Koan.AI (Ollama) for address correction
 - Add Google Maps geocoding service + fallback
 - Build AgnosticLocation hierarchy generator
 - Implement caching layer
@@ -224,16 +224,16 @@ samples/S8.Location/
 ### Environment Variables
 ```bash
 # MongoDB
-SORA_DATA_MONGO_DATABASE=s8location
-SORA_DATA_MONGO_CONNECTIONSTRING=mongodb://mongo:27017
+Koan_DATA_MONGO_DATABASE=s8location
+Koan_DATA_MONGO_CONNECTIONSTRING=mongodb://mongo:27017
 
 # RabbitMQ  
-SORA_MESSAGING_RABBITMQ_CONNECTIONSTRING=amqp://guest:guest@rabbitmq:5672
+Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING=amqp://guest:guest@rabbitmq:5672
 
 # AI (Ollama)
-SORA_AI_SERVICES_OLLAMA_0_ID=ollama
-SORA_AI_SERVICES_OLLAMA_0_BASEURL=http://ollama:11434
-SORA_AI_SERVICES_OLLAMA_0_DEFAULTMODEL=llama3.1:8b
+Koan_AI_SERVICES_OLLAMA_0_ID=ollama
+Koan_AI_SERVICES_OLLAMA_0_BASEURL=http://ollama:11434
+Koan_AI_SERVICES_OLLAMA_0_DEFAULTMODEL=llama3.1:8b
 
 # Geocoding
 GOOGLE_MAPS_API_KEY=your_api_key_here
@@ -347,7 +347,7 @@ start.bat
 **Rationale**: Eliminates 95% of resolution calls, consistent results, collision-resistant
 
 ### ADR-003: Flow Intake Interceptor Pattern
-**Decision**: Use Sora.Flow's built-in orchestration with FlowIntakeInterceptors
+**Decision**: Use Koan.Flow's built-in orchestration with FlowIntakeInterceptors
 
 **Rationale**: Leverage framework capabilities, no custom orchestrators needed, cleaner separation of concerns
 
@@ -366,7 +366,7 @@ start.bat
 ## Next Steps
 
 1. **Implementation**: Follow `IMPLEMENTATION.md` for step-by-step development guide
-2. **Framework Integration**: Leverage existing Sora capabilities (no changes required)
+2. **Framework Integration**: Leverage existing Koan capabilities (no changes required)
 3. **Testing**: Implement comprehensive test suite
 4. **Monitoring**: Set up observability and alerting
 5. **Production**: Deploy with proper configuration and scaling
@@ -385,4 +385,4 @@ start.bat
 
 **Document Status**: Ready for Implementation  
 **Architecture Status**: Final - Gang Approved ✅  
-**Framework Dependencies**: Sora.Data, Sora.Flow, Sora.Messaging, Sora.AI
+**Framework Dependencies**: Koan.Data, Koan.Flow, Koan.Messaging, Koan.AI

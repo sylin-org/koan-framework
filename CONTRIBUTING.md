@@ -1,6 +1,6 @@
-# Contributing to Sora
+# Contributing to Koan
 
-Thanks for helping build Sora. This repo favors small, focused PRs with good tests and docs. Start here:
+Thanks for helping build Koan. This repo favors small, focused PRs with good tests and docs. Start here:
 
 - Read the support docs at `docs/support/` (architecture, adapters, testing, releases, migration).
 - Follow the ADR process for meaningful technical decisions (see `docs/decisions`).

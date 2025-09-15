@@ -1,4 +1,4 @@
-# Sora Framework Proposals
+# Koan Framework Proposals
 
 This directory contains architectural proposals for the Instance-Based Relationship System.
 
@@ -14,7 +14,7 @@ This directory contains architectural proposals for the Instance-Based Relations
 - **Selective Enrichment**: Only requested entities get `RelationshipGraph` format
 - **Direct Migration**: Remove `ParentKeyAttribute` entirely - no compatibility bridge
 
-**Impact**: All Sora modules gain intuitive relationship navigation with performance optimization
+**Impact**: All Koan modules gain intuitive relationship navigation with performance optimization
 
 ### 2. [Implementation Roadmap](implementation-roadmap.md)
 **Status**: Work Breakdown Structure

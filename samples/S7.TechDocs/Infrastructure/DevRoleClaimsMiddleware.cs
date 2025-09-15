@@ -1,10 +1,10 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 
 namespace S7.TechDocs.Infrastructure;
 
 /// <summary>
 /// Development-only middleware to enrich the authenticated principal (from TestProvider)
-/// with role claims based on a simple cookie. This keeps identity issuance with Sora.Web.Auth
+/// with role claims based on a simple cookie. This keeps identity issuance with Koan.Web.Auth
 /// while allowing us to simulate Roles for the demo.
 /// Cookie format: _s7_roles=Reader|Author|Moderator|Admin (pipe or comma separated). Defaults to Reader.
 /// Cumulative semantics are applied: Reader ⊆ Author ⊆ Moderator ⊆ Admin.

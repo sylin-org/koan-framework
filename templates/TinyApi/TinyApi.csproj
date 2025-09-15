@@ -5,8 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Sylin.Sora.App" Version="0.1.0-preview" />
-    <PackageReference Include="Sylin.Sora.Web.Swagger" Version="0.1.0-preview" />
-    <PackageReference Include="Sylin.Sora.Data.Json" Version="0.1.0-preview" />
+    <PackageReference Include="Sylin.Koan.App" Version="0.1.0-preview" />
+    <PackageReference Include="Sylin.Koan.Web.Swagger" Version="0.1.0-preview" />
+    <PackageReference Include="Sylin.Koan.Data.Json" Version="0.1.0-preview" />
   </ItemGroup>
 </Project>

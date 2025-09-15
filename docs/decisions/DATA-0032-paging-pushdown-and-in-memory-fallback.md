@@ -21,13 +21,13 @@ We also added repository-level `CountAsync` to avoid loading all items just to c
   - LINQ-capable adapters should apply `Skip/Take` and sorting before execution.
   - String-query adapters should translate to `LIMIT/OFFSET` (or equivalent) with `ORDER BY`.
 - Keep in-memory pagination as a correctness fallback for adapters that lack native paging (e.g., pure JSON store) or when capabilities are insufficient.
-- When in-memory pagination is used, the controller must surface a response header: `Sora-InMemory-Paging: true`.
+- When in-memory pagination is used, the controller must surface a response header: `Koan-InMemory-Paging: true`.
 - Totals should be computed via repository `CountAsync(..)` whenever supported; if not, fall back to counting the materialized result.
 
 ## Consequences
 
 - Adapters should extend their query paths to support native paging over time.
-- Clients and operators can detect non-native paging via the `Sora-InMemory-Paging` header and treat it as a performance warning.
+- Clients and operators can detect non-native paging via the `Koan-InMemory-Paging` header and treat it as a performance warning.
 - Behavior remains correct across providers; performance improves as adapters adopt pushdown.
 
 ## Alternatives considered

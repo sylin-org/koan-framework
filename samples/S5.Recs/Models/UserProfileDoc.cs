@@ -1,7 +1,7 @@
-using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Data.Core.Model;
-using Sora.Data.Core.Relationships;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Core.Model;
+using Koan.Data.Core.Relationships;
 
 namespace S5.Recs.Models;
 

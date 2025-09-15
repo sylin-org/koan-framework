@@ -1,6 +1,6 @@
 # Vector Adapter Acceptance Criteria
 
-This document defines testable acceptance criteria for Sora Vector adapters. It complements the authoring checklist and testing guide with normative MUST/SHOULD/MAY language, and ties behavior to provider capabilities. It is the vector analogue to "Data Adapter Acceptance Criteria" and should be read alongside the Vector Search guide and ADR DATA-0054.
+This document defines testable acceptance criteria for Koan Vector adapters. It complements the authoring checklist and testing guide with normative MUST/SHOULD/MAY language, and ties behavior to provider capabilities. It is the vector analogue to "Data Adapter Acceptance Criteria" and should be read alongside the Vector Search guide and ADR DATA-0054.
 
 Scope: Adapters that expose vector similarity search over entities (IEntity<TKey>) via the Vector Search contracts.
 
@@ -87,13 +87,13 @@ References:
 
 ## 10) Options, configuration, and defaults
 
-- MUST bind options from configuration sections named consistently (e.g., `Sora:Data:<Adapter>`). Provide sane dev defaults (host, port, scheme), and respect environment overrides.
+- MUST bind options from configuration sections named consistently (e.g., `Koan:Data:<Adapter>`). Provide sane dev defaults (host, port, scheme), and respect environment overrides.
 - MUST fail fast with actionable messages when required configuration (endpoint, API key, metric, dimension) is missing or inconsistent.
 - SHOULD allow configuring index parameters (metric, dimension, replicas) per logical set/index via named options.
 
 ## 11) Error semantics and safety
 
-- MUST translate provider-specific errors to meaningful exceptions/results aligned with Sora contracts (not-found vs validation vs auth). Include remediation hints where possible.
+- MUST translate provider-specific errors to meaningful exceptions/results aligned with Koan contracts (not-found vs validation vs auth). Include remediation hints where possible.
 - MUST avoid partial writes in atomic batch mode. In best-effort mode, MUST report per-item outcomes and accurate counts.
 - MUST validate inputs (dimension length equals index dimension; numeric ranges) and reject early with clear messages.
 - MUST ensure all external inputs are parameterized/encoded safely for provider APIs; avoid injection vulnerabilities in hybrid query components.

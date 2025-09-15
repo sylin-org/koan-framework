@@ -2,12 +2,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using S8.Location.Core.Models;
-using Sora.Flow.Core;
-using Sora.Flow.Core.Extensions;
-using Sora.Flow.Model;
-using Sora.Flow.Infrastructure;
-using Sora.Flow.Actions;
-using Sora.Data.Core;
+using Koan.Flow.Core;
+using Koan.Flow.Core.Extensions;
+using Koan.Flow.Model;
+using Koan.Flow.Infrastructure;
+using Koan.Flow.Actions;
+using Koan.Data.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 namespace S8.Location.Core.Services;
 
 /// <summary>
-/// Background service that monitors Sora.Flow's native parked collection 
+/// Background service that monitors Koan.Flow's native parked collection 
 /// and resolves addresses that were parked with "WAITING_ADDRESS_RESOLVE" status.
 /// Uses ONLY Flow's native parking mechanisms - no custom parking entities.
 /// </summary>

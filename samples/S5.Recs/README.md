@@ -1,8 +1,8 @@
 # AnimeRadar
 
-**This sample demonstrates how to build a complete recommendation engine using Sora.**
+**This sample demonstrates how to build a complete recommendation engine using Koan.**
 
-AnimeRadar shows you how to create a modern content recommendation system by combining MongoDB for data storage, optional vector search with Weaviate, and AI embeddings via Ollama. The sample walks through building personalized recommendations, semantic search, user preference modeling, and a responsive web interface—all using Sora's modular architecture.
+AnimeRadar shows you how to create a modern content recommendation system by combining MongoDB for data storage, optional vector search with Weaviate, and AI embeddings via Ollama. The sample walks through building personalized recommendations, semantic search, user preference modeling, and a responsive web interface—all using Koan's modular architecture.
 
 ## What this sample teaches
 
@@ -13,7 +13,7 @@ This sample demonstrates how to build a hybrid recommendation system that combin
 The sample shows how to add semantic search and vector embeddings to your application while maintaining graceful fallbacks. When AI services are unavailable, the system continues working with popularity and preference-based recommendations.
 
 **Modular architecture in practice**  
-You'll see how Sora's modular design lets you start simple (just MongoDB) and add complexity incrementally (vector search, AI embeddings) without restructuring your core application code.
+You'll see how Koan's modular design lets you start simple (just MongoDB) and add complexity incrementally (vector search, AI embeddings) without restructuring your core application code.
 
 **Production-ready patterns**  
 The sample implements real-world concerns: data seeding pipelines, admin dashboards, health monitoring, user management, and responsive UI design using vanilla JavaScript and modern CSS.
@@ -21,7 +21,7 @@ The sample implements real-world concerns: data seeding pipelines, admin dashboa
 ## How to build an app like this
 
 **[1] Start with basic data modeling**  
-First, you'll need entities to represent your content and user interactions. We use `AnimeDoc` for content metadata, `UserDoc` for user profiles, and `LibraryEntryDoc` to track user interactions with content.
+First, you'll need entities to represent your content and user interactions. We use `MediaDoc` for content metadata, `UserDoc` for user profiles, and `LibraryEntryDoc` to track user interactions with content.
 
 **[2] Add simple recommendation logic**  
 Begin with popularity-based recommendations filtered by user preferences. This gives you working recommendations immediately while you build more sophisticated features.
@@ -32,7 +32,7 @@ Build a system to track user behaviors (ratings, favorites, viewing status) and 
 **[4] Layer in semantic search**  
 Add vector embeddings to enable semantic search ("find something like Cowboy Bebop") alongside keyword-based filtering. 
 
-*But wait—what exactly is a vector database, and why would we need one?* Think of it this way: when you search for "space western," you're not just looking for anime with those exact words. You want shows that *feel* like space westerns—the themes, atmosphere, and storytelling style. Vector databases store mathematical representations (embeddings) of content that capture semantic meaning, not just keywords.
+*But wait—what exactly is a vector database, and why would we need one?* Think of it this way: when you search for "space western," you're not just looking for media with those exact words. You want content that *feels* like space westerns—the themes, atmosphere, and storytelling style. Vector databases store mathematical representations (embeddings) of content that capture semantic meaning, not just keywords.
 
 *How does this tie to user preferences?* As users rate content, we can build a "preference vector" that represents their taste in this mathematical space. Then we can find content that's similar to what they already love, even if it doesn't share obvious keywords.
 
@@ -52,7 +52,7 @@ Start by modeling your core entities. The sample uses three main documents:
 
 ```csharp
 // Content metadata
-public class AnimeDoc : Entity<AnimeDoc>
+public class MediaDoc : Entity<MediaDoc>
 {
     public string Title { get; set; } = string.Empty;
     public List<string> Genres { get; set; } = [];
@@ -86,7 +86,7 @@ Before adding complexity, start with simple popularity-based recommendations:
 public async Task<RecsResponse> GetRecommendations([FromBody] RecsRequest request)
 {
     // Start simple: sort by popularity, filter by preferences
-    var query = _animeCollection
+    var query = _mediaCollection
         .Find(a => request.Genres.Count == 0 || a.Genres.Any(g => request.Genres.Contains(g)))
         .SortByDescending(a => a.Popularity);
         
@@ -102,15 +102,15 @@ This gives you working recommendations immediately while you build more sophisti
 Track user interactions and build preference profiles:
 
 ```csharp
-public async Task UpdateUserPreferences(string userId, string animeId, int rating)
+public async Task UpdateUserPreferences(string userId, string mediaId, int rating)
 {
-    // Get the anime to extract genres
-    var anime = await _animeCollection.Find(a => a.Id == animeId).FirstOrDefaultAsync();
-    if (anime == null) return;
+    // Get the media to extract genres
+    var media = await _mediaCollection.Find(a => a.Id == mediaId).FirstOrDefaultAsync();
+    if (media == null) return;
     
     // Update user's genre preferences based on rating
     var profile = await GetOrCreateUserProfile(userId);
-    foreach (var genre in anime.Genres)
+    foreach (var genre in media.Genres)
     {
         // EWMA update: new preference = α * rating + (1-α) * old preference
         var currentWeight = profile.GenreWeights.GetValueOrDefault(genre, 0.5f);
@@ -132,19 +132,19 @@ This creates user taste profiles that improve recommendations over time.
 
 ```csharp
 // Generate embeddings for new content
-public async Task GenerateEmbeddings(AnimeDoc anime)
+public async Task GenerateEmbeddings(MediaDoc media)
 {
-    var text = $"{anime.Title} {string.Join(" ", anime.Genres)} {anime.Synopsis}";
+    var text = $"{media.Title} {string.Join(" ", media.Genres)} {media.Synopsis}";
     var embedding = await _aiService.GetEmbeddingAsync(text);
     
-    anime.Vector = embedding;
-    await _animeCollection.ReplaceOneAsync(a => a.Id == anime.Id, anime);
+    media.Vector = embedding;
+    await _mediaCollection.ReplaceOneAsync(a => a.Id == media.Id, media);
 }
 
 // Find similar content using vector similarity
-public async Task<List<AnimeDoc>> FindSimilar(string animeId, int count = 10)
+public async Task<List<MediaDoc>> FindSimilar(string mediaId, int count = 10)
 {
-    var source = await _animeCollection.Find(a => a.Id == animeId).FirstOrDefaultAsync();
+    var source = await _mediaCollection.Find(a => a.Id == mediaId).FirstOrDefaultAsync();
     if (source?.Vector == null) return [];
     
     // Use vector database to find similar embeddings
@@ -168,9 +168,9 @@ The vector database stores numerical representations (embeddings) of your conten
 The magic happens when you combine them:
 
 ```csharp
-public async Task<List<AnimeDoc>> GetSemanticRecommendations(string userId, string? searchText = null)
+public async Task<List<MediaDoc>> GetSemanticRecommendations(string userId, string? searchText = null)
 {
-    List<AnimeDoc> candidates;
+    List<MediaDoc> candidates;
     
     if (!string.IsNullOrEmpty(searchText))
     {
@@ -198,12 +198,12 @@ public async Task<List<AnimeDoc>> GetSemanticRecommendations(string userId, stri
     // Apply user preference scoring to rerank results
     var userProfile = await GetUserProfile(userId);
     return candidates
-        .Select(anime => new { 
-            Anime = anime, 
-            Score = CalculatePersonalizedScore(anime, userProfile) 
+        .Select(media => new {
+            Media = media,
+            Score = CalculatePersonalizedScore(media, userProfile) 
         })
         .OrderByDescending(x => x.Score)
-        .Select(x => x.Anime)
+        .Select(x => x.Media)
         .Take(request.TopK)
         .ToList();
 }
@@ -241,7 +241,7 @@ public async Task<ActionResult> StartSeeding([FromBody] SeedRequest request)
             }
             
             // Bulk insert with deduplication
-            await _animeCollection.BulkWrite(/* upsert operations */);
+            await _mediaCollection.BulkWrite(/* upsert operations */);
             
             _logger.LogInformation("Seeding completed: {Count} items", items.Count);
         }
@@ -257,7 +257,7 @@ public async Task<ActionResult> StartSeeding([FromBody] SeedRequest request)
 
 *Why run this as a background task instead of blocking the API call?* Data seeding can take several minutes when processing thousands of items and generating embeddings. Users shouldn't have to wait with a frozen browser tab—they should get an immediate job ID and can check progress later.
 
-*What are embeddings, exactly?* Think of them as "coordinates" in a multi-dimensional space where similar content clusters together. When we convert an anime's synopsis into an embedding vector, we're essentially saying "this story lives at coordinates [0.2, -0.5, 0.8, ...]" in a space where similar stories are nearby.
+*What are embeddings, exactly?* Think of them as "coordinates" in a multi-dimensional space where similar content clusters together. When we convert media content into an embedding vector, we're essentially saying "this story lives at coordinates [0.2, -0.5, 0.8, ...]" in a space where similar stories are nearby.
 
 This provides essential operations tooling for production deployment.
 
@@ -365,7 +365,7 @@ start.bat
 4. Navigate to `/` to browse recommendations
 
 **Try the features**
-- Search for anime: "space western" or "slice of life romance"
+- Search for media: "space western" or "slice of life romance"
 - Rate a few titles to see personalization kick in
 - Check your personal library and statistics
 ### Filters panel (AnimeRadar UX)
@@ -380,7 +380,7 @@ start.bat
 - Highlighting updates after render and whenever tag selection/weights change, so discovery feels responsive.
 
 ## Understanding the code structure
-**Controllers/** - API endpoints following Sora's controller-only routing pattern
+**Controllers/** - API endpoints following Koan's controller-only routing pattern
 RecsController.cs     - Recommendation queries and rating submission
 UsersController.cs    - User profile creation and statistics
 AdminController.cs    - Data seeding and system administration
@@ -393,7 +393,7 @@ SettingsService.cs    - Configuration management for tunable parameters
 
 **Models/** - Data contracts and entities
 ```
-AnimeDoc.cs          - Content metadata with optional vector embeddings
+MediaDoc.cs          - Content metadata with optional vector embeddings
 LibraryEntryDoc.cs   - User interaction tracking (ratings, favorites, status)
 UserProfileDoc.cs    - Preference profiles with genre weights and vectors
 SettingsDoc.cs       - System configuration (recommendation parameters)
@@ -410,7 +410,7 @@ js/filters.js       - Search and filtering logic
 
 ## Authentication and login
 
-S5.Recs uses Sora.Web.Auth for centralized provider discovery and login flows. Sessions are cookie-based; the UI sends requests with `credentials: 'include'` so the browser carries the session cookie.
+S5.Recs uses Koan.Web.Auth for centralized provider discovery and login flows. Sessions are cookie-based; the UI sends requests with `credentials: 'include'` so the browser carries the session cookie.
 
 - Discover providers (to render the Login menu):
     - GET `/.well-known/auth/providers` → descriptors `{ id, name, protocol, enabled, state, icon?, scopes? }`.
@@ -420,7 +420,7 @@ S5.Recs uses Sora.Web.Auth for centralized provider discovery and login flows. S
     - Server sets short-lived `state` and `return` cookies and redirects to the IdP.
 - Complete login (callback):
     - GET `/auth/{provider}/callback?code=...&state=...`.
-    - On success, the server signs in using cookie scheme `sora.cookie` and performs a local redirect to the sanitized return path (default `/`).
+    - On success, the server signs in using cookie scheme `Koan.cookie` and performs a local redirect to the sanitized return path (default `/`).
 - Logout:
     - GET or POST `/auth/logout?return=/` to clear the session and redirect.
 
@@ -432,11 +432,11 @@ Prompt and re-authentication
 Return URL policy
 
 - Return URLs must be a relative path, or match configured allow-listed prefixes.
-- Configure via `Sora:Web:Auth:ReturnUrl:{ DefaultPath, AllowList[] }`.
+- Configure via `Koan:Web:Auth:ReturnUrl:{ DefaultPath, AllowList[] }`.
 
 Development TestProvider (optional)
 
-- When the `Sora.Web.Auth.TestProvider` module is referenced, a local OAuth2 provider appears as "Test (Local)" (id: `test`).
+- When the `Koan.Web.Auth.TestProvider` module is referenced, a local OAuth2 provider appears as "Test (Local)" (id: `test`).
 - Normal login uses `/auth/test/challenge` and `/auth/test/callback` like other providers.
 - The underlying dev IdP endpoints (internal exchange) are served at: `/.testoauth/authorize`, `/.testoauth/token`, `/.testoauth/userinfo`.
 - First-time use shows a minimal HTML form for Name/Email and stores a local cookie to streamline subsequent logins.
@@ -452,8 +452,8 @@ This sample exposes several REST endpoints that demonstrate different aspects of
 
 **User Library** (`/api/library`)
 - `GET /{userId}` - Retrieve user's library with pagination, sorting, and status filtering
-- `PUT /{userId}/{animeId}` - Update favorite status, watch state, or rating
-- `DELETE /{userId}/{animeId}` - Remove item from user's library
+- `PUT /{userId}/{mediaId}` - Update favorite status, watch state, or rating
+- `DELETE /{userId}/{mediaId}` - Remove item from user's library
 
 **User Management** (`/api/users`)
 - `GET /` - List all users (sample auto-creates default user if none exist)
@@ -483,7 +483,7 @@ This sample exposes several REST endpoints that demonstrate different aspects of
 - Real-time UI updates with server-sent events
 - Graceful error handling and system health monitoring
 - Modular JavaScript architecture with event delegation
-- RESTful API design following Sora conventions
+- RESTful API design following Koan conventions
 - MongoDB document modeling for recommendation use cases
 
 This sample serves as both a working application and a reference implementation for building similar systems in your own projects.

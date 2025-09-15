@@ -53,7 +53,7 @@ Tracks the shrinking gap to full S8.Flow operational readiness on the greenfield
 
 7. **Production Safety and ProvisioningMode Enforcement**
    - [x] Centralized mode evaluation (env override + environment heuristic) in orchestrator.
-   - [x] Implement shared guard + audit for `ForceRecreate` (env `SORA_MESSAGING_ALLOW_FORCE=1`).
+   - [x] Implement shared guard + audit for `ForceRecreate` (env `Koan_MESSAGING_ALLOW_FORCE=1`).
    - [ ] Normalize provider-level mode handling (RabbitMQ internal fallback still performs own evaluation).
    - [ ] Uniform DryRun diff logging format across providers.
 
@@ -74,7 +74,7 @@ Tracks the shrinking gap to full S8.Flow operational readiness on the greenfield
 
 ## References
 - [ADR MESS-0070: Messaging Topology, System Primitives, and Zero-Config Developer Experience](./decisions/MESS-0070-messaging-topology-system-primitives-zero-config.md)
-- [Sora.Messaging primitives and provisioning source]
+- [Koan.Messaging primitives and provisioning source]
 
 ---
 

@@ -1,11 +1,11 @@
-# Sora CLI — orchestration usage
+# Koan CLI — orchestration usage
 
-This page summarizes how to use the Sora CLI to validate your environment, export Compose, inspect a project, and start/stop apps locally.
+This page summarizes how to use the Koan CLI to validate your environment, export Compose, inspect a project, and start/stop apps locally.
 
 ## Contract
 
 - Inputs
-  - Your repository with Sora services and descriptors (attributes drive endpoints and persistence).
+  - Your repository with Koan services and descriptors (attributes drive endpoints and persistence).
   - Optional flags: profile, engine, base port, verbosity, JSON.
 - Outputs
   - Compose v2 artifacts for local runs.
@@ -20,11 +20,11 @@ This page summarizes how to use the Sora CLI to validate your environment, expor
 
 - Container engine: Docker Desktop or Podman installed and running.
 - Windows PowerShell 5.1+ or PowerShell 7+.
-- PATH includes the published CLI folder (dist/bin) when invoking as `Sora`.
+- PATH includes the published CLI folder (dist/bin) when invoking as `Koan`.
 
 Notes
 - Engine auto-selection is supported; override with `--engine docker|podman`.
-- Non‑prod profiles auto-avoid occupied ports; tune with `SORA_PORT_PROBE_MAX`.
+- Non‑prod profiles auto-avoid occupied ports; tune with `Koan_PORT_PROBE_MAX`.
 - Profile policy (mounts): Local/Staging = bind; CI = named; Prod = none.
 - Conflict policy: non‑prod warns; Prod fails on conflicts.
 - “Up” is gated for Staging/Prod.
@@ -44,13 +44,13 @@ Notes
 ./scripts/cli-publish.ps1 -Runtime win-x64 -Configuration Release
 ```
 
-After install, a friendly executable `Sora.exe` is available in `dist/bin` (add that folder to PATH to call `Sora` globally).
+After install, a friendly executable `Koan.exe` is available in `dist/bin` (add that folder to PATH to call `Koan` globally).
 
 ## Common scenarios
 
-No-args context card (in a Sora-compatible project folder)
+No-args context card (in a Koan-compatible project folder)
 ```pwsh
-Sora
+Koan
 # First line prints: "Use -h for help"
 # Then a concise Context Card with:
 # - Providers (Docker/Podman availability)
@@ -65,8 +65,8 @@ Sora
 
 Inspect (explicit)
 ```pwsh
-Sora inspect
-Sora inspect --json
+Koan inspect
+Koan inspect --json
 ```
 
 Inspect JSON (contract — selected fields)
@@ -76,7 +76,7 @@ Inspect JSON (contract — selected fields)
 - app: {
     ids: ["api", ...],
     ports: [{ id: "api", host: 5084, container: 8080, source: "flag|launch-alloc|launch-app|code-default|deterministic|unknown" }],
-    networks: { external: "sora_external", internal: "sora_internal" }
+    networks: { external: "Koan_external", internal: "Koan_internal" }
   }
 - composeServices: ["api", "db", ...]
 - dependencies: { database?: "mongodb|postgres|redis|sqlite|none", vector?: "weaviate|qdrant|pinecone|none", ai?: "ollama|openai|none", auth?: "enabled|disabled" }
@@ -87,23 +87,23 @@ Notes
 
 Validate environment
 ```pwsh
-Sora doctor --json
+Koan doctor --json
 ```
 
 Export Compose (v2)
 ```pwsh
-Sora export compose
+Koan export compose
 # Options:
 #   --profile Local|CI|Staging|Prod
 #   --base-port <n>
 #   --port <n>                 # force app public port (overrides persisted/default)
 #   --expose-internals         # publish internal services on host ports too
-#   --no-launch-manifest       # don’t read/write .sora/manifest.json
+#   --no-launch-manifest       # don’t read/write .Koan/manifest.json
 ```
 
 Start app (Local profile)
 ```pwsh
-Sora up --profile Local
+Koan up --profile Local
 # Optional overrides
 #   --port 5084               # force app public port for this run
 #   --expose-internals        # publish non-app services on host
@@ -112,48 +112,48 @@ Sora up --profile Local
 
 If startup is pulling large images on first run, consider raising the timeout:
 ```pwsh
-Sora up --profile Local --timeout 300
+Koan up --profile Local --timeout 300
 ```
 
 Stop app and prune data
 ```pwsh
-Sora down --prune-data
+Koan down --prune-data
 ```
 
 Check status and view logs
 ```pwsh
-Sora status
-Sora logs
+Koan status
+Koan logs
 ```
 
 Engine selection
 ```pwsh
-Sora up --engine docker
+Koan up --engine docker
 ```
 
 Base port (auto-avoid starts here in non‑prod)
 ```pwsh
-Sora export compose --base-port 5000
+Koan export compose --base-port 5000
 ```
 
 Verbosity and explain plan
 ```pwsh
-Sora export compose -v --explain
+Koan export compose -v --explain
 ```
 
 JSON output (where supported)
 ```pwsh
-Sora doctor --json
-Sora inspect --json
+Koan doctor --json
+Koan inspect --json
 ```
 
-## Overrides (.sora/overrides.json)
+## Overrides (.Koan/overrides.json)
 
 You can customize images, env, volumes, and container ports per service without changing code.
 
 - File candidates (first match wins):
-  - `.sora/overrides.json`
-  - `overrides.sora.json` (repo root)
+  - `.Koan/overrides.json`
+  - `overrides.Koan.json` (repo root)
 
 Schema (subset)
 ```json
@@ -178,9 +178,9 @@ Behavior
   - `Volumes` are appended (profile policy controls bind vs named vs none).
   - `Ports` replaces the service’s container ports. Exporters map host:container as `p:p` per profile/flags; app/internal publishing still follows exposure rules (use `--expose-internals` to publish non‑app services).
 
-## Launch Manifest (.sora/manifest.json)
+## Launch Manifest (.Koan/manifest.json)
 
-Sora persists safe, dev-time choices (like the app’s public port) in `.sora/manifest.json`.
+Koan persists safe, dev-time choices (like the app’s public port) in `.Koan/manifest.json`.
 - Purpose: Keep your chosen app port stable across runs without hardcoding it in code.
 - Precedence for app public port:
   1) CLI `--port <n>`
@@ -189,54 +189,54 @@ Sora persists safe, dev-time choices (like the app’s public port) in `.sora/ma
   4) App default (from code or attribute)
   5) Deterministic fallback (seeded into 30000–50000)
 - Source is surfaced in Context Card, Status, Up (explain), and Inspect (human + JSON).
-- Backup-on-change: updates create a timestamped backup under `.sora/`.
+- Backup-on-change: updates create a timestamped backup under `.Koan/`.
 - Opt out anytime with `--no-launch-manifest` (applies to export/up/status/inspect).
 
 ## Networks and exposure
 
-- Two networks are always defined: `sora_internal` and `sora_external`.
+- Two networks are always defined: `Koan_internal` and `Koan_external`.
 - Adapters (e.g., databases, vector, AI providers) attach to the internal network only by default.
 - The app attaches to both networks; ports are published on the host only when the selected host port > 0.
 - Use `--expose-internals` to also publish internal services on host ports during local runs.
 
 ## Deeper walkthrough: start S5.Recs locally
 
-This example uses the `samples/S5.Recs` sample and runs everything through the Sora CLI. Two paths are shown: from code and from prebuilt binaries.
+This example uses the `samples/S5.Recs` sample and runs everything through the Koan CLI. Two paths are shown: from code and from prebuilt binaries.
 
 ### Path A — From code (recommended during development)
 
 1) Verify engine and environment
 ```pwsh
-Sora doctor --json
+Koan doctor --json
 ```
 
 2) Export Compose (v2) at the repo root
 ```pwsh
-Sora export compose --profile Local
+Koan export compose --profile Local
 ```
 
 3) Bring services up (Local profile)
 ```pwsh
-Sora up --profile Local
+Koan up --profile Local
 ```
 
 4) Inspect status and discover live ports
 ```pwsh
-Sora status
+Koan status
 ```
 
 Tips
-- If you need a predictable starting port, set a base: `Sora export compose --base-port 7000`.
-- Prefer a specific engine: `Sora up --engine docker`.
+- If you need a predictable starting port, set a base: `Koan export compose --base-port 7000`.
+- Prefer a specific engine: `Koan up --engine docker`.
 
 5) View logs (follow)
 ```pwsh
-Sora logs
+Koan logs
 ```
 
 6) Tear down (optionally prune volumes)
 ```pwsh
-Sora down --prune-data
+Koan down --prune-data
 ```
 
 ### Project example: S5.Recs (quick op sheet)
@@ -245,17 +245,17 @@ From the repo root, this sequence validates the engine, exports Compose, brings 
 
 ```pwsh
 # 1) Validate your container engine
-Sora doctor --json
+Koan doctor --json
 
 # 2) Export Compose (Local profile)
-Sora export compose --profile Local
+Koan export compose --profile Local
 
 # 3) Up with a generous timeout (first run pulls images)
-Sora up --profile Local --timeout 300
+Koan up --profile Local --timeout 300
 
 # 4) Status and quick checks
-Sora status
-docker compose -f .sora/compose.yml ps   # or: podman compose -f .sora/compose.yml ps
+Koan status
+docker compose -f .Koan/compose.yml ps   # or: podman compose -f .Koan/compose.yml ps
 
 # API health (PowerShell)
 Invoke-RestMethod http://127.0.0.1:5084/health/live | Format-List
@@ -265,38 +265,38 @@ Test-NetConnection 127.0.0.1 -Port 5081  # Mongo
 Invoke-RestMethod http://127.0.0.1:5082/v1/ | Out-Null  # Weaviate
 
 # 5) Tear down and prune data
-Sora down --prune-data
+Koan down --prune-data
 ```
 
 Notes
-- If `Sora up` exits with code 4 (readiness timeout), services may still be progressing. Run `Sora status` and `Sora logs --tail 200`, or use engine-native `compose ps/logs` as above.
+- If `Koan up` exits with code 4 (readiness timeout), services may still be progressing. Run `Koan status` and `Koan logs --tail 200`, or use engine-native `compose ps/logs` as above.
 - You can force the engine via `--engine docker|podman` if both are installed.
 
 ### Path B — From binaries (no build)
 
-1) Ensure `Sora.exe` is available (publish or download), then run from the repo root:
+1) Ensure `Koan.exe` is available (publish or download), then run from the repo root:
 ```pwsh
-Sora doctor --json
-Sora export compose --profile Local
-Sora up --profile Local
-Sora status
-Sora logs
+Koan doctor --json
+Koan export compose --profile Local
+Koan up --profile Local
+Koan status
+Koan logs
 ```
 
 2) Tear down when done:
 ```pwsh
-Sora down --prune-data
+Koan down --prune-data
 ```
 
 ### Alternative: Use Docker Compose directly
 
-If you prefer to manage containers yourself, export with Sora, then use Docker Compose:
+If you prefer to manage containers yourself, export with Koan, then use Docker Compose:
 ```pwsh
-Sora export compose
-docker compose -f .sora/compose.yml up -d
-docker compose -f .sora/compose.yml ps
-docker compose -f .sora/compose.yml logs -f --tail=200
-docker compose -f .sora/compose.yml down -v
+Koan export compose
+docker compose -f .Koan/compose.yml up -d
+docker compose -f .Koan/compose.yml ps
+docker compose -f .Koan/compose.yml logs -f --tail=200
+docker compose -f .Koan/compose.yml down -v
 ```
 
 ### Alternative: Sample’s local script
@@ -307,7 +307,7 @@ cd samples/S5.Recs
 ./start.bat
 ```
 
-This bypasses Sora’s planner/policies; prefer Sora for consistent profiles, port allocation, and conflict handling.
+This bypasses Koan’s planner/policies; prefer Koan for consistent profiles, port allocation, and conflict handling.
 
 ## Profiles and safety
 
@@ -320,12 +320,12 @@ This bypasses Sora’s planner/policies; prefer Sora for consistent profiles, po
 
 - Engine not detected: ensure Docker/Podman is installed and running; try `--engine`.
 - Port conflicts: on non‑prod, CLI bumps to free ports; set a different `--base-port` if needed.
-- Readiness timeout (exit code 4): services may still be starting. Run `Sora status` and `Sora logs --tail 200` to inspect. You can also use engine-native commands:
-  - `docker compose -f .sora/compose.yml ps` and `docker compose -f .sora/compose.yml logs --tail=200`
-  - or `podman compose -f .sora/compose.yml ps` / `... logs`
+- Readiness timeout (exit code 4): services may still be starting. Run `Koan status` and `Koan logs --tail 200` to inspect. You can also use engine-native commands:
+  - `docker compose -f .Koan/compose.yml ps` and `docker compose -f .Koan/compose.yml logs --tail=200`
+  - or `podman compose -f .Koan/compose.yml ps` / `... logs`
 - PATH issues: run `./scripts/cli-install.ps1` to add `dist/bin` to PATH, then open a new shell.
-- Compose not found: ensure you ran `Sora export compose` at the repo root; Compose is written under `.sora/`.
-- No project detected (no-args/inspect): the CLI prints the help hint then `No Sora project detected here.` and exits with code 2.
+- Compose not found: ensure you ran `Koan export compose` at the repo root; Compose is written under `.Koan/`.
+- No project detected (no-args/inspect): the CLI prints the help hint then `No Koan project detected here.` and exits with code 2.
 
 ## See also
 

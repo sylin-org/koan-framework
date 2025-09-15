@@ -18,7 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\samples\S6.SocialCreator\S6.SocialCreator.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Storage\Sora.Storage.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Core\Sora.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
 </Project>

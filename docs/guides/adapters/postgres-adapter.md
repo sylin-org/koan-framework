@@ -1,6 +1,6 @@
 # PostgreSQL Adapter
 
-This guide covers Sora's PostgreSQL data adapter. It mirrors relational semantics used by the SQL Server and SQLite adapters with JSONB-based storage, projection pushdown, and governance controls.
+This guide covers Koan's PostgreSQL data adapter. It mirrors relational semantics used by the SQL Server and SQLite adapters with JSONB-based storage, projection pushdown, and governance controls.
 
 ## Capabilities
 
@@ -12,11 +12,11 @@ This guide covers Sora's PostgreSQL data adapter. It mirrors relational semantic
 
 ## Package & registration
 
-Namespace: `Sora.Data.Postgres`
+Namespace: `Koan.Data.Postgres`
 
 ```csharp
-services.AddSoraCore();
-services.AddSoraDataCore();
+services.AddKoanCore();
+services.AddKoanDataCore();
 services.AddPostgresAdapter();
 ```
 
@@ -24,19 +24,19 @@ services.AddPostgresAdapter();
 
 Keys (first-win):
 
-- Sora:Data:Postgres:ConnectionString
-- Sora:Data:Sources:Default:postgres:ConnectionString
+- Koan:Data:Postgres:ConnectionString
+- Koan:Data:Sources:Default:postgres:ConnectionString
 - ConnectionStrings:Postgres
 - ConnectionStrings:Default
 
 Optional:
 
-- Sora:Data:Postgres:DefaultPageSize (default 50)
-- Sora:Data:Postgres:MaxPageSize (default 200)
-- Sora:Data:Postgres:DdlPolicy (NoDdl | Validate | AutoCreate; default AutoCreate)
-- Sora:Data:Postgres:SchemaMatchingMode (Relaxed | Strict; default Relaxed)
-- Sora:Data:Postgres:SearchPath (default public)
-- Sora:AllowMagicInProduction (bool)
+- Koan:Data:Postgres:DefaultPageSize (default 50)
+- Koan:Data:Postgres:MaxPageSize (default 200)
+- Koan:Data:Postgres:DdlPolicy (NoDdl | Validate | AutoCreate; default AutoCreate)
+- Koan:Data:Postgres:SchemaMatchingMode (Relaxed | Strict; default Relaxed)
+- Koan:Data:Postgres:SearchPath (default public)
+- Koan:AllowMagicInProduction (bool)
 
 ## Usage
 
@@ -68,7 +68,7 @@ See also:
 ## Testing
 
 The test project uses Testcontainers to start PostgreSQL if env vars are unset.
-Env keys: `SORA_POSTGRES__CONNECTION_STRING` or `ConnectionStrings__Postgres`
+Env keys: `Koan_POSTGRES__CONNECTION_STRING` or `ConnectionStrings__Postgres`
 Default image: `postgres:16-alpine`, port 54329.
 
 Docker detection and endpoints:
@@ -81,13 +81,13 @@ Docker detection and endpoints:
 
 If Docker is not reachable and no connection string is provided, tests no-op to keep CI green. Provide a Postgres connection string to force execution without Docker:
 
-- `SORA_POSTGRES__CONNECTION_STRING` or `ConnectionStrings__Postgres`
+- `Koan_POSTGRES__CONNECTION_STRING` or `ConnectionStrings__Postgres`
 
 Example:
 
 ```
 # Windows PowerShell
-$env:SORA_POSTGRES__CONNECTION_STRING = "Host=localhost;Port=5432;Database=sora;Username=postgres;Password=postgres"
+$env:Koan_POSTGRES__CONNECTION_STRING = "Host=localhost;Port=5432;Database=Koan;Username=postgres;Password=postgres"
 
 # Optional: force a Docker endpoint if needed
 $env:DOCKER_HOST = "npipe://./pipe/docker_engine"

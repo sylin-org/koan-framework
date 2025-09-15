@@ -1,4 +1,4 @@
-﻿# Storage (Sora.Storage + Sora.Web.Storage)
+# Storage (Koan.Storage + Koan.Web.Storage)
 
 Contract
 
@@ -36,8 +36,8 @@ Profiles and rules
 Defaults and fallbacks (minimal config)
 
 - Options:
-  - Sora:Storage:DefaultProfile: string (optional).
-  - Sora:Storage:FallbackMode: Disabled | SingleProfileOnly | NamedDefault (default SingleProfileOnly).
+  - Koan:Storage:DefaultProfile: string (optional).
+  - Koan:Storage:FallbackMode: Disabled | SingleProfileOnly | NamedDefault (default SingleProfileOnly).
 - Resolution order when the caller does not specify a profile:
   1) DefaultProfile when set (must exist in Profiles).
   2) If FallbackMode == SingleProfileOnly and exactly one profile exists, use it and log a warning.
@@ -47,11 +47,11 @@ Defaults and fallbacks (minimal config)
 Examples (minimal)
 
 - Single profile, dev convenience:
-  - Sora:Storage:Profiles:solo: { Provider: local, Container: only }
+  - Koan:Storage:Profiles:solo: { Provider: local, Container: only }
   - Implicit fallback used; warning logged on first use.
 - Explicit default:
-  - Sora:Storage:DefaultProfile: main
-  - Sora:Storage:Profiles:main: { Provider: local, Container: bucket }
+  - Koan:Storage:DefaultProfile: main
+  - Koan:Storage:Profiles:main: { Provider: local, Container: bucket }
 
 Helpers (DX)
 
@@ -111,9 +111,9 @@ MVP: Local provider specifics
 
 - Capabilities: sequential + seek/range; no presigned URLs.
 - Options (example):
-  - Sora:Storage:Profiles:
-    - { Name: "local-default", ProviderId: "local", BasePath: "C:/sora/storage", Shard: "hash2", AuditEnabled: true }
-  - Sora:Storage:Rules:
+  - Koan:Storage:Profiles:
+    - { Name: "local-default", ProviderId: "local", BasePath: "C:/Koan/storage", Shard: "hash2", AuditEnabled: true }
+  - Koan:Storage:Rules:
     - { When: { TagsAny: ["secure"] }, Use: "local-default" }
     - { Default: true, Use: "local-default" }
 - Safety: enforce BasePath, sanitize keys, write temp+rename, directory sharding to avoid hot directories.

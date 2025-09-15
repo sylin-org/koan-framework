@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Flow.Core</AssemblyName>
+    <RootNamespace>Koan.Flow</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  <ProjectReference Include="..\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+  </ItemGroup>
+</Project>

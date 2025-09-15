@@ -1,5 +1,5 @@
 param(
-    [string]$SolutionPath = "Sora.sln",
+    [string]$SolutionPath = "Koan.sln",
     [string]$SearchRoot = "src"
 )
 

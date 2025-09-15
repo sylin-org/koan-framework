@@ -1,5 +1,5 @@
-﻿---
-title: Sora.Web.Auth.TestProvider — TECHNICAL
+---
+title: Koan.Web.Auth.TestProvider — TECHNICAL
 description: Design and operational reference for the development-only TestProvider.
 ---
 
@@ -30,18 +30,18 @@ Security and validation
 - Prompt handling: prompt=login/select_account clears the dev cookie and forces the login UI.
 
 Claims injection (authorize)
-- roles=csv or sora.roles=csv (multi-value aware)
-- perms=csv | permissions=csv | sora.permissions=csv
+- roles=csv or Koan.roles=csv (multi-value aware)
+- perms=csv | permissions=csv | Koan.permissions=csv
 - claim.{type}=csv supports repeating keys and values are deduped with caps.
 
 Extensibility
 - Replace the login HTML by copying wwwroot/testprovider-login.html into your app; the StaticController serves the local file first, then embedded.
-- Override options via configuration at `Sora:Web:Auth:TestProvider`.
-- Map endpoints in your composition root: `app.MapSoraTestProviderEndpoints();` (namespace `Sora.Web.Auth.TestProvider.Extensions`).
+- Override options via configuration at `Koan:Web:Auth:TestProvider`.
+- Map endpoints in your composition root: `app.MapKoanTestProviderEndpoints();` (namespace `Koan.Web.Auth.TestProvider.Extensions`).
 
 Operational notes
 - Development-only component; do not deploy to production.
-- Central logout (Sora.Web.Auth) clears the TestProvider cookie (_tp_user) as a best-effort to avoid auto-login loops.
+- Central logout (Koan.Web.Auth) clears the TestProvider cookie (_tp_user) as a best-effort to avoid auto-login loops.
 
 References
 - Web Authentication: docs/reference/web-auth.md

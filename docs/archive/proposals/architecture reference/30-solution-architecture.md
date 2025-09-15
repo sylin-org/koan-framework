@@ -5,7 +5,7 @@ Neutral vocabulary (collections and flow)
 - RejectionReport on any failure path (reasonCode, message, evidence, policyVersion)
 
 Containers and responsibilities
-- adapters/* (Sora, .NET 9): publish IntakeRecord via REST/MQ
+- adapters/* (Koan, .NET 9): publish IntakeRecord via REST/MQ
 - core/intake-gateway: validate, publish to intake exchange
 - core/standardizer: PolicyBundle parsers/healing → StandardizedRecord
 - core/keying: derive AggregationKeys → KeyedRecord
@@ -13,11 +13,11 @@ Containers and responsibilities
 - core/projection: build ProjectionView idempotently using ReferenceItem.Version
 - core/distribution-api: serve views, lineage, diagnostics; policy admin and replay
 - infra/rabbitmq: stage exchanges/queues + DLQs
-- infra/mongodb: single instance; Sora Entity<> namespace = collection name
+- infra/mongodb: single instance; Koan Entity<> namespace = collection name
 - infra/workflow-lite: Dapr Workflow (recommended)
 - infra/otel-collector: tracing/metrics; optional Jaeger/Tempo, Prom/Grafana
 
-Mongo model (Sora Entity<> namespaces)
+Mongo model (Koan Entity<> namespaces)
 - intake.IntakeRecord
 - standardization.StandardizedRecord
 - keying.KeyedRecord

@@ -10,8 +10,8 @@ Symptoms
 - The request fails with connection refused when running inside a container or behind a reverse proxy.
 
 Context
-- Component: `Sora.Web.Auth` (OAuth/OIDC-like flow managed by `AuthController`).
-- Provider: `Sora.Web.Auth.TestProvider` (development-only).
+- Component: `Koan.Web.Auth` (OAuth/OIDC-like flow managed by `AuthController`).
+- Provider: `Koan.Web.Auth.TestProvider` (development-only).
 - Environment: Containerized app or reverse-proxied Kestrel where the internal bound address/port differs from localhost:8080.
 
 Root cause
@@ -42,4 +42,4 @@ Verification steps
 
 References
 - Web Authentication reference: ../../reference/web-auth.md
-- Source: `src/Sora.Web.Auth/Controllers/AuthController.cs` (base URL resolution).
+- Source: `src/Koan.Web.Auth/Controllers/AuthController.cs` (base URL resolution).

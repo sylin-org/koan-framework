@@ -35,7 +35,7 @@ class FlowApiClient {
   }
 
   async getObservability() {
-    return this.fetchJson("/.well-known/sora/observability");
+    return this.fetchJson("/.well-known/Koan/observability");
   }
 
   // Entity APIs - Devices
@@ -249,11 +249,11 @@ class FlowApiClient {
 
   // Utility methods for error handling and response processing
   extractTraceId(response) {
-    return response.headers.get("Sora-Trace-Id");
+    return response.headers.get("Koan-Trace-Id");
   }
 
   isInMemoryPaging(response) {
-    return response.headers.get("Sora-InMemory-Paging") === "true";
+    return response.headers.get("Koan-InMemory-Paging") === "true";
   }
 
   // High-level convenience methods

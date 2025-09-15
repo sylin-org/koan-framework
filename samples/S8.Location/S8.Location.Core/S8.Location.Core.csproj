@@ -7,16 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Core Sora Framework -->
-    <ProjectReference Include="..\..\..\src\Sora.Core\Sora.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
-    <ProjectReference Include="..\..\..\src\Sora.Flow.Core\Sora.Flow.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
-    <ProjectReference Include="..\..\..\src\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\src\Sora.AI\Sora.AI.csproj" />
-    <ProjectReference Include="..\..\..\src\Sora.Ai.Provider.Ollama\Sora.Ai.Provider.Ollama.csproj" />
+    <!-- Core Koan Framework -->
+    <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Flow.Core\Koan.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Messaging.RabbitMq\Koan.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Ai.Provider.Ollama\Koan.Ai.Provider.Ollama.csproj" />
     
     <!-- External dependencies -->
     <PackageReference Include="System.Text.Json" Version="9.0.8" />

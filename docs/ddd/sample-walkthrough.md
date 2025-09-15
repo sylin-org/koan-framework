@@ -2,8 +2,8 @@
 
 S2 (API + Mongo + Client)
 - Aggregate: `Item` (simple example). Repository uses Mongo adapter.
-- API: Sora.Web exposes CRUD + seed/clear; totals via `CountAsync`; paging flags via header.
-- Client: proxies API, shows observability snapshot and `Sora-Trace-Id`.
+- API: Koan.Web exposes CRUD + seed/clear; totals via `CountAsync`; paging flags via header.
+- Client: proxies API, shows observability snapshot and `Koan-Trace-Id`.
 
 S3 (RabbitMQ sample)
 - Messaging: RabbitMQ transport; publish/consume integration events.
@@ -15,6 +15,6 @@ What to look for
 
 ## Terms in plain language
 - Sample Stack: a minimal but realistic app to demonstrate the ideas.
-- Adapter: the piece that connects Sora to a specific storage/messaging system.
+- Adapter: the piece that connects Koan to a specific storage/messaging system.
 - Seed/Clear: create sample data, then delete it to start over.
 f1f1f1f1f1

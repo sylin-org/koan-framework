@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  <Description>SQLite provider for Koan relational data: lightweight local development and testing support.</Description>
+  <PackageTags>$(CommonPackageTags);data;sqlite;relational;efcore</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Dapper" Version="2.1.35" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>

@@ -14,5 +14,5 @@ Cons
 - Optionality: goes against "no magic by default"; may surprise users if auto-enabled.
 
 Middle path (recommended)
-- Start without a generator. Provide tiny hand-written static helpers as optional packages (Sora.Data.Facades) that call into DI-resolved repos.
+- Start without a generator. Provide tiny hand-written static helpers as optional packages (Koan.Data.Facades) that call into DI-resolved repos.
 - If demand is strong, add a generator later for convenience-only features (never required), behind an explicit opt-in MSBuild property.

@@ -2,22 +2,22 @@
 
 Status: Accepted
 Date: 2025-08-21
-Owners: Sora AI
+Owners: Koan AI
 
 ## Context
 
-`Sora.AI.Ai.TryResolve()` improved ergonomics but reads redundant and lacks strong naming. We want a semantic, terse entrypoint to AI features that can also target specific providers/models inline, mirroring the vector facade pattern.
+`Koan.AI.Ai.TryResolve()` improved ergonomics but reads redundant and lacks strong naming. We want a semantic, terse entrypoint to AI features that can also target specific providers/models inline, mirroring the vector facade pattern.
 
 ## Decision
 
-Introduce `Sora.AI.Engine` as the preferred facade for AI operations:
+Introduce `Koan.AI.Engine` as the preferred facade for AI operations:
 
 - Default access:
   - `Engine.IsAvailable`, `Engine.Try()` for discovery
   - `Engine.Prompt(...)`, `Engine.Stream(...)`, `Engine.Embed(...)`
 - Targeted access:
   - `Engine(provider)....` or `Engine(provider, model)....` returning a selector that forces routing
-- Backward compatibility: keep `Sora.AI.Ai` and delegate under the hood.
+- Backward compatibility: keep `Koan.AI.Ai` and delegate under the hood.
 
 Resolution precedence mirrors vector:
 
@@ -39,5 +39,5 @@ Resolution precedence mirrors vector:
 
 ## Status & Migration
 
-- Status: Accepted; to be implemented as a thin alias over `Sora.AI.Ai`.
-- Migration: Prefer `Sora.AI.Engine` in new code; gradually replace `Ai.TryResolve()` sites with `Engine.Try()` or direct calls.
+- Status: Accepted; to be implemented as a thin alias over `Koan.AI.Ai`.
+- Migration: Prefer `Koan.AI.Engine` in new code; gradually replace `Ai.TryResolve()` sites with `Engine.Try()` or direct calls.

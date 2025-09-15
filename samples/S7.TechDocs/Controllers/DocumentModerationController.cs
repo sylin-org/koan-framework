@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using S7.TechDocs.Models;
-using Sora.Web.Extensions.Controllers;
+using Koan.Web.Extensions.Controllers;
 
 namespace S7.TechDocs.Controllers;
 

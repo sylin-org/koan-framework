@@ -1,11 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
-using Sora.Data.Core;
+using Koan.Data.Core;
 using System;
 using System.IO;
 
-Console.WriteLine("=== Testing Enhanced Sora Bootstrap Decision Logging ===");
+Console.WriteLine("=== Testing Enhanced Koan Bootstrap Decision Logging ===");
 Console.WriteLine();
 
 // Set container environment to see container-based decisions
@@ -16,10 +16,10 @@ var configBuilder = new ConfigurationBuilder()
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddInMemoryCollection(new Dictionary<string, string>
     {
-        {"Sora:Bootstrap:ShowDecisions", "true"},
-        {"Sora:Bootstrap:ShowConnectionAttempts", "true"}, 
-        {"Sora:Bootstrap:ShowDiscovery", "true"},
-        {"Sora:Bootstrap:CompactMode", "false"},
+        {"Koan:Bootstrap:ShowDecisions", "true"},
+        {"Koan:Bootstrap:ShowConnectionAttempts", "true"}, 
+        {"Koan:Bootstrap:ShowDiscovery", "true"},
+        {"Koan:Bootstrap:CompactMode", "false"},
         {"ASPNETCORE_ENVIRONMENT", "Development"}
     })
     .AddEnvironmentVariables();
@@ -30,12 +30,12 @@ var services = new ServiceCollection();
 services.AddSingleton<IConfiguration>(configuration);
 
 // This will trigger all the enhanced BootReport decision logging we implemented
-services.AddSora();
+services.AddKoan();
 
 var serviceProvider = services.BuildServiceProvider();
 
 // Manually trigger the discovery process to see our enhanced BootReport
-var appRuntime = serviceProvider.GetService<Sora.Core.Hosting.Runtime.IAppRuntime>();
+var appRuntime = serviceProvider.GetService<Koan.Core.Hosting.Runtime.IAppRuntime>();
 appRuntime?.Discover();
 
 Console.WriteLine();

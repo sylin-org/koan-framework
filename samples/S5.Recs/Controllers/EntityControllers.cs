@@ -1,17 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using S5.Recs.Models;
-using Sora.Web;
-using Sora.Web.Controllers;
+using Koan.Web;
+using Koan.Web.Controllers;
 
 namespace S5.Recs.Controllers;
 
-[ApiController]
-[Route("api/data/animes")]
-public class AnimeDocController : EntityController<AnimeDoc, string> { }
+// MediaController is defined in MediaController.cs, removed duplicate
 
 [ApiController]
 [Route("api/data/library")]
-public class LibraryEntryDocController : EntityController<LibraryEntryDoc, string>
+public class LibraryEntryController : EntityController<LibraryEntry, string>
 {
 	[HttpGet("_whoami")] // GET /api/data/library/_whoami
 	public IActionResult WhoAmI() => Ok(new

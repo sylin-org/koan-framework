@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repo = Resolve-Path (Join-Path $root "..")
-$nuspec = Join-Path $repo "templates/pack/Sylin.Sora.Templates.nuspec"
+$nuspec = Join-Path $repo "templates/pack/Sylin.Koan.Templates.nuspec"
 $artifacts = Join-Path $repo "artifacts"
 $templatesRoot = Join-Path $repo "templates"
 
@@ -25,13 +25,13 @@ if ($nuget) {
   nuget pack $nuspec -OutputDirectory $artifacts | Write-Host
 
   # Find produced nupkg
-  $nupkg = Get-ChildItem $artifacts -Filter "Sylin.Sora.Templates.*.nupkg" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  $nupkg = Get-ChildItem $artifacts -Filter "Sylin.Koan.Templates.*.nupkg" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
   if (-not $nupkg) { throw "No nupkg produced in $artifacts" }
   Write-Host "Created: $($nupkg.FullName)"
 
   if ($Install) {
     Write-Host "Installing templates from: $($nupkg.FullName)"
-    dotnet new uninstall Sylin.Sora.Templates | Out-Null
+    dotnet new uninstall Sylin.Koan.Templates | Out-Null
     dotnet new install $nupkg.FullName
   }
 }
@@ -39,7 +39,7 @@ else {
   Write-Warning "nuget.exe not found on PATH. Skipping packing."
   if ($Install) {
     Write-Host "Installing templates directly from folder: $templatesRoot"
-    dotnet new uninstall Sylin.Sora.Templates | Out-Null
+    dotnet new uninstall Sylin.Koan.Templates | Out-Null
     dotnet new install $templatesRoot
   }
   else {

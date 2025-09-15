@@ -1,4 +1,4 @@
-﻿---
+---
 id: ARCH-0043
 slug: lightweight-parity-roadmap
 domain: Architecture
@@ -9,7 +9,7 @@ title: Lightweight parity roadmap — Observability, Resilience, Recipes, Dev Pr
 
 ## Context
 
-Sora aims to stay library-first and lightweight while offering a competitive developer and operations experience comparable to .NET Aspire/Dapr. External analysis positions Sora strong on agility, AI integration, and portability, with gaps in turnkey observability, orchestration/dev-hosting, and “enterprise fit” guardrails (reliability patterns, presets).
+Koan aims to stay library-first and lightweight while offering a competitive developer and operations experience comparable to .NET Aspire/Dapr. External analysis positions Koan strong on agility, AI integration, and portability, with gaps in turnkey observability, orchestration/dev-hosting, and “enterprise fit” guardrails (reliability patterns, presets).
 
 We need a focused, low-friction path to raise parity without becoming a heavy platform.
 
@@ -24,13 +24,13 @@ Constraints and guardrails
 
 Phase 1 — high value / low complexity (target immediate sprints)
 1) Observability preset
-   - Deliver AddSoraTelemetry() with sane defaults for OpenTelemetry across HTTP, data adapters, messaging, and AI.
+   - Deliver AddKoanTelemetry() with sane defaults for OpenTelemetry across HTTP, data adapters, messaging, and AI.
    - Options expose exporters (console/OTLP) and sampling; Aspire-aware to avoid duplicate exporters (ref: ARCH-0033-opentelemetry-integration.md).
 2) Resilience preset
-   - AddSoraResilience() wiring Polly-style retry, timeout, and circuit breaker policies across HTTP clients, messaging dispatchers, and data adapters.
+   - AddKoanResilience() wiring Polly-style retry, timeout, and circuit breaker policies across HTTP clients, messaging dispatchers, and data adapters.
    - Policy names/keys centralized via Constants; toggles via IOptions.
 3) Integration recipes
-   - Sora.Recipes.* micro-packages for Postgres, Mongo, Redis, RabbitMQ, Vector DBs (Weaviate/Qdrant).
+   - Koan.Recipes.* micro-packages for Postgres, Mongo, Redis, RabbitMQ, Vector DBs (Weaviate/Qdrant).
    - Each recipe composes: health checks, telemetry, resilience, and minimal migrations/ensure-created.
 4) Dev Profiles + compose samples
    - Conventional dev/ci/prod profiles and sample docker-compose files per recipe; kept out of runtime packages.
@@ -45,7 +45,7 @@ Phase 2 — high value / medium complexity
 8) AI embedding orchestration
    - [Embeddable] attribute and an EmbedderWorker that maintains vector indexes on save; backoff + metrics (ref: AI-0001, AI-0008).
 9) Compose generator (optional)
-   - Scan referenced Sora adapters to emit compose.sora.yml for local up/down.
+   - Scan referenced Koan adapters to emit compose.Koan.yml for local up/down.
 
 Phase 3 — medium value / higher complexity
 10) Diagnostics Console (secured)
@@ -54,7 +54,7 @@ Phase 3 — medium value / higher complexity
     - ITenantAccessor and tenant-aware options/data partitioning helpers.
 12) Pluggable event store abstraction
     - Multiple backends (SQL/Mongo/EventStoreDB) behind a single IEventStore, used by projections and ES consumers.
-13) CLI (sora dev …)
+13) CLI (Koan dev …)
     - Thin wrapper for dev up/down/logs/status; export compose/helm as artifacts.
 
 ## Contract (for Phase 1 packages)
@@ -72,7 +72,7 @@ Error modes
 Success criteria
 - Traces/metrics/logs available in <5 minutes locally.
 - Resilience policies active by default in dev; observable via logs/OTEL attributes.
-- Recipes: single call to AddSora<Postgres|Mongo|Redis|RabbitMq|Weaviate>() yields a runnable sample with health and OTEL.
+- Recipes: single call to AddKoan<Postgres|Mongo|Redis|RabbitMq|Weaviate>() yields a runnable sample with health and OTEL.
 
 ## Scope
 
@@ -96,7 +96,7 @@ Trade-offs
 ## Implementation notes
 
 - Packaging
-  - Sora.Diagnostics (AddSoraTelemetry), Sora.Resilience (AddSoraResilience), Sora.Recipes.* (one per adapter).
+  - Koan.Diagnostics (AddKoanTelemetry), Koan.Resilience (AddKoanResilience), Koan.Recipes.* (one per adapter).
 - Options and constants
   - Centralize policy names/headers/route segments under Infrastructure/Constants per ARCH-0040.
 - Web and data
@@ -106,7 +106,7 @@ Trade-offs
 
 ## Follow-ups
 
-- Draft detailed contracts for AddSoraTelemetry and AddSoraResilience (options, defaults, example wiring).
+- Draft detailed contracts for AddKoanTelemetry and AddKoanResilience (options, defaults, example wiring).
 - Define the minimal set of adapters covered by initial Recipes: Postgres, Redis, RabbitMQ, Weaviate.
 - Create Dev Profiles guidance and sample compose files under docs/support/ or samples/.
 

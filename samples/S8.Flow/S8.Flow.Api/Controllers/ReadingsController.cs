@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using S8.Flow.Shared;
-using Sora.Flow.Model;
-using Sora.Flow.Infrastructure;
-using Sora.Data.Core;
+using Koan.Flow.Model;
+using Koan.Flow.Infrastructure;
+using Koan.Data.Core;
 
 namespace S8.Flow.Api.Controllers;
 
@@ -108,11 +108,11 @@ public sealed class ReadingsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] SensorReading reading, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(reading.SensorKey)) return BadRequest("SensorIdis required");
+        if (string.IsNullOrWhiteSpace(reading.SensorId)) return BadRequest("SensorId is required");
 
         var readingData = new Reading
         {
-            SensorId = reading.SensorKey,
+            SensorId = reading.SensorId,
             Value = reading.Value,
             CapturedAt = reading.CapturedAt,
             Unit = reading.Unit,
@@ -125,7 +125,7 @@ public sealed class ReadingsController : ControllerBase
             SourceId = reading.Source ?? FlowSampleConstants.Sources.Api,
             OccurredAt = reading.CapturedAt,
             Data = readingData,
-            CorrelationId = reading.SensorKey
+            CorrelationId = reading.SensorId
         };
         var setName = FlowSets.StageShort(FlowSets.Intake);
         using (DataSetContext.With(setName))

@@ -1,15 +1,16 @@
-﻿// S5.Recs Dashboard page controller (classic script)
+// S5.Recs Dashboard page controller (classic script)
 (function(){
   // Overview loaders
-  async function loadStats(){ try{ const u=(window.S5Const?.ENDPOINTS?.ADMIN_STATS)||'/admin/stats'; const r = await fetch(u); if(r.ok){ const s = await r.json(); const anime=(s.anime||0).toLocaleString(); const vectors=(s.vectors||0).toLocaleString(); const $=document.getElementById.bind(document); $('ov-anime').textContent=anime; $('ov-vectors').textContent=vectors; }}catch{} }
+  async function loadStats(){ try{ const u=(window.S5Const?.ENDPOINTS?.ADMIN_STATS)||'/admin/stats'; const r = await fetch(u); if(r.ok){ const s = await r.json(); const media=(s.media||0).toLocaleString(); const vectors=(s.vectors||0).toLocaleString(); const $=document.getElementById.bind(document); $('ov-media').textContent=media; $('ov-vectors').textContent=vectors; }}catch{} }
   async function loadTagsCount(){ try{ const u=(window.S5Const?.ENDPOINTS?.TAGS)||'/api/tags'; const cReq = await fetch(u); const full = cReq.ok? await cReq.json():[]; const el=document.getElementById('ov-tags'); if(el) el.textContent = (full.length||0).toLocaleString(); }catch{} }
-  async function loadHealth(){ try{ const u=(window.S5Const?.ENDPOINTS?.WK_HEALTH)||'/.well-known/sora/health'; const r = await fetch(u); const el=document.getElementById('ov-health'); if(el) el.textContent = r.ok?'OK':'N/A'; }catch{ const el=document.getElementById('ov-health'); if(el) el.textContent='N/A'; } }
-  async function loadObservability(){ try{ const u=(window.S5Const?.ENDPOINTS?.WK_OBSERVABILITY)||'/.well-known/sora/observability'; const r = await fetch(u); const el=document.getElementById('observabilityJson'); if(!el) return; el.textContent = r.ok? JSON.stringify(await r.json(), null, 2):'Unavailable'; }catch{ const el=document.getElementById('observabilityJson'); if(el) el.textContent='Unavailable'; } }
-  async function loadAggregates(){ try{ const u=(window.S5Const?.ENDPOINTS?.WK_AGGREGATES)||'/.well-known/sora/aggregates'; const r = await fetch(u); const el=document.getElementById('aggregatesJson'); if(!el) return; el.textContent = r.ok? JSON.stringify(await r.json(), null, 2):'Unavailable'; }catch{ const el=document.getElementById('aggregatesJson'); if(el) el.textContent='Unavailable'; } }
+  async function loadHealth(){ try{ const u=(window.S5Const?.ENDPOINTS?.WK_HEALTH)||'/.well-known/Koan/health'; const r = await fetch(u); const el=document.getElementById('ov-health'); if(el) el.textContent = r.ok?'OK':'N/A'; }catch{ const el=document.getElementById('ov-health'); if(el) el.textContent='N/A'; } }
+  async function loadObservability(){ try{ const u=(window.S5Const?.ENDPOINTS?.WK_OBSERVABILITY)||'/.well-known/Koan/observability'; const r = await fetch(u); const el=document.getElementById('observabilityJson'); if(!el) return; el.textContent = r.ok? JSON.stringify(await r.json(), null, 2):'Unavailable'; }catch{ const el=document.getElementById('observabilityJson'); if(el) el.textContent='Unavailable'; } }
+  async function loadAggregates(){ try{ const u=(window.S5Const?.ENDPOINTS?.WK_AGGREGATES)||'/.well-known/Koan/aggregates'; const r = await fetch(u); const el=document.getElementById('aggregatesJson'); if(!el) return; el.textContent = r.ok? JSON.stringify(await r.json(), null, 2):'Unavailable'; }catch{ const el=document.getElementById('aggregatesJson'); if(el) el.textContent='Unavailable'; } }
 
   // Admin actions
-  async function seedDataFromForm(){ const src=document.getElementById('importSource')?.value||'anilist'; const defLim=(window.S5Const?.ADMIN?.IMPORT_DEFAULT_LIMIT)??200; const lim=parseInt(document.getElementById('importLimit')?.value||String(defLim),10); const ow=!!document.getElementById('importOverwrite')?.checked; await seedDataFrom(src, lim, ow); }
-  async function seedDataFrom(source, limit, overwrite){ try{ window.showToast && showToast('Seeding…'); const u=(window.S5Const?.ENDPOINTS?.ADMIN_SEED_START)||'/admin/seed/start'; const r = await fetch(u, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source, limit, overwrite }) }); window.showToast && showToast(r.ok?'Seed started':'Seed failed', r.ok?'success':'error'); if(r.ok){ const d=(window.S5Const?.ADMIN?.QUICK_ACTIONS_REFRESH_DELAY_MS)??1500; setTimeout(()=>{ loadStats(); loadTagsCount(); }, d); }}catch{ window.showToast && showToast('Seed error','error'); } }
+  async function seedDataFromForm(){ const src=document.getElementById('importSource')?.value||'anilist'; const mediaType=document.getElementById('importMediaType')?.value; const limitValue=document.getElementById('importLimit')?.value; const lim=limitValue ? parseInt(limitValue,10) : null; const ow=!!document.getElementById('importOverwrite')?.checked; if(!mediaType){ window.showToast && showToast('Please select a media type','error'); return; } await seedDataFrom(src, mediaType, lim, ow); }
+  async function seedDataFrom(source, mediaType, limit, overwrite){ try{ window.showToast && showToast('Seeding…'); const u=(window.S5Const?.ENDPOINTS?.ADMIN_SEED_START)||'/admin/seed/start'; const r = await fetch(u, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source, mediaType, limit, overwrite }) }); window.showToast && showToast(r.ok?'Seed started':'Seed failed', r.ok?'success':'error'); if(r.ok){ const d=(window.S5Const?.ADMIN?.QUICK_ACTIONS_REFRESH_DELAY_MS)??1500; setTimeout(()=>{ loadStats(); loadTagsCount(); }, d); }}catch{ window.showToast && showToast('Seed error','error'); } }
+  async function loadMediaTypes(){ try{ const u=(window.S5Const?.ENDPOINTS?.MEDIA_TYPES)||'/api/media-types'; const r = await fetch(u); if(r.ok){ const types = await r.json(); const select = document.getElementById('importMediaType'); if(select){ select.innerHTML = '<option value="">Select media type...</option><option value="all">All (import all media types)</option>'; types.forEach(type => { const option = document.createElement('option'); option.value = type.name; option.textContent = type.name; select.appendChild(option); }); }}}catch{ const select = document.getElementById('importMediaType'); if(select) select.innerHTML = '<option value="">Failed to load</option>'; } }
   async function vectorUpsert(){ try{ window.showToast && showToast('Vector upsert…'); const lim=(window.S5Const?.ADMIN?.VECTOR_UPSERT_LIMIT)??1000; const u=(window.S5Const?.ENDPOINTS?.ADMIN_SEED_VECTORS)||'/admin/seed/vectors'; const r = await fetch(u, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ limit: lim }) }); window.showToast && showToast(r.ok?'Vectors job started':'Vectors job failed', r.ok?'success':'error'); }catch{ window.showToast && showToast('Vectors error','error'); } }
   async function rebuildTags(){ try{ window.showToast && showToast('Rebuilding tags…'); const u=(window.S5Const?.ENDPOINTS?.ADMIN_TAGS_REBUILD)||'/admin/tags/rebuild'; const r = await fetch(u, { method:'POST' }); window.showToast && showToast(r.ok?'Tags rebuilt':'Tags rebuild failed', r.ok?'success':'error'); if(r.ok){ loadTagsCount(); }}catch{ window.showToast && showToast('Tags error','error'); } }
   async function rebuildGenres(){ try{ window.showToast && showToast('Rebuilding genres…'); const u=(window.S5Const?.ENDPOINTS?.ADMIN_GENRES_REBUILD)||'/admin/genres/rebuild'; const r = await fetch(u, { method:'POST' }); window.showToast && showToast(r.ok?'Genres rebuilt':'Genres rebuild failed', r.ok?'success':'error'); }catch{ window.showToast && showToast('Genres error','error'); } }
@@ -34,9 +35,9 @@
   async function saveRecsSettings(){ try{ const defMpt=(window.S5Const?.RECS?.DEFAULT_MAX_PREFERRED_TAGS)??3; const body = { preferTagsWeight: parseFloat(document.getElementById('ptwNum')?.value || '0'), maxPreferredTags: parseInt(document.getElementById('mptNum')?.value || String(defMpt), 10), diversityWeight: parseFloat(document.getElementById('dwNum')?.value || '0') }; window.showToast && showToast('Saving settings…'); const u=(window.S5Const?.ENDPOINTS?.RECS_SETTINGS)||'/admin/recs-settings'; const r = await fetch(u, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); window.showToast && showToast(r.ok? 'Settings saved' : 'Save failed', r.ok? 'success':'error'); }catch{ window.showToast && showToast('Save error','error'); } }
 
   // Censor tags admin
-  async function initCensorAdmin(){
+  async function initCenKoandmin(){
     const input = document.getElementById('censorInput');
-    const btnAdd = document.getElementById('btnCensorAdd');
+    const btnAdd = document.getElementById('btnCenKoandd');
     const btnCopy = document.getElementById('btnCensorCopy');
     const btnClear = document.getElementById('btnCensorClear');
     const list = document.getElementById('censorList');
@@ -219,7 +220,7 @@
 
   async function refreshCensorData(){
     // Refresh the main censor list
-    await initCensorAdmin();
+    await initCenKoandmin();
     // Re-render the browser to update button states
     renderCensorTagsBrowser();
   }
@@ -271,10 +272,10 @@
     }
   }
 
-  // Override the existing initCensorAdmin to also track censored tags
-  const originalInitCensorAdmin = initCensorAdmin;
-  initCensorAdmin = async function(){
-    await originalInitCensorAdmin();
+  // Override the existing initCenKoandmin to also track censored tags
+  const originalInitCenKoandmin = initCenKoandmin;
+  initCenKoandmin = async function(){
+    await originalInitCenKoandmin();
 
     // Load current censor list
     try{
@@ -289,12 +290,8 @@
 
   // Bootstrap
   document.addEventListener('DOMContentLoaded', () => {
-  loadStats(); loadHealth(); loadTagsCount(); loadAggregates(); loadObservability(); bindSettings(); loadRecsSettings(); initCensorAdmin(); loadTagsForCensor(); initCensorTagsBrowser();
-    // Initialize Import limit from constants to avoid magic number in HTML
-    const defLim = (window.S5Const && window.S5Const.ADMIN && typeof window.S5Const.ADMIN.IMPORT_DEFAULT_LIMIT === 'number') ? window.S5Const.ADMIN.IMPORT_DEFAULT_LIMIT : 200;
-    const limEl = document.getElementById('importLimit');
-    if(limEl && !limEl.value){ limEl.value = String(defLim); }
+  loadStats(); loadHealth(); loadTagsCount(); loadAggregates(); loadObservability(); bindSettings(); loadRecsSettings(); initCenKoandmin(); loadTagsForCensor(); initCensorTagsBrowser(); loadMediaTypes();
     // Expose actions for buttons with inline handlers
-  Object.assign(window, { seedDataFromForm, vectorUpsert, rebuildTags, rebuildGenres, loadAggregates, loadObservability });
+  Object.assign(window, { seedDataFromForm, vectorUpsert, rebuildTags, rebuildGenres, loadAggregates, loadObservability, loadMediaTypes });
   });
 })();

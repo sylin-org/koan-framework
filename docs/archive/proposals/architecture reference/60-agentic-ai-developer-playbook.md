@@ -1,7 +1,7 @@
-# Agentic AI Developer Playbook (Sora‑first)
+# Agentic AI Developer Playbook (Koan‑first)
 
 Purpose
-- Enable a code‑assistant to build the solution from zero to completion, consistently and safely, using the agreed architecture and Sora as the adapter baseline.
+- Enable a code‑assistant to build the solution from zero to completion, consistently and safely, using the agreed architecture and Koan as the adapter baseline.
 
 Gaps in the existing docs (now addressed here)
 - Missing end‑to‑end scaffolding steps with folder layout and naming
@@ -13,7 +13,7 @@ Gaps in the existing docs (now addressed here)
 
 ## 1) Repository layout scaffold
 - adapters/
-  - sample-adapter/ (Sora .NET 9; emits IntakeRecord)
+  - sample-adapter/ (Koan .NET 9; emits IntakeRecord)
 - services/
   - intake-gateway/
   - standardizer/
@@ -35,7 +35,7 @@ Gaps in the existing docs (now addressed here)
 ## 2) Environment and configuration (defaults)
 - MongoDB
   - MONGO_URL=mongodb://mongo-replset-0:27017,mongo-replset-1:27017,mongo-replset-2:27017/?replicaSet=rs0
-  - Single database name per solution; Sora Entity<> namespace defines collection names
+  - Single database name per solution; Koan Entity<> namespace defines collection names
 - RabbitMQ
   - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
   - Exchanges: intake, standardized, keyed, association, projection, diagnostics
@@ -88,9 +88,9 @@ Note: Store schemas under shared/Contracts and validate at runtime for ingress/e
 - With constructed collision (two ReferenceIds for same key), expect RejectionReport MULTI_OWNER_COLLISION
 - OTEL traces present for each step; check queue depths non‑increasing
 
-## 8) Adapter template (Sora)
+## 8) Adapter template (Koan)
 - Project scaffolding:
-  - Sora service with config for source polling/webhooks
+  - Koan service with config for source polling/webhooks
   - Mapper from source payload → IntakeRecord
   - Health endpoints (/healthz, /readyz)
   - Emission via REST to IntakeGateway or AMQP publish to intake exchange

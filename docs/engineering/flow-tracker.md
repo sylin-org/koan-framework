@@ -1,7 +1,7 @@
 # Flow tracker — tasks and status
 
 Scope
-- Track implementation steps for Sora.Flow to support entity-first pipelines and the Person example.
+- Track implementation steps for Koan.Flow to support entity-first pipelines and the Person example.
 
 In progress / Done
 - Runtime

@@ -2,11 +2,11 @@
 
 Status: Proposed
 Date: 2025-08-19
-Owners: Sora Web
+Owners: Koan Web
 
 ## Context
 
-Teams may standardize on KServe or OSS servers (vLLM, TGI) for model hosting. Sora should interoperate without coupling core behavior.
+Teams may standardize on KServe or OSS servers (vLLM, TGI) for model hosting. Koan should interoperate without coupling core behavior.
 
 ## Decision
 

@@ -8,9 +8,9 @@ Contract (at a glance)
 
 Precedence and resolution
 - Record-level transformer (per model) — overrides everything for that model; single warning emitted.
-- Per-path policy: `Sora:Flow:Materialization:PerPath["<Model>:<Path>"]`.
-- Per-model default: `Sora:Flow:Materialization:PerModelDefaults["<Model>"]`.
-- Global default: `Sora:Flow:Materialization:DefaultPolicy` (default: last).
+- Per-path policy: `Koan:Flow:Materialization:PerPath["<Model>:<Path>"]`.
+- Per-model default: `Koan:Flow:Materialization:PerModelDefaults["<Model>"]`.
+- Global default: `Koan:Flow:Materialization:DefaultPolicy` (default: last).
 
 Built-in property transformers (policy names)
 - last: last non-empty value seen in order.
@@ -24,7 +24,7 @@ Configuration (startup-only)
 appsettings.json
 
 {
-  "Sora": {
+  "Koan": {
     "Flow": {
       "Materialization": {
         "DefaultPolicy": "last",
@@ -69,7 +69,7 @@ Implement a custom property transformer
 
 // MyApp.Flow.LatestByTimestampTransformer.cs
 using System.Globalization;
-using Sora.Flow.Core.Materialization;
+using Koan.Flow.Core.Materialization;
 
 public sealed class LatestByTimestampTransformer : IPropertyMaterializationTransformer
 {
@@ -127,7 +127,7 @@ public sealed class LatestByTimestampTransformer : IPropertyMaterializationTrans
 Implement a custom record transformer (override whole model)
 
 // MyApp.Flow.DeviceRecordTransformer.cs
-using Sora.Flow.Core.Materialization;
+using Koan.Flow.Core.Materialization;
 
 public sealed class DeviceRecordTransformer : IRecordMaterializationTransformer
 {
@@ -154,7 +154,7 @@ Register in configuration (type names are assembly-qualified or short if resolva
 appsettings.json
 
 {
-  "Sora": {
+  "Koan": {
     "Flow": {
       "Materialization": {
         "PropertyTransformers": {

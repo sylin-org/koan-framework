@@ -1,20 +1,20 @@
-using Sora.Core.Observability;
-using Sora.Data.Core;
-using Sora.Messaging;
-using Sora.Web.Extensions;
-using Sora.Web.Extensions.GenericControllers;
-using Sora.Web.Swagger;
+using Koan.Core.Observability;
+using Koan.Data.Core;
+using Koan.Messaging;
+using Koan.Web.Extensions;
+using Koan.Web.Extensions.GenericControllers;
+using Koan.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSora()
+builder.Services.AddKoan()
     .AsWebApi()
     .AsProxiedApi()
     .WithRateLimit();
 
-// Optional: enable OpenTelemetry based on config/env (Sora:Observability or OTEL_* env vars)
-builder.Services.AddSoraObservability();
-// Swagger/OpenAPI is auto-registered via Sora.Web.Swagger. Call AddSoraSwagger only for custom config.
+// Optional: enable OpenTelemetry based on config/env (Koan:Observability or OTEL_* env vars)
+builder.Services.AddKoanObservability();
+// Swagger/OpenAPI is auto-registered via Koan.Web.Swagger. Call AddKoanSwagger only for custom config.
 
 // Enable Mongo adapter via discovery or explicit registration (optional)
 // builder.Services.AddMongoAdapter();
@@ -30,8 +30,8 @@ builder.Services
     .AddEntityModerationController<S2.Api.Controllers.Item, string>("api/items");
 
 var app = builder.Build();
-// Enable Swagger UI per policy: Dev by default; in non-dev only when Sora__Web__Swagger__Enabled=true or SORA_MAGIC_ENABLE_SWAGGER=true
-app.UseSoraSwagger();
+// Enable Swagger UI per policy: Dev by default; in non-dev only when Koan__Web__Swagger__Enabled=true or Koan_MAGIC_ENABLE_SWAGGER=true
+app.UseKoanSwagger();
 app.Run();
 
 namespace S2.Api

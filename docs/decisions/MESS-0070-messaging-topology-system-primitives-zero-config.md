@@ -1,14 +1,14 @@
-﻿# ADR: Messaging Topology, System Primitives, and Zero-Config Developer Experience
+# ADR: Messaging Topology, System Primitives, and Zero-Config Developer Experience
 
 ## Context
 
-Sora.Flow and Sora.Messaging previously required some manual configuration and entity-centric modeling for messaging primitives. System-level primitives (Command, Announcement) were not first-class, and developers often needed to configure queues, exchanges, or bindings to get the stack working. This led to friction, risk of misconfiguration, and a suboptimal developer experience.
+Koan.Flow and Koan.Messaging previously required some manual configuration and entity-centric modeling for messaging primitives. System-level primitives (Command, Announcement) were not first-class, and developers often needed to configure queues, exchanges, or bindings to get the stack working. This led to friction, risk of misconfiguration, and a suboptimal developer experience.
 
 ## Decision
 
 Core decisions (accepted) plus refined architecture clarifications:
 
-1. **Greenfield rebuild of messaging layers (Sora.Messaging + Flow bridge)** retaining reuse where practical.
+1. **Greenfield rebuild of messaging layers (Koan.Messaging + Flow bridge)** retaining reuse where practical.
 2. **Automatic, idempotent topology plan/diff/apply at startup** (exchanges, queues, bindings) under a configurable `ProvisioningMode`:
   - `Off`, `DryRun`, `CreateIfMissing`, `ReconcileAdditive`, `ForceRecreate`.
 3. **System primitives are first-class and provider‑agnostic:**
@@ -29,7 +29,7 @@ Core decisions (accepted) plus refined architecture clarifications:
 
 | Header | Purpose |
 |--------|---------|
-| `x-sora-kind` | Primitive kind (`command`, `announcement`, `flow-event`) |
+| `x-Koan-kind` | Primitive kind (`command`, `announcement`, `flow-event`) |
 | `x-correlation-id` | Distributed correlation (propagated / generated) |
 | `x-trace-id` | Trace root/span bridge to OpenTelemetry |
 | `x-command-target` | Target service / group for commands |

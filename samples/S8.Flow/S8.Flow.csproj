@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -13,14 +13,14 @@
     <Compile Remove="S8.Flow.Shared\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Sora.Core\Sora.Core.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Web.Swagger\Sora.Web.Swagger.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Json\Sora.Data.Json.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Flow.Core\Sora.Flow.Core.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Flow.Web\Sora.Flow.Web.csproj" />
-    <ProjectReference Include="..\..\tests\Sora.Testing\Sora.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Json\Koan.Data.Json.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Flow.Core\Koan.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Flow.Web\Koan.Flow.Web.csproj" />
+    <ProjectReference Include="..\..\tests\Koan.Testing\Koan.Testing.csproj" />
   <ProjectReference Include="S8.Flow.Shared\S8.Flow.Shared.csproj" />
   </ItemGroup>
 </Project>

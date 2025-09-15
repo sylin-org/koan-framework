@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Framework-level external ID correlation for Sora Flow entities enables automatic cross-system entity tracking and parent-child resolution.
+Framework-level external ID correlation for Koan Flow entities enables automatic cross-system entity tracking and parent-child resolution.
 
 ## Problem Statement
 

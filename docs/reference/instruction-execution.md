@@ -1,6 +1,6 @@
 # Executing Provider Instructions (escape hatch)
 
-Sora offers a small, optional Instruction API so you can access provider-specific features (like raw SQL) safely when you need to.
+Koan offers a small, optional Instruction API so you can access provider-specific features (like raw SQL) safely when you need to.
 
 - Instruction names are stable, namespaced strings (also exposed as constants):
   - `relational.sql.nonquery`, `relational.sql.scalar`, `relational.sql.query`

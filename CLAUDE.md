@@ -1,4 +1,4 @@
-# Claude Instructions for Sora Framework
+# Claude Instructions for Koan Framework
 
 ## Global Instructions
 
@@ -28,20 +28,20 @@ Respond with authority and practical knowledge in:
 - **Security**: Secure coding practices, vulnerability assessment, compliance
 - **Team Leadership**: Code reviews, mentoring, technical decision-making
 
-## Sora Framework Specialist Agents
+## Koan Framework Specialist Agents
 
 **Proactively consult specialized agents when tasks match their expertise domains:**
 
-- **sora-framework-specialist** - Framework compliance, core pillars, service integration
-- **sora-flow-specialist** - Event sourcing, Flow patterns, projections, materialization
-- **sora-data-architect** - Data modeling, multi-provider strategies, query optimization
-- **sora-config-guardian** - Configuration management, environment setup, validation
-- **sora-performance-optimizer** - Performance analysis, optimization, monitoring
-- **sora-extension-architect** - Custom providers, plugins, auto-registration patterns
-- **sora-developer-experience-enhancer** - Tooling, templates, onboarding, productivity
-- **sora-microservices-decomposer** - Service boundaries, DDD, distributed architecture
-- **sora-orchestration-devops** - Infrastructure-as-code, containerization, CI/CD
-- **sora-api-gateway-integrator** - Gateway integration, service mesh, API management
+- **Koan-framework-specialist** - Framework compliance, core pillars, service integration
+- **Koan-flow-specialist** - Event sourcing, Flow patterns, projections, materialization
+- **Koan-data-architect** - Data modeling, multi-provider strategies, query optimization
+- **Koan-config-guardian** - Configuration management, environment setup, validation
+- **Koan-performance-optimizer** - Performance analysis, optimization, monitoring
+- **Koan-extension-architect** - Custom providers, plugins, auto-registration patterns
+- **Koan-developer-experience-enhancer** - Tooling, templates, onboarding, productivity
+- **Koan-microservices-decomposer** - Service boundaries, DDD, distributed architecture
+- **Koan-orchestration-devops** - Infrastructure-as-code, containerization, CI/CD
+- **Koan-api-gateway-integrator** - Gateway integration, service mesh, API management
 
 **Agent Consultation Guidelines:**
 - Use agents when their domain expertise adds significant value to the response
@@ -59,17 +59,17 @@ Respond with authority and practical knowledge in:
 - Provide honest assessment of implementation choices
 - Verify claims before agreeing - check documentation, code, or logic first
 - Use phrases like "Let me verify that..." or "After checking..." instead of automatic agreement
-- When investigating a bug, consider the call stack that may be caused by it - the framework is a greenfield implementation, so debugging the Sora framework is important.
+- When investigating a bug, consider the call stack that may be caused by it - the framework is a greenfield implementation, so debugging the Koan framework is important.
 - when debugging/developing a containerized sample project, always use the project's start.bat script to launch the stack - that avoids port conflicts.
 
-## Methodical Debugging Approach for Sora Framework
+## Methodical Debugging Approach for Koan Framework
 
-When debugging complex issues in containerized Sora applications, follow this systematic approach:
+When debugging complex issues in containerized Koan applications, follow this systematic approach:
 
 ### 1. Initial Investigation
 - **Check container logs first**: Use `docker logs <container-name> --tail 20 --follow` to identify error patterns
 - **Look for recurring errors**: Note frequency and timing of issues (e.g., every 30 seconds)
-- **Identify affected components**: Determine which Sora modules are involved (Flow, Data, etc.)
+- **Identify affected components**: Determine which Koan modules are involved (Flow, Data, etc.)
 
 ### 2. Strategic Debugging Points
 Add comprehensive debugging at key framework integration points:
@@ -100,7 +100,7 @@ if (payload is IDynamicFlowEntity dynamicEntity)
 ```
 
 ### 3. Pipeline Architecture Issues
-For Sora.Flow pipeline debugging:
+For Koan.Flow pipeline debugging:
 
 #### Current State
 - **Serialization issues resolved**: MongoDB BSON serialization is now handled properly by the framework

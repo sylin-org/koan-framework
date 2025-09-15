@@ -2,22 +2,22 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Sora.Core;
-using Sora.Messaging;
-using Sora.Messaging.RabbitMq;
+using Koan.Core;
+using Koan.Messaging;
+using Koan.Messaging.RabbitMq;
 using S8.Flow.Shared;
-using Sora.Flow.Actions;
-using Sora.Flow.Extensions;
-using Sora.Core.Hosting.App;
-using Sora.Flow.Attributes;
-using Sora.Data.Core;
-using Sora.Flow.Model;
+using Koan.Flow.Actions;
+using Koan.Flow.Extensions;
+using Koan.Core.Hosting.App;
+using Koan.Flow.Attributes;
+using Koan.Data.Core;
+using Koan.Flow.Model;
 using System.Collections.Generic;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 
-if (!Sora.Core.SoraEnv.InContainer)
+if (!Koan.Core.KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Flow.Adapters.Bms is container-only. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -27,8 +27,8 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Sora framework with auto-configuration
-builder.Services.AddSora();
+// Koan framework with auto-configuration
+builder.Services.AddKoan();
 
 
 var app = builder.Build();
@@ -113,7 +113,7 @@ public sealed class BmsPublisher : BackgroundService
                             {
                                 Id = "bms" + sensorTemplate.Id, // bmsS1, bmsS2, etc.
                                 DeviceId = "bms" + sensorTemplate.DeviceId, // bmsDX
-                                SensorId = "bms" + sensorTemplate.SensorKey,
+                                SensorId = "bms" + sensorTemplate.SensorId,
                                 Code = sensorTemplate.Code,
                                 Unit = sensorTemplate.Unit
                             };
@@ -134,13 +134,13 @@ public sealed class BmsPublisher : BackgroundService
                 {
                     var reading = new Reading
                     {
-                        SensorId = "bms" + readingTemplate.SensorKey,
+                        SensorId = "bms" + readingTemplate.SensorId,
                         Value = readingTemplate.Value,
                         CapturedAt = readingTemplate.CapturedAt,
                         Unit = readingTemplate.Unit
                     };
 
-                    _log.LogDebug("[BMS] Reading: {SensorKey} = {Value}", reading.SensorKey, reading.Value);
+                    _log.LogDebug("[BMS] Reading: {SensorId} = {Value}", reading.SensorId, reading.Value);
                     await reading.Send();
                 }
             }

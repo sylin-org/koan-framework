@@ -1,9 +1,9 @@
-# Sora Implementation Plan (milestones tied to samples)
+# Koan Implementation Plan (milestones tied to samples)
 
 Principle: Each milestone ends with a runnable sample proving the slice. CI and minimal docs accompany it.
 
 ## M0 — Repo bootstrap (docs only)
-- Create Sora solution skeleton (no runtime code yet)
+- Create Koan solution skeleton (no runtime code yet)
 - Docs migrated and structured (this folder)
 - ADRs: Adapter families; Discovery precedence; Profiles; Batching semantics
 - Outcome: docs build + lint; plan approved
@@ -11,7 +11,7 @@ Principle: Each milestone ends with a runnable sample proving the slice. CI and 
 ## M1 — Core & S0 (Console + JSON repo)
 - Runtime: Core hosting, options + validation, logging, OpenTelemetry stubs, health system
 - Data: Repository interfaces, JSON-file adapter, operation pipeline (Validation, PII, Audit, Soft-delete), batch APIs (IBatchSet)
-- DX: AddSora()/UseSora() with Core + minimal diagnostics (one-liner helper optional)
+- DX: AddKoan()/UseKoan() with Core + minimal diagnostics (one-liner helper optional)
 - Sample S0: console app performing CRUD + batch on a Todo aggregate via JSON adapter
 - CI: unit tests for options and JSON adapter; smoke test for S0
 
@@ -69,6 +69,6 @@ Principle: Each milestone ends with a runnable sample proving the slice. CI and 
 - Source generator (decision revisit after v1)
 
 ## Notes
-- Discovery defaults: On in non-Production, Off in Production unless `Sora:AllowMagicInProduction=true`. You can force via `Sora:Messaging:Discovery:Enabled`.
-- Explicit configuration (e.g., `Sora:Messaging:Inbox:Endpoint`) always overrides and skips discovery.
+- Discovery defaults: On in non-Production, Off in Production unless `Koan:AllowMagicInProduction=true`. You can force via `Koan:Messaging:Discovery:Enabled`.
+- Explicit configuration (e.g., `Koan:Messaging:Inbox:Endpoint`) always overrides and skips discovery.
 - Adapter factories can indicate priority using `ProviderPriorityAttribute` to influence default provider selection.

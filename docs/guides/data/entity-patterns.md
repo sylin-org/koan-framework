@@ -67,7 +67,7 @@ public partial class DataService : IDataService
 ## Entity facade (sketch)
 
 ```csharp
-// Note: vector helpers moved to Sora.Data.Vector (see DATA-0060)
+// Note: vector helpers moved to Koan.Data.Vector (see DATA-0060)
 public static class Entity<T>
 {
     public static class Doc

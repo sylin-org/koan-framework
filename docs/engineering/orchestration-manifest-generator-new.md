@@ -1,29 +1,29 @@
-﻿---
+---
 title: Orchestration Manifest Generator — Getting Services Running Automatically
-description: How to add simple attributes to your code so Sora can automatically start the databases and services your app needs
+description: How to add simple attributes to your code so Koan can automatically start the databases and services your app needs
 ---
 
 # Orchestration Manifest Generator — Getting Services Running Automatically
 
 ## What is this and why do I need it?
 
-The Sora Framework automatically discovers the services your application depends on (like databases, message queues, vector stores) and generates the Docker configuration needed to run them locally or in containers. Instead of manually writing docker-compose files, you just add simple attributes to your data adapter classes, and Sora handles the rest.
+The Koan Framework automatically discovers the services your application depends on (like databases, message queues, vector stores) and generates the Docker configuration needed to run them locally or in containers. Instead of manually writing docker-compose files, you just add simple attributes to your data adapter classes, and Koan handles the rest.
 
 This system solves several problems:
 - **No more manual docker-compose maintenance** - Your service configuration lives with your code
 - **Consistent environments** - Development, testing, and production use the same service definitions
-- **Automatic dependency discovery** - Sora finds all the services you actually use
-- **Zero-configuration local development** - Just run `sora up` and everything starts
+- **Automatic dependency discovery** - Koan finds all the services you actually use
+- **Zero-configuration local development** - Just run `Koan up` and everything starts
 
 ## How it works (the big picture)
 
-Here's what happens when you build and run your Sora application:
+Here's what happens when you build and run your Koan application:
 
 ### 1. Build Time (Automatic)
 When you build your project, a source generator scans your code for orchestration attributes and creates a manifest file containing all your service definitions. This happens completely automatically - you don't need to do anything special.
 
-### 2. Runtime Discovery (When you run `sora up`)
-When you run Sora CLI commands, the system:
+### 2. Runtime Discovery (When you run `Koan up`)
+When you run Koan CLI commands, the system:
 1. Looks for the generated manifest in your built assemblies
 2. Reads all the service definitions you've declared
 3. Builds a deployment plan based on your target profile (Local vs Container)
@@ -40,7 +40,7 @@ Let's say you're adding PostgreSQL to your application. Here's the complete proc
 ### Step 1: Add attributes to your data adapter
 
 ```csharp
-using Sora.Orchestration.Abstractions.Attributes;
+using Koan.Orchestration.Abstractions.Attributes;
 
 [ServiceId("postgresql")]
 [ContainerDefaults("postgres:16", 
@@ -70,10 +70,10 @@ That's it! The generator automatically creates a manifest containing your Postgr
 
 ### Step 3: Run your application
 ```bash
-sora up
+Koan up
 ```
 
-Sora will:
+Koan will:
 - Start PostgreSQL in a Docker container
 - Wait for it to be healthy
 - Set the `DATABASE_URL` environment variable for your app
@@ -87,7 +87,7 @@ Each attribute serves a specific purpose in the orchestration process:
 ```csharp
 [ServiceId("postgresql")]
 ```
-This gives your service a unique name that Sora uses internally. Keep it simple and descriptive.
+This gives your service a unique name that Koan uses internally. Keep it simple and descriptive.
 
 ### ContainerDefaults - "How do we run this in Docker?"
 ```csharp
@@ -96,7 +96,7 @@ This gives your service a unique name that Sora uses internally. Keep it simple 
     Env = new[] { "POSTGRES_DB=myapp" },
     Volumes = new[] { "/var/lib/postgresql/data" })]
 ```
-This tells Sora:
+This tells Koan:
 - **Image**: What Docker image to use (`postgres:16`)
 - **Ports**: What ports the service listens on (`5432`)
 - **Env**: Environment variables the container needs
@@ -115,7 +115,7 @@ You need both modes:
 ```csharp
 [AppEnvDefaults(new[] { "DATABASE_URL=postgres://{user}:{password}@{host}:{port}/{database}" })]
 ```
-Sora will create environment variables for your application using the connection details. The `{tokens}` get replaced with actual values.
+Koan will create environment variables for your application using the connection details. The `{tokens}` get replaced with actual values.
 
 ### HealthEndpointDefaults - "How do we know the service is ready?"
 ```csharp
@@ -123,7 +123,7 @@ Sora will create environment variables for your application using the connection
 ```
 This tells Docker how to check if your service is healthy before starting dependent services. Only use this for HTTP services.
 
-## Real Examples from the Sora Codebase
+## Real Examples from the Koan Codebase
 
 ### Weaviate Vector Database
 ```csharp
@@ -170,9 +170,9 @@ The `OrchestrationManifestGenerator` source generator:
 
 The generated file looks like this:
 ```csharp
-namespace Sora.Orchestration
+namespace Koan.Orchestration
 {
-    internal static class __SoraOrchestrationManifest
+    internal static class __KoanOrchestrationManifest
     {
         public const string Json = @"{""services"":[{""id"":""postgresql"",""image"":""postgres:16""...}]}";
     }
@@ -180,9 +180,9 @@ namespace Sora.Orchestration
 ```
 
 ### During Discovery (CLI Runtime)
-When you run `sora up`, the `ProjectDependencyAnalyzer`:
+When you run `Koan up`, the `ProjectDependencyAnalyzer`:
 1. Finds your built assembly files
-2. Looks for the `__SoraOrchestrationManifest` class
+2. Looks for the `__KoanOrchestrationManifest` class
 3. Reads the embedded JSON string
 4. Parses all service definitions
 5. Falls back to reflection if no generated manifest is found
@@ -213,14 +213,14 @@ You should add orchestration attributes to your adapter classes whenever:
 ### As a Service Provider
 If you're creating a new type of data adapter or service integration:
 1. Add the orchestration attributes to your service class
-2. Test that `sora up` correctly starts your service
+2. Test that `Koan up` correctly starts your service
 3. Verify that your service's health check works
 4. Document any special configuration requirements
 
 ### As an Application Developer
-You typically don't need to add these attributes to your own application code. The Sora data adapters you're using should already have them. You just:
+You typically don't need to add these attributes to your own application code. The Koan data adapters you're using should already have them. You just:
 1. Add the data adapter NuGet packages to your project
-2. Run `sora up` to start everything
+2. Run `Koan up` to start everything
 3. Your app gets the right environment variables automatically
 
 ## Integration with NuGet Packages
@@ -234,15 +234,15 @@ When you create a NuGet package containing data adapters with orchestration attr
 
 ### For Package Authors
 Make sure to:
-- Include `Sora.Orchestration.Abstractions` as a dependency
+- Include `Koan.Orchestration.Abstractions` as a dependency
 - Add attributes to your adapter classes (not the assembly)
 - Test your package in a consuming application
 
 ### For Package Consumers
 The process is transparent:
-1. Install NuGet packages with Sora adapters
+1. Install NuGet packages with Koan adapters
 2. Build your project (generator runs automatically)
-3. Run `sora up` (your dependencies are discovered automatically)
+3. Run `Koan up` (your dependencies are discovered automatically)
 
 ## Troubleshooting
 
@@ -253,7 +253,7 @@ The process is transparent:
 - Make sure your adapter classes are public
 - Verify you have `[ServiceId("...")]` on your classes
 - Check that your project built successfully
-- Look for `__SoraOrchestrationManifest.g.cs` in your `obj/` folder
+- Look for `__KoanOrchestrationManifest.g.cs` in your `obj/` folder
 
 ### "Service not appearing in compose output"
 **Cause**: The service was discovered but filtered out during planning.
@@ -284,8 +284,8 @@ The process is transparent:
 
 If you're having trouble with the orchestration system:
 1. Check the generated manifest in `obj/Debug/net*/generated/`
-2. Run `sora export` to see the generated compose file
-3. Look at existing adapter implementations in the Sora codebase for patterns
+2. Run `Koan export` to see the generated compose file
+3. Look at existing adapter implementations in the Koan codebase for patterns
 4. File an issue with your service configuration and error output
 
 ## Technical Reference
@@ -295,7 +295,7 @@ For developers who need the technical details:
 ### Discovery Precedence
 The CLI follows this precedence when building deployment plans:
 1. **Descriptor File**: Explicitly provided orchestration configuration
-2. **Generated Manifest**: Build-time generated `__SoraOrchestrationManifest.Json`
+2. **Generated Manifest**: Build-time generated `__KoanOrchestrationManifest.Json`
 3. **Reflection**: Runtime discovery via legacy `OrchestrationServiceManifestAttribute`
 4. **Demo Fallback**: Hardcoded services for development scenarios
 
@@ -331,7 +331,7 @@ The generator produces JSON with this structure:
 ```
 
 ### Auto-Attachment
-In the Sora repository, the generator is auto-attached to all projects via `Directory.Build.props` as an Analyzer reference, so you don't need to add a package reference explicitly.
+In the Koan repository, the generator is auto-attached to all projects via `Directory.Build.props` as an Analyzer reference, so you don't need to add a package reference explicitly.
 
 ### Error Handling
 - Missing `ServiceId` or `ContainerDefaults.Image` → service candidate ignored

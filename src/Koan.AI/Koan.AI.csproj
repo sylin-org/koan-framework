@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Koan AI facade and runtime glue.</Description>
+    <PackageTags>$(CommonPackageTags);ai;facade;runtime</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.8" />
+  </ItemGroup>
+</Project>

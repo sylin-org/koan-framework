@@ -1,9 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Sora.Data.Json\Sora.Data.Json.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Json\Koan.Data.Json.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1,6 +1,6 @@
-using Sora.Flow.Model;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Flow.Attributes;
+using Koan.Flow.Model;
+using Koan.Data.Abstractions.Annotations;
+using Koan.Flow.Attributes;
 
 namespace S8.Location.Core.Models;
 

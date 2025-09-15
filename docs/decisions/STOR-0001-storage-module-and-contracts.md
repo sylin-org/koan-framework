@@ -1,4 +1,4 @@
-﻿---
+---
 id: STOR-0001
 slug: STOR-0001-storage-module-and-contracts
 domain: STOR
@@ -9,13 +9,13 @@ date: 2025-08-24
 
 Context
 
-- Sora needs first-class file storage with entity-backed metadata, thin provider adapters, and centralized orchestration (routing, pipeline, audit, transfers).
+- Koan needs first-class file storage with entity-backed metadata, thin provider adapters, and centralized orchestration (routing, pipeline, audit, transfers).
 - Consumers may use storage without web; HTTP concerns must be in a separate module.
 - DX should be simple: model statics for data access and thin helpers for content reads.
 
 Decision
 
-- Introduce Sora.Storage (core, transport-agnostic) and Sora.Web.Storage (HTTP endpoints) as separate modules.
+- Introduce Koan.Storage (core, transport-agnostic) and Koan.Web.Storage (HTTP endpoints) as separate modules.
 - Define a canonical entity and a properties-only interface:
   - IStorageObject: metadata contract (no IO methods).
   - StorageObject : Entity<StorageObject>, IStorageObject — the default model with first-class static data methods (All/Query/Stream/Page).
@@ -29,11 +29,11 @@ Decision
   - IStorageAuditSink: structured events for actions and pipeline steps.
 - Options and constants:
   - StorageOptions: Profiles[], Rules[], Limits (size, types), Pipeline defaults.
-  - Constants centralized under Sora.Storage.Infrastructure.Constants (non-HTTP); HTTP constants live in Sora.Web.Storage.
+  - Constants centralized under Koan.Storage.Infrastructure.Constants (non-HTTP); HTTP constants live in Koan.Web.Storage.
 
 Scope
 
-- In scope: entity contracts, provider contracts and capabilities, orchestrator/router/audit contracts, options, and module split. Include Sora.Storage.Local as the baseline provider in the first iteration.
+- In scope: entity contracts, provider contracts and capabilities, orchestrator/router/audit contracts, options, and module split. Include Koan.Storage.Local as the baseline provider in the first iteration.
 - Out of scope: specific cloud adapters (to be added as thin providers) and UI integrations.
 
 Contracts (indicative)

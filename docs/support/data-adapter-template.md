@@ -1,6 +1,6 @@
 # Data Adapter Template (copy-and-tweak)
 
-Purpose: Provide a minimal, idiomatic starting point for a Sora data adapter (relational/document/etc.). It mirrors the “Data Adapter Acceptance Criteria” and follows Sora conventions (options binding, DI registration, naming, health, observability), and controller-first routing via repositories.
+Purpose: Provide a minimal, idiomatic starting point for a Koan data adapter (relational/document/etc.). It mirrors the “Data Adapter Acceptance Criteria” and follows Koan conventions (options binding, DI registration, naming, health, observability), and controller-first routing via repositories.
 
 Use this as a reference or copy-and-paste template into a new adapter project.
 
@@ -12,8 +12,8 @@ Notes
 
 ## Project structure (suggested)
 
-- src/Sora.Data.YourData/
-  - Initialization/SoraAutoRegistrar.cs
+- src/Koan.Data.YourData/
+  - Initialization/KoanAutoRegistrar.cs
   - YourDataAdapter.cs (options + factory + repository + batch)
   - Infrastructure/Constants.cs (config keys)
   - Health/YourDataHealthContributor.cs
@@ -28,8 +28,8 @@ Notes
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Sora.Data.Abstractions\Sora.Data.Abstractions.csproj" />
-    <ProjectReference Include="..\Sora.Data.Core\Sora.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <!-- Add provider client/driver packages here -->
   </ItemGroup>
 </Project>
@@ -42,28 +42,28 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Sora.Core;
-using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Naming;
+using Koan.Core;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
 
-namespace Sora.Data.YourData.Initialization;
+namespace Koan.Data.YourData.Initialization;
 
-public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
+public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
-    public string ModuleName => "Sora.Data.YourData";
-    public string ModuleVersion => typeof(SoraAutoRegistrar).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+    public string ModuleName => "Koan.Data.YourData";
+    public string ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString() ?? "0.0.0";
 
     public void Register(IServiceCollection services)
     {
-    services.AddSoraOptions<YourDataOptions>(config, "Sora:Data:YourData");
+    services.AddKoanOptions<YourDataOptions>(config, "Koan:Data:YourData");
         services.AddSingleton<IDataAdapterFactory, YourDataAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<INamingDefaultsProvider, YourDataNamingDefaultsProvider>());
     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, YourDataHealthContributor>());
     }
 
-    public void Describe(Sora.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
+    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)
     {
-        var opts = cfg.GetSection("Sora:Data:YourData");
+        var opts = cfg.GetSection("Koan:Data:YourData");
         report.AddConfig("YourData:Endpoint", opts["Endpoint"], sensitive: true);
     }
 }
@@ -72,7 +72,7 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
 ## Options and constants
 
 ```csharp
-namespace Sora.Data.YourData;
+namespace Koan.Data.YourData;
 
 public sealed class YourDataOptions
 {
@@ -86,7 +86,7 @@ internal static class Constants
 {
     public static class Config
     {
-        public const string Section = "Sora:Data:YourData";
+        public const string Section = "Koan:Data:YourData";
     }
 }
 ```
@@ -96,9 +96,9 @@ internal static class Constants
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Sora.Data.Abstractions;
+using Koan.Data.Abstractions;
 
-namespace Sora.Data.YourData;
+namespace Koan.Data.YourData;
 
 [ProviderPriority(0)]
 public sealed class YourDataAdapterFactory : IDataAdapterFactory
@@ -111,8 +111,8 @@ public sealed class YourDataAdapterFactory : IDataAdapterFactory
         where TKey : notnull
     {
         var opts = sp.GetRequiredService<IOptions<YourDataOptions>>().Value;
-        var naming = sp.GetRequiredService<Sora.Data.Abstractions.Naming.IStorageNameResolver>();
-        var tracer = new System.Diagnostics.ActivitySource("Sora.Data.YourData");
+        var naming = sp.GetRequiredService<Koan.Data.Abstractions.Naming.IStorageNameResolver>();
+        var tracer = new System.Diagnostics.ActivitySource("Koan.Data.YourData");
         return new YourDataRepository<TEntity, TKey>(opts, naming, tracer, sp);
     }
 }
@@ -123,11 +123,11 @@ public sealed class YourDataAdapterFactory : IDataAdapterFactory
 ```csharp
 using System.Diagnostics;
 using System.Linq.Expressions;
-using Sora.Data.Abstractions;
-using Sora.Data.Abstractions.Instructions;
-using Sora.Data.Abstractions.Naming;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Naming;
 
-namespace Sora.Data.YourData;
+namespace Koan.Data.YourData;
 
 public sealed class YourDataRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
@@ -296,9 +296,9 @@ public sealed class YourDataRepository<TEntity, TKey> :
 ## Health contributor
 
 ```csharp
-using Sora.Data.Abstractions;
+using Koan.Data.Abstractions;
 
-namespace Sora.Data.YourData;
+namespace Koan.Data.YourData;
 
 public sealed class YourDataHealthContributor : IHealthContributor
 {
@@ -314,9 +314,9 @@ public sealed class YourDataHealthContributor : IHealthContributor
 ## Naming defaults (optional)
 
 ```csharp
-using Sora.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Naming;
 
-namespace Sora.Data.YourData;
+namespace Koan.Data.YourData;
 
 public sealed class YourDataNamingDefaultsProvider : INamingDefaultsProvider
 {
@@ -328,9 +328,9 @@ public sealed class YourDataNamingDefaultsProvider : INamingDefaultsProvider
 ## Usage snippet
 
 ```csharp
-var services = new ServiceCollection().AddSora();
-// Adapter package auto-registers via SoraAutoRegistrar
-var sp = services.StartSora();
+var services = new ServiceCollection().AddKoan();
+// Adapter package auto-registers via KoanAutoRegistrar
+var sp = services.StartKoan();
 
 var data = sp.GetRequiredService<IDataService>();
 var repo = data.GetRepository<Person, string>();

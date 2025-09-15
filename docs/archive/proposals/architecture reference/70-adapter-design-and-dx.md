@@ -4,7 +4,7 @@ Goal
 - Thin adapters with minimal code; common behavior in shared libraries; great developer ergonomics (DX) with simple scaffolding and configuration.
 
 Baseline
-- .NET 9, Sora framework for service scaffolding
+- .NET 9, Koan framework for service scaffolding
 - RabbitMQ for data/control planes; REST IntakeGateway optional
 - Mongo-backed PolicyBundle, OTEL instrumentation, workflow-lite orchestrator in the platform
 
@@ -25,7 +25,7 @@ Baseline
   - OTEL bootstrap and correlation headers propagation
   - Health/metrics middleware (/healthz, /readyz, /metrics)
 - Templates:
-  - sora-adapter-template: project skeleton with Program.cs, config, DI, handlers, and tests
+  - Koan-adapter-template: project skeleton with Program.cs, config, DI, handlers, and tests
 
 ## Minimal adapter code surface
 - SourceClient: a single class implementing IDataSource with methods:
@@ -48,7 +48,7 @@ Baseline
 - Respect Throttle and Suspend commands; report progress via SeedProgress
 
 ## DX workflow
-- dotnet new sora-adapter -n <Name>
+- dotnet new Koan-adapter -n <Name>
 - Implement SourceClient and a simple Mapper
 - Configure env vars; run docker-compose local-full; adapter connects and announces
 - Post a SeedCommand via platform API; observe records flow and progress in portal/Jaeger

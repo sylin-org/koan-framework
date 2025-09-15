@@ -7,15 +7,15 @@
 
 ---
 
-## 🔐 Sora Framework Authentication Guide
+## 🔐 Koan Framework Authentication Guide
 
-This document provides comprehensive coverage of Sora's authentication capabilities, including OAuth 2.1, OIDC, SAML, and multi-provider authentication patterns.
+This document provides comprehensive coverage of Koan's authentication capabilities, including OAuth 2.1, OIDC, SAML, and multi-provider authentication patterns.
 
 ---
 
 ## 🌟 Authentication Overview
 
-Sora provides **enterprise-grade authentication** with support for multiple protocols and providers through a unified, developer-friendly API.
+Koan provides **enterprise-grade authentication** with support for multiple protocols and providers through a unified, developer-friendly API.
 
 ### Key Features
 
@@ -41,7 +41,7 @@ Sora provides **enterprise-grade authentication** with support for multiple prot
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "Providers": {
@@ -68,7 +68,7 @@ Sora provides **enterprise-grade authentication** with support for multiple prot
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "Providers": {
@@ -86,7 +86,7 @@ Sora provides **enterprise-grade authentication** with support for multiple prot
 **Advanced Microsoft setup:**
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "Providers": {
@@ -107,7 +107,7 @@ Sora provides **enterprise-grade authentication** with support for multiple prot
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "ReturnUrl": {
@@ -296,11 +296,11 @@ public class ExternalIdentity : Entity<ExternalIdentity>
 
 ### TestProvider (Development Only)
 
-Sora includes a built-in TestProvider for development that requires no external configuration:
+Koan includes a built-in TestProvider for development that requires no external configuration:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "Providers": {
@@ -334,7 +334,7 @@ GET /.testoauth/userinfo   # User information
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "TestProvider": {
@@ -359,7 +359,7 @@ Complete SAML 2.0 support for enterprise identity providers:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "Providers": {
@@ -387,7 +387,7 @@ Support for any OIDC-compliant provider:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "Providers": {
@@ -413,7 +413,7 @@ Integration with enterprise secret stores:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "Providers": {
@@ -737,7 +737,7 @@ const signOut = () => {
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "AllowDynamicProvidersInProduction": false,
@@ -773,7 +773,7 @@ For applications behind load balancers:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "TrustForwardedHeaders": true,
@@ -791,13 +791,13 @@ For applications behind load balancers:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "SessionStore": {
           "Provider": "Redis",
           "ConnectionString": "${REDIS_CONNECTION_STRING}",
-          "KeyPrefix": "sora:auth:",
+          "KeyPrefix": "Koan:auth:",
           "DefaultExpiration": "01:00:00"
         },
         "DistributedCache": {
@@ -816,7 +816,7 @@ For applications behind load balancers:
 
 ### Built-in Metrics
 
-Sora automatically tracks authentication metrics:
+Koan automatically tracks authentication metrics:
 
 ```csharp
 // Authentication metrics
@@ -935,7 +935,7 @@ Enable detailed authentication logging:
 {
   "Logging": {
     "LogLevel": {
-      "Sora.Web.Auth": "Debug",
+      "Koan.Web.Auth": "Debug",
       "Microsoft.AspNetCore.Authentication": "Debug"
     }
   }
@@ -989,7 +989,7 @@ Enable detailed authentication logging:
 
 ## 🎯 Summary
 
-Sora's authentication system provides:
+Koan's authentication system provides:
 
 1. **🚀 Developer Experience**: Zero-config development, intelligent defaults, comprehensive documentation
 2. **🔒 Enterprise Security**: OAuth 2.1, OIDC, SAML support with security best practices

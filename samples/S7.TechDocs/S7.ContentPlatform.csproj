@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -8,14 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/Sora.Core/Sora.Core.csproj" />
-    <ProjectReference Include="../../src/Sora.Data.Core/Sora.Data.Core.csproj" />
-    <ProjectReference Include="../../src/Sora.Data.Json/Sora.Data.Json.csproj" />
-  <ProjectReference Include="../../src/Sora.Scheduling/Sora.Scheduling.csproj" />
-    <ProjectReference Include="../../src/Sora.Web/Sora.Web.csproj" />
-    <ProjectReference Include="../../src/Sora.Web.Extensions/Sora.Web.Extensions.csproj" />
-    <ProjectReference Include="../../src/Sora.Web.Swagger/Sora.Web.Swagger.csproj" />
-    <ProjectReference Include="../../src/Sora.Messaging.Core/Sora.Messaging.Core.csproj" />
+    <ProjectReference Include="../../src/Koan.Core/Koan.Core.csproj" />
+    <ProjectReference Include="../../src/Koan.Data.Core/Koan.Data.Core.csproj" />
+    <ProjectReference Include="../../src/Koan.Data.Json/Koan.Data.Json.csproj" />
+  <ProjectReference Include="../../src/Koan.Scheduling/Koan.Scheduling.csproj" />
+    <ProjectReference Include="../../src/Koan.Web/Koan.Web.csproj" />
+    <ProjectReference Include="../../src/Koan.Web.Extensions/Koan.Web.Extensions.csproj" />
+    <ProjectReference Include="../../src/Koan.Web.Swagger/Koan.Web.Swagger.csproj" />
+    <ProjectReference Include="../../src/Koan.Messaging.Core/Koan.Messaging.Core.csproj" />
   </ItemGroup>
 
 </Project>

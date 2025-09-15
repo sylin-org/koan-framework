@@ -8,7 +8,9 @@ internal static class Constants
         public const string Recs = "api/recs";
         public const string Users = "api/users";
         public const string Library = "api/library";
-        public const string Anime = "api/anime";
+        public const string Media = "api/media";
+        public const string MediaTypes = "api/media-types";
+        public const string MediaFormats = "api/media-formats";
         public const string Tags = "api/tags";
         public const string Genres = "api/genres";
     }
@@ -16,7 +18,7 @@ internal static class Constants
     internal static class Paths
     {
         public const string SeedCache = "data/seed-cache";
-        public const string OfflineData = "data/offline/anime.json";
+        public const string OfflineData = "data/offline/media.json";
         public const string Manifest = "data/seed-cache/manifest.json";
     }
 

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,10 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../src/Sora.Data.Core/Sora.Data.Core.csproj" />
-    <ProjectReference Include="../src/Sora.Data.Mongo/Sora.Data.Mongo.csproj" />
-    <ProjectReference Include="../src/Sora.Messaging.RabbitMq/Sora.Messaging.RabbitMq.csproj" />
-    <ProjectReference Include="../src/Sora.Flow.Core/Sora.Flow.Core.csproj" />
+    <ProjectReference Include="../src/Koan.Data.Core/Koan.Data.Core.csproj" />
+    <ProjectReference Include="../src/Koan.Data.Mongo/Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="../src/Koan.Messaging.RabbitMq/Koan.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="../src/Koan.Flow.Core/Koan.Flow.Core.csproj" />
   </ItemGroup>
 
 </Project>

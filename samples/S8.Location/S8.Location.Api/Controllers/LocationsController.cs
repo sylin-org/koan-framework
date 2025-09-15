@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using S8.Location.Core.Models;
-using Sora.Data.Core;
-using Sora.Messaging;
+using Koan.Data.Core;
+using Koan.Messaging;
 
 namespace S8.Location.Api.Controllers;
 

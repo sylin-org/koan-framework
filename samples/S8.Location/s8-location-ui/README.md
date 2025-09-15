@@ -61,4 +61,4 @@ Visit `http://localhost:5173` to view the dashboard.
 - **Performance Monitoring** - System health and metrics
 - **Responsive Design** - Works on desktop and mobile
 
-Built with ❤️ for the Sora Framework ecosystem
+Built with ❤️ for the Koan Framework ecosystem

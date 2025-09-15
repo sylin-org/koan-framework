@@ -1,4 +1,4 @@
-﻿---
+---
 id: WEB-0048
 slug: entity-moderation-controller-standard-flow
 domain: Web
@@ -50,7 +50,7 @@ Library responsibilities (non-delegable):
 
 ## Scope
 
-Applies to Sora.Web.Extensions moderation controller(s) and all sample apps adopting moderation flows. Does not change core data adapters or set naming policy. Samples should remove controller-level overrides and move entity-specific behavior into flows/validators when customization is needed.
+Applies to Koan.Web.Extensions moderation controller(s) and all sample apps adopting moderation flows. Does not change core data adapters or set naming policy. Samples should remove controller-level overrides and move entity-specific behavior into flows/validators when customization is needed.
 
 ## Consequences
 

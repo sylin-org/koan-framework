@@ -2,7 +2,7 @@
 
 Use this when creating a new provider adapter.
 
-- Package placement and naming: `Sora.Data.<Provider>`
+- Package placement and naming: `Koan.Data.<Provider>`
 - Implement `IDataRepository<TEntity,TKey>` and opt into capabilities:
   - `IStringQueryRepository<TEntity,TKey>` if you support string queries.
   - `ILinqQueryRepository<TEntity,TKey>` if you support LINQ predicates; also implement `IQueryCapabilities` and return `QueryCapabilities.Linq` (and `String` if applicable).
@@ -28,4 +28,4 @@ Use this when creating a new provider adapter.
   - Provide a tiny `IHealthContributor` that performs a lightweight pull check. For example:
     - JSON: verify data directory exists and is writable (probe file create/delete).
     - SQLite: open a connection and run a trivial PRAGMA; if file-based, ensure directory exists.
-  - Auto-register the contributor in your module initializer (e.g., `*SoraInitializer.Initialize`) so apps get it by default when the adapter is discovered.
+  - Auto-register the contributor in your module initializer (e.g., `*KoanInitializer.Initialize`) so apps get it by default when the adapter is discovered.

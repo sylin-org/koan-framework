@@ -1,6 +1,6 @@
-﻿---
+---
 title: Working with Secrets — solution developers
-description: Scenario-driven guidance for using secrets across .NET and Sora.Secrets, from simplest dev setup to production-capable patterns.
+description: Scenario-driven guidance for using secrets across .NET and Koan.Secrets, from simplest dev setup to production-capable patterns.
 ---
 
 ## Contract (what success looks like)
@@ -22,7 +22,7 @@ References: ARCH-0050, ARCH-0051; see also reference/secrets.md for module detai
 ## Quick wiring (one-time)
 
 - Register secrets and the resolve-on-read configuration wrapper
-  - services.AddSoraSecrets();
+  - services.AddKoanSecrets();
   - configuration.AddSecretsReferenceConfiguration();
 - Prefer provider-agnostic references in appsettings: secret://scope/name
 - Keep secrets out of repo; use .NET User Secrets, environment variables, or your platform secret manager
@@ -32,7 +32,7 @@ References: ARCH-0050, ARCH-0051; see also reference/secrets.md for module detai
 1. Environment variables only (no files)
 
 - Set an environment variable per secret and reference it via configuration mapping if needed
-- With Sora’s config-backed provider, you can also map canonical keys directly (see Scenario 2)
+- With Koan’s config-backed provider, you can also map canonical keys directly (see Scenario 2)
 
 2. Development using .NET User Secrets (preferred, no extra provider)
 
@@ -135,8 +135,8 @@ if (builder.Environment.IsDevelopment())
   builder.Configuration.AddUserSecrets<Program>(optional: true);
 }
 
-// Register Sora secrets and the resolve-on-read configuration wrapper
-builder.Services.AddSoraSecrets();
+// Register Koan secrets and the resolve-on-read configuration wrapper
+builder.Services.AddKoanSecrets();
 builder.Configuration.AddSecretsReferenceConfiguration();
 
 var app = builder.Build();
@@ -205,10 +205,10 @@ public sealed record ServiceXKey(string KeyId, string Secret);
 
 ```csharp
 // Force Vault; NotFound will not fall back
-var id = Sora.Secrets.Abstractions.SecretId.Parse("secret+vault://db/main");
+var id = Koan.Secrets.Abstractions.SecretId.Parse("secret+vault://db/main");
 try
 {
-  var resolver = app.Services.GetRequiredService<Sora.Secrets.Abstractions.ISecretResolver>();
+  var resolver = app.Services.GetRequiredService<Koan.Secrets.Abstractions.ISecretResolver>();
   var value = await resolver.GetAsync(id, default);
   // use value (do not log)
 }
@@ -225,11 +225,11 @@ catch (Exception ex)
 ```csharp
 var ids = new[]
 {
-  Sora.Secrets.Abstractions.SecretId.Parse("secret://db/main"),
-  Sora.Secrets.Abstractions.SecretId.Parse("secret://api/servicex")
+  Koan.Secrets.Abstractions.SecretId.Parse("secret://db/main"),
+  Koan.Secrets.Abstractions.SecretId.Parse("secret://api/servicex")
 };
 
-var resolver = app.Services.GetRequiredService<Sora.Secrets.Abstractions.ISecretResolver>();
+var resolver = app.Services.GetRequiredService<Koan.Secrets.Abstractions.ISecretResolver>();
 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
 foreach (var sid in ids)

@@ -1,7 +1,7 @@
-# Sora.Messaging & Sora.Flow Greenfield Refactor Plan
+# Koan.Messaging & Koan.Flow Greenfield Refactor Plan
 
 ## Purpose
-This document details the break-and-build refactoring plan for Sora.Messaging and Sora.Flow, aligning with ADRs MESS-0071 and MESS-0070. The goal is a pure greenfield implementation: all legacy code is deleted, and only the new, provider-agnostic, fluent, and testable messaging foundation remains.
+This document details the break-and-build refactoring plan for Koan.Messaging and Koan.Flow, aligning with ADRs MESS-0071 and MESS-0070. The goal is a pure greenfield implementation: all legacy code is deleted, and only the new, provider-agnostic, fluent, and testable messaging foundation remains.
 
 ---
 
@@ -16,12 +16,12 @@ This document details the break-and-build refactoring plan for Sora.Messaging an
 ## Refactor Steps
 
 ### 1. Remove All Old Code
-- Delete all provider-specific topology logic, legacy APIs, and direct provider dependencies in Sora.Messaging.* and Sora.Flow.*.
+- Delete all provider-specific topology logic, legacy APIs, and direct provider dependencies in Koan.Messaging.* and Koan.Flow.*.
 - Remove all legacy message bus interfaces, registration patterns, and configuration paths.
 - Purge all obsolete code, shims, and `[Obsolete]` attributes.
 
 ### 2. Implement New Core APIs
-- Define and implement `ITopologyProvisioner` and supporting types in Sora.Messaging.Core.
+- Define and implement `ITopologyProvisioner` and supporting types in Koan.Messaging.Core.
 - Expose only the new, provider-agnostic API for topology and messaging.
 
 ### 3. Provider Rebuild
@@ -35,8 +35,8 @@ This document details the break-and-build refactoring plan for Sora.Messaging an
 ### 5. In-Memory/Mock Bus
 - Implement a new in-memory/mock bus with full API parity for testing.
 
-### 6. Consumer Rebuild (Sora.Flow, etc.)
-- Refactor Sora.Flow and all other consumers to use only the new APIs.
+### 6. Consumer Rebuild (Koan.Flow, etc.)
+- Refactor Koan.Flow and all other consumers to use only the new APIs.
 - Remove all direct provider dependencies and legacy code.
 
 ### 7. Documentation & Samples

@@ -60,7 +60,7 @@ This guide describes the end‑to‑end flow, how to define contracts and polici
 - Start local stack:
   - docker‑compose (Mongo replica set, RabbitMQ, workflow‑lite, OTEL, core services, sample adapters)
 - Hot reload:
-  - dotnet watch for services; adapters scaffolded with Sora templates
+  - dotnet watch for services; adapters scaffolded with Koan templates
 - Seed data:
   - Seed a base PolicyBundle and IntakeRecord fixtures; verify flows via OTEL/Jaeger
 - Inspect and replay:
@@ -89,6 +89,6 @@ This guide describes the end‑to‑end flow, how to define contracts and polici
 - Q: Can I disable RabbitMQ locally?
   - A: Use the local‑slim profile; Channels can replace MQ, but default is MQ for parity.
 - Q: How do I add a new adapter?
-  - A: Use the Sora adapter template, map to IntakeRecord, validate schemas, and point to IntakeGateway or MQ intake.
+  - A: Use the Koan adapter template, map to IntakeRecord, validate schemas, and point to IntakeGateway or MQ intake.
 - Q: How do I evolve keys without breaking linkage?
   - A: Add keys with lower priority; keep PolicyBundle versioned; monitor collisions and adjust rules; use replay for backfills.

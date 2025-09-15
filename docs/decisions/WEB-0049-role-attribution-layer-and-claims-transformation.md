@@ -1,4 +1,4 @@
-﻿---
+---
 id: WEB-0049
 slug: role-attribution-layer-and-claims-transformation
 domain: Web
@@ -8,41 +8,41 @@ title: Role attribution layer — claims transformation, policies, and auto-regi
 
 Context
 
-Modern apps need a first-class, pluggable role/permission layer that cooperates with the authentication pipeline and works out-of-the-box. Controllers should be able to guard endpoints using standard [Authorize] attributes (Roles or Policy) without every app reinventing role parsing or permission mapping. Sora already provides:
+Modern apps need a first-class, pluggable role/permission layer that cooperates with the authentication pipeline and works out-of-the-box. Controllers should be able to guard endpoints using standard [Authorize] attributes (Roles or Policy) without every app reinventing role parsing or permission mapping. Koan already provides:
 
 - Multi-protocol authentication with provider discovery (WEB-0043, WEB-0044, WEB-0045).
-- Canonical capability policy names (SoraWebPolicyNames) and a helper to bind them to roles (AuthorizationPolicyExtensions).
+- Canonical capability policy names (KoanWebPolicyNames) and a helper to bind them to roles (AuthorizationPolicyExtensions).
 - Capability authorization defaults and fallbacks (WEB-0047).
 
 The missing piece is a cohesive “role attribution layer” that:
 - Extracts roles/permissions from identities consistently.
-- Fuses provider-specific claims into normalized Sora roles/permissions.
+- Fuses provider-specific claims into normalized Koan roles/permissions.
 - Adds roles/permissions to ClaimsPrincipal early, so [Authorize] works everywhere with zero custom code.
-- Ships sane defaults with no configuration and a great DX; is extensible via SoraAutoRegistrar.
+- Ships sane defaults with no configuration and a great DX; is extensible via KoanAutoRegistrar.
 
 Decision
 
-Adopt a roles/permissions attribution layer under a new package Sora.Web.Auth.Roles with these parts:
+Adopt a roles/permissions attribution layer under a new package Koan.Web.Auth.Roles with these parts:
 
 1) Contracts
 - IRoleAttributionService: Computes effective roles and permissions for a ClaimsPrincipal (and optional tenant/context).
 - IRoleMapContributor: Contributes default role/permission mappings from raw claims (per adapter/module). Pattern mirrors IAuthProviderContributor.
-- RoleAttributionOptions: Options to control claim keys, normalization, reserved role names, and dev defaults. Bound at Sora:Web:Auth:Roles.
+- RoleAttributionOptions: Options to control claim keys, normalization, reserved role names, and dev defaults. Bound at Koan:Web:Auth:Roles.
 
 2) Pipeline integration
-- SoraRoleClaimsTransformation: IClaimsTransformation that runs post-authentication and enriches the principal with normalized role and permission claims according to IRoleAttributionService. Adds role claims using ClaimTypes.Role and a sora:perm claim for permissions.
+- KoanRoleClaimsTransformation: IClaimsTransformation that runs post-authentication and enriches the principal with normalized role and permission claims according to IRoleAttributionService. Adds role claims using ClaimTypes.Role and a Koan:perm claim for permissions.
 - Optional DynamicAuthorizationPolicyProvider: If enabled, auto-creates policies for names like role:admin or perm:softdelete.actor, mapping to RequireRole/RequireClaim as appropriate. Disabled by default; useful for large apps that prefer convention over registration.
 
 3) Policies and attributes
-- Keep canonical policy names in SoraWebPolicyNames.
+- Keep canonical policy names in KoanWebPolicyNames.
 - Provide an AuthorizeByPermissionAttribute : AuthorizeAttribute helper that sets Policy = "perm:<name>" for ergonomics (optional sugar).
-- Provide ServiceCollectionExtensions.AddSoraRolePolicies(Action<RolePolicyOptions>) to bind canonical capability policies to roles/permissions using a terse options object; if not called, ship a safe default mapping (see Defaults).
+- Provide ServiceCollectionExtensions.AddKoanRolePolicies(Action<RolePolicyOptions>) to bind canonical capability policies to roles/permissions using a terse options object; if not called, ship a safe default mapping (see Defaults).
 
 4) Auto-registration
-- New module Sora.Web.Auth.Roles registers via Initialization/SoraAutoRegistrar.cs:
-  - services.AddSoraOptions<RoleAttributionOptions>("Sora:Web:Auth:Roles");
+- New module Koan.Web.Auth.Roles registers via Initialization/KoanAutoRegistrar.cs:
+  - services.AddKoanOptions<RoleAttributionOptions>("Koan:Web:Auth:Roles");
   - services.TryAddSingleton<IRoleAttributionService, DefaultRoleAttributionService>();
-  - services.TryAddEnumerable(ServiceDescriptor.Singleton<IClaimsTransformation, SoraRoleClaimsTransformation>());
+  - services.TryAddEnumerable(ServiceDescriptor.Singleton<IClaimsTransformation, KoanRoleClaimsTransformation>());
   - services.AddAuthorization(o => { // optional conventional policies if RolePolicyOptions.Defaults.Enabled });
   - services.TryAddEnumerable(ServiceDescriptor.Transient<IRoleMapContributor, …>) wiring for external packages.
 
@@ -59,11 +59,11 @@ Adopt a roles/permissions attribution layer under a new package Sora.Web.Auth.Ro
 - Caching: IRoleAttributionService uses a cached snapshot; controller writes invalidate cache; /reload endpoint is optional sugar.
 
 6) Import/seed semantics
-- On startup, if the DB has no Role/RoleAlias/RolePolicyBinding rows, seed from Sora:Web:Auth:Roles (template). Record a ConfigStamp for traceability.
+- On startup, if the DB has no Role/RoleAlias/RolePolicyBinding rows, seed from Koan:Web:Auth:Roles (template). Record a ConfigStamp for traceability.
 - Re-population endpoint: POST /api/auth/roles/import
   - dryRun=true → return diff summary without applying.
   - force=true → replace DB state with template; otherwise merge-add new items and update matches by key.
-- Production guardrails: seeding or force-reimport is disabled in Production unless explicitly allowed via either SoraEnv.AllowMagicInProduction or Roles.AllowSeedingInProduction.
+- Production guardrails: seeding or force-reimport is disabled in Production unless explicitly allowed via either KoanEnv.AllowMagicInProduction or Roles.AllowSeedingInProduction.
 
 7) Admin policy and initial bootstrap
 - Management protection policy constant: auth.roles.admin. All admin endpoints require [Authorize(Policy = "auth.roles.admin")].
@@ -111,7 +111,7 @@ Admin API (spec)
   - 409 on RowVersion conflicts, 422 on validation errors.
 
 - Import behavior
-  - Template source: Sora:Web:Auth:Roles in appsettings (treated as seed template).
+  - Template source: Koan:Web:Auth:Roles in appsettings (treated as seed template).
   - dryRun: returns diff only; force: replace DB state; otherwise merge-and-update.
   - Production guardrails as above.
 
@@ -124,11 +124,11 @@ Outputs
 - RoleAttributionResult { Roles: IReadOnlySet<string>, Permissions: IReadOnlySet<string>, Stamp: string? }.
 
 Behavior
-- Merge roles from well-known claims (roles, role, groups, sora:role, sora:roles).
-- Merge permissions from sora:perm, permissions, scope (both space- and claim-per-value styles).
+- Merge roles from well-known claims (roles, role, groups, Koan:role, Koan:roles).
+- Merge permissions from Koan:perm, permissions, scope (both space- and claim-per-value styles).
 - Normalize names to lowercase kebab, trim, dedupe, and apply aliasing (e.g., administrator → admin).
-- Add ClaimTypes.Role for each role; add sora:perm for each permission.
-- If Stamp is provided, emit a sora:rolever claim. Subsequent transformations can be no-ops if stamp unchanged.
+- Add ClaimTypes.Role for each role; add Koan:perm for each permission.
+- If Stamp is provided, emit a Koan:rolever claim. Subsequent transformations can be no-ops if stamp unchanged.
 
 Error modes
 - Missing identity: no roles added.
@@ -138,7 +138,7 @@ Error modes
 Defaults (no configuration)
 
 Out-of-the-box behavior with zero app code:
-- Recognize standard claim keys: roles, role, groups, sora:role(s), permissions, scope.
+- Recognize standard claim keys: roles, role, groups, Koan:role(s), permissions, scope.
 - Role aliases: administrator → admin; moderator → mod; reader|viewer → reader; author|editor → author.
 - Canonical roles available for immediate use: reader, author, moderator, admin.
 - Canonical capability policies mapped to roles:
@@ -148,17 +148,17 @@ Out-of-the-box behavior with zero app code:
   - softdelete.actor → role:moderator
   - audit.actor → role:admin
 - Dev safety: In Development, if no known role claims are present, fall back to reader only. No implicit admin.
-- Production safety: No magic elevation. Only explicit claims produce roles. Honors SoraEnv.AllowMagicInProduction — but roles never elevate via magic.
+- Production safety: No magic elevation. Only explicit claims produce roles. Honors KoanEnv.AllowMagicInProduction — but roles never elevate via magic.
 
 Scope
 
-- Applies to ASP.NET Core apps using Sora.Web.Auth. Doesn’t replace provider-specific claims; it normalizes them.
+- Applies to ASP.NET Core apps using Koan.Web.Auth. Doesn’t replace provider-specific claims; it normalizes them.
 - V1 includes a DB-backed management surface and default entities, plus import/export endpoints. appsettings serves as a template for initial and optional re-seeding.
 
 Consequences
 
 Positive
-- Controllers can use [Authorize(Roles = "admin")] or [Authorize(Policy = SoraWebPolicyNames.SoftDeleteActor)] immediately.
+- Controllers can use [Authorize(Roles = "admin")] or [Authorize(Policy = KoanWebPolicyNames.SoftDeleteActor)] immediately.
 - Providers and modules can contribute role/permission mappings via IRoleMapContributor without tight coupling.
 - Keeps existing capability policies and WEB-0047 defaults intact; this layer makes them actually plug-and-play.
 
@@ -181,15 +181,15 @@ Negative / Trade-offs
 
 Implementation notes
 
-- Namespace: Sora.Web.Auth.Roles (new project) under src/.
+- Namespace: Koan.Web.Auth.Roles (new project) under src/.
 - Constants: place well-known claim keys and role aliases under Infrastructure/RoleClaimConstants.cs.
 - Options shape (RoleAttributionOptions):
   - ClaimKeys: Roles[], Permissions[]; EmitPermissionsClaims (bool, default true); MaxRoles (256), MaxPermissions (1024).
   - Aliases: IDictionary<string, string> (e.g., {"administrator":"admin"}).
   - DevFallbackRole: "reader"; Enabled (true).
 - IRoleAttributionService default implementation composes results from IRoleMapContributor instances + raw claim extraction.
-- SoraAutoRegistrar should run after auth registration; order is not critical because IClaimsTransformation executes at runtime.
-- For capability policies, reuse Sora.Web.Extensions.AuthorizationPolicyExtensions to avoid duplicate logic.
+- KoanAutoRegistrar should run after auth registration; order is not critical because IClaimsTransformation executes at runtime.
+- For capability policies, reuse Koan.Web.Extensions.AuthorizationPolicyExtensions to avoid duplicate logic.
 
 Follow-ups
 

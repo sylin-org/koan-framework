@@ -1,14 +1,14 @@
-# Domain-Driven Design (DDD) in Sora
+# Domain-Driven Design (DDD) in Koan
 
-Sora embraces DDD as a practical toolbox for building modular, evolvable systems. This section aligns Sora’s building blocks (Core, Data, Messaging, Web) with DDD concepts so you can apply a ubiquitous language, clear tactical patterns, and sensible boundaries in your apps.
+Koan embraces DDD as a practical toolbox for building modular, evolvable systems. This section aligns Koan’s building blocks (Core, Data, Messaging, Web) with DDD concepts so you can apply a ubiquitous language, clear tactical patterns, and sensible boundaries in your apps.
 
-Use these docs with the rest of Sora docs and ADRs. Each page maps DDD ideas to concrete Sora APIs and samples.
+Use these docs with the rest of Koan docs and ADRs. Each page maps DDD ideas to concrete Koan APIs and samples.
 
 Contents
 - [ubiquitous-language.md](ubiquitous-language.md) — Ubiquitous language and term mapping
 - [bounded-contexts-and-modules.md](bounded-contexts-and-modules.md) — Bounded contexts and modular composition
 - [tactical-design.md](tactical-design.md) — Aggregates, repositories, services, invariants
-- [cqrs-and-eventing-in-sora.md](cqrs-and-eventing-in-sora.md) — CQRS, outbox/inbox, messaging
+- [cqrs-and-eventing-in-Koan.md](cqrs-and-eventing-in-Koan.md) — CQRS, outbox/inbox, messaging
 - [sample-walkthrough.md](sample-walkthrough.md) — Mapping S2/S3 samples to DDD
 - [testing.md](testing.md) — Testing aggregates and adapters
 - [anti-corruption-layer.md](anti-corruption-layer.md) — ACL patterns at system boundaries
@@ -21,7 +21,7 @@ Related
 - ../decisions/ARCH-0033-opentelemetry-integration.md
 
 ---
-Applied DDD should feel natural in Sora: model the domain first, keep boundaries explicit, and let infrastructure (adapters, messaging, web) serve the model.
+Applied DDD should feel natural in Koan: model the domain first, keep boundaries explicit, and let infrastructure (adapters, messaging, web) serve the model.
 
 ## Terms in plain language
 - Domain: the problem space you're solving (e.g., orders, billing).

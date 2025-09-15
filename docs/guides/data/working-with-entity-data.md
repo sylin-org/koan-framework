@@ -1,8 +1,8 @@
-# Working with Entity Data in Sora
+# Working with Entity Data in Koan
 
 This guide centers on the domain-first Entity approach: simple, readable APIs like `Item.Get(id)` and `item.Save()`. Raw `model.Upsert<T,TKey>()` and `Data<TEntity,TKey>` helpers are covered later for advanced control.
 
-Audience: Developers building with Sora’s domain model and generic EntityController.
+Audience: Developers building with Koan’s domain model and generic EntityController.
 
 ---
 
@@ -24,7 +24,7 @@ See 15-entity-filtering-and-query.md for the full filter DSL and pagination head
 
 ## Entity essentials
 
-Sora provides a domain-centric CRTP base `Sora.Domain.Entity<TEntity, TKey>` that exposes static conveniences. Typical usage with an `Item` entity:
+Koan provides a domain-centric CRTP base `Koan.Domain.Entity<TEntity, TKey>` that exposes static conveniences. Typical usage with an `Item` entity:
 
 ```csharp
 // Read
@@ -63,7 +63,7 @@ If your key is not a string or you need explicit type control, see “Raw model.
 
 ## Sets: route the same entity to multiple logical stores
 
-Sora supports logical data “sets” so you can keep multiple parallel collections of the same entity (e.g., root, backup, archive). The physical storage name is resolved per adapter; non-root sets are suffixed internally (e.g., "Todo#backup").
+Koan supports logical data “sets” so you can keep multiple parallel collections of the same entity (e.g., root, backup, archive). The physical storage name is resolved per adapter; non-root sets are suffixed internally (e.g., "Todo#backup").
 
 Ways to choose a set:
 
@@ -149,7 +149,7 @@ Full details and examples: 15-entity-filtering-and-query.md.
 
 ## Advanced: set migrations (clear, copy, move, replace)
 
-Sora provides high-level helpers to manipulate whole sets safely and predictably (batching-friendly). These operations respect adapters and push as much work down as possible.
+Koan provides high-level helpers to manipulate whole sets safely and predictably (batching-friendly). These operations respect adapters and push as much work down as possible.
 
 These live on the data facade `Data<TEntity,TKey>`:
 

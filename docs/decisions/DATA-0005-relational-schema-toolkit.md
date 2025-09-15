@@ -25,6 +25,6 @@ date: 2025-08-16
 - Additive by default; destructive migrations are an explicit future opt-in.
 
 ## Implementation notes
-- Sora.Data.Relational provides the contracts and a simple synchronizer.
+- Koan.Data.Relational provides the contracts and a simple synchronizer.
 - SQLite adapter consumes the toolkit now; others can follow with their dialects.
-- Provider-specific dialect implementations live in the provider packages (e.g., `Sora.Data.Sqlite.SqliteDialect`). The relational toolkit must remain adapter-agnostic.
+- Provider-specific dialect implementations live in the provider packages (e.g., `Koan.Data.Sqlite.SqliteDialect`). The relational toolkit must remain adapter-agnostic.

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <Description>CQRS utilities for Koan Data: query/command helpers and patterns.</Description>
+  <PackageTags>$(CommonPackageTags);data;cqrs;commands;queries</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+  <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+</Project>

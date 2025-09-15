@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2025-08-17
-- Owners: Sora Messaging
+- Owners: Koan Messaging
 
 ## Context
 
@@ -16,7 +16,7 @@ True Outbox requires atomic write with the app’s domain database. A remote “
 - Provide a Redis-backed service exposing:
   - GET /v1/inbox/{key}
   - POST /v1/inbox/mark-processed
-- Ship a thin client (already: `Sora.Messaging.Inbox.Http`).
+- Ship a thin client (already: `Koan.Messaging.Inbox.Http`).
 - Announce presence over MQ for auto-discovery.
 
 2) Do not build a remote “Outbox service.”
@@ -28,27 +28,27 @@ True Outbox requires atomic write with the app’s domain database. A remote “
 ## Naming conventions
 
 - Service names (Docker/K8s):
-  - Inbox service: `sora-service-inbox-redis`
-  - Publisher relay: `sora-service-mq-gateway`
+  - Inbox service: `Koan-service-inbox-redis`
+  - Publisher relay: `Koan-service-mq-gateway`
 - Repo/projects:
-  - Service: `Sora.Service.Inbox.Redis` (service runtime/images)
-  - Client: `Sora.Messaging.Inbox.Http` (already exists)
-  - Optional client: `Sora.Messaging.Publisher.Http`
+  - Service: `Koan.Service.Inbox.Redis` (service runtime/images)
+  - Client: `Koan.Messaging.Inbox.Http` (already exists)
+  - Optional client: `Koan.Messaging.Publisher.Http`
 - HTTP routes:
   - Base: `/v1/inbox` for inbox; `/v1` for relay publish.
 - Discovery over MQ:
-  - Ping: `sora.discovery.ping.{bus}.{group}`
-  - Announce: `sora.discovery.announce.inbox.redis`
+  - Ping: `Koan.discovery.ping.{bus}.{group}`
+  - Announce: `Koan.discovery.announce.inbox.redis`
   - Payload: `{ kind: "inbox", name: "redis", version: "v1", endpoint: { url } }`
   - Optional: `priority`, `tls`.
 
 ## Configuration
 
-- Inbox client endpoint: `Sora:Messaging:Inbox:Endpoint`
-- Discovery policy keys per ADR-0026: `Sora:Messaging:Discovery:*`, `Sora:AllowMagicInProduction`.
+- Inbox client endpoint: `Koan:Messaging:Inbox:Endpoint`
+- Discovery policy keys per ADR-0026: `Koan:Messaging:Discovery:*`, `Koan:AllowMagicInProduction`.
 - Inbox service:
-  - `Sora:Inbox:Redis:ConnectionString` (or `ConnectionStrings:InboxRedis`)
-  - `Sora:Http:Port` (default 8080), base path `/`.
+  - `Koan:Inbox:Redis:ConnectionString` (or `ConnectionStrings:InboxRedis`)
+  - `Koan:Http:Port` (default 8080), base path `/`.
 
 ## Rationale
 
@@ -57,12 +57,12 @@ True Outbox requires atomic write with the app’s domain database. A remote “
 
 ## Consequences
 
-- We proceed to build `sora-service-inbox-redis` service and finalize discovery/announce.
+- We proceed to build `Koan-service-inbox-redis` service and finalize discovery/announce.
 - We keep improving in-proc outbox libraries. If teams need a remote publish facade, they can use the gateway with clear semantics.
 
 ## Follow-ups
 
-- Add discovery client tests validating announce/ping roundtrip and auto-wiring of `HttpInboxStore`. Implemented in `tests/Sora.Mq.RabbitMq.IntegrationTests/DiscoveryE2ETests.cs`.
-- Service announce responder implemented in `Sora.Service.Inbox.Redis`: listens to `sora.discovery.ping.{bus}.{group}` and replies with `{ endpoint }`. Configure via `Sora:Messaging:Buses:rabbit:*` and optional `Sora:Messaging:DefaultGroup`.
+- Add discovery client tests validating announce/ping roundtrip and auto-wiring of `HttpInboxStore`. Implemented in `tests/Koan.Mq.RabbitMq.IntegrationTests/DiscoveryE2ETests.cs`.
+- Service announce responder implemented in `Koan.Service.Inbox.Redis`: listens to `Koan.discovery.ping.{bus}.{group}` and replies with `{ endpoint }`. Configure via `Koan:Messaging:Buses:rabbit:*` and optional `Koan:Messaging:DefaultGroup`.
 - Add docs for the Inbox service API and deployment examples (Docker Compose, K8s).
 - Evaluate adding selection strategy (priority/name) and caching policy tuning.

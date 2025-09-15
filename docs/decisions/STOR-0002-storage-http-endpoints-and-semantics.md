@@ -1,20 +1,20 @@
-﻿---
+---
 id: STOR-0002
 slug: STOR-0002-storage-http-endpoints-and-semantics
 domain: STOR
-title: Storage HTTP endpoints, headers, and semantics (Sora.Web.Storage)
+title: Storage HTTP endpoints, headers, and semantics (Koan.Web.Storage)
 status: Accepted
 date: 2025-08-24
 ---
 
 Context
 
-- Expose RESTful storage endpoints via controllers (no inline endpoints), keeping HTTP concerns out of Sora.Storage core.
+- Expose RESTful storage endpoints via controllers (no inline endpoints), keeping HTTP concerns out of Koan.Storage core.
 - Support metadata, content streaming, downloads, tagging, and transfers with correct HTTP caching and range semantics.
 
 Decision
 
-- Create Sora.Web.Storage with attribute-routed controllers and transformers per WEB-0035 for payload shaping.
+- Create Koan.Web.Storage with attribute-routed controllers and transformers per WEB-0035 for payload shaping.
 - Primary controller: StorageController<T> where T : IEntity, IStorageObject.
 - Routes (indicative):
   - POST /storage — create + upload (multipart or streamed body). Return 201 (sync) or 202 (async) with Id.
@@ -42,7 +42,7 @@ Implementation notes
 - End-to-end streaming; avoid buffering entire files in memory.
 - Conditional GET and range handling must rely on provider capability flags and OpenRange fallbacks.
 - Transformers (WEB-0035) may project metadata; content endpoints are binary-only.
-- Constants for header names and route segments live under Sora.Web.Storage.Infrastructure.Constants.
+- Constants for header names and route segments live under Koan.Web.Storage.Infrastructure.Constants.
 
 Consequences
 
@@ -51,8 +51,8 @@ Consequences
 
 Follow-ups
 
-- Wire Swagger annotations in Sora.Web.Swagger when Sora.Web.Storage is present.
-- Provide small examples in src/Sora.Web.Storage/README.md.
+- Wire Swagger annotations in Koan.Web.Swagger when Koan.Web.Storage is present.
+- Provide small examples in src/Koan.Web.Storage/README.md.
 
 References
 

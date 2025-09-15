@@ -6,7 +6,7 @@ This page shows minimal, copy-pasteable usage for the Health Aggregator.
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Health": {
       "Aggregator": {
         "Enabled": true,
@@ -33,7 +33,7 @@ This page shows minimal, copy-pasteable usage for the Health Aggregator.
 var builder = WebApplication.CreateBuilder(args);
 
 // Bind options
-builder.Services.Configure<HealthAggregatorOptions>(builder.Configuration.GetSection("Sora:Health:Aggregator"));
+builder.Services.Configure<HealthAggregatorOptions>(builder.Configuration.GetSection("Koan:Health:Aggregator"));
 
 // Add the aggregator service
 builder.Services.AddSingleton<IHealthAggregator, HealthAggregator>();

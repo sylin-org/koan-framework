@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
-using Sora.Data.Abstractions.Annotations;
-using Sora.Data.Core;
-using Sora.Data.Core.Extensions;
-using Sora.Web.Attributes;
-using Sora.Web.Controllers;
+using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Core;
+using Koan.Data.Core.Extensions;
+using Koan.Web.Attributes;
+using Koan.Web.Controllers;
 
 namespace S1.Web;
 
 [Route("api/todo")]
-[SoraDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
+[KoanDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
 public sealed class TodoController : EntityController<Todo>
 {
     [HttpPost("seed-with-relationships")]

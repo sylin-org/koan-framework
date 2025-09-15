@@ -9,7 +9,7 @@
 
 ## Overview
 
-The Sora AI pillar provides chat, embeddings, vector search, and RAG building blocks with local-first architecture and production-ready patterns.
+The Koan AI pillar provides chat, embeddings, vector search, and RAG building blocks with local-first architecture and production-ready patterns.
 
 ## Core Features
 
@@ -35,14 +35,14 @@ The Sora AI pillar provides chat, embeddings, vector search, and RAG building bl
 
 ### 1. Installation
 ```bash
-dotnet add package Sora.AI
-dotnet add package Sora.Data.Weaviate  # For vector search
+dotnet add package Koan.AI
+dotnet add package Koan.Data.Weaviate  # For vector search
 ```
 
 ### 2. Configuration
 ```json
 {
-  "Sora": {
+  "Koan": {
     "AI": {
       "DefaultProvider": "Ollama",
       "Ollama": {
@@ -201,7 +201,7 @@ public interface IVectorService
 
 ### AI Options
 ```csharp
-public class SoraAIOptions
+public class KoanAIOptions
 {
     public string DefaultProvider { get; set; } = "Ollama";
     public OllamaOptions Ollama { get; set; } = new();

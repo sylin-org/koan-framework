@@ -1,17 +1,17 @@
 # Bounded Contexts and Modules
 
-Treat each bounded context as a cohesive Sora module with clear interfaces.
+Treat each bounded context as a cohesive Koan module with clear interfaces.
 
 Principles
 - Independent model + language per context. Avoid bleeding types across boundaries.
-- Explicit contracts at seams: HTTP APIs (Sora.Web), messages (Sora.Messaging), or ACLs.
+- Explicit contracts at seams: HTTP APIs (Koan.Web), messages (Koan.Messaging), or ACLs.
 - Autonomy: each context chooses its storage adapter (Mongo/Relational/Json/etc.).
 
-Composition with Sora
+Composition with Koan
 - Projects/namespaces: one module per bounded context (e.g., `Shipping`, `Billing`).
 - Data adapters: pick the right adapter per context; configure via `ConnectionStrings` and adapter-specific options.
-- Messaging: connect via `Sora.Messaging.*` or the `Sora.Mq.RabbitMq` transport for integration events.
-- Web/API: expose use-cases via Sora.Web controllers or thin application services.
+- Messaging: connect via `Koan.Messaging.*` or the `Koan.Mq.RabbitMq` transport for integration events.
+- Web/API: expose use-cases via Koan.Web controllers or thin application services.
 
 Context maps (integration patterns)
 - Customer ↔ Billing: publish Integration Events from `Customer` outbox; `Billing` consumes via inbox.

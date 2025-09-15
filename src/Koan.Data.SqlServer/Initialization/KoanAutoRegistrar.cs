@@ -1,0 +1,55 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Koan.Core;
+using Koan.Core.Modules;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
+
+namespace Koan.Data.SqlServer.Initialization;
+
+public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
+{
+    public string ModuleName => "Koan.Data.SqlServer";
+    public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
+
+    public void Initialize(IServiceCollection services)
+    {
+        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.SqlServer.Initialization.KoanAutoRegistrar");
+    logger?.Log(LogLevel.Debug, "Koan.Data.SqlServer KoanAutoRegistrar loaded.");
+        services.AddKoanOptions<SqlServerOptions>();
+        services.AddSingleton<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>();
+        services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
+        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqlServerNamingDefaultsProvider), ServiceLifetime.Singleton));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
+        services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
+    }
+
+    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    {
+        report.AddModule(ModuleName, ModuleVersion);
+        var o = new SqlServerOptions
+        {
+            ConnectionString = Configuration.ReadFirst(cfg, "Server=localhost;Database=Koan;User Id=sa;Password=Your_password123;TrustServerCertificate=True",
+                Infrastructure.Constants.Configuration.Keys.ConnectionString,
+                Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+                Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlServer,
+                Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
+            DefaultPageSize = Configuration.ReadFirst(cfg, 50,
+                Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+                Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize),
+            MaxPageSize = Configuration.ReadFirst(cfg, 200,
+                Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+                Infrastructure.Constants.Configuration.Keys.AltMaxPageSize)
+        };
+        report.AddSetting("ConnectionString", o.ConnectionString, isSecret: true);
+        report.AddSetting("NamingStyle", o.NamingStyle.ToString());
+        report.AddSetting("Separator", o.Separator);
+        report.AddSetting("EnsureCreatedSupported", true.ToString());
+        report.AddSetting("DefaultPageSize", o.DefaultPageSize.ToString());
+        report.AddSetting("MaxPageSize", o.MaxPageSize.ToString());
+    }
+}

@@ -9,7 +9,7 @@ Start here for hosting, composition, options, and guardrails.
 
 ## Configuration & Options
 - **[Configuration Patterns](../../reference/configuration-patterns.md)** - Settings and constants management
-- **[Module System](../../reference/modules.md)** - Understanding Sora's module architecture
+- **[Module System](../../reference/modules.md)** - Understanding Koan's module architecture
 
 ## Getting Started
 - **[Framework Overview](../../reference/framework-overview.md)** - Complete architectural overview

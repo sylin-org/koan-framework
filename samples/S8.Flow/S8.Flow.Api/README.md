@@ -9,7 +9,7 @@ Materialized snapshots are persisted as root dynamic entities:
 You can filter by set via `?set=` if needed; default set is the model-qualified base.
 
 
-IoT monitoring sample using Sora Flow with multi-key aggregation (inventory + serial), namespaced tags, and a live monitor UI (SSE-ready). Two thin adapters run as separate processes/containers and publish over MQ; this API acts as the orchestrator/consumer that persists intake records.
+IoT monitoring sample using Koan Flow with multi-key aggregation (inventory + serial), namespaced tags, and a live monitor UI (SSE-ready). Two thin adapters run as separate processes/containers and publish over MQ; this API acts as the orchestrator/consumer that persists intake records.
 
 - Keys: device.identifier.inventory, device.identifier.serial
 - Adapters: BMS and OEM publishers (separate processes) → MQ → orchestrator (this project)

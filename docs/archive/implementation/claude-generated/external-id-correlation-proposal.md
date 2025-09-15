@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This proposal outlines the implementation of a framework-level external ID correlation system for Sora Flow entities to enable automatic cross-system entity tracking and correlation. The system will automatically populate `identifier.external.{source}:{id}` structures in canonical projections and create indexed key relationships for efficient parent-child resolution across different source systems.
+This proposal outlines the implementation of a framework-level external ID correlation system for Koan Flow entities to enable automatic cross-system entity tracking and correlation. The system will automatically populate `identifier.external.{source}:{id}` structures in canonical projections and create indexed key relationships for efficient parent-child resolution across different source systems.
 
 ## Problem Statement
 
@@ -151,13 +151,13 @@ Enable efficient parent lookups across systems with canonical ULID resolution:
 
 **✅ FULLY IMPLEMENTED Components**:
 
-1. **IdentityLink<T> Model**: Complete external ID → ReferenceUlid mapping system (`src/Sora.Flow.Core/Model/Identity.cs:7`)
-2. **Canonical Projection Pipeline**: Enhanced with external ID auto-population (`src/Sora.Flow.Core/ServiceCollectionExtensions.cs:217-250`)
-3. **FlowRegistry**: GetExternalIdKeys method with policy-driven detection (`src/Sora.Flow.Core/Infrastructure/FlowRegistry.cs:106-119`)
-4. **Data/Source Separation**: Clean separation in StageRecord<T> with Data and Source properties (`src/Sora.Flow.Core/Model/Typed.cs:57-59`)
-5. **External ID Resolution**: Working IdentityLink resolution in intake pipeline (`src/Sora.Flow.Core/ServiceCollectionExtensions.cs:636-709`)
-6. **Reserved Key Infrastructure**: Constants for `identifier.external.*` prefix (`src/Sora.Flow.Core/Infrastructure/Constants.cs:66`)
-7. **Policy Framework**: FlowPolicyAttribute with ExternalIdPolicy enum (`src/Sora.Flow.Core/Attributes/FlowPolicyAttribute.cs`)
+1. **IdentityLink<T> Model**: Complete external ID → ReferenceUlid mapping system (`src/Koan.Flow.Core/Model/Identity.cs:7`)
+2. **Canonical Projection Pipeline**: Enhanced with external ID auto-population (`src/Koan.Flow.Core/ServiceCollectionExtensions.cs:217-250`)
+3. **FlowRegistry**: GetExternalIdKeys method with policy-driven detection (`src/Koan.Flow.Core/Infrastructure/FlowRegistry.cs:106-119`)
+4. **Data/Source Separation**: Clean separation in StageRecord<T> with Data and Source properties (`src/Koan.Flow.Core/Model/Typed.cs:57-59`)
+5. **External ID Resolution**: Working IdentityLink resolution in intake pipeline (`src/Koan.Flow.Core/ServiceCollectionExtensions.cs:636-709`)
+6. **Reserved Key Infrastructure**: Constants for `identifier.external.*` prefix (`src/Koan.Flow.Core/Infrastructure/Constants.cs:66`)
+7. **Policy Framework**: FlowPolicyAttribute with ExternalIdPolicy enum (`src/Koan.Flow.Core/Attributes/FlowPolicyAttribute.cs`)
 8. **Source Entity ID Extraction**: GetSourceEntityId() extracts [Key] property values (`ServiceCollectionExtensions.cs:926-972`)
 9. **ParentKey Resolution**: TryResolveParentViaExternalId() for cross-system parent lookup (`ServiceCollectionExtensions.cs:806-831`)
 10. **Source ID Stripping**: Canonical models exclude source 'id' fields (`ServiceCollectionExtensions.cs:256-259`)
@@ -176,7 +176,7 @@ The external ID correlation infrastructure is **FULLY FUNCTIONAL**. The system n
 
 #### Phase 1: Core External ID Processing ✅ (COMPLETED)
 
-**File**: `src/Sora.Flow.Core/ServiceCollectionExtensions.cs`
+**File**: `src/Koan.Flow.Core/ServiceCollectionExtensions.cs`
 **Location**: Lines 208-231 (canonical projection loop)
 **Current State**: Processing only Data payload, no Source metadata integration
 **Required Changes**:
@@ -224,7 +224,7 @@ foreach (var r in all)
 
 #### Phase 2: Policy Framework
 
-**New File**: `src/Sora.Flow.Core/Attributes/FlowPolicyAttribute.cs`
+**New File**: `src/Koan.Flow.Core/Attributes/FlowPolicyAttribute.cs`
 
 ```csharp
 [AttributeUsage(AttributeTargets.Class)]
@@ -245,7 +245,7 @@ public enum ExternalIdPolicy
 
 #### Phase 3: Enhanced FlowRegistry
 
-**File**: `src/Sora.Flow.Core/Infrastructure/FlowRegistry.cs`
+**File**: `src/Koan.Flow.Core/Infrastructure/FlowRegistry.cs`
 **Method**: `GetExternalIdKeys` (lines 104-108)
 **Current State**: Returns empty array with comment "vNext: rely on reserved identifier.external.\* keys"
 **Required Changes**:
@@ -283,7 +283,7 @@ private static string GetDefaultAggregationKey(Type modelType)
 
 #### Phase 4: Auto-Index Management
 
-**File**: `src/Sora.Flow.Core/ServiceCollectionExtensions.cs`
+**File**: `src/Koan.Flow.Core/ServiceCollectionExtensions.cs`
 **Addition**: Automatic IdentityLink creation with proper indexing
 
 ```csharp
@@ -390,7 +390,7 @@ await CreateOrUpdateIdentityLinks(modelType, refUlid, externalIds, stoppingToken
 
 ## Conclusion
 
-The External ID Correlation Framework provides a comprehensive solution for cross-system entity tracking and correlation within Sora Flow. The infrastructure is **already in place** - only the final integration between Source metadata and external ID generation is missing.
+The External ID Correlation Framework provides a comprehensive solution for cross-system entity tracking and correlation within Koan Flow. The infrastructure is **already in place** - only the final integration between Source metadata and external ID generation is missing.
 
 By leveraging existing infrastructure (IdentityLink, canonical projections, reserved key processing) and adding minimal automatic external ID processing, the framework will enable seamless correlation of entities across multiple source systems while maintaining excellent developer experience and performance characteristics.
 

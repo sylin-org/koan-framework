@@ -1,17 +1,17 @@
-# Sora.Flow Performance Optimization Usage Examples
+# Koan.Flow Performance Optimization Usage Examples
 
 This document provides examples of how to use the newly implemented Flow performance optimizations.
 
 ## Quick Start - Drop-in Replacement
 
-Replace your existing `AddSoraFlow()` call with the optimized version:
+Replace your existing `AddKoanFlow()` call with the optimized version:
 
 ```csharp
 // Before (Original)
-services.AddSoraFlow();
+services.AddKoanFlow();
 
 // After (Optimized - 5-20x performance improvement)
-services.AddSoraFlowOptimized();
+services.AddKoanFlowOptimized();
 ```
 
 This provides immediate performance benefits with:
@@ -25,7 +25,7 @@ This provides immediate performance benefits with:
 For production environments, use the configurable approach:
 
 ```csharp
-services.AddSoraFlowWithOptimizations(options =>
+services.AddKoanFlowWithOptimizations(options =>
 {
     // Enable/disable specific optimizations
     options.Features.EnableBatchOperations = true;
@@ -131,7 +131,7 @@ public class MyBackgroundService : BackgroundService
 ### Step 1: Enable Performance Monitoring Only
 
 ```csharp
-services.AddSoraFlowWithOptimizations(options =>
+services.AddKoanFlowWithOptimizations(options =>
 {
     // Only enable monitoring first
     options.Features.EnablePerformanceMonitoring = true;
@@ -145,7 +145,7 @@ services.AddSoraFlowWithOptimizations(options =>
 ### Step 2: Enable Batch Operations
 
 ```csharp
-services.AddSoraFlowWithOptimizations(options =>
+services.AddKoanFlowWithOptimizations(options =>
 {
     options.Features.EnablePerformanceMonitoring = true;
     options.Features.EnableBatchOperations = true; // Enable batch ops
@@ -159,7 +159,7 @@ services.AddSoraFlowWithOptimizations(options =>
 ### Step 3: Enable Optimized Workers
 
 ```csharp
-services.AddSoraFlowWithOptimizations(options =>
+services.AddKoanFlowWithOptimizations(options =>
 {
     options.Features.EnablePerformanceMonitoring = true;
     options.Features.EnableBatchOperations = true;
@@ -175,7 +175,7 @@ services.AddSoraFlowWithOptimizations(options =>
 
 ```csharp
 // Final configuration with all optimizations
-services.AddSoraFlowOptimized();
+services.AddKoanFlowOptimized();
 ```
 
 ## Performance Expectations
@@ -223,7 +223,7 @@ public async Task ProcessCustomOperation()
 ### High Memory Usage
 
 ```csharp
-services.AddSoraFlowWithOptimizations(options =>
+services.AddKoanFlowWithOptimizations(options =>
 {
     // Reduce batch sizes if memory usage is high
     options.Performance.DefaultBatchSize = 500;  // Reduce from 1000
@@ -234,7 +234,7 @@ services.AddSoraFlowWithOptimizations(options =>
 ### Performance Degradation
 
 ```csharp
-services.AddSoraFlowWithOptimizations(options =>
+services.AddKoanFlowWithOptimizations(options =>
 {
     // Reduce concurrency if CPU usage is too high
     options.Performance.MaxConcurrency = Environment.ProcessorCount; // Reduce from 2x
@@ -248,7 +248,7 @@ services.AddSoraFlowWithOptimizations(options =>
 
 ```csharp
 // Simply revert to original registration
-services.AddSoraFlow(); // Removes all optimizations
+services.AddKoanFlow(); // Removes all optimizations
 ```
 
 ## Next Steps
@@ -258,4 +258,4 @@ services.AddSoraFlow(); // Removes all optimizations
 3. **Plan Phase 2 implementation** (advanced caching, provider optimizations)
 4. **Consider Phase 3 features** (custom providers, additional monitoring)
 
-See the [complete refactoring plan](../planning/sora-flow-refactoring-plan.md) for the full roadmap.
+See the [complete refactoring plan](../planning/Koan-flow-refactoring-plan.md) for the full roadmap.

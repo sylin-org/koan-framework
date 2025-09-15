@@ -1,4 +1,4 @@
-# Testing DDD Models with Sora
+# Testing DDD Models with Koan
 
 Layers
 - Unit: aggregates and value objects — pure tests of invariants and behaviors.
@@ -7,7 +7,7 @@ Layers
 
 Guidance
 - Favor fast unit tests for domain rules.
-- Use adapter-specific test fixtures (see `tests/Sora.Data.Mongo.Tests`, `Sora.Data.Relational.Tests`).
+- Use adapter-specific test fixtures (see `tests/Koan.Data.Mongo.Tests`, `Koan.Data.Relational.Tests`).
 - For messaging, test outbox persistence and inbox idempotency; use RabbitMQ containers where useful.
 - CI: smoke the compose stack (see `.github/workflows/s2-compose-smoke.yml`).
 

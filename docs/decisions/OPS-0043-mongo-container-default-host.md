@@ -18,7 +18,7 @@ When the process is containerized and no explicit Mongo connection string is pro
 Detection: the environment variable `DOTNET_RUNNING_IN_CONTAINER=true` (or the same key via configuration) indicates a containerized execution context.
 
 Resolution precedence:
-1) `Sora:Data:Mongo` or `Sora:Data:Sources:Default:mongo` (options binding)
+1) `Koan:Data:Mongo` or `Koan:Data:Sources:Default:mongo` (options binding)
 2) `ConnectionStrings:Default`
 3) If still unset:
    - Containerized: `mongodb://mongodb:27017`
@@ -27,7 +27,7 @@ Resolution precedence:
 The final value is normalized to ensure a `mongodb://` scheme is present when needed.
 
 ## Consequences
-– Container-first DX: Sora samples work out-of-the-box with a standard `mongodb` service name in Compose.
+– Container-first DX: Koan samples work out-of-the-box with a standard `mongodb` service name in Compose.
 – Local-first DX preserved: non-container runs still default to `localhost`.
 – Behavior is transparent and shown in the bootstrap report (connection string redacted).
 

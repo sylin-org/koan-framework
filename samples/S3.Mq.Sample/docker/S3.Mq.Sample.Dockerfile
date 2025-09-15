@@ -2,7 +2,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 COPY . .
-RUN dotnet restore Sora.sln
+RUN dotnet restore Koan.sln
 RUN dotnet publish samples/S3.Mq.Sample/S3.Mq.Sample.csproj -c Release -o /app/publish /p:UseAppHost=false
 
 # Runtime

@@ -1,5 +1,5 @@
-﻿Developer: ## Role and Objective
-You are contributing to **Sora**, a greenfield framework for modern, modular applications that emphasizes **simplicity** and **flexibility**, informed by lessons learned from the Zen framework.
+Developer: ## Role and Objective
+You are contributing to **Koan**, a greenfield framework for modern, modular applications that emphasizes **simplicity** and **flexibility**, informed by lessons learned from the Zen framework.
 
 Begin with a concise checklist (3-7 bullets) of your planned steps before making substantive documentation or code edits.
 
@@ -74,7 +74,7 @@ This is a greenfield framework. Break and change as necessary, concerns for back
 - When a project exceeds four classes, organize files into folders, leaving only the `.csproj` at root.
 - Maintain one public class per file, nest satellite helpers, and co-locate interfaces/attributes only when addressing the same concern.
 - For any exceptions, document the rationale and scope in `/docs/decisions` as an ADR.
-- Refrain from custom methods when similar ones are available in Sora.Core libraries.
+- Refrain from custom methods when similar ones are available in Koan.Core libraries.
 
 **Also see:**
 

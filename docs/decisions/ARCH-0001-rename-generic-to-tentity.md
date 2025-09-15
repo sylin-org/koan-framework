@@ -12,7 +12,7 @@ Context
 - Public APIs used `TAggregate` historically, but the domain-facing base is `Entity<T>`, and the codebase moved to a domain-centric vocabulary.
 
 Decision
-- Rename all public generic parameters `TAggregate` → `TEntity` across Sora abstractions and implementations.
+- Rename all public generic parameters `TAggregate` → `TEntity` across Koan abstractions and implementations.
 // Updated later by ADR 0009 to unify on `IEntity<TKey>`; aggregate root remains a doc concept.
 
 Consequences
@@ -21,4 +21,4 @@ Consequences
 - Docs updated accordingly.
 
 References
-- PR: Rename sweep across Sora; samples and tests updated.
+- PR: Rename sweep across Koan; samples and tests updated.

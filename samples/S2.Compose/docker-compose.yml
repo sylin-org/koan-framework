@@ -14,13 +14,13 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:5054
       ConnectionStrings__Default: mongodb://mongo:27017
-      Sora__Data__Mongo__Database: s2
+      Koan__Data__Mongo__Database: s2
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_ENVIRONMENT: Development
-  # Sora.Web: running behind a reverse proxy; let proxy own security headers
-      Sora__Web__IsProxiedApi: "true"
-  # Enable Swagger UI in non-development per Sora.Web.Swagger policy
-      Sora__Web__Swagger__Enabled: "true"
+  # Koan.Web: running behind a reverse proxy; let proxy own security headers
+      Koan__Web__IsProxiedApi: "true"
+  # Enable Swagger UI in non-development per Koan.Web.Swagger policy
+      Koan__Web__Swagger__Enabled: "true"
   # Optional OpenTelemetry endpoint (enable by uncommenting the collector service below)
   # OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
     depends_on:

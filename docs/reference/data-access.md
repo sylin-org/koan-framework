@@ -1,6 +1,6 @@
 # Data Access Reference
 
-Canonical APIs and semantics for Sora data access. Newer ADRs supersede older ones (see references).
+Canonical APIs and semantics for Koan data access. Newer ADRs supersede older ones (see references).
 
 ## Contract
 - First-class static model methods only for top-level access:
@@ -114,7 +114,7 @@ Notes
 ## Edge cases
 - Empty/null filter: treat as All; ensure auth/tenant scopes still apply.
 - Large result sets: prefer QueryStream/AllStream or Pager to avoid OOM/timeouts.
-- In-memory fallback: when pushdown isn’t possible, emit `Sora-InMemory-Paging: true` and consider tighter page caps.
+- In-memory fallback: when pushdown isn’t possible, emit `Koan-InMemory-Paging: true` and consider tighter page caps.
 - Concurrency during paging: stable Id-ascending order avoids skips/dupes when new items are inserted.
 - Authorization: filters must be applied after auth scoping; do not leak cross-tenant data.
 

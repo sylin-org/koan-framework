@@ -7,9 +7,9 @@
 
 ---
 
-## 🎨 Sora Framework Usage Patterns
+## 🎨 Koan Framework Usage Patterns
 
-This document covers common usage patterns, best practices, and architectural approaches when building with Sora Framework.
+This document covers common usage patterns, best practices, and architectural approaches when building with Koan Framework.
 
 ---
 
@@ -92,17 +92,17 @@ Start simple, add complexity incrementally:
 // Phase 1: Basic Web API
 // Program.cs
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSora(); // Includes Core, Web, SQLite
+builder.Services.AddKoan(); // Includes Core, Web, SQLite
 var app = builder.Build();
 await app.RunAsync();
 
 // Phase 2: Add messaging
-// dotnet add package Sora.Messaging.RabbitMq
+// dotnet add package Koan.Messaging.RabbitMq
 // No code changes needed - auto-discovered
 
 // Phase 3: Add AI
-// dotnet add package Sora.AI
-// dotnet add package Sora.AI.Provider.Ollama
+// dotnet add package Koan.AI
+// dotnet add package Koan.AI.Provider.Ollama
 
 [Route("api/[controller]")]
 [ApiController]  
@@ -129,8 +129,8 @@ public class AiController : ControllerBase
 }
 
 // Phase 4: Add vector search
-// dotnet add package Sora.Data.Vector
-// dotnet add package Sora.Data.Redis
+// dotnet add package Koan.Data.Vector
+// dotnet add package Koan.Data.Redis
 
 public class Document : Entity<Document>
 {
@@ -151,7 +151,7 @@ Use configuration to control framework behavior without code changes:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Data": {
       "DefaultProvider": "Postgres",
       "Sqlite": {
@@ -641,7 +641,7 @@ public class EcommerceProduct : FlowEntity<EcommerceProduct>
 }
 
 // Interceptors for data transformation
-public class ProductInterceptor : ISoraAutoRegistrar
+public class ProductInterceptor : IKoanAutoRegistrar
 {
     public void Initialize(IServiceCollection services)
     {
@@ -774,10 +774,10 @@ public class SupportCustomerAdapter : BackgroundService
 
 ### 1. **Container-Based Development**
 
-Use Sora CLI for local development:
+Use Koan CLI for local development:
 
 ```yaml
-# sora.orchestration.yml
+# Koan.orchestration.yml
 dependencies:
   postgres:
     provider: docker
@@ -828,9 +828,9 @@ volumes:
 
 ```bash
 # Development workflow
-Sora export compose --profile Local
-Sora up --profile Local --timeout 300
-Sora status  # Check all services are healthy
+Koan export compose --profile Local
+Koan up --profile Local --timeout 300
+Koan status  # Check all services are healthy
 dotnet run   # Start your application
 ```
 
@@ -841,7 +841,7 @@ Environment-specific settings:
 ```json
 // appsettings.Production.json
 {
-  "Sora": {
+  "Koan": {
     "Data": {
       "DefaultProvider": "Postgres",
       "Postgres": {
@@ -934,7 +934,7 @@ Built-in auth providers:
 
 ```csharp
 // Program.cs - Authentication setup
-builder.Services.AddSoraWeb(options =>
+builder.Services.AddKoanWeb(options =>
 {
     options.EnableAuthentication = true;
     options.AuthProviders = new[]
@@ -947,7 +947,7 @@ builder.Services.AddSoraWeb(options =>
 
 // appsettings.json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "Auth": {
         "Google": {
@@ -1012,7 +1012,7 @@ Built-in OpenTelemetry support:
 
 ```csharp
 // Program.cs
-builder.Services.AddSoraObservability(options =>
+builder.Services.AddKoanObservability(options =>
 {
     options.ServiceName = "MyApp";
     options.ServiceVersion = "1.0.0";
@@ -1212,4 +1212,4 @@ public class ProductCacheService
 
 ---
 
-This comprehensive guide covers the most important usage patterns in Sora Framework. For specific pillar deep-dives, see the pillar-specific REF documents.
+This comprehensive guide covers the most important usage patterns in Koan Framework. For specific pillar deep-dives, see the pillar-specific REF documents.

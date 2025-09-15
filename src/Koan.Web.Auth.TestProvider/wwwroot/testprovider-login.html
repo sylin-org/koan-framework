@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Koan TestProvider — Sign in</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script>tailwind.config = { theme: { extend: { colors: { slate: { 950: '#020617' } } } } };</script>
+  <style>
+    .card { background: linear-gradient(180deg, rgba(15,23,42,1) 0%, rgba(2,6,23,1) 100%); }
+    .kv-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; }
+  </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col">
+  <header class="bg-slate-900 border-b border-slate-800">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center space-x-3" title="Home">
+          <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+            <i class="fas fa-satellite-dish text-white text-sm"></i>
+          </div>
+          <h1 class="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Koan — Sign in</h1>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center px-4 py-10">
+    <div class="w-full max-w-2xl card rounded-2xl border border-slate-800 shadow-2xl p-6">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+          <i class="fa-regular fa-user text-white"></i>
+        </div>
+        <div>
+          <div class="text-xl font-semibold">Sign in</div>
+          <div class="text-sm text-gray-400">Development Test Provider</div>
+        </div>
+      </div>
+
+      <form id="f" class="space-y-4">
+        <input type="hidden" id="client_id" />
+        <input type="hidden" id="redirect_uri" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="u" class="block text-sm text-gray-300 mb-1">Name</label>
+            <input id="u" class="w-full bg-slate-900 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Jane Doe" />
+          </div>
+          <div>
+            <label for="e" class="block text-sm text-gray-300 mb-1">Email</label>
+            <input id="e" type="email" class="w-full bg-slate-900 text-white rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="jane@example.com" />
+          </div>
+        </div>
+
+        <details class="rounded-lg border border-slate-800 bg-slate-900/50 p-3">
+          <summary class="cursor-pointer select-none">Advanced (roles, permissions, claims)</summary>
+          <div class="mt-3 space-y-3">
+            <div>
+              <label for="roles" class="block text-sm text-gray-300 mb-1">Roles (comma separated)</label>
+              <input id="roles" class="w-full bg-slate-900 text-white rounded-lg px-3 py-2 border border-slate-700" placeholder="reader,author,admin" />
+            </div>
+            <div>
+              <label for="perms" class="block text-sm text-gray-300 mb-1">Permissions (comma separated)</label>
+              <input id="perms" class="w-full bg-slate-900 text-white rounded-lg px-3 py-2 border border-slate-700" placeholder="content:write,posts:delete" />
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <label class="text-sm text-gray-300">Claims</label>
+                <button type="button" id="addClaim" class="text-xs px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded">Add row</button>
+              </div>
+              <div id="claimsGrid" class="kv-grid mt-2"></div>
+            </div>
+          </div>
+        </details>
+
+        <div class="flex gap-2">
+          <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium">Continue</button>
+          <button type="button" id="clear" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg">Clear</button>
+          <button type="button" id="export" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg">Export persona</button>
+          <label class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg cursor-pointer">
+            Import persona<input id="import" type="file" accept="application/json" class="hidden" />
+          </label>
+        </div>
+        <p class="text-xs text-gray-500">Local-only auth for development. Do not enable in production.</p>
+      </form>
+    </div>
+  </main>
+
+  <footer class="border-t border-slate-800 py-6 text-center text-sm text-gray-500">
+    Powered by Koan · TestProvider
+  </footer>
+
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const u = document.getElementById('u');
+    const e = document.getElementById('e');
+    const roles = document.getElementById('roles');
+    const perms = document.getElementById('perms');
+    const claimsGrid = document.getElementById('claimsGrid');
+    const addRowBtn = document.getElementById('addClaim');
+    const persist = true; // always persist for now; can be toggled via options later
+
+    function loadDefaults() {
+      u.value = localStorage.getItem('tp_u')||'';
+      e.value = localStorage.getItem('tp_e')||'';
+      roles.value = localStorage.getItem('tp_roles')||'reader';
+      perms.value = localStorage.getItem('tp_perms')||'';
+      const raw = localStorage.getItem('tp_claims');
+      const arr = raw ? JSON.parse(raw) : [];
+      claimsGrid.innerHTML = '';
+      for (const kv of arr) addRow(kv.key, kv.value);
+      if (arr.length === 0) addRow('', '');
+      document.getElementById('client_id').value = qs.get('client_id')||'';
+      document.getElementById('redirect_uri').value = qs.get('redirect_uri')||'';
+    }
+
+    function addRow(k='', v='') {
+      const wrap = document.createElement('div');
+      wrap.className = 'contents';
+      const key = document.createElement('input');
+      key.className = 'bg-slate-900 text-white rounded-lg px-3 py-2 border border-slate-700';
+      key.placeholder = 'claim type (e.g., department or Koan.capability)';
+      key.value = k;
+      const val = document.createElement('input');
+      val.className = 'bg-slate-900 text-white rounded-lg px-3 py-2 border border-slate-700';
+      val.placeholder = 'value';
+      val.value = v;
+      const rm = document.createElement('button');
+      rm.type = 'button'; rm.className = 'px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded'; rm.textContent = 'Remove';
+      rm.onclick = () => wrap.remove();
+      wrap.appendChild(key); wrap.appendChild(val); wrap.appendChild(rm);
+      claimsGrid.appendChild(wrap);
+    }
+
+    addRowBtn.onclick = () => addRow('', '');
+
+    document.getElementById('clear').onclick = () => {
+      localStorage.removeItem('tp_u');
+      localStorage.removeItem('tp_e');
+      localStorage.removeItem('tp_roles');
+      localStorage.removeItem('tp_perms');
+      localStorage.removeItem('tp_claims');
+      loadDefaults();
+    };
+
+    document.getElementById('export').onclick = () => {
+      const data = personaFromUi();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'testprovider-persona.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    document.getElementById('import').onchange = async (ev) => {
+      const file = ev.target.files[0]; if (!file) return;
+      const txt = await file.text();
+      const data = JSON.parse(txt);
+      u.value = data.name||'';
+      e.value = data.email||'';
+      roles.value = (data.roles||[]).join(',');
+      perms.value = (data.permissions||[]).join(',');
+      claimsGrid.innerHTML = '';
+      if (data.claims && Array.isArray(data.claims)) {
+        for (const kv of data.claims) addRow(kv.key, kv.value);
+      } else if (data.claims && typeof data.claims === 'object') {
+        for (const [k, v] of Object.entries(data.claims)) {
+          if (Array.isArray(v)) for (const vi of v) addRow(k, vi); else addRow(k, v);
+        }
+      }
+    };
+
+    function personaFromUi() {
+      const kvs = [];
+      for (const wrap of claimsGrid.children) {
+        const key = wrap.children[0].value.trim();
+        const val = wrap.children[1].value.trim();
+        if (!key || !val) continue;
+        kvs.push({ key, value: val });
+      }
+      return {
+        name: u.value.trim(),
+        email: e.value.trim(),
+        roles: roles.value.split(',').map(s => s.trim()).filter(Boolean),
+        permissions: perms.value.split(',').map(s => s.trim()).filter(Boolean),
+        claims: kvs
+      };
+    }
+
+    document.getElementById('f').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const data = personaFromUi();
+      if (persist) {
+        localStorage.setItem('tp_u', data.name||'');
+        localStorage.setItem('tp_e', data.email||'');
+        localStorage.setItem('tp_roles', (data.roles||[]).join(','));
+        localStorage.setItem('tp_perms', (data.permissions||[]).join(','));
+        localStorage.setItem('tp_claims', JSON.stringify(data.claims||[]));
+      }
+      document.cookie = `_tp_user=${encodeURIComponent(data.name||'')}|${encodeURIComponent(data.email||'')}; path=/`;
+  const base = '/.testoauth/authorize';
+      const p = new URLSearchParams(location.search);
+  const params = new URLSearchParams();
+      params.set('response_type', 'code');
+      params.set('client_id', p.get('client_id')||'');
+      params.set('redirect_uri', p.get('redirect_uri')||'');
+  const st = p.get('state'); if (st) params.set('state', st);
+  const sc = p.get('scope'); if (sc) params.set('scope', sc);
+  const cc = p.get('code_challenge'); if (cc) params.set('code_challenge', cc);
+  const ccm = p.get('code_challenge_method'); if (ccm) params.set('code_challenge_method', ccm);
+      if (data.roles && data.roles.length) params.set('roles', data.roles.join(','));
+      if (data.permissions && data.permissions.length) params.set('perms', data.permissions.join(','));
+      for (const kv of data.claims||[]) params.append(`claim.${kv.key}`, kv.value);
+      location.href = `${base}?${params.toString()}`;
+    });
+
+    loadDefaults();
+  </script>
+  <noscript>Enable JavaScript.</noscript>
+</body>
+</html>

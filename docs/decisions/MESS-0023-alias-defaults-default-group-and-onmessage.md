@@ -20,7 +20,7 @@ Decision
   - When [Message] is absent or has no Alias, the alias is the full type name (Namespace.TypeName). This is implemented in DefaultTypeAliasRegistry.
   - [Message(Alias = "...")] overrides the alias.
 - Default group and auto-subscribe:
-  - Introduce Sora:Messaging:DefaultGroup with default "workers".
+  - Introduce Koan:Messaging:DefaultGroup with default "workers".
   - If ProvisionOnStart is enabled and no Subscriptions are configured, providers may auto-create a single subscription using DefaultGroup and bind to all ("#").
   - Explicit Subscriptions disable auto-subscribe.
 - OnMessage sugar:
@@ -35,6 +35,6 @@ Consequences
 References
 - See Reference/Messaging for defaults and OnMessage usage.
  - src changes:
-  - Sora.Messaging.Core: MessagingOptions.DefaultGroup
-    - Sora.Messaging.Core: MessagingExtensions.OnMessage
-  - Sora.Mq.RabbitMq: auto-subscription when Subscriptions omitted
+  - Koan.Messaging.Core: MessagingOptions.DefaultGroup
+    - Koan.Messaging.Core: MessagingExtensions.OnMessage
+  - Koan.Mq.RabbitMq: auto-subscription when Subscriptions omitted

@@ -1,8 +1,8 @@
 ﻿// S5.Recs UI: delegated interactions for browse grid/list
-// Relies on global functions defined in index.html (openDetails, toggleFavorite, markWatched, markDropped, openQuickRate, togglePreferredTag)
+// Relies on global functions defined in index.html (openMediaDetails, toggleFavorite, markWatched, markDropped, openQuickRate, togglePreferredTag)
 
 document.addEventListener('DOMContentLoaded', () => {
-  const grid = document.getElementById('animeGrid');
+  const grid = document.getElementById('mediaGrid');
   if (!grid) return;
 
   grid.addEventListener('click', (e) => {
@@ -32,9 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const openEl = e.target.closest('[data-open-details]');
     if (openEl) {
       const id = openEl.getAttribute('data-open-details');
-      if (id && window.openDetails) {
+      if (id && window.openMediaDetails) {
         e.preventDefault();
-        window.openDetails(id);
+        window.openMediaDetails(id);
       }
       return;
     }
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (openEl) {
       e.preventDefault();
       const id = openEl.getAttribute('data-open-details');
-      if (id && window.openDetails) window.openDetails(id);
+      if (id && window.openMediaDetails) window.openMediaDetails(id);
     }
   });
 });

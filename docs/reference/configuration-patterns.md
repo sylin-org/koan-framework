@@ -1,7 +1,7 @@
 # Config & Constants Reference
 
 ## Configuration helpers
-- Use Sora.Core.Configuration helpers: Read(...), ReadFirst(...).
+- Use Koan.Core.Configuration helpers: Read(...), ReadFirst(...).
 - Prefer canonical ":" keys; helpers adapt provider/env shapes.
 
 ## Constants policy
@@ -9,10 +9,10 @@
 - Use constants for stable names (routes, headers, keys, defaults); use Options for tunables.
 
 ## Examples (keys)
-- Sora:Web:RoutePrefix
-- Sora:Data:DefaultPageSize
-- Sora:Messaging:DefaultGroup
-- Sora:AI:Provider
+- Koan:Web:RoutePrefix
+- Koan:Data:DefaultPageSize
+- Koan:Messaging:DefaultGroup
+- Koan:AI:Provider
 
 ## References
 - decisions/ARCH-0040-config-and-constants-naming.md
@@ -28,7 +28,7 @@ internal static class Constants
 }
 
 // Reading configuration (first-win)
-var prefix = SoraConfig.ReadFirst("Sora:Web:RoutePrefix") ?? Constants.RoutePrefix;
+var prefix = KoanConfig.ReadFirst("Koan:Web:RoutePrefix") ?? Constants.RoutePrefix;
 ```
 
 ## Edge cases

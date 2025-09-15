@@ -1,6 +1,6 @@
-﻿# Data access: All/Query, streaming, and cursor/pager usage
+# Data access: All/Query, streaming, and cursor/pager usage
 
-This guide shows how to use Sora’s data-access surface with clear semantics and safe iteration for large datasets. It complements ADR-0050.
+This guide shows how to use Koan’s data-access surface with clear semantics and safe iteration for large datasets. It complements ADR-0050.
 
 ## Semantics at a glance
 
@@ -12,8 +12,8 @@ This guide shows how to use Sora’s data-access surface with clear semantics an
 ## Materialize everything (All/QueryAll)
 
 ```csharp
-using Sora.Data.Core;
-using Sora.Domain;
+using Koan.Data.Core;
+using Koan.Domain;
 
 // Full collection
 var all = await MyModel.All(ct);

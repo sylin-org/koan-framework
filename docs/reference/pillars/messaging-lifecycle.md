@@ -1,4 +1,4 @@
-﻿## Messaging Topology Lifecycle
+## Messaging Topology Lifecycle
 
 Contract (Plan → Diff → Apply):
 - Inputs: registered handlers, explicit message registrations, configuration, naming strategy.
@@ -42,7 +42,7 @@ Stable ordering + JSON canonicalization of desired objects; ignore opaque provid
   "bus": "rabbit",
   "mode": "DryRun",
   "adds": {
-    "exchanges": ["sora.commands", "sora.announcements"],
+    "exchanges": ["Koan.commands", "Koan.announcements"],
     "queues": ["cmd.payment.process-order.q.workers"],
     "bindings": ["cmd.payment.process-order -> cmd.payment.process-order.q.workers"]
   },

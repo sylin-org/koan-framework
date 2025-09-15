@@ -1,11 +1,11 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
 using System.Net;
 using System.Net.Http.Json;
-using Sora.Web.Extensions.Policies;
+using Koan.Web.Extensions.Policies;
 using Xunit;
 
 namespace S2.Api.IntegrationTests;
@@ -26,7 +26,7 @@ public sealed class CapabilitiesTests
                 {
                     o.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAssertion(_ => true).Build();
                 });
-                services.AddSoraWebCapabilityPolicies(opts =>
+                services.AddKoanWebCapabilityPolicies(opts =>
                 {
                     opts.ModerationAuthorRole = "Dev";
                     opts.ModerationReviewerRole = "Dev";

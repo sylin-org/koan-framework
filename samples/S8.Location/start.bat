@@ -6,7 +6,7 @@ pushd "%SCRIPT_DIR%"
 
 REM Use the compose file living under S8.Compose
 set COMPOSE_FILE=S8.Compose\docker-compose.yml
-set PROJECT_NAME=sora-s8-location
+set PROJECT_NAME=Koan-s8-location
 set API_URL=http://localhost:4915
 
 where docker >nul 2>nul

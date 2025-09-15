@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using S8.Flow.Shared;
-using Sora.Flow.Extensions;
-using Sora.Messaging;
+using Koan.Flow.Extensions;
+using Koan.Messaging;
 
 namespace S8.Flow.Api.Controllers;
 
@@ -95,7 +95,7 @@ public class FlowDemoController : ControllerBase
         return Ok(new
         {
             message = "✅ Reading sent via messaging-first Flow patterns!",
-            reading = new { reading.SensorKey, reading.Value, reading.Unit },
+            reading = new { reading.SensorId, reading.Value, reading.Unit },
             route = "Messaging → [FlowOrchestrator] → Flow Intake → Processing Pipeline"
         });
     }

@@ -1,4 +1,4 @@
-﻿---
+---
 id: ARCH-0046
 slug: ARCH-0046-recipes-intention-driven-bootstrap-and-layered-config
 domain: ARCH
@@ -14,7 +14,7 @@ Status: Accepted
 
 ## Context
 
-- Sora is intention-driven: “reference = intent.” Referencing a provider package lights up sane defaults with options-driven overrides.
+- Koan is intention-driven: “reference = intent.” Referencing a provider package lights up sane defaults with options-driven overrides.
 - Teams repeatedly wire cross-cutting operational concerns (health checks, OTEL, retries/circuit breakers, workers) alongside providers (DB, messaging, AI, vector, cache).
 - We want a composable, code-first way to apply opinionated, best-practice wiring with strong DX, while remaining AOT/trimming friendly and predictable.
 
@@ -23,9 +23,9 @@ Status: Accepted
 Introduce Integration Recipes: small bootstrap bundles that apply best-practice operational wiring on top of already-referenced modules. Recipes follow these principles and guardrails:
 
 1) DX-first activation
-- Reference = intent: referencing a `Sora.Recipe.*` package declares intent to apply its recipe(s).
+- Reference = intent: referencing a `Koan.Recipe.*` package declares intent to apply its recipe(s).
 - Also support explicit activation for control/AOT: `services.AddRecipe<T>()` and `services.AddRecipe("name")`.
-- Config-only path: `Sora:Recipes:Active` (comma-separated) to select a subset.
+- Config-only path: `Koan:Recipes:Active` (comma-separated) to select a subset.
 
 2) Layered configuration (predictable precedence)
 - Provider defaults < Recipe defaults < AppSettings/Env < Code overrides < Recipe forced overrides.
@@ -44,7 +44,7 @@ Introduce Integration Recipes: small bootstrap bundles that apply best-practice 
 - Recipes are infra-only wiring; they must not declare inline endpoints. Controllers remain the only HTTP route surface (WEB-0035).
 
 7) Packaging and naming
-- Namespace/package root: `Sora.Recipe` / `Sora.Recipe.*`. Third parties may use `<Org>.Sora.Recipe.*`.
+- Namespace/package root: `Koan.Recipe` / `Koan.Recipe.*`. Third parties may use `<Org>.Koan.Recipe.*`.
 - Prefer one public recipe per package to preserve “reference = intent.”
 
 8) Discovery strategy with AOT safety
@@ -69,27 +69,27 @@ Negative/Risks
 
 ## Implementation notes
 
-- Provide abstractions in a small `Sora.Recipe.Abstractions` package:
-  - `public interface ISoraRecipe { string Name { get; } int Order => 0; bool ShouldApply(IConfiguration cfg, IHostEnvironment env) => true; void Apply(IServiceCollection services, IConfiguration cfg, IHostEnvironment env); }`
+- Provide abstractions in a small `Koan.Recipe.Abstractions` package:
+  - `public interface IKoanRecipe { string Name { get; } int Order => 0; bool ShouldApply(IConfiguration cfg, IHostEnvironment env) => true; void Apply(IServiceCollection services, IConfiguration cfg, IHostEnvironment env); }`
   - Registration helpers: `AddRecipe<T>()`, `AddRecipe(string name)`.
   - Optional assembly-level attribute for self-registration.
-- Options layering helpers (in Sora.Core) to encode precedence without developers memorizing Configure/PostConfigure nuances.
+- Options layering helpers (in Koan.Core) to encode precedence without developers memorizing Configure/PostConfigure nuances.
 - Logging categories and stable event IDs for discover/apply/skip/conflict/override; redact secrets.
 - Logging reference (EventIds)
   - Applying (41000): starting recipe application
   - AppliedOk (41001): recipe applied successfully
-  - SkippedNotActive (41002): recipe not in `Sora:Recipes:Active`
+  - SkippedNotActive (41002): recipe not in `Koan:Recipes:Active`
   - SkippedShouldApplyFalse (41003): `ShouldApply` returned false
   - DryRun (41004): dry-run enabled — no mutations
   - ApplyFailed (41005): exception during `Apply` (continue)
 - Config keys (canonical):
-  - `Sora:Recipes:Active` — list of active recipe names.
-  - `Sora:Recipes:AllowOverrides` — global gate for forced overrides.
-  - Per-recipe flags — e.g., `Sora:Recipes:<RecipeName>:ForceOverrides`.
+  - `Koan:Recipes:Active` — list of active recipe names.
+  - `Koan:Recipes:AllowOverrides` — global gate for forced overrides.
+  - Per-recipe flags — e.g., `Koan:Recipes:<RecipeName>:ForceOverrides`.
 
 ## Follow-ups
 
-1) Add `Sora.Recipe.Abstractions` with the minimal contract and registration helpers.
+1) Add `Koan.Recipe.Abstractions` with the minimal contract and registration helpers.
 2) Add a sample recipe package and tests (health checks + OTEL + Polly policies).
 3) Document options layering with examples and dry-run troubleshooting.
 4) Optional: DevHost/export reads active recipes to emit matching local/CI manifests.

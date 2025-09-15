@@ -1,4 +1,4 @@
-﻿// S5.Recs UI constants (global)
+// S5.Recs UI constants (global)
 // Centralizes magic numbers used across the browse UI so behavior is easy to tweak.
 // Keep environment/config-like knobs in config.js; use constants here for UI logic.
 window.S5Const = Object.freeze({
@@ -9,10 +9,16 @@ window.S5Const = Object.freeze({
     DASHBOARD: 'dashboard.html'
   }),
   LINKS: Object.freeze({
-    GITHUB_REPO: 'https://github.com/sylin-labs/sora-framework'
+    GITHUB_REPO: 'https://github.com/sylin-labs/Koan-framework'
   }),
   BRAND: Object.freeze({
-    NAME: 'AnimeRadar'
+    NAME: 'MediaHub'
+  }),
+  MEDIA_TYPES: Object.freeze({
+    ANIME: 'Anime',
+    MANGA: 'Manga',
+    MOVIE: 'Movie',
+    BOOK: 'Book'
   }),
   // Common UI text strings
   TEXT: Object.freeze({
@@ -37,6 +43,11 @@ window.S5Const = Object.freeze({
   EPISODES: Object.freeze({
     SHORT_MAX: 12,
     MEDIUM_MAX: 25,
+    LONG_MAX: 9999 // used as a practical upper bound
+  }),
+  CHAPTERS: Object.freeze({
+    SHORT_MAX: 50,
+    MEDIUM_MAX: 200,
     LONG_MAX: 9999 // used as a practical upper bound
   }),
   LIBRARY: Object.freeze({
@@ -72,13 +83,13 @@ window.S5Const = Object.freeze({
     DIVERSITY_WEIGHT_STEP: 0.05
   }),
   RATING: Object.freeze({
-    STARS: 5,
-    MIN: 0,
-    MAX: 5,
+    STARS: 10,
+    MIN: 1,
+    MAX: 10,
     DEFAULT_POPULARITY_SCORE: 0.7,
-    SCALE_MULTIPLIER: 5,
+    SCALE_MULTIPLIER: 10,
     ROUND_TO: 10, // round to 1 decimal place via *10 then /10
-    STEP: 0.5
+    STEP: 1
   }),
   YEAR: Object.freeze({
     WINDOW_YEARS: 30
@@ -93,8 +104,10 @@ window.S5Const = Object.freeze({
     LIBRARY_BASE: '/api/library',
     RATE: '/api/recs/rate',
     RECS_QUERY: '/api/recs/query',
-    ANIME_BASE: '/api/anime',
-    ANIME_BY_IDS: '/api/anime/by-ids',
+    MEDIA_BASE: '/api/media',
+    MEDIA_BY_IDS: '/api/media/by-ids',
+    MEDIA_TYPES: '/api/media-types',
+    MEDIA_FORMATS: '/api/media-formats',
   TAGS: '/api/tags',
   GENRES: '/api/genres',
   // Admin endpoints
@@ -108,8 +121,8 @@ window.S5Const = Object.freeze({
   ADMIN_TAGS_CENSOR_REMOVE: '/admin/tags/censor/remove',
   ADMIN_TAGS_CENSOR_CLEAR: '/admin/tags/censor/clear',
   // Well-known
-  WK_HEALTH: '/.well-known/sora/health',
-  WK_OBSERVABILITY: '/.well-known/sora/observability',
-  WK_AGGREGATES: '/.well-known/sora/aggregates'
+  WK_HEALTH: '/.well-known/Koan/health',
+  WK_OBSERVABILITY: '/.well-known/Koan/observability',
+  WK_AGGREGATES: '/.well-known/Koan/aggregates'
   })
 });

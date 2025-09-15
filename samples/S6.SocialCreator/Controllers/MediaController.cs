@@ -1,19 +1,19 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using Sora.Media.Core.Model;
-using Sora.Media.Core.Operators;
-using Sora.Media.Core.Options;
-using Sora.Media.Web.Controllers;
-using Sora.Storage.Abstractions;
-using Sora.Storage.Model;
-using HttpHeaderNames = Sora.Media.Web.Infrastructure.HttpHeaderNames;
-using SignatureUtility = Sora.Media.Core.Operators.SignatureUtility;
+using Koan.Media.Core.Model;
+using Koan.Media.Core.Operators;
+using Koan.Media.Core.Options;
+using Koan.Media.Web.Controllers;
+using Koan.Storage.Abstractions;
+using Koan.Storage.Model;
+using HttpHeaderNames = Koan.Media.Web.Infrastructure.HttpHeaderNames;
+using SignatureUtility = Koan.Media.Core.Operators.SignatureUtility;
 
 namespace S6.SocialCreator.Controllers;
 
 [ApiController]
 [Route("api/media")]
-public sealed class MediaController : Sora.Media.Web.Controllers.MediaContentController<Sora.Media.Core.Model.ProfileMedia>
+public sealed class MediaController : Koan.Media.Web.Controllers.MediaContentController<Koan.Media.Core.Model.ProfileMedia>
 {
     private readonly IMediaOperatorRegistry _registry;
     private readonly IStorageService _storage;

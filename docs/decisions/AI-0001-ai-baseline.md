@@ -2,11 +2,11 @@
 
 Status: Accepted
 Date: 2025-08-19
-Owners: Sora Core
+Owners: Koan Core
 
 ## Context
 
-Sora needs native AI capabilities that match its principles: controllers-only HTTP, capability discovery, sane defaults, and strong observability. Teams want turnkey inference/RAG without lock-in or excessive configuration.
+Koan needs native AI capabilities that match its principles: controllers-only HTTP, capability discovery, sane defaults, and strong observability. Teams want turnkey inference/RAG without lock-in or excessive configuration.
 
 ## Decision
 
@@ -19,6 +19,6 @@ Sora needs native AI capabilities that match its principles: controllers-only HT
 
 ## Consequences
 
-- Package structure: Sora.AI.Core, Sora.AI.Providers.*, Sora.Data.Vector.*, Sora.Web.AI.
+- Package structure: Koan.AI.Core, Koan.AI.Providers.*, Koan.Data.Vector.*, Koan.Web.AI.
 - Clear lines with existing Data/Web/Messaging; shared constants and headers.
 - Training/registry remain integrations, not core.

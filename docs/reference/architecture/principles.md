@@ -7,9 +7,9 @@
 
 ---
 
-## 🏛️ Sora Framework Architecture Guide
+## 🏛️ Koan Framework Architecture Guide
 
-This document provides a comprehensive architectural overview of the Sora Framework, covering its design principles, component relationships, and extensibility patterns.
+This document provides a comprehensive architectural overview of the Koan Framework, covering its design principles, component relationships, and extensibility patterns.
 
 ---
 
@@ -51,15 +51,15 @@ graph TB
         BackgroundServices[Background Services]
     end
     
-    subgraph "Sora Framework"
-        Core[Sora.Core]
-        Web[Sora.Web]
-        Data[Sora.Data.*]
-        Messaging[Sora.Messaging.*]
-        AI[Sora.AI]
-        Flow[Sora.Flow]
-        Storage[Sora.Storage]
-        Media[Sora.Media]
+    subgraph "Koan Framework"
+        Core[Koan.Core]
+        Web[Koan.Web]
+        Data[Koan.Data.*]
+        Messaging[Koan.Messaging.*]
+        AI[Koan.AI]
+        Flow[Koan.Flow]
+        Storage[Koan.Storage]
+        Media[Koan.Media]
     end
     
     subgraph "Infrastructure Layer"  
@@ -95,9 +95,9 @@ graph TB
 ```
 Application Code
        ↓
-   Sora Pillars (Composition Layer)
+   Koan Pillars (Composition Layer)
        ↓
-   Sora.Core (Foundation Layer)
+   Koan.Core (Foundation Layer)
        ↓
    .NET Runtime & Infrastructure
 ```
@@ -106,13 +106,13 @@ Application Code
 
 ## 🧱 Core Framework Components
 
-### 1. **Sora.Core - Foundation Layer**
+### 1. **Koan.Core - Foundation Layer**
 
 The foundational layer that all other pillars depend on.
 
 #### Key Responsibilities
-- **Auto-Registration**: `ISoraAutoRegistrar` pattern for module discovery
-- **Configuration**: Hierarchical configuration with `SoraEnv` helpers
+- **Auto-Registration**: `IKoanAutoRegistrar` pattern for module discovery
+- **Configuration**: Hierarchical configuration with `KoanEnv` helpers
 - **Health Checks**: `IHealthContributor` pattern for monitoring
 - **Boot Reports**: Module discovery and initialization reporting
 - **Observability**: OpenTelemetry integration (opt-in)
@@ -120,7 +120,7 @@ The foundational layer that all other pillars depend on.
 #### Architecture
 ```csharp
 // Auto-Registration Pattern
-public interface ISoraAutoRegistrar
+public interface IKoanAutoRegistrar
 {
     string ModuleName { get; }
     string? ModuleVersion { get; }
@@ -137,7 +137,7 @@ public interface IHealthContributor
 }
 
 // Configuration Pattern
-public static class SoraEnv
+public static class KoanEnv
 {
     public static string Environment { get; }
     public static bool IsProduction { get; }
@@ -154,7 +154,7 @@ public static class SoraEnv
 
 ---
 
-### 2. **Sora.Web - HTTP Layer**
+### 2. **Koan.Web - HTTP Layer**
 
 Provides HTTP handling with security and developer experience focus.
 
@@ -198,7 +198,7 @@ public interface IPayloadTransformer<T>
 
 ---
 
-### 3. **Sora.Data.* - Data Access Layer**
+### 3. **Koan.Data.* - Data Access Layer**
 
 Adapter-agnostic data access with multiple provider support.
 
@@ -266,7 +266,7 @@ public interface IDataAdapter<T> where T : IEntity
 
 ---
 
-### 4. **Sora.Messaging.* - Message Queue Layer**
+### 4. **Koan.Messaging.* - Message Queue Layer**
 
 Capability-aware messaging with multiple transport support.
 
@@ -327,7 +327,7 @@ sequenceDiagram
 
 ---
 
-### 5. **Sora.AI - AI Integration Layer**
+### 5. **Koan.AI - AI Integration Layer**
 
 AI capabilities with local and remote provider support.
 
@@ -385,7 +385,7 @@ public interface IAiBudgetManager
 
 ---
 
-### 6. **Sora.Flow - Data Pipeline Layer**
+### 6. **Koan.Flow - Data Pipeline Layer**
 
 Model-typed data pipeline for ingestion and transformation.
 
@@ -471,9 +471,9 @@ Hierarchical configuration with environment-specific overrides.
 
 #### Configuration Pattern
 ```csharp
-public class SoraDataOptions
+public class KoanDataOptions
 {
-    public const string SectionName = "Sora:Data";
+    public const string SectionName = "Koan:Data";
     
     public string DefaultProvider { get; set; } = "Sqlite";
     public Dictionary<string, string> ConnectionStrings { get; set; } = new();
@@ -481,8 +481,8 @@ public class SoraDataOptions
 }
 
 // Usage
-var dataOptions = builder.Configuration.GetSection(SoraDataOptions.SectionName)
-    .Get<SoraDataOptions>() ?? new();
+var dataOptions = builder.Configuration.GetSection(KoanDataOptions.SectionName)
+    .Get<KoanDataOptions>() ?? new();
 ```
 
 ### 2. **Dependency Injection**
@@ -496,8 +496,8 @@ Service lifetime patterns and registration strategies.
 
 #### Registration Patterns
 ```csharp
-// Auto-Registration via ISoraAutoRegistrar
-public class DataAutoRegistrar : ISoraAutoRegistrar
+// Auto-Registration via IKoanAutoRegistrar
+public class DataAutoRegistrar : IKoanAutoRegistrar
 {
     public void Initialize(IServiceCollection services)
     {
@@ -510,7 +510,7 @@ public class DataAutoRegistrar : ISoraAutoRegistrar
 }
 
 // Manual Registration
-builder.Services.AddSora(options =>
+builder.Services.AddKoan(options =>
 {
     options.EnableTelemetry = true;
     options.DefaultEnvironment = "Development";
@@ -524,7 +524,7 @@ Consistent error handling across all pillars.
 #### Error Patterns
 ```csharp
 // Domain Exceptions
-public class EntityNotFoundException : SoraException
+public class EntityNotFoundException : KoanException
 {
     public EntityNotFoundException(string entityType, string id) 
         : base($"{entityType} with ID '{id}' was not found")
@@ -539,7 +539,7 @@ public class EntityNotFoundException : SoraException
 
 // Controller Error Handling
 [ApiController]
-public abstract class SoraControllerBase : ControllerBase
+public abstract class KoanControllerBase : ControllerBase
 {
     protected ActionResult HandleException(Exception ex)
     {
@@ -647,9 +647,9 @@ Automatic discovery and registration of components.
 
 #### Discovery Process
 ```csharp
-public static class SoraServiceCollectionExtensions
+public static class KoanServiceCollectionExtensions
 {
-    public static IServiceCollection AddSora(this IServiceCollection services)
+    public static IServiceCollection AddKoan(this IServiceCollection services)
     {
         // 1. Scan for auto-registrars
         var registrars = DiscoverAutoRegistrars();
@@ -667,14 +667,14 @@ public static class SoraServiceCollectionExtensions
         return services;
     }
     
-    private static IEnumerable<ISoraAutoRegistrar> DiscoverAutoRegistrars()
+    private static IEnumerable<IKoanAutoRegistrar> DiscoverAutoRegistrars()
     {
         var assemblies = GetReferencedAssemblies();
         
         return assemblies
             .SelectMany(a => a.GetTypes())
-            .Where(t => typeof(ISoraAutoRegistrar).IsAssignableFrom(t) && !t.IsAbstract)
-            .Select(t => (ISoraAutoRegistrar)Activator.CreateInstance(t)!)
+            .Where(t => typeof(IKoanAutoRegistrar).IsAssignableFrom(t) && !t.IsAbstract)
+            .Select(t => (IKoanAutoRegistrar)Activator.CreateInstance(t)!)
             .OrderBy(r => r.ModuleName);
     }
 }
@@ -686,7 +686,7 @@ Best-practice bundles that apply operational patterns.
 
 #### Recipe Structure
 ```csharp
-public abstract class SoraRecipe : ISoraAutoRegistrar
+public abstract class KoanRecipe : IKoanAutoRegistrar
 {
     protected abstract bool ShouldApply(IServiceCollection services);
     protected abstract void ApplyRecipe(IServiceCollection services, IConfiguration configuration);
@@ -705,7 +705,7 @@ public abstract class SoraRecipe : ISoraAutoRegistrar
 }
 
 // Example Recipe
-public class ObservabilityRecipe : SoraRecipe
+public class ObservabilityRecipe : KoanRecipe
 {
     protected override bool ShouldApply(IServiceCollection services) =>
         services.Any(s => s.ServiceType == typeof(ILogger<>));
@@ -887,8 +887,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SORA__DATA__DEFAULTPROVIDER=Postgres
-      - SORA__DATA__POSTGRES__CONNECTIONSTRING=Host=postgres;Database=myapp;Username=user;Password=pass
+      - Koan__DATA__DEFAULTPROVIDER=Postgres
+      - Koan__DATA__POSTGRES__CONNECTIONSTRING=Host=postgres;Database=myapp;Username=user;Password=pass
     depends_on:
       postgres:
         condition: service_healthy
@@ -917,7 +917,7 @@ services:
 
 ## 📋 Architecture Decision Records (ADRs)
 
-Sora Framework uses ADRs to document architectural decisions. Key decisions include:
+Koan Framework uses ADRs to document architectural decisions. Key decisions include:
 
 ### Core Architecture
 - **ARCH-0011**: Logging + headers layering
@@ -946,7 +946,7 @@ Sora Framework uses ADRs to document architectural decisions. Key decisions incl
 
 ## 🎯 Summary
 
-The Sora Framework architecture provides:
+The Koan Framework architecture provides:
 
 1. **Modular Design**: Independent pillars that compose naturally
 2. **Extensible Patterns**: Provider, auto-registration, and recipe patterns

@@ -10,7 +10,7 @@ Relational adapters (SQLite, SQL Server, Postgres) ensure and validate schema on
 
 ## Decision
 
-Introduce a generic singleflight utility in Core: `Sora.Core.Infrastructure.Singleflight`.
+Introduce a generic singleflight utility in Core: `Koan.Core.Infrastructure.Singleflight`.
 
 - Dedupe by key (string).
 - Only in-flight deduplication: entries are removed after completion; no TTL/state retention.
@@ -19,7 +19,7 @@ Introduce a generic singleflight utility in Core: `Sora.Core.Infrastructure.Sing
   - `Task<T> RunAsync<T>(string key, Func<CancellationToken, Task<T>> work, CancellationToken ct = default)`
   - `void Invalidate(string key)` to remove an in-flight entry if present (safe no-op otherwise).
 
-Relational adds a thin shim `Sora.Data.Relational.Infrastructure.Singleflight` forwarding to Core for convenience/back-compat.
+Relational adds a thin shim `Koan.Data.Relational.Infrastructure.Singleflight` forwarding to Core for convenience/back-compat.
 
 SQLite, SQL Server, and Postgres adapters integrate this to dedupe ensure/validate/DDL per database+table key.
 

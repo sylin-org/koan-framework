@@ -22,4 +22,4 @@ Documents
 
 Notes
 - Neutral vocabulary is used across all documents (no domain‑specific entities).
-- Decisions captured: MongoDB primary store, RabbitMQ default in dev, DB‑backed PolicyBundle with file fallback, workflow‑lite orchestrator, Sora Entity<> namespaces for collection names, OTEL for observability.
+- Decisions captured: MongoDB primary store, RabbitMQ default in dev, DB‑backed PolicyBundle with file fallback, workflow‑lite orchestrator, Koan Entity<> namespaces for collection names, OTEL for observability.

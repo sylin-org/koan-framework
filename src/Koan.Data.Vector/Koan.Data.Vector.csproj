@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Koan vector module (facades, DI, defaults)</Description>
+  <PackageTags>$(CommonPackageTags);data;vector;di;facade</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,4 @@
-﻿services:
+services:
   mongo:
     image: mongo:7
     container_name: s8-mongo
@@ -32,7 +32,7 @@
     environment:
       ASPNETCORE_URLS: http://+:4903
       # Use Mongo in containers
-      Sora__Data__Mongo__Database: s8
+      Koan__Data__Mongo__Database: s8
       ASPNETCORE_ENVIRONMENT: Development
       DOTNET_ENVIRONMENT: Development
     depends_on:

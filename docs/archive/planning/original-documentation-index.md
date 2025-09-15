@@ -1,4 +1,4 @@
-# Sora Docs Index
+# Koan Docs Index
 
 Note: This page contains historical planning materials. For day-to-day development, start with:
 - Engineering front door: engineering/index.md
@@ -6,12 +6,12 @@ Note: This page contains historical planning materials. For day-to-day developme
 - Web Authentication reference: reference/web-auth.md
 	- Challenge supports `?return=` and optional `&prompt=login`; Dev TestProvider uses a remembered-user cookie that central logout clears.
 
-This documentation set tracks the design and implementation plan for the Sora Framework.
+This documentation set tracks the design and implementation plan for the Koan Framework.
 
 Start here:
 // Removed tutorial and quickstart links; prefer Engineering and Reference sections.
 
-- 01-proposal.md — New framework proposal (moved from Zen docs), updated for Sora
+- 01-proposal.md — New framework proposal (moved from Zen docs), updated for Koan
 - 02-composition-and-profiles.md — Composition model and profile presets explained
 - 03-core-contracts.md — Core interfaces (data, CQRS, messaging, webhooks, AI)
 - 04-adapter-authoring-guide.md — How to build adapters (Relational/Document/Vector)
@@ -28,7 +28,7 @@ Additional guides:
  - 16-working-with-entity-data.md — Developer guide to reading, filtering, sets, and migrations
 - 17-sqlite-logging-and-governance.md — SQLite adapter logging, tracing, and DDL governance
  - 18-sqlserver-adapter.md — SQL Server adapter: setup, options, capabilities, and testing
- - ddd/00-index.md — Domain-Driven Design in Sora: ubiquitous language, tactical design, CQRS/eventing, and more
+ - ddd/00-index.md — Domain-Driven Design in Koan: ubiquitous language, tactical design, CQRS/eventing, and more
 
 See also: `docs/decisions` for ADRs tracking key architecture choices (capabilities, markers, naming). Notable:
 - 0029 — JSON filter language and endpoints

@@ -1,6 +1,6 @@
-﻿# S7.ContentPlatform - Content Management Sample
+# S7.ContentPlatform - Content Management Sample
 
-This sample demonstrates a **Content Management Platform** for blog/publishing workflows, showcasing Sora's **moderation** and **soft-delete** capabilities in a real-world scenario.
+This sample demonstrates a **Content Management Platform** for blog/publishing workflows, showcasing Koan's **moderation** and **soft-delete** capabilities in a real-world scenario.
 
 ## 🎯 What This Sample Demonstrates
 
@@ -143,32 +143,32 @@ GET /api/authors/alice/stats
 ## 🛠️ Configuration
 
 The sample uses:
-- **JSON file storage** for simplicity (via `Sora.Data.Json`)
+- **JSON file storage** for simplicity (via `Koan.Data.Json`)
 - **In-memory data** with seeded examples
 - **Generic capability controllers** for moderation/soft-delete
 - **Swagger documentation** for API exploration
 
 ### Key Dependencies
 ```xml
-<ProjectReference Include="../../src/Sora.Web.Extensions/Sora.Web.Extensions.csproj" />
-<ProjectReference Include="../../src/Sora.Data.Json/Sora.Data.Json.csproj" />
-<ProjectReference Include="../../src/Sora.Web.Swagger/Sora.Web.Swagger.csproj" />
+<ProjectReference Include="../../src/Koan.Web.Extensions/Koan.Web.Extensions.csproj" />
+<ProjectReference Include="../../src/Koan.Data.Json/Koan.Data.Json.csproj" />
+<ProjectReference Include="../../src/Koan.Web.Swagger/Koan.Web.Swagger.csproj" />
 ```
 
 ## 📈 Extension Ideas
 
 This sample can be extended with:
-- **Authentication/Authorization** (via `Sora.Web.Auth`)
-- **Real database** (via `Sora.Data.Postgres` or `Sora.Data.SqlServer`)
-- **Search capabilities** (via `Sora.Data.Vector` for semantic search)
-- **File uploads** (via `Sora.Media` for article images)
-- **Messaging notifications** (via `Sora.Messaging` for editorial alerts)
+- **Authentication/Authorization** (via `Koan.Web.Auth`)
+- **Real database** (via `Koan.Data.Postgres` or `Koan.Data.SqlServer`)
+- **Search capabilities** (via `Koan.Data.Vector` for semantic search)
+- **File uploads** (via `Koan.Media` for article images)
+- **Messaging notifications** (via `Koan.Messaging` for editorial alerts)
 - **Comment system** with its own moderation workflow
 
 ## 🔍 Learning Objectives
 
 After exploring this sample, you'll understand:
-- How to implement editorial workflows with Sora's moderation capabilities
+- How to implement editorial workflows with Koan's moderation capabilities
 - Patterns for soft-delete in content management systems
 - Using data sets to organize content by lifecycle stage
 - Building role-based content platforms with audit trails

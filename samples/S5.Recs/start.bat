@@ -7,7 +7,7 @@ pushd "%SCRIPT_DIR%"
 
 REM Build the API image and bring up the stack detached, then wait and launch the app.
 set COMPOSE_FILE=docker\compose.yml
-set PROJECT_NAME=sora-s5-recs
+set PROJECT_NAME=koan-s5-recs
 set API_URL=http://localhost:5084/swagger/index.html
 set OPEN_URL=http://localhost:5084
 

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Media contracts for Koan: models, transforms, tasks, and events.</Description>
+    <PackageTags>$(CommonPackageTags);media;images;video;pdf;transform;pipelines</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

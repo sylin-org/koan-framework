@@ -9,7 +9,7 @@ title: Messaging capabilities and framework negotiation
 # 0021 — Messaging capabilities and framework negotiation
 
 Context
-- Sora.Mq aims for low-friction, semantic APIs (Send/On<T>) over multiple brokers.
+- Koan.Mq aims for low-friction, semantic APIs (Send/On<T>) over multiple brokers.
 - Not all providers support the same features (e.g., delayed delivery, DLQ shape, exact once, scheduling).
 - We need a consistent way to declare provider capabilities and for the framework to adapt behavior safely.
 
@@ -22,7 +22,7 @@ Decision
   - MessageOrdering (None | Partition)
   - ScheduledEnqueue (bool)
   - PublisherConfirms (bool)
-- Add a capability-aware negotiation layer in Sora.Mq.Core that:
+- Add a capability-aware negotiation layer in Koan.Mq.Core that:
   - Evaluates requested features (from options/attributes) against provider capabilities.
   - Applies the best implementation strategy or no-ops with a clear diagnostic when not supported.
   - Records the effective plan in a per-bus EffectiveMessagingPlan for diagnostics.

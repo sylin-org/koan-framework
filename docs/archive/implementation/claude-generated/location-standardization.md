@@ -171,9 +171,9 @@ public enum LocationType
 }
 ```
 
-### **No Custom Parking Entities - Uses Sora.Flow Native**
+### **No Custom Parking Entities - Uses Koan.Flow Native**
 
-❌ **No ParkedLocation entity needed** - Sora.Flow handles parking natively:
+❌ **No ParkedLocation entity needed** - Koan.Flow handles parking natively:
 
 ```csharp
 // Interceptor uses Flow's native parking
@@ -357,7 +357,7 @@ namespace S8.Location.Core.Interceptors;
 /// Auto-registrar that configures Location intake interceptors for hash collision detection
 /// and native Flow parking for records awaiting resolution.
 /// </summary>
-public class LocationInterceptor : ISoraAutoRegistrar
+public class LocationInterceptor : IKoanAutoRegistrar
 {
     public string ModuleName => "S8.Location.Core.Interceptors";
     public string? ModuleVersion => GetType().Assembly.GetName().Version?.ToString();
@@ -366,7 +366,7 @@ public class LocationInterceptor : ISoraAutoRegistrar
     {
         Console.WriteLine("[LocationInterceptor] Registering hash collision detection interceptor");
         
-        // Register the hash-collision interceptor using Sora.Flow native parking
+        // Register the hash-collision interceptor using Koan.Flow native parking
         FlowIntakeInterceptors.RegisterForType<Models.Location>(location =>
         {
             // Basic validation - park for background resolution if valid
@@ -400,7 +400,7 @@ public class LocationInterceptor : ISoraAutoRegistrar
 namespace S8.Location.Core.Services;
 
 /// <summary>
-/// Background service that monitors Sora.Flow's native parked collection 
+/// Background service that monitors Koan.Flow's native parked collection 
 /// and resolves addresses that were parked with "WAITING_ADDRESS_RESOLVE" status.
 /// Uses ONLY Flow's native parking mechanisms - no custom parking entities.
 /// </summary>
@@ -660,7 +660,7 @@ Flow.OnUpdate receives location with AgnosticLocationId already set
 4. **Hierarchical Resolution**: Self-referencing AgnosticLocation structure
 5. **Source System Attribution**: Clean separation of source records vs canonical data
 
-**🚀 Ready for Implementation**: All components align with Sora.Flow patterns and your specific requirements.
+**🚀 Ready for Implementation**: All components align with Koan.Flow patterns and your specific requirements.
 
 ---
 
@@ -668,12 +668,12 @@ Flow.OnUpdate receives location with AgnosticLocationId already set
 
 ## 🔧 New Framework Enhancement: `.HealAsync()` Extension Method
 
-As part of this implementation, a new semantic extension method `.HealAsync()` has been added to the Sora.Flow.Core framework to provide a clean, maintainable API for healing parked records:
+As part of this implementation, a new semantic extension method `.HealAsync()` has been added to the Koan.Flow.Core framework to provide a clean, maintainable API for healing parked records:
 
 ### **Extension Method Location**
 ```csharp
-// File: F:\Replica\NAS\Files\repo\github\sora-framework\src\Sora.Flow.Core\Extensions\ParkedRecordExtensions.cs
-namespace Sora.Flow.Core.Extensions;
+// File: F:\Replica\NAS\Files\repo\github\Koan-framework\src\Koan.Flow.Core\Extensions\ParkedRecordExtensions.cs
+namespace Koan.Flow.Core.Extensions;
 
 public static class ParkedRecordExtensions
 {
@@ -729,7 +729,7 @@ healingReason: "Address resolved to canonical location", ct: ct);
 
 ### **Benefits**
 - **Encapsulation**: Hides Flow healing complexity behind clean API
-- **Consistency**: Standardizes healing across all Sora.Flow applications  
+- **Consistency**: Standardizes healing across all Koan.Flow applications  
 - **Maintainability**: Changes to healing logic centralized in one place
 - **Auditability**: Automatic metadata for compliance and debugging
 - **Developer Experience**: Intuitive API following Framework conventions
@@ -738,7 +738,7 @@ healingReason: "Address resolved to canonical location", ct: ct);
 
 **Document Status**: ✅ **UPDATED** - Architecture enhanced with semantic healing API  
 **Last Updated**: 2025-01-09  
-**Framework Enhancement**: ✅ **NEW** - `.HealAsync()` extension method added to Sora.Flow.Core  
+**Framework Enhancement**: ✅ **NEW** - `.HealAsync()` extension method added to Koan.Flow.Core  
 **Approved**: Ready for implementation with enhanced healing patterns
 
 **Architecture Review**: ✅ **APPROVED** - Interceptor → Native Parking → Background Resolution → Semantic Healing flow complete

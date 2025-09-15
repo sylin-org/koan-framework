@@ -106,4 +106,4 @@ The system will automatically:
 
 ---
 
-**Built with ❤️ for the Sora Framework ecosystem**
+**Built with ❤️ for the Koan Framework ecosystem**

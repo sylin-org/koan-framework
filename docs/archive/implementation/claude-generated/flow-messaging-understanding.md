@@ -15,7 +15,7 @@
 ## Current System Architecture
 
 ### Overview
-The Sora Flow system is a data orchestration pipeline that processes entities through multiple stages:
+The Koan Flow system is a data orchestration pipeline that processes entities through multiple stages:
 1. **Intake** - Raw data ingestion
 2. **Association** - Key-based entity linking
 3. **Keying** - Aggregation key resolution
@@ -23,11 +23,11 @@ The Sora Flow system is a data orchestration pipeline that processes entities th
 
 ### Key Components
 
-#### 1. **Messaging System (Sora.Messaging)**
+#### 1. **Messaging System (Koan.Messaging)**
 - **Core**: Message publishing/subscription via RabbitMQ
 - **Pattern**: `services.On<T>(handler)` for receiving, `message.Send()` for sending
 - **Transformers**: `MessagingTransformers.Register()` for message transformation
-- **Queues**: Named by message type, e.g., `Sora.Flow.Sending.FlowTargetedMessage<S8.Flow.Shared.Device>`
+- **Queues**: Named by message type, e.g., `Koan.Flow.Sending.FlowTargetedMessage<S8.Flow.Shared.Device>`
 
 #### 2. **Flow Entities**
 Two types of entities:
@@ -274,7 +274,7 @@ graph LR
 ### Phase 1: New Infrastructure (Non-Breaking)
 
 #### 1.1 Create FlowContext
-**File**: `Sora.Flow.Core/Context/FlowContext.cs`
+**File**: `Koan.Flow.Core/Context/FlowContext.cs`
 ```csharp
 public class FlowContext
 {
@@ -288,7 +288,7 @@ public class FlowContext
 ```
 
 #### 1.2 Create Send Extension
-**File**: `Sora.Flow.Core/Extensions/FlowEntityExtensions.cs`
+**File**: `Koan.Flow.Core/Extensions/FlowEntityExtensions.cs`
 ```csharp
 public static async Task Send<T>(this T entity) where T : class, IFlowEntity
 {
@@ -298,13 +298,13 @@ public static async Task Send<T>(this T entity) where T : class, IFlowEntity
 ```
 
 #### 1.3 Register Transformers
-**File**: `Sora.Flow.Core/Initialization/FlowMessagingInitializer.cs`
+**File**: `Koan.Flow.Core/Initialization/FlowMessagingInitializer.cs`
 - Scan all assemblies for IFlowEntity implementations
 - Register transformer for each to wrap in TransportEnvelope
 - Capture FlowContext.Current in envelope
 
 #### 1.4 Create Transport Handler
-**File**: `Sora.Flow.Core/Handlers/TransportEnvelopeHandler.cs`
+**File**: `Koan.Flow.Core/Handlers/TransportEnvelopeHandler.cs`
 - Single handler for all TransportEnvelope messages
 - Extract entity and metadata
 - Write to appropriate intake collection
@@ -341,8 +341,8 @@ builder.Services.AddFlowTransportHandler();
 ### Phase 3: Cleanup
 
 #### 3.1 Remove Files
-- `Sora.Flow.Core/Configuration/FlowServiceExtensions.cs` (auto-handlers)
-- `Sora.Flow.Core/Sending/FlowTargetedMessage.cs`
+- `Koan.Flow.Core/Configuration/FlowServiceExtensions.cs` (auto-handlers)
+- `Koan.Flow.Core/Sending/FlowTargetedMessage.cs`
 - `AUTOCONFIGURE_FLOW_EXAMPLES.md`
 
 #### 3.2 Clean Up Code
@@ -356,7 +356,7 @@ builder.Services.AddFlowTransportHandler();
 
 ### Core Flow Files
 ```
-src/Sora.Flow.Core/
+src/Koan.Flow.Core/
 ├── Attributes/
 │   ├── FlowAttributes.cs          # [AggregationKey], [FlowModel]
 │   └── FlowAdapterAttribute.cs    # [FlowAdapter(system, adapter)]
@@ -372,7 +372,7 @@ src/Sora.Flow.Core/
 │   ├── FlowRegistry.cs           # Model type resolution
 │   └── Constants.cs              # NO_KEYS, etc.
 ├── Initialization/
-│   ├── SoraAutoRegistrar.cs      # Current auto-registration
+│   ├── KoanAutoRegistrar.cs      # Current auto-registration
 │   └── FlowMessagingInitializer.cs # TO BE CREATED
 ├── Model/
 │   ├── FlowEntity.cs             # Base entity class
@@ -411,7 +411,7 @@ MongoDB (s8 database):
 ├── S8.Flow.Shared.Device#flow.parked
 ├── S8.Flow.Shared.Manufacturer#flow.intake
 ├── S8.Flow.Shared.Manufacturer#flow.parked
-└── Sora.Flow.Diagnostics.RejectionReport
+└── Koan.Flow.Diagnostics.RejectionReport
 ```
 
 ---
@@ -465,7 +465,7 @@ MongoDB (s8 database):
 ##### **MessagingInterceptors Pattern (Better than Proposed)**
 - **Type-safe registration**: `RegisterForType<T>()` and `RegisterForInterface<T>()`
 - **Automatic discovery**: All Flow entity types found and registered at startup
-- **Zero-config**: Registration happens automatically via `AddSoraFlow()`
+- **Zero-config**: Registration happens automatically via `AddKoanFlow()`
 - **Clean separation**: Regular entities vs DynamicFlowEntity handled differently
 
 ##### **JSON String Transport (Solved JsonElement Issue)**
@@ -488,8 +488,8 @@ MongoDB (s8 database):
 
 #### 📋 **LESSONS LEARNED**
 1. **RabbitMQ Serialization**: System.Text.Json creates JsonElement objects during deserialization
-2. **Newtonsoft.Json Advantage**: Sora.Core uses Newtonsoft.Json which doesn't create JsonElements
-3. **DRY Principle**: Always check for existing Sora.Core capabilities before reinventing
+2. **Newtonsoft.Json Advantage**: Koan.Core uses Newtonsoft.Json which doesn't create JsonElements
+3. **DRY Principle**: Always check for existing Koan.Core capabilities before reinventing
 4. **Architecture Success**: Transport envelope pattern works correctly - issue is serialization layer
 5. **Root vs Symptom**: Initial fixes targeted symptoms; real issue was RabbitMQ deserialization
 
@@ -507,33 +507,33 @@ docker exec s8-mongo mongosh --quiet --eval "
 
 # Check rejections
 docker exec s8-mongo mongosh --quiet --eval "
-  db.getSiblingDB('s8')['Sora.Flow.Diagnostics.RejectionReport']
+  db.getSiblingDB('s8')['Koan.Flow.Diagnostics.RejectionReport']
     .find().sort({CreatedAt: -1}).limit(1).toArray()
 "
 
 # Check adapter logs
-docker logs sora-s8-flow-adapter-bms-1 --tail 50
+docker logs Koan-s8-flow-adapter-bms-1 --tail 50
 ```
 
 ### 🚀 Framework Implementation Action Items
-1. **IQueuedMessage Interface**: Add to Sora.Messaging.Core for dedicated queue routing
+1. **IQueuedMessage Interface**: Add to Koan.Messaging.Core for dedicated queue routing
 2. **FlowOrchestrator Pattern**: Implement auto-discovery and [FlowOrchestrator] attribute support
 3. **Metadata Separation**: Fix StagePayload contamination - keep source info in StageMetadata
-4. **Queue Architecture**: Route Flow entities to "Sora.Flow.FlowEntity" dedicated queue
+4. **Queue Architecture**: Route Flow entities to "Koan.Flow.FlowEntity" dedicated queue
 5. **Zero-Config Experience**: Ensure adapters need only [FlowAdapter] + entity.Send()
 
 ### Important Context
 - This is a **greenfield project** - breaking changes are acceptable
 - The user prefers **clean breaks** over backwards compatibility
 - The goal is **simplicity and correctness** over magic
-- Follow existing **Sora patterns** rather than creating new ones
+- Follow existing **Koan patterns** rather than creating new ones
 
 ### Problem Summary for Next Session
 **"✅ RESOLVED: Flow system architectural refactor from auto-handlers to transport envelope pattern is complete and functional. 
 
 ⚠️ CURRENT ISSUE: JsonElement serialization prevents MongoDB persistence. Transport messages flow correctly, but RabbitMQ deserializes entities with System.Text.Json.JsonElement properties that MongoDB BSON serializer rejects. 
 
-🔧 SOLUTION: Implement Sora.Core JSON round-trip (Newtonsoft.Json) to eliminate JsonElements in TransportEnvelopeProcessor before persistence."**
+🔧 SOLUTION: Implement Koan.Core JSON round-trip (Newtonsoft.Json) to eliminate JsonElements in TransportEnvelopeProcessor before persistence."**
 
 ---
 

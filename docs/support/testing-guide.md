@@ -10,7 +10,7 @@
 
 ## Samples
 - Keep runnable samples minimal. Provide a start script and HTTP request file if web-based.
- - Console samples that use Sora adapters should register a minimal IConfiguration in DI so adapter option configurators can resolve. In tests, prefer overriding options via `services.PostConfigure<...Options>(o => ...)` to avoid depending on environment config.
+ - Console samples that use Koan adapters should register a minimal IConfiguration in DI so adapter option configurators can resolve. In tests, prefer overriding options via `services.PostConfigure<...Options>(o => ...)` to avoid depending on environment config.
 
 ## CI tips
 - `dotnet build` then `dotnet test` on solution.
@@ -19,7 +19,7 @@
 ## Integration tests for health
 - Use `WebApplicationFactory<Program>` to bootstrap sample apps.
 - Override configuration to simulate failures:
-	- JSON: `Sora:Data:Sources:Default:json:DirectoryPath` → invalid path
-	- SQLite: `Sora:Data:Sources:Default:sqlite:ConnectionString` → invalid file path
+	- JSON: `Koan:Data:Sources:Default:json:DirectoryPath` → invalid path
+	- SQLite: `Koan:Data:Sources:Default:sqlite:ConnectionString` → invalid file path
 - Assert `/health/live` returns 200 and `/health/ready` returns 503 in failure scenarios.
-- To avoid cross-test contamination due to cached per-entity configs, call `Sora.Data.Core.TestHooks.ResetDataConfigs()` at the start of each test.
+- To avoid cross-test contamination due to cached per-entity configs, call `Koan.Data.Core.TestHooks.ResetDataConfigs()` at the start of each test.

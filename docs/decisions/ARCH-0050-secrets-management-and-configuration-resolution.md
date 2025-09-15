@@ -1,4 +1,4 @@
-﻿---
+---
 id: ARCH-0050
 slug: secrets-management-and-configuration-resolution
 domain: Architecture
@@ -9,9 +9,9 @@ title: Secrets management — provider chain, configuration resolution, and orch
 
 ## Context
 
-Sora needs a first-class, zero-config secrets capability that works consistently across modules (Data, Messaging, Web) and orchestration. The goals are:
+Koan needs a first-class, zero-config secrets capability that works consistently across modules (Data, Messaging, Web) and orchestration. The goals are:
 
-- Reference = intent: referencing Sora.Secrets.\* packages enables secrets behavior without extra wiring.
+- Reference = intent: referencing Koan.Secrets.\* packages enables secrets behavior without extra wiring.
 - Safe-by-default: no secret values baked into artifacts or logs; redaction everywhere; rotation-friendly.
 - Simple DX: explicit secret references in configuration and a small DI surface for late-bound resolution.
 - Orchestration alignment: exporters prefer references over values (secretsRefOnly) and can map to platform-native secret primitives.
@@ -34,7 +34,7 @@ We will introduce a secrets module with a provider chain and a configuration-res
 
 3. Provider chain and Reference = Intent
 
-- Referencing Sora.Secrets.Core registers the resolver and default chain. Referencing provider packages (e.g., Sora.Secrets.HashiCorpVault) registers those providers into the chain via SoraAutoRegistrar.
+- Referencing Koan.Secrets.Core registers the resolver and default chain. Referencing provider packages (e.g., Koan.Secrets.HashiCorpVault) registers those providers into the chain via KoanAutoRegistrar.
 - Default precedence is stable and configurable. Adapters can be forced via explicit scheme (secret+vault://…).
 
 4. Explicit reference syntax (no magic keys)
@@ -45,8 +45,8 @@ We will introduce a secrets module with a provider chain and a configuration-res
 
 5. Orchestration exporters prefer references
 
-- When any Sora.Secrets.\* provider is present, exporters set capabilities.secretsRefOnly = true and emit references (envRef) rather than values. Renderers map to platform mechanisms (Kubernetes secretKeyRef/ESO; Compose secrets; optional Vault Agent).
-- Sidecars/agents or file-sinks are enabled only under minimal, explicit signals (e.g., Sora:Secrets:Provider=Vault or VAULT_ADDR present), keeping Reference = Intent predictable without surprising topology changes.
+- When any Koan.Secrets.\* provider is present, exporters set capabilities.secretsRefOnly = true and emit references (envRef) rather than values. Renderers map to platform mechanisms (Kubernetes secretKeyRef/ESO; Compose secrets; optional Vault Agent).
+- Sidecars/agents or file-sinks are enabled only under minimal, explicit signals (e.g., Koan:Secrets:Provider=Vault or VAULT_ADDR present), keeping Reference = Intent predictable without surprising topology changes.
 
 6. Safety, health, and observability
 
@@ -59,7 +59,7 @@ We will introduce a secrets module with a provider chain and a configuration-res
 In scope
 
 - Secrets abstractions and resolver chain; configuration source for on-read expansion.
-- DI wiring via SoraAutoRegistrar; explicit reference syntax and parsing rules.
+- DI wiring via KoanAutoRegistrar; explicit reference syntax and parsing rules.
 - Orchestration exporter behavior (secretsRefOnly), envRef contract, and sidecar hints policy.
 
 Out of scope (this ADR)
@@ -98,8 +98,8 @@ Configuration
 
 DI surface
 
-- services.AddSoraSecrets(o => { /_ options _/ }).UseDefaultChain().AddProvider<T>()
-- Providers auto-register via SoraAutoRegistrar; order is deterministic and user-overridable.
+- services.AddKoanSecrets(o => { /_ options _/ }).UseDefaultChain().AddProvider<T>()
+- Providers auto-register via KoanAutoRegistrar; order is deterministic and user-overridable.
 
 Parsing and placeholders
 

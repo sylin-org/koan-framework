@@ -4,12 +4,12 @@ slug: DX-0028-service-project-naming-and-conventions
 domain: DX
 status: Accepted
 date: 2025-08-17
-title: Service project naming and conventions (Sora.Service.*)
+title: Service project naming and conventions (Koan.Service.*)
 ---
  
-# 0028: Service project naming and conventions (Sora.Service.*)
+# 0028: Service project naming and conventions (Koan.Service.*)
 
-Owners: Sora Core
+Owners: Koan Core
 
 ## Context
 
@@ -17,12 +17,12 @@ We’ve introduced standalone HTTP services (e.g., Inbox over Redis). To avoid n
 
 ## Decision
 
-- Prefix all standalone services with `Sora.Service.*` in source/assemblies.
-  - Example: `Sora.Service.Inbox.Redis`.
+- Prefix all standalone services with `Koan.Service.*` in source/assemblies.
+  - Example: `Koan.Service.Inbox.Redis`.
 - Docker/K8s image/runtime names use hyphenated form:
-  - Example image/app name: `sora-service-inbox-redis`.
+  - Example image/app name: `Koan-service-inbox-redis`.
 - Client libraries remain under capability domains:
-  - Example: `Sora.Messaging.Inbox.Http`.
+  - Example: `Koan.Messaging.Inbox.Http`.
 - Apply this policy retroactively to existing services and prospectively to new ones.
 
 ## Rationale
@@ -33,8 +33,8 @@ We’ve introduced standalone HTTP services (e.g., Inbox over Redis). To avoid n
 
 ## Consequences
 
-- `Sora.Inbox.Redis` is renamed to `Sora.Service.Inbox.Redis`.
-- Docs, samples, and compose files should reference `sora-service-*` images.
+- `Koan.Inbox.Redis` is renamed to `Koan.Service.Inbox.Redis`.
+- Docs, samples, and compose files should reference `Koan-service-*` images.
 - Build, publish, and discovery scripts should be updated to new names.
 
 ## Follow-ups

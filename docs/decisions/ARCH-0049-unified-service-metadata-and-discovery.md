@@ -15,17 +15,17 @@ The CLI contained multiple separation-of-concerns violations by inferring servic
 
 Adopt a unified attribute and manifest schema for all service adapters and make CLI/Planner consume only declared metadata.
 
-- Single attribute [SoraService] on adapter types implementing IServiceAdapter.
+- Single attribute [KoanService] on adapter types implementing IServiceAdapter.
 - Manifest fields include kind, shortCode, qualifiedCode, name, description, deploymentKind, containerImage, defaultTag, defaultPorts, healthEndpoint, capabilities, provides, consumes.
 - Generator emits manifest JSON (schemaVersion=1) with the above fields, decoupled from runtime enums.
 - Planner and CLI derive dependencies and grouping exclusively from declared kinds and relations; remove all heuristics from Program.cs.
 
 ## Scope
 
-- Orchestration.Abstractions: new ServiceKind enum, IServiceAdapter/ISoraService interfaces, SoraServiceAttribute.
+- Orchestration.Abstractions: new ServiceKind enum, IServiceAdapter/IKoanService interfaces, KoanServiceAttribute.
 - Orchestration.Generators: extend manifest to emit unified fields.
 - Orchestration.Cli: replace all heuristic detection with plan-based logic; render kind/type and image:tag where available.
-- Adapters (DB/Vector/AI/Auth): annotate with [SoraService].
+- Adapters (DB/Vector/AI/Auth): annotate with [KoanService].
 
 ## Consequences
 
@@ -36,7 +36,7 @@ Adopt a unified attribute and manifest schema for all service adapters and make 
 ## Implementation notes
 
 - Keep Kind a closed enum; Subtype an open string taxonomy.
-- Support simple shortCode (e.g., "mongo") and fully-qualified code (e.g., "sora.db.relational.postgres").
+- Support simple shortCode (e.g., "mongo") and fully-qualified code (e.g., "Koan.db.relational.postgres").
 - Include container image and tag when deploymentKind==Container; allow profile overrides.
 - Known capability keys per kind; allow vendor.* extensions.
 

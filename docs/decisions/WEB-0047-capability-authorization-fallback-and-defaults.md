@@ -1,4 +1,4 @@
-﻿---
+---
 id: WEB-0047
 slug: capability-authorization-fallback-and-defaults
 domain: Web
@@ -9,7 +9,7 @@ title: Capability authorization — global allow/deny fallback and per-entity de
 
 ## Context
 
-Sora exposes generic capability controllers for moderation, soft-delete, and audit. These endpoints must enforce authorization consistently without forcing bespoke controllers. Teams need a clear policy for:
+Koan exposes generic capability controllers for moderation, soft-delete, and audit. These endpoints must enforce authorization consistently without forcing bespoke controllers. Teams need a clear policy for:
 
 - How permissions are resolved per capability action.
 - What happens when no explicit mapping is configured for an entity/action.

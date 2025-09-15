@@ -7,9 +7,9 @@
 
 ---
 
-## 🏛️ Sora Framework Pillars Reference
+## 🏛️ Koan Framework Pillars Reference
 
-This document provides detailed reference information for all Sora Framework pillars, their capabilities, APIs, and configuration options.
+This document provides detailed reference information for all Koan Framework pillars, their capabilities, APIs, and configuration options.
 
 ---
 
@@ -17,23 +17,23 @@ This document provides detailed reference information for all Sora Framework pil
 
 | Pillar            | Package              | Purpose                                      | Dependencies          |
 | ----------------- | -------------------- | -------------------------------------------- | --------------------- |
-| **Core**          | `Sora.Core`          | Foundation, auto-registration, health checks | None                  |
-| **Web**           | `Sora.Web`           | HTTP, controllers, authentication            | Core                  |
-| **Data**          | `Sora.Data.*`        | Database abstraction, CQRS                   | Core                  |
-| **Storage**       | `Sora.Storage`       | File/blob handling                           | Core                  |
-| **Media**         | `Sora.Media`         | Media processing, HTTP endpoints             | Core, Storage         |
-| **Messaging**     | `Sora.Messaging.*`   | Message queues, event handling               | Core                  |
-| **AI**            | `Sora.AI`            | Chat, embeddings, vector search              | Core                  |
-| **Flow**          | `Sora.Flow`          | Data pipeline, identity mapping              | Core, Data, Messaging |
-| **Recipes**       | `Sora.Recipe.*`      | Best-practice bundles                        | Core                  |
-| **Orchestration** | `Sora.Orchestration` | DevHost CLI, container management            | Core                  |
-| **Scheduling**    | `Sora.Scheduling`    | Background jobs, startup tasks               | Core                  |
+| **Core**          | `Koan.Core`          | Foundation, auto-registration, health checks | None                  |
+| **Web**           | `Koan.Web`           | HTTP, controllers, authentication            | Core                  |
+| **Data**          | `Koan.Data.*`        | Database abstraction, CQRS                   | Core                  |
+| **Storage**       | `Koan.Storage`       | File/blob handling                           | Core                  |
+| **Media**         | `Koan.Media`         | Media processing, HTTP endpoints             | Core, Storage         |
+| **Messaging**     | `Koan.Messaging.*`   | Message queues, event handling               | Core                  |
+| **AI**            | `Koan.AI`            | Chat, embeddings, vector search              | Core                  |
+| **Flow**          | `Koan.Flow`          | Data pipeline, identity mapping              | Core, Data, Messaging |
+| **Recipes**       | `Koan.Recipe.*`      | Best-practice bundles                        | Core                  |
+| **Orchestration** | `Koan.Orchestration` | DevHost CLI, container management            | Core                  |
+| **Scheduling**    | `Koan.Scheduling`    | Background jobs, startup tasks               | Core                  |
 
 ---
 
 ## 🏗️ Core Pillar
 
-### Package: `Sora.Core`
+### Package: `Koan.Core`
 
 The foundational layer providing auto-registration, configuration, and health checks.
 
@@ -41,7 +41,7 @@ The foundational layer providing auto-registration, configuration, and health ch
 
 ```csharp
 // Auto-Registration
-public interface ISoraAutoRegistrar
+public interface IKoanAutoRegistrar
 {
     string ModuleName { get; }
     string? ModuleVersion { get; }
@@ -71,7 +71,7 @@ public class HealthReport
 }
 
 // Environment Helpers
-public static class SoraEnv
+public static class KoanEnv
 {
     public static string Environment { get; }
     public static bool IsProduction { get; }
@@ -81,7 +81,7 @@ public static class SoraEnv
 }
 
 // Configuration Helpers
-public static class SoraConfiguration
+public static class KoanConfiguration
 {
     public static T Read<T>(IConfiguration configuration, string key) where T : new();
     public static T ReadFirst<T>(IConfiguration configuration, params string[] keys) where T : new();
@@ -92,7 +92,7 @@ public static class SoraConfiguration
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Core": {
       "EnableBootReport": true,
       "EnableTelemetry": false,
@@ -106,7 +106,7 @@ public static class SoraConfiguration
 
 ```csharp
 // Auto-registration
-builder.Services.AddSora(); // Discovers all ISoraAutoRegistrar implementations
+builder.Services.AddKoan(); // Discovers all IKoanAutoRegistrar implementations
 
 // Custom health contributor
 public class DatabaseHealthCheck : IHealthContributor
@@ -134,7 +134,7 @@ public class DatabaseHealthCheck : IHealthContributor
 
 ## 🌐 Web Pillar
 
-### Package: `Sora.Web`
+### Package: `Koan.Web`
 
 HTTP layer with controllers, security, and authentication.
 
@@ -189,7 +189,7 @@ public interface IWebCapability<T> where T : IEntity
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Web": {
       "EnableSwagger": true,
       "CorsOrigins": ["http://localhost:3000"],
@@ -237,7 +237,7 @@ public interface IWebCapability<T> where T : IEntity
 #### Well-Known Endpoints
 
 - `GET /.well-known/auth/providers` - Available auth providers
-- `GET /.well-known/sora/capabilities` - Framework capabilities
+- `GET /.well-known/Koan/capabilities` - Framework capabilities
 - `POST /auth/challenge/{provider}` - Authentication challenge
 - `POST /auth/callback` - Authentication callback
 - `POST /auth/logout` - Sign out
@@ -296,7 +296,7 @@ public class OrdersController : EntityController<Order>
 
 ## 💾 Data Pillar
 
-### Packages: `Sora.Data.Core`, `Sora.Data.Sqlite`, `Sora.Data.Postgres`, `Sora.Data.MongoDB`, etc.
+### Packages: `Koan.Data.Core`, `Koan.Data.Sqlite`, `Koan.Data.Postgres`, `Koan.Data.MongoDB`, etc.
 
 Unified data access across multiple database providers.
 
@@ -373,19 +373,19 @@ public static class Data<T, TKey> where T : class, IEntity<TKey>
 
 | Provider       | Package               | Capabilities                      | Production Ready |
 | -------------- | --------------------- | --------------------------------- | ---------------- |
-| **SQLite**     | `Sora.Data.Sqlite`    | Full SQL, JSON, FTS               | ✅               |
-| **PostgreSQL** | `Sora.Data.Postgres`  | Full SQL, JSON, Vector (pgvector) | ✅               |
-| **SQL Server** | `Sora.Data.SqlServer` | Full SQL, JSON                    | ✅               |
-| **MongoDB**    | `Sora.Data.MongoDB`   | Document, Aggregation             | ✅               |
-| **Redis**      | `Sora.Data.Redis`     | Key-Value, Vector (HNSW)          | ✅               |
-| **JSON File**  | `Sora.Data.Json`      | File-based JSON                   | ✅ Dev only      |
-| **Weaviate**   | `Sora.Data.Weaviate`  | Vector, GraphQL                   | ✅               |
+| **SQLite**     | `Koan.Data.Sqlite`    | Full SQL, JSON, FTS               | ✅               |
+| **PostgreSQL** | `Koan.Data.Postgres`  | Full SQL, JSON, Vector (pgvector) | ✅               |
+| **SQL Server** | `Koan.Data.SqlServer` | Full SQL, JSON                    | ✅               |
+| **MongoDB**    | `Koan.Data.MongoDB`   | Document, Aggregation             | ✅               |
+| **Redis**      | `Koan.Data.Redis`     | Key-Value, Vector (HNSW)          | ✅               |
+| **JSON File**  | `Koan.Data.Json`      | File-based JSON                   | ✅ Dev only      |
+| **Weaviate**   | `Koan.Data.Weaviate`  | Vector, GraphQL                   | ✅               |
 
 #### Configuration
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Data": {
       "DefaultProvider": "Postgres",
       "EnableQueryLogging": false,
@@ -408,7 +408,7 @@ public static class Data<T, TKey> where T : class, IEntity<TKey>
       "Vector": {
         "DefaultProvider": "Redis",
         "Redis": {
-          "IndexPrefix": "sora:",
+          "IndexPrefix": "Koan:",
           "DefaultDimensions": 1536
         }
       }
@@ -471,7 +471,7 @@ var customResults = await Data<Product, string>.QueryAsync(@"
 
 ## 🗄️ Storage Pillar
 
-### Package: `Sora.Storage`
+### Package: `Koan.Storage`
 
 File and blob storage with profile-based routing.
 
@@ -537,16 +537,16 @@ public interface IStorageProvider
 
 | Provider         | Package                    | Capabilities                           | Production Ready |
 | ---------------- | -------------------------- | -------------------------------------- | ---------------- |
-| **Local File**   | `Sora.Storage.Local`       | Filesystem, range reads, atomic writes | ✅               |
-| **Azure Blob**   | `Sora.Storage.Azure`       | Blob storage, CDN, presigned URLs      | 🚧 Planned       |
-| **AWS S3**       | `Sora.Storage.S3`          | Object storage, presigned URLs         | 🚧 Planned       |
-| **Google Cloud** | `Sora.Storage.GoogleCloud` | Cloud storage, CDN                     | 🚧 Planned       |
+| **Local File**   | `Koan.Storage.Local`       | Filesystem, range reads, atomic writes | ✅               |
+| **Azure Blob**   | `Koan.Storage.Azure`       | Blob storage, CDN, presigned URLs      | 🚧 Planned       |
+| **AWS S3**       | `Koan.Storage.S3`          | Object storage, presigned URLs         | 🚧 Planned       |
+| **Google Cloud** | `Koan.Storage.GoogleCloud` | Cloud storage, CDN                     | 🚧 Planned       |
 
 #### Configuration
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Storage": {
       "DefaultProfile": "Default",
       "Profiles": {
@@ -623,7 +623,7 @@ await _storage.CopyAsync("temp/file.txt", "permanent/file.txt",
 
 ## 📺 Media Pillar
 
-### Package: `Sora.Media`
+### Package: `Koan.Media`
 
 First-class media handling with HTTP endpoints and transforms.
 
@@ -704,7 +704,7 @@ public class MediaController : ControllerBase
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Media": {
       "DefaultStorageProfile": "Media",
       "MaxUploadSize": 10485760,
@@ -790,7 +790,7 @@ public class ProductImage : MediaObject<ProductImage>
 
 ## 📨 Messaging Pillar
 
-### Packages: `Sora.Messaging.Core`, `Sora.Messaging.RabbitMq`, `Sora.Messaging.Redis`
+### Packages: `Koan.Messaging.Core`, `Koan.Messaging.RabbitMq`, `Koan.Messaging.Redis`
 
 Reliable messaging with multiple transport support.
 
@@ -845,21 +845,21 @@ public interface IMessageTransport
 
 | Transport     | Package                   | Capabilities               | Production Ready |
 | ------------- | ------------------------- | -------------------------- | ---------------- |
-| **RabbitMQ**  | `Sora.Messaging.RabbitMq` | Full AMQP, DLQ, clustering | ✅               |
-| **Redis**     | `Sora.Messaging.Redis`    | Pub/sub, streams           | ✅               |
-| **In-Memory** | `Sora.Messaging.Core`     | Testing, development       | ✅ Dev only      |
+| **RabbitMQ**  | `Koan.Messaging.RabbitMq` | Full AMQP, DLQ, clustering | ✅               |
+| **Redis**     | `Koan.Messaging.Redis`    | Pub/sub, streams           | ✅               |
+| **In-Memory** | `Koan.Messaging.Core`     | Testing, development       | ✅ Dev only      |
 
 #### Configuration
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Messaging": {
       "DefaultTransport": "RabbitMq",
       "RabbitMq": {
         "ConnectionString": "amqp://guest:guest@localhost:5672",
         "VirtualHost": "/",
-        "ExchangeName": "sora.events",
+        "ExchangeName": "Koan.events",
         "EnableDeadLetterQueue": true,
         "MaxRetries": 3
       },
@@ -947,7 +947,7 @@ public class ReportService : BackgroundService
 
 ## 🤖 AI Pillar
 
-### Package: `Sora.AI`
+### Package: `Koan.AI`
 
 AI capabilities with chat, embeddings, and vector search.
 
@@ -1002,15 +1002,15 @@ public interface IAiBudgetManager
 
 | Provider         | Package                   | Capabilities           | Production Ready |
 | ---------------- | ------------------------- | ---------------------- | ---------------- |
-| **Ollama**       | `Sora.AI.Provider.Ollama` | Local LLMs, streaming  | ✅               |
-| **OpenAI**       | `Sora.AI.Provider.OpenAI` | GPT models, embeddings | 🚧 Planned       |
-| **Azure OpenAI** | `Sora.AI.Provider.Azure`  | Enterprise GPT         | 🚧 Planned       |
+| **Ollama**       | `Koan.AI.Provider.Ollama` | Local LLMs, streaming  | ✅               |
+| **OpenAI**       | `Koan.AI.Provider.OpenAI` | GPT models, embeddings | 🚧 Planned       |
+| **Azure OpenAI** | `Koan.AI.Provider.Azure`  | Enterprise GPT         | 🚧 Planned       |
 
 #### Configuration
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "AI": {
       "DefaultProvider": "Ollama",
       "Budget": {
@@ -1116,7 +1116,7 @@ public class DocumentService
 
 ## 🌊 Flow Pillar
 
-### Package: `Sora.Flow`
+### Package: `Koan.Flow`
 
 Data pipeline for ingestion, transformation, and identity resolution.
 
@@ -1206,7 +1206,7 @@ public enum ExternalIdPolicy
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Flow": {
       "EnableInterceptors": true,
       "ExternalIdPolicy": "AutoPopulate",
@@ -1272,7 +1272,7 @@ public class ShopifyAdapter : BackgroundService
 }
 
 // Interceptors
-public class ProductInterceptor : ISoraAutoRegistrar
+public class ProductInterceptor : IKoanAutoRegistrar
 {
     public void Initialize(IServiceCollection services)
     {

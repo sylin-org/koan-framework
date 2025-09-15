@@ -1,6 +1,6 @@
-﻿# Building Messaging Queue Adapters
+# Building Messaging Queue Adapters
 
-Implementing a messaging transport or inbox provider in Sora.
+Implementing a messaging transport or inbox provider in Koan.
 
 Surfaces
 - Producer: IBus and IMessageBatch plumbing; advertise batching and delivery semantics.
@@ -9,7 +9,7 @@ Surfaces
 
 Steps
 1) Package and DI
-   - Create src/Sora.Messaging.<Adapter>/ (transport) or src/Sora.Messaging.Inbox.<Adapter>/. 
+   - Create src/Koan.Messaging.<Adapter>/ (transport) or src/Koan.Messaging.Inbox.<Adapter>/. 
    - Add Add<Adapter>Messaging() / Add<Adapter>Inbox() DI extensions with options and health checks.
 
 2) Naming
@@ -32,5 +32,5 @@ Steps
 
 References
 - Messaging reference: reference/messaging.md
-- RabbitMQ sample: src/Sora.Messaging.RabbitMq/
-- Inbox contracts: src/Sora.Messaging.Inbox.*
+- RabbitMQ sample: src/Koan.Messaging.RabbitMq/
+- Inbox contracts: src/Koan.Messaging.Inbox.*

@@ -1,7 +1,7 @@
 # AI Interop Matrix
 
 Purpose
-- Provide a concise mapping from Sora’s native REST + SSE endpoints to other AI protocol surfaces for teams that need interop.
+- Provide a concise mapping from Koan’s native REST + SSE endpoints to other AI protocol surfaces for teams that need interop.
 - REST + SSE is authoritative. Other surfaces are optional adapters; scope and limits are documented here.
 
 Native endpoints (authoritative)
@@ -11,9 +11,9 @@ Native endpoints (authoritative)
 - GET /ai/models
 
 Common headers (native)
-- Sora-AI-Provider, Sora-AI-Model, Sora-AI-Streaming: true|false
-- Sora-Session-Id, Sora-Tenant, Sora-Project
-- Sora-Vector-Provider (for RAG)
+- Koan-AI-Provider, Koan-AI-Model, Koan-AI-Streaming: true|false
+- Koan-Session-Id, Koan-Tenant, Koan-Project
+- Koan-Vector-Provider (for RAG)
 
 gRPC mapping (internal S2S; optional)
 - Service AiChatService
@@ -24,7 +24,7 @@ gRPC mapping (internal S2S; optional)
   - rpc Query(stream RagRequest) returns (stream RagChunk)
 Notes
 - Bidirectional streaming mirrors SSE. Metadata carries tenant/session/model.
-- Feature flagged; versioned proto package: sora.ai.v1
+- Feature flagged; versioned proto package: Koan.ai.v1
 
 OpenAI-compatible shim (scoped subset; optional)
 - POST /v1/chat/completions → maps to /ai/chat
@@ -35,24 +35,24 @@ Notes
 
 MCP (Model Context Protocol) adapter (desirable; optional)
 - Tools
-  - sora.chat tool → calls /ai/chat
-  - sora.embed tool → calls /ai/embed
-  - sora.rag tool → calls /ai/rag/query
+  - Koan.chat tool → calls /ai/chat
+  - Koan.embed tool → calls /ai/embed
+  - Koan.rag tool → calls /ai/rag/query
 - Resources
-  - sora.models resource → enumerates /ai/models
+  - Koan.models resource → enumerates /ai/models
 Notes
-- Tool allow-list integrates with Sora’s safe tool registry; tenant/session propagated in resource params.
+- Tool allow-list integrates with Koan’s safe tool registry; tenant/session propagated in resource params.
 
 AI-RPC adapter (desirable; optional)
 - Methods
   - ai.chat → /ai/chat
   - ai.embed → /ai/embed
 Notes
-- Map method metadata to Sora headers; streaming parity depends on AI-RPC client capabilities.
+- Map method metadata to Koan headers; streaming parity depends on AI-RPC client capabilities.
 
 Headers/metadata mapping
-- Tenant/Project: gRPC metadata keys (sora-tenant, sora-project); OpenAI shim uses API key scoping if available; MCP/AI-RPC pass via params/metadata.
-- Provider/Model: prefer Sora-AI-Provider/Sora-AI-Model headers; for shim, use model field mapping.
+- Tenant/Project: gRPC metadata keys (Koan-tenant, Koan-project); OpenAI shim uses API key scoping if available; MCP/AI-RPC pass via params/metadata.
+- Provider/Model: prefer Koan-AI-Provider/Koan-AI-Model headers; for shim, use model field mapping.
 - Streaming: gRPC streams by default; REST uses SSE; shim uses stream:true when supported by client.
 
 Capabilities and limits
@@ -65,4 +65,4 @@ Testing
 
 References
 - ADR: AI-0005 — Protocol surfaces (gRPC, OpenAI shim, MCP, AI-RPC)
-- Epic: Native AI Sora — W2 story
+- Epic: Native AI Koan — W2 story

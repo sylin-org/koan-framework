@@ -2,7 +2,7 @@
 
 **Zero to Completion Development Plan**
 
-This document provides step-by-step implementation instructions for the S8.Location canonical location standardization system, following Sora Framework patterns and established architectural decisions.
+This document provides step-by-step implementation instructions for the S8.Location canonical location standardization system, following Koan Framework patterns and established architectural decisions.
 
 ---
 
@@ -15,11 +15,11 @@ This document provides step-by-step implementation instructions for the S8.Locat
 - **Git** (for version control)
 
 ### Framework Dependencies
-All dependencies are handled automatically via Sora's self-registration:
-- ✅ **Sora.Data** (MongoDB integration)
-- ✅ **Sora.Flow** (Flow entity and orchestrator support)
-- ✅ **Sora.Messaging** (RabbitMQ integration)  
-- ✅ **Sora.AI** (Ollama provider for address correction)
+All dependencies are handled automatically via Koan's self-registration:
+- ✅ **Koan.Data** (MongoDB integration)
+- ✅ **Koan.Flow** (Flow entity and orchestrator support)
+- ✅ **Koan.Messaging** (RabbitMQ integration)  
+- ✅ **Koan.AI** (Ollama provider for address correction)
 
 ### External Services
 - **Google Maps Geocoding API** (API key required)
@@ -35,8 +35,8 @@ All dependencies are handled automatically via Sora's self-registration:
 
 **File: `S8.Location.Core/Models/Location.cs`**
 ```csharp
-using Sora.Flow.Model;
-using Sora.Data.Abstractions.Annotations;
+using Koan.Flow.Model;
+using Koan.Data.Abstractions.Annotations;
 
 namespace S8.Location.Core.Models;
 
@@ -58,8 +58,8 @@ public enum LocationStatus
 
 **File: `S8.Location.Core/Models/AgnosticLocation.cs`**
 ```csharp
-using Sora.Data.Core.Model;
-using Sora.Data.Abstractions.Annotations;
+using Koan.Data.Core.Model;
+using Koan.Data.Abstractions.Annotations;
 
 namespace S8.Location.Core.Models;
 
@@ -89,8 +89,8 @@ public enum LocationType
 
 **File: `S8.Location.Core/Models/ResolutionCache.cs`**
 ```csharp
-using Sora.Data.Core.Model;
-using Sora.Data.Abstractions.Annotations;
+using Koan.Data.Core.Model;
+using Koan.Data.Abstractions.Annotations;
 
 namespace S8.Location.Core.Models;
 
@@ -156,7 +156,7 @@ public class AiOptions
 
 ### 1.3 Create Self-Registration Module
 
-**File: `S8.Location.Core/Initialization/SoraAutoRegistrar.cs`**
+**File: `S8.Location.Core/Initialization/KoanAutoRegistrar.cs`**
 ```csharp
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -165,20 +165,20 @@ using Microsoft.Extensions.Hosting;
 using S8.Location.Core.Options;
 using S8.Location.Core.Services;
 using S8.Location.Core.Health;
-using Sora.Core;
-using Sora.Core.Hosting.Bootstrap;
+using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace S8.Location.Core.Initialization;
 
-public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
+public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "S8.Location";
-    public string? ModuleVersion => typeof(SoraAutoRegistrar).Assembly.GetName().Version?.ToString();
+    public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
         // Register configuration options
-        services.AddSoraOptions<LocationOptions>();
+        services.AddKoanOptions<LocationOptions>();
         
         // Register core services
         services.AddScoped<IAddressResolutionService, AddressResolutionService>();
@@ -225,12 +225,12 @@ public sealed class SoraAutoRegistrar : ISoraAutoRegistrar
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Core Sora Framework -->
-    <ProjectReference Include="..\..\..\..\src\Sora.Core\Sora.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Sora.Flow.Core\Sora.Flow.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Sora.Messaging\Sora.Messaging.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
+    <!-- Core Koan Framework -->
+    <ProjectReference Include="..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Flow.Core\Koan.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Messaging\Koan.Messaging.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
     
     <!-- External dependencies -->
     <PackageReference Include="System.Text.Json" Version="9.0.0" />
@@ -302,8 +302,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S8.Location.Core.Models;
 using S8.Location.Core.Options;
-using Sora.AI.Contracts;
-using Sora.Data.Core;
+using Koan.AI.Contracts;
+using Koan.Data.Core;
 
 namespace S8.Location.Core.Services;
 
@@ -563,8 +563,8 @@ public class GoogleMapsGeocodingService : IGeocodingService
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Models;
 using S8.Location.Core.Services;
-using Sora.Flow.Attributes;
-using Sora.Flow.Core.Orchestration;
+using Koan.Flow.Attributes;
+using Koan.Flow.Core.Orchestration;
 
 namespace S8.Location.Core.Orchestration;
 
@@ -627,7 +627,7 @@ public class LocationOrchestrator : IFlowOrchestrator<Location>
 
 **File: `S8.Location.Core/Models/LocationEvents.cs`**
 ```csharp
-using Sora.Flow.Model;
+using Koan.Flow.Model;
 
 namespace S8.Location.Core.Models;
 
@@ -657,7 +657,7 @@ public class LocationErrorEvent : FlowValueObject<LocationErrorEvent>
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using S8.Location.Core.Models;
-using Sora.Data.Core;
+using Koan.Data.Core;
 
 namespace S8.Location.Api.Controllers;
 
@@ -737,20 +737,20 @@ public record CreateLocationRequest(string Address, string? ExternalId = null);
 **File: `S8.Location.Api/Program.cs`**
 ```csharp
 using S8.Location.Core.Models;
-using Sora.Data.Core;
-using Sora.Flow.Initialization;
-using Sora.Web.Swagger;
+using Koan.Data.Core;
+using Koan.Flow.Initialization;
+using Koan.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Sora framework with auto-configuration
-builder.Services.AddSora();
+// Koan framework with auto-configuration
+builder.Services.AddKoan();
 
 // Initialize Flow transport handler  
 builder.Services.AddFlowTransportHandler();
 
 // Container environment requirement
-if (!Sora.Core.SoraEnv.InContainer)
+if (!Koan.Core.KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Location.Api requires container environment. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -758,7 +758,7 @@ if (!Sora.Core.SoraEnv.InContainer)
 
 builder.Services.AddControllers();
 builder.Services.AddRouting();
-builder.Services.AddSoraSwagger(builder.Configuration);
+builder.Services.AddKoanSwagger(builder.Configuration);
 
 var app = builder.Build();
 
@@ -795,7 +795,7 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.UseSoraSwagger();
+app.UseKoanSwagger();
 
 app.Run();
 ```
@@ -811,12 +811,12 @@ app.Run();
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Models;
-using Sora.Core;
-using Sora.Flow.Attributes;
+using Koan.Core;
+using Koan.Flow.Attributes;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-if (!SoraEnv.InContainer)
+if (!KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Location.Adapters.Inventory is container-only. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -826,8 +826,8 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Sora framework with auto-configuration
-builder.Services.AddSora();
+// Koan framework with auto-configuration
+builder.Services.AddKoan();
 
 var app = builder.Build();
 await app.RunAsync();
@@ -902,12 +902,12 @@ public sealed class InventoryLocationAdapter : BackgroundService
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Models;
-using Sora.Core;
-using Sora.Flow.Attributes;
+using Koan.Core;
+using Koan.Flow.Attributes;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-if (!SoraEnv.InContainer)
+if (!KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Location.Adapters.Healthcare is container-only. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -917,8 +917,8 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Sora framework with auto-configuration  
-builder.Services.AddSora();
+// Koan framework with auto-configuration  
+builder.Services.AddKoan();
 
 var app = builder.Build();
 await app.RunAsync();
@@ -1051,15 +1051,15 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:4914
       # MongoDB Configuration
-      Sora__Data__Mongo__Database: s8location
-      SORA_DATA_MONGO_DATABASE: s8location
+      Koan__Data__Mongo__Database: s8location
+      Koan_DATA_MONGO_DATABASE: s8location
       # RabbitMQ Configuration
-      SORA_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
+      Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
       # AI Configuration
-      Sora__Ai__Services__Ollama__0__Id: "ollama"
-      Sora__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
-      Sora__Ai__Services__Ollama__0__DefaultModel: "llama3.1:8b"
-      Sora__Ai__Services__Ollama__0__Enabled: "true"
+      Koan__Ai__Services__Ollama__0__Id: "ollama"
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Koan__Ai__Services__Ollama__0__DefaultModel: "llama3.1:8b"
+      Koan__Ai__Services__Ollama__0__Enabled: "true"
       # Location-specific configuration
       S8__Location__Resolution__CacheEnabled: "true"
       S8__Location__Geocoding__GoogleMapsApiKey: "${GOOGLE_MAPS_API_KEY:-}"
@@ -1080,8 +1080,8 @@ services:
       dockerfile: samples/S8.Location/S8.Location.Adapters.Inventory/Dockerfile
     container_name: s8-location-adapter-inventory
     environment:
-      SORA_DATA_MONGO_DATABASE: s8location
-      SORA_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
+      Koan_DATA_MONGO_DATABASE: s8location
+      Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
       DOTNET_ENVIRONMENT: Development
     depends_on:
       mongo:
@@ -1095,8 +1095,8 @@ services:
       dockerfile: samples/S8.Location/S8.Location.Adapters.Healthcare/Dockerfile
     container_name: s8-location-adapter-healthcare
     environment:
-      SORA_DATA_MONGO_DATABASE: s8location
-      SORA_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
+      Koan_DATA_MONGO_DATABASE: s8location
+      Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
       DOTNET_ENVIRONMENT: Development
     depends_on:
       mongo:
@@ -1122,7 +1122,7 @@ pushd "%SCRIPT_DIR%"
 
 REM Use the compose file living under S8.Compose
 set COMPOSE_FILE=S8.Compose\docker-compose.yml
-set PROJECT_NAME=sora-s8-location
+set PROJECT_NAME=Koan-s8-location
 set API_URL=http://localhost:4914
 
 where docker >nul 2>nul
@@ -1229,8 +1229,8 @@ using Microsoft.Extensions.Options;
 using S8.Location.Core.Models;
 using S8.Location.Core.Options;
 using S8.Location.Core.Services;
-using Sora.Core.Health;
-using Sora.Data.Core;
+using Koan.Core.Health;
+using Koan.Data.Core;
 
 namespace S8.Location.Core.Health;
 
@@ -1320,7 +1320,7 @@ public class LocationHealthContributor : IHealthContributor
 - [x] Location FlowEntity model
 - [x] AgnosticLocation canonical storage
 - [x] ResolutionCache for SHA512 deduplication
-- [x] SoraAutoRegistrar self-registration
+- [x] KoanAutoRegistrar self-registration
 - [x] Configuration options
 
 ### Resolution Pipeline ✅
@@ -1363,11 +1363,11 @@ public class LocationHealthContributor : IHealthContributor
 ✅ **Cost Optimization**: <$0.0005 per address resolution  
 ✅ **Sequential Processing**: No race conditions or duplicate canonicals  
 ✅ **Source Attribution**: Perfect traceability via Flow identity.external  
-✅ **Developer Experience**: Follows Sora Framework patterns exactly  
+✅ **Developer Experience**: Follows Koan Framework patterns exactly  
 
 ---
 
 **Implementation Status**: Ready for Development  
 **Estimated Effort**: 8 development days  
-**Framework Dependencies**: ✅ All available in Sora Framework  
+**Framework Dependencies**: ✅ All available in Koan Framework  
 **External Dependencies**: Google Maps API key (optional, has fallback)

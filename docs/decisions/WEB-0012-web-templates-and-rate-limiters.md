@@ -19,6 +19,6 @@ Decision
 - Apps are responsible for registering a limiter via `AddRateLimiter(...)` when they opt in to rate limiting.
 
 Consequences
-- Sora.Web has no hard dependency on the rate limiting package; apps control it.
+- Koan.Web has no hard dependency on the rate limiting package; apps control it.
 - Enabling `WithRateLimit()` without registering a limiter is safe; `UseRateLimiter()` becomes a no-op.
 - Documentation and samples show registering a simple fixed-window limiter in the app.

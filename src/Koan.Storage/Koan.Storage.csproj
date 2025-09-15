@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Storage core for Koan: contracts, orchestrator, routing, and options.</Description>
+    <PackageTags>$(CommonPackageTags);storage;files;blobs;providers</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.8" />
+  <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.8" />
+  <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.8" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>

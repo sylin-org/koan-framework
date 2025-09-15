@@ -1,7 +1,7 @@
-﻿# Sora documentation engagement plan
+# Koan documentation engagement plan
 
 Purpose
-- Make Sora’s guidance obvious, accurate, and runnable for developers and architects.
+- Make Koan’s guidance obvious, accurate, and runnable for developers and architects.
 - Drive a populate-first, then migrate approach with clear milestones, quality gates, and ownership.
 
 Guiding principles

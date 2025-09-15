@@ -68,7 +68,7 @@ Building on the concept of distinct operational modes, here are refined UI propo
 │ │                           │ │                            │ │
 │ │ ## Quick Setup            │ │ Quick Setup                │ │
 │ │ ```bash                   │ │ --------                   │ │
-│ │ npm install sora          │ │ npm install sora           │ │
+│ │ npm install Koan          │ │ npm install Koan           │ │
 │ │ ```                       │ │                            │ │
 │ │                           │ │                            │ │
 │ │ [🤖 AI writing assist...]  │ │ [📎 Attachments: 2 files] │ │

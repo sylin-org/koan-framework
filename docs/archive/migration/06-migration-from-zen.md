@@ -1,11 +1,11 @@
-# Migration from Zen to Sora
+# Migration from Zen to Koan
 
-Sora modernizes and modularizes the former Zen framework. Key notes:
+Koan modernizes and modularizes the former Zen framework. Key notes:
 
-- Namespaces: move to `Sora.*` packages.
+- Namespaces: move to `Koan.*` packages.
 - Data: annotate aggregates with `Identifier` and `Index` (property-anchored).
 - Relational: complex properties stored as JSON; ensure hydration logic.
-- Dialects: move to provider packages (e.g., SqliteDialect -> Sora.Data.Sqlite).
+- Dialects: move to provider packages (e.g., SqliteDialect -> Koan.Data.Sqlite).
 - Instruction API: replace custom escape hatches with `Instruction` + `Execute`.
 
 Strategy:

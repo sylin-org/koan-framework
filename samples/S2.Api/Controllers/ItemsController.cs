@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
-using Sora.Data.Core;
-using Sora.Web.Attributes;
-using Sora.Web.Controllers;
+using Koan.Data.Core;
+using Koan.Web.Attributes;
+using Koan.Web.Controllers;
 
 namespace S2.Api.Controllers;
 
 [Route("api/items")]
-[Sora.Web.Transformers.EnableEntityTransformers]
-[SoraDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
+[Koan.Web.Transformers.EnableEntityTransformers]
+[KoanDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
 public sealed class ItemsController : EntityController<Item>
 {
     [HttpPost("seed/{count}")]

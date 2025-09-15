@@ -1,27 +1,27 @@
-﻿---
+---
 title: Orchestration manifest generator — attribute-driven service metadata
-description: How Sora developers declare orchestration metadata via attributes and let the Roslyn generator produce a manifest consumed by the CLI/analyzer.
+description: How Koan developers declare orchestration metadata via attributes and let the Roslyn generator produce a manifest consumed by the CLI/analyzer.
 ---
 
 # Orchestration manifest generator — attribute-driven service metadata
 
 Contract (at a glance)
 - Inputs: C# attributes on a concrete type in your project/adapter: ServiceId, ContainerDefaults, EndpointDefaults, AppEnvDefaults, HealthEndpointDefaults.
-- Output: a generated in-assembly manifest (`__SoraOrchestrationManifest.Json`) listing services with image, ports, env, volumes, default endpoints (container/local), and optional HTTP health settings.
+- Output: a generated in-assembly manifest (`__KoanOrchestrationManifest.Json`) listing services with image, ports, env, volumes, default endpoints (container/local), and optional HTTP health settings.
 - Error modes: missing `ServiceId` or `ContainerDefaults.Image` → candidate ignored; invalid attribute values → generator skips that piece and continues; generator failures are swallowed to not break builds.
 - Success: the CLI discovers your service deterministically (generator-first), exports Compose with correct ports/env/volumes, emits healthchecks only for HTTP endpoints, and chooses depends_on accordingly.
 
 Scope and precedence
-- Generator-first discovery: the CLI/analyzer prefers the generated `__SoraOrchestrationManifest.Json` when present.
+- Generator-first discovery: the CLI/analyzer prefers the generated `__KoanOrchestrationManifest.Json` when present.
 - Fallbacks (in order): descriptor file → generated manifest → legacy reflection (attributes read at runtime) → demo heuristics as last resort.
 - Health is HTTP-only: only services with `EndpointDefaults` that yield `http` or `https` and a `HealthEndpointDefaults` path get a healthcheck.
 
 ## How it works
 
-During build, the Roslyn source generator scans class declarations for orchestration attributes and collects candidates into a JSON manifest. It then emits a generated file `__SoraOrchestrationManifest.g.cs` that contains:
+During build, the Roslyn source generator scans class declarations for orchestration attributes and collects candidates into a JSON manifest. It then emits a generated file `__KoanOrchestrationManifest.g.cs` that contains:
 
 ```csharp
-namespace Sora.Orchestration { public static class __SoraOrchestrationManifest { public const string Json = "..."; } }
+namespace Koan.Orchestration { public static class __KoanOrchestrationManifest { public const string Json = "..."; } }
 ```
 
 The CLI/analyzer reads this JSON at runtime to build a Plan. No files are written to disk; the manifest travels embedded in the assembly.
@@ -43,7 +43,7 @@ Repo convenience: in this repository, the generator is auto-attached to all proj
   - `UriPattern` overrides the rendered hint (e.g., "postgres://{host}:{port}").
 
 - AppEnvDefaultsAttribute(params string[] keyEqualsValue)
-  - Optional. Application-facing env pairs that the exporter can pass through and that the app can bind to options (e.g., `Sora__Data__Mongo__ConnectionString=...`).
+  - Optional. Application-facing env pairs that the exporter can pass through and that the app can bind to options (e.g., `Koan__Data__Mongo__ConnectionString=...`).
 
 - HealthEndpointDefaultsAttribute(httpPath, IntervalSeconds=15, TimeoutSeconds=2, Retries=5)
   - Optional (HTTP-only). Enables a compose healthcheck via curl when the endpoint scheme is http/https.
@@ -69,7 +69,7 @@ Postgres adapter-style type (container endpoint and mount declared elsewhere):
 
 ```csharp
 [ServiceId("postgres")]
-[ContainerDefaults("postgres", Tag = "16", Ports = new[] { 5432 }, Env = new[] { "POSTGRES_USER=postgres", "POSTGRES_DB=sora" })]
+[ContainerDefaults("postgres", Tag = "16", Ports = new[] { 5432 }, Env = new[] { "POSTGRES_USER=postgres", "POSTGRES_DB=Koan" })]
 [EndpointDefaults(EndpointMode.Container, "postgres", "postgres", 5432, UriPattern = "postgres://{host}:{port}")]
 public sealed class PostgresAdapterFactory {}
 ```
@@ -94,15 +94,15 @@ Local vs container endpoints (both):
 ## Verification
 
 - Build the solution. The generator runs at compile time.
-- Inspect the generated file (optional): `obj/Debug/net*/**/__SoraOrchestrationManifest.g.cs` in your project.
+- Inspect the generated file (optional): `obj/Debug/net*/**/__KoanOrchestrationManifest.g.cs` in your project.
 - From the project folder, run:
 
 ```pwsh
-Sora inspect
-Sora export compose --profile Local
+Koan inspect
+Koan export compose --profile Local
 ```
 
-You should see your service in the Context Card and in `.sora/compose.yml` with ports/env/volumes. If you declared HTTP health, the compose service will include a curl-based healthcheck and upstream services will depend on `service_healthy`; otherwise `service_started`.
+You should see your service in the Context Card and in `.Koan/compose.yml` with ports/env/volumes. If you declared HTTP health, the compose service will include a curl-based healthcheck and upstream services will depend on `service_healthy`; otherwise `service_started`.
 
 ## Common pitfalls
 

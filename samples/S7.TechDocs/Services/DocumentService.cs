@@ -1,7 +1,7 @@
 using S7.TechDocs.Models;
 using S7.TechDocs.Infrastructure;
 
-using Sora.Data.Core.Model;
+using Koan.Data.Core.Model;
 
 namespace S7.TechDocs.Services;
 
@@ -23,16 +23,16 @@ public class DocumentService : IDocumentService
             new()
             {
                 Id = "doc-001",
-                Title = "Getting Started with Sora Framework",
-                Content = @"# Getting Started with Sora Framework
+                Title = "Getting Started with Koan Framework",
+                Content = @"# Getting Started with Koan Framework
 
-Welcome to Sora! This guide will help you set up your first Sora application.
+Welcome to Koan! This guide will help you set up your first Koan application.
 
 ## Quick Setup
 
 ```bash
-dotnet new sora-api
-dotnet add package Sora.Core
+dotnet new Koan-api
+dotnet add package Koan.Core
 ```
 
 ## Your First Controller
@@ -51,8 +51,8 @@ public class ItemsController : ControllerBase
 }
 ```
 
-This creates a basic API with data access using Sora's first-class model methods.",
-                Summary = "Complete setup guide for new Sora applications with examples",
+This creates a basic API with data access using Koan's first-class model methods.",
+                Summary = "Complete setup guide for new Koan applications with examples",
                 Status = Constants.DocumentStatus.Published,
                 CollectionId = Constants.Collections.GettingStarted,
                 AuthorId = "auth-001",
@@ -71,11 +71,11 @@ This creates a basic API with data access using Sora's first-class model methods
                 Title = "API Authentication Best Practices",
                 Content = @"# API Authentication Best Practices
 
-Learn how to secure your Sora APIs with proper authentication.
+Learn how to secure your Koan APIs with proper authentication.
 
 ## TestProvider Setup
 
-For development, use Sora's TestProvider:
+For development, use Koan's TestProvider:
 
 ```csharp
 builder.Services.AddAuthentication(""TestProvider"")
@@ -111,7 +111,7 @@ builder.Services.AddAuthorization(options =>
                 Title = "Data Access Patterns",
                 Content = @"# Data Access Patterns
 
-This guide covers Sora's data access patterns and best practices.
+This guide covers Koan's data access patterns and best practices.
 
 ## First-Class Model Methods
 
@@ -134,7 +134,7 @@ await foreach (var item in Item.AllStream(ct))
     // Process items one by one
 }
 ```",
-                Summary = "Essential patterns for data access using Sora's first-class model methods",
+                Summary = "Essential patterns for data access using Koan's first-class model methods",
                 Status = Constants.DocumentStatus.Draft,
                 CollectionId = Constants.Collections.Guides,
                 AuthorId = "auth-001",
@@ -152,7 +152,7 @@ await foreach (var item in Item.AllStream(ct))
                 Title = "Common Deployment Issues",
                 Content = @"# Common Deployment Issues
 
-Troubleshoot common problems when deploying Sora applications.
+Troubleshoot common problems when deploying Koan applications.
 
 ## Connection String Problems
 
@@ -160,7 +160,7 @@ Make sure your connection strings are properly configured:
 
 ```json
 {
-  ""Sora"": {
+  ""Koan"": {
     ""Data"": {
       ""Postgres"": {
         ""ConnectionString"": ""Server=localhost;Database=myapp;""
@@ -194,17 +194,17 @@ Common Dockerfile problems and solutions...",
 
 ## General Questions
 
-**Q: What is Sora Framework?**
-A: Sora is a greenfield framework for building modern, modular applications with emphasis on simplicity and flexibility.
+**Q: What is Koan Framework?**
+A: Koan is a greenfield framework for building modern, modular applications with emphasis on simplicity and flexibility.
 
 **Q: How does it compare to other frameworks?**
-A: Sora focuses on developer experience with first-class data access patterns and built-in AI capabilities.
+A: Koan focuses on developer experience with first-class data access patterns and built-in AI capabilities.
 
 ## Technical Questions
 
 **Q: Which databases are supported?**
 A: Postgres, MongoDB, Redis, SQLite, and SQL Server are all supported through dedicated adapters.",
-                Summary = "Common questions and answers about Sora Framework",
+                Summary = "Common questions and answers about Koan Framework",
                 Status = Constants.DocumentStatus.Published,
                 CollectionId = Constants.Collections.Faq,
                 AuthorId = "admin-001", 

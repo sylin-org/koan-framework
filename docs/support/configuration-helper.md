@@ -1,10 +1,10 @@
 # Configuration helper and extensions
 
-Sora ships a tiny, resilient configuration helper and a set of `IConfiguration` extensions to keep call sites terse and consistent.
+Koan ships a tiny, resilient configuration helper and a set of `IConfiguration` extensions to keep call sites terse and consistent.
 
 ## TL;DR
 - Prefer `cfg.Read(key, default)` when `IConfiguration` is in scope.
-- Use `Sora.Core.Configuration.Read(key, default)` when it isn’t.
+- Use `Koan.Core.Configuration.Read(key, default)` when it isn’t.
 - Fallbacks: `cfg.ReadFirst(keyA, keyB, ...)` or with default overloads for string/bool/int.
 
 ## Behavior
@@ -13,9 +13,9 @@ Sora ships a tiny, resilient configuration helper and a set of `IConfiguration` 
 - Typed reads with robust conversions (bool on/off/1/0/yes/no, numbers, enums, timespan).
 
 ## Examples
-- `var enabled = cfg.Read(Sora.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false);`
-- `var magic = cfg.Read(Sora.Core.Infrastructure.Constants.Configuration.Sora.AllowMagicInProduction, false);`
-- `var env = cfg.ReadFirst(Sora.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Sora.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment);`
+- `var enabled = cfg.Read(Koan.Web.Swagger.Infrastructure.Constants.Configuration.Enabled, false);`
+- `var magic = cfg.Read(Koan.Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction, false);`
+- `var env = cfg.ReadFirst(Koan.Core.Infrastructure.Constants.Configuration.Env.AspNetCoreEnvironment, Koan.Core.Infrastructure.Constants.Configuration.Env.DotnetEnvironment);`
 
 ## Notes
 - Keep constants per assembly in a `Constants` class; rely on namespaces for readability.

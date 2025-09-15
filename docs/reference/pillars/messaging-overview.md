@@ -1,6 +1,6 @@
 # Messaging Reference
 
-Canonical APIs and patterns for Sora messaging: primitives, topology lifecycle, batching, aliasing, inbox, diagnostics.
+Canonical APIs and patterns for Koan messaging: primitives, topology lifecycle, batching, aliasing, inbox, diagnostics.
 
 > For focused deep dives see: `messaging-primitives.md` and `messaging-topology-lifecycle.md`.
 
@@ -61,7 +61,7 @@ Inputs:
 
 - Message types annotated with `[Message]` or implementing primitive marker interfaces.
 - Handler registrations (`IMessageHandler<T>` or sugar `On<T>()`).
-- Configuration: `Sora:Messaging:*` and optional `SORA_MESSAGING_PROVISION` env override.
+- Configuration: `Koan:Messaging:*` and optional `Koan_MESSAGING_PROVISION` env override.
 
 Outputs:
 
@@ -117,7 +117,7 @@ Minimal bus config (per-bus, appsettings.json):
 ```json
 // appsettings.json
 {
-  "Sora": {
+  "Koan": {
     "Messaging": {
       "DefaultBus": "rabbit",
       "DefaultGroup": "workers",
@@ -147,10 +147,10 @@ Minimal bus config (per-bus, appsettings.json):
 Environment variable equivalents:
 
 ```
-Sora__Messaging__DefaultBus=rabbit
-Sora__Messaging__DefaultGroup=workers
-Sora__Messaging__Buses__rabbit__ConnectionString=amqp://guest:guest@localhost:5672/
-Sora__Messaging__Buses__rabbit__RabbitMq__ProvisionOnStart=true
+Koan__Messaging__DefaultBus=rabbit
+Koan__Messaging__DefaultGroup=workers
+Koan__Messaging__Buses__rabbit__ConnectionString=amqp://guest:guest@localhost:5672/
+Koan__Messaging__Buses__rabbit__RabbitMq__ProvisionOnStart=true
 ```
 
 ## Notes

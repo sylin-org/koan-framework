@@ -1,4 +1,4 @@
-﻿## Web capability controllers (moderation, soft-delete, audit)
+## Web capability controllers (moderation, soft-delete, audit)
 
 Contract
 - Inputs: REST requests to canonical routes under api/{model}/...
@@ -45,7 +45,7 @@ Paging and headers
 
 Authorization
 - All capability endpoints require [Authorize] by default.
-- Swagger surfaces 401/403 responses for clarity; wire schemes via Sora.Web.Auth.* packages.
+- Swagger surfaces 401/403 responses for clarity; wire schemes via Koan.Web.Auth.* packages.
 
 Edge cases
 - Missing draft or snapshot → 404; empty bulk ids → 400; invalid filter when adapter doesn’t support string-query → 400; large result sets → prefer FirstPage/Page or stream APIs for data access.
