@@ -9,19 +9,23 @@ This document provides step-by-step implementation instructions for the S8.Locat
 ## Prerequisites
 
 ### Development Environment
+
 - **Visual Studio 2022** or **VS Code** with C# extension
 - **.NET 9.0 SDK**
 - **Docker Desktop** (for local stack)
 - **Git** (for version control)
 
 ### Framework Dependencies
+
 All dependencies are handled automatically via Koan's self-registration:
+
 - ✅ **Koan.Data** (MongoDB integration)
 - ✅ **Koan.Flow** (Flow entity and orchestrator support)
-- ✅ **Koan.Messaging** (RabbitMQ integration)  
+- ✅ **Koan.Messaging** (RabbitMQ integration)
 - ✅ **Koan.AI** (Ollama provider for address correction)
 
 ### External Services
+
 - **Google Maps Geocoding API** (API key required)
 - **Ollama** (runs in Docker, models downloaded automatically)
 
@@ -34,6 +38,7 @@ All dependencies are handled automatically via Koan's self-registration:
 ### 1.1 Create Core Models
 
 **File: `S8.Location.Core/Models/Location.cs`**
+
 ```csharp
 using Koan.Flow.Model;
 using Koan.Data.Abstractions.Annotations;
@@ -51,12 +56,13 @@ public class Location : FlowEntity<Location>
 public enum LocationStatus
 {
     Pending,    // Just received from source
-    Parked,     // Awaiting resolution  
+    Parked,     // Awaiting resolution
     Active      // Resolution complete
 }
 ```
 
 **File: `S8.Location.Core/Models/AgnosticLocation.cs`**
+
 ```csharp
 using Koan.Data.Core.Model;
 using Koan.Data.Abstractions.Annotations;
@@ -88,6 +94,7 @@ public enum LocationType
 ```
 
 **File: `S8.Location.Core/Models/ResolutionCache.cs`**
+
 ```csharp
 using Koan.Data.Core.Model;
 using Koan.Data.Abstractions.Annotations;
@@ -107,6 +114,7 @@ public class ResolutionCache : Entity<ResolutionCache>
 ### 1.2 Create Configuration Options
 
 **File: `S8.Location.Core/Options/LocationOptions.cs`**
+
 ```csharp
 namespace S8.Location.Core.Options;
 
@@ -157,6 +165,7 @@ public class AiOptions
 ### 1.3 Create Self-Registration Module
 
 **File: `S8.Location.Core/Initialization/KoanAutoRegistrar.cs`**
+
 ```csharp
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -179,11 +188,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         // Register configuration options
         services.AddKoanOptions<LocationOptions>();
-        
+
         // Register core services
         services.AddScoped<IAddressResolutionService, AddressResolutionService>();
         services.AddScoped<IGeocodingService, GoogleMapsGeocodingService>();
-        
+
         // Register health contributor
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, LocationHealthContributor>());
     }
@@ -191,18 +200,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        
+
         // Configuration discovery
         var defaultRegion = Configuration.ReadFirst(cfg, "US",
             "S8:Location:DefaultRegion",
             "LOCATION_DEFAULT_REGION");
         report.AddSetting("DefaultRegion", defaultRegion);
-        
+
         var cacheEnabled = Configuration.ReadFirst(cfg, "true",
             "S8:Location:Resolution:CacheEnabled",
             "LOCATION_CACHE_ENABLED");
         report.AddSetting("CacheEnabled", cacheEnabled);
-        
+
         // Google Maps API configuration check
         var gmapsKey = Configuration.ReadFirst(cfg, null,
             "S8:Location:Geocoding:GoogleMapsApiKey",
@@ -215,6 +224,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 ### 1.4 Create Project File
 
 **File: `S8.Location.Core/S8.Location.Core.csproj`**
+
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
 
@@ -231,7 +241,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     <ProjectReference Include="..\..\..\..\src\Koan.Flow.Core\Koan.Flow.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Messaging\Koan.Messaging.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
-    
+
     <!-- External dependencies -->
     <PackageReference Include="System.Text.Json" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
@@ -247,6 +257,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 ### 2.1 Create Service Interfaces
 
 **File: `S8.Location.Core/Services/IAddressResolutionService.cs`**
+
 ```csharp
 namespace S8.Location.Core.Services;
 
@@ -257,12 +268,12 @@ public interface IAddressResolutionService
     /// Uses SHA512 caching to eliminate 95%+ of expensive AI/geocoding calls.
     /// </summary>
     Task<string> ResolveToCanonicalIdAsync(string address, CancellationToken ct = default);
-    
+
     /// <summary>
     /// Normalizes an address for consistent hashing
     /// </summary>
     string NormalizeAddress(string address);
-    
+
     /// <summary>
     /// Computes SHA512 hash of input string
     /// </summary>
@@ -271,6 +282,7 @@ public interface IAddressResolutionService
 ```
 
 **File: `S8.Location.Core/Services/IGeocodingService.cs`**
+
 ```csharp
 using S8.Location.Core.Models;
 
@@ -294,6 +306,7 @@ public record GeocodingResult(
 ### 2.2 Implement Address Resolution Service
 
 **File: `S8.Location.Core/Services/AddressResolutionService.cs`**
+
 ```csharp
 using System.Security.Cryptography;
 using System.Text;
@@ -333,10 +346,10 @@ public class AddressResolutionService : IAddressResolutionService
     {
         // Step 1: Normalize address for consistent hashing
         var normalized = NormalizeAddress(address);
-        
+
         // Step 2: Generate deterministic hash
         var sha512 = ComputeSHA512(normalized);
-        
+
         // Step 3: Check cache
         if (_options.Resolution.CacheEnabled)
         {
@@ -347,36 +360,36 @@ public class AddressResolutionService : IAddressResolutionService
                 return cached.CanonicalUlid;
             }
         }
-        
+
         // Step 4: Perform expensive resolution
         _logger.LogInformation("Resolving new address: {Address}", address);
-        
+
         try
         {
             // AI correction
             var aiPrompt = $"Correct and standardize this address format: {address}. " +
                           "Return only the corrected address, no explanation.";
-            var aiCorrected = await _ai.PromptAsync(aiPrompt, _options.Ai.Model, 
+            var aiCorrected = await _ai.PromptAsync(aiPrompt, _options.Ai.Model,
                 cancellationToken: ct);
-            
+
             // Geocoding
             var geocodingResult = await _geocoding.GeocodeAsync(aiCorrected, ct);
             if (!geocodingResult.Success)
             {
-                _logger.LogWarning("Geocoding failed for {Address}: {Error}", 
+                _logger.LogWarning("Geocoding failed for {Address}: {Error}",
                     aiCorrected, geocodingResult.ErrorMessage);
                 throw new InvalidOperationException($"Geocoding failed: {geocodingResult.ErrorMessage}");
             }
-            
+
             // Create hierarchical structure
             var hierarchy = await BuildLocationHierarchy(
-                geocodingResult.FormattedAddress ?? aiCorrected, 
-                geocodingResult.Coordinates!, 
+                geocodingResult.FormattedAddress ?? aiCorrected,
+                geocodingResult.Coordinates!,
                 ct);
-            
+
             // Generate canonical ULID (leaf node of hierarchy)
             var canonicalId = hierarchy.LastOrDefault()?.Id ?? Ulid.NewUlid().ToString();
-            
+
             // Step 5: Cache for future
             if (_options.Resolution.CacheEnabled)
             {
@@ -388,7 +401,7 @@ public class AddressResolutionService : IAddressResolutionService
                     ResolvedAt = DateTime.UtcNow
                 }, ct);
             }
-            
+
             return canonicalId;
         }
         catch (Exception ex)
@@ -401,20 +414,20 @@ public class AddressResolutionService : IAddressResolutionService
     public string NormalizeAddress(string address)
     {
         var rules = _options.Resolution.NormalizationRules;
-        
+
         var normalized = address.Trim();
-        
+
         if (rules.CaseMode == "Upper")
             normalized = normalized.ToUpperInvariant();
         else if (rules.CaseMode == "Lower")
             normalized = normalized.ToLowerInvariant();
-            
+
         if (rules.RemovePunctuation)
             normalized = Regex.Replace(normalized, @"[^\w\s]", " ");
-            
+
         if (rules.CompressWhitespace)
             normalized = Regex.Replace(normalized, @"\s+", " ");
-            
+
         return normalized.Trim();
     }
 
@@ -427,13 +440,13 @@ public class AddressResolutionService : IAddressResolutionService
     }
 
     private async Task<List<AgnosticLocation>> BuildLocationHierarchy(
-        string formattedAddress, 
-        GeoCoordinate coordinates, 
+        string formattedAddress,
+        GeoCoordinate coordinates,
         CancellationToken ct)
     {
         // Simplified hierarchy creation - in production, would parse components
         var hierarchy = new List<AgnosticLocation>();
-        
+
         // For demo, create a simple street-level location
         var streetLocation = new AgnosticLocation
         {
@@ -447,10 +460,10 @@ public class AddressResolutionService : IAddressResolutionService
                 ["confidence"] = "high"
             }
         };
-        
+
         await streetLocation.Save();
         hierarchy.Add(streetLocation);
-        
+
         return hierarchy;
     }
 }
@@ -459,6 +472,7 @@ public class AddressResolutionService : IAddressResolutionService
 ### 2.3 Implement Geocoding Service
 
 **File: `S8.Location.Core/Services/GoogleMapsGeocodingService.cs`**
+
 ```csharp
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -533,10 +547,10 @@ public class GoogleMapsGeocodingService : IGeocodingService
     {
         // Simple fallback - in production, would use OpenStreetMap Nominatim
         _logger.LogInformation("Using fallback geocoding for {Address}", address);
-        
+
         // Mock coordinates for demo
         var mockCoords = new GeoCoordinate(40.7128, -74.0060); // NYC
-        
+
         return new GeocodingResult(
             Success: true,
             Coordinates: mockCoords,
@@ -559,6 +573,7 @@ public class GoogleMapsGeocodingService : IGeocodingService
 ### 3.1 Create Location Orchestrator
 
 **File: `S8.Location.Core/Orchestration/LocationOrchestrator.cs`**
+
 ```csharp
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Models;
@@ -626,6 +641,7 @@ public class LocationOrchestrator : IFlowOrchestrator<Location>
 ### 3.2 Create Flow Events
 
 **File: `S8.Location.Core/Models/LocationEvents.cs`**
+
 ```csharp
 using Koan.Flow.Model;
 
@@ -654,6 +670,7 @@ public class LocationErrorEvent : FlowValueObject<LocationErrorEvent>
 ### 4.1 Create API Controllers
 
 **File: `S8.Location.Api/Controllers/LocationsController.cs`**
+
 ```csharp
 using Microsoft.AspNetCore.Mvc;
 using S8.Location.Core.Models;
@@ -674,7 +691,7 @@ public class LocationsController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Location>>> GetLocations(
-        [FromQuery] int page = 1, 
+        [FromQuery] int page = 1,
         [FromQuery] int size = 50)
     {
         var locations = await Location.All()
@@ -735,6 +752,7 @@ public record CreateLocationRequest(string Address, string? ExternalId = null);
 ### 4.2 Create API Program
 
 **File: `S8.Location.Api/Program.cs`**
+
 ```csharp
 using S8.Location.Core.Models;
 using Koan.Data.Core;
@@ -746,7 +764,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Koan framework with auto-configuration
 builder.Services.AddKoan();
 
-// Initialize Flow transport handler  
+// Initialize Flow transport handler
 builder.Services.AddFlowTransportHandler();
 
 // Container environment requirement
@@ -767,14 +785,14 @@ app.Lifetime.ApplicationStarted.Register(async () =>
 {
     try
     {
-        var testLocation = new Location 
-        { 
-            Id = "test", 
+        var testLocation = new Location
+        {
+            Id = "test",
             Address = "123 Test Street, Test City, TS 12345",
             Status = LocationStatus.Pending
         };
         await testLocation.Save();
-        
+
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
         logger?.LogInformation("[API] Data provider test: Location saved successfully");
@@ -807,6 +825,7 @@ app.Run();
 ### 5.1 Create Inventory Adapter
 
 **File: `S8.Location.Adapters.Inventory/Program.cs`**
+
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -898,6 +917,7 @@ public sealed class InventoryLocationAdapter : BackgroundService
 ### 5.2 Create Healthcare Adapter
 
 **File: `S8.Location.Adapters.Healthcare/Program.cs`**
+
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -917,7 +937,7 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Koan framework with auto-configuration  
+// Koan framework with auto-configuration
 builder.Services.AddKoan();
 
 var app = builder.Build();
@@ -993,6 +1013,7 @@ public sealed class HealthcareLocationAdapter : BackgroundService
 ### 6.1 Create Docker Compose Configuration
 
 **File: `S8.Compose/docker-compose.yml`**
+
 ```yaml
 services:
   mongo:
@@ -1015,8 +1036,8 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "4911:5672"    # AMQP
-      - "4912:15672"   # Management UI
+      - "4911:5672" # AMQP
+      - "4912:15672" # Management UI
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -1113,6 +1134,7 @@ volumes:
 ### 6.2 Create Startup Script
 
 **File: `start.bat`**
+
 ```batch
 @echo off
 setlocal enableextensions
@@ -1122,7 +1144,7 @@ pushd "%SCRIPT_DIR%"
 
 REM Use the compose file living under S8.Compose
 set COMPOSE_FILE=S8.Compose\docker-compose.yml
-set PROJECT_NAME=Koan-s8-location
+set PROJECT_NAME=koan-s8-location
 set API_URL=http://localhost:4914
 
 where docker >nul 2>nul
@@ -1223,6 +1245,7 @@ exit /b 1
 ### 7.1 Create Health Check Service
 
 **File: `S8.Location.Core/Health/LocationHealthContributor.cs`**
+
 ```csharp
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -1288,7 +1311,7 @@ public class LocationHealthContributor : IHealthContributor
         {
             var cacheCount = await _cache.CountAsync(ct);
             checks["cache_entries"] = cacheCount;
-            
+
             // Calculate approximate hit rate (simplified)
             var recentCacheEntries = await _cache.Query("ResolvedAt >= @date")
                 .SetParameter("date", DateTime.UtcNow.AddHours(-24))
@@ -1317,6 +1340,7 @@ public class LocationHealthContributor : IHealthContributor
 ## Final Implementation Checklist
 
 ### Core Infrastructure ✅
+
 - [x] Location FlowEntity model
 - [x] AgnosticLocation canonical storage
 - [x] ResolutionCache for SHA512 deduplication
@@ -1324,24 +1348,28 @@ public class LocationHealthContributor : IHealthContributor
 - [x] Configuration options
 
 ### Resolution Pipeline ✅
+
 - [x] AddressResolutionService with SHA512 caching
 - [x] Google Maps geocoding with fallback
 - [x] Address normalization rules
 - [x] Hierarchical location building
 
 ### Flow Integration ✅
+
 - [x] LocationOrchestrator with sequential processing
 - [x] Park → Resolve → Imprint → Promote pattern
 - [x] Flow events for downstream processing
 - [x] External identity preservation
 
 ### Source Adapters ✅
+
 - [x] Inventory system adapter
 - [x] Healthcare system adapter
 - [x] FlowAdapter attribute registration
 - [x] Sample data generation
 
 ### API & Deployment ✅
+
 - [x] REST API with location CRUD
 - [x] Docker Compose with all services
 - [x] Port separation (4910-4914)
@@ -1349,6 +1377,7 @@ public class LocationHealthContributor : IHealthContributor
 - [x] Startup script with browser opening
 
 ### Testing & Monitoring ✅
+
 - [x] Health contributor
 - [x] Cache hit rate tracking
 - [x] Error handling and logging
@@ -1363,7 +1392,7 @@ public class LocationHealthContributor : IHealthContributor
 ✅ **Cost Optimization**: <$0.0005 per address resolution  
 ✅ **Sequential Processing**: No race conditions or duplicate canonicals  
 ✅ **Source Attribution**: Perfect traceability via Flow identity.external  
-✅ **Developer Experience**: Follows Koan Framework patterns exactly  
+✅ **Developer Experience**: Follows Koan Framework patterns exactly
 
 ---
 

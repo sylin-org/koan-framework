@@ -6,7 +6,7 @@ pushd "%SCRIPT_DIR%"
 
 REM Use the compose file living under S8.Compose
 set COMPOSE_FILE=S8.Compose\docker-compose.yml
-set PROJECT_NAME=Koan-s8-flow
+set PROJECT_NAME=koan-s8-flow
 set API_URL=http://localhost:4903
 
 where docker >nul 2>nul

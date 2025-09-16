@@ -1133,7 +1133,7 @@ Id = Ulid.NewUlid().ToString()  // Instead of Guid.NewGuid()
 
 ```bash
 # Check if S8.Location is working with new interceptor pattern
-docker logs Koan-s8-location-api-1 | grep -i "FlowInterceptors\|BeforeIntake\|hash collision"
+docker logs koan-s8-location-api-1 | grep -i "FlowInterceptors\|BeforeIntake\|hash collision"
 
 # Verify entity model corrections
 docker exec s8-mongo mongosh s8 --eval "
