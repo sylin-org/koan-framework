@@ -42,6 +42,25 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         report.AddModule(ModuleName, ModuleVersion);
         var enabled = env.IsDevelopment() || cfg.GetSection(TestProviderOptions.SectionPath).GetValue<bool>(nameof(TestProviderOptions.Enabled));
         report.AddSetting("Enabled", enabled ? "true" : "false");
+
+        if (enabled)
+        {
+            var section = cfg.GetSection(TestProviderOptions.SectionPath);
+            var useJwtTokens = section.GetValue<bool>(nameof(TestProviderOptions.UseJwtTokens));
+            var tokenFormat = useJwtTokens ? "JWT" : "Hash";
+            var issuer = section.GetValue<string>(nameof(TestProviderOptions.JwtIssuer)) ?? "koan-test-provider";
+            var audience = section.GetValue<string>(nameof(TestProviderOptions.JwtAudience)) ?? "koan-test-client";
+            var expiration = section.GetValue<int>(nameof(TestProviderOptions.JwtExpirationMinutes));
+
+            report.AddSetting("TokenFormat", tokenFormat);
+            if (useJwtTokens)
+            {
+                report.AddSetting("JWT.Issuer", issuer);
+                report.AddSetting("JWT.Audience", audience);
+                report.AddSetting("JWT.Expiration", $"{expiration}min");
+            }
+        }
+
         if (!env.IsDevelopment() && enabled)
         {
             report.AddNote("WARNING: TestProvider is enabled outside Development. Do not use in Production.");

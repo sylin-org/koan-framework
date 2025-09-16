@@ -31,8 +31,6 @@ public sealed class JwtTokenService
             new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         };
 
-        _logger.LogDebug("TestProvider JWT: Creating token with claims - Sub: {Sub}, Name: {Name}, Email: {Email}",
-            profile.Email, profile.Username, profile.Email);
 
         // Add roles
         foreach (var role in env.Roles)
@@ -67,8 +65,6 @@ public sealed class JwtTokenService
         var token = tokenHandler.CreateToken(tokenDescriptor);
         var jwt = tokenHandler.WriteToken(token);
 
-        _logger.LogDebug("TestProvider JWT: created token for {Email} with {ClaimCount} claims",
-            profile.Email, claims.Count);
 
         return jwt;
     }
@@ -104,31 +100,13 @@ public sealed class JwtTokenService
                 return false;
             }
 
-            // Debug: Log all claims in the token
-            _logger.LogDebug("TestProvider JWT: All claims in token:");
-            foreach (var claim in principal.Claims)
-            {
-                _logger.LogDebug("TestProvider JWT: Claim - Type: '{Type}', Value: '{Value}'", claim.Type, claim.Value);
-            }
-
-            // Extract profile information
-            // Try both JWT standard claim names and Microsoft claim schema URIs
+            // Extract profile information - try both JWT standard claim names and Microsoft claim schema URIs
             var emailClaim = principal.FindFirst(JwtRegisteredClaimNames.Email) ??
                             principal.FindFirst(ClaimTypes.Email);
             var subClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub) ??
                           principal.FindFirst(ClaimTypes.NameIdentifier);
             var nameClaim = principal.FindFirst(JwtRegisteredClaimNames.Name) ??
                            principal.FindFirst(ClaimTypes.Name);
-
-            _logger.LogDebug("TestProvider JWT: Looking for claim types - Email: '{EmailType}', Sub: '{SubType}', Name: '{NameType}'",
-                JwtRegisteredClaimNames.Email, JwtRegisteredClaimNames.Sub, JwtRegisteredClaimNames.Name);
-
-            _logger.LogDebug("TestProvider JWT: Claims found - Email: {EmailExists}, Sub: {SubExists}, Name: {NameExists}",
-                emailClaim != null, subClaim != null, nameClaim != null);
-
-            if (emailClaim != null) _logger.LogDebug("TestProvider JWT: Email claim value: {Email}", emailClaim.Value);
-            if (subClaim != null) _logger.LogDebug("TestProvider JWT: Sub claim value: {Sub}", subClaim.Value);
-            if (nameClaim != null) _logger.LogDebug("TestProvider JWT: Name claim value: {Name}", nameClaim.Value);
 
             var email = emailClaim?.Value ?? subClaim?.Value ?? string.Empty;
             var username = nameClaim?.Value ?? email;
@@ -183,7 +161,6 @@ public sealed class JwtTokenService
                 }
             }
 
-            _logger.LogDebug("TestProvider JWT: validated token for {Email}", profile.Email);
             return true;
         }
         catch (SecurityTokenException ex)

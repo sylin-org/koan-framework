@@ -68,12 +68,10 @@ public sealed class DevTokenStore
 
         if (options.UseJwtTokens)
         {
-            _logger.LogDebug("TestProvider: issuing JWT token for {Email}", profile.Email);
             return _jwtService.CreateToken(profile, env, options);
         }
         else
         {
-            _logger.LogDebug("TestProvider: issuing hash token for {Email}", profile.Email);
             return IssueHashToken(profile, ttl, env);
         }
     }
@@ -99,7 +97,6 @@ public sealed class DevTokenStore
         var options = _options.Value;
         if (options.UseJwtTokens && IsJwtFormat(token))
         {
-            _logger.LogDebug("TestProvider: attempting JWT validation for token");
             return _jwtService.ValidateToken(token, options, out profile, out env);
         }
 
