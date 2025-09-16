@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Koan.Scheduling</RootNamespace>
+    <AssemblyName>Koan.Scheduling</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <Description>Scheduling primitives for Koan: orchestration helpers, coordination, and background job utilities.</Description>
+  <PackageTags>$(CommonPackageTags);scheduling;orchestrator;jobs;background</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+</Project>

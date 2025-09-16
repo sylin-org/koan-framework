@@ -1,6 +1,6 @@
 # Health aggregator (push-first)
 
-Sora’s Health Aggregator provides a simple, push-first model for module health while keeping complexity inside the service:
+Koan’s Health Aggregator provides a simple, push-first model for module health while keeping complexity inside the service:
 
 - Push-only TTL: a component’s entry expires only when that component explicitly supplies a TTL on push; no guessed TTLs.
 - Probe invite: the aggregator exposes an event to invite contributors to publish their latest status.
@@ -51,11 +51,11 @@ Sora’s Health Aggregator provides a simple, push-first model for module health
 
 ## Configuration (appsettings.json)
 
-Bind from `Sora:Health:Aggregator:*`:
+Bind from `Koan:Health:Aggregator:*`:
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Health": {
       "Aggregator": {
         "Enabled": true,

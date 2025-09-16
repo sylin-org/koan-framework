@@ -1,8 +1,8 @@
-﻿# ADR: Sora.Messaging Developer Experience and Topology Provisioning
+# ADR: Koan.Messaging Developer Experience and Topology Provisioning
 
 ## Context
 
-Sora.Messaging aims to provide a simple, powerful, and provider-agnostic messaging abstraction for .NET. Current APIs focus on message send/receive and handler registration, with strong conventions and auto-registration. However, there is no public, agnostic API for consumers to declaratively request or provision custom MQ topologies (exchanges, queues, bindings) at runtime. There is also an opportunity to further improve developer experience (DX) with a more fluent, discoverable, and testable API surface.
+Koan.Messaging aims to provide a simple, powerful, and provider-agnostic messaging abstraction for .NET. Current APIs focus on message send/receive and handler registration, with strong conventions and auto-registration. However, there is no public, agnostic API for consumers to declaratively request or provision custom MQ topologies (exchanges, queues, bindings) at runtime. There is also an opportunity to further improve developer experience (DX) with a more fluent, discoverable, and testable API surface.
 
 ## Decision
 
@@ -27,7 +27,7 @@ Augments original decision with concrete API & lifecycle definition:
 7. **In-memory provider** implementing full contract & provisioning no-ops (records plan for assertions in tests).
 8. **Naming centralization** via `ITopologyNaming` (implemented by `DefaultTopologyNaming`).
 9. **Opt-in advanced customization**: replace naming service or wrap provisioner; all are additive, never required for basic use.
-10. **Safety modes**: explicit environment variable `SORA_MESSAGING_PROVISION=DryRun|CreateIfMissing|...` overrides config (dev containers / CI convenience).
+10. **Safety modes**: explicit environment variable `Koan_MESSAGING_PROVISION=DryRun|CreateIfMissing|...` overrides config (dev containers / CI convenience).
 
 ## Rationale
 
@@ -62,7 +62,7 @@ Augments original decision with concrete API & lifecycle definition:
 ### Open Follow-ups (tracked outside this ADR)
 - Analyzer to warn on sending anonymous object lacking `[Message]` metadata.
 - Contract hash header for cross-service drift detection.
-- Declarative "virtual topology" file export (`sora topology export`).
+- Declarative "virtual topology" file export (`Koan topology export`).
 
 ---
 

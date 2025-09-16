@@ -1,3 +1,3 @@
 namespace S5.Recs.Controllers;
 
-public record SeedRequest(string Source = "local", int Limit = 50, bool Overwrite = false);
+public record SeedRequest(string Source = "local", string? MediaType = null, int? Limit = null, bool Overwrite = false);

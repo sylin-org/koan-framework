@@ -1,6 +1,6 @@
 using S7.TechDocs.Models;
 using S7.TechDocs.Infrastructure;
-using Sora.Data.Core.Model;
+using Koan.Data.Core.Model;
 
 namespace S7.TechDocs.Services;
 

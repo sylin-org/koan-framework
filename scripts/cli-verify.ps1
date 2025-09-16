@@ -1,5 +1,5 @@
-﻿param(
-  [string]$ExeName = 'Sora'
+param(
+  [string]$ExeName = 'Koan'
 )
 
 $ErrorActionPreference = 'Stop'

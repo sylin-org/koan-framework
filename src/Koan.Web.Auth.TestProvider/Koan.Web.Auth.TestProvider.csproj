@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="wwwroot\**\*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+    <!-- Embed login HTML as a fallback when running from published container where content may be trimmed -->
+    <EmbeddedResource Include="wwwroot\testprovider-login.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+</Project>

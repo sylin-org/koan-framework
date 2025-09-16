@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  <Description>HTTP payload transformers for Koan Web: flexible request/response shaping with auto-discovery.</Description>
+  <PackageTags>$(CommonPackageTags);web;transformers;middleware;http</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.2.0" />
+  </ItemGroup>
+</Project>

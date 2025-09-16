@@ -8,13 +8,13 @@
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Sora.Core\Sora.Core.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Media.Core\Sora.Media.Core.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Media.Abstractions\Sora.Media.Abstractions.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Media.Web\Sora.Media.Web.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Storage\Sora.Storage.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Storage.Local\Sora.Storage.Local.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Media.Web\Koan.Media.Web.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Storage.Local\Koan.Storage.Local.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="wwwroot/**" CopyToPublishDirectory="Always" />

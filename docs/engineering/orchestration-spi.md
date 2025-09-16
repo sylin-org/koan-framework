@@ -1,6 +1,6 @@
-﻿---
+---
 title: Orchestration CLI and SPI — hosting providers and exporters
-description: Engineering contract for Sora DevHost — pluggable hosting providers (Docker/Podman) and artifact exporters (Compose/Helm/ACA), with selection rules, logging, and tests.
+description: Engineering contract for Koan DevHost — pluggable hosting providers (Docker/Podman) and artifact exporters (Compose/Helm/ACA), with selection rules, logging, and tests.
 ---
 
 # Orchestration CLI and SPI — hosting providers and exporters
@@ -11,13 +11,13 @@ Purpose
 - Allow adapters to declare endpoint and persistence metadata via attributes.
 
 Scope
-- CLI behaviors (sora up/down/status/logs/doctor/export) and profiles.
+- CLI behaviors (Koan up/down/status/logs/doctor/export) and profiles.
 - Provider SPI (run/stop/inspect stacks) and Exporter SPI (generate artifacts).
 - Descriptor model contributed by adapters/recipes.
 
 ## Profiles (runtime model)
 
-- SORA_ENV: local (default), ci, staging, prod.
+- Koan_ENV: local (default), ci, staging, prod.
 - Local: conservative readiness; optional OTel exporters; seeders allowed.
 - CI: ephemeral volumes; deterministic ports; faster fail.
 - Staging/Prod: export-only; no DevHost-run deps.
@@ -72,13 +72,13 @@ Composer (v1)
 ## Planner and selection rules
 
 Activation order
-1) Explicit config under Sora:* enables a dependency.
+1) Explicit config under Koan:* enables a dependency.
 2) Active recipes that see configured deps enable orchestration for those deps.
 3) Package presence alone is only a hint; require minimal config.
 
 Provider selection
 - Default precedence on Windows: Docker → Podman.
-- Override with --engine. Configurable via Sora:Orchestration:PreferredProviders.
+- Override with --engine. Configurable via Koan:Orchestration:PreferredProviders.
 
 Explainability
 - --explain prints the plan (active/inactive with reasons), selected provider, ports, readiness gates.

@@ -5,7 +5,7 @@ Date: 2025-08-20
 
 ## Context
 
-Sora’s data model centers on aggregates (`IEntity<TKey>`) and adapter-specific query capabilities (LINQ, string queries, server paging). Vector databases expose a different access pattern: similarity search (top‑K) over embeddings with optional metadata filtering. LINQ/string semantics do not generalize well to vector engines.
+Koan’s data model centers on aggregates (`IEntity<TKey>`) and adapter-specific query capabilities (LINQ, string queries, server paging). Vector databases expose a different access pattern: similarity search (top‑K) over embeddings with optional metadata filtering. LINQ/string semantics do not generalize well to vector engines.
 
 ## Decision
 
@@ -34,12 +34,12 @@ Sora’s data model centers on aggregates (`IEntity<TKey>`) and adapter-specific
 ## Rationale
 
 - Uses domain‑correct language (Search) and avoids leaking LINQ/SQL semantics into vector adapters.
-- Preserves Sora’s simplicity: identity and lifecycle via existing repos; vector search via a focused interface.
+- Preserves Koan’s simplicity: identity and lifecycle via existing repos; vector search via a focused interface.
 - Capability flags make behavior explicit and discoverable.
 
 ## Adoption plan
 
-1. Add `Sora.Data.Vector.Abstractions` package with interfaces, options, and instruction constants.
+1. Add `Koan.Data.Vector.Abstractions` package with interfaces, options, and instruction constants.
 2. Extend the capabilities reporting to include Vector flags (without breaking existing enum values).
 3. Document a capability matrix and dual‑store pattern (vector index + primary repo).
 4. Implement a pgvector adapter prototype, then Qdrant/Milvus.

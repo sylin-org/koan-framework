@@ -1,6 +1,6 @@
-﻿# Developer Guidelines
+# Developer Guidelines
 
-Concise conventions for contributors building within Sora. These complement the Engineering front door and Contributor workflow.
+Concise conventions for contributors building within Koan. These complement the Engineering front door and Contributor workflow.
 
 Core defaults (follow unless an ADR says otherwise)
 - Controllers only for HTTP routes; no inline endpoints. Prefer transformers for payload shaping.
@@ -13,7 +13,7 @@ Coding patterns
 - Async first: observe CancellationToken; avoid fire‑and‑forget; prefer TryXYZ for recoverable flows.
 - Paging guardrails: enforce DefaultPageSize/MaxPageSize; prefer server pushdown with bounded fallbacks.
 - Pushdown‑first: attempt provider pushdown for filters, counts, and ordering; surface capability flags honestly.
-- Options/config: adopt “first‑win” key resolution (Sora:Data:<Adapter>:..., Sora:Data:Sources:Default:<name>:..., ConnectionStrings:...).
+- Options/config: adopt “first‑win” key resolution (Koan:Data:<Adapter>:..., Koan:Data:Sources:Default:<name>:..., ConnectionStrings:...).
 - Logging/tracing: structured logs (LoggerMessage) and ActivitySource spans with db.*, messaging.* tags.
 
 Testing

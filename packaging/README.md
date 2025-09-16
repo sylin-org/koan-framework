@@ -1,9 +1,9 @@
 # Packaging
 
-This folder contains nuspecs for the meta packages (published under Sylin.Sora.*):
+This folder contains nuspecs for the meta packages (published under Sylin.Koan.*):
 
-- Sora.nuspec -> Sylin.Sora: meta-package for core + data abstractions + JSON adapter
-- Sora.App.nuspec -> Sylin.Sora.App: meta-package for Sylin.Sora + Sylin.Sora.Web
+- Koan.nuspec -> Sylin.Koan: meta-package for core + data abstractions + JSON adapter
+- Koan.App.nuspec -> Sylin.Koan.App: meta-package for Sylin.Koan + Sylin.Koan.Web
 
 Automated publish
 
@@ -28,7 +28,7 @@ powershell .\.github\scripts\pack-meta.ps1 -Version (nbgv get-version -v SimpleV
 Push (example):
 
 ```powershell
-nuget push .\artifacts\Sylin.Sora*.nupkg -Source https://api.nuget.org/v3/index.json -ApiKey $env:NUGET_API_KEY
+nuget push .\artifacts\Sylin.Koan*.nupkg -Source https://api.nuget.org/v3/index.json -ApiKey $env:NUGET_API_KEY
 ```
 
 Notes

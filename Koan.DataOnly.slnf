@@ -1,0 +1,25 @@
+{
+  "solution": {
+    "path": "Koan.sln",
+    "projects": [
+      "src/Koan.Data.Abstractions/Koan.Data.Abstractions.csproj",
+      "src/Koan.Data.Core/Koan.Data.Core.csproj",
+      "src/Koan.Data.Json/Koan.Data.Json.csproj",
+      "src/Koan.Data.Relational/Koan.Data.Relational.csproj",
+      "src/Koan.Data.Sqlite/Koan.Data.Sqlite.csproj",
+      "src/Koan.Data.Postgres/Koan.Data.Postgres.csproj",
+      "src/Koan.Data.SqlServer/Koan.Data.SqlServer.csproj",
+      "src/Koan.Data.Mongo/Koan.Data.Mongo.csproj",
+      "src/Koan.Data.Cqrs/Koan.Data.Cqrs.csproj",
+      "src/Koan.Data.Cqrs.Outbox.Mongo/Koan.Data.Cqrs.Outbox.Mongo.csproj",
+      "tests/Koan.Data.Core.Tests/Koan.Data.Core.Tests.csproj",
+      "tests/Koan.Data.Json.Tests/Koan.Data.Json.Tests.csproj",
+      "tests/Koan.Data.Relational.Tests/Koan.Data.Relational.Tests.csproj",
+      "tests/Koan.Data.Sqlite.Tests/Koan.Data.Sqlite.Tests.csproj",
+      "tests/Koan.Data.Postgres.Tests/Koan.Data.Postgres.Tests.csproj",
+      "tests/Koan.Data.SqlServer.Tests/Koan.Data.SqlServer.Tests.csproj",
+      "tests/Koan.Data.Mongo.Tests/Koan.Data.Mongo.Tests.csproj",
+      "tests/Koan.Testing/Koan.Testing.csproj"
+    ]
+  }
+}

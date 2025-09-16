@@ -1,14 +1,14 @@
-﻿# Module configuration patterns (SoC + DX)
+# Module configuration patterns (SoC + DX)
 
 This page is a copy-paste blueprint for module authors to implement consistent configuration, validation, discovery, and health checks.
 
 Contract
-- Key scheme: `Sora:<Area>:<ModuleName>:<Alias>:<Property>`
+- Key scheme: `Koan:<Area>:<ModuleName>:<Alias>:<Property>`
 - Default alias: `Default`; named aliases allowed
-- Env vars: `SORA__...` mapping
+- Env vars: `Koan__...` mapping
 - Options per module with `BindPath` constant + `ValidateOnStart()`
-- One DI entrypoint per module: `AddSora<Module>(IConfiguration, alias = "Default")`
-- Runtime access via `SoraEnv`; avoid raw `Environment.*`
+- One DI entrypoint per module: `AddKoan<Module>(IConfiguration, alias = "Default")`
+- Runtime access via `KoanEnv`; avoid raw `Environment.*`
 
 Scaffold
 1) Options (typed + defaults + validation)
@@ -17,12 +17,12 @@ Scaffold
 4) Client factory with keyed registrations (by alias)
 5) Health check (predictable name/tags)
 
-Example (hypothetical: Sora.Data.Oracle)
+Example (hypothetical: Koan.Data.Oracle)
 // Options
 ```csharp
 public sealed class OracleOptions
 {
-    public const string BindPath = "Sora:Data:Oracle";
+    public const string BindPath = "Koan:Data:Oracle";
 
     [Required]
     public string? ConnectionString { get; set; }
@@ -51,13 +51,13 @@ public static class OracleConstants
 ```csharp
 public static class OracleServiceCollectionExtensions
 {
-    public static IServiceCollection AddSoraOracle(
+    public static IServiceCollection AddKoanOracle(
         this IServiceCollection services,
         IConfiguration config,
         string alias = OracleConstants.DefaultAlias,
         Action<OracleOptions>? postConfigure = null)
     {
-        services.AddSoraOptions<OracleOptions>(config, OracleConstants.SectionPath(alias), o => postConfigure?.Invoke(o));
+        services.AddKoanOptions<OracleOptions>(config, OracleConstants.SectionPath(alias), o => postConfigure?.Invoke(o));
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<OracleOptions>, OracleOptionsValidator>());
 
@@ -113,10 +113,10 @@ Discovery (Dev/CI, SoC)
 
 Startup (consumer)
 ```csharp
-builder.AddSoraConfiguration();
-builder.Services.AddSoraDefaults(builder.Configuration, builder.Environment);
-builder.Services.AddSoraOracle(builder.Configuration);             // Default
-builder.Services.AddSoraOracle(builder.Configuration, "Reporting"); // Named alias
+builder.AddKoanConfiguration();
+builder.Services.AddKoanDefaults(builder.Configuration, builder.Environment);
+builder.Services.AddKoanOracle(builder.Configuration);             // Default
+builder.Services.AddKoanOracle(builder.Configuration, "Reporting"); // Named alias
 ```
 
 Health behavior
@@ -125,14 +125,14 @@ Health behavior
 See also
 - ARCH-0044-standardized-module-config-and-discovery.md
 - ARCH-0040-config-and-constants-naming.md
-- ARCH-0039-soraenv-static-runtime.md
+- ARCH-0039-Koanenv-static-runtime.md
 
 ## Intentional deviations
 
-Most modules should use `services.AddSoraOptions<TOptions>(...)` for binding + validation. A few cases intentionally diverge:
+Most modules should use `services.AddKoanOptions<TOptions>(...)` for binding + validation. A few cases intentionally diverge:
 
-- Transformers (Sora.Web.Transformers): uses deferred runtime discovery with `AddOptions + PostConfigure` to register bindings on first use. This avoids hard configuration coupling and fits late-bound transformer discovery.
-- Ollama provider (Sora.Ai.Provider.Ollama): registers `AddOptions<OllamaServiceOptions[]>()` to support multiple services discovered/registered at runtime. The array pattern is by design.
+- Transformers (Koan.Web.Transformers): uses deferred runtime discovery with `AddOptions + PostConfigure` to register bindings on first use. This avoids hard configuration coupling and fits late-bound transformer discovery.
+- Ollama provider (Koan.Ai.Provider.Ollama): registers `AddOptions<OllamaServiceOptions[]>()` to support multiple services discovered/registered at runtime. The array pattern is by design.
   
 
-These exceptions are scoped; all other modules should follow the standardized `AddSoraOptions` golden path per ARCH-0044.
+These exceptions are scoped; all other modules should follow the standardized `AddKoanOptions` golden path per ARCH-0044.

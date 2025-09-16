@@ -1,11 +1,11 @@
-using Sora.Data.Core;
-using Sora.Web.Extensions;
+using Koan.Data.Core;
+using Koan.Web.Extensions;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Framework bootstrap
-builder.Services.AddSora()
+builder.Services.AddKoan()
     // Sensible defaults: controllers, static files, secure headers, ProblemDetails
     .AsWebApi()
     // Toggle middleware
@@ -20,7 +20,7 @@ builder.Services.AddSora()
 // builder.Logging.AddSimpleConsole(o => o.SingleLine = true);
 // builder.Logging.SetMinimumLevel(LogLevel.Debug);
 // // Allow DDL in Production shell for local dev
-// builder.Configuration["Sora:AllowMagicInProduction"] = "true";
+// builder.Configuration["Koan:AllowMagicInProduction"] = "true";
 
 // App policy: register a rate limiter (pipeline toggle enables UseRateLimiter)
 builder.Services.AddRateLimiter(options =>
@@ -43,7 +43,7 @@ builder.Services.AddRateLimiter(options =>
 
 // Auth: none in S1 sample (keep API simple)
 
-// Sora.Web wires routing, controllers, static files, secure headers, and /api/health.
+// Koan.Web wires routing, controllers, static files, secure headers, and /api/health.
 var app = builder.Build();
 
 // Platform auto-ensures schema at startup when supported

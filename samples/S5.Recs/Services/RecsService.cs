@@ -1,15 +1,12 @@
 using Microsoft.Extensions.Logging;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
-using Sora.AI.Contracts;
-using Sora.AI.Contracts.Models;
-using Sora.Data.Abstractions;
-using Sora.Data.Core;
-using Sora.Data.Vector;
-using Sora.Data.Vector.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Koan.AI.Contracts;
+using Koan.AI.Contracts.Models;
+using Koan.Data.Abstractions;
+using Koan.Data.Core;
+using Koan.Data.Vector;
+using Koan.Data.Vector.Abstractions;
 
 namespace S5.Recs.Services;
 
@@ -18,354 +15,388 @@ internal sealed class RecsService : IRecsService
     private readonly IServiceProvider _sp;
     private readonly ILogger<RecsService>? _logger;
 
-    private readonly List<Anime> _demo = new()
+    // Demo data for fallback scenarios
+    private readonly List<Media> _demoMedia = new()
     {
-        new Anime { Id = "local:haikyuu", Title = "Haikyuu!!", Genres = new[]{"Sports","School Life"}, Episodes = 25, Synopsis = "A high-energy volleyball ensemble.", Popularity = 0.95 },
-        new Anime { Id = "local:kon", Title = "K-On!", Genres = new[]{"Slice of Life","Music"}, Episodes = 12, Synopsis = "Cozy after-school band hijinks.", Popularity = 0.88 },
-        new Anime { Id = "local:yuru", Title = "Laid-Back Camp", Genres = new[]{"Slice of Life"}, Episodes = 12, Synopsis = "Wholesome camping and friendship.", Popularity = 0.90 }
+        new Media
+        {
+            MediaTypeId = "demo-media-type",
+            MediaFormatId = "demo-tv-format",
+            ProviderCode = "local",
+            ExternalId = "haikyuu",
+            Title = "Haikyuu!!",
+            Genres = new[] { "Sports", "School Life" },
+            Episodes = 25,
+            Synopsis = "A high-energy volleyball ensemble.",
+            Popularity = 0.95,
+            ImportedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        },
+        new Media
+        {
+            MediaTypeId = "demo-media-type",
+            MediaFormatId = "demo-tv-format",
+            ProviderCode = "local",
+            ExternalId = "kon",
+            Title = "K-On!",
+            Genres = new[] { "Slice of Life", "Music" },
+            Episodes = 12,
+            Synopsis = "Cozy after-school band hijinks.",
+            Popularity = 0.88,
+            ImportedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        },
+        new Media
+        {
+            MediaTypeId = "demo-media-type",
+            MediaFormatId = "demo-tv-format",
+            ProviderCode = "local",
+            ExternalId = "yuru",
+            Title = "Laid-Back Camp",
+            Genres = new[] { "Slice of Life" },
+            Episodes = 12,
+            Synopsis = "Wholesome camping and friendship.",
+            Popularity = 0.90,
+            ImportedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        }
     };
 
     public RecsService(IServiceProvider sp, ILogger<RecsService>? logger = null)
     {
-        _sp = sp; _logger = logger;
+        _sp = sp;
+        _logger = logger;
     }
 
     public async Task<(IReadOnlyList<Recommendation> items, bool degraded)> QueryAsync(
         string? text,
-        string? anchorAnimeId,
+        string? anchorMediaId,
         string[]? genres,
         int? episodesMax,
         bool spoilerSafe,
         int topK,
         string? userId,
         string[]? preferTags,
-    double? preferWeight,
-    string? sort,
+        double? preferWeight,
+        string? sort,
+        string? mediaTypeFilter,
         CancellationToken ct)
     {
-        // Guardrails: sensible defaults and caps for K
-        if (topK <= 0) topK = 10; // avoid empty results when a caller sends 0
-        if (topK > 100) topK = 100; // allow up to 100 to match UI page size
-        // Try vector-first if text or anchor provided
-        _logger?.LogInformation("Query: text='{Text}' anchor='{Anchor}' genres=[{Genres}] episodesMax={EpisodesMax} spoilerSafe={SpoilerSafe} topK={TopK} user={UserId} preferTagsCount={PreferTagsCount}",
-            text, anchorAnimeId, genres is null ? string.Empty : string.Join(',', genres), episodesMax, spoilerSafe, topK, userId, preferTags?.Length ?? 0);
+        // Guardrails
+        if (topK <= 0) topK = 10;
+        if (topK > 100) topK = 100;
+
+        _logger?.LogInformation("Multi-media query: text='{Text}' anchor='{Anchor}' mediaType='{MediaType}' topK={TopK}",
+            text, anchorMediaId, mediaTypeFilter, topK);
+
         try
         {
             if (!string.IsNullOrWhiteSpace(text)
-                || !string.IsNullOrWhiteSpace(anchorAnimeId)
+                || !string.IsNullOrWhiteSpace(anchorMediaId)
                 || !string.IsNullOrWhiteSpace(userId)
                 || (preferTags is { Length: > 0 }))
             {
-                float[] query;
-                if (!string.IsNullOrWhiteSpace(text))
-                {
-                    // Derive simple embedding using AI core for the query; avoid blocking on seed
-                    var ai = Sora.AI.Ai.TryResolve();
-                    _logger?.LogDebug("AI resolve: {Resolved}", ai is null ? "null" : ai.GetType().Name);
-                    if (ai is not null)
-                    {
-                        _logger?.LogDebug("Embedding query text len={Len}", text!.Length);
-                        var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { text! } }, ct);
-                        query = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
-                        _logger?.LogDebug("Embedding result: dim={Dim}", query.Length);
-                    }
-                    else query = Array.Empty<float>();
-                }
-                else if (!string.IsNullOrWhiteSpace(anchorAnimeId))
-                {
-                    // For now, approximate by embedding the anchor's synopsis+title
-                    var anchorDoc = await AnimeDoc.Get(anchorAnimeId!, ct);
-                    AnimeDoc? anchor = anchorDoc;
-                    if (anchor is null)
-                    {
-                        Anime? aDemo = _demo.FirstOrDefault(d => d.Id == anchorAnimeId);
-                        if (aDemo is not null)
-                            anchor = new AnimeDoc { Id = aDemo.Id, Title = aDemo.Title, Genres = aDemo.Genres, Episodes = aDemo.Episodes, Synopsis = aDemo.Synopsis, Popularity = aDemo.Popularity };
-                    }
-                    var textAnchor = anchor is null ? null : $"{anchor.Title}\n\n{anchor.Synopsis}\nTags: {string.Join(", ", anchor.Genres ?? Array.Empty<string>())}";
-                    var ai = Sora.AI.Ai.TryResolve();
-                    AiEmbeddingsResponse? emb = textAnchor is not null && ai is not null
-                        ? await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { textAnchor } }, ct)
-                        : null;
-                    _logger?.LogDebug("Anchor embedding: text?={HasText} dim={Dim}", textAnchor is not null, emb?.Vectors.FirstOrDefault()?.Length ?? 0);
-                    query = emb?.Vectors.FirstOrDefault() ?? Array.Empty<float>();
-                }
-                else if (!string.IsNullOrWhiteSpace(userId))
-                {
-                    var prof = await UserProfileDoc.Get(userId!, ct);
-                    query = prof?.PrefVector ?? Array.Empty<float>();
-                }
-                else if (preferTags is { Length: > 0 })
-                {
-                    // Derive an embedding from the selected tags to drive vector search in Free Browsing
-                    var ai = Sora.AI.Ai.TryResolve();
-                    if (ai is not null)
-                    {
-                        var tagText = $"Tags: {string.Join(", ", preferTags.Where(t => !string.IsNullOrWhiteSpace(t)))}";
-                        var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { tagText } }, ct);
-                        query = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
-                        _logger?.LogDebug("Embedding from tags: count={Count} dim={Dim}", preferTags.Length, query.Length);
-                    }
-                    else query = Array.Empty<float>();
-                }
-                else
-                {
-                    query = Array.Empty<float>();
-                }
+                float[] query = await BuildQueryVector(text, anchorMediaId, userId, preferTags, ct);
 
-                if (query.Length > 0 && Vector<AnimeDoc>.IsAvailable)
+                if (query.Length > 0 && Vector<Media>.IsAvailable)
                 {
-                    // If user profile vector exists, blend with query vector for personalization
-                    if (!string.IsNullOrWhiteSpace(userId))
-                    {
-                        var prof = await UserProfileDoc.Get(userId, ct);
-                        if (prof?.PrefVector is { Length: > 0 } pv && pv.Length == query.Length)
-                        {
-                            _logger?.LogDebug("Query: blending profile vector for user {UserId}", userId);
-                            var blended = new float[query.Length];
-                            for (int i = 0; i < query.Length; i++)
-                            {
-                                blended[i] = (float)(Constants.Scoring.ProfileBlend * query[i] + (1 - Constants.Scoring.ProfileBlend) * pv[i]);
-                            }
-                            query = blended;
-                        }
-                    }
-                    var res = await Vector<AnimeDoc>.Search(new VectorQueryOptions(query, TopK: topK), ct);
-                    var idToScore = res.Matches.ToDictionary(m => m.Id, m => m.Score);
-                    var docs = new List<AnimeDoc>();
+                    var vectorResults = await Vector<Media>.Search(new VectorQueryOptions(query, TopK: topK), ct);
+                    var idToScore = vectorResults.Matches.ToDictionary(m => m.Id, m => m.Score);
+
+                    var mediaItems = new List<Media>();
                     foreach (var id in idToScore.Keys)
                     {
-                        var d = await AnimeDoc.Get(id, ct);
-                        if (d is not null) docs.Add(d);
+                        var media = await Media.Get(id, ct);
+                        if (media != null) mediaItems.Add(media);
                     }
-                    IEnumerable<AnimeDoc> q = docs;
-                    if (genres is { Length: > 0 }) q = q.Where(a => (a.Genres ?? Array.Empty<string>()).Intersect(genres).Any());
-                    if (episodesMax is int emax) q = q.Where(a => a.Episodes is null || a.Episodes <= emax);
-                    // Personalization: fetch profile if present
-                    UserProfileDoc? profile = null;
-                    if (!string.IsNullOrWhiteSpace(userId))
-                    {
-                        profile = await UserProfileDoc.Get(userId, ct);
-                        // Exclude any items already present in the user's Library (watched/favorite/dropped/rated)
-                        var entries = (await LibraryEntryDoc.All(ct)).Where(e => e.UserId == userId).ToList();
-                        var exclude = entries.Select(e => e.AnimeId).ToHashSet();
-                        q = q.Where(a => !exclude.Contains(a.Id));
-                    }
-                    // Load effective settings
-                    var eff = (_sp.GetService(typeof(IRecommendationSettingsProvider)) as IRecommendationSettingsProvider)?.GetEffective()
-                              ?? (Infrastructure.Constants.Scoring.PreferTagsWeightDefault, Infrastructure.Constants.Scoring.MaxPreferredTagsDefault, Infrastructure.Constants.Scoring.DiversityWeightDefault);
-                    var preferTagsWeightEff = Math.Clamp(preferWeight ?? eff.PreferTagsWeight, 0, 1.0);
-                    var preferTagsSet = new HashSet<string>((preferTags ?? Array.Empty<string>()).Take(Math.Max(1, eff.MaxPreferredTags)), StringComparer.OrdinalIgnoreCase);
 
-                    var mappedQ = q.Select(a =>
-                    {
-                        var vs = idToScore.TryGetValue(a.Id, out var s) ? s : 0d;
-                        var pop = a.Popularity;
-                        var genreBoost = 0d;
-                        if (profile?.GenreWeights is { Count: > 0 } && a.Genres is { Length: > 0 })
-                        {
-                            foreach (var g in a.Genres)
-                            {
-                                if (profile.GenreWeights.TryGetValue(g, out var w)) genreBoost += w;
-                            }
-                            genreBoost /= Math.Max(1, a.Genres.Length);
-                        }
-                        // Include tags into preference (centered)
-                        if (profile?.GenreWeights is { Count: > 0 } && a.Tags is { Length: > 0 })
-                        {
-                            var add = 0d; int cnt = 0;
-                            foreach (var t in a.Tags)
-                            {
-                                if (profile.GenreWeights.TryGetValue(t, out var w)) { add += (w - 0.5); cnt++; }
-                            }
-                            if (cnt > 0) genreBoost += add / cnt;
-                        }
-                        // Prefer-tags soft boost
-                        double preferBoost = 0d;
-                        if (preferTagsSet.Count > 0)
-                        {
-                            var keys = new List<string>();
-                            if (a.Genres is { Length: > 0 }) keys.AddRange(a.Genres);
-                            if (a.Tags is { Length: > 0 }) keys.AddRange(a.Tags);
-                            if (keys.Count > 0)
-                            {
-                                var hits = keys.Count(k => preferTagsSet.Contains(k));
-                                if (hits > 0) preferBoost = (double)hits / keys.Count; // 0..1
-                            }
-                        }
-                        var hasSpoiler = spoilerSafe && Constants.Spoilers.Keywords.Any(k => a.Synopsis?.Contains(k, StringComparison.OrdinalIgnoreCase) == true);
-                        var spoilerPenalty = hasSpoiler ? Constants.Scoring.SpoilerPenalty : 0.0;
-                        var hybrid = Constants.Scoring.VectorWeight * vs + Constants.Scoring.PopularityWeight * pop + Constants.Scoring.GenreWeight * genreBoost + preferBoost * preferTagsWeightEff;
-                        hybrid *= (1.0 - spoilerPenalty);
+                    // Apply filters
+                    var filteredMedia = await ApplyFilters(mediaItems, genres, episodesMax, mediaTypeFilter, userId, ct);
 
-                        var reasons = new List<string> { "vector" };
-                        if (genreBoost > 0) reasons.Add("genre");
-                        if (preferBoost > 0) reasons.Add("boost");
-                        if (pop > Constants.Scoring.PopularityHotThreshold) reasons.Add("popular");
-                        if (spoilerPenalty > 0) reasons.Add("spoiler-safe");
+                    // Apply personalization and scoring
+                    var recommendations = await ScoreAndPersonalize(filteredMedia, idToScore, userId, preferTags, preferWeight, spoilerSafe, ct);
 
-                        return new Recommendation
-                        {
-                            Anime = new Anime
-                            {
-                                Id = a.Id,
-                                Title = a.Title,
-                                TitleEnglish = a.TitleEnglish,
-                                TitleRomaji = a.TitleRomaji,
-                                TitleNative = a.TitleNative,
-                                Synonyms = a.Synonyms ?? Array.Empty<string>(),
-                                Genres = a.Genres ?? Array.Empty<string>(),
-                                Tags = a.Tags ?? Array.Empty<string>(),
-                                Episodes = a.Episodes,
-                                Synopsis = a.Synopsis,
-                                Popularity = a.Popularity,
-                                CoverUrl = a.CoverUrl,
-                                BannerUrl = a.BannerUrl,
-                                CoverColorHex = a.CoverColorHex
-                            },
-                            Score = hybrid,
-                            Reasons = reasons.ToArray()
-                        };
-                    }).ToList();
-                    // Apply server-side ordering
-                    var orderedQ = ApplySort(mappedQ, sort);
-                    var takenQ = orderedQ.Take(topK).ToList();
-                    _logger?.LogInformation("Query: vector path returned {Count} items (degraded=false)", takenQ.Count);
-                    return (takenQ, false);
+                    // Apply sorting
+                    var sortedRecommendations = ApplySort(recommendations, sort);
+                    var finalResults = sortedRecommendations.Take(topK).ToList();
+
+                    _logger?.LogInformation("Multi-media vector query returned {Count} results", finalResults.Count);
+                    return (finalResults, false);
                 }
             }
         }
-        catch (Exception ex) { _logger?.LogWarning(ex, "Query: vector path failed, degrading to demo"); }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Multi-media vector query failed, falling back to database query");
+        }
 
-        // Fallback: try Mongo (if seeded) else return empty degraded set
+        // Fallback to database query
         try
         {
-            var allDocs = await AnimeDoc.All(ct);
-            var docs = allDocs.AsEnumerable();
-            // Exclude items in user's Library if provided
-            if (!string.IsNullOrWhiteSpace(userId))
-            {
-                var entries = (await LibraryEntryDoc.All(ct)).Where(e => e.UserId == userId).ToList();
-                var exclude = entries.Select(e => e.AnimeId).ToHashSet();
-                docs = docs.Where(a => !exclude.Contains(a.Id));
-            }
-            if (genres is { Length: > 0 }) docs = docs.Where(a => (a.Genres ?? Array.Empty<string>()).Intersect(genres).Any());
-            if (episodesMax is int em) docs = docs.Where(a => a.Episodes is null || a.Episodes <= em);
-            // Apply prefer-tags soft boost in fallback so Free Browsing honors tags even without user/text
-            var eff = (_sp.GetService(typeof(IRecommendationSettingsProvider)) as IRecommendationSettingsProvider)?.GetEffective()
-                      ?? (Infrastructure.Constants.Scoring.PreferTagsWeightDefault, Infrastructure.Constants.Scoring.MaxPreferredTagsDefault, Infrastructure.Constants.Scoring.DiversityWeightDefault);
-            var preferTagsWeightEff = Math.Clamp(preferWeight ?? eff.PreferTagsWeight, 0, 1.0);
-            var preferTagsSet = new HashSet<string>((preferTags ?? Array.Empty<string>()).Take(Math.Max(1, eff.MaxPreferredTags)), StringComparer.OrdinalIgnoreCase);
-            var mappedDocs = docs.Select(a =>
-            {
-                // Popularity base with optional tag-based boost
-                var pop = a.Popularity;
-                double preferBoost = 0d;
-                if (preferTagsSet.Count > 0)
-                {
-                    var keys = new List<string>();
-                    if (a.Genres is { Length: > 0 }) keys.AddRange(a.Genres);
-                    if (a.Tags is { Length: > 0 }) keys.AddRange(a.Tags);
-                    if (keys.Count > 0)
-                    {
-                        var hits = keys.Count(k => preferTagsSet.Contains(k));
-                        if (hits > 0) preferBoost = (double)hits / keys.Count; // 0..1
-                    }
-                }
-                var score = Constants.Scoring.PopularityWeight * pop + preferBoost * preferTagsWeightEff;
-                var reasons = new List<string> { "popularity" };
-                if (preferBoost > 0) reasons.Add("boost");
+            var allMedia = await Media.All(ct);
+            var filteredMedia = await ApplyFilters(allMedia, genres, episodesMax, mediaTypeFilter, userId, ct);
 
-                return new Recommendation
-                {
-                    Anime = new Anime
-                    {
-                        Id = a.Id,
-                        Title = a.Title,
-                        TitleEnglish = a.TitleEnglish,
-                        TitleRomaji = a.TitleRomaji,
-                        TitleNative = a.TitleNative,
-                        Synonyms = a.Synonyms ?? Array.Empty<string>(),
-                        Genres = a.Genres ?? Array.Empty<string>(),
-                        Tags = a.Tags ?? Array.Empty<string>(),
-                        Episodes = a.Episodes,
-                        Synopsis = a.Synopsis,
-                        Popularity = a.Popularity,
-                        CoverUrl = a.CoverUrl,
-                        BannerUrl = a.BannerUrl,
-                        CoverColorHex = a.CoverColorHex
-                    },
-                    Score = score,
-                    Reasons = reasons.ToArray()
-                };
+            var fallbackRecommendations = filteredMedia.Select(media => new Recommendation
+            {
+                Media = media,
+                Score = media.Popularity,
+                Reasons = new[] { "popularity" }
             }).ToList();
-            var ordered = ApplySort(mappedDocs, sort);
-            var taken = ordered.Take(topK).ToList();
-            _logger?.LogInformation("Query: mongo fallback returned {Count} items (degraded=true)", taken.Count);
-            return (taken, true);
+
+            var sortedFallback = ApplySort(fallbackRecommendations, sort);
+            var finalFallback = sortedFallback.Take(topK).ToList();
+
+            _logger?.LogInformation("Multi-media database fallback returned {Count} results", finalFallback.Count);
+            return (finalFallback, true);
         }
-        catch
+        catch (Exception ex)
         {
-            _logger?.LogWarning("Query: no data available; returning empty set (degraded=true)");
-            return (Array.Empty<Recommendation>(), true);
+            _logger?.LogWarning(ex, "Database fallback failed, returning demo data");
+
+            // Final fallback to demo data
+            var demoRecommendations = _demoMedia.Select(media => new Recommendation
+            {
+                Media = media,
+                Score = media.Popularity,
+                Reasons = new[] { "demo" }
+            }).Take(topK).ToList();
+
+            return (demoRecommendations, true);
         }
     }
 
-    private static IEnumerable<Recommendation> ApplySort(IEnumerable<Recommendation> items, string? sort)
+    public async Task RateAsync(string userId, string mediaId, int rating, CancellationToken ct)
     {
-        var arr = items ?? Array.Empty<Recommendation>();
-        switch ((sort ?? string.Empty).ToLowerInvariant())
-        {
-            case "rating": // Highest Rated
-                return arr.OrderByDescending(r => r.Score);
-            case "popular": // Most Popular
-                return arr.OrderByDescending(r => r.Anime?.Popularity ?? 0);
-            case "relevance":
-            default:
-                return arr.OrderByDescending(r => r.Score);
-        }
-    }
+        _logger?.LogInformation("Rating: user={UserId} media={MediaId} rating={Rating}", userId, mediaId, rating);
 
-    public async Task RateAsync(string userId, string animeId, int rating, CancellationToken ct)
-    {
-        _logger?.LogInformation("Rating: user={UserId} anime={AnimeId} rating={Rating}", userId, animeId, rating);
         var data = (IDataService?)_sp.GetService(typeof(IDataService));
         if (data is null) return;
-        // Upsert status+rating in LibraryEntry
-        var id = $"{userId}:{animeId}";
-        var entry = await LibraryEntryDoc.Get(id, ct) ?? new LibraryEntryDoc { Id = id, UserId = userId, AnimeId = animeId, AddedAt = DateTimeOffset.UtcNow };
-        entry.Rating = Math.Max(0, Math.Min(5, rating));
-        if (!entry.Watched && !entry.Dropped) entry.Watched = true; // auto-set watched
-        entry.UpdatedAt = DateTimeOffset.UtcNow;
-        await LibraryEntryDoc.UpsertMany(new[] { entry }, ct);
 
-        // Update profile preferences using simple EWMA over genres and tags
-        var a = await AnimeDoc.Get(animeId, ct);
-        if (a is null) return;
-        var profile = await UserProfileDoc.Get(userId, ct) ?? new UserProfileDoc { Id = userId };
-        const double alpha = 0.3; // smoothing factor
-        void Nudge(string key, double target)
+        // Update or create library entry
+        var entryId = LibraryEntry.MakeId(userId, mediaId);
+        var entry = await LibraryEntry.Get(entryId, ct) ?? new LibraryEntry
         {
-            profile.GenreWeights.TryGetValue(key, out var oldW);
-            var updated = (1 - alpha) * oldW + alpha * target;
-            profile.GenreWeights[key] = Math.Clamp(updated, 0, 1);
+            Id = entryId,
+            UserId = userId,
+            MediaId = mediaId,
+            AddedAt = DateTimeOffset.UtcNow
+        };
+
+        entry.Rating = Math.Max(1, Math.Min(10, rating)); // 1-10 scale
+        if (entry.Status == MediaStatus.PlanToConsume)
+        {
+            entry.Status = MediaStatus.Completed; // Auto-mark as completed when rating
         }
-        foreach (var g in a.Genres ?? Array.Empty<string>()) Nudge(g, rating / 5.0);
-        foreach (var t in a.Tags ?? Array.Empty<string>()) Nudge(t, rating / 5.0);
-        // Update preference vector via EWMA if embedding is available
+        entry.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await LibraryEntry.UpsertMany(new[] { entry }, ct);
+
+        // Update user profile preferences
+        await UpdateUserPreferences(userId, mediaId, rating, ct);
+    }
+
+    private async Task<float[]> BuildQueryVector(string? text, string? anchorMediaId, string? userId, string[]? preferTags, CancellationToken ct)
+    {
+        var ai = Koan.AI.Ai.TryResolve();
+        if (ai is null) return Array.Empty<float>();
+
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { text! } }, ct);
+            return emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+        }
+
+        if (!string.IsNullOrWhiteSpace(anchorMediaId))
+        {
+            var anchorMedia = await Media.Get(anchorMediaId!, ct);
+            if (anchorMedia != null)
+            {
+                var textAnchor = $"{anchorMedia.Title}\n\n{anchorMedia.Synopsis}\nGenres: {string.Join(", ", anchorMedia.Genres ?? Array.Empty<string>())}";
+                var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { textAnchor } }, ct);
+                return emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            var profile = await UserProfileDoc.Get(userId!, ct);
+            if (profile?.PrefVector is { Length: > 0 } pv)
+            {
+                return pv;
+            }
+        }
+
+        if (preferTags is { Length: > 0 })
+        {
+            var tagText = $"Tags: {string.Join(", ", preferTags.Where(t => !string.IsNullOrWhiteSpace(t)))}";
+            var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { tagText } }, ct);
+            return emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+        }
+
+        return Array.Empty<float>();
+    }
+
+    private async Task<List<Media>> ApplyFilters(IEnumerable<Media> media, string[]? genres, int? episodesMax, string? mediaTypeFilter, string? userId, CancellationToken ct)
+    {
+        var filtered = media.AsEnumerable();
+
+        // Media type filter - now accepts media type ID directly
+        if (!string.IsNullOrWhiteSpace(mediaTypeFilter))
+        {
+            filtered = filtered.Where(m => m.MediaTypeId == mediaTypeFilter);
+        }
+
+        // Genre filter
+        if (genres is { Length: > 0 })
+        {
+            filtered = filtered.Where(m => (m.Genres ?? Array.Empty<string>()).Intersect(genres).Any());
+        }
+
+        // Episodes filter
+        if (episodesMax is int emax)
+        {
+            filtered = filtered.Where(m => m.Episodes is null || m.Episodes <= emax);
+        }
+
+        // Exclude items already in user's library
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            var libraryEntries = (await LibraryEntry.All(ct)).Where(e => e.UserId == userId).ToList();
+            var excludeIds = libraryEntries.Select(e => e.MediaId).ToHashSet();
+            filtered = filtered.Where(m => !excludeIds.Contains(m.Id!));
+        }
+
+        return filtered.ToList();
+    }
+
+    private async Task<List<Recommendation>> ScoreAndPersonalize(List<Media> media, Dictionary<string, double> vectorScores, string? userId, string[]? preferTags, double? preferWeight, bool spoilerSafe, CancellationToken ct)
+    {
+        UserProfileDoc? profile = null;
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            profile = await UserProfileDoc.Get(userId, ct);
+        }
+
+        var preferTagsWeight = Math.Clamp(preferWeight ?? 0.2, 0, 1.0);
+        var preferTagsSet = new HashSet<string>((preferTags ?? Array.Empty<string>()).Take(3), StringComparer.OrdinalIgnoreCase);
+
+        return media.Select(m =>
+        {
+            var vectorScore = vectorScores.TryGetValue(m.Id!, out var vs) ? vs : 0.0;
+            var popularityScore = m.Popularity;
+
+            // Genre/tag personalization
+            var genreBoost = 0.0;
+            if (profile?.GenreWeights is { Count: > 0 })
+            {
+                foreach (var genre in m.Genres ?? Array.Empty<string>())
+                {
+                    if (profile.GenreWeights.TryGetValue(genre, out var weight))
+                        genreBoost += weight;
+                }
+                if ((m.Genres?.Length ?? 0) > 0)
+                    genreBoost /= m.Genres!.Length;
+
+                foreach (var tag in m.Tags ?? Array.Empty<string>())
+                {
+                    if (profile.GenreWeights.TryGetValue(tag, out var weight))
+                        genreBoost += (weight - 0.5);
+                }
+            }
+
+            // Preferred tags boost
+            var preferBoost = 0.0;
+            if (preferTagsSet.Count > 0)
+            {
+                var allKeys = (m.Genres ?? Array.Empty<string>()).Concat(m.Tags ?? Array.Empty<string>()).ToList();
+                if (allKeys.Count > 0)
+                {
+                    var hits = allKeys.Count(k => preferTagsSet.Contains(k));
+                    if (hits > 0) preferBoost = (double)hits / allKeys.Count;
+                }
+            }
+
+            // Spoiler penalty
+            var spoilerPenalty = 0.0;
+            if (spoilerSafe && m.Synopsis?.Contains("spoiler", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                spoilerPenalty = 0.3;
+            }
+
+            // Combined score
+            var hybridScore = (0.4 * vectorScore) + (0.3 * popularityScore) + (0.2 * genreBoost) + (preferBoost * preferTagsWeight);
+            hybridScore *= (1.0 - spoilerPenalty);
+
+            var reasons = new List<string> { "vector" };
+            if (genreBoost > 0) reasons.Add("personalized");
+            if (preferBoost > 0) reasons.Add("preferred-tags");
+            if (popularityScore > 0.8) reasons.Add("popular");
+
+            return new Recommendation
+            {
+                Media = m,
+                Score = hybridScore,
+                Reasons = reasons.ToArray()
+            };
+        }).ToList();
+    }
+
+    private static IEnumerable<Recommendation> ApplySort(IEnumerable<Recommendation> recommendations, string? sort)
+    {
+        return (sort ?? string.Empty).ToLowerInvariant() switch
+        {
+            "rating" => recommendations.OrderByDescending(r => r.Media?.AverageScore ?? 0),
+            "popular" => recommendations.OrderByDescending(r => r.Media?.Popularity ?? 0),
+            "relevance" or _ => recommendations.OrderByDescending(r => r.Score)
+        };
+    }
+
+    private async Task UpdateUserPreferences(string userId, string mediaId, int rating, CancellationToken ct)
+    {
         try
         {
-            var ai = Sora.AI.Ai.TryResolve();
-            if (ai is not null)
+            var media = await Media.Get(mediaId, ct);
+            if (media is null) return;
+
+            var profile = await UserProfileDoc.Get(userId, ct) ?? new UserProfileDoc
             {
-                var textBlend = $"{a.Title}\n\n{a.Synopsis}\nTags: {string.Join(", ", (a.Genres ?? Array.Empty<string>()).Concat(a.Tags ?? Array.Empty<string>()))}";
+                Id = userId,
+                UserId = userId
+            };
+
+            const double alpha = 0.3; // Learning rate
+
+            // Update genre/tag preferences
+            foreach (var genre in media.Genres ?? Array.Empty<string>())
+            {
+                profile.GenreWeights.TryGetValue(genre, out var oldWeight);
+                var target = rating / 10.0; // Convert to 0-1 scale
+                var updated = (1 - alpha) * oldWeight + alpha * target;
+                profile.GenreWeights[genre] = Math.Clamp(updated, 0, 1);
+            }
+
+            foreach (var tag in media.Tags ?? Array.Empty<string>())
+            {
+                profile.GenreWeights.TryGetValue(tag, out var oldWeight);
+                var target = (rating / 10.0) - 0.5; // Centered around 0.5
+                var updated = (1 - alpha) * oldWeight + alpha * target;
+                profile.GenreWeights[tag] = Math.Clamp(updated, 0, 1);
+            }
+
+            // Update preference vector if AI is available
+            var ai = Koan.AI.Ai.TryResolve();
+            if (ai != null)
+            {
+                var textBlend = $"{media.Title}\n\n{media.Synopsis}\nTags: {string.Join(", ", (media.Genres ?? Array.Empty<string>()).Concat(media.Tags ?? Array.Empty<string>()))}";
                 var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { textBlend } }, ct);
                 var vec = emb.Vectors.FirstOrDefault();
+
                 if (vec is { Length: > 0 })
                 {
                     if (profile.PrefVector is { Length: > 0 } pv && pv.Length == vec.Length)
                     {
-                        for (int i = 0; i < pv.Length; i++) pv[i] = (float)((1 - alpha) * pv[i] + alpha * vec[i]);
+                        for (int i = 0; i < pv.Length; i++)
+                            pv[i] = (float)((1 - alpha) * pv[i] + alpha * vec[i]);
                         profile.PrefVector = pv;
                     }
                     else
@@ -374,12 +405,13 @@ internal sealed class RecsService : IRecsService
                     }
                 }
             }
+
+            profile.UpdatedAt = DateTimeOffset.UtcNow;
+            await UserProfileDoc.UpsertMany(new[] { profile }, ct);
         }
-        catch
+        catch (Exception ex)
         {
-            // non-fatal
+            _logger?.LogWarning(ex, "Failed to update user preferences for user {UserId}", userId);
         }
-        profile.UpdatedAt = DateTimeOffset.UtcNow;
-        await UserProfileDoc.UpsertMany(new[] { profile }, ct);
     }
 }

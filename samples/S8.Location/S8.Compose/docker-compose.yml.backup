@@ -1,0 +1,114 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: s8-location-mongo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "4910:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: s8-location-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "4911:5672"    # AMQP
+      - "4912:15672"   # Management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  ollama:
+    image: ollama/ollama
+    container_name: s8-location-ollama
+    ports:
+      - "4913:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    command: >
+      sh -c "ollama serve & 
+             sleep 10 && 
+             ollama pull llama3.1:8b && 
+             wait"
+
+  api:
+    build:
+      context: ../../..
+      dockerfile: samples/S8.Location/S8.Location.Api/Dockerfile
+    container_name: s8-location-api
+    environment:
+      ASPNETCORE_URLS: http://+:4914
+      # MongoDB Configuration
+      Koan__Data__Mongo__Database: s8location
+      Koan_DATA_MONGO_DATABASE: s8location
+      # RabbitMQ Configuration
+      Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
+      # AI Configuration
+      Koan__Ai__Services__Ollama__0__Id: "ollama"
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Koan__Ai__Services__Ollama__0__DefaultModel: "llama3.1:8b"
+      Koan__Ai__Services__Ollama__0__Enabled: "true"
+      # Location-specific configuration
+      S8__Location__Resolution__CacheEnabled: "true"
+      S8__Location__Geocoding__GoogleMapsApiKey: "${GOOGLE_MAPS_API_KEY:-}"
+      DOTNET_ENVIRONMENT: Development
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    ports:
+      - "4914:4914"
+
+  adapter-inventory:
+    build:
+      context: ../../..
+      dockerfile: samples/S8.Location/S8.Location.Adapters.Inventory/Dockerfile
+    container_name: s8-location-adapter-inventory
+    environment:
+      Koan_DATA_MONGO_DATABASE: s8location
+      Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
+      DOTNET_ENVIRONMENT: Development
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  adapter-healthcare:
+    build:
+      context: ../../..
+      dockerfile: samples/S8.Location/S8.Location.Adapters.Healthcare/Dockerfile
+    container_name: s8-location-adapter-healthcare
+    environment:
+      Koan_DATA_MONGO_DATABASE: s8location
+      Koan_MESSAGING_RABBITMQ_CONNECTIONSTRING: amqp://guest:guest@rabbitmq:5672
+      DOTNET_ENVIRONMENT: Development
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
+  rabbitmq_data:
+  ollama_data:

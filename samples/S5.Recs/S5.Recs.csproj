@@ -7,22 +7,22 @@
     <RootNamespace>S5.Recs</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Sora.Core\Sora.Core.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Web.Swagger\Sora.Web.Swagger.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Vector.Abstractions\Sora.Data.Vector.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Vector\Sora.Data.Vector.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Weaviate\Sora.Data.Weaviate.csproj" />
-    <ProjectReference Include="..\..\src\Sora.AI\Sora.AI.csproj" />
-    <ProjectReference Include="..\..\src\Sora.AI.Contracts\Sora.AI.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Ai.Provider.Ollama\Sora.Ai.Provider.Ollama.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Scheduling\Sora.Scheduling.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Weaviate\Koan.Data.Weaviate.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Ai.Provider.Ollama\Koan.Ai.Provider.Ollama.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Scheduling\Koan.Scheduling.csproj" />
     <!-- Auth core and dev TestProvider for Development login/testing -->
-    <ProjectReference Include="..\..\src\Sora.Web.Auth\Sora.Web.Auth.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Web.Auth.TestProvider\Sora.Web.Auth.TestProvider.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Web.Extensions\Sora.Web.Extensions.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth.TestProvider\Koan.Web.Auth.TestProvider.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>

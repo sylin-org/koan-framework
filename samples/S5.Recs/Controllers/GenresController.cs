@@ -16,8 +16,8 @@ public class GenresController : ControllerBase
         if (string.Equals(sort, "alpha", StringComparison.OrdinalIgnoreCase) || string.Equals(sort, "name", StringComparison.OrdinalIgnoreCase))
             q = q.OrderBy(t => t.Genre);
         else
-            q = q.OrderByDescending(t => t.AnimeCount).ThenBy(t => t.Genre);
+            q = q.OrderByDescending(t => t.MediaCount).ThenBy(t => t.Genre);
         if (top.HasValue && top.Value > 0) q = q.Take(top.Value);
-        return Ok(q.Select(t => new { genre = t.Genre, count = t.AnimeCount }));
+        return Ok(q.Select(t => new { genre = t.Genre, count = t.MediaCount }));
     }
 }

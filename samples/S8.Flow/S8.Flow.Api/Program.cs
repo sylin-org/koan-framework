@@ -1,34 +1,37 @@
 using S8.Flow.Api.Entities;
-using Sora.Data.Core;
-using Sora.Flow;
-using Sora.Flow.Configuration;
-using Sora.Flow.Options;
+using Koan.Data.Core;
+using Koan.Flow.Initialization;
+using Koan.Flow.Options;
 using S8.Flow.Shared;
-using Sora.Messaging;
+using Koan.Messaging;
 using S8.Flow.Api.Adapters;
-using Sora.Web.Swagger;
-using Sora.Flow.Sending;
+using Koan.Web.Swagger;
+using Koan.Flow.Attributes;
+using Koan.Flow.Core.Orchestration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using Koan.Core.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Sora framework with auto-configuration
-builder.Services.AddSora();
+// Configure centralized Koan logging - replace ALL logging
+builder.Logging.ClearProviders()
+    .AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Error) // Hide port override noise  
+    .AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Error) // Hide startup noise
+    .AddFilter("Microsoft", LogLevel.Warning) // Reduce other Microsoft noise
+    .AddFilter("System", LogLevel.Warning)    // Reduce System noise
+    .AddFilter("Koan", LogLevel.Debug)        // Allow all Koan debug logs
+    .SetMinimumLevel(LogLevel.Information)    // Default to Info level
+    .AddKoanFormatter();
 
-// Auto-configure Flow handlers for all FlowEntity and FlowValueObject types
-// Eliminates boilerplate - handlers route to Flow intake automatically
-builder.Services.AutoConfigureFlow(typeof(Reading).Assembly);
+// Koan framework with auto-configuration
+builder.Services.AddKoan();
 
-// FlowCommandMessage handler for API commands
-builder.Services.On<FlowCommandMessage>(async cmd =>
-{
-    // Commands are processed by registered handlers
-    await Task.CompletedTask;
-});
-
-// AutoConfigured handlers will process FlowTargetedMessage types automatically
+// Flow interceptors and orchestrator are registered automatically via AddKoanFlow()
+// All Flow entities now route through unified FlowOrchestrator - no separate transport handler needed
 
 // Container environment requirement
-if (!Sora.Core.SoraEnv.InContainer)
+if (!Koan.Core.KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Flow.Api requires container environment. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -36,8 +39,8 @@ if (!Sora.Core.SoraEnv.InContainer)
 
 builder.Services.Configure<FlowOptions>(o =>
 {
-    // Default tags act as fallback when model has no AggregationTag attributes.
-    // Our Sensor model carries [AggregationTag(Keys.Sensor.Key)], so this isn't required,
+    // Default tags act as fallback when model has no AggregationKey attributes.
+    // Our Sensor model carries [AggregationKey] on SensorId, so this isn't required,
     // but we keep a conservative default for other models.
     o.AggregationTags = new[] { Keys.Sensor.Key };
     // Enable purge for VO-heavy workloads and keep keyed retention modest by default
@@ -50,7 +53,7 @@ builder.Services.Configure<FlowOptions>(o =>
 
 builder.Services.AddControllers();
 builder.Services.AddRouting();
-builder.Services.AddSoraSwagger(builder.Configuration);
+builder.Services.AddKoanSwagger(builder.Configuration);
 
 // That's it! No complex Flow orchestrator setup needed.
 // Messages sent via .Send() will be automatically routed to handlers above.
@@ -71,13 +74,13 @@ app.Lifetime.ApplicationStarted.Register(async () =>
         await setting.Save();
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
-        logger?.LogInformation("[API] Data provider test: AppSetting saved successfully");
+        logger?.LogKoanInit("Data provider test: AppSetting saved successfully");
     }
     catch (Exception ex)
     {
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
-        logger?.LogError(ex, "[API] Data provider test failed");
+        logger?.LogInformation("[Koan:init] Data provider test failed: {Error}", ex.Message);
     }
 });
 
@@ -90,6 +93,22 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.UseSoraSwagger();
+app.UseKoanSwagger();
 
 app.Run();
+
+/// <summary>
+/// S8.Flow API orchestrator that processes Flow entity messages from adapters.
+/// This marks the API as the central orchestrator service that should run Flow background workers.
+/// </summary>
+[FlowOrchestrator]
+public class S8FlowOrchestrator : FlowOrchestratorBase
+{
+    public S8FlowOrchestrator(ILogger<S8FlowOrchestrator> logger, IConfiguration configuration, IServiceProvider serviceProvider)
+        : base(logger, configuration, serviceProvider)
+    {
+    }
+
+    // Inherits all processing logic from FlowOrchestratorBase
+    // Can override methods here for custom S8.Flow-specific processing if needed
+}

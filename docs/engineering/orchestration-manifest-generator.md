@@ -1,28 +1,28 @@
 ---
 title: Orchestration Manifest Generator — unified attributes and manifest-first discovery
-description: How to declare service/app metadata with SoraService/SoraApp so Sora generates a single manifest consumed by the CLI and planners
+description: How to declare service/app metadata with KoanService/KoanApp so Koan generates a single manifest consumed by the CLI and planners
 ---
 
 # Orchestration Manifest Generator — unified attributes and manifest-first discovery
 
 Contract (at a glance)
-- Inputs: annotated types in referenced assemblies: [SoraService] on adapter types, optional [SoraApp] (or ISoraManifest) app anchor.
-- Outputs: one embedded JSON manifest (__SoraOrchestrationManifest.Json) with schemaVersion, services[], app{}, authProviders[].
+- Inputs: annotated types in referenced assemblies: [KoanService] on adapter types, optional [KoanApp] (or IKoanManifest) app anchor.
+- Outputs: one embedded JSON manifest (__KoanOrchestrationManifest.Json) with schemaVersion, services[], app{}, authProviders[].
 - Error modes: invalid shortCode/qualifiedCode, duplicate shortCode within a compilation, missing image when DeploymentKind=Container, latest tag warnings. The generator reports diagnostics; the build stays green.
-- Success: CLI/Planner use only the generated manifest (no heuristics). `sora inspect` shows unified fields (kind, codes, image/tag, ports, provides/consumes, capabilities).
+- Success: CLI/Planner use only the generated manifest (no heuristics). `Koan inspect` shows unified fields (kind, codes, image/tag, ports, provides/consumes, capabilities).
 
 ## Authoring: add attributes
 
 Use the unified attribute on each adapter or service provider. Prefer stable short codes and qualified codes.
 
 ```csharp
-using Sora.Orchestration.Attributes;
+using Koan.Orchestration.Attributes;
 
-[SoraService(
+[KoanService(
     kind: ServiceKind.Database,
     shortCode: "postgres",
     name: "PostgreSQL",
-    QualifiedCode = "sora.db.relational.postgres",
+    QualifiedCode = "Koan.db.relational.postgres",
     Description = "Relational database",
     DeploymentKind = DeploymentKind.Container,
     ContainerImage = "postgres",
@@ -37,14 +37,14 @@ using Sora.Orchestration.Attributes;
 public sealed class PostgresAdapter /* : IServiceAdapter */ { }
 ```
 
-Declare an app anchor once per application to surface the app block and default public port. Either implement `ISoraManifest` or add the attribute directly to a trivial type.
+Declare an app anchor once per application to surface the app block and default public port. Either implement `IKoanManifest` or add the attribute directly to a trivial type.
 
 ```csharp
-using Sora.Orchestration;
-using Sora.Orchestration.Attributes;
+using Koan.Orchestration;
+using Koan.Orchestration.Attributes;
 
-[SoraApp(AppCode = "api", AppName = "S2 API", Description = "Sample API", DefaultPublicPort = 8080)]
-public sealed class AppManifest : ISoraManifest { }
+[KoanApp(AppCode = "api", AppName = "S2 API", Description = "Sample API", DefaultPublicPort = 8080)]
+public sealed class AppManifest : IKoanManifest { }
 ```
 
 Notes
@@ -58,9 +58,9 @@ Notes
 At build time, the generator scans referenced assemblies, validates attributes, and emits a single internal type with an embedded JSON payload:
 
 ```csharp
-namespace Sora.Orchestration
+namespace Koan.Orchestration
 {
-    internal static class __SoraOrchestrationManifest
+    internal static class __KoanOrchestrationManifest
     {
         public const string Json = "{\"schemaVersion\":1,\"services\":[...],\"app\":{...},\"authProviders\":[...]}";
     }
@@ -88,10 +88,10 @@ Diagnostics (subset)
 Manifest-first and only. The CLI doesn’t scrape compose/csproj/image names and doesn’t reflect for legacy attributes.
 
 Flow
-1) CLI loads `__SoraOrchestrationManifest.Json` from built assemblies in the working set.
+1) CLI loads `__KoanOrchestrationManifest.Json` from built assemblies in the working set.
 2) Inspect/Planner read unified fields, compute `depends_on` via `Provides`/`Consumes`.
 3) Profiles and overrides can adjust image/tag/ports during planning (profile-aware merges).
-4) App defaults to a deterministic port when not specified; assignment is persisted in `.sora/manifest.json`.
+4) App defaults to a deterministic port when not specified; assignment is persisted in `.Koan/manifest.json`.
 
 Inspect extras
 - Surfaces duplicate service ids across manifests (JSON: `duplicates`).
@@ -109,7 +109,7 @@ Inspect extras
       "shortCode": "postgres",
       "name": "PostgreSQL",
       "kind": 1,
-      "qualifiedCode": "sora.db.relational.postgres",
+      "qualifiedCode": "Koan.db.relational.postgres",
       "deploymentKind": 1,
       "containerImage": "postgres",
       "defaultTag": "16",
@@ -122,9 +122,9 @@ Inspect extras
 ```
 
 ## Troubleshooting (quick)
-- “No services discovered”: ensure your adapters reference `Sora.Orchestration.Abstractions` and are attributed with `[SoraService]`. Build the solution and re-run `sora inspect`.
+- “No services discovered”: ensure your adapters reference `Koan.Orchestration.Abstractions` and are attributed with `[KoanService]`. Build the solution and re-run `Koan inspect`.
 - “Missing image warning”: set `ContainerImage` or provide `[ContainerDefaults]` on the class if your adapter also supports legacy defaults.
-- “Duplicate ids”: fix shortCode collisions across referenced manifests; `sora inspect` prints a DUPLICATE IDS section.
+- “Duplicate ids”: fix shortCode collisions across referenced manifests; `Koan inspect` prints a DUPLICATE IDS section.
 
 ## References
 - Decision — ARCH-0049 Unified service metadata and discovery: ../decisions/ARCH-0049-unified-service-metadata-and-discovery.md

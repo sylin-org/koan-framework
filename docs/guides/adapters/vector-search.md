@@ -1,12 +1,12 @@
-# Vector Search contracts (Sora.Data.Vector)
+# Vector Search contracts (Koan.Data.Vector)
 
 Status: Planned (see ADR DATA-0054)
 
-This guide defines Sora’s vector datasource signature and accessory elements. It complements, but does not replace, classic query surfaces (LINQ/string). Vector search is a parallel capability focused on kNN/top‑K similarity.
+This guide defines Koan’s vector datasource signature and accessory elements. It complements, but does not replace, classic query surfaces (LINQ/string). Vector search is a parallel capability focused on kNN/top‑K similarity.
 
 See also:
 
-- Support: Vector Adapter Acceptance Criteria (docs/support/09-vector-adapter-acceptance-criteria.md)
+- Support: Vector Adapter Acceptance Criteria (docs/support/vector-adapter-acceptance-criteria.md)
 
 ## Contracts (proposed)
 
@@ -17,7 +17,7 @@ See also:
 - Repository interface
 
 ```csharp
-namespace Sora.Data.Vector.Abstractions;
+namespace Koan.Data.Vector.Abstractions;
 
 public sealed record VectorQueryOptions(
   ReadOnlyMemory<float> Embedding,
@@ -34,7 +34,7 @@ public sealed record VectorHit<TKey>(TKey Id, double Score, string? Raw = null);
 public sealed record VectorSearchResult<TKey>(IReadOnlyList<VectorHit<TKey>> Hits, string? Continuation = null);
 
 public interface IVectorSearchRepository<TEntity, TKey>
-  where TEntity : class, Sora.Data.Abstractions.IEntity<TKey>
+  where TEntity : class, Koan.Data.Abstractions.IEntity<TKey>
   where TKey : notnull
 {
   Task<VectorSearchResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default);
@@ -44,7 +44,7 @@ public interface IVectorIndexInfo
 {
   int Dimensions { get; }
   string Metric { get; }             // normalized name
-  Sora.Data.Vector.Abstractions.VectorCapabilities Capabilities { get; }
+  Koan.Data.Vector.Abstractions.VectorCapabilities Capabilities { get; }
 }
 
 [Flags]
@@ -73,23 +73,23 @@ public sealed class VectorEmbeddingAttribute : Attribute
 
 Notes:
 
-- These definitions are specification-only here; implementation will live in Sora.Data.Vector.
+- These definitions are specification-only here; implementation will live in Koan.Data.Vector.
 
 ## Usage patterns
 
 ### 1) Search → hydrate pattern (recommended)
 
 ```csharp
-// Assume: services.AddSora(); vector adapter registered (e.g., Weaviate)
+// Assume: services.AddKoan(); vector adapter registered (e.g., Weaviate)
 var data = sp.GetRequiredService<IDataService>();
 var primary = data.GetRepository<Person, string>();         // source of truth
 var vectors = (IVectorSearchRepository<Person, string>)primary; // or resolved separately if vector-only
 
 var embedding = await embedder.CreateAsync("search text...");
 // Prefer typed filter AST; JSON-DSL is available for interop/advanced scenarios.
-var filter = Sora.Data.Abstractions.VectorFilter.And(
-  Sora.Data.Abstractions.VectorFilter.Eq("country", "US"),
-  Sora.Data.Abstractions.VectorFilter.Gte("price", 10)
+var filter = Koan.Data.Abstractions.VectorFilter.And(
+  Koan.Data.Abstractions.VectorFilter.Eq("country", "US"),
+  Koan.Data.Abstractions.VectorFilter.Gte("price", 10)
 );
 var options = new VectorQueryOptions(embedding, TopK: 20, Filter: filter);
 
@@ -111,14 +111,14 @@ Some engines can store full entities (JSON payload) alongside vectors.
 
 ```csharp
 var vectorRepo = sp.GetRequiredService<IVectorSearchRepository<Document, string>>();
-var rsp = await vectorRepo.SearchAsync(new(embedding, TopK: 10, Filter: Sora.Data.Abstractions.VectorFilter.Eq("tag", "kb")));
+var rsp = await vectorRepo.SearchAsync(new(embedding, TopK: 10, Filter: Koan.Data.Abstractions.VectorFilter.Eq("tag", "kb")));
 // engine may also let you fetch documents directly by id from the same store
 ```
 
 ### 3) Index lifecycle with instructions
 
 ```csharp
-var exec = (Sora.Data.Abstractions.Instructions.IInstructionExecutor<Person>)primary;
+var exec = (Koan.Data.Abstractions.Instructions.IInstructionExecutor<Person>)primary;
 await exec.ExecuteAsync<bool>(Instruction.Create("vector.index.ensureCreated"));
 var stats = await exec.ExecuteAsync<Dictionary<string, object?>>(Instruction.Create("vector.index.stats"));
 ```
@@ -173,7 +173,7 @@ Notes
 - Use StorageNameRegistry to derive collection/class names per entity set.
 - Adapter options should include: Endpoint/Connection, ApiKey/Secret, DefaultTopK, DefaultMetric, DefaultDimensions (optional), timeouts, and engine tunables.
 
-## First adapter target: Sora.Data.Weaviate
+## First adapter target: Koan.Data.Weaviate
 
 - Search: GraphQL/REST nearVector with where filter; topK; cursor for continuation.
 - Entities: store JSON payload in properties or separate primary store with hydration.

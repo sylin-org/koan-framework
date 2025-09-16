@@ -1,6 +1,6 @@
 # JSON Utilities Reference
 
-Instruction-first reference for Sora’s JSON helpers. These APIs live under `Sora.Core.Json` and use Newtonsoft.Json, centralized via `JsonDefaults`.
+Instruction-first reference for Koan’s JSON helpers. These APIs live under `Koan.Core.Json` and use Newtonsoft.Json, centralized via `JsonDefaults`.
 
 ## Contract
 - Inputs/Outputs: strings, `JToken`/`JObject`/`JArray`, and POCOs.
@@ -40,7 +40,7 @@ Semantics:
 ### Merge examples
 
 ```csharp
-using Sora.Core.Json;
+using Koan.Core.Json;
 
 var strong = "{\"arr\":[1,2],\"obj\":{\"x\":1}}";
 var weak   = "{\"arr\":[9,8,7],\"obj\":{\"x\":2,\"y\":3}}";
@@ -79,8 +79,8 @@ var back = JsonPathMapper.Expand(flat);
 ## Samples
 
 ```csharp
-var obj = new { Name = "Sora", Count = 2, Skip = (string?)null };
-var json = obj.ToJson(); // {"name":"Sora","count":2}
+var obj = new { Name = "Koan", Count = 2, Skip = (string?)null };
+var json = obj.ToJson(); // {"name":"Koan","count":2}
 
 if (json.TryFromJson(out dynamic? dyn)) { /* ... */ }
 var canonical = json.ToCanonicalJson();

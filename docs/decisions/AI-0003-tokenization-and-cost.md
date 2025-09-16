@@ -2,7 +2,7 @@
 
 Status: Proposed
 Date: 2025-08-19
-Owners: Sora AI
+Owners: Koan AI
 
 ## Context
 

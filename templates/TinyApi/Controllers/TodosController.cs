@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Sora.Web.Controllers;
+using Koan.Web.Controllers;
 using TinyApi.Models;
 
 namespace TinyApi.Controllers;

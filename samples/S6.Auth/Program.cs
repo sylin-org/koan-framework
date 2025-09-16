@@ -1,16 +1,16 @@
-﻿using Sora.Data.Core;
-using Sora.Web.Extensions;
+using Koan.Data.Core;
+using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Sora web defaults
-builder.Services.AddSora().AsWebApi().WithExceptionHandler();
+// Koan web defaults
+builder.Services.AddKoan().AsWebApi().WithExceptionHandler();
 
-// Sora.Web.Auth is auto-registered via Sora auto-bootstrap; explicit call not required.
+// Koan.Web.Auth is auto-registered via Koan auto-bootstrap; explicit call not required.
 
 var app = builder.Build();
 
-// Static files are enabled by Sora.Web initialization; no explicit calls needed.
+// Static files are enabled by Koan.Web initialization; no explicit calls needed.
 
 app.Run();
 

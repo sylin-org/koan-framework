@@ -2,15 +2,15 @@
 
 Status: Proposed
 Date: 2025-08-19
-Owners: Sora AI
+Owners: Koan AI
 
 ## Context
 
-We want a pluggable AI adapter abstraction so Sora can connect to different yet similar inference offerings (Ollama, OpenAI-compatible, Anthropic/Gemini via shims, and local servers like vLLM/TGI), without leaking provider specifics into application code. The Ollama adapter is the first concrete implementation and must list capabilities, enumerate installed models, and support chat (streaming + non-streaming) and embeddings. We also need a registry to host multiple adapters and expose a unified capabilities view.
+We want a pluggable AI adapter abstraction so Koan can connect to different yet similar inference offerings (Ollama, OpenAI-compatible, Anthropic/Gemini via shims, and local servers like vLLM/TGI), without leaking provider specifics into application code. The Ollama adapter is the first concrete implementation and must list capabilities, enumerate installed models, and support chat (streaming + non-streaming) and embeddings. We also need a registry to host multiple adapters and expose a unified capabilities view.
 
 ## Decision
 
- First-party adapters: Sora.Ai.Provider.Ollama (first), Sora.AI.Adapter.OpenAI (subset). Others can be community.
+ First-party adapters: Koan.Ai.Provider.Ollama (first), Koan.AI.Adapter.OpenAI (subset). Others can be community.
 ### Adapter identity and capabilities (contract)
 
 1) Identity
@@ -70,7 +70,7 @@ We want a pluggable AI adapter abstraction so Sora can connect to different yet 
   - GET /ai/models — flattened list with adapterId and model metadata
   - POST /ai/chat and /ai/chat/stream — accept optional adapter/model hints
   - POST /ai/embeddings — accept optional adapter/model hints
-- Requests may carry headers to influence selection (e.g., X-Sora-AI-Adapter, X-Sora-AI-Model, X-Sora-AI-RoutePolicy). These map to router policies in AI-0009.
+- Requests may carry headers to influence selection (e.g., X-Koan-AI-Adapter, X-Koan-AI-Model, X-Koan-AI-RoutePolicy). These map to router policies in AI-0009.
 
 ## Consequences
 
@@ -81,12 +81,12 @@ We want a pluggable AI adapter abstraction so Sora can connect to different yet 
 ## Notes
 
 - Protocol shims (AI-0005) sit above adapters; an OpenAI-compatible shim can delegate to any adapter via the registry.
-- Observability: All adapter calls emit OTel spans with attributes: sora.ai.adapter.id, kind, model, operation, tokens.in/out, latency.ms, error.
+- Observability: All adapter calls emit OTel spans with attributes: Koan.ai.adapter.id, kind, model, operation, tokens.in/out, latency.ms, error.
 - Backpressure and multi-service routing is specified in AI-0009.
 
 ## Development auto-discovery (Ollama)
 
-Scope: Development only (SoraEnv.IsDevelopment). Controlled by options ai:autoDiscovery:enabled (default true in Dev, false elsewhere). Explicit configuration always wins over discovery.
+Scope: Development only (KoanEnv.IsDevelopment). Controlled by options ai:autoDiscovery:enabled (default true in Dev, false elsewhere). Explicit configuration always wins over discovery.
 
 Heuristics (performed in parallel with short timeouts ≤ 250ms per probe):
 - Host endpoints:
@@ -98,15 +98,15 @@ Heuristics (performed in parallel with short timeouts ≤ 250ms per probe):
   - http://gateway.docker.internal:11434 or default gateway (e.g., 172.17.0.1:11434) as a last resort
 - Environment hints (highest precedence among discovery):
   - OLLAMA_BASE_URL
-  - SORA_AI_OLLAMA_URLS (semicolon/comma-separated)
+  - Koan_AI_OLLAMA_URLS (semicolon/comma-separated)
 
 Probe method: GET /api/tags with 200–500ms overall budget; if reachable, fetch /api/show for a small sample model to refine metadata. Register each reachable endpoint as an Ollama adapter with:
 - AdapterId: ollama@{host}:{port}
 - Labels: { discovered: "true", pool: "dev", family: inferred-from-model-name }
 
 Safety and controls:
-- Only active when SoraEnv.IsDevelopment == true and ai:autoDiscovery:enabled == true
-- Can be disabled via env SORA_AI_AUTODISCOVERY=0 or ai:autoDiscovery:enabled=false
+- Only active when KoanEnv.IsDevelopment == true and ai:autoDiscovery:enabled == true
+- Can be disabled via env Koan_AI_AUTODISCOVERY=0 or ai:autoDiscovery:enabled=false
 - Never runs in Production by default; in non-Dev, explicit configuration is required
 - Discovery adds adapters but does not override explicitly-declared adapters with the same AdapterId
 
@@ -116,11 +116,11 @@ DX:
 
 ## Configuration model
 
-Binding root: "Sora:Ai" (strongly-typed options). Supports multiple services per provider type via arrays.
+Binding root: "Koan:Ai" (strongly-typed options). Supports multiple services per provider type via arrays.
 
 appsettings.json shape (illustrative):
 
-Sora:
+Koan:
   Ai:
     AutoDiscovery:
       Enabled: true
@@ -180,11 +180,11 @@ Strongly-typed options (sketch):
 
 ## Bootstrapping
 
-services.AddSora() auto-wires AI with sane defaults and environment-aware discovery:
-- AddSora():
-  - Binds Sora:Ai options
+services.AddKoan() auto-wires AI with sane defaults and environment-aware discovery:
+- AddKoan():
+  - Binds Koan:Ai options
   - Calls AddAi(options)
-  - Registers providers declared under Sora:Ai:Services:*
+  - Registers providers declared under Koan:Ai:Services:*
   - If none declared and environment is Development (or non-Prod when configured), runs auto-discovery for Ollama and registers any found endpoints
   - Adds routing automatically; if only one eligible provider is present, IAi bypasses the router
 
@@ -195,7 +195,7 @@ Public API for callers remains IAi (PromptAsync/StreamAsync/EmbedAsync) and the 
 
 ## Persistence
 
-The AI runtime may persist internal state using Sora’s Entity patterns on the default database or a configured connection:
+The AI runtime may persist internal state using Koan’s Entity patterns on the default database or a configured connection:
 - Entities (examples): AiServiceState (health snapshots), AiCallRecord (request/response metadata), AiBudget (quota usage), AiRouteDecision (audit)
-- Options: Sora:Ai:Persistence { Enabled: false, ConnectionName: null, Schema/TablePrefix: "Ai" }
+- Options: Koan:Ai:Persistence { Enabled: false, ConnectionName: null, Schema/TablePrefix: "Ai" }
 - Persistence is off by default; when enabled, it augments telemetry with durable audit trails and quota enforcement.

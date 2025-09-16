@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Koan.Flow.Runtime.Dapr</AssemblyName>
+    <RootNamespace>Koan.Flow.Runtime.Dapr</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Flow.Core\Koan.Flow.Core.csproj" />
+  </ItemGroup>
+</Project>

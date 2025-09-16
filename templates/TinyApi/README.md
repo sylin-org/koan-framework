@@ -1,6 +1,6 @@
 # TinyApi
 
-Minimal Sora Web API backed by JSON files.
+Minimal Koan Web API backed by JSON files.
 
 - Port: __PORT__ (override with --port when templating)
 - Endpoints: /api/todos, /swagger

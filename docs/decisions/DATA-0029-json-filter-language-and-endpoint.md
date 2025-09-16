@@ -27,5 +27,5 @@ Consequences
 
 References
 - Data abstractions: `ILinqQueryRepository<TEntity,TKey>`
-- Sqlite translator: `Sora.Data.Relational.Linq.LinqWhereTranslator`
+- Sqlite translator: `Koan.Data.Relational.Linq.LinqWhereTranslator`
 - ADR 0031: `$options.ignoreCase` details and provider compatibility

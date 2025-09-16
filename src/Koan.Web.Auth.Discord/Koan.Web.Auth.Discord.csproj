@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Discord OAuth2 auth provider adapter for Koan.Web.Auth (self-registering defaults).</Description>
+    <PackageTags>$(CommonPackageTags);auth;discord;oauth2;provider</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+  </ItemGroup>
+</Project>

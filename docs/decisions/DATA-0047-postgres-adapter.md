@@ -12,10 +12,10 @@ Context
 - Existing relational tooling (LINQ translator, schema toolkit) and the SQL Server adapter define patterns for consistency.
 
 Decision
-- Implement Sora.Data.Postgres using Npgsql with JSONB storage for complex properties, server-side paging, LINQ pushdown via ILinqSqlDialect, and instruction execution.
+- Implement Koan.Data.Postgres using Npgsql with JSONB storage for complex properties, server-side paging, LINQ pushdown via ILinqSqlDialect, and instruction execution.
 - Use expression indexes on JSONB extraction for projected properties; generated columns may be added later as an option.
 - Support atomic batches via transactions; bulk delete via WHERE Id = ANY(@ids); bulk upsert via INSERT ... ON CONFLICT for now (COPY/staging optional later).
-- Expose options under Sora:Data:Postgres with defaults aligned to other relational adapters.
+- Expose options under Koan:Data:Postgres with defaults aligned to other relational adapters.
 - Participate in OpenTelemetry via ActivitySource without hard dependency.
 
 Consequences

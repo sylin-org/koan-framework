@@ -18,7 +18,7 @@ Context
 Decision
 
 - Introduce centralized, scoped constants:
-  - Sora.Data.Abstractions
+  - Koan.Data.Abstractions
     - Instructions/DataInstructions.cs: data.ensureCreated, data.clear
     - Instructions/RelationalInstructions.cs: relational.schema.validate|ensureCreated|clear; relational.sql.scalar|nonquery|query
 - Replace magic strings across adapters and Core with these constants.

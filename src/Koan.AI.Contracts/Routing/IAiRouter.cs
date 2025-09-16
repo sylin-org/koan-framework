@@ -1,0 +1,10 @@
+using Koan.AI.Contracts.Models;
+
+namespace Koan.AI.Contracts.Routing;
+
+public interface IAiRouter
+{
+    Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default);
+    IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, CancellationToken ct = default);
+    Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default);
+}

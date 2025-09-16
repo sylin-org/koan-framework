@@ -66,7 +66,7 @@
     function itemsApp() {
       const endpoint = '/graphql';
       async function gql(query, variables) {
-        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Sora-Debug': 'true' }, body: JSON.stringify({ query, variables }) });
+        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Koan-Debug': 'true' }, body: JSON.stringify({ query, variables }) });
         const data = await res.json();
         if (data.errors) throw new Error(data.errors.map(e => e.message).join('; '));
         return data.data;

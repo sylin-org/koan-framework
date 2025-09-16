@@ -59,24 +59,36 @@
       const qs = qsp({ sort, page, pageSize, status });
       return await get(`${B}/${encodeURIComponent(userId)}${qs}`) || { items: [] };
     },
-    async putLibrary(userId, animeId, body){
+    async putLibrary(userId, mediaId, body){
       const B = (window.S5Const?.ENDPOINTS?.LIBRARY_BASE) || '/api/library';
-      return await put(`${B}/${encodeURIComponent(userId)}/${encodeURIComponent(animeId)}`, body||{});
+      return await put(`${B}/${encodeURIComponent(userId)}/${encodeURIComponent(mediaId)}`, body||{});
     },
-    async postRate(userId, animeId, rating){
+    async postRate(userId, mediaId, rating){
       const R = (window.S5Const?.ENDPOINTS?.RATE) || '/api/recs/rate';
-      return await post(R, { userId, animeId, rating });
+      return await post(R, { userId, mediaId, rating });
     },
     async recsQuery(body){
       const RQ = (window.S5Const?.ENDPOINTS?.RECS_QUERY) || '/api/recs/query';
       return await post(RQ, body||{}) || { items: [] };
     },
-    async getAnimeByIds(ids){
+    async getMediaByIds(ids){
       const arr = Array.isArray(ids) ? ids : [];
       if(arr.length === 0) return [];
-      const AB = (window.S5Const?.ENDPOINTS?.ANIME_BY_IDS) || '/api/anime/by-ids';
+      const MB = (window.S5Const?.ENDPOINTS?.MEDIA_BY_IDS) || '/api/media/by-ids';
       const qs = `?ids=${encodeURIComponent(arr.join(','))}`;
-      return (await get(`${AB}${qs}`)) || [];
+      return (await get(`${MB}${qs}`)) || [];
+    },
+    // Legacy compatibility
+    async getAnimeByIds(ids){
+      return await this.getMediaByIds(ids);
+    },
+    async getMediaTypes(){
+      const MT = (window.S5Const?.ENDPOINTS?.MEDIA_TYPES) || '/api/media-types';
+      return (await get(MT)) || [];
+    },
+    async getMediaFormats(mediaType){
+      const MF = (window.S5Const?.ENDPOINTS?.MEDIA_FORMATS) || '/api/media-formats';
+      return (await get(`${MF}${qsp({ mediaType })}`)) || [];
     },
     async getTags(sort){
       const T = (window.S5Const?.ENDPOINTS?.TAGS) || '/api/tags';

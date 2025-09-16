@@ -18,7 +18,7 @@ We introduced messaging with capability negotiation and a RabbitMQ provider. We 
 ## Decision
 - Provisioning defaults:
   - If `ProvisionOnStart` is absent, default to `true` except when the environment is Production (`ASPNETCORE_ENVIRONMENT`/`DOTNET_ENVIRONMENT`).
-  - In Production, default to `false` unless `Sora:AllowMagicInProduction=true`.
+  - In Production, default to `false` unless `Koan:AllowMagicInProduction=true`.
   - Explicit `ProvisionOnStart` always wins.
 - Type aliases and attributes:
   - Add `[Message(Alias, Version, Bus, Group)]` and property-level `[PartitionKey]`, `[Header(name)]`, `[Sensitive]`, `[DelaySeconds]`, `[IdempotencyKey]`.

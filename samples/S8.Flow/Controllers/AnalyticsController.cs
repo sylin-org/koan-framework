@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Sora.Flow.Model;
-using Sora.Flow.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
+using Koan.Flow.Model;
+using Koan.Flow.Infrastructure;
 using S8.Flow.Shared;
-using Sora.Data.Core;
-using Sora.Flow.Diagnostics;
+using Koan.Data.Core;
+using Koan.Flow.Diagnostics;
 
 namespace S8.Flow.Controllers;
 
@@ -25,15 +25,15 @@ public class AnalyticsController : ControllerBase
         LineageProjection<Device>? lineageDoc;
         using (DataSetContext.With(FlowSets.ViewShort(Constants.Views.Canonical)))
         {
-            canonicalDoc = await Sora.Data.Core.Data<CanonicalProjection<Device>, string>.GetAsync($"{Constants.Views.Canonical}::{referenceId}", ct);
+            canonicalDoc = await Koan.Data.Core.Data<CanonicalProjection<Device>, string>.GetAsync($"{Constants.Views.Canonical}::{referenceId}", ct);
         }
         using (DataSetContext.With(FlowSets.ViewShort(Constants.Views.Lineage)))
         {
-            lineageDoc = await Sora.Data.Core.Data<LineageProjection<Device>, string>.GetAsync($"{Constants.Views.Lineage}::{referenceId}", ct);
+            lineageDoc = await Koan.Data.Core.Data<LineageProjection<Device>, string>.GetAsync($"{Constants.Views.Lineage}::{referenceId}", ct);
         }
 
         // Reference metadata (typed)
-        var refItem = await Sora.Data.Core.Data<ReferenceItem<Device>, string>.GetAsync(referenceId, ct);
+        var refItem = await Koan.Data.Core.Data<ReferenceItem<Device>, string>.GetAsync(referenceId, ct);
 
         if (canonicalDoc is null && lineageDoc is null)
         {
@@ -77,11 +77,11 @@ public class AnalyticsController : ControllerBase
         CanonicalProjection<Sensor>? canonicalDoc;
         LineageProjection<Sensor>? lineageDoc;
         using (DataSetContext.With(FlowSets.ViewShort(Constants.Views.Canonical)))
-        { canonicalDoc = await Sora.Data.Core.Data<CanonicalProjection<Sensor>, string>.GetAsync($"{Constants.Views.Canonical}::{referenceId}", ct); }
+        { canonicalDoc = await Koan.Data.Core.Data<CanonicalProjection<Sensor>, string>.GetAsync($"{Constants.Views.Canonical}::{referenceId}", ct); }
         using (DataSetContext.With(FlowSets.ViewShort(Constants.Views.Lineage)))
-        { lineageDoc = await Sora.Data.Core.Data<LineageProjection<Sensor>, string>.GetAsync($"{Constants.Views.Lineage}::{referenceId}", ct); }
+        { lineageDoc = await Koan.Data.Core.Data<LineageProjection<Sensor>, string>.GetAsync($"{Constants.Views.Lineage}::{referenceId}", ct); }
 
-        var refItem = await Sora.Data.Core.Data<ReferenceItem<Sensor>, string>.GetAsync(referenceId, ct);
+        var refItem = await Koan.Data.Core.Data<ReferenceItem<Sensor>, string>.GetAsync(referenceId, ct);
         if (canonicalDoc is null && lineageDoc is null) return NotFound($"No data found for sensor {referenceId}");
 
     var canonical = canonicalDoc?.Model as Dictionary<string, object> ?? new Dictionary<string, object>();
@@ -122,7 +122,7 @@ public class AnalyticsController : ControllerBase
     using (DataSetContext.With(FlowSets.StageShort(FlowSets.Keyed)))
     { keyedRecords = await StageRecord<Sensor>.All(ct); }
     var rejections = await RejectionReport.All(ct);
-    var pendingTasks = await Sora.Data.Core.Data<ProjectionTask<Sensor>, string>.All(ct);
+    var pendingTasks = await Koan.Data.Core.Data<ProjectionTask<Sensor>, string>.All(ct);
 
         var recentRejections = rejections
             .Where(r => r.CreatedAt > DateTimeOffset.UtcNow.AddHours(-1))

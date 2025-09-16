@@ -2,11 +2,11 @@
 
 Status: Proposed
 Date: 2025-08-19
-Owners: Sora Web
+Owners: Koan Web
 
 ## Context
 
-Teams integrate via different AI protocol surfaces. We need an approach that preserves Sora’s controller-first model while offering optional interoperability layers.
+Teams integrate via different AI protocol surfaces. We need an approach that preserves Koan’s controller-first model while offering optional interoperability layers.
 
 ## Decision
 
@@ -17,5 +17,5 @@ Teams integrate via different AI protocol surfaces. We need an approach that pre
 
 ## Consequences
 
-- Protocol adapters must map headers/capabilities to Sora equivalents; differences documented.
+- Protocol adapters must map headers/capabilities to Koan equivalents; differences documented.
 - Testing includes compatibility suites; performance budgets compared to native REST.

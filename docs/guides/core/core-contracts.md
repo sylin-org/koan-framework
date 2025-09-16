@@ -1,4 +1,4 @@
-# Sora Core Contracts (draft)
+# Koan Core Contracts (draft)
 
 This mirrors and refines the core contracts with your guidance.
 
@@ -36,7 +36,7 @@ Notes
 - Attributes provide metadata and routing hints: [Message(Alias, Version, Bus, Group)], [PartitionKey], [Header(name)], [Sensitive], [DelaySeconds], [IdempotencyKey].
   - [Header] values are promoted to transport headers by providers that support it.
   - [PartitionKey] may influence routing/ordering (partition suffixing or partitions depending on provider).
-  - Aliases can optionally include a version suffix (e.g., `Alias@v1`) when `Sora:Messaging:IncludeVersionInAlias = true`.
+  - Aliases can optionally include a version suffix (e.g., `Alias@v1`) when `Koan:Messaging:IncludeVersionInAlias = true`.
 - Providers can provision topology on startup based on options (guarded in Production by a global switch).
 - See ADR-0021 (messaging capabilities and negotiation) and ADR-0022 (provisioning defaults, aliases/attributes, dispatcher).
 
@@ -59,7 +59,7 @@ Notes
 ## Notes
 - Versioning (snapshots) is deferred to a later milestone; not part of the initial built-ins.
  - Naming rationale: We unify on IEntity<TKey> for simplicity; "aggregate root" remains a doc concept for ownership and consistency boundaries.
- - Configuration: Sora ensures an IConfiguration is available when using the one-liner `services.StartSora()` (console/non-host scenarios). If an IConfiguration is already registered by the host, Sora does not override it. Adapters bind options from configuration sections (e.g., `Sora:Data:...`).
+ - Configuration: Koan ensures an IConfiguration is available when using the one-liner `services.StartKoan()` (console/non-host scenarios). If an IConfiguration is already registered by the host, Koan does not override it. Adapters bind options from configuration sections (e.g., `Koan:Data:...`).
 
 ## Health & criticality contracts
  - Pull checks: `IHealthContributor` returns `HealthCheckResult`; aggregated by `IHealthService`.

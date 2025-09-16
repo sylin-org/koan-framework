@@ -40,7 +40,7 @@ $repo = Resolve-RepoRoot
 New-Item -ItemType Directory -Force -Path (Join-Path $repo $OutDir) | Out-Null
 
 Write-Host "[pack] Restoring solution..." -ForegroundColor Cyan
-& dotnet restore (Join-Path $repo 'Sora.sln') | Out-Null
+& dotnet restore (Join-Path $repo 'Koan.sln') | Out-Null
 
 if (-not $Version -or [string]::IsNullOrWhiteSpace($Version)) {
   Write-Host "[pack] Computing NuGet version via NB.GV..." -ForegroundColor Cyan

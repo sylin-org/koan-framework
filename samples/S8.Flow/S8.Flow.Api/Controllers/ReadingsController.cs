@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using S8.Flow.Shared;
-using Sora.Flow.Model;
-using Sora.Flow.Infrastructure;
-using Sora.Data.Core;
+using Koan.Flow.Model;
+using Koan.Flow.Infrastructure;
+using Koan.Data.Core;
 
 namespace S8.Flow.Api.Controllers;
 
@@ -42,7 +42,7 @@ public sealed class ReadingsController : ControllerBase
                 id = r.Id,
                 at = r.OccurredAt,
                 source = r.SourceId,
-                payload = r.StagePayload,
+                payload = r.Data,
                 correlationId = r.CorrelationId
             })
             .ToList();
@@ -97,7 +97,7 @@ public sealed class ReadingsController : ControllerBase
                 id = r.Id,
                 at = r.OccurredAt,
                 source = r.SourceId,
-                payload = r.StagePayload
+                payload = r.Data
             })
             .ToList();
 
@@ -108,24 +108,24 @@ public sealed class ReadingsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] SensorReading reading, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(reading.SensorKey)) return BadRequest("sensorKey is required");
+        if (string.IsNullOrWhiteSpace(reading.SensorId)) return BadRequest("SensorId is required");
 
-        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        var readingData = new Reading
         {
-            [Keys.Sensor.Key] = reading.SensorKey,
-            [Keys.Reading.Value] = reading.Value,   
-            [Keys.Reading.CapturedAt] = reading.CapturedAt.ToString("O"),
+            SensorId = reading.SensorId,
+            Value = reading.Value,
+            CapturedAt = reading.CapturedAt,
+            Unit = reading.Unit,
+            Source = reading.Source
         };
-        if (!string.IsNullOrWhiteSpace(reading.Unit)) payload[Keys.Sensor.Unit] = reading.Unit;
-        if (!string.IsNullOrWhiteSpace(reading.Source)) payload[Keys.Reading.Source] = reading.Source!;
 
         var typed = new StageRecord<Reading>
         {
             Id = Guid.NewGuid().ToString("n"),
             SourceId = reading.Source ?? FlowSampleConstants.Sources.Api,
             OccurredAt = reading.CapturedAt,
-            StagePayload = payload,
-            CorrelationId = reading.SensorKey
+            Data = readingData,
+            CorrelationId = reading.SensorId
         };
         var setName = FlowSets.StageShort(FlowSets.Intake);
         using (DataSetContext.With(setName))

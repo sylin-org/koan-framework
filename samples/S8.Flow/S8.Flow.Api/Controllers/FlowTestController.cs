@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using S8.Flow.Shared;
-using Sora.Flow;
-using Sora.Flow.Sending;
+using Koan.Flow.Extensions;
+using Koan.Messaging;
 
 namespace S8.Flow.Api.Controllers;
 
@@ -21,23 +21,19 @@ public class FlowTestController : ControllerBase
     {
         try
         {
-            // Verify Flow static API is accessible
-            var outbound = Sora.Flow.Flow.Outbound;
-            var inbound = Sora.Flow.Flow.Inbound;
-            
-            return Ok(new { 
-                status = "✅ Flow orchestrator APIs are accessible",
-                outbound = outbound != null ? "Available" : "Null",
-                inbound = inbound != null ? "Available" : "Null",
-                assembly_marked = "This assembly has [FlowOrchestrator] attribute",
-                auto_registration = "Should auto-register handlers for Device, Sensor, Reading"
+            return Ok(new
+            {
+                status = "✅ Flow messaging system is available",
+                messaging = "Entity.Send() pattern available",
+                transport = "TransportEnvelope system active"
             });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { 
-                status = "❌ Flow orchestrator API failed", 
-                error = ex.Message 
+            return StatusCode(500, new
+            {
+                status = "❌ Flow orchestrator API failed",
+                error = ex.Message
             });
         }
     }
@@ -54,7 +50,7 @@ public class FlowTestController : ControllerBase
             // Test creating Flow entities
             var device = new Device
             {
-                DeviceId = "test-device",
+                Id = "test-device",
                 Inventory = "TEST-001",
                 Serial = "SN-123",
                 Manufacturer = "Test Corp",
@@ -65,35 +61,37 @@ public class FlowTestController : ControllerBase
 
             var sensor = new Sensor
             {
-                SensorKey = "test::device::temp",
-                DeviceId = "test-device",
+                SensorId = "test::device::temp",
+                Id = "test-device",
                 Code = "TEMP",
                 Unit = "°C"
             };
 
             var reading = new Reading
             {
-                SensorKey = "test::device::temp",
+                SensorId = "test::device::temp",
                 Value = 25.5,
                 CapturedAt = DateTimeOffset.UtcNow,
                 Unit = "°C",
                 Source = "test"
             };
 
-            return Ok(new { 
+            return Ok(new
+            {
                 status = "✅ Successfully created Flow entities",
-                device = new { device.DeviceId, device.Manufacturer, device.Model },
-                sensor = new { sensor.SensorKey, sensor.Code, sensor.Unit },
-                reading = new { reading.SensorKey, reading.Value, reading.Unit },
+                device = new { device.Id, device.Manufacturer, device.Model },
+                sensor = new { sensor.SensorId, sensor.Code, sensor.Unit },
+                reading = new { reading.SensorId, reading.Value, reading.Unit },
                 message = "Entities created successfully - Flow model types are working"
             });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { 
-                status = "❌ Failed to create Flow entities", 
+            return StatusCode(500, new
+            {
+                status = "❌ Failed to create Flow entities",
                 error = ex.Message,
-                stack_trace = ex.StackTrace 
+                stack_trace = ex.StackTrace
             });
         }
     }
@@ -109,7 +107,7 @@ public class FlowTestController : ControllerBase
         {
             var device = new Device
             {
-                DeviceId = $"test-{Guid.NewGuid():N}",
+                Id = $"test-{Guid.NewGuid():N}",
                 Inventory = "TEST-SEND",
                 Serial = $"SN-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}",
                 Manufacturer = "Flow Test Corp",
@@ -122,17 +120,19 @@ public class FlowTestController : ControllerBase
             // device.Send() should route through messaging → orchestrator → Flow intake
             await device.Send();
 
-            return Ok(new { 
+            return Ok(new
+            {
                 status = "✅ Successfully sent entity via Flow messaging pipeline!",
-                device = new { device.DeviceId, device.Manufacturer, device.Model },
+                device = new { device.Id, device.Manufacturer, device.Model },
                 pipeline = "entity.Send() → Messaging → [FlowOrchestrator] → Flow Intake → Processing",
                 message = "If you see this, the beautiful messaging-first architecture is working!"
             });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { 
-                status = "❌ Failed to send entity via Flow pipeline", 
+            return StatusCode(500, new
+            {
+                status = "❌ Failed to send entity via Flow pipeline",
                 error = ex.Message,
                 inner_error = ex.InnerException?.Message,
                 stack_trace = ex.StackTrace,
@@ -140,7 +140,7 @@ public class FlowTestController : ControllerBase
                 {
                     check_messaging = "Ensure a messaging provider (RabbitMQ, Redis, etc.) is configured",
                     check_orchestrator = "Verify [FlowOrchestrator] attribute is present on assembly",
-                    check_autoregistration = "Check that Sora auto-registration is working"
+                    check_autoregistration = "Check that Koan auto-registration is working"
                 }
             });
         }

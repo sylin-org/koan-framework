@@ -1,6 +1,6 @@
 # TinyApp
 
-Minimal Sora Web API backed by SQLite.
+Minimal Koan Web API backed by SQLite.
 
 - Port: __PORT__ (override with --port when templating)
 - DB: ./data/app.db

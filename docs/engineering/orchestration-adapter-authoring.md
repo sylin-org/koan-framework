@@ -1,9 +1,9 @@
-﻿---
+---
 title: Orchestration adapter authoring — deprecated (see ARCH-0049 unified attributes)
-description: This legacy guidance predates ARCH-0049. Use SoraService/SoraApp and the manifest-first model. Endpoint/mount hints remain as optional extras for exporters.
+description: This legacy guidance predates ARCH-0049. Use KoanService/KoanApp and the manifest-first model. Endpoint/mount hints remain as optional extras for exporters.
 ---
 
-> Deprecated: This page documents the pre-ARCH-0049 authoring model. The CLI no longer relies on image-name heuristics or reflection-based defaults. Prefer the unified attributes: [SoraService] for services and [SoraApp] for the app anchor. See: engineering/orchestration-manifest-generator.md
+> Deprecated: This page documents the pre-ARCH-0049 authoring model. The CLI no longer relies on image-name heuristics or reflection-based defaults. Prefer the unified attributes: [KoanService] for services and [KoanApp] for the app anchor. See: engineering/orchestration-manifest-generator.md
 
 # Orchestration adapter authoring — endpoints and persistence mounts (legacy)
 
@@ -11,7 +11,7 @@ Contract (at a glance)
 - Inputs: adapter factory/type annotated with attributes.
 - Outputs: endpoint hints for UX (scheme and optional UriPattern) and persistence mount paths consumed by exporters.
 - Error modes: missing or ambiguous metadata results in heuristic fallbacks (image/port based) but should be avoided.
-- Success: `sora status` renders deterministic endpoints and Compose export injects correct `./Data/{service}:{containerPath}` binds without duplication.
+- Success: `Koan status` renders deterministic endpoints and Compose export injects correct `./Data/{service}:{containerPath}` binds without duplication.
 
 ## Attributes
 
@@ -25,7 +25,7 @@ HostMountAttribute
 - Signature: `HostMountAttribute(string containerPath)`; can be repeated to declare multiple paths.
 
 Discovery
-- Manifest-first: planners and CLI consume `__SoraOrchestrationManifest.Json` exclusively.
+- Manifest-first: planners and CLI consume `__KoanOrchestrationManifest.Json` exclusively.
 - Exporters may still use these hints (when present) to improve UX (endpoints) and add persistence mounts safely.
 
 ## Minimal examples

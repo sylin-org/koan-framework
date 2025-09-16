@@ -1,22 +1,22 @@
-﻿# MEDIA-0001 — Media pillar baseline, tasked pipelines, and storage integration
+# MEDIA-0001 — Media pillar baseline, tasked pipelines, and storage integration
 
-Owners: Sora Media  
+Owners: Koan Media  
 Status: Accepted  
 Date: 2025-08-24
 
 ## Context
 
-Modern apps need first-class media handling (images, video, audio, PDFs), including derivatives (thumbnails, crops, transcodes), text extraction and translation, and safe, cacheable delivery. We want enterprise-grade capabilities with premium DX, aligned with Sora’s model-first style and existing Storage, Web, Messaging, and Scheduling pillars.
+Modern apps need first-class media handling (images, video, audio, PDFs), including derivatives (thumbnails, crops, transcodes), text extraction and translation, and safe, cacheable delivery. We want enterprise-grade capabilities with premium DX, aligned with Koan’s model-first style and existing Storage, Web, Messaging, and Scheduling pillars.
 
 ## Decision
 
 - Pillar and packages
-  - Introduce Sora.Media with a clean split:
-    - Sora.Media.Abstractions — contracts, events, transform specs
-    - Sora.Media.Core — Ensure/RunTask, pipelines, ancestry, idempotency
-    - Sora.Media.Storage — bridge to Sora.Storage (placement, URLs)
-    - Sora.Media.Web — controllers and HTTP surface (no inline endpoints)
-    - Sora.Media.Actions.* — Image/PDF/Video/Text action packs (opt-in heavy deps)
+  - Introduce Koan.Media with a clean split:
+    - Koan.Media.Abstractions — contracts, events, transform specs
+    - Koan.Media.Core — Ensure/RunTask, pipelines, ancestry, idempotency
+    - Koan.Media.Storage — bridge to Koan.Storage (placement, URLs)
+    - Koan.Media.Web — controllers and HTTP surface (no inline endpoints)
+    - Koan.Media.Actions.* — Image/PDF/Video/Text action packs (opt-in heavy deps)
 
 - First-class model statics (DX)
   - Media model pattern: `public sealed class MyMedia : MediaObject<MyMedia> {}`
@@ -45,17 +45,17 @@ Modern apps need first-class media handling (images, video, audio, PDFs), includ
   - Provide upward (`Ancestors`) and downward (`Descendants`/`Derivatives`) traversal statics.
 
 - Storage integration (must)
-  - All blob placement and retrieval go through Sora.Storage profiles and routing.
+  - All blob placement and retrieval go through Koan.Storage profiles and routing.
   - Placement decisions can use content-type, size, and tags/metadata (e.g., `profile-photo`, `archive`, `pii`).
-  - Media records carry `StorageKey`, `StorageProvider`, `ContentHash`, `ETag`; presigned URL generation is delegated to Sora.Storage providers.
+  - Media records carry `StorageKey`, `StorageProvider`, `ContentHash`, `ETag`; presigned URL generation is delegated to Koan.Storage providers.
   - CDN compatibility: support signed URLs, range requests, and cache headers; on-demand transforms require signed tokens or pre-registered variant policies.
 
 ## Rationale
 
-- Matches Sora’s model-first, low-ceremony DX while leveraging existing pillars for durability (Storage), async (Scheduling/Messaging), and web semantics.
+- Matches Koan’s model-first, low-ceremony DX while leveraging existing pillars for durability (Storage), async (Scheduling/Messaging), and web semantics.
 - Named tasks provide discoverable, auditable recipes with simple one-liners.
 - Derivatives as first-class objects enable reuse, lifecycle, and clear security boundaries.
-- Centralizing placement via Sora.Storage avoids duplicated logic and keeps providers thin.
+- Centralizing placement via Koan.Storage avoids duplicated logic and keeps providers thin.
 
 ## Consequences
 
@@ -74,5 +74,5 @@ Modern apps need first-class media handling (images, video, audio, PDFs), includ
 
 - Implement Abstractions/Core scaffolding and register a minimal Image actions pack (thumbnail/resize) and PDF text extract.
 - Wire `Upload/Ensure/RunTask/Url` statics and the task registry with the described schemas.
-- Bridge to Sora.Storage routing using tags and content-type; document a few routing examples.
+- Bridge to Koan.Storage routing using tags and content-type; document a few routing examples.
 - Add controllers for `/media`, `/media/{id}/variants`, `/media/{id}/tasks/{code}`, and `/media/tasks/{taskId}`.

@@ -4,7 +4,7 @@
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(SORA_ENABLE_S4_TESTS)' != '1'">
+  <PropertyGroup Condition="'$(Koan_ENABLE_S4_TESTS)' != '1'">
     <!-- Prevent test discovery/execution locally unless explicitly enabled -->
     <IsTestProject>false</IsTestProject>
   </PropertyGroup>

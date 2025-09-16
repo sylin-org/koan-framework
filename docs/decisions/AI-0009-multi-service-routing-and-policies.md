@@ -2,15 +2,15 @@
 
 Status: Proposed
 Date: 2025-08-19
-Owners: Sora AI
+Owners: Koan AI
 
 ## Context
 
-Users may run multiple inference backends of the same kind (e.g., two or more Ollama instances) or a mix of providers. We need a simple yet powerful router layered above the AdapterRegistry to support load balancing, failover, task distribution, quotas, and governance while preserving SSE semantics and Sora’s controller-first model.
+Users may run multiple inference backends of the same kind (e.g., two or more Ollama instances) or a mix of providers. We need a simple yet powerful router layered above the AdapterRegistry to support load balancing, failover, task distribution, quotas, and governance while preserving SSE semantics and Koan’s controller-first model.
 
 ## Decision
 
-Introduce an AI Router in Sora.AI.Core with pluggable policies. It selects an adapter/endpoint per request using model hints, labels, health, and policy inputs. It exposes selection results to controllers and observability.
+Introduce an AI Router in Koan.AI.Core with pluggable policies. It selects an adapter/endpoint per request using model hints, labels, health, and policy inputs. It exposes selection results to controllers and observability.
 
 ### Router contract
 - SelectAsync(intent, requestMetadata, cancellation) → RouteDecision
@@ -32,12 +32,12 @@ Introduce an AI Router in Sora.AI.Core with pluggable policies. It selects an ad
 - Hedging (duplicate after T ms; cancel loser on first success)
 
 ### Headers and options
-- X-Sora-AI-Adapter: force a specific adapter id (admins only)
-- X-Sora-AI-Model: model hint or alias (e.g., llama3.1:8b)
-- X-Sora-AI-RoutePolicy: named policy (rr, wrw, least-pending, sticky:session)
-- X-Sora-AI-StickyKey: override sticky key
-- X-Sora-AI-Budget: tokens/$ or request budget hint
-- X-Sora-AI-Timeout: per-request timeout
+- X-Koan-AI-Adapter: force a specific adapter id (admins only)
+- X-Koan-AI-Model: model hint or alias (e.g., llama3.1:8b)
+- X-Koan-AI-RoutePolicy: named policy (rr, wrw, least-pending, sticky:session)
+- X-Koan-AI-StickyKey: override sticky key
+- X-Koan-AI-Budget: tokens/$ or request budget hint
+- X-Koan-AI-Timeout: per-request timeout
 
 ### Auto-wire and default flow
 - Auto-wire: If the AdapterRegistry contains 2+ eligible adapters for the intent/model, the Router is engaged automatically; controllers delegate selection with no extra setup.
@@ -65,9 +65,9 @@ Introduce an AI Router in Sora.AI.Core with pluggable policies. It selects an ad
 - Required vs optional:
   - By default AI is optional for overall app readiness; set ai:health:required=true to propagate Degraded/Unhealthy to the app readiness result.
 - Telemetry (OTel):
-  - Metrics (gauges): sora.ai.adapters.total, .healthy, .degraded, .unhealthy, .inflight, .queue.depth
-  - Metrics (histograms): sora.ai.latency.ms, sora.ai.tokens.in, sora.ai.tokens.out
-  - Spans: attributes sora.ai.adapter.id, kind, model, policy, route.decision, health.state
+  - Metrics (gauges): Koan.ai.adapters.total, .healthy, .degraded, .unhealthy, .inflight, .queue.depth
+  - Metrics (histograms): Koan.ai.latency.ms, Koan.ai.tokens.in, Koan.ai.tokens.out
+  - Spans: attributes Koan.ai.adapter.id, kind, model, policy, route.decision, health.state
   - Events on state change: ai.health.changed from→to including reasons (last error, circuit-breaker)
 - Health endpoints:
   - GET /ai/health returns { overall, adapters[], router { status, policy, inflight, queue } }
@@ -90,12 +90,12 @@ Introduce an AI Router in Sora.AI.Core with pluggable policies. It selects an ad
 
 ### Recommended namespaces and API shape
 - Namespaces (terse, semantic):
-  - Sora.AI — root abstractions and DI entrypoints (AddAi)
-  - Sora.AI.Contracts — request/response DTOs and interfaces (IAi, IAiRouter)
-  - Sora.AI.Runtime — runtime services (Router, Health, Inflight, Policies)
-  - Sora.AI.Catalog — provider registry and model catalog
-  - Sora.AI.Providers.Ollama — Ollama provider (HTTP client, mapping)
-  - Sora.AI.AspNet — MVC controllers and wiring
+  - Koan.AI — root abstractions and DI entrypoints (AddAi)
+  - Koan.AI.Contracts — request/response DTOs and interfaces (IAi, IAiRouter)
+  - Koan.AI.Runtime — runtime services (Router, Health, Inflight, Policies)
+  - Koan.AI.Catalog — provider registry and model catalog
+  - Koan.AI.Providers.Ollama — Ollama provider (HTTP client, mapping)
+  - Koan.AI.AspNet — MVC controllers and wiring
 - Primary entrypoint:
   - IAi with PromptAsync(request), StreamAsync(request), and EmbedAsync(request)
   - IAi internally consults IAiRouter when 2+ eligible providers exist; otherwise calls the single provider directly
@@ -105,7 +105,7 @@ Introduce an AI Router in Sora.AI.Core with pluggable policies. It selects an ad
       .AddOllama("ollama-b", url2)
       .AddRouting();
   - Or via top-level:
-    - services.AddSora(); // Auto-binds Sora:Ai, registers declared services, runs Dev auto-discovery if none declared, and self-registers routing
+    - services.AddKoan(); // Auto-binds Koan:Ai, registers declared services, runs Dev auto-discovery if none declared, and self-registers routing
 
 ### Minimal flows (behavioral)
 1) Single provider, no routing

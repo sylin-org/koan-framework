@@ -21,7 +21,7 @@ We previously derived table/collection names per adapter, duplicating precedence
   - `IStorageNameResolver` (default implementation registered) for the core algorithm and app-level overrides.
   - `INamingDefaultsProvider` (per provider) to surface adapter defaults from options (`MongoOptions`, `SqliteOptions`, etc.).
 - Make defaults provider optional:
-  - If none is registered for a provider, fall back to `NamingFallbackOptions` (configurable via `Sora:Data:Naming:{Style,Separator,Casing}`) or a safe built-in.
+  - If none is registered for a provider, fall back to `NamingFallbackOptions` (configurable via `Koan:Data:Naming:{Style,Separator,Casing}`) or a safe built-in.
 - Add one-liner overrides for DX:
   - `services.OverrideStorageNaming((Type type, Convention conv) => string? name)` to globally override without custom classes.
 

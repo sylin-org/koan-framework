@@ -1,9 +1,9 @@
-﻿param(
+param(
   [ValidateSet('win-x64','linux-x64','osx-x64','osx-arm64')]
   [string]$Runtime = 'win-x64',
   [ValidateSet('Debug','Release')]
   [string]$Configuration = 'Release',
-  [string]$Project = 'src/Sora.Orchestration.Cli/Sora.Orchestration.Cli.csproj'
+  [string]$Project = 'src/Koan.Orchestration.Cli/Koan.Orchestration.Cli.csproj'
 )
 
 $ErrorActionPreference = 'Stop'

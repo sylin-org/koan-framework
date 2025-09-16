@@ -1,10 +1,10 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
-using Sora.Web.Extensions.Authorization;
+using Koan.Web.Extensions.Authorization;
 using Xunit;
 
 namespace S2.Api.IntegrationTests;
@@ -28,7 +28,7 @@ public sealed class CapabilityAuthorizationTests : IClassFixture<MongoFixture>
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                        ["Sora:Data:Mongo:Database"] = "s2_cap_auth"
+                        ["Koan:Data:Mongo:Database"] = "s2_cap_auth"
                     });
                 });
                 builder.ConfigureServices(services =>
@@ -74,7 +74,7 @@ public sealed class CapabilityAuthorizationTests : IClassFixture<MongoFixture>
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                        ["Sora:Data:Mongo:Database"] = "s2_cap_auth"
+                        ["Koan:Data:Mongo:Database"] = "s2_cap_auth"
                     });
                 });
                 builder.ConfigureServices(services =>
@@ -112,7 +112,7 @@ public sealed class CapabilityAuthorizationTests : IClassFixture<MongoFixture>
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                        ["Sora:Data:Mongo:Database"] = "s2_cap_auth"
+                        ["Koan:Data:Mongo:Database"] = "s2_cap_auth"
                     });
                 });
                 builder.ConfigureServices(services =>
@@ -151,7 +151,7 @@ public sealed class CapabilityAuthorizationTests : IClassFixture<MongoFixture>
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                        ["Sora:Data:Mongo:Database"] = "s2_cap_auth"
+                        ["Koan:Data:Mongo:Database"] = "s2_cap_auth"
                     });
                 });
                 builder.ConfigureServices(services =>
@@ -190,7 +190,7 @@ public sealed class CapabilityAuthorizationTests : IClassFixture<MongoFixture>
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                        ["Sora:Data:Mongo:Database"] = "s2_cap_auth"
+                        ["Koan:Data:Mongo:Database"] = "s2_cap_auth"
                     });
                 });
                 builder.ConfigureServices(services =>
@@ -227,7 +227,7 @@ public sealed class CapabilityAuthorizationTests : IClassFixture<MongoFixture>
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                        ["Sora:Data:Mongo:Database"] = "s2_cap_auth"
+                        ["Koan:Data:Mongo:Database"] = "s2_cap_auth"
                     });
                 });
                 builder.ConfigureServices(services =>
@@ -273,7 +273,7 @@ public sealed class CapabilityAuthorizationTests : IClassFixture<MongoFixture>
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                        ["Sora:Data:Mongo:Database"] = "s2_cap_auth"
+                        ["Koan:Data:Mongo:Database"] = "s2_cap_auth"
                     });
                 });
                 builder.ConfigureServices(services =>
@@ -322,7 +322,7 @@ public sealed class CapabilityAuthorizationTests : IClassFixture<MongoFixture>
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                        ["Sora:Data:Mongo:Database"] = "s2_cap_auth"
+                        ["Koan:Data:Mongo:Database"] = "s2_cap_auth"
                     });
                 });
                 builder.ConfigureServices(services =>

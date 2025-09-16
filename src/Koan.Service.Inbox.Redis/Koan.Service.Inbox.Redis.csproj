@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Koan.Service.Inbox.Redis</AssemblyName>
+    <RootNamespace>Koan.Service.Inbox.Redis</RootNamespace>
+  <Description>Redis-backed inbox service for Koan: lightweight HTTP receiver storing messages in Redis.</Description>
+  <PackageTags>$(CommonPackageTags);service;inbox;redis;messaging</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.1" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="9.0.8" />
+  <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>

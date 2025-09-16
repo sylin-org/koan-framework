@@ -11,19 +11,19 @@ title: Sylin.* prefix for NuGet package IDs
 
 Context
 - We own sylin.org and will publish packages under a verified "Sylin" NuGet publisher.
-- Code namespaces remain `Sora.*` to avoid churn and preserve clarity.
+- Code namespaces remain `Koan.*` to avoid churn and preserve clarity.
 
 Decision
-- Publish all NuGet packages with IDs `Sylin.Sora.*`.
-- Keep code namespaces `Sora.*`.
+- Publish all NuGet packages with IDs `Sylin.Koan.*`.
+- Keep code namespaces `Koan.*`.
 - Provide meta packages:
-  - `Sylin.Sora` (core + data abstractions + JSON adapter)
-  - `Sylin.Sora.App` (Sylin.Sora + Sora.Web)
-- Future capability packs: `Sylin.Sora.Pack.*`.
+  - `Sylin.Koan` (core + data abstractions + JSON adapter)
+  - `Sylin.Koan.App` (Sylin.Koan + Koan.Web)
+- Future capability packs: `Sylin.Koan.Pack.*`.
 
 Consequences
 - Discoverable, consistent package IDs; minimal code changes.
-- Docs/READMEs must reference `Sylin.Sora.*` IDs for installs.
+- Docs/READMEs must reference `Sylin.Koan.*` IDs for installs.
 
 See also
-- 0010: Meta packages (Sora, Sora.App)
+- 0010: Meta packages (Koan, Koan.App)

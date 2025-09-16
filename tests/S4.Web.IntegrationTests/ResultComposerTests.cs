@@ -2,7 +2,7 @@ using FluentAssertions;
 using HotChocolate;
 using HotChocolate.Execution;
 using Microsoft.AspNetCore.Http;
-using Sora.Web.GraphQl.Infrastructure;
+using Koan.Web.GraphQl.Infrastructure;
 using System.Collections.Generic;
 using Xunit;
 

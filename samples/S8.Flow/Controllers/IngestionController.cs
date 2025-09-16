@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Sora.Data.Core;
-using Sora.Flow.Infrastructure;
-using Sora.Flow.Model;
-using Sora.Testing.Flow;
+using Microsoft.AspNetCore.Mvc;
+using Koan.Data.Core;
+using Koan.Flow.Infrastructure;
+using Koan.Flow.Model;
+using Koan.Testing.Flow;
 
 namespace S8.Flow.Controllers;
 
@@ -23,7 +23,7 @@ public class IngestionController : ControllerBase
         {
             SourceId = "crm-system",
             OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object>
+            Data = new Dictionary<string, object>
             {
                 [FlowTestConstants.Keys.Email] = registration.Email,
                 [FlowTestConstants.Keys.Phone] = registration.Phone ?? string.Empty,
@@ -52,7 +52,7 @@ public class IngestionController : ControllerBase
         {
             SourceId = $"social-{interaction.Platform}",
             OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object>
+            Data = new Dictionary<string, object>
             {
                 [FlowTestConstants.Keys.Handle] = interaction.Handle,
                 [FlowTestConstants.Keys.Email] = interaction.Email ?? string.Empty,
@@ -81,7 +81,7 @@ public class IngestionController : ControllerBase
         {
             SourceId = $"iot-{iotEvent.DeviceType}",
             OccurredAt = DateTimeOffset.UtcNow,
-            StagePayload = new Dictionary<string, object>
+            Data = new Dictionary<string, object>
             {
                 [FlowTestConstants.Keys.Phone] = iotEvent.OwnerPhone, // Phone as device owner identifier
                 ["deviceId"] = iotEvent.DeviceId,
@@ -114,7 +114,7 @@ public class IngestionController : ControllerBase
             {
                 SourceId = item.Source,
                 OccurredAt = DateTimeOffset.UtcNow,
-                StagePayload = item.Payload
+                Data = item.Payload
             };
 
             using (DataSetContext.With(Constants.Sets.Intake))

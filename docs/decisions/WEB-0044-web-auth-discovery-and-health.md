@@ -4,12 +4,12 @@ slug: web-auth-discovery-and-health
 domain: WEB
 status: Accepted
 date: 2025-08-23
-title: Sora.Web.Auth discovery payload and initialization reporting
+title: Koan.Web.Auth discovery payload and initialization reporting
 ---
 
 ## Context
 
-We introduced Sora.Web.Auth to support multiple authentication protocols (OIDC, OAuth2, SAML). Provider discovery (a single well-known endpoint) powers the client UX. We also want reliable runtime visibility during startup about which providers are detected and their protocol types to aid configuration and ops.
+We introduced Koan.Web.Auth to support multiple authentication protocols (OIDC, OAuth2, SAML). Provider discovery (a single well-known endpoint) powers the client UX. We also want reliable runtime visibility during startup about which providers are detected and their protocol types to aid configuration and ops.
 
 On top of the initial design (WEB-0043), we need:
 - Initialization logs to explicitly list detected providers with type (e.g., "Google (OIDC), Discord (OAuth)").
@@ -17,7 +17,7 @@ On top of the initial design (WEB-0043), we need:
 
 ## Decision
 
-- Extend the bootstrap report for Sora.Web.Auth to include:
+- Extend the bootstrap report for Koan.Web.Auth to include:
   - `Providers=<count>` and `DetectedProviders=<comma-separated list>` using friendly names and types.
   - Fallback to well-known adapters when no explicit configuration is present.
 - Extend `ProviderDescriptor` shape returned by `GET /.well-known/auth/providers` with:
@@ -44,7 +44,7 @@ Cons/Trade-offs:
 
 ## Implementation notes
 
-- Initialization: implemented in `Sora.Web.Auth/Initialization/SoraAutoRegistrar.cs` by composing display name and protocol type from configured providers. Defaults for known providers are supplied by separate adapter modules via `IAuthProviderContributor` (see WEB-0045), not by the core.
+- Initialization: implemented in `Koan.Web.Auth/Initialization/KoanAutoRegistrar.cs` by composing display name and protocol type from configured providers. Defaults for known providers are supplied by separate adapter modules via `IAuthProviderContributor` (see WEB-0045), not by the core.
 - Discovery: `ProviderDescriptor` adds `state`, computed in `ProviderRegistry.EvaluateHealth(...)` based on minimal fields per protocol.
 - Schema after change:
   - `{ id, name, protocol, enabled, state, icon?, challengeUrl?, metadataUrl?, scopes? }`.
@@ -52,7 +52,7 @@ Cons/Trade-offs:
 ## Follow-ups
 
 - Optional: add an `active` probe mode that performs a HEAD/GET to relevant endpoints (OIDC discovery, OAuth2/token) gated by a config knob.
-- Tie into `/.well-known/sora/observability` snapshot once standardized in WEB to expose auth discovery there too.
+- Tie into `/.well-known/Koan/observability` snapshot once standardized in WEB to expose auth discovery there too.
 
 ## References
 

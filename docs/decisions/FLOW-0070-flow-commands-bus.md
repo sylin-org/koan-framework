@@ -4,7 +4,7 @@
 
 ## Context
 
-Operational actions (seed, purge, recalc, etc.) in Sora Flow have historically required bespoke HTTP endpoints and orchestration logic, leading to boilerplate, model coupling, and poor discoverability. There is a need for a unified, minimal, and idiomatic command facility that:
+Operational actions (seed, purge, recalc, etc.) in Koan Flow have historically required bespoke HTTP endpoints and orchestration logic, leading to boilerplate, model coupling, and poor discoverability. There is a need for a unified, minimal, and idiomatic command facility that:
 - Is not coupled to Flow models or event store
 - Is fire-and-forget (no reply, no await)
 - Allows broadcast or targeted dispatch (adapter/system)

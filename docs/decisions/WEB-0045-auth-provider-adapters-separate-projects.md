@@ -1,4 +1,4 @@
-﻿---
+---
 id: WEB-0045
 slug: auth-provider-adapters-separate-projects
 domain: Web
@@ -9,26 +9,26 @@ title: Auth provider adapters shipped as separate self-registering modules
 
 Context
 
-- Sora mandates Separation of Concerns and clean module boundaries.
-- Early Sora.Web.Auth builds hard-coded provider defaults (Google, Microsoft, Discord) inside the core auth module.
+- Koan mandates Separation of Concerns and clean module boundaries.
+- Early Koan.Web.Auth builds hard-coded provider defaults (Google, Microsoft, Discord) inside the core auth module.
 - This made the core aware of adapter-specific metadata and violated the separation rule.
 
 Decision
 
 - Extract each provider into its own project/package:
-  - Sora.Web.Auth.Google (OIDC)
-  - Sora.Web.Auth.Microsoft (OIDC)
-  - Sora.Web.Auth.Discord (OAuth2)
-  - Sora.Web.Auth.Oidc (generic handler; no defaults)
-- Each adapter self-registers via ISoraAutoRegistrar and contributes defaults through IAuthProviderContributor.
-- The core registry (Sora.Web.Auth) no longer carries any hard-coded defaults or brand knowledge.
+  - Koan.Web.Auth.Google (OIDC)
+  - Koan.Web.Auth.Microsoft (OIDC)
+  - Koan.Web.Auth.Discord (OAuth2)
+  - Koan.Web.Auth.Oidc (generic handler; no defaults)
+- Each adapter self-registers via IKoanAutoRegistrar and contributes defaults through IAuthProviderContributor.
+- The core registry (Koan.Web.Auth) no longer carries any hard-coded defaults or brand knowledge.
 - Production gating: dynamic providers (those contributed by adapters without explicit appsettings) are disabled by default in Production unless either:
-  - Sora:Web:Auth:AllowDynamicProvidersInProduction=true, or
-  - Sora:AllowMagicInProduction=true.
+  - Koan:Web:Auth:AllowDynamicProvidersInProduction=true, or
+  - Koan:AllowMagicInProduction=true.
 
 Scope
 
-- Applies to Sora.Web.Auth and all provider adapters listed above.
+- Applies to Koan.Web.Auth and all provider adapters listed above.
 - Samples updated to reference provider modules explicitly; no appsettings are required for providers to appear in Development.
 
 Consequences
@@ -39,7 +39,7 @@ Consequences
 
 Dev-only provider
 
-- A separate adapter `Sora.Web.Auth.TestProvider` offers an in-process OAuth2 test IdP for local runs. It self-registers in Development (or when explicitly enabled via `Sora:Web:Auth:TestProvider:Enabled=true`) and contributes a `test` OAuth2 provider with built-in endpoints. No appsettings are necessary for local discovery; credentials default to `test-client` / `test-secret` and may be overridden. The adapter logs a warning if enabled outside Development.
+- A separate adapter `Koan.Web.Auth.TestProvider` offers an in-process OAuth2 test IdP for local runs. It self-registers in Development (or when explicitly enabled via `Koan:Web:Auth:TestProvider:Enabled=true`) and contributes a `test` OAuth2 provider with built-in endpoints. No appsettings are necessary for local discovery; credentials default to `test-client` / `test-secret` and may be overridden. The adapter logs a warning if enabled outside Development.
 
 Implementation notes
 

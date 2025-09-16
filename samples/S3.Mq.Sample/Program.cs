@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using S3.Mq.Sample;
-using Sora.Core;
-using Sora.Data.Core;
-using Sora.Messaging;
+using Koan.Core;
+using Koan.Data.Core;
+using Koan.Messaging;
 
 var services = new ServiceCollection();
 
@@ -14,8 +14,8 @@ var cfg = new ConfigurationBuilder()
     .Build();
 services.AddSingleton<IConfiguration>(cfg);
 
-// Add Sora with discovery; RabbitMQ initializer registers itself when referenced
-services.AddSora();
+// Add Koan with discovery; RabbitMQ initializer registers itself when referenced
+services.AddKoan();
 
 // register handlers with simple chaining
 // [REMOVED obsolete OnMessage/OnBatch handlers]
@@ -24,14 +24,14 @@ services.AddSora();
 
 // Build and start
 var sp = services.BuildServiceProvider();
-Sora.Core.Hosting.App.AppHost.Current = sp;
-try { Sora.Core.SoraEnv.TryInitialize(sp); } catch { }
-(sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Discover();
-(sp.GetService(typeof(Sora.Core.Hosting.Runtime.IAppRuntime)) as Sora.Core.Hosting.Runtime.IAppRuntime)?.Start();
+Koan.Core.Hosting.App.AppHost.Current = sp;
+try { Koan.Core.KoanEnv.TryInitialize(sp); } catch { }
+(sp.GetService(typeof(Koan.Core.Hosting.Runtime.IAppRuntime)) as Koan.Core.Hosting.Runtime.IAppRuntime)?.Discover();
+(sp.GetService(typeof(Koan.Core.Hosting.Runtime.IAppRuntime)) as Koan.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
 Console.WriteLine("S3.Mq.Sample: sending two test messages...");
 
-await new Hello { Name = "Sora" }.Send();
+await new Hello { Name = "Koan" }.Send();
 await new UserRegistered { UserId = "u-1", Email = "u1@example.com" }.Send();
 
 // send a batch (grouped) example

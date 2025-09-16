@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Contracts for Koan DevHost orchestration: descriptors, planner models, hosting provider and artifact exporter SPIs.</Description>
+    <PackageTags>$(CommonPackageTags);orchestration;hosting;compose;docker;podman;cli;spi</PackageTags>
+    <AssemblyName>Koan.Orchestration.Abstractions</AssemblyName>
+    <RootNamespace>Koan.Orchestration</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+  <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>

@@ -3,7 +3,7 @@
 Quickstart:
 - Dev run:
   - ConnectionStrings__Default: mongodb connection string
-  - Sora__Data__Mongo__Database: database name
+  - Koan__Data__Mongo__Database: database name
 - Defaults in start.bat:
   - ASPNETCORE_URLS: http://localhost:5054
   - ConnectionStrings__Default: mongodb://localhost:5055 (matches Testcontainers and Compose assumptions)

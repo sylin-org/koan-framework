@@ -32,7 +32,7 @@ References: WEB-0035 (EntityController transformers), ARCH-0011 (headers layerin
 - Exporters generate deterministic artifacts (Compose v2 today; Helm/ACA planned) with safe env substitution and profile-aware persistence mounts.
 - Profiles: local/ci can run; staging/prod are export-only by default. Non-prod auto-avoids port conflicts; prod fails fast on conflicts.
 - Readiness: wait for running/healthy containers with timeouts; surface endpoint hints consistently.
-- Discovery: prefer explicit descriptor (sora.orchestration.{yml|json}) and minimal config over broad scans; keep trimming/AOT-friendly.
+- Discovery: prefer explicit descriptor (Koan.orchestration.{yml|json}) and minimal config over broad scans; keep trimming/AOT-friendly.
 
 References: ARCH-0047 (hosting providers/exporters), ARCH-0048 (endpoint resolution and mounts), Reference → Orchestration (`../reference/orchestration.md`).
 
@@ -51,10 +51,10 @@ References: ARCH-0033 (OTel), OPS-0050 (scheduling/bootstrap unification).
 ## Integration recipes
 
 - Intention-driven bootstrap bundles that apply best-practice wiring (health checks, telemetry, resilience, workers) on top of referenced modules.
-- Activation: reference = intent (Sora.Recipe.*), plus explicit `AddRecipe<T>()` and config-only selection via `Sora:Recipes:Active` for precise control/AOT.
-- Deterministic layering: Provider defaults < Recipe defaults < AppSettings/Env < Code overrides < Recipe forced overrides. Forced overrides are off by default and gated by `Sora:Recipes:AllowOverrides` and per-recipe `Sora:Recipes:<Name>:ForceOverrides`.
+- Activation: reference = intent (Koan.Recipe.*), plus explicit `AddRecipe<T>()` and config-only selection via `Koan:Recipes:Active` for precise control/AOT.
+- Deterministic layering: Provider defaults < Recipe defaults < AppSettings/Env < Code overrides < Recipe forced overrides. Forced overrides are off by default and gated by `Koan:Recipes:AllowOverrides` and per-recipe `Koan:Recipes:<Name>:ForceOverrides`.
 - Capability gating: apply only when prereqs exist; prefer checking registered services or configured options over raw key sniffing.
-- Logging + dry-run: stable event ids for apply/skip/fail; `Sora:Recipes:DryRun=true` logs decisions without mutating DI.
+- Logging + dry-run: stable event ids for apply/skip/fail; `Koan:Recipes:DryRun=true` logs decisions without mutating DI.
 - Guardrails: infra-only wiring (no inline endpoints); respect controller-only HTTP routes; no magic values—use options/constants.
 - Discovery: explicit registration and/or assembly attributes; avoid broad scans to remain trimming/AOT friendly.
 
@@ -68,7 +68,7 @@ Reference: Engineering Guardrails (service lifetimes section).
 
 ## Naming and constants
 
-- Use Sora.Core.Configuration helpers (`Read`, `ReadFirst`) and canonical `:` keys.
+- Use Koan.Core.Configuration helpers (`Read`, `ReadFirst`) and canonical `:` keys.
 - One `Constants` per assembly; rely on namespaces; use using-aliases when needed.
 
 Reference: ARCH-0040.

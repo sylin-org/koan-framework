@@ -1,8 +1,8 @@
-# Working with Entity Data in Sora
+# Working with Entity Data in Koan
 
 This guide centers on the domain-first Entity approach: simple, readable APIs like `Item.Get(id)` and `item.Save()`. Raw `model.Upsert<T,TKey>()` and `Data<TEntity,TKey>` helpers are covered later for advanced control.
 
-Audience: Developers building with Sora’s domain model and generic EntityController.
+Audience: Developers building with Koan’s domain model and generic EntityController.
 
 ---
 
@@ -24,7 +24,7 @@ See 15-entity-filtering-and-query.md for the full filter DSL and pagination head
 
 ## Entity essentials
 
-Sora provides a domain-centric CRTP base `Sora.Domain.Entity<TEntity, TKey>` that exposes static conveniences. Typical usage with an `Item` entity:
+Koan provides a domain-centric CRTP base `Koan.Domain.Entity<TEntity, TKey>` that exposes static conveniences. Typical usage with an `Item` entity:
 
 ```csharp
 // Read
@@ -57,15 +57,16 @@ For string-keyed entities, you can call `item.Save(ct)` directly via extensions.
 await item.Save(); // string-keyed convenience
 ```
 
-If your key is not a string or you need explicit type control, see “Raw model.* operations” at the end.
+If your key is not a string or you need explicit type control, see “Raw model.\* operations” at the end.
 
 ---
 
 ## Sets: route the same entity to multiple logical stores
 
-Sora supports logical data “sets” so you can keep multiple parallel collections of the same entity (e.g., root, backup, archive). The physical storage name is resolved per adapter; non-root sets are suffixed internally (e.g., "Todo#backup").
+Koan supports logical data “sets” so you can keep multiple parallel collections of the same entity (e.g., root, backup, archive). The physical storage name is resolved per adapter; non-root sets are suffixed internally (e.g., "Todo#backup").
 
 Ways to choose a set:
+
 - Preferred: pass `set` to first-class statics and instance Save("set").
 - HTTP: pass `set` in querystring for GET or inside the POST /query body.
 - Code: wrap operations in DataSetContext.With("backup"). Root is null/empty.
@@ -129,6 +130,7 @@ POST   /api/items/query                    // body: { filter: { ... }, set: "bac
 ```
 
 Notes:
+
 - When `set` is omitted, operations target the root collection.
 - Pagination and filter semantics are unchanged; only routing differs.
 
@@ -147,7 +149,7 @@ Full details and examples: 15-entity-filtering-and-query.md.
 
 ## Advanced: set migrations (clear, copy, move, replace)
 
-Sora provides high-level helpers to manipulate whole sets safely and predictably (batching-friendly). These operations respect adapters and push as much work down as possible.
+Koan provides high-level helpers to manipulate whole sets safely and predictably (batching-friendly). These operations respect adapters and push as much work down as possible.
 
 These live on the data facade `Data<TEntity,TKey>`:
 
@@ -189,6 +191,7 @@ await item.MoveToSet<Item, string>(toSet: "backup", fromSet: null /* ambient */,
 ```
 
 Notes:
+
 - ReplaceSet clears the target up-front to guarantee a clean replacement.
 - Map lets you transform entities during migration (e.g., stamp flags, rewrite keys).
 - BatchSize is advisory; adapters may chunk operations accordingly.
@@ -235,7 +238,7 @@ GET /api/items?filter={"$options":{ "ignoreCase": true },"Name":"*report*"}&page
 
 ---
 
-## Raw model.* operations (when you need full control)
+## Raw model.\* operations (when you need full control)
 
 Most apps can stick to the Entity-first APIs above. If you need to control generic type parameters or work with non-string keys explicitly, use the instance extensions:
 
@@ -251,6 +254,7 @@ var id = await model.UpsertId<MyEntity, Guid>();
 ```
 
 Notes:
+
 - For string-keyed entities, prefer `model.Save()` (no type arguments needed).
 - These extensions resolve the right repository, ensure identifiers, and persist the model.
 
@@ -263,9 +267,9 @@ All APIs shown accept an optional CancellationToken as the last parameter (e.g.,
 ## Where to go next
 
 See Engineering front door and Reference/Data Access for setup.
+
 - 15-entity-filtering-and-query.md for full filter language details
 - docs/decisions for ADRs 0029 (filter language), 0030 (sets), 0031 (ignoreCase)
-
 
 ## Flow: parent relationships and ingestion without canonical IDs
 
@@ -280,11 +284,11 @@ Mark parent properties with `[ParentKey]` so the resolver can bind canonical ref
 public sealed class Sensor : FlowEntity<Sensor>
 {
     // Canonical Device ULID (filled by the resolver)
-    [ParentKey]
+    [Parent(typeof(Device))]
     public string DeviceId { get; set; } = default!;
 
     [AggregationTag(Keys.Sensor.Key)]
-    public string SensorKey { get; set; } = default!;
+    public string SerialNumber { get; set; } = default!;
 
     public string Code { get; set; } = default!;
     public string Unit { get; set; } = default!;
@@ -306,7 +310,7 @@ var batch = new[]
         new Dictionary<string,string> { [ExternalSystems.Oem] = "OEM-00001" }),
 
     FlowSendItem.Of(
-        new Sensor { SensorKey = "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
+        new Sensor { SerialNumber= "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
         // Include parent’s external ID to enable resolver to fill Sensor.DeviceId
         new Dictionary<string,string> { ["oem-device"] = "OEM-00001", ["oem-sensor"] = "S-00987" })
 };
@@ -359,6 +363,7 @@ await _sender.SendAsync(items, ct: ct);
 ```
 
 Notes:
+
 - Do not stamp adapter identity in the bag; the ingestion API stamps it based on the host/envelope.
 - For large batches, pass IEnumerable<FlowSendPlainItem> to stream or page as needed.
 
@@ -386,11 +391,11 @@ Mark parent properties with `[ParentKey]` so the resolver can bind canonical ref
 public sealed class Sensor : FlowEntity<Sensor>
 {
     // Canonical Device ULID (filled by the resolver)
-    [ParentKey(Keys.Device.Key)]
+    [Parent(typeof(Device))]
     public string DeviceId { get; set; } = default!;
 
     [AggregationTag(Keys.Sensor.Key)]
-    public string SensorKey { get; set; } = default!;
+    public string SerialNumber { get; set; } = default!;
 
     public string Code { get; set; } = default!;
     public string Unit { get; set; } = default!;
@@ -412,7 +417,7 @@ var batch = new[]
         new Dictionary<string,string> { [ExternalSystems.Oem] = "OEM-00001" }),
 
     FlowSendItem.Of(
-        new Sensor { SensorKey = "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
+        new Sensor { SerialNumber= "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" },
         // Include parent’s external ID to enable resolver to fill Sensor.DeviceId
         new Dictionary<string,string> { ["oem-device"] = "OEM-00001", ["oem-sensor"] = "S-00987" })
 };
@@ -466,7 +471,7 @@ await new Device { Inventory = "INV-123", Serial = "SN-ABC", Manufacturer = "Hit
 
 await new[]
 {
-    new Sensor { SensorKey = "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" }
+    new Sensor { SerialNumber= "INV-123::SN-ABC::TEMP", Code = "TEMP", Unit = "C" }
 }.Send(sourceId: "events", occurredAt: DateTimeOffset.UtcNow, ct: ct);
 ```
 

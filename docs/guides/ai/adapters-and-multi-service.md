@@ -13,12 +13,12 @@ Example scenarios
 - Batch embeddings: LeastPending + CapacityGuard; backpressure visible via metrics
 
 Development auto-discovery (Ollama)
-- In Development, Sora can probe common Ollama endpoints (localhost:11434, host.docker.internal:11434, and service name ollama:11434) and auto-register reachable instances.
-- Controlled by ai:autoDiscovery:enabled (default true in Dev) or env SORA_AI_AUTODISCOVERY; never on by default in Production.
+- In Development, Koan can probe common Ollama endpoints (localhost:11434, host.docker.internal:11434, and service name ollama:11434) and auto-register reachable instances.
+- Controlled by ai:autoDiscovery:enabled (default true in Dev) or env Koan_AI_AUTODISCOVERY; never on by default in Production.
 - Discovered entries are labeled discovered=true and pool=dev and appear in /ai/capabilities.
 
 See also
 - ADR AI-0008 — adapters and registry: ../../decisions/AI-0008-adapters-and-registry.md
 - ADR AI-0009 — multi-service routing: ../../decisions/AI-0009-multi-service-routing-and-policies.md
 - Interop matrix: interop-matrix.md
-- Native AI Sora — Epic: native-ai-sora-epic.md
+- Native AI Koan — Epic: native-ai-Koan-epic.md

@@ -1,6 +1,6 @@
-﻿# S8.Flow Sample
+# S8.Flow Sample
 
-This sample demonstrates Sora Flow capabilities for data ingestion, association, and projection across multiple data sources.
+This sample demonstrates Koan Flow capabilities for data ingestion, association, and projection across multiple data sources.
 
 ## Scenarios
 
@@ -50,7 +50,7 @@ Demonstrates rejection when data lacks configured aggregation keys:
 - `POST /api/sampledata/collision-scenario` - Generate collision test data
 - `POST /api/sampledata/no-keys-scenario` - Generate rejection test data
 
-### Flow Views (from Sora.Flow.Web)
+### Flow Views (from Koan.Flow.Web)
 
 - `GET /flow/views/canonical` - Canonical projections (unique values per tag)
 - `GET /flow/views/lineage` - Lineage projections (sources per value)
@@ -109,7 +109,7 @@ Rejections are stored in `rejections` with reason codes for debugging.
 
 ## Sample Aggregation Keys
 
-All scenarios use shared constants from `Sora.Testing.Flow.FlowTestConstants`:
+All scenarios use shared constants from `Koan.Testing.Flow.FlowTestConstants`:
 
 - Email: `a@example.com`, `b@example.com`
 - Phone: `+1-202-555-0101`, `+1-202-555-0102`

@@ -1,10 +1,10 @@
 # S1.Web container (multi-stage)
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
-# Copy entire Sora folder (multi-project) as build context
+# Copy entire Koan folder (multi-project) as build context
 COPY . .
-# Restore and publish using Sora root as build context
-RUN dotnet restore Sora.sln
+# Restore and publish using Koan root as build context
+RUN dotnet restore Koan.sln
 RUN dotnet publish samples/S1.Web/S1.Web.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final

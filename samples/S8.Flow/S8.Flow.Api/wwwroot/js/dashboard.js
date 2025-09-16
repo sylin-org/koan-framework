@@ -228,7 +228,7 @@ class FlowDashboard {
 
       // Update activity indicators
       document.getElementById('deviceActivity').textContent = deviceCount > 0 ? 'active' : 'none';
-      document.getElementById('sensorActivity').textContent = sensorCount > 0 ? 'active' : 'none';
+      document.getElementById('senKoanctivity').textContent = sensorCount > 0 ? 'active' : 'none';
       document.getElementById('readingActivity').textContent = readingCount > 0 ? 'recent' : 'none';
       document.getElementById('manufacturerActivity').textContent = manufacturerCount > 0 ? 'active' : 'none';
       

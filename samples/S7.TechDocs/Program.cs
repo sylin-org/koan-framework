@@ -1,29 +1,29 @@
-using Sora.Core;
-using Sora.Core.Modules;
-using Sora.Core.Observability;
-using Sora.Data.Core;
-using Sora.Web.Extensions;
-using Sora.Web.Swagger;
-using Sora.Web.Auth.Extensions;
+using Koan.Core;
+using Koan.Core.Modules;
+using Koan.Core.Observability;
+using Koan.Data.Core;
+using Koan.Web.Extensions;
+using Koan.Web.Swagger;
+using Koan.Web.Auth.Extensions;
 using Microsoft.AspNetCore.Authentication;
-using Sora.Web.Extensions.Authorization;
-using Sora.Data.Mongo;
+using Koan.Web.Extensions.Authorization;
+using Koan.Data.Mongo;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSora()
+builder.Services.AddKoan()
     .AsWebApi()
     .AsProxiedApi()
     .WithRateLimit();
 
-builder.Services.AddSoraObservability();
-builder.Services.AddSoraSwagger(builder.Configuration);
+builder.Services.AddKoanObservability();
+builder.Services.AddKoanSwagger(builder.Configuration);
 
 // Data layer — Single database (Mongo) across environments
 // Options auto-bind from configuration; defaults safe for Development
 builder.Services.AddMongoAdapter();
 
-// Controllers; Sora auto-registrars wire authentication; TestProvider will attach itself in Development
+// Controllers; Koan auto-registrars wire authentication; TestProvider will attach itself in Development
 builder.Services.AddControllers();
 
 // Authorization with role-based policies
@@ -35,7 +35,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
 });
 
-// Map Sora capability actions to our role policies so generic controllers can enforce them
+// Map Koan capability actions to our role policies so generic controllers can enforce them
 builder.Services.AddCapabilityAuthorization(opts =>
 {
     // Default mapping for all entities (can be overridden per-entity later)
@@ -78,6 +78,6 @@ app.MapControllers();
 app.MapFallbackToFile("index.html");
 
 // Swagger UI (enabled in all environments; restrict externally via hosting if needed)
-app.UseSoraSwagger();
+app.UseKoanSwagger();
 
 app.Run();

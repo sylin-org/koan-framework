@@ -14,7 +14,7 @@ Context
 
 Decision
 
-- Introduce Sora.Web.Transformers module:
+- Introduce Koan.Web.Transformers module:
   - IEntityTransformer<TEntity, TShape> to declare Accept content types, Transform/TransformMany for output, and Parse/ParseMany for input.
   - ITransformerRegistry to register per-entity transformers and resolve by Accept/Content-Type with RFC 7231 q-values and wildcards.
   - MVC integration:
@@ -35,18 +35,18 @@ Details
   - Selection tie-breakers: higher q-value, then higher registration priority (Explicit via DI > Discovered), then header order.
 - Registration & discovery
   - DI helper: services.AddEntityTransformer<TEntity,TShape,TTransformer>(params string[] contentTypes).
-  - Auto-discovery (default on) via ISoraInitializer scans loaded assemblies for IEntityTransformer<,> and registers with Discovered priority.
+  - Auto-discovery (default on) via IKoanInitializer scans loaded assemblies for IEntityTransformer<,> and registers with Discovered priority.
   - DI registrations override discovered transformers for the same media type.
 - MVC integration
   - Output: a global result filter checks for [EnableEntityTransformers] on the controller, resolves the best transformer for the response model type and Accept header, transforms payload, and sets Content-Type.
   - Input: a custom input formatter participates for entity types and uses ResolveForInput based on the request Content-Type.
 - Swagger/OpenAPI
-  - In Sora.Web.Swagger, a reflection-based operation filter (added only when transformers are present) advertises alternate media types:
+  - In Koan.Web.Swagger, a reflection-based operation filter (added only when transformers are present) advertises alternate media types:
     - For 200 responses on entity-returning actions.
     - For request bodies on actions taking entity parameters.
 - Configuration
-  - Sora:Web:Transformers:AutoDiscover (bool, default true): enable/disable transformer discovery.
-  - Swagger gating is handled by Sora.Web.Swagger (Dev on by default; in non-Dev require Sora__Web__Swagger__Enabled=true or Sora:AllowMagicInProduction=true).
+  - Koan:Web:Transformers:AutoDiscover (bool, default true): enable/disable transformer discovery.
+  - Swagger gating is handled by Koan.Web.Swagger (Dev on by default; in non-Dev require Koan__Web__Swagger__Enabled=true or Koan:AllowMagicInProduction=true).
 
 Consequences
 

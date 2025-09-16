@@ -6,14 +6,14 @@
     <LangVersion>preview</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Sora.Core\Sora.Core.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Web\Sora.Web.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Web.Swagger\Sora.Web.Swagger.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Data.Mongo\Sora.Data.Mongo.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Web.Transformers\Sora.Web.Transformers.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Web.Extensions\Sora.Web.Extensions.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Web.Transformers\Koan.Web.Transformers.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Messaging.RabbitMq\Koan.Messaging.RabbitMq.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
   </ItemGroup>
 </Project>

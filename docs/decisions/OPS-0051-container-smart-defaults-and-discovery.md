@@ -1,4 +1,4 @@
-﻿---
+---
 title: OPS-0051 Container-smart defaults and discovery lists
 status: accepted
 date: 2025-08-22
@@ -12,10 +12,10 @@ Decision
 
 - Provide container-smart defaults across adapters/providers with a unified pattern:
   - Support a multi-endpoint environment variable list to preserve caller order and pick the first reachable candidate.
-    - Ollama: SORA_AI_OLLAMA_URLS (existing)
-    - Weaviate: SORA_DATA_WEAVIATE_URLS (new)
-    - Mongo: SORA_DATA_MONGO_URLS (new)
-    - Redis: SORA_DATA_REDIS_URLS (new)
+    - Ollama: Koan_AI_OLLAMA_URLS (existing)
+    - Weaviate: Koan_DATA_WEAVIATE_URLS (new)
+    - Mongo: Koan_DATA_MONGO_URLS (new)
+    - Redis: Koan_DATA_REDIS_URLS (new)
   - Recognize a sentinel value "auto" for option fields to explicitly opt-in to discovery/default resolution.
   - Maintain a host-first default order that reflects dev compose reality:
     - Weaviate: host.docker.internal:8080 → localhost:8080 → weaviate:8080 → localhost:8085
@@ -34,9 +34,9 @@ Consequences
 Implementation Notes
 
 - Ollama: Changed default for AllowDiscoveryInNonDev to true unless explicitly set in AiOptions.
-- Weaviate: Added SORA_DATA_WEAVIATE_URLS list, 'auto' recognition, and retained probing with readiness fallback.
-- Mongo: Added SORA_DATA_MONGO_URLS list with quick ping, 'auto' recognition, and existing compose-aware defaults.
-- Redis: Added SORA_DATA_REDIS_URLS list with quick connect ping, 'auto' recognition, and existing compose-aware defaults.
+- Weaviate: Added Koan_DATA_WEAVIATE_URLS list, 'auto' recognition, and retained probing with readiness fallback.
+- Mongo: Added Koan_DATA_MONGO_URLS list with quick ping, 'auto' recognition, and existing compose-aware defaults.
+- Redis: Added Koan_DATA_REDIS_URLS list with quick connect ping, 'auto' recognition, and existing compose-aware defaults.
 
 Testing
 

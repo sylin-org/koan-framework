@@ -39,7 +39,7 @@
   <!-- Overview -->
   <section id="overview" class="space-y-8">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between"><div><p class="text-gray-400 text-sm">Total Anime</p><p class="text-3xl font-bold text-white mt-2" id="ov-anime">-</p></div><div class="bg-blue-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-film text-blue-500 text-xl"></i></div></div></div>
+        <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between"><div><p class="text-gray-400 text-sm">Total Media</p><p class="text-3xl font-bold text-white mt-2" id="ov-media">-</p></div><div class="bg-blue-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-film text-blue-500 text-xl"></i></div></div></div>
         <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between"><div><p class="text-gray-400 text-sm">Vectors</p><p class="text-3xl font-bold text-white mt-2" id="ov-vectors">-</p></div><div class="bg-yellow-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-brain text-yellow-500 text-xl"></i></div></div></div>
         <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between"><div><p class="text-gray-400 text-sm">Tag Catalog</p><p class="text-3xl font-bold text-white mt-2" id="ov-tags">-</p></div><div class="bg-purple-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-tags text-purple-500 text-xl"></i></div></div></div>
         <div class="bg-slate-900 rounded-xl p-6 border border-slate-800"><div class="flex items-center justify-between"><div><p class="text-gray-400 text-sm">Health</p><p class="text-3xl font-bold text-white mt-2" id="ov-health">-</p></div><div class="bg-green-500 bg-opacity-20 p-3 rounded-lg"><i class="fas fa-heartbeat text-green-500 text-xl"></i></div></div></div>
@@ -48,7 +48,7 @@
       <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
         <div class="flex items-center justify-between mb-6"><h3 class="text-lg font-semibold text-white">Quick Actions</h3>
           <div class="flex gap-2">
-            <button onclick="vectorUpsert()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-brain mr-2"></i>Rebuild from Anime</button>
+            <button onclick="vectorUpsert()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-brain mr-2"></i>Rebuild Vectors</button>
             <button onclick="rebuildTags()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-tags mr-2"></i>Rebuild Tags</button>
             <button onclick="rebuildGenres()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-list mr-2"></i>Rebuild Genres</button>
           </div>
@@ -66,11 +66,15 @@
           <label class="text-sm text-gray-400">Source
             <select id="importSource" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700">
               <option value="anilist">AniList</option>
-              <option value="local">Local JSON</option>
             </select>
           </label>
-          <label class="text-sm text-gray-400">Limit
-            <input id="importLimit" type="number" min="1" max="2000" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 w-28" />
+          <label class="text-sm text-gray-400">Media Type
+            <select id="importMediaType" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700">
+              <option value="">Loading...</option>
+            </select>
+          </label>
+          <label class="text-sm text-gray-400">Limit (optional)
+            <input id="importLimit" type="number" min="1" max="2000" placeholder="All" class="block bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 w-28" />
           </label>
           <label class="text-sm text-gray-400">Overwrite
             <input id="importOverwrite" type="checkbox" class="ml-2 align-middle" />
@@ -124,18 +128,55 @@
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-white">Tag Censor</h3>
         </div>
-        <p class="text-sm text-gray-400 mb-3">Paste comma or line separated tags to censor. These will be excluded from the tag catalog.</p>
-        <div class="mb-3">
-          <textarea id="censorInput" class="w-full bg-slate-800 text-white rounded px-3 py-2 h-28 border border-slate-700" placeholder="Example: nsfw, hentai\necchi\nsmut"></textarea>
+
+        <!-- Tag Browser Section -->
+        <div class="mb-6">
+          <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-300 font-medium">Browse & Toggle Tags</span>
+              <div class="flex bg-slate-800 rounded-lg p-1" role="group" aria-label="Tag sort mode">
+                <button id="censorTagsSortPopularityBtn" class="px-2 py-1 text-xs text-white bg-red-600 rounded transition-colors" type="button">Popularity</button>
+                <button id="censorTagsSortAlphaBtn" class="px-2 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors" type="button">A–Z</button>
+              </div>
+            </div>
+            <input id="censorTagsSearch" placeholder="Search tags..." class="bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 text-sm w-full md:w-64" />
+          </div>
+          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div class="text-xs text-gray-400 mb-3">Click tags to add/remove from censor list. Censored tags appear in red.</div>
+            <div id="censorTagsBrowser" class="flex flex-wrap gap-2 max-h-64 overflow-y-auto scroll-dark">
+              <div class="text-sm text-gray-400">Loading tags...</div>
+            </div>
+          </div>
         </div>
+
+        <!-- Manual Input Section (Collapsed by default) -->
+        <div class="mb-4">
+          <button id="btnToggleManualInput" class="text-sm text-gray-400 hover:text-white mb-3 flex items-center">
+            <i class="fas fa-chevron-right mr-2 transition-transform" id="manualInputChevron"></i>
+            Manual Input (Advanced)
+          </button>
+          <div id="manualInputSection" class="hidden">
+            <p class="text-sm text-gray-400 mb-3">Paste comma or line separated tags to censor. These will be excluded from the tag catalog.</p>
+            <div class="mb-3">
+              <textarea id="censorInput" class="w-full bg-slate-800 text-white rounded px-3 py-2 h-28 border border-slate-700" placeholder="Example: nsfw, hentai
+ecchi
+smut"></textarea>
+            </div>
+            <div class="flex items-center gap-2 mb-4">
+              <button id="btnCenKoandd" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><i class="fas fa-plus mr-2"></i>Add to list</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Current Censor List Actions -->
         <div class="flex items-center gap-2 mb-4">
-          <button id="btnCensorAdd" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><i class="fas fa-plus mr-2"></i>Add to list</button>
           <button id="btnCensorCopy" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-200 rounded-lg border border-slate-700"><i class="fas fa-copy mr-2"></i>Copy list</button>
           <button id="btnCensorClear" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-200 rounded-lg border border-slate-700"><i class="fas fa-trash mr-2"></i>Clear list</button>
         </div>
+
         <div class="text-sm text-gray-300">
           <div class="flex items-center">
-            <span class="font-medium">Current list</span>
+            <span class="font-medium">Current censor list</span>
             <span class="ml-1">(<span id="censorCount">0</span>)</span>
             <button id="btnCensorToggle" class="ml-3 px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-gray-200 rounded border border-slate-700" aria-expanded="false" aria-controls="censorListContainer">Show</button>
           </div>
@@ -166,7 +207,7 @@
   <script src="/js/dom.js"></script>
   <script src="/js/dashboard.page.js"></script>
   <footer class="border-t border-slate-800 mt-10 py-6 text-center text-sm text-gray-400">
-    Made with Sora · <a class="text-purple-400 hover:text-purple-300" href="https://github.com/sylin-labs/sora-framework" target="_blank" rel="noopener">github.com/sylin-labs/sora-framework</a>
+    Made with Koan · <a class="text-purple-400 hover:text-purple-300" href="https://github.com/sylin-labs/Koan-framework" target="_blank" rel="noopener">github.com/sylin-labs/Koan-framework</a>
   </footer>
 </body>
 </html>

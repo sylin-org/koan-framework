@@ -1,4 +1,4 @@
-﻿---
+---
 id: ARCH-0048
 slug: endpoint-resolution-and-persistence-mounts
 domain: Architecture
@@ -38,7 +38,7 @@ We also needed predictable, opt-in persistence for containerized adapters so dat
 
 ## Implementation notes
 
-- Attributes live in Sora.Orchestration.Abstractions.
+- Attributes live in Koan.Orchestration.Abstractions.
 - CLI registers both a simple scheme resolver (legacy) and a richer endpoint resolver (scheme + pattern). EndpointFormatter prioritizes the richer resolver and applies UriPattern first.
 - Compose exporter enriches ServiceSpec.Volumes with host bind mounts based on attribute discovery; named volumes already declared are preserved unmodified.
 - Adapters annotated (initial set): Postgres, Mongo, Redis, SQL Server, Weaviate.

@@ -6,7 +6,7 @@ Date: 2025-08-21
 
 ## Context
 
-Sora supports multiple data adapters in a single application (document stores, relational, vector DBs, etc.). In multi-adapter scenarios, implicit routing can lead to ambiguity (for example, entities inadvertently going to the wrong adapter or vector features being disabled). The S5.Recs sample highlighted this risk: documents were imported but vectors were not created due to adapter disambiguation and endpoint defaults.
+Koan supports multiple data adapters in a single application (document stores, relational, vector DBs, etc.). In multi-adapter scenarios, implicit routing can lead to ambiguity (for example, entities inadvertently going to the wrong adapter or vector features being disabled). The S5.Recs sample highlighted this risk: documents were imported but vectors were not created due to adapter disambiguation and endpoint defaults.
 
 We already use `[Storage(Name=…)]` for logical set naming and `[DataAdapter("…")]` appears in samples. We need a first-class, role-aware way to declare where an entity’s data lives per modality (documents vs. vectors) and to define resolution precedence in `DataService`.
 

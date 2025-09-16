@@ -1,9 +1,9 @@
-using Sora.Data.Core;
-using Sora.Web.Swagger;
+using Koan.Data.Core;
+using Koan.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSora();
+builder.Services.AddKoan();
 builder.Services.AsWebApi();
 
 // Bind Mongo from configuration/env (.env used by compose)
@@ -13,9 +13,9 @@ var cs = builder.Configuration.GetConnectionString("mongo")
 
 builder.Services.AddMongoAdapter(o => o.ConnectionString = cs);
 
-// Swagger auto-registers via Sora initializer
+// Swagger auto-registers via Koan initializer
 
 var app = builder.Build();
-// Web pipeline is wired by Sora's startup filter (AddSora().AsWebApi()).
+// Web pipeline is wired by Koan's startup filter (AddKoan().AsWebApi()).
 
 app.Run($"http://0.0.0.0:__PORT__");

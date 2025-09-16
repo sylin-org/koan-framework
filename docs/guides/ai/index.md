@@ -1,6 +1,6 @@
-# AI in Sora
+# AI in Koan
 
-Sora provides a simple, capability-driven way to add AI features (chat, embeddings, RAG, and AI-powered transformations) with auto-setup defaults, controller-based HTTP, and strong observability.
+Koan provides a simple, capability-driven way to add AI features (chat, embeddings, RAG, and AI-powered transformations) with auto-setup defaults, controller-based HTTP, and strong observability.
 
 - Start small in-app with local or hosted models.
 - Scale to a sidecar or central proxy/connector with governance, budgets, and quotas.
@@ -8,7 +8,7 @@ Sora provides a simple, capability-driven way to add AI features (chat, embeddin
 
 See the epic for a full roadmap and interconnected deliverables:
 
-- Native AI Sora — Epic (this guide series): native-ai-sora-epic.md
+- Native AI Koan — Epic (this guide series): native-ai-Koan-epic.md
 - Adapters and multi-service routing: adapters-and-multi-service.md
 - Engine facade (terse AI access): engine-facade.md
 

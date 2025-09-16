@@ -4,25 +4,25 @@ slug: WEB-0041-graphql-module-and-controller
 domain: WEB
 status: Accepted
 date: 2025-08-19
-title: GraphQL module (Sora.Web.GraphQl) — controller-hosted schema from IEntity<>, typed filters/sorts, display field
+title: GraphQL module (Koan.Web.GraphQl) — controller-hosted schema from IEntity<>, typed filters/sorts, display field
 ---
  
-# ADR 0041: GraphQL module (Sora.Web.GraphQl) — controller-hosted schema from IEntity<>, typed filters/sorts, display field
+# ADR 0041: GraphQL module (Koan.Web.GraphQl) — controller-hosted schema from IEntity<>, typed filters/sorts, display field
 
 ## Context
 
-- Sora’s `EntityController<T>` delivers low-friction CRUD over `IEntity<>`, with shared hooks (`QueryOptions`, `HookRunner`) and repository abstractions.
+- Koan’s `EntityController<T>` delivers low-friction CRUD over `IEntity<>`, with shared hooks (`QueryOptions`, `HookRunner`) and repository abstractions.
 - Teams also want GraphQL for flexible selection sets and a single endpoint, while keeping the same domain model, policies, and limits.
 - Goals:
   - Add a first-class GraphQL surface that reuses repositories, `QueryOptions`, and hooks to keep behavior aligned with REST.
   - Zero boilerplate per entity: discover `IEntity<>` types and generate schema automatically.
   - Provide typed filter/sort inputs that map to the same `QueryOptions` (ADR-0029/0031/0032), not a separate provider-specific pipeline.
   - Expose a `display: String` field mirroring `EntityController.GetDisplay`.
-  - Respect Sora guardrails: Controllers (no inline endpoints), centralized constants, self-bootstrapping.
+  - Respect Koan guardrails: Controllers (no inline endpoints), centralized constants, self-bootstrapping.
 
 ## Decision
 
-- Add a new module: `Sora.Web.GraphQl`.
+- Add a new module: `Koan.Web.GraphQl`.
 - Host via MVC controller: `GraphQlController` at `POST /graphql`. Avoid inline `MapGraphQL` endpoints.
 - Use Hot Chocolate as the GraphQL engine (code-first):
   - Packages: `HotChocolate`, `HotChocolate.AspNetCore`, `HotChocolate.Execution`, `HotChocolate.Types`, `HotChocolate.DataLoader`.
@@ -52,7 +52,7 @@ title: GraphQL module (Sora.Web.GraphQl) — controller-hosted schema from IEnti
 - Dataloaders/perf:
   - Use `HotChocolate.DataLoader` (GreenDonut) to batch id lookups and relations, backed by repository bulk APIs.
 - Limits/safety:
-  - Configure depth, complexity, and timeouts on `IRequestExecutor`. Enforce page size ceilings via `QueryOptions`/`SoraDataBehavior` defaults.
+  - Configure depth, complexity, and timeouts on `IRequestExecutor`. Enforce page size ceilings via `QueryOptions`/`KoanDataBehavior` defaults.
 - Dev tooling:
   - Optionally serve Banana Cake Pop in Development only behind a flag. Production exposes only the controller route.
 - Coexistence with REST:
@@ -61,9 +61,9 @@ title: GraphQL module (Sora.Web.GraphQl) — controller-hosted schema from IEnti
 ## Implementation plan
 
 Phase 0: Module scaffold and bootstrapping
-- Project `Sora.Web.GraphQl` with folders: `Controllers`, `Types`, `Inputs`, `Resolvers`, `Dataloaders`, `Options`, `Infrastructure`.
+- Project `Koan.Web.GraphQl` with folders: `Controllers`, `Types`, `Inputs`, `Resolvers`, `Dataloaders`, `Options`, `Infrastructure`.
 - `Infrastructure/Constants.cs` (route "/graphql", default limits).
-- `ServiceCollectionExtensions.AddSoraGraphQl()`:
+- `ServiceCollectionExtensions.AddKoanGraphQl()`:
   - Scan for `IEntity<>` types (reuse Data.Core discovery pattern).
   - Register Hot Chocolate `IRequestExecutor` with dynamic type descriptors; register dataloaders and display provider.
   - Do not map inline endpoints.
@@ -90,7 +90,7 @@ Phase 3: Dataloaders and polish
 - Dev-only IDE toggle; docs and SDL export.
 
 ## Acceptance criteria
-- `AddSoraGraphQl` exposes schema for all discovered `IEntity<>` types without manual wiring.
+- `AddKoanGraphQl` exposes schema for all discovered `IEntity<>` types without manual wiring.
 - Queries/mutations use the same repositories and respect hooks/policies.
 - Typed filters/sorts correctly translate to `QueryOptions` (unit-tested).
 - `GraphQlController` is the only public endpoint for GraphQL.
@@ -101,7 +101,7 @@ Phase 3: Dataloaders and polish
 - Positive
   - Seamless GraphQL with minimal per-entity code; shared behavior via `QueryOptions`/hooks.
   - Strongly-typed filters/sorts and `display` improve DX.
-  - Controller-first hosting matches Sora guidelines.
+  - Controller-first hosting matches Koan guidelines.
 - Negative
   - Pagination metadata in payload (not headers); expected for GraphQL.
   - Transformers/content negotiation don’t apply; shapes must be explicit.

@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 function Invoke-Gql([string]$Query, $Variables) {
-  $headers = @{ 'X-Sora-Debug' = 'true' }
+  $headers = @{ 'X-Koan-Debug' = 'true' }
   $payload = @{ query = $Query }
   if ($null -ne $Variables) { $payload.variables = $Variables }
   $json = $payload | ConvertTo-Json -Depth 8

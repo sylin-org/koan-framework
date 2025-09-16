@@ -11,7 +11,7 @@ Symptoms
   - Referer: `http://localhost:5084/.testoauth/login.html?...`
 
 Context
-- Component: `Sora.Web.Auth.TestProvider` static login page: `wwwroot/testprovider-login.html`.
+- Component: `Koan.Web.Auth.TestProvider` static login page: `wwwroot/testprovider-login.html`.
 - The page constructs the authorize URL client-side in JavaScript.
 
 Root cause
@@ -23,7 +23,7 @@ Resolution (code)
 - Change the authorize target to an absolute path:
   - From: `const base = '.testoauth/authorize';`
   - To:   `const base = '/.testoauth/authorize';`
-- File: `src/Sora.Web.Auth.TestProvider/wwwroot/testprovider-login.html`.
+- File: `src/Koan.Web.Auth.TestProvider/wwwroot/testprovider-login.html`.
 
 Affected versions
 - Affected: Builds before the change dated 2025-08-30.

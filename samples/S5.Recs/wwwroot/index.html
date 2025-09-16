@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>AnimeRadar - AI-Powered Anime Recommendations</title>
+      <title>MediaHub - AI-Powered Media Recommendations</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link href="/styles.css" rel="stylesheet">
@@ -48,12 +48,12 @@
       <div class="flex items-center justify-between h-16">
         <!-- Logo and Brand -->
         <div class="flex items-center space-x-4">
-          <a href="index.html" class="flex items-center space-x-3" title="AnimeRadar Home">
+          <a href="index.html" class="flex items-center space-x-3" title="MediaHub Home">
             <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
               <i class="fas fa-satellite-dish text-white text-sm"></i>
             </div>
             <h1 class="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              AnimeRadar
+              MediaHub
             </h1>
           </a>
                     
@@ -73,7 +73,7 @@
             <input 
               type="text" 
               id="globalSearch"
-              placeholder="Search anime, genres..."
+              placeholder="Search media, genres..."
               class="bg-slate-800 text-white placeholder-gray-400 rounded-lg px-4 py-2 pl-10 w-80 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-slate-700 transition-colors"
             >
             <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
@@ -133,7 +133,7 @@
         </div>
         <div>
           <h2 class="text-2xl font-bold text-white" id="bannerProfileName">Welcome back, Casual Viewer!</h2>
-          <p class="text-purple-200" id="bannerProfileDescription">Here are some light-hearted anime recommendations perfect for relaxation</p>
+          <p class="text-purple-200" id="bannerProfileDescription">Here are some light-hearted media recommendations perfect for relaxation</p>
           <div class="flex items-center space-x-4 mt-2">
             <span class="text-sm text-purple-300">
               <i class="fas fa-heart mr-1"></i>
@@ -151,7 +151,7 @@
     <!-- Filters and Sort -->
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 space-y-4 lg:space-y-0">
       <div class="flex flex-wrap items-center space-x-4">
-        <h3 class="text-xl font-semibold text-white" id="contentTitle">Discover Anime</h3>
+        <h3 class="text-xl font-semibold text-white" id="contentTitle">Discover Media</h3>
         <div class="flex items-center space-x-2">
           <span class="text-gray-400 text-sm" id="resultCount">Loading…</span>
         </div>
@@ -182,6 +182,16 @@
           <button id="forYouBtn" class="px-3 py-1.5 text-sm text-white bg-purple-600 rounded transition-colors">For You</button>
           <button id="freeBrowsingBtn" class="px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors">Free Browsing</button>
           <button id="libraryBtn" class="px-3 py-1.5 text-sm text-gray-400 hover:text-white rounded transition-colors">Library</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Media Type Toggles -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 space-y-4 lg:space-y-0">
+      <div class="flex flex-wrap items-center space-x-4">
+        <h4 class="text-lg font-medium text-gray-300">Media Types</h4>
+        <div id="mediaTypeToggles" class="flex flex-wrap gap-2">
+          <!-- Media type buttons will be populated by JavaScript -->
         </div>
       </div>
     </div>
@@ -264,15 +274,28 @@
       </div>
     </div>
 
+    <!-- Active Filters -->
+    <div id="activeFiltersContainer" class="mb-4 hidden">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-sm font-medium text-gray-400">Active filters:</span>
+        <div id="activeFilterChips" class="flex flex-wrap gap-2">
+          <!-- Filter chips will be populated here -->
+        </div>
+        <button id="clearAllFilters" class="text-xs text-purple-400 hover:text-purple-300 ml-2 px-2 py-1 rounded hover:bg-purple-900/20 transition-colors">
+          <i class="fas fa-times mr-1"></i>Clear all
+        </button>
+      </div>
+    </div>
+
     <!-- Content Grid -->
-    <div id="animeGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-      <!-- Anime cards will be populated here -->
+    <div id="mediaGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+      <!-- Media cards will be populated here -->
     </div>
         
     <!-- Loading State -->
     <div id="loadingState" class="text-center py-12">
       <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-      <p class="text-gray-400 mt-4">Loading amazing anime recommendations...</p>
+      <p class="text-gray-400 mt-4">Loading amazing media recommendations...</p>
     </div>
         
     <!-- Empty State -->
@@ -280,7 +303,7 @@
       <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
         <i class="fas fa-search text-4xl text-gray-600"></i>
       </div>
-      <h3 class="text-xl font-semibold text-white mb-2">No anime found</h3>
+      <h3 class="text-xl font-semibold text-white mb-2">No media found</h3>
       <p class="text-gray-400">Try adjusting your filters or search terms</p>
     </div>
   </main>
@@ -295,7 +318,7 @@
 
   <!-- Page logic moved to /js/index.page.js -->
   <footer class="border-t border-slate-800 mt-10 py-6 text-center text-sm text-gray-400">
-    Made with Sora · <a class="text-purple-400 hover:text-purple-300" href="https://github.com/sylin-labs/sora-framework" target="_blank" rel="noopener">github.com/sylin-labs/sora-framework</a>
+    Made with Koan · <a class="text-purple-400 hover:text-purple-300" href="https://github.com/sylin-labs/Koan-framework" target="_blank" rel="noopener">github.com/sylin-labs/Koan-framework</a>
   </footer>
 </body>
 </html>

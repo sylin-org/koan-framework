@@ -1,4 +1,4 @@
-﻿# ADR-0050: Data access semantics — All/Query materialize fully; add streaming and cursor/pager APIs
+# ADR-0050: Data access semantics — All/Query materialize fully; add streaming and cursor/pager APIs
 
 Status: Proposed
 
@@ -51,7 +51,7 @@ Current behavior surprises users: calling `Entity<T>.All()` (or `Data<T>.All`) m
 
 ## Follow-ups
 
-- Implement facade methods and interfaces in `Sora.Data.Core`.
+- Implement facade methods and interfaces in `Koan.Data.Core`.
 - Update adapters:
   - Mongo/Sqlite/Redis: stop default limiting in no-options queries; ensure options overloads cap sizes.
   - Ensure ORDER BY Id for relational adapters in paged paths.

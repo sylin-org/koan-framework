@@ -1,4 +1,4 @@
-﻿---
+---
 id: ARCH-0041
 slug: ARCH-0041-docs-posture-instructions-over-tutorials
 domain: ARCH
@@ -11,7 +11,7 @@ title: Documentation posture — instructions and references over tutorials/cour
 
 ## Context
 
-Sora’s documentation was a mix of conceptual references, engineering guidance, and tutorial/course-style content (quickstarts, “getting started,” long-form walkthroughs). Tutorial content became stale quickly, duplicated guidance, and distracted from authoritative, testable instructions and reference material. The framework favors consistent engineering guardrails and clear APIs over narrative journeys.
+Koan’s documentation was a mix of conceptual references, engineering guidance, and tutorial/course-style content (quickstarts, “getting started,” long-form walkthroughs). Tutorial content became stale quickly, duplicated guidance, and distracted from authoritative, testable instructions and reference material. The framework favors consistent engineering guardrails and clear APIs over narrative journeys.
 
 ## Decision
 

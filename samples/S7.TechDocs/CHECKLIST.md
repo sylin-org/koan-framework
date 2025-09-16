@@ -1,8 +1,8 @@
-﻿# S7.TechDocs – De‑mock Plan and Implementation Checklist
+# S7.TechDocs – De‑mock Plan and Implementation Checklist
 
 Last updated: 2025-08-29
 
-Purpose: track replacing mock behaviors with proper Sora-backed functionality. Keep this list authoritative for scope and progress.
+Purpose: track replacing mock behaviors with proper Koan-backed functionality. Keep this list authoritative for scope and progress.
 
 References
 - Engineering front door: /docs/engineering/index.md
@@ -13,20 +13,20 @@ References
 
 ## Package wiring (once)
 - [ ] Add and configure (dev/prod as appropriate):
-  - [ ] Sora.Web.Extensions, Sora.Web.Swagger
-  - [ ] Sora.Web.Auth.TestProvider (dev), Sora.Web.Auth.Oidc (prod)
-  - [ ] Sora.Data.Postgres, Sora.Data.Relational
-  - [ ] Sora.Data.Vector (pgvector)
-  - [ ] Sora.Messaging.Inbox.Http (dev) / Sora.Messaging.RabbitMq (prod)
-  - [ ] Sora.AI, Sora.Ai.Provider.Ollama (dev) or selected provider
-  - [ ] Sora.Recipe.Observability
+  - [ ] Koan.Web.Extensions, Koan.Web.Swagger
+  - [ ] Koan.Web.Auth.TestProvider (dev), Koan.Web.Auth.Oidc (prod)
+  - [ ] Koan.Data.Postgres, Koan.Data.Relational
+  - [ ] Koan.Data.Vector (pgvector)
+  - [ ] Koan.Messaging.Inbox.Http (dev) / Koan.Messaging.RabbitMq (prod)
+  - [ ] Koan.AI, Koan.Ai.Provider.Ollama (dev) or selected provider
+  - [ ] Koan.Recipe.Observability
 
 ---
 
 ## Phase 0 – Hardening and baselines
 - [x] Enable Swagger UI
 - [ ] Annotate responses (problem details, examples)
-- [ ] Add health probes (DB, AI, messaging) via Sora.Recipe.Observability
+- [ ] Add health probes (DB, AI, messaging) via Koan.Recipe.Observability
 - [x] Replace custom auth middleware with TestProvider in Development
 
 ## Phase 1 – Persistence (remove in-memory services)
@@ -35,12 +35,12 @@ References
 - [x] Ensure server-side filtering by role remains enforced (DB-backed via adapter)
 - [ ] Create relational schema (Documents, Collections, Users, Roles, Ratings, Bookmarks, Issues) in Postgres
 - [ ] Add migrations/setup scripts and apply to dev/prod (optional; using AutoCreate for now)
-- [x] Wire Sora.Data.Postgres adapter via options; verify connections
+- [x] Wire Koan.Data.Postgres adapter via options; verify connections
 - [x] Switch Development to Postgres (single database across environments)
 - [ ] Keep controllers and services (no CQRS); use first-class model statics against Postgres
 
 ## Phase 2 – AuthN/Z (policies + ownership)
-- [x] Dev: Sora.Web.Auth.TestProvider; Prod: Sora.Web.Auth.Oidc
+- [x] Dev: Koan.Web.Auth.TestProvider; Prod: Koan.Web.Auth.Oidc
 - [x] Policies: Reader (auth), Author, Moderator, Admin
 - [ ] Ownership checks (Author can edit own Draft; Moderator can change any)
 - [ ] Remove UI role switcher in non-Development builds
@@ -62,7 +62,7 @@ References
 - [ ] Wire messaging (dev Inbox.Http; prod RabbitMQ) and a minimal subscriber
 
 ## Phase 6 – AI assistance (real provider)
-- [ ] Hook Sora.AI provider for suggestions (title/tags/improvements)
+- [ ] Hook Koan.AI provider for suggestions (title/tags/improvements)
 - [ ] Generate quality score with retries/timeouts
 - [ ] TOC generation: parse headings server-side; AI fallback when sparse
 - [ ] Degrade gracefully when AI unavailable (UI hints)

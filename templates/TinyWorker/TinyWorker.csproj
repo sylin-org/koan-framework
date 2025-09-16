@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Sylin.Sora" Version="0.1.0-preview" />
-    <PackageReference Include="Sylin.Sora.Data.Json" Version="0.1.0-preview" />
+    <PackageReference Include="Sylin.Koan" Version="0.1.0-preview" />
+    <PackageReference Include="Sylin.Koan.Data.Json" Version="0.1.0-preview" />
   </ItemGroup>
 </Project>

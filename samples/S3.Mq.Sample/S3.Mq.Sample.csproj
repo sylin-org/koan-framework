@@ -6,10 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Sora.Messaging.Core\Sora.Messaging.Core.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Messaging.RabbitMq\Sora.Messaging.RabbitMq.csproj" />
-    <ProjectReference Include="..\..\src\Sora.Core\Sora.Core.csproj" />
-  <ProjectReference Include="..\..\src\Sora.Data.Core\Sora.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Messaging.RabbitMq\Koan.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
   <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />

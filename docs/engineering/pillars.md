@@ -1,7 +1,7 @@
-﻿# Sora pillars — quick reference
+# Koan pillars — quick reference
 
 Purpose
-- A short, instruction-first overview of Sora’s pillars for quick orientation and cross-linking. Use this when socializing the framework or picking the right module for a job.
+- A short, instruction-first overview of Koan’s pillars for quick orientation and cross-linking. Use this when socializing the framework or picking the right module for a job.
 
 Core
 - What: Unified runtime/config, health/readiness, secure defaults, auto-registration pipeline, boot reports, optional OpenTelemetry.

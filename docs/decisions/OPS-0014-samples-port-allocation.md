@@ -10,10 +10,10 @@ title: Samples port allocation scheme
 # ADR-0014: Samples port allocation scheme
 
 ## Context
-Common ports like 5000/8080/27017 often collide with local services. We want predictable, low-conflict ports for all Sora samples, across local runs and compose.
+Common ports like 5000/8080/27017 often collide with local services. We want predictable, low-conflict ports for all Koan samples, across local runs and compose.
 
 ## Decision
-Reserve contiguous blocks of 10 ports per sample starting at 5034 (visual hint to “Sora”). The first port in each block is the app’s HTTP binding. Internal container ports mirror the external choice for clarity.
+Reserve contiguous blocks of 10 ports per sample starting at 5034 (visual hint to “Koan”). The first port in each block is the app’s HTTP binding. Internal container ports mirror the external choice for clarity.
 
 - Range start: 5034
 - Block size: 10 per sample

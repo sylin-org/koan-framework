@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Sora.Web.GraphQl.Infrastructure;
+using Koan.Web.GraphQl.Infrastructure;
 using Newtonsoft.Json.Linq;
 using Xunit;
 

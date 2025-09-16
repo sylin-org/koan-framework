@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core Koan Framework -->
+    <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Flow.Core\Koan.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Messaging.RabbitMq\Koan.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Ai.Provider.Ollama\Koan.Ai.Provider.Ollama.csproj" />
+    
+    <!-- External dependencies -->
+    <PackageReference Include="System.Text.Json" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
+  </ItemGroup>
+
+</Project>

@@ -153,7 +153,7 @@ try {
   }
   $configDir = Split-Path -Parent $configFullPath
 
-  Write-Heading "Sora Docs Build"
+  Write-Heading "Koan Docs Build"
   Write-Host "Repo Root: $repoRoot"
   Write-Host "Config   : $configFullPath"
 

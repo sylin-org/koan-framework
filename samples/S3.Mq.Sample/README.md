@@ -1,6 +1,6 @@
 # S3.Mq.Sample
 
-A minimal end-to-end sample for Sora Messaging over RabbitMQ.
+A minimal end-to-end sample for Koan Messaging over RabbitMQ.
 
 - Demonstrates default aliasing (full type name when no [Message] attribute).
 - Demonstrates default group and auto-subscribe when no Subscriptions are configured.
@@ -19,7 +19,7 @@ These commands are optional if you're not using integrated VS Code tasks.
 
 After startup you should see two handler lines similar to:
 
-[handler] Hello -> Hello, Sora!
+[handler] Hello -> Hello, Koan!
 [handler] UserRegistered -> Welcome user u-1 (u1@example.com)
 
 Batch example:

@@ -18,7 +18,7 @@ Adapters should avoid in-memory filtering when server-side pushdown is reasonabl
   - Use standard .NET annotations to refine behavior:
     - [NotMapped] to opt out a property from projection
     - [Column("Name")] to override projected column name
-    - [Index] to request an index (existing Sora attribute)
+    - [Index] to request an index (existing Koan attribute)
 - Provider handling:
   - SQLite: implement projected columns (generated) sourced from Json and create indexes for [Index]. For non-projected properties, rewrite predicates to JSON1 (json_extract) instead of falling back to in-memory. Full SELECT remains uncapped; LIMIT/OFFSET applied elsewhere.
   - Providers without benefit (e.g., Mongo) ignore projection metadata.
@@ -33,5 +33,5 @@ Adapters should avoid in-memory filtering when server-side pushdown is reasonabl
 - Enums are projected as strings by default; policy hooks can switch to ints later if needed.
 
 ## Notes
-- A central ProjectionResolver in Sora.Data.Core will compute the projection plan per entity; adapters consume it for DDL and query rewriting.
+- A central ProjectionResolver in Koan.Data.Core will compute the projection plan per entity; adapters consume it for DDL and query rewriting.
 - Diagnostics may be added later to warn on excessive projections; no hard cap enforced initially.

@@ -1,4 +1,4 @@
-﻿---
+---
 id: ARCH-0042
 slug: per-project-companion-docs
 domain: Architecture
@@ -9,12 +9,12 @@ title: Per-project companion docs — README.md (informational) and TECHNICAL.md
 
 ## Context
 
-New contributors need concise, project-scoped documentation that is discoverable in the repository, aligned with our docs posture (instructions over tutorials), and consistent with Sora’s engineering guardrails. The centralized docs site is the canonical reference, but module owners and consumers benefit from files colocated with code for quick onboarding and day-to-day use.
+New contributors need concise, project-scoped documentation that is discoverable in the repository, aligned with our docs posture (instructions over tutorials), and consistent with Koan’s engineering guardrails. The centralized docs site is the canonical reference, but module owners and consumers benefit from files colocated with code for quick onboarding and day-to-day use.
 
 We evaluated options: a single README, a docs/ folder per project, and dual files separating quick information from deep technical reference. We want:
 - Fast path for developers to understand capabilities and get a minimal working setup.
 - A stable, complete technical reference that covers contracts, configuration, design/ops, and extension points without bloating the README.
-- Clear alignment with Sora rules: controllers (no inline endpoints), first-class data model statics (All/Query/FirstPage/Page/Stream), no magic values (constants/options), and links to ADRs.
+- Clear alignment with Koan rules: controllers (no inline endpoints), first-class data model statics (All/Query/FirstPage/Page/Stream), no magic values (constants/options), and links to ADRs.
 
 ## Decision
 
@@ -37,7 +37,7 @@ Adopt “two docs per project” at the project root:
 - Configuration: options catalog; constants and typed Options; examples
 - Edge cases and limits: large/slow, auth/permissions, concurrency, paging/streaming
 - Observability and Security: logs/metrics/tracing; AuthN/AuthZ, headers/policies
-- Design model: abstractions, data flow, composition with other Sora layers
+- Design model: abstractions, data flow, composition with other Koan layers
 - Extensibility and versioning stance
 - Deployment/topology: dependencies, scale-out, adapters/providers
 - Performance guidance: paging/streaming/batching, known constraints
@@ -89,7 +89,7 @@ PR hygiene
 ## Follow-ups
 
 1) Add DocFX content glob for `src/**/README.md` and `src/**/TECHNICAL.md` if not already present.
-2) Create skeletons for Sora.Data.Core and Sora.Web; wire links to relevant ADRs.
+2) Create skeletons for Koan.Data.Core and Koan.Web; wire links to relevant ADRs.
 3) Add “Modules index” page under docs/reference that links to key project READMEs.
 4) Update PR template to include a “docs updated” checkbox for README/TECHNICAL.
 

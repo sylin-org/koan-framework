@@ -1,4 +1,4 @@
-﻿using Sora.Data.Core.Model;
+using Koan.Data.Core.Model;
 
 namespace S0.ConsoleJsonRepo
 {

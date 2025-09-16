@@ -1,0 +1,1 @@
+// Moved to Koan.Core.Observability.Probes.ProbeReason

@@ -1,6 +1,6 @@
-﻿# Engineering Guide
+# Engineering Guide
 
-Audience: humans and agentic code LLMs. This is the front door for building in Sora. It curates the most important rules and points to canonical references.
+Audience: humans and agentic code LLMs. This is the front door for building in Koan. It curates the most important rules and points to canonical references.
 
 ## Read first
 
@@ -10,7 +10,7 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 - Orchestration (DevHost, providers, exporters): ../reference/orchestration.md
 - Orchestration adapter authoring (endpoints & mounts): ./orchestration-adapter-authoring.md
 - Data access semantics (contract): ../guides/data/all-query-streaming-and-pager.md and decisions/DATA-0061-data-access-pagination-and-streaming.md
-- SoraService authoring (DX quick guide): ./sora-service-authoring.md
+- KoanService authoring (DX quick guide): ./Koan-service-authoring.md
 - Web transformers and controllers: decisions/WEB-0035-entitycontroller-transformers.md
 - Constants and configuration naming: decisions/ARCH-0040-config-and-constants-naming.md
 - Module configuration patterns (SoC + DX): ./module-configuration-patterns.md
@@ -65,17 +65,17 @@ Audience: humans and agentic code LLMs. This is the front door for building in S
 - AI
 
   - AddAiDefaults + MapAgentEndpoints; local-first providers; safety filters on in Dev.
-  - See: ../guides/ai/index.md and src/Sora.Ai.Provider.Ollama/README.md
+  - See: ../guides/ai/index.md and src/Koan.Ai.Provider.Ollama/README.md
 
 - Orchestration
 
   - DX-first DevHost with hosting providers (Docker/Podman) and exporters (Compose now; Helm/ACA later).
-  - CLI: `sora up|down|status|logs|doctor|export` with profiles (SORA_ENV) and verbosity flags.
+  - CLI: `Koan up|down|status|logs|doctor|export` with profiles (Koan_ENV) and verbosity flags.
   - See: ../reference/orchestration.md and decisions/ARCH-0047-orchestration-hosting-and-exporters-as-pluggable-adapters.md
     - Authoring adapters: engineering/orchestration-adapter-authoring.md
 
 - Config & constants
-  - Use Sora.Core.Configuration helpers; centralize names; avoid ad-hoc cfg["..."] lookups.
+  - Use Koan.Core.Configuration helpers; centralize names; avoid ad-hoc cfg["..."] lookups.
   - See: decisions/ARCH-0040-config-and-constants-naming.md
 
 ## PR checklist (operational)

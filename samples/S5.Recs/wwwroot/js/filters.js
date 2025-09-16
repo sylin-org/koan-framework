@@ -84,5 +84,210 @@
     });
   }
 
-  window.S5Filters = { filter, sort, search };
+  // Track and render active filter chips
+  function updateFilterChips(activeFilters = {}) {
+    const container = document.getElementById('activeFiltersContainer');
+    const chipsContainer = document.getElementById('activeFilterChips');
+
+    if (!container || !chipsContainer) return;
+
+    const chips = [];
+
+    // Genre filter chip
+    if (activeFilters.genre) {
+      chips.push({
+        type: 'genre',
+        label: `Genre: ${activeFilters.genre}`,
+        value: activeFilters.genre
+      });
+    }
+
+    // Rating range chip
+    if (activeFilters.ratingMin != null || activeFilters.ratingMax != null) {
+      const min = activeFilters.ratingMin || 0;
+      const max = activeFilters.ratingMax || 10;
+      chips.push({
+        type: 'rating',
+        label: `Rating: ${min}–${max}`,
+        value: { min, max }
+      });
+    }
+
+    // Year range chip
+    if (activeFilters.yearMin != null || activeFilters.yearMax != null || activeFilters.year) {
+      if (activeFilters.year) {
+        chips.push({
+          type: 'year',
+          label: `Year: ${activeFilters.year}`,
+          value: activeFilters.year
+        });
+      } else {
+        const min = activeFilters.yearMin || '';
+        const max = activeFilters.yearMax || '';
+        const label = min && max ? `Year: ${min}–${max}` : min ? `Year: ${min}+` : `Year: –${max}`;
+        chips.push({
+          type: 'year',
+          label: label,
+          value: { min, max }
+        });
+      }
+    }
+
+    // Episode length chip
+    if (activeFilters.episode) {
+      const labels = {
+        'short': 'Short (≤12 eps)',
+        'medium': 'Medium (13–25 eps)',
+        'long': 'Long (26+ eps)'
+      };
+      chips.push({
+        type: 'episode',
+        label: labels[activeFilters.episode] || `Episodes: ${activeFilters.episode}`,
+        value: activeFilters.episode
+      });
+    }
+
+    // Search query chip
+    if (activeFilters.search && activeFilters.search.trim()) {
+      chips.push({
+        type: 'search',
+        label: `Search: "${activeFilters.search.trim()}"`,
+        value: activeFilters.search.trim()
+      });
+    }
+
+    // Show/hide container based on active chips
+    if (chips.length === 0) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    container.classList.remove('hidden');
+
+    // Render chips
+    chipsContainer.innerHTML = chips.map(chip => `
+      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-900/30 text-purple-200 text-xs rounded-full border border-purple-700/50">
+        <span>${chip.label}</span>
+        <button type="button"
+                class="hover:text-white hover:bg-purple-600/50 rounded-full p-0.5 transition-colors touch-target-44"
+                data-remove-filter="${chip.type}"
+                data-filter-value='${JSON.stringify(chip.value)}'
+                title="Remove ${chip.label}">
+          <i class="fas fa-times text-xs"></i>
+        </button>
+      </span>
+    `).join('');
+  }
+
+  // Get current active filters from form elements
+  function getActiveFilters() {
+    const filters = {};
+
+    // Get genre from dropdown
+    const genreSelect = document.getElementById('genreFilter');
+    if (genreSelect && genreSelect.value) {
+      filters.genre = genreSelect.value;
+    }
+
+    // Get rating range
+    const ratingMin = document.getElementById('ratingMin');
+    const ratingMax = document.getElementById('ratingMax');
+    if (ratingMin && ratingMin.value) {
+      filters.ratingMin = parseFloat(ratingMin.value);
+    }
+    if (ratingMax && ratingMax.value) {
+      filters.ratingMax = parseFloat(ratingMax.value);
+    }
+
+    // Get year filters
+    const yearExact = document.getElementById('yearFilter');
+    const yearMin = document.getElementById('yearMin');
+    const yearMax = document.getElementById('yearMax');
+    if (yearExact && yearExact.value) {
+      filters.year = parseInt(yearExact.value, 10);
+    } else {
+      if (yearMin && yearMin.value) {
+        filters.yearMin = parseInt(yearMin.value, 10);
+      }
+      if (yearMax && yearMax.value) {
+        filters.yearMax = parseInt(yearMax.value, 10);
+      }
+    }
+
+    // Get episode length
+    const episodeFilter = document.getElementById('episodeFilter');
+    if (episodeFilter && episodeFilter.value) {
+      filters.episode = episodeFilter.value;
+    }
+
+    // Get search query
+    const searchInput = document.getElementById('globalSearch');
+    if (searchInput && searchInput.value && searchInput.value.trim()) {
+      filters.search = searchInput.value.trim();
+    }
+
+    return filters;
+  }
+
+  // Clear specific filter
+  function clearFilter(filterType) {
+    switch (filterType) {
+      case 'genre':
+        const genreSelect = document.getElementById('genreFilter');
+        if (genreSelect) genreSelect.value = '';
+        break;
+      case 'rating':
+        const ratingMin = document.getElementById('ratingMin');
+        const ratingMax = document.getElementById('ratingMax');
+        if (ratingMin) ratingMin.value = '';
+        if (ratingMax) ratingMax.value = '';
+        break;
+      case 'year':
+        const yearExact = document.getElementById('yearFilter');
+        const yearMin = document.getElementById('yearMin');
+        const yearMax = document.getElementById('yearMax');
+        if (yearExact) yearExact.value = '';
+        if (yearMin) yearMin.value = '';
+        if (yearMax) yearMax.value = '';
+        break;
+      case 'episode':
+        const episodeFilter = document.getElementById('episodeFilter');
+        if (episodeFilter) episodeFilter.value = '';
+        break;
+      case 'search':
+        const searchInput = document.getElementById('globalSearch');
+        if (searchInput) {
+          searchInput.value = '';
+          // Trigger search clear event for recommendations/library views
+          if (window.handleGlobalSearch) {
+            window.handleGlobalSearch({ target: searchInput });
+          }
+        }
+        break;
+    }
+
+    // Trigger filter update if global function exists (except for search which handles its own updates)
+    if (filterType !== 'search' && window.applyFilters) {
+      window.applyFilters();
+    }
+  }
+
+  // Clear all filters
+  function clearAllFilters() {
+    clearFilter('genre');
+    clearFilter('rating');
+    clearFilter('year');
+    clearFilter('episode');
+
+    // Also clear search if it exists
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
+
+    // Trigger filter update if global function exists
+    if (window.applyFilters) {
+      window.applyFilters();
+    }
+  }
+
+  window.S5Filters = { filter, sort, search, updateFilterChips, getActiveFilters, clearFilter, clearAllFilters };
 })();

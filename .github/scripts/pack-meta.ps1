@@ -32,5 +32,5 @@ if (-not (Test-Path $iconPng)) {
 }
 
 # Pack with BasePath at repo root so nuspec file entries resolve correctly
-nuget pack ./packaging/Sora.nuspec -Version $Version -OutputDirectory $OutDir -BasePath $repoRoot -Properties "depVersionRange=$depRange"
-nuget pack ./packaging/Sora.App.nuspec -Version $Version -OutputDirectory $OutDir -BasePath $repoRoot -Properties "depVersionRange=$depRange"
+nuget pack ./packaging/Koan.nuspec -Version $Version -OutputDirectory $OutDir -BasePath $repoRoot -Properties "depVersionRange=$depRange"
+nuget pack ./packaging/Koan.App.nuspec -Version $Version -OutputDirectory $OutDir -BasePath $repoRoot -Properties "depVersionRange=$depRange"

@@ -5,5 +5,6 @@ public record Filters(
     int? EpisodesMax,
     bool SpoilerSafe = true,
     string[]? PreferTags = null,
-    double? PreferWeight = null
+    double? PreferWeight = null,
+    string? MediaType = null
 );

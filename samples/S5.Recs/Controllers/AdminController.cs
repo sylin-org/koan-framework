@@ -5,15 +5,34 @@ using S5.Recs.Services;
 namespace S5.Recs.Controllers;
 
 [ApiController]
-[Route(Constants.Routes.Admin)] // Sora guideline: controllers define routes
-public class AdminController(ISeedService seeder, ILogger<AdminController> _logger, IEnumerable<Providers.IAnimeProvider> providers) : ControllerBase
+[Route(Constants.Routes.Admin)] // Koan guideline: controllers define routes
+public class AdminController(ISeedService seeder, ILogger<AdminController> _logger, IEnumerable<Providers.IMediaProvider> providers) : ControllerBase
 {
 
     [HttpPost("seed/start")]
     public IActionResult StartSeed([FromBody] SeedRequest req)
     {
-        var id = seeder.StartAsync(req.Source, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
-        return Ok(new { jobId = id });
+        try
+        {
+            // Require MediaType to be explicitly provided
+            if (string.IsNullOrWhiteSpace(req.MediaType))
+            {
+                return BadRequest(new { error = "MediaType is required. Please specify a media type or 'all' to import all types." });
+            }
+
+            var id = seeder.StartAsync(req.Source, req.MediaType, req.Limit, req.Overwrite, HttpContext.RequestAborted).GetAwaiter().GetResult();
+            return Ok(new { jobId = id });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("import is already in progress"))
+        {
+            return Conflict(new { error = ex.Message, isImportInProgress = seeder.IsImportInProgress });
+        }
+    }
+
+    [HttpGet("seed/status")]
+    public IActionResult GetImportStatus()
+    {
+        return Ok(new { isImportInProgress = seeder.IsImportInProgress });
     }
 
     // Censor tags admin
@@ -107,8 +126,8 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpGet("stats")]
     public IActionResult GetStats()
     {
-        var (anime, contentPieces, vectors) = seeder.GetStatsAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
-        return Ok(new { anime, contentPieces, vectors });
+        var (media, contentPieces, vectors) = seeder.GetStatsAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
+        return Ok(new { media, contentPieces, vectors });
     }
 
     [HttpGet("providers")]
@@ -131,11 +150,82 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         return Ok(new { updated = n });
     }
 
+    [HttpGet("tags/all")] // Admin-only endpoint to get ALL tags including censored ones
+    public async Task<IActionResult> GetAllTags([FromQuery] string? sort = "popularity", CancellationToken ct = default)
+    {
+        var list = await Models.TagStatDoc.All(ct);
+        IEnumerable<Models.TagStatDoc> q = list;
+        if (string.Equals(sort, "alpha", StringComparison.OrdinalIgnoreCase) || string.Equals(sort, "name", StringComparison.OrdinalIgnoreCase))
+            q = q.OrderBy(t => t.Tag);
+        else
+            q = q.OrderByDescending(t => t.MediaCount).ThenBy(t => t.Tag);
+        return Ok(q.Select(t => new { tag = t.Tag, count = t.MediaCount }));
+    }
+
+    [HttpGet("tags/censor/hashes")] // Generate MD5 hashes for preemptive filtering
+    public async Task<IActionResult> GetCensoredTagHashes(CancellationToken ct)
+    {
+        var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct);
+        var tags = doc?.Tags ?? new List<string>();
+
+        var hashes = tags.Select(tag =>
+        {
+            var normalizedTag = tag.Trim().ToLowerInvariant();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(normalizedTag);
+            var hash = System.Security.Cryptography.MD5.HashData(bytes);
+            return Convert.ToHexString(hash).ToLowerInvariant();
+        }).OrderBy(h => h).ToArray();
+
+        return Ok(new {
+            count = hashes.Length,
+            hashes = hashes,
+            generated = DateTimeOffset.UtcNow,
+            note = "MD5 hashes of normalized (lowercase, trimmed) censored tags for preemptive filtering"
+        });
+    }
+
+    [HttpGet("tags/preemptive-filter/status")] // Get preemptive filter diagnostics
+    public IActionResult GetPreemptiveFilterStatus()
+    {
+        var hashCount = Infrastructure.PreemptiveTagFilter.PreemptiveHashCount;
+        return Ok(new {
+            enabled = hashCount > 0,
+            preemptiveHashCount = hashCount,
+            note = hashCount > 0
+                ? "Preemptive filtering is active. Tags matching stored MD5 hashes will be auto-censored during import."
+                : "Preemptive filtering is inactive. No hash list loaded. Update PreemptiveTagFilter.cs with hashes from /admin/tags/censor/hashes"
+        });
+    }
+
+    public record TestPreemptiveFilterRequest(string Tag);
+
+    [HttpPost("tags/preemptive-filter/test")] // Test if a specific tag would be preemptively filtered
+    public IActionResult TestPreemptiveFilter([FromBody] TestPreemptiveFilterRequest req)
+    {
+        var tag = req?.Tag?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return BadRequest(new { error = "tag is required" });
+        }
+
+        var shouldCensor = Infrastructure.PreemptiveTagFilter.ShouldCensor(tag);
+        var hash = Infrastructure.PreemptiveTagFilter.GetHashForTag(tag);
+
+        return Ok(new {
+            tag = tag,
+            shouldCensor = shouldCensor,
+            hash = hash,
+            note = shouldCensor
+                ? "This tag would be automatically censored during import"
+                : "This tag would pass through the preemptive filter"
+        });
+    }
+
     [HttpPost("seed/vectors")] // vector-only upsert from existing docs
     public IActionResult StartVectorOnly([FromBody] VectorOnlyRequest req)
     {
         // Responsibility: AdminController builds the list; SeedService just upserts vectors for the provided items.
-        var all = Models.AnimeDoc.All(HttpContext.RequestAborted).Result.ToList();
+        var all = Models.Media.All(HttpContext.RequestAborted).Result.ToList();
 
         _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})", all.Count, req.Limit);
 

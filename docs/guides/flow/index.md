@@ -1,4 +1,4 @@
-# Sora Flow (Entity Pipeline) — Accurate Guide
+# Koan Flow (Entity Pipeline) — Accurate Guide
 
 > Contract Summary
 >
@@ -11,7 +11,7 @@
 
 ## 1. Scope & When to Use
 
-Use Sora Flow when you need to:
+Use Koan Flow when you need to:
 
 - Merge records about the same logical entity (customer, device, account) from multiple systems.
 - Maintain a canonical, deduplicated view AND a lineage/audit trail of contributing sources.
@@ -36,22 +36,22 @@ Implemented building blocks:
 
 ```csharp
 // Program.cs
-using Sora.Flow;           // AddSoraFlowNaming/AddSoraFlow (normally through AddSora())
-using Sora.Data.Core;       // Base data services
-using Sora.Data.Json;       // Simple file storage (development)
+using Koan.Flow;           // AddKoanFlowNaming/AddKoanFlow (normally through AddKoan())
+using Koan.Data.Core;       // Base data services
+using Koan.Data.Json;       // Simple file storage (development)
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSora();            // Discovers Flow module + Data
-builder.Services.AddSoraDataCore();    // Core data abstractions
+builder.Services.AddKoan();            // Discovers Flow module + Data
+builder.Services.AddKoanDataCore();    // Core data abstractions
 builder.Services.AddJsonData();        // Development adapter
 
 var app = builder.Build();
-Sora.Core.Hosting.App.AppHost.Current = app.Services; // Ambient host (required)
+Koan.Core.Hosting.App.AppHost.Current = app.Services; // Ambient host (required)
 app.Run();
 ```
 
-`AddSora()` will (via module auto-registration) register Flow workers:
+`AddKoan()` will (via module auto-registration) register Flow workers:
 
 - Association / keying
 - Projection / materialization
@@ -61,7 +61,7 @@ app.Run();
 
 ```json
 {
-  "Sora": {
+  "Koan": {
     "Data": { "Json": { "DirectoryPath": "./data" } },
     "Flow": {
       "AggregationTags": ["email", "phone", "externalId"],
@@ -381,9 +381,9 @@ Advanced orchestration teaches you:
 
 ## Connecting to the World: Messaging and External Systems
 
-Modern applications don't exist in isolation. They integrate with APIs, message queues, webhooks, and external services. Sora Flow makes these integrations first-class citizens in your workflows.
+Modern applications don't exist in isolation. They integrate with APIs, message queues, webhooks, and external services. Koan Flow makes these integrations first-class citizens in your workflows.
 
-### Event-Driven Architecture with Sora Flow
+### Event-Driven Architecture with Koan Flow
 
 Let's build a customer support ticket system that integrates with multiple external systems:
 
@@ -602,7 +602,7 @@ public class SupportTicketFlow : FlowBase<SupportTicketCreated, TicketProcessing
 
 ### Integrating with External APIs
 
-Sora Flow makes it easy to integrate with REST APIs, GraphQL endpoints, and other external services:
+Koan Flow makes it easy to integrate with REST APIs, GraphQL endpoints, and other external services:
 
 ```csharp
 public class CustomerOnboardingFlow : FlowBase<NewCustomerRequest, OnboardingResult>
@@ -907,13 +907,13 @@ Integration with external systems teaches you:
 4. **Saga Patterns:** Coordinate distributed transactions with compensation
 5. **Fault Tolerance:** Handle external service failures gracefully
 
-**🌐 Integration Insight:** Modern applications are ecosystems, not monoliths. Sora Flow helps you orchestrate across service boundaries while maintaining reliability and observability.
+**🌐 Integration Insight:** Modern applications are ecosystems, not monoliths. Koan Flow helps you orchestrate across service boundaries while maintaining reliability and observability.
 
 ---
 
 ## Extensibility: Building Your Flow Ecosystem
 
-As your application grows, you'll want to extend Sora Flow with custom behaviors, cross-cutting concerns, and domain-specific functionality. Let's explore how to build a rich, extensible flow ecosystem.
+As your application grows, you'll want to extend Koan Flow with custom behaviors, cross-cutting concerns, and domain-specific functionality. Let's explore how to build a rich, extensible flow ecosystem.
 
 ### Custom Activities for Domain Logic
 
@@ -1067,7 +1067,7 @@ public class PerformanceMonitoringMiddleware : IFlowMiddleware
         catch (Exception ex)
         {
 
-<!-- The following advanced features are not currently implemented in Sora Flow and have been removed for accuracy: advanced middleware, attribute-based decorators, registry/discovery, domain extensions, distributed locks, advanced observability, and environment-specific configuration. Only supported, real features and APIs are described below. -->
+<!-- The following advanced features are not currently implemented in Koan Flow and have been removed for accuracy: advanced middleware, attribute-based decorators, registry/discovery, domain extensions, distributed locks, advanced observability, and environment-specific configuration. Only supported, real features and APIs are described below. -->
 
 ---
 
@@ -1300,9 +1300,9 @@ public class IdempotentPaymentFlow : FlowBase<PaymentRequest, PaymentResult>
 }
 ```
 
-<!-- Security and authorization patterns are not currently implemented as first-class features in Sora Flow. For sensitive operations, implement security checks and authorization logic directly within your flow's business logic. -->
+<!-- Security and authorization patterns are not currently implemented as first-class features in Koan Flow. For sensitive operations, implement security checks and authorization logic directly within your flow's business logic. -->
 
-<!-- Distributed failure handling, circuit breaker, and advanced retry patterns are not currently implemented as built-in features in Sora Flow. For resilience, use standard .NET patterns and libraries within your flow logic as needed. -->
+<!-- Distributed failure handling, circuit breaker, and advanced retry patterns are not currently implemented as built-in features in Koan Flow. For resilience, use standard .NET patterns and libraries within your flow logic as needed. -->
 
 ### Performance Optimization Tips
 
@@ -1313,13 +1313,13 @@ public class IdempotentPaymentFlow : FlowBase<PaymentRequest, PaymentResult>
 5. **Set Reasonable Timeouts:** Prevent flows from hanging indefinitely
 6. **Monitor Resource Usage:** Track memory, CPU, and network usage
 
-<!-- Advanced monitoring, tracing, and observability APIs are not currently implemented in Sora Flow. For observability, use standard .NET logging and monitoring tools within your flows. -->
+<!-- Advanced monitoring, tracing, and observability APIs are not currently implemented in Koan Flow. For observability, use standard .NET logging and monitoring tools within your flows. -->
 
 ## References and Further Reading
 
 ### Core Documentation
 
-- [Sora Flow API Reference](../../reference/flow.md)
+- [Koan Flow API Reference](../../reference/flow.md)
 - [Architecture Principles](../../architecture/principles.md)
 - [Messaging Integration Guide](../messaging/index.md)
 - [Data Access Patterns](../data/all-query-streaming-and-pager.md)
@@ -1339,6 +1339,6 @@ public class IdempotentPaymentFlow : FlowBase<PaymentRequest, PaymentResult>
 
 ---
 
-**Next Steps:** Now that you understand Sora Flow concepts, explore the [Sample Applications](../../../samples/) to see these patterns in action, or dive into the [API Reference](../../reference/flow.md) for detailed technical documentation.
+**Next Steps:** Now that you understand Koan Flow concepts, explore the [Sample Applications](../../../samples/) to see these patterns in action, or dive into the [API Reference](../../reference/flow.md) for detailed technical documentation.
 
 **See also:** [Engineering Index](../../engineering/index.md) | [Module Catalog](../../modules/) | [Support Resources](../../support/)

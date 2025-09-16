@@ -11,7 +11,7 @@ Context
 
 Decision
 
-- Introduce a shared typed AST (VectorFilter) in Sora.Data.Abstractions covering a minimal set: And/Or/Not, Eq/Ne/Gt/Gte/Lt/Lte, Like, Contains.
+- Introduce a shared typed AST (VectorFilter) in Koan.Data.Abstractions covering a minimal set: And/Or/Not, Eq/Ne/Gt/Gte/Lt/Lte, Like, Contains.
 - Provide helpers: VectorFilterJson (parse/write a small JSON DSL and equality-map shorthand) and VectorFilterExpression (subset of C# expression to AST).
 - Each adapter implements a translator from AST to provider-native query (e.g., Weaviate GraphQL where).
 - Documentation prefers typed filters; JSON-DSL is marked advanced and for interop.

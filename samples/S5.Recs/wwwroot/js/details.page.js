@@ -6,7 +6,7 @@
   // State
   let currentUserId = null;
   const authState = { isAuthenticated: false, me: null };
-  let currentAnimeId = null;
+  let currentMediaId = null;
   let currentEntry = null;
 
   function goHome(){ const h=(window.S5Const?.PATHS?.HOME)||'index.html'; location.href = h; }
@@ -55,8 +55,8 @@
 
   // No user list on details page; always use authenticated user from /me
 
-  async function loadAnime(id){ if(!id) return; const b=(window.S5Const?.ENDPOINTS?.ANIME_BASE)||'/api/anime'; const r = await fetch(`${b}/${encodeURIComponent(id)}`); if(!r.ok) return; const a = await r.json(); renderAnime(a); const st=document.getElementById('similarTitle'); if(st) st.textContent = `Similar to ${a.title || 'this'}`; }
-  function renderAnime(a){
+  async function loadMedia(id){ if(!id) return; const b=(window.S5Const?.ENDPOINTS?.MEDIA_BASE)||'/api/media'; const r = await fetch(`${b}/${encodeURIComponent(id)}`); if(!r.ok) return; const a = await r.json(); renderMedia(a); const st=document.getElementById('similarTitle'); if(st) st.textContent = `Similar to ${a.title || 'this'}`; }
+  function renderMedia(a){
     const poster=document.getElementById('poster');
     if(poster) poster.src = a.coverUrl || a.image || a.poster || '/images/missing-cover.svg';
 
@@ -106,17 +106,51 @@
     renderEntryState();
   }
 
-  async function loadSimilar(id){ if(!currentUserId){ const c=document.getElementById('similar'); if(c) c.innerHTML=''; return; } const topK = (window.S5Const?.DETAILS?.SIMILAR_TOPK) ?? 12; const body = { userId: currentUserId, anchorAnimeId: id, topK, filters: { spoilerSafe: true } }; const rq=(window.S5Const?.ENDPOINTS?.RECS_QUERY)||'/api/recs/query'; const r = await fetch(rq, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); if(!r.ok){ const c=document.getElementById('similar'); if(c) c.innerHTML=''; return; } const { items } = await r.json(); const list = (items||[]).map(it => it?.anime || it).filter(Boolean).filter(a => a && a.id !== id); renderSimilar(list); }
+  async function loadSimilar(id){
+    console.log('[S5 Details] loadSimilar called with id:', id, 'currentUserId:', currentUserId);
+    if(!id){
+      console.log('[S5 Details] No media id provided, clearing similar section');
+      const c=document.getElementById('similar');
+      if(c) c.innerHTML='';
+      return;
+    }
+    const topK = (window.S5Const?.DETAILS?.SIMILAR_TOPK) ?? 12;
+    // Build request body - UserId is optional for content-based similar recommendations
+    const body = {
+      AnchorMediaId: id,
+      TopK: topK,
+      Filters: { SpoilerSafe: true }
+    };
+    // Include UserId if available for personalized filtering
+    if(currentUserId) {
+      body.UserId = currentUserId;
+    }
+    console.log('[S5 Details] Making similar recommendations request:', body);
+    const rq=(window.S5Const?.ENDPOINTS?.RECS_QUERY)||'/api/recs/query';
+    const r = await fetch(rq, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    console.log('[S5 Details] Similar recommendations response status:', r.status);
+    if(!r.ok){
+      console.warn('[S5 Details] Similar recommendations request failed:', r.status, r.statusText);
+      const c=document.getElementById('similar');
+      if(c) c.innerHTML='';
+      return;
+    }
+    const { items } = await r.json();
+    console.log('[S5 Details] Similar recommendations received:', items?.length || 0, 'items');
+    const list = (items||[]).map(it => it?.media || it).filter(Boolean).filter(a => a && a.id !== id);
+    console.log('[S5 Details] Filtered similar list:', list.length, 'items');
+    renderSimilar(list);
+  }
   function renderSimilar(items){
     const c = document.getElementById('similar');
     if(!c) return;
     const maxChips = (window.S5Const?.TAGS?.CHIPS_IN_CARD) ?? 2;
-    c.innerHTML = (items||[]).map(anime => `
-        <div class="min-w-[180px] bg-slate-900 rounded-xl overflow-hidden hover:scale-[1.02] hover:shadow-xl transition-all cursor-pointer" onclick="window.__details.gotoDetails(${__q(anime.id)})">
-          <img src="${anime.coverUrl || anime.image || anime.poster || '/images/missing-cover.svg'}" class="h-48 w-full object-cover" />
+    c.innerHTML = (items||[]).map(media => `
+        <div class="min-w-[180px] bg-slate-900 rounded-xl overflow-hidden hover:scale-[1.02] hover:shadow-xl transition-all cursor-pointer" onclick="window.__details.gotoDetails(${__q(media.id)})">
+          <img src="${media.coverUrl || media.image || media.poster || '/images/missing-cover.svg'}" class="h-48 w-full object-cover" />
           <div class="p-3">
-            <div class="text-sm font-semibold line-clamp-2">${anime.titleEnglish || anime.title || 'Untitled'}<\/div>
-            <div class="text-xs text-gray-400 mt-1">${(anime.genres||[]).slice(0,maxChips).join(' • ')}<\/div>
+            <div class="text-sm font-semibold line-clamp-2">${media.titleEnglish || media.title || 'Untitled'}<\/div>
+            <div class="text-xs text-gray-400 mt-1">${(media.genres||[]).slice(0,maxChips).join(' • ')}<\/div>
           </div>
         <\/div>
       `).join('');
@@ -124,11 +158,11 @@
   function gotoDetails(id){ const d=(window.S5Const?.PATHS?.DETAILS)||'details.html'; location.href = `${d}?id=${encodeURIComponent(id)}`; }
 
   // Actions
-  async function markFavorite(){ if(!authState.isAuthenticated){ window.showToast && showToast('Please login first','warning'); return;} if(!currentUserId || !currentAnimeId) return; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; await fetch(`${b}/${currentUserId}/${currentAnimeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ favorite:true }) }); await loadEntryState(); window.showToast && showToast('Added to favorites','success'); }
-  async function markWatched(){ if(!authState.isAuthenticated){ window.showToast && showToast('Please login first','warning'); return;} if(!currentUserId || !currentAnimeId) return; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; await fetch(`${b}/${currentUserId}/${currentAnimeId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ watched:true }) }); await loadEntryState(); window.showToast && showToast('Marked as watched','success'); }
-  async function rate(stars){ if(!authState.isAuthenticated){ window.showToast && showToast('Please login first','warning'); return;} if(!currentUserId || !currentAnimeId) return; const r=(window.S5Const?.ENDPOINTS?.RATE)||'/api/recs/rate'; await fetch(r, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId: currentUserId, animeId: currentAnimeId, rating: stars }) }); await loadEntryState(); window.showToast && showToast(`Rated ${stars}★`,'success'); }
+  async function markFavorite(){ if(!authState.isAuthenticated){ window.showToast && showToast('Please login first','warning'); return;} if(!currentUserId || !currentMediaId) return; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; await fetch(`${b}/${currentUserId}/${currentMediaId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ favorite:true }) }); await loadEntryState(); window.showToast && showToast('Added to favorites','success'); }
+  async function markWatched(){ if(!authState.isAuthenticated){ window.showToast && showToast('Please login first','warning'); return;} if(!currentUserId || !currentMediaId) return; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; await fetch(`${b}/${currentUserId}/${currentMediaId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ watched:true }) }); await loadEntryState(); window.showToast && showToast('Marked as watched','success'); }
+  async function rate(stars){ if(!authState.isAuthenticated){ window.showToast && showToast('Please login first','warning'); return;} if(!currentUserId || !currentMediaId) return; const r=(window.S5Const?.ENDPOINTS?.RATE)||'/api/recs/rate'; await fetch(r, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId: currentUserId, mediaId: currentMediaId, rating: stars }) }); await loadEntryState(); window.showToast && showToast(`Rated ${stars}★`,'success'); }
 
-  async function loadEntryState(){ if(!currentUserId || !currentAnimeId){ currentEntry = null; renderEntryState(); return; } try{ const ps = (window.S5Const?.LIBRARY?.PAGE_SIZE) ?? 500; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; const r = await fetch(`${b}/${currentUserId}?sort=updatedAt&page=1&pageSize=${encodeURIComponent(ps)}`); if(!r.ok){ currentEntry = null; renderEntryState(); return; } const data = await r.json(); currentEntry = (data.items||[]).find(e=>e.animeId===currentAnimeId) || null; }catch{ currentEntry = null; } renderEntryState(); }
+  async function loadEntryState(){ if(!currentUserId || !currentMediaId){ currentEntry = null; renderEntryState(); return; } try{ const ps = (window.S5Const?.LIBRARY?.PAGE_SIZE) ?? 500; const b=(window.S5Const?.ENDPOINTS?.LIBRARY_BASE)||'/api/library'; const r = await fetch(`${b}/${currentUserId}?sort=updatedAt&page=1&pageSize=${encodeURIComponent(ps)}`); if(!r.ok){ currentEntry = null; renderEntryState(); return; } const data = await r.json(); currentEntry = (data.items||[]).find(e=>e.mediaId===currentMediaId) || null; }catch{ currentEntry = null; } renderEntryState(); }
   function renderEntryState(){
     const favBtn = document.querySelector('button[data-action="favorite"]');
     const watchBtn = document.querySelector('button[data-action="watched"]');
@@ -154,7 +188,7 @@
 
   // Bootstrap
   document.addEventListener('DOMContentLoaded', async () => {
-    const qs = new URLSearchParams(location.search); currentAnimeId = qs.get('id');
+    const qs = new URLSearchParams(location.search); currentMediaId = qs.get('id');
     // Bind top menu buttons
     const backBtn = document.querySelector('button[data-action="go-home"]'); if(backBtn) backBtn.addEventListener('click', goHome);
     // Login/Logout button hooks if present in this page's layout
@@ -172,7 +206,7 @@
       host.innerHTML = '';
       const bar = document.createElement('div');
       bar.className = 'star-bar flex items-center gap-1 bg-black/50 rounded-md px-2 py-1 border border-slate-700';
-      bar.setAttribute('data-id', currentAnimeId ? String(currentAnimeId) : '');
+      bar.setAttribute('data-id', currentMediaId ? String(currentMediaId) : '');
       const curr = (currentEntry && typeof currentEntry.rating === 'number') ? currentEntry.rating : null;
       if (curr != null) bar.setAttribute('data-current-rating', String(curr));
       for (let n=1; n<=stars; n++){
@@ -205,6 +239,6 @@
   window.__details = { gotoDetails };
 
   await ensureAuthState();
-    if(currentAnimeId){ await loadAnime(currentAnimeId); await loadEntryState(); await loadSimilar(currentAnimeId); }
+    if(currentMediaId){ await loadMedia(currentMediaId); await loadEntryState(); await loadSimilar(currentMediaId); }
   });
 })();

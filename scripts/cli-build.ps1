@@ -1,6 +1,6 @@
-﻿param(
+param(
   [ValidateSet('Debug','Release')][string]$Configuration = 'Release',
-  [string]$Project = 'src/Sora.Orchestration.Cli/Sora.Orchestration.Cli.csproj',
+  [string]$Project = 'src/Koan.Orchestration.Cli/Koan.Orchestration.Cli.csproj',
   [switch]$NoRestore
 )
 

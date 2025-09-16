@@ -1,6 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using S5.Recs.Models;
-using Sora.Data.Core;
+using Koan.Data.Core;
 
 namespace S5.Recs.Services;
 

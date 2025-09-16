@@ -1,4 +1,4 @@
-﻿---
+---
 id: MESS-0028
 slug: MESS-0028-mq-provisioning-plan-diff-apply-modes
 domain: MESS
@@ -37,7 +37,7 @@ Introduce a provider-agnostic provisioning pipeline with four roles and explicit
   - ForceRecreate: Apply full diff including destructive changes (drop/recreate). Requires explicit enablement and production override.
 
 - Defaults and guards
-  - Default mode: CreateIfMissing for Development/Test; Off for Production environments unless Sora:AllowMagicInProduction=true.
+  - Default mode: CreateIfMissing for Development/Test; Off for Production environments unless Koan:AllowMagicInProduction=true.
   - An explicit configured mode always wins. ForceRecreate requires both an explicit mode and production override.
   - Startup order: Provisioning (according to mode) completes before consumers start.
 
@@ -59,7 +59,7 @@ Applies to all messaging providers; first delivery in RabbitMQ. Does not redesig
 - Repeatable deployments with DryRun for change review in CI/CD.
 
 ## Implementation notes
-- Contracts live in Sora.Messaging.Core.Abstractions; provider-specific Applier/Inspector live with the provider (e.g., Sora.Messaging.RabbitMq).
+- Contracts live in Koan.Messaging.Core.Abstractions; provider-specific Applier/Inspector live with the provider (e.g., Koan.Messaging.RabbitMq).
 - Inspector may use management APIs when available; otherwise rely on AMQP declaration pass to infer existence and arguments.
 - Emit concise, stable names; reuse alias registry from MESS-0022 for routing keys and exchange names.
 - Log a single-line summary per bus: mode, adds/updates/removals counts, and any blocked destructive ops.

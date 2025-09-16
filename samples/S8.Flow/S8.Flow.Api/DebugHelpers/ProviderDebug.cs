@@ -1,5 +1,5 @@
 using System;
-using Sora.Data.Core;
+using Koan.Data.Core;
 
 namespace S8.Flow.Api.DebugHelpers
 {
@@ -7,7 +7,7 @@ namespace S8.Flow.Api.DebugHelpers
     {
         public static string GetProviderForStageRecordReading()
         {
-            return AggregateConfigs.Get<Sora.Flow.Model.StageRecord<S8.Flow.Shared.Reading>, string>(Sora.Core.Hosting.App.AppHost.Current!).Provider;
+            return AggregateConfigs.Get<Koan.Flow.Model.StageRecord<S8.Flow.Shared.Reading>, string>(Koan.Core.Hosting.App.AppHost.Current!).Provider;
         }
     }
 }

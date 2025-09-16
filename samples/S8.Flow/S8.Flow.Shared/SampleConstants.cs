@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Logging;
-using Sora.Flow.Sending;
+using Koan.Flow.Extensions;
+using Koan.Messaging;
 
 namespace S8.Flow.Shared;
 
@@ -47,7 +48,7 @@ public static class AdapterSeeding
             // Send Device entity through messaging system
             var device = new Device
             {
-                DeviceId = d.DeviceId,
+                Id = d.Id,
                 Inventory = d.Inventory,
                 Serial = d.Serial,
                 Manufacturer = d.Manufacturer,
@@ -55,21 +56,20 @@ public static class AdapterSeeding
                 Kind = d.Kind,
                 Code = d.Code
             };
-            
-            await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, ct);
+            await device.Send(cancellationToken: ct);
 
             // Send Sensor entities through messaging system
             foreach (var s in sensorSelector(d))
             {
                 var sensor = new Sensor
                 {
-                    SensorKey = s.SensorKey,
+                    Id = s.Id,
+                    SensorId = s.SensorId,
                     DeviceId = s.DeviceId,
                     Code = s.Code,
                     Unit = s.Unit
                 };
-                
-                await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor, ct);
+                await sensor.Send(cancellationToken: ct);
             }
         }
     }

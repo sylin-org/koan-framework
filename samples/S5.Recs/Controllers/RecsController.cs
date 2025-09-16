@@ -5,7 +5,7 @@ using S5.Recs.Services;
 namespace S5.Recs.Controllers;
 
 [ApiController]
-[Route(Constants.Routes.Recs)] // Controllers only per Sora guideline
+[Route(Constants.Routes.Recs)] // Controllers only per Koan guideline
 public class RecsController(IRecsService recs) : ControllerBase
 {
     [HttpPost("query")]
@@ -22,7 +22,7 @@ public class RecsController(IRecsService recs) : ControllerBase
         var ct = HttpContext?.RequestAborted ?? CancellationToken.None;
         var (items, degraded) = recs.QueryAsync(
             req.Text,
-            req.AnchorAnimeId,
+            req.AnchorMediaId,
             req.Filters?.Genres,
             req.Filters?.EpisodesMax,
             req.Filters?.SpoilerSafe ?? true,
@@ -31,14 +31,15 @@ public class RecsController(IRecsService recs) : ControllerBase
             req.Filters?.PreferTags,
             req.Filters?.PreferWeight,
             req.Sort,
-        ct).GetAwaiter().GetResult();
+            req.Filters?.MediaType,
+            ct).GetAwaiter().GetResult();
         return Ok(new { items, degraded });
     }
 
     [HttpPost("rate")]
     public IActionResult Rate([FromBody] RateRequest req)
     {
-        recs.RateAsync(req.UserId, req.AnimeId, req.Rating, HttpContext.RequestAborted).GetAwaiter().GetResult();
+        recs.RateAsync(req.UserId, req.MediaId, req.Rating, HttpContext.RequestAborted).GetAwaiter().GetResult();
         return Ok(new { ok = true });
     }
 }

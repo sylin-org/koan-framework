@@ -1,7 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using S7.ContentPlatform.Models;
-using Sora.Data.Core;
-using Sora.Scheduling;
+using Koan.Data.Core;
+using Koan.Scheduling;
 
 namespace S7.ContentPlatform.Tasks;
 

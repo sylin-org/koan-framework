@@ -14,12 +14,12 @@ Context
 - We want clear layering: framework provides sensible defaults; apps define policy.
 
 Decision
-- Move default logging to Sora.Core (configured by `AddSoraCore`):
+- Move default logging to Koan.Core (configured by `AddKoanCore`):
   - SimpleConsole provider, single-line with timestamps.
-  - Category filters: Microsoft/System at Warning, Hosting.Lifetime at Information, Sora at Information.
-- Centralize secure headers in Sora.Web via startup filter controlled by `SoraWebOptions`:
+  - Category filters: Microsoft/System at Warning, Hosting.Lifetime at Information, Koan at Information.
+- Centralize secure headers in Koan.Web via startup filter controlled by `KoanWebOptions`:
   - Adds `X-Content-Type-Options=nosniff`, `X-Frame-Options=DENY`, `Referrer-Policy=no-referrer`.
-  - Optional `Content-Security-Policy` value via `SoraWebOptions.ContentSecurityPolicy`.
+  - Optional `Content-Security-Policy` value via `KoanWebOptions.ContentSecurityPolicy`.
 - Keep application-level policy in apps:
   - ProblemDetails registration and exception pipeline.
   - Rate limiting policies.
@@ -27,7 +27,7 @@ Decision
 
 Consequences
 - Apps get sensible logs without extra code; appsettings can override providers/levels.
-- Secure headers are applied consistently across Sora.Web apps; CSP is opt-in/configurable.
+- Secure headers are applied consistently across Koan.Web apps; CSP is opt-in/configurable.
 - Samples (S1) are simpler and focus on policies (ProblemDetails, rate limiting) rather than framework plumbing.
 
 Alternatives considered
@@ -36,5 +36,5 @@ Alternatives considered
 - Use third-party header libraries now: optional; the built-in layer is minimal and non-invasive.
 
 See also
-- 0010: Meta packages (Sora, Sora.App)
+- 0010: Meta packages (Koan, Koan.App)
 - 0009: Unify on `IEntity<TKey>`

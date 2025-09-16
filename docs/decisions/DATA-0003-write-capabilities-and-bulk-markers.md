@@ -25,4 +25,4 @@ We want providers to declare support for native bulk operations (upsert/delete) 
 ## Implementation notes (2025-08-16)
 - JSON adapter: advertises `BulkUpsert | BulkDelete` and implements bulk paths in-memory.
 - SQLite adapter: now advertises `BulkUpsert | BulkDelete`. Bulk methods are functionally correct and currently loop per-item; native batching may be added later without surfacing changes.
-- Discovery: The `/.well-known/sora/capabilities` endpoint aggregates `QueryCapabilities` and `WriteCapabilities` per aggregate and provider, so clients can branch or feature-detect.
+- Discovery: The `/.well-known/Koan/capabilities` endpoint aggregates `QueryCapabilities` and `WriteCapabilities` per aggregate and provider, so clients can branch or feature-detect.

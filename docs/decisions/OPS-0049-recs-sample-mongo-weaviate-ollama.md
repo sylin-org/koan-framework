@@ -24,8 +24,8 @@ Operational UX:
 ## Decision
 
 1) Storage choices
-- Document DB: MongoDB (Sora.Data.Mongo) for flexible metadata.
-- Vector DB: Weaviate (Sora.Data.Weaviate) with vectorizer = none. The app supplies embeddings.
+- Document DB: MongoDB (Koan.Data.Mongo) for flexible metadata.
+- Vector DB: Weaviate (Koan.Data.Weaviate) with vectorizer = none. The app supplies embeddings.
 
 2) Embeddings
 - Provider: Ollama by default. Auto-detect endpoints in this order and cache the first healthy:
@@ -63,7 +63,7 @@ Operational UX:
 ## Consequences
 
 Positive
-- Clear demonstration of Sora’s data and AI modules working together.
+- Clear demonstration of Koan’s data and AI modules working together.
 - One-click seeding with caching makes demos reproducible and fast after first run.
 - Alpine.js keeps the front-end simple and server-agnostic.
 

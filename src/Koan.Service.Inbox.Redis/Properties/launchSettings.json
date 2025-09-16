@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Koan.Service.Inbox.Redis": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:49891;http://localhost:49892"
+    }
+  }
+}

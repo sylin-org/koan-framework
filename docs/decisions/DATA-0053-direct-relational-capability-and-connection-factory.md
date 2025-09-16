@@ -18,11 +18,11 @@ Direct commands previously created provider-specific DbConnection instances in C
 - Keeps Direct thin and provider-agnostic.
 
 ## Implementation
-- Added `Sora.Data.Core.Configuration.IDataProviderConnectionFactory` and provider implementations:
+- Added `Koan.Data.Core.Configuration.IDataProviderConnectionFactory` and provider implementations:
   - SqlServerConnectionFactory
   - PostgresConnectionFactory
   - SqliteConnectionFactory
-- Updated `Sora.Data.Direct` to resolve factories from DI and remove type-switches.
+- Updated `Koan.Data.Direct` to resolve factories from DI and remove type-switches.
 - Removed/Excluded previous Core-level DirectService implementation that created connections.
 
 ## Usage and resolution rules

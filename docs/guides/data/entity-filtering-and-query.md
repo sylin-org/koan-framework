@@ -1,9 +1,9 @@
 # Entity Filtering and Query: From Simple to Powerful
 
-This guide explains how to filter and page entities using Sora’s generic `EntityController`, step by step.
+This guide explains how to filter and page entities using Koan’s generic `EntityController`, step by step.
 It covers both GET with querystring filters and POST /query for richer payloads, and shows how clients like S2.Client compose requests.
 
-Audience: Developers building web APIs or clients on top of Sora.
+Audience: Developers building web APIs or clients on top of Koan.
 
 ---
 
@@ -15,14 +15,14 @@ Audience: Developers building web APIs or clients on top of Sora.
   - `POST /api/items/query`
   - Body: `{ "filter": { "Name": "*milk*" }, "page": 1, "size": 10 }`
 - Headers: `X-Total-Count` is set to the count AFTER filtering (before pagination). `X-Page`, `X-Page-Size`, `X-Total-Pages` are included.
-- Header `Sora-InMemory-Paging: true` is set when the server slices the page in memory (fallback). Providers should prefer native paging pushdown.
+- Header `Koan-InMemory-Paging: true` is set when the server slices the page in memory (fallback). Providers should prefer native paging pushdown.
 - Optional set routing: add `set=backup` to target a non-root logical set.
 
 ---
 
 ## 2) Basics: Wildcards and equality
 
-Sora uses a pragmatic JSON filter subset:
+Koan uses a pragmatic JSON filter subset:
 - Equality: `{ "Status": "active" }`
 - String wildcards with `*`:
   - Starts with: `{ "Name": "milk*" }`
@@ -61,7 +61,7 @@ Examples:
 
 ## 4) Pagination and headers
 
-- Sora paginates server-side when page/size are present (or when required by controller behavior).
+- Koan paginates server-side when page/size are present (or when required by controller behavior).
 - Response headers:
   - `X-Total-Count`: number of items matching the filter
   - `X-Page`, `X-Page-Size`, `X-Total-Pages`
@@ -91,7 +91,7 @@ This aligns with the server’s filter semantics and pagination headers.
 
 ## 6) Sets (routing to non-root data)
 
-Sora supports logical sets to route the same entity to different physical storage names (e.g., `root` vs `backup`).
+Koan supports logical sets to route the same entity to different physical storage names (e.g., `root` vs `backup`).
 - Root set uses no suffix; others are suffixed internally (e.g., `#backup`).
 - Pass `set` via querystring or POST body.
 

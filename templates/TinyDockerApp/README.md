@@ -1,6 +1,6 @@
 # TinyDockerApp
 
-Sora API + Alpine.js client + MongoDB via Docker Compose.
+Koan API + Alpine.js client + MongoDB via Docker Compose.
 
 - API Port: __PORT__
 - UI served by the API from wwwroot

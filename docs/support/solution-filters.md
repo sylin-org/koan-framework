@@ -2,10 +2,10 @@
 
 Open focused subsets of the solution with .slnf files:
 
-- Sora.CoreOnly.slnf – Core + Data abstractions + tests
-- Sora.DataOnly.slnf – All data libs + tests
-- Sora.WebOnly.slnf – Web libs + GraphQL + samples + tests
-- Sora.Full.slnf – Entire solution (default)
+- Koan.CoreOnly.slnf – Core + Data abstractions + tests
+- Koan.DataOnly.slnf – All data libs + tests
+- Koan.WebOnly.slnf – Web libs + GraphQL + samples + tests
+- Koan.Full.slnf – Entire solution (default)
 
 In VS Code: File > Open... and select the .slnf. In Visual Studio: File > Open > Project/Solution and pick the .slnf.
 

@@ -19,7 +19,7 @@
 
 ## 2. Current Implementation Analysis
 
-### Sora.Messaging.*
+### Koan.Messaging.*
 - Provides message send/receive, handler registration, and some conventions.
 - No public, provider-agnostic API for runtime topology provisioning.
 - Topology (exchanges, queues, bindings) handled internally or via provider-specific code.
@@ -27,8 +27,8 @@
 - In-memory/mock bus is limited or absent.
 - Documentation and samples focus on basic usage, not advanced topology.
 
-### Sora.Flow.*
-- Consumes Sora.Messaging for workflow/event-driven scenarios.
+### Koan.Flow.*
+- Consumes Koan.Messaging for workflow/event-driven scenarios.
 - Lacks a standard, provider-agnostic way to provision advanced topologies.
 
 ---
@@ -42,7 +42,7 @@
 
 ### Feasibility
 - **High for greenfield:** Breaking changes and refactoring are acceptable.
-- Requires coordinated changes across Sora.Messaging.Core, all providers, and consumers like Sora.Flow.
+- Requires coordinated changes across Koan.Messaging.Core, all providers, and consumers like Koan.Flow.
 - Documentation and sample updates are straightforward but require discipline.
 
 #### Pros
@@ -68,7 +68,7 @@
 | Testing             | Limited or no in-memory/mock bus                   | In-memory/mock bus with same API as prod                 |
 | Documentation       | Basic, focused on simple usage                     | Example-driven, real-world, minimal boilerplate          |
 | Extensibility       | Some, but not unified                              | Strong typing, diagnostics, extensibility as core        |
-| Consumer Support    | Sora.Flow limited by lack of agnostic topology API | Sora.Flow can declaratively provision/inspect topology   |
+| Consumer Support    | Koan.Flow limited by lack of agnostic topology API | Koan.Flow can declaratively provision/inspect topology   |
 
 ---
 
@@ -78,7 +78,7 @@
 - Prioritize the introduction of `ITopologyProvisioner` and refactor all providers to implement it.
 - Redesign the API surface to be fluent and intent-driven.
 - Build and document an in-memory/mock bus for testing.
-- Update Sora.Flow and other consumers to leverage the new APIs.
+- Update Koan.Flow and other consumers to leverage the new APIs.
 - Ensure robust zero-config defaults and comprehensive, example-driven documentation.
 
 **Summary:**

@@ -1,5 +1,5 @@
-using Sora.Flow.Attributes;
-using Sora.Flow.Model;
+using Koan.Flow.Attributes;
+using Koan.Flow.Model;
 
 namespace S8.Flow.Shared;
 

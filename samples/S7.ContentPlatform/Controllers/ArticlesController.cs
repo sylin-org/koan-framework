@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Sora.Data.Core;
-using Sora.Web.Controllers;
+using Microsoft.AspNetCore.Mvc;
+using Koan.Data.Core;
+using Koan.Web.Controllers;
 using S7.ContentPlatform.Models;
 
 namespace S7.ContentPlatform.Controllers;

@@ -1,6 +1,6 @@
 # Engineering Guardrails
 
-Purpose: Keep Sora simple to read, easy to reason about, and pleasant to maintain. Favor SoC, KISS, YAGNI, DRY. The “magic” should be in the process flow (composability), not in clever code tricks.
+Purpose: Keep Koan simple to read, easy to reason about, and pleasant to maintain. Favor SoC, KISS, YAGNI, DRY. The “magic” should be in the process flow (composability), not in clever code tricks.
 
 ## Architectural constraints
 - No hidden magic by default
@@ -66,7 +66,7 @@ Purpose: Keep Sora simple to read, easy to reason about, and pleasant to maintai
 
 Layering defaults (see ADR-0011)
 - Core sets sane default logging (SimpleConsole and category filters); apps override via configuration.
-- Sora.Web applies minimal secure response headers; CSP is opt-in via SoraWebOptions.
+- Koan.Web applies minimal secure response headers; CSP is opt-in via KoanWebOptions.
 - Apps own policies like ProblemDetails and rate limiting.
 
 ## AI
@@ -82,8 +82,8 @@ Layering defaults (see ADR-0011)
 ## Auto-registration (reference = intent)
 
 Standard
-- Intent to use a Sora module is expressed by adding a reference. Every package must self-register when referenced.
-- Each assembly exposes a single registrar at `/Initialization/SoraAutoRegistrar.cs` implementing `Sora.Core.ISoraAutoRegistrar`.
+- Intent to use a Koan module is expressed by adding a reference. Every package must self-register when referenced.
+- Each assembly exposes a single registrar at `/Initialization/KoanAutoRegistrar.cs` implementing `Koan.Core.IKoanAutoRegistrar`.
 - Registrar contract:
   - Initialize(IServiceCollection): wire services and options. Keep idempotent; avoid provider rebuilds.
   - Describe(BootReport, IConfiguration, IHostEnvironment): add a module header and a few key settings to the startup report.
@@ -95,7 +95,7 @@ Describe expectations
 
 Hygiene
 - Do not keep placeholder initializers. Remove empty/non-functional files.
-- If an assembly already contains internal `ISoraInitializer` helpers for discovery, ensure the registrar doesn’t duplicate the same work.
+- If an assembly already contains internal `IKoanInitializer` helpers for discovery, ensure the registrar doesn’t duplicate the same work.
 
 ## PR checklist (short)
 - Readability: can a new contributor follow the flow without prior context?
@@ -137,10 +137,10 @@ Options & configuration
 - Avoid IOptionsSnapshot (Scoped) unless absolutely necessary.
 
 ### Naming: configuration helper and constants
-- Use `Sora.Core.Configuration.Read[...]` and `ReadFirst[...]` for config access. Avoid ad-hoc `cfg["..."]` and direct `Environment.GetEnvironmentVariable` reads.
+- Use `Koan.Core.Configuration.Read[...]` and `ReadFirst[...]` for config access. Avoid ad-hoc `cfg["..."]` and direct `Environment.GetEnvironmentVariable` reads.
 - Keep constant keys in canonical `:` form; the helper translates env/provider shapes internally.
-- Name the per-assembly constants class `Constants` and rely on namespaces for clarity (e.g., `Sora.Web.Swagger.Infrastructure.Constants`). Use using-aliases when multiple `Constants` are required in the same file.
- - When an `IConfiguration cfg` is in scope, prefer the extension methods `cfg.Read(...)` and `cfg.ReadFirst(...)` for brevity; use `Sora.Core.Configuration.Read(...)` when no `cfg` is readily available.
+- Name the per-assembly constants class `Constants` and rely on namespaces for clarity (e.g., `Koan.Web.Swagger.Infrastructure.Constants`). Use using-aliases when multiple `Constants` are required in the same file.
+ - When an `IConfiguration cfg` is in scope, prefer the extension methods `cfg.Read(...)` and `cfg.ReadFirst(...)` for brevity; use `Koan.Core.Configuration.Read(...)` when no `cfg` is readily available.
 
 Heuristics (choose lifetime)
 1) Does it hold mutable state across calls? If yes, can it be internal and thread-safe? → Singleton; otherwise Transient.

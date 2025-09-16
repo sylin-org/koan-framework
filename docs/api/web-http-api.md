@@ -1,6 +1,6 @@
-# HTTP API conventions (Sora.Web)
+# HTTP API conventions (Koan.Web)
 
-Sora.Web provides sensible defaults for entity-centric APIs and well-known operational endpoints.
+Koan.Web provides sensible defaults for entity-centric APIs and well-known operational endpoints.
 
 Entity endpoints (typical)
 - GET /api/{entity} — list/query
@@ -11,16 +11,16 @@ Entity endpoints (typical)
 
 Query/filter
 - Prefer POST /api/{entity}/query with a JSON filter body for complex queries.
-- Adapters push down filters/paging when possible. If fallback to in-memory slicing occurs, Sora adds header: `Sora-InMemory-Paging: true`.
+- Adapters push down filters/paging when possible. If fallback to in-memory slicing occurs, Koan adds header: `Koan-InMemory-Paging: true`.
 - Totals should use repository `CountAsync` (not by reading all). Your API can return totals in the body or via a total-count header as appropriate.
 
 Paging
 - Common parameters: `page` (1-based) and `size` (page size). Exact shape may vary by controller template.
-- Header `Sora-InMemory-Paging: true` is emitted when the controller had to paginate locally.
+- Header `Koan-InMemory-Paging: true` is emitted when the controller had to paginate locally.
 
 Headers
-- `Sora-Trace-Id`: correlation id of the current request’s trace (when tracing enabled).
-- `Sora-InMemory-Paging`: `true` when in-memory pagination fallback happened.
+- `Koan-Trace-Id`: correlation id of the current request’s trace (when tracing enabled).
+- `Koan-InMemory-Paging`: `true` when in-memory pagination fallback happened.
 
 Capability endpoints (semantics)
 - Capabilities expand the baseline collection (`/api/{entity}`) with short, action-like routes.
@@ -36,8 +36,8 @@ Moderation views (visibility overlays)
 - Unauthorized `view` requests fall back to published.
 
 Well-known endpoints
-- See well-known-endpoints.md for `/.well-known/sora/*` routes.
-- Authentication routes (Sora.Web.Auth)
+- See well-known-endpoints.md for `/.well-known/Koan/*` routes.
+- Authentication routes (Koan.Web.Auth)
 - Discovery: `GET /.well-known/auth/providers`
 - Challenge/Callback: `GET /auth/{provider}/challenge`, `GET /auth/{provider}/callback`
 - Logout: `GET|POST /auth/logout`

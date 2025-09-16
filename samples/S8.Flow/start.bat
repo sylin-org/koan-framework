@@ -1,13 +1,12 @@
-﻿@echo off
+@echo off
 setlocal enableextensions
-
 REM Ensure we run from the script's directory
 set "SCRIPT_DIR=%~dp0"
 pushd "%SCRIPT_DIR%"
 
 REM Use the compose file living under S8.Compose
 set COMPOSE_FILE=S8.Compose\docker-compose.yml
-set PROJECT_NAME=sora-s8-flow
+set PROJECT_NAME=koan-s8-flow
 set API_URL=http://localhost:4903
 
 where docker >nul 2>nul
@@ -21,12 +20,12 @@ REM Prefer modern "docker compose"; fallback to legacy docker-compose
 for /f "tokens=*" %%i in ('docker compose version 2^>nul') do set HAS_DOCKER_COMPOSE_CLI=1
 if defined HAS_DOCKER_COMPOSE_CLI (
   echo Using "docker compose" CLI
-  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build --no-cache || goto :error
+  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build || goto :error
   docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
 ) else (
   where docker-compose >nul 2>nul || goto :nolegacy
   echo Using legacy "docker-compose" CLI
-  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build --no-cache || goto :error
+  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build || goto :error
   docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
 )
 

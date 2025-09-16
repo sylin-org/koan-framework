@@ -1,6 +1,6 @@
 # Redis adapter
 
-This guide covers Sora's Redis data adapter. It provides a lightweight key/value store with LINQ filtering in-memory, simple paging guardrails, and instruction support. Use it for caches, simple aggregates, and ephemeral data.
+This guide covers Koan's Redis data adapter. It provides a lightweight key/value store with LINQ filtering in-memory, simple paging guardrails, and instruction support. Use it for caches, simple aggregates, and ephemeral data.
 
 ## Capabilities
 
@@ -12,11 +12,11 @@ This guide covers Sora's Redis data adapter. It provides a lightweight key/value
 
 ## Package & registration
 
-Project: `src/Sora.Data.Redis`
+Project: `src/Koan.Data.Redis`
 
 ```csharp
-services.AddSoraCore();
-services.AddSoraDataCore();
+services.AddKoanCore();
+services.AddKoanDataCore();
 services.AddRedisAdapter();
 ```
 
@@ -24,15 +24,15 @@ services.AddRedisAdapter();
 
 First-win configuration keys:
 
-- Sora:Data:Redis:ConnectionString
-- Sora:Data:Sources:Default:redis:ConnectionString
+- Koan:Data:Redis:ConnectionString
+- Koan:Data:Sources:Default:redis:ConnectionString
 - ConnectionStrings:Redis
 - ConnectionStrings:Default
 
 Optional:
 
-- Sora:Data:Redis:DefaultPageSize (default 50)
-- Sora:Data:Redis:MaxPageSize (default 200)
+- Koan:Data:Redis:DefaultPageSize (default 50)
+- Koan:Data:Redis:MaxPageSize (default 200)
 
 Discovery defaults:
 

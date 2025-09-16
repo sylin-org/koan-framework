@@ -9,14 +9,14 @@ title: Inbox contract, client behavior, and provider discovery
 # 0025 — Inbox contract, client behavior, and provider discovery
 
 Context
-- Sora supports consumer-side idempotency via an Inbox. We need a portable contract so providers (Redis/SQL/Mongo/microservice) remain pluggable.
-- The Sora client should follow a minimal, robust flow without hard dependencies on any specific store.
+- Koan supports consumer-side idempotency via an Inbox. We need a portable contract so providers (Redis/SQL/Mongo/microservice) remain pluggable.
+- The Koan client should follow a minimal, robust flow without hard dependencies on any specific store.
 
 Decision
 - Introduce a minimal SDK contract (IInboxStore) for client-side integration, plus a standardized microservice wire protocol for external providers.
 
 Client SDK contract
-- IInboxStore (in Sora.Messaging.Core)
+- IInboxStore (in Koan.Messaging.Core)
   - Task<bool> IsProcessedAsync(string key)
   - Task MarkProcessedAsync(string key)
 - Behavior in RabbitMQ consumer

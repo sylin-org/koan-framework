@@ -1,4 +1,4 @@
-﻿---
+---
 id: STOR-0006
 slug: STOR-0006-storage-default-routing-and-fallbacks
 domain: storage
@@ -9,7 +9,7 @@ title: Storage default routing and fallbacks (minimal-config behavior)
 
 Context
 
-Sora storage supports profiles and routing rules. For small apps and development, we want a sane default that works with minimal configuration, without risking silent misroutes in production.
+Koan storage supports profiles and routing rules. For small apps and development, we want a sane default that works with minimal configuration, without risking silent misroutes in production.
 
 Decision
 
@@ -37,7 +37,7 @@ Consequences
 Implementation notes
 
 - StorageService.Resolve implements the above order and logs a warning on SingleProfileOnly fallback.
-- Options binding under Sora:Storage supports DefaultProfile and FallbackMode.
+- Options binding under Koan:Storage supports DefaultProfile and FallbackMode.
 
 Follow-ups
 

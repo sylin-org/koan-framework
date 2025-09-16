@@ -11,6 +11,158 @@
 .chip--dark:hover { background-color: #334155; }
 .chip--active { background-color: #9333ea; color: #fff; }
 
+/* Mobile-first touch targets (minimum 44px for accessibility) */
+.touch-target-44 {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Filter chips */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #374151;
+  color: #e5e7eb;
+  border: 1px solid #4b5563;
+  border-radius: 16px;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover {
+  background: #4b5563;
+  border-color: #6b7280;
+}
+
+.filter-chip .remove-btn {
+  padding: 0;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.filter-chip .remove-btn:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+}
+
+/* Status dropdown menu */
+.status-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 160px;
+  background: #1e293b;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.status-dropdown.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+.status-dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #e5e7eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.status-dropdown-item:hover {
+  background-color: #374151;
+}
+
+.status-dropdown-item.active {
+  background-color: #4f46e5;
+  color: white;
+}
+
+.status-dropdown-item i {
+  margin-right: 8px;
+  width: 16px;
+}
+
+/* Rating side panel for status dropdown */
+.status-dropdown-item {
+  position: relative;
+}
+
+.status-rating-panel {
+  position: fixed; /* Use fixed positioning to overlay properly */
+  min-width: 140px;
+  background: #1e293b;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  z-index: 10001;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+  padding: 8px;
+}
+
+.status-rating-panel.show {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: all;
+}
+
+.status-rating-header {
+  display: none; /* Hidden per user request */
+}
+
+.status-rating-stars {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.status-rating-star {
+  color: #4b5563;
+  cursor: pointer;
+  font-size: 16px;
+  transition: color 0.15s ease;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.status-rating-star:hover,
+.status-rating-star.hover {
+  color: #fbbf24;
+}
+
+.status-rating-star.active {
+  color: #f59e0b;
+}
+
 /* Weight-sensitive selected tag styles */
 .chip--sel-low { background-color: #2563eb; color: #fff; }
 .chip--sel-mid { background-color: #9333ea; color: #fff; }
@@ -366,13 +518,13 @@ button {
   color: var(--text-secondary);
 }
 
-.anime-grid {
+.media-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 1.5rem;
 }
 
-.anime-card {
+.media-card {
   background: linear-gradient(145deg, var(--bg-secondary), var(--bg-tertiary));
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -381,7 +533,7 @@ button {
   cursor: pointer;
 }
 
-.anime-card:hover {
+.media-card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-lg);
   border-color: var(--accent-primary);
@@ -393,7 +545,7 @@ button {
   padding: 1rem;
 }
 
-.anime-poster {
+.media-poster {
   position: relative;
   width: 80px;
   height: 120px;
@@ -424,19 +576,19 @@ button {
   box-shadow: var(--shadow-md);
 }
 
-.anime-info {
+.media-info {
   flex: 1;
   min-width: 0;
 }
 
-.anime-title {
+.media-title {
   font-size: 1.125rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
   line-height: 1.4;
 }
 
-.anime-meta {
+.media-meta {
   display: flex;
   gap: 1rem;
   margin-bottom: 0.75rem;
@@ -1345,7 +1497,7 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .anime-grid {
+  .media-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1383,12 +1535,12 @@ button {
     padding: 1rem;
   }
 
-  .anime-card .card-header {
+  .media-card .card-header {
     flex-direction: column;
     text-align: center;
   }
 
-  .anime-poster {
+  .media-poster {
     align-self: center;
   }
 }
@@ -1411,3 +1563,110 @@ button {
 .star-btn:hover ~ .star-btn { color: #9ca3af; }
 .star-btn:hover, .star-btn.hover { color: #fbbf24; }
 .star-btn.active { color: #f59e0b; }
+
+/* Media type icons using CSS pseudo-elements */
+.media-type-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.media-type-icon::before {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  line-height: 1;
+}
+
+/* Cover overlay icon for cards */
+.media-type-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  color: white;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.75rem;
+  z-index: 10;
+}
+
+.media-type-badge::before {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  line-height: 1;
+}
+
+/* Media type specific icons */
+.media-type-icon.anime::before,
+.media-type-badge.anime::before,
+.media-type-icon.media-anime::before,
+.media-type-badge.media-anime::before {
+  content: "\f144"; /* fa-play-circle */
+}
+
+.media-type-icon.manga::before,
+.media-type-badge.manga::before,
+.media-type-icon.media-manga::before,
+.media-type-badge.media-manga::before {
+  content: "\f02d"; /* fa-book */
+}
+
+.media-type-icon.movie::before,
+.media-type-badge.movie::before,
+.media-type-icon.media-movie::before,
+.media-type-badge.media-movie::before {
+  content: "\f008"; /* fa-film */
+}
+
+.media-type-icon.book::before,
+.media-type-badge.book::before,
+.media-type-icon.media-book::before,
+.media-type-badge.media-book::before {
+  content: "\f518"; /* fa-book-open */
+}
+
+.media-type-icon.tv::before,
+.media-type-badge.tv::before,
+.media-type-icon.media-tv::before,
+.media-type-badge.media-tv::before {
+  content: "\f26c"; /* fa-tv */
+}
+
+.media-type-icon.novel::before,
+.media-type-badge.novel::before,
+.media-type-icon.media-novel::before,
+.media-type-badge.media-novel::before {
+  content: "\f52d"; /* fa-feather-alt */
+}
+
+.media-type-icon.game::before,
+.media-type-badge.game::before,
+.media-type-icon.media-game::before,
+.media-type-badge.media-game::before {
+  content: "\f11b"; /* fa-gamepad */
+}
+
+.media-type-icon.music::before,
+.media-type-badge.music::before,
+.media-type-icon.media-music::before,
+.media-type-badge.media-music::before {
+  content: "\f001"; /* fa-music */
+}
+
+/* Default/fallback icon */
+.media-type-icon:not(.anime):not(.manga):not(.movie):not(.book):not(.tv):not(.novel):not(.game):not(.music):not(.media-anime):not(.media-manga):not(.media-movie):not(.media-book):not(.media-tv):not(.media-novel):not(.media-game):not(.media-music)::before,
+.media-type-badge:not(.anime):not(.manga):not(.movie):not(.book):not(.tv):not(.novel):not(.game):not(.music):not(.media-anime):not(.media-manga):not(.media-movie):not(.media-book):not(.media-tv):not(.media-novel):not(.media-game):not(.media-music)::before {
+  content: "\f008"; /* fa-film as default */
+}

@@ -13,7 +13,7 @@ public sealed class S1SmokeTests
     public async Task health_seed_list_flow_should_work()
     {
         // Reset config cache to avoid contamination from previous factories
-        Sora.Data.Core.TestHooks.ResetDataConfigs();
+        Koan.Data.Core.TestHooks.ResetDataConfigs();
         await using var app = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("urls", "http://localhost:0");
@@ -21,8 +21,8 @@ public sealed class S1SmokeTests
             var jsonDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "s1-web-it-json");
             System.IO.Directory.CreateDirectory(jsonDir);
             var sqliteFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "s1-web-it-sqlite.db");
-            builder.UseSetting("Sora:Data:Sources:Default:json:DirectoryPath", jsonDir);
-            builder.UseSetting("Sora:Data:Sources:Default:sqlite:ConnectionString", $"Data Source={sqliteFile}");
+            builder.UseSetting("Koan:Data:Sources:Default:json:DirectoryPath", jsonDir);
+            builder.UseSetting("Koan:Data:Sources:Default:sqlite:ConnectionString", $"Data Source={sqliteFile}");
         });
         var client = app.CreateClient();
 
@@ -49,7 +49,7 @@ public sealed class S1SmokeTests
     [Fact]
     public async Task health_endpoints_should_return_expected_status_codes()
     {
-        Sora.Data.Core.TestHooks.ResetDataConfigs();
+        Koan.Data.Core.TestHooks.ResetDataConfigs();
         await using var app = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("urls", "http://localhost:0");
@@ -57,8 +57,8 @@ public sealed class S1SmokeTests
             var jsonDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "s1-web-it-json");
             System.IO.Directory.CreateDirectory(jsonDir);
             var sqliteFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "s1-web-it-sqlite.db");
-            builder.UseSetting("Sora:Data:Sources:Default:json:DirectoryPath", jsonDir);
-            builder.UseSetting("Sora:Data:Sources:Default:sqlite:ConnectionString", $"Data Source={sqliteFile}");
+            builder.UseSetting("Koan:Data:Sources:Default:json:DirectoryPath", jsonDir);
+            builder.UseSetting("Koan:Data:Sources:Default:sqlite:ConnectionString", $"Data Source={sqliteFile}");
         });
         var client = app.CreateClient();
 
@@ -73,16 +73,16 @@ public sealed class S1SmokeTests
     [Fact]
     public async Task readiness_should_be_unhealthy_when_json_path_invalid()
     {
-        Sora.Data.Core.TestHooks.ResetDataConfigs();
+        Koan.Data.Core.TestHooks.ResetDataConfigs();
         await using var app = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("urls", "http://localhost:0");
             builder.UseSetting("DOTNET_ENVIRONMENT", "Development");
             // Valid sqlite so only JSON drives readiness unhealthy
             var sqliteFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "s1-web-it-sqlite.db");
-            builder.UseSetting("Sora:Data:Sources:Default:sqlite:ConnectionString", $"Data Source={sqliteFile}");
+            builder.UseSetting("Koan:Data:Sources:Default:sqlite:ConnectionString", $"Data Source={sqliteFile}");
             // Force JSON adapter directory to a path that cannot exist or be created (invalid drive letter)
-            builder.UseSetting("Sora:Data:Sources:Default:json:DirectoryPath", "Z:|\\invalid?path");
+            builder.UseSetting("Koan:Data:Sources:Default:json:DirectoryPath", "Z:|\\invalid?path");
         });
 
         var client = app.CreateClient();
@@ -93,7 +93,7 @@ public sealed class S1SmokeTests
     [Fact]
     public async Task readiness_should_be_unhealthy_when_sqlite_connection_invalid()
     {
-        Sora.Data.Core.TestHooks.ResetDataConfigs();
+        Koan.Data.Core.TestHooks.ResetDataConfigs();
         await using var app = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("urls", "http://localhost:0");
@@ -101,9 +101,9 @@ public sealed class S1SmokeTests
             // Valid JSON so only SQLite drives readiness unhealthy
             var jsonDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "s1-web-it-json");
             System.IO.Directory.CreateDirectory(jsonDir);
-            builder.UseSetting("Sora:Data:Sources:Default:json:DirectoryPath", jsonDir);
+            builder.UseSetting("Koan:Data:Sources:Default:json:DirectoryPath", jsonDir);
             // For SQLite, override via default named source pattern used by our configurator
-            builder.UseSetting("Sora:Data:Sources:Default:sqlite:ConnectionString", "Data Source=Z:|\\invalid?path\\bad.sqlite");
+            builder.UseSetting("Koan:Data:Sources:Default:sqlite:ConnectionString", "Data Source=Z:|\\invalid?path\\bad.sqlite");
         });
 
         var client = app.CreateClient();

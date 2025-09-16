@@ -1,4 +1,4 @@
-﻿---
+---
 id: MEDIA-0003
 slug: media-variant-routing-and-transforms
 domain: Media
@@ -9,7 +9,7 @@ title: Media variant routing, automatic transforms, and canonical signature
 
 ## Context
 
-Sora’s media pipeline streams original content with strong HTTP semantics (ETag/Last-Modified, Range, HEAD). We now need collision-free addressing, ergonomic transforms via query parameters (e.g., resize), deterministic variant keys to prevent reprocessing/storage bloat, and clear policies around unknown params and operator overlap.
+Koan’s media pipeline streams original content with strong HTTP semantics (ETag/Last-Modified, Range, HEAD). We now need collision-free addressing, ergonomic transforms via query parameters (e.g., resize), deterministic variant keys to prevent reprocessing/storage bloat, and clear policies around unknown params and operator overlap.
 
 ## Decision
 
@@ -74,7 +74,7 @@ Sora’s media pipeline streams original content with strong HTTP semantics (ETa
 
 ## Scope
 
-- Applies to Sora.Media.Web and sample apps (e.g., S6). ID routes become the canonical public API for media bytes.
+- Applies to Koan.Media.Web and sample apps (e.g., S6). ID routes become the canonical public API for media bytes.
 - Keeps the existing byte-streaming controller semantics and options (cache-control) intact.
 
 ## Consequences

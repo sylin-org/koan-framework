@@ -1,4 +1,4 @@
-# Sora API Docs
+# Koan API Docs
 
 This folder contains generated API reference content from XML documentation comments.
 

@@ -28,7 +28,7 @@ public class SeedAndClearTests : IClassFixture<MongoFixture>
                 {
                     ["DOTNET_ENVIRONMENT"] = "Development",
                     ["ConnectionStrings:Default"] = _fx.ConnectionString,
-                    ["Sora:Data:Mongo:Database"] = "s2test_seedclear"
+                    ["Koan:Data:Mongo:Database"] = "s2test_seedclear"
                 });
             });
         });

@@ -1,10 +1,10 @@
-﻿---
+---
 id: WEB-0043
 slug: auth-multi-protocol-oauth-oidc-saml
 domain: WEB
 status: Accepted
 date: 2025-08-23
-title: Sora.Web.Auth — multi-protocol authentication (OIDC, OAuth2, SAML) with pluggable adapters
+title: Koan.Web.Auth — multi-protocol authentication (OIDC, OAuth2, SAML) with pluggable adapters
 ---
 
 ## Context
@@ -12,19 +12,19 @@ title: Sora.Web.Auth — multi-protocol authentication (OIDC, OAuth2, SAML) with
 Modern apps need first-class social and enterprise sign-in. Requirements:
 
 - Protocol-agnostic core with adapters for OIDC/OAuth2 (Google, Microsoft, Discord) and SAML 2.0.
-- Minimal configuration via Sora config resolution (env/appsettings) and optional secret-store adapters.
+- Minimal configuration via Koan config resolution (env/appsettings) and optional secret-store adapters.
 - Provider discovery endpoint for UI (“Select a provider”).
 - Sign-in plus account linking/unlinking without email-based linking.
-- Provider-agnostic user store using Sora Entity<> resolution by default; extensible via DI.
+- Provider-agnostic user store using Koan Entity<> resolution by default; extensible via DI.
 - Strong security defaults (PKCE, state/nonce, strict returnUrl policy), audit trail, and rate limiting.
 
 ## Decision
 
-Adopt a new module, Sora.Web.Auth (core), with adapter packages:
+Adopt a new module, Koan.Web.Auth (core), with adapter packages:
 
-- Sora.Web.Auth.Oidc (generic OIDC)
-- Sora.Web.Auth.Google, Sora.Web.Auth.Microsoft, Sora.Web.Auth.Discord (thin wrappers)
-- Sora.Web.Auth.Saml2 (SAML 2.0 SP)
+- Koan.Web.Auth.Oidc (generic OIDC)
+- Koan.Web.Auth.Google, Koan.Web.Auth.Microsoft, Koan.Web.Auth.Discord (thin wrappers)
+- Koan.Web.Auth.Saml2 (SAML 2.0 SP)
 
 Expose controller-routed HTTP endpoints only:
 
@@ -47,8 +47,8 @@ Security defaults:
 
 Configuration model (keys abbreviated):
 
-- `Sora:Web:Auth:*` (ReturnUrl, Bff, RateLimit, Tokens, ReConsent)
-- `Sora:Web:Auth:Providers:{id}:*` with `Type` = `oidc|oauth2|saml` and protocol-specific settings
+- `Koan:Web:Auth:*` (ReturnUrl, Bff, RateLimit, Tokens, ReConsent)
+- `Koan:Web:Auth:Providers:{id}:*` with `Type` = `oidc|oauth2|saml` and protocol-specific settings
 - Secrets: default config resolution; optional secret-store adapters via `SecretRef`
 
 Settings composition (defaults + overrides):
@@ -62,7 +62,7 @@ Settings composition (defaults + overrides):
 Example (Discord) — minimal developer config overlays defaults:
 
 ```
-"Sora:Web:Auth:Providers:discord": {
+"Koan:Web:Auth:Providers:discord": {
 	"ClientId": "${DISCORD_CLIENT_ID}",
 	"ClientSecret": "${DISCORD_CLIENT_SECRET}"
 }

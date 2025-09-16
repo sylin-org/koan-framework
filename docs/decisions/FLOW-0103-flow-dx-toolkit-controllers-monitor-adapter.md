@@ -1,4 +1,4 @@
-﻿---
+---
 id: FLOW-0103
 slug: flow-dx-toolkit-controllers-monitor-adapter
 domain: flow
@@ -14,9 +14,9 @@ Developers working with Flow need simple, out-of-the-box tools to operate on bot
 - Orchestrators should expose safe HTTP endpoints for Flow models (roots and views), observe onboarding/projection/parked events, and initiate actions like seed/report.
 - Adapters should easily stamp envelopes with consistent metadata (system/adapter/source/policies), handle orchestrator actions, and reply in a uniform way.
 
-Sora guardrails apply:
+Koan guardrails apply:
 - Controllers over inline endpoints; reference=intent canon for route design.
-- Sane defaults and self-registration via SoraAutoRegistrar.
+- Sane defaults and self-registration via KoanAutoRegistrar.
 - First-class model statics for data access.
 
 ## Decision
@@ -39,9 +39,9 @@ Adopt a Flow DX toolkit with the following pillars:
 - Orchestrators publish typed `FlowAction<TModel>` messages (verbs: `seed`, `report`, `ping` by default). Adapters reply with `FlowAck` (ok|reject|busy|unsupported|error) or `FlowReport` (free-form stats/metrics).
 - CorrelationId and Model name are mandatory; ReplyTo is set by orchestrators.
 
-5) OOB sane defaults + SoraAutoRegistrar
+5) OOB sane defaults + KoanAutoRegistrar
 - A registrar in Flow Web/Runtime wires: controllers for all discovered `FlowEntity<T>` models, a default monitor, and action client/agent with the default verbs.
-- Opt-out or override via `Sora:Flow` options.
+- Opt-out or override via `Koan:Flow` options.
 
 ## Scope
 
@@ -60,11 +60,11 @@ Cons
 
 ## Implementation notes
 
-- Controllers: implement `FlowEntityController<TModel>` in Flow Web; register via `AddFlowControllers(o => o.AddForAllModels())` and SoraAutoRegistrar.
+- Controllers: implement `FlowEntityController<TModel>` in Flow Web; register via `AddFlowControllers(o => o.AddForAllModels())` and KoanAutoRegistrar.
 - Monitor: implement `ProjectionContext<TModel>` with `Model: IDictionary<string,object?>` and `Policies: IDictionary<string,string>`; commit occurs in the projection worker after hook returns.
-- Adapter metadata: add `FlowAdapterAttribute` under `Sora.Flow.Attributes`; runtime reads it at startup and configures enrichment and capabilities.
+- Adapter metadata: add `FlowAdapterAttribute` under `Koan.Flow.Attributes`; runtime reads it at startup and configures enrichment and capabilities.
 - Actions: define `IFlowActions`, `FlowAction<TModel>`, `FlowAck`, `FlowReport` in Flow Messaging; map default verbs; wire a responder in adapter hosts.
-- Options: enable/disable auto-registration via `Sora:Flow:AutoRegister` and customize route prefix/paging.
+- Options: enable/disable auto-registration via `Koan:Flow:AutoRegister` and customize route prefix/paging.
 
 ## Follow-ups
 

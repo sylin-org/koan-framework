@@ -11,7 +11,7 @@ date: 2025-08-17
  
 
 ## Context
-Developers using Sora asked for a practical DDD perspective with a beginner-friendly on-ramp. While existing docs cover core contracts, CQRS, and adapters, they didn’t frame Sora explicitly in DDD terms or define a consistent ubiquitous language. Newcomers also benefit from brief, plain-language definitions near where terms are introduced.
+Developers using Koan asked for a practical DDD perspective with a beginner-friendly on-ramp. While existing docs cover core contracts, CQRS, and adapters, they didn’t frame Koan explicitly in DDD terms or define a consistent ubiquitous language. Newcomers also benefit from brief, plain-language definitions near where terms are introduced.
 
 ## Decision
 - Create a dedicated `docs/ddd` section with:
@@ -19,7 +19,7 @@ Developers using Sora asked for a practical DDD perspective with a beginner-frie
   - 01-ubiquitous-language.md (dictionary)
   - 02-bounded-contexts-and-modules.md
   - 03-tactical-design.md
-  - 04-cqrs-and-eventing-in-sora.md
+  - 04-cqrs-and-eventing-in-Koan.md
   - 05-sample-walkthrough.md
   - 06-testing.md
   - 07-anti-corruption-layer.md
@@ -28,7 +28,7 @@ Developers using Sora asked for a practical DDD perspective with a beginner-frie
 - Link the section from `docs/00-index.md` for discoverability.
 
 ## Consequences
-- DDD alignment is explicit and approachable; teams can adopt Sora with a clearer model-first mindset.
+- DDD alignment is explicit and approachable; teams can adopt Koan with a clearer model-first mindset.
 - Glossaries reduce ramp-up time and help keep code and conversations consistent.
 - Documentation maintenance: future features should reference and, when necessary, extend the DDD section.
 

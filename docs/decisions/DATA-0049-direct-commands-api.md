@@ -54,7 +54,7 @@ We will introduce a "Direct" data API as an escape hatch, built on each adapter'
 
 1) IConfiguration (first win):
    - `ConnectionStrings:{name}`
-   - `Sora:Data:Sources:{name}:ConnectionString`
+   - `Koan:Data:Sources:{name}:ConnectionString`
 2) Internal registry:
    - If `name` matches a registered source/bundle, use it.
    - If `name` matches an adapter moniker (e.g., `postgres`, `sqlserver`, `sqlite`, `mongodb`), use adapter defaults (may still require a raw connection string).
@@ -73,16 +73,16 @@ Notes:
 ### Governance and safety
 
 - Disabled by default in production:
-  - `Sora:Data:AllowDirectCommands = false` (must be set true to enable).
+  - `Koan:Data:AllowDirectCommands = false` (must be set true to enable).
 - Optional policy:
-  - `Sora:Data:Direct:StatementPolicy = SelectOnly | NoDdl | All` (default All in dev; default NoDdl in prod unless overridden).
+  - `Koan:Data:Direct:StatementPolicy = SelectOnly | NoDdl | All` (default All in dev; default NoDdl in prod unless overridden).
 - Limits:
-  - `Sora:Data:Direct:DefaultMaxRows` (e.g., 10_000), `DefaultTimeoutSeconds` (e.g., 30), overrideable per call.
+  - `Koan:Data:Direct:DefaultMaxRows` (e.g., 10_000), `DefaultTimeoutSeconds` (e.g., 30), overrideable per call.
 - Parameters only; interpolation discouraged. All logs redact parameter values; statements truncated and hashed.
 
 ### Observability
 
-- ActivitySource spans around each call with tags: `db.system`, `sora.source`, `sora.adapter`, statement kind, rows returned/affected, duration.
+- ActivitySource spans around each call with tags: `db.system`, `Koan.source`, `Koan.adapter`, statement kind, rows returned/affected, duration.
 - Structured logs with redacted parameters and statement hashes for correlation.
 
 ### Rollout plan
@@ -102,6 +102,6 @@ Notes:
 
 ## Alternatives considered
 
-- Newtonsoft.Json for mapping: more flexible and consistent across Sora.
+- Newtonsoft.Json for mapping: more flexible and consistent across Koan.
 - Sync/async dual API: rejected to keep the surface terse and consistent.
 - Transactions hidden inside each call: rejected for lack of control; explicit Begin/Commit preferred.

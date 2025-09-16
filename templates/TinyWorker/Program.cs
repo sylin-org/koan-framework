@@ -1,11 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Sora.Core;
-using Sora.Data.Core;
+using Koan.Core;
+using Koan.Data.Core;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.AddSora();
+builder.Services.AddKoan();
 // JSON adapter auto-discovers
 
 builder.Services.AddHostedService<TimedJob>();

@@ -1,6 +1,6 @@
-﻿# Building Data Adapters
+# Building Data Adapters
 
-A practical, capability‑honest path to implement a Sora data adapter (relational, document, key/value).
+A practical, capability‑honest path to implement a Koan data adapter (relational, document, key/value).
 
 Contract (minimal viable surface)
 - Query: advertise capabilities via IQueryCapabilities (Linq, String, PagingPushdown, FilterPushdown).
@@ -10,7 +10,7 @@ Contract (minimal viable surface)
 
 Steps
 1) Package and DI
-   - Create a provider package under src/Sora.Data.<Adapter>/.
+   - Create a provider package under src/Koan.Data.<Adapter>/.
    - Add extension Add<Adapter>Adapter(IServiceCollection, Action<AdapterOptions>?).
    - Register StorageNameRegistry, options binding, capability reporter, and repository.
 
@@ -39,6 +39,6 @@ Steps
    - Options/guardrails unit tests; repository happy‑path CRUD; Testcontainers integration with env opt‑in and Docker probing.
 
 References and templates
-- Acceptance criteria: support/08-data-adapter-acceptance-criteria.md
-- Template: support/08-data-adapter-template.md
-- Vector contracts (if applicable): guides/adapters/vector-search.md, support/09-vector-adapter-acceptance-criteria.md
+- Acceptance criteria: support/data-adapter-acceptance-criteria.md
+- Template: support/data-adapter-template.md
+- Vector contracts (if applicable): guides/adapters/vector-search.md, support/vector-adapter-acceptance-criteria.md

@@ -2,23 +2,22 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Sora.Core;
-using Sora.Messaging;
-using Sora.Messaging.RabbitMq;
+using Koan.Core;
+using Koan.Messaging;
+using Koan.Messaging.RabbitMq;
 using S8.Flow.Shared;
-using Sora.Flow.Actions;
-using Sora.Core.Hosting.App;
-using Sora.Flow.Attributes;
-using Sora.Flow.Configuration;
-using Sora.Flow.Sending;
-using Sora.Data.Core;
-using Sora.Flow;
+using Koan.Flow.Actions;
+using Koan.Flow.Extensions;
+using Koan.Core.Hosting.App;
+using Koan.Flow.Attributes;
+using Koan.Data.Core;
+using Koan.Flow.Model;
 using System.Collections.Generic;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 
-if (!Sora.Core.SoraEnv.InContainer)
+if (!Koan.Core.KoanEnv.InContainer)
 {
     Console.Error.WriteLine("S8.Flow.Adapters.Bms is container-only. Use samples/S8.Compose/docker-compose.yml.");
     return;
@@ -28,54 +27,9 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables();
 
-// Sora framework with auto-configuration
-builder.Services.AddSora();
+// Koan framework with auto-configuration
+builder.Services.AddKoan();
 
-// Handle seed commands via messaging
-builder.Services.On<FlowCommandMessage>(async cmd =>
-{
-    if (cmd.Command == "seed")
-    {
-        var count = 1;
-        if (cmd.Payload is Dictionary<string, object> dict && dict.TryGetValue("count", out var v))
-        {
-            count = Convert.ToInt32(v);
-        }
-        
-        var subset = SampleProfiles.Fleet.Take(Math.Min(count, SampleProfiles.Fleet.Length)).ToArray();
-        
-        // Send device and sensor entities 
-        foreach (var deviceProfile in subset)
-        {
-            var device = new Device
-            {
-                DeviceId = deviceProfile.DeviceId,
-                Inventory = deviceProfile.Inventory,
-                Serial = deviceProfile.Serial,
-                Manufacturer = deviceProfile.Manufacturer,
-                Model = deviceProfile.Model,
-                Kind = deviceProfile.Kind,
-                Code = deviceProfile.Code
-            };
-            
-            await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device);
-            
-            // Send sensors for this device
-            foreach (var sensorProfile in SampleProfiles.SensorsForBms(deviceProfile))
-            {
-                var sensor = new Sensor
-                {
-                    SensorKey = sensorProfile.SensorKey,
-                    DeviceId = sensorProfile.DeviceId,
-                    Code = sensorProfile.Code,
-                    Unit = sensorProfile.Unit
-                };
-                
-                await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor);
-            }
-        }
-    }
-});
 
 var app = builder.Build();
 await app.RunAsync();
@@ -89,155 +43,114 @@ public sealed class BmsPublisher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        _log.LogInformation("[BMS] Starting ExecuteAsync");
-        // Initial bulk seed on startup via MQ (resilient to broker warm-up)
-        _log.LogInformation("[BMS] Seeding catalog with {DeviceCount} devices", SampleProfiles.Fleet.Length);
-        await AdapterSeeding.SeedCatalogWithRetryAsync(
-            FlowSampleConstants.Sources.Bms,
-            SampleProfiles.Fleet,
-            SampleProfiles.SensorsForBms,
-            _log,
-            ct);
+        _log.LogInformation("[BMS] Starting with simplified sample data");
 
-        // Send initial manufacturer data using new dynamic capabilities
-        _log.LogDebug("[BMS] Initializing manufacturer data");
-        await SendManufacturerData();
+        // Get clean sample data
+        var sampleData = SampleData.CreateSampleData();
+        _log.LogInformation("[BMS] Created {DeviceCount} devices with {SensorCount} sensors each",
+            sampleData.Count, sampleData.First().Value.Count);
 
         var rng = new Random();
         var lastAnnounce = DateTimeOffset.MinValue;
-        var lastManufacturerUpdate = DateTimeOffset.MinValue;
+
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                var idx = rng.Next(0, SampleProfiles.Fleet.Length);
-                var d = SampleProfiles.Fleet[idx];
-                _log.LogDebug("[BMS] Preparing to announce Device {DeviceId}", d.DeviceId);
-                // Periodic device announcements
-                // Periodic device and sensor announcements
-                if (DateTimeOffset.UtcNow - lastAnnounce > FlowSampleConstants.Timing.AnnouncementInterval)
+                // Send all devices and sensors periodically
+                if (DateTimeOffset.UtcNow - lastAnnounce > TimeSpan.FromSeconds(30))
                 {
-                    // Create and send Device entity through messaging system
-                    var device = new Device
+                    _log.LogInformation("[BMS] Sending complete dataset");
+
+                    // Send manufacturers using clean dictionary approach
+                    var mfg1 = new Dictionary<string, object>
                     {
-                        DeviceId = d.DeviceId,
-                        Inventory = d.Inventory,
-                        Serial = d.Serial,
-                        Manufacturer = d.Manufacturer,
-                        Model = d.Model,
-                        Kind = d.Kind,
-                        Code = d.Code
+                        ["identifier.code"] = "MFG001",
+                        ["identifier.name"] = "Acme Corp",
+                        ["identifier.external.bms"] = "BMS-MFG-001",
+                        ["manufacturing.country"] = "USA",
+                        ["manufacturing.established"] = "1985",
+                        ["manufacturing.facilities"] = new[] { "Plant A", "Plant B" },
+                        ["products.categories"] = new[] { "sensors", "actuators" }
                     };
-                    
-                    _log.LogTrace("[BMS] Device entity: {DeviceId}", d.DeviceId);
-                    await Sora.Flow.Sending.FlowEntitySendExtensions.Send(device, ct); // ✨ Routes through messaging → orchestrator → Flow intake
+                    _log.LogDebug("[BMS] Sending Manufacturer: {Code}", mfg1["identifier.code"]);
+                    await mfg1.Send<Manufacturer>();
 
-                    // Send Sensor entities
-                    foreach (var s in SampleProfiles.SensorsForBms(d))
+                    var mfg2 = new Dictionary<string, object>
                     {
-                        var sensor = new Sensor
+                        ["identifier.code"] = "MFG002",
+                        ["identifier.name"] = "TechCorp Industries",
+                        ["identifier.external.bms"] = "BMS-MFG-002",
+                        ["manufacturing.country"] = "Germany",
+                        ["manufacturing.established"] = "1992",
+                        ["manufacturing.facilities"] = new[] { "Factory 1", "Factory 2", "Factory 3" },
+                        ["products.categories"] = new[] { "controllers", "displays" }
+                    };
+                    _log.LogDebug("[BMS] Sending Manufacturer: {Code}", mfg2["identifier.code"]);
+                    await mfg2.Send<Manufacturer>();
+
+                    foreach (var (deviceTemplate, sensorsTemplate) in sampleData)
+                    {
+                        // Clone and adjust device for BMS
+                        var device = new Device
                         {
-                            SensorKey = s.SensorKey,
-                            DeviceId = s.DeviceId,
-                            Code = s.Code,
-                            Unit = s.Unit
+                            Id = "bms" + deviceTemplate.Id, // bmsD1, bmsD2, etc.
+                            Inventory = deviceTemplate.Inventory,
+                            Serial = deviceTemplate.Serial,
+                            Manufacturer = deviceTemplate.Manufacturer,
+                            Model = deviceTemplate.Model,
+                            Kind = deviceTemplate.Kind,
+                            Code = deviceTemplate.Code
                         };
-                        
-                        _log.LogTrace("[BMS] Sensor entity: {SensorKey}", s.SensorKey);
-                        await Sora.Flow.Sending.FlowEntitySendExtensions.Send(sensor, ct); // ✨ Beautiful messaging-first routing
+
+                        _log.LogDebug("[BMS] Sending Device: {DeviceId}", device.Id);
+                        await device.Send();
+
+                        // Send all sensors for this device
+                        foreach (var sensorTemplate in sensorsTemplate)
+                        {
+                            var sensor = new Sensor
+                            {
+                                Id = "bms" + sensorTemplate.Id, // bmsS1, bmsS2, etc.
+                                DeviceId = "bms" + sensorTemplate.DeviceId, // bmsDX
+                                SensorId = "bms" + sensorTemplate.SensorId,
+                                Code = sensorTemplate.Code,
+                                Unit = sensorTemplate.Unit
+                            };
+
+                            _log.LogDebug("[BMS] Sending Sensor: {SensorId} -> Device: {DeviceId}",
+                                sensor.Id, sensor.DeviceId);
+                            await sensor.Send();
+                        }
                     }
-                    
+
                     lastAnnounce = DateTimeOffset.UtcNow;
-                    _log.LogDebug("[BMS] Device {Inv}/{Serial} announced with sensors", d.Inventory, d.Serial);
+                    _log.LogInformation("[BMS] Complete dataset sent");
                 }
 
-                // Send Reading value object through messaging
-                var reading = new Reading
+                // Send random readings
+                var readings = SampleData.CreateSampleReadings(5);
+                foreach (var readingTemplate in readings)
                 {
-                    SensorKey = $"{d.Inventory}::{d.Serial}::{SensorCodes.TEMP}",
-                    Value = Math.Round(20 + rng.NextDouble() * 10, 2),
-                    CapturedAt = DateTimeOffset.UtcNow,
-                    Unit = Units.C,
-                    Source = "bms"
-                };
-                
-                _log.LogTrace("[BMS] Reading: {SensorKey}={Value}{Unit}", reading.SensorKey, reading.Value, reading.Unit);
-                await Sora.Flow.Sending.FlowValueObjectSendExtensions.Send(reading, ct);
+                    var reading = new Reading
+                    {
+                        SensorId = "bms" + readingTemplate.SensorId,
+                        Value = readingTemplate.Value,
+                        CapturedAt = readingTemplate.CapturedAt,
+                        Unit = readingTemplate.Unit
+                    };
 
-                // Periodically update manufacturer data (every 5 minutes)
-                if (DateTimeOffset.UtcNow - lastManufacturerUpdate > TimeSpan.FromMinutes(5))
-                {
-                    _log.LogDebug("[BMS] Updating manufacturer data");
-                    await SendManufacturerData();
-                    lastManufacturerUpdate = DateTimeOffset.UtcNow;
+                    _log.LogDebug("[BMS] Reading: {SensorId} = {Value}", reading.SensorId, reading.Value);
+                    await reading.Send();
                 }
             }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "BMS publish failed");
+                _log.LogWarning(ex, "[BMS] Error in publish loop");
             }
-            try { await Task.Delay(FlowSampleConstants.Timing.BmsLoopDelay, ct); } catch (TaskCanceledException) { }
+
+            try { await Task.Delay(TimeSpan.FromSeconds(10), ct); } catch (TaskCanceledException) { }
         }
     }
 
-    private async Task SendManufacturerData()
-    {
-        // BMS provides manufacturing and production data for manufacturers
-        var manufacturers = new[]
-        {
-            new Dictionary<string, object?>
-            {
-                ["identifier.code"] = "MFG001",
-                ["identifier.name"] = "Acme Corp",
-                ["identifier.external.bms"] = "BMS-MFG-001",
-                ["manufacturing.country"] = "USA",
-                ["manufacturing.established"] = "1985",
-                ["manufacturing.facilities"] = new[] { "Plant A", "Plant B", "Plant C" },
-                ["products.categories"] = new[] { "sensors", "actuators", "controllers" },
-                ["production.capacity"] = "10000 units/month",
-                ["quality.defectRate"] = 0.002
-            },
-            new Dictionary<string, object?>
-            {
-                ["identifier.code"] = "MFG002", 
-                ["identifier.name"] = "TechFlow Industries",
-                ["identifier.external.bms"] = "BMS-MFG-002",
-                ["manufacturing.country"] = "Germany",
-                ["manufacturing.established"] = "1992",
-                ["manufacturing.facilities"] = new[] { "Berlin Factory", "Munich Lab" },
-                ["products.categories"] = new[] { "flow sensors", "pressure gauges" },
-                ["production.capacity"] = "5000 units/month",
-                ["quality.defectRate"] = 0.001
-            },
-            new Dictionary<string, object?>
-            {
-                ["identifier.code"] = "MFG003",
-                ["identifier.name"] = "Precision Dynamics",
-                ["identifier.external.bms"] = "BMS-MFG-003", 
-                ["manufacturing.country"] = "Japan",
-                ["manufacturing.established"] = "1978",
-                ["manufacturing.facilities"] = new[] { "Tokyo HQ", "Osaka Plant" },
-                ["products.categories"] = new[] { "precision instruments", "calibration tools" },
-                ["production.capacity"] = "3000 units/month",
-                ["quality.defectRate"] = 0.0005
-            }
-        };
-
-        foreach (var mfgData in manufacturers)
-        {
-            try
-            {
-                // Use new beautiful DX: Send dictionary directly as DynamicFlowEntity
-                await Flow.Send<Manufacturer>(mfgData).Broadcast();
-                
-                var code = mfgData["identifier.code"];
-                var name = mfgData["identifier.name"];
-                _log.LogDebug("[BMS] Manufacturer data sent: {Code} ({Name})", code, name);
-            }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, "[BMS] Failed to send manufacturer data");
-            }
-        }
-    }
 }

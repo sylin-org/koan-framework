@@ -1,10 +1,10 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S8.Flow.Shared;
-using Sora.Data.Core;
-using Sora.Flow.Infrastructure;
-using Sora.Flow.Model;
+using Koan.Data.Core;
+using Koan.Flow.Infrastructure;
+using Koan.Flow.Model;
 
 namespace S8.Flow.Hosting;
 
@@ -36,7 +36,7 @@ public sealed class LatestReadingProjector : BackgroundService
                         foreach (var g in groups)
                         {
                             var latest = g.OrderByDescending(x => x.OccurredAt).First();
-                            var payload = Extract(latest.StagePayload);
+                            var payload = Extract(latest.Data);
                             if (payload is null) continue;
                             var viewDoc = new SensorLatestReading
                             {
