@@ -25,6 +25,11 @@ services:
       Koan__Ai__Services__Ollama__0__Enabled: "false"
   # Readiness: require the embedding model to be present
       Koan__Ai__Ollama__RequiredModels__0: "all-minilm"
+  # TestProvider JWT Configuration
+      Koan__Web__Auth__TestProvider__UseJwtTokens: "true"
+      Koan__Web__Auth__TestProvider__JwtIssuer: "koan-s5-recs-dev"
+      Koan__Web__Auth__TestProvider__JwtAudience: "s5-recs-client"
+      Koan__Web__Auth__TestProvider__JwtExpirationMinutes: "120"
     volumes:
       - ../data:/app/data
     depends_on:

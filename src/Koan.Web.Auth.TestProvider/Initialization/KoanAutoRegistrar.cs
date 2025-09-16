@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Authentication;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Web.Auth.Providers;
@@ -19,13 +20,21 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        services.AddSingleton<JwtTokenService>();
         services.AddSingleton<DevTokenStore>();
         services.AddKoanOptions<TestProviderOptions>(TestProviderOptions.SectionPath);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuthProviderContributor, TestProviderContributor>());
-    // Ensure MVC discovers TestProvider controllers
-    services.AddControllers().AddApplicationPart(typeof(StaticController).Assembly);
-    // Map TestProvider endpoints during startup (honors RouteBase)
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IStartupFilter, Hosting.KoanTestProviderStartupFilter>());
+
+        // Configure TestProvider as default challenge scheme for development
+        services.Configure<AuthenticationOptions>(options =>
+        {
+            options.DefaultChallengeScheme = "Test";
+        });
+
+        // Ensure MVC discovers TestProvider controllers
+        services.AddControllers().AddApplicationPart(typeof(StaticController).Assembly);
+        // Map TestProvider endpoints during startup (honors RouteBase)
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IStartupFilter, Hosting.KoanTestProviderStartupFilter>());
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
