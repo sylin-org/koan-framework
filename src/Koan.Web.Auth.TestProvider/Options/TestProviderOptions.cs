@@ -27,4 +27,9 @@ public sealed class TestProviderOptions
     public string JwtIssuer { get; init; } = "koan-test-provider";
     public string JwtAudience { get; init; } = "koan-test-client";
     public int JwtExpirationMinutes { get; init; } = 60;
+
+    // Client Credentials Support
+    public bool EnableClientCredentials { get; init; } = false;
+    public Dictionary<string, ClientCredentialsClient> RegisteredClients { get; init; } = new();
+    public string[] AllowedScopes { get; init; } = Array.Empty<string>();
 }
