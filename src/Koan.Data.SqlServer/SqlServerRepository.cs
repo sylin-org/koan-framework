@@ -11,6 +11,7 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
+using Koan.Data.Core.Optimization;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Linq.Expressions;
@@ -20,6 +21,7 @@ namespace Koan.Data.SqlServer;
 
 internal sealed class SqlServerRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
+    IOptimizedDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
     IDataRepositoryWithOptions<TEntity, TKey>,
@@ -35,6 +37,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
     public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch;
+
+    // Storage optimization support
+    private readonly StorageOptimizationInfo _optimizationInfo;
+    public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
     private readonly IServiceProvider _sp;
     private readonly SqlServerOptions _options;
@@ -52,6 +58,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         _sp = sp;
         _options = options;
         _nameResolver = resolver;
+
+        // Get storage optimization info from AggregateBag
+        _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
+
         KoanEnv.TryInitialize(sp);
         _logger = (sp.GetService(typeof(ILogger<SqlServerRepository<TEntity, TKey>>)) as ILogger)
                   ?? (sp.GetService(typeof(ILoggerFactory)) is ILoggerFactory lf
@@ -69,9 +79,47 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             Formatting = options.JsonWriteIndented ? Formatting.Indented : Formatting.None,
             NullValueHandling = options.JsonIgnoreNullValues ? NullValueHandling.Ignore : NullValueHandling.Include
         };
+
+        // Log optimization strategy for diagnostics
+        if (_optimizationInfo.IsOptimized)
+        {
+            _logger.LogInformation("SQL Server Repository Optimization: Entity={EntityType}, OptimizationType={OptimizationType}",
+                typeof(TEntity).Name, _optimizationInfo.OptimizationType);
+        }
     }
 
     private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+
+    /// <summary>
+    /// Applies storage optimization to entity before writing to SQL Server.
+    /// Simple pre-write transformation - no complex serialization needed.
+    /// </summary>
+    private static void OptimizeEntityForStorage(TEntity entity, StorageOptimizationInfo optimizationInfo)
+    {
+        // Only optimize if needed and this is a string-keyed entity
+        if (!optimizationInfo.IsOptimized || typeof(TKey) != typeof(string))
+            return;
+
+        // Get the current string ID value
+        var idProperty = typeof(TEntity).GetProperty(optimizationInfo.IdPropertyName);
+        if (idProperty?.GetValue(entity) is not string stringId || string.IsNullOrEmpty(stringId))
+            return;
+
+        // Apply optimization based on type
+        switch (optimizationInfo.OptimizationType)
+        {
+            case StorageOptimizationType.Guid:
+                // For SQL Server, convert GUID string to UNIQUEIDENTIFIER for efficient storage
+                if (Guid.TryParse(stringId, out var guid))
+                {
+                    // SQL Server UNIQUEIDENTIFIER is efficient for storage and indexing
+                    idProperty.SetValue(entity, guid.ToString("D")); // Ensure standard format
+                }
+                break;
+
+            // Future optimization types would go here
+        }
+    }
 
     private SqlConnection Open()
     {

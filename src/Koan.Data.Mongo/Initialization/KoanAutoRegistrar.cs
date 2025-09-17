@@ -39,6 +39,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         BsonSerializer.RegisterSerializationProvider(new JObjectSerializationProvider());
 
+        // Note: Optimized serialization will be registered lazily when repositories are created
         // Note: Conventions handle null values, no custom serializer needed
 
         services.AddKoanOptions<MongoOptions>();

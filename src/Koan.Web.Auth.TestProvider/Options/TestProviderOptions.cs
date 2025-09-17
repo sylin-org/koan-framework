@@ -21,15 +21,15 @@ public sealed class TestProviderOptions
     public bool PersistPersona { get; init; } = true; // use LocalStorage in the login UI
 
     // JWT Token Configuration
-    public bool UseJwtTokens { get; init; } = false;
+    public bool UseJwtTokens { get; set; } = false;
     public string JwtSigningKey { get; init; } = string.Empty; // Base64 encoded key; auto-generated if empty
     public string JwtAlgorithm { get; init; } = "HS256";
-    public string JwtIssuer { get; init; } = "koan-test-provider";
-    public string JwtAudience { get; init; } = "koan-test-client";
+    public string JwtIssuer { get; set; } = "koan-test-provider";
+    public string JwtAudience { get; set; } = "koan-test-client";
     public int JwtExpirationMinutes { get; init; } = 60;
 
     // Client Credentials Support
-    public bool EnableClientCredentials { get; init; } = false;
+    public bool EnableClientCredentials { get; set; } = false;
     public Dictionary<string, ClientCredentialsClient> RegisteredClients { get; init; } = new();
-    public string[] AllowedScopes { get; init; } = Array.Empty<string>();
+    public string[] AllowedScopes { get; set; } = Array.Empty<string>();
 }

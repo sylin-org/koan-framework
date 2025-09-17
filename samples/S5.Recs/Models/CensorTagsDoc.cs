@@ -4,7 +4,6 @@ using Koan.Data.Core.Model;
 
 namespace S5.Recs.Models;
 
-[DataAdapter("mongo")]
 [Storage(Name = "RecsCensorTags")]
 public sealed class CensorTagsDoc : Entity<CensorTagsDoc>
 {

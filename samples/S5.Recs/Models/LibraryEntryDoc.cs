@@ -1,13 +1,14 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Optimization;
 using Koan.Data.Core.Relationships;
 using S5.Recs.Infrastructure;
 
 namespace S5.Recs.Models;
 
-[DataAdapter("mongo")]
 [Storage(Name = "LibraryEntries")]
+[OptimizeStorage(OptimizationType = StorageOptimizationType.None, Reason = "Uses composite deterministic string IDs, not GUIDs")]
 public sealed class LibraryEntry : Entity<LibraryEntry>
 {
     [Parent(typeof(UserDoc))]

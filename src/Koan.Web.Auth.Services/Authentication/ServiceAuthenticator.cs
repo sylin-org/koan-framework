@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,22 +14,25 @@ public sealed class ServiceAuthenticator : IServiceAuthenticator
 {
     private readonly ServiceAuthOptions _options;
     private readonly IMemoryCache _tokenCache;
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ServiceAuthenticator> _logger;
     private readonly IHostEnvironment _hostEnvironment;
+    private readonly IConfiguration _configuration;
 
     public ServiceAuthenticator(
         IOptions<ServiceAuthOptions> options,
         IMemoryCache tokenCache,
-        HttpClient httpClient,
+        IHttpClientFactory httpClientFactory,
         ILogger<ServiceAuthenticator> logger,
-        IHostEnvironment hostEnvironment)
+        IHostEnvironment hostEnvironment,
+        IConfiguration configuration)
     {
         _options = options.Value;
         _tokenCache = tokenCache;
-        _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
         _hostEnvironment = hostEnvironment;
+        _configuration = configuration;
     }
 
     public async Task<string> GetServiceTokenAsync(string targetService, string[]? scopes = null, CancellationToken ct = default)
@@ -101,12 +105,13 @@ public sealed class ServiceAuthenticator : IServiceAuthenticator
 
         _logger.LogDebug("Requesting token from {TokenEndpoint} for client {ClientId}", tokenEndpoint, clientId);
 
+        using var httpClient = _httpClientFactory.CreateClient("KoanAuthInternal");
         using var request = new HttpRequestMessage(HttpMethod.Post, tokenEndpoint)
         {
             Content = new FormUrlEncodedContent(requestBody)
         };
 
-        using var response = await _httpClient.SendAsync(request, ct);
+        using var response = await httpClient.SendAsync(request, ct);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -172,10 +177,60 @@ public sealed class ServiceAuthenticator : IServiceAuthenticator
 
     private string ResolveTokenEndpoint()
     {
-        // For now, assume it's relative to the current host
-        // In a real implementation, this would resolve the auth provider endpoint
-        var baseUrl = "http://localhost:5007"; // Default TestProvider port
+        // In development with embedded TestProvider, use current application's internal endpoint
+        // In production, this would resolve the actual auth provider endpoint
+        string baseUrl;
+        if (_hostEnvironment.IsDevelopment())
+        {
+            // For embedded TestProvider, use the internal application URL
+            // Since TestProvider runs in the same process, use the internal port directly
+            baseUrl = GetCurrentApplicationInternalUrl();
+        }
+        else
+        {
+            // Production would use configured auth provider endpoint
+            baseUrl = "http://localhost:5007"; // Default TestProvider port
+        }
+
         return $"{baseUrl.TrimEnd('/')}{_options.TokenEndpoint}";
+    }
+
+    private string GetCurrentApplicationInternalUrl()
+    {
+        // For embedded TestProvider, use the actual internal binding port
+        var urls = _configuration["ASPNETCORE_URLS"];
+        _logger.LogDebug("ASPNETCORE_URLS value: {Urls}", urls ?? "null");
+
+        if (!string.IsNullOrEmpty(urls))
+        {
+            // Parse the first URL to get the internal port
+            var firstUrl = urls.Split(';')[0].Trim();
+            _logger.LogDebug("First URL to parse: {FirstUrl}", firstUrl);
+
+            // Handle ASP.NET Core wildcard bindings like "http://+:5084"
+            if (firstUrl.Contains("://+:"))
+            {
+                var port = firstUrl.Split(':').Last();
+                var result = $"http://localhost:{port}";
+                _logger.LogDebug("Parsed wildcard binding to: {BaseUrl} (port={Port})", result, port);
+                return result;
+            }
+            else if (Uri.TryCreate(firstUrl, UriKind.Absolute, out var uri))
+            {
+                // For internal calls within the same process, use localhost with the actual binding port
+                var result = $"http://localhost:{uri.Port}";
+                _logger.LogDebug("Internal base URL: {BaseUrl} (port={Port})", result, uri.Port);
+                return result;
+            }
+            else
+            {
+                _logger.LogWarning("Failed to parse URL: {FirstUrl}", firstUrl);
+            }
+        }
+
+        // Fallback to default development port
+        _logger.LogDebug("Using fallback base URL: http://localhost:5000");
+        return "http://localhost:5000";
     }
 
     private static string GenerateDevClientSecret(string clientId)

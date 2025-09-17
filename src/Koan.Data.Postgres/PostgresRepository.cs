@@ -10,6 +10,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
+using Koan.Data.Core.Optimization;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Linq.Expressions;
@@ -19,6 +20,7 @@ namespace Koan.Data.Postgres;
 
 internal sealed class PostgresRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
+    IOptimizedDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
     IDataRepositoryWithOptions<TEntity, TKey>,
@@ -33,6 +35,10 @@ internal sealed class PostgresRepository<TEntity, TKey> :
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
     public WriteCapabilities Writes => WriteCapabilities.AtomicBatch | WriteCapabilities.BulkDelete; // BulkUpsert later via COPY staging
+
+    // Storage optimization support
+    private readonly StorageOptimizationInfo _optimizationInfo;
+    public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
     private readonly IServiceProvider _sp;
     private readonly PostgresOptions _options;
@@ -49,6 +55,10 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         _sp = sp;
         _options = options;
         _nameResolver = resolver;
+
+        // Get storage optimization info from AggregateBag
+        _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
+
         KoanEnv.TryInitialize(sp);
         _logger = (sp.GetService(typeof(ILogger<PostgresRepository<TEntity, TKey>>)) as ILogger)
                   ?? (sp.GetService(typeof(ILoggerFactory)) is ILoggerFactory lf
@@ -57,10 +67,48 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
         _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
         _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
+
+        // Log optimization strategy for diagnostics
+        if (_optimizationInfo.IsOptimized)
+        {
+            _logger.LogInformation("PostgreSQL Repository Optimization: Entity={EntityType}, OptimizationType={OptimizationType}",
+                typeof(TEntity).Name, _optimizationInfo.OptimizationType);
+        }
     }
 
     private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
     private string QualifiedTable => (_options.SearchPath is { Length: > 0 } sp ? $"\"{sp}\"." : string.Empty) + "\"" + TableName.Replace("\"", "\"\"") + "\"";
+
+    /// <summary>
+    /// Applies storage optimization to entity before writing to PostgreSQL.
+    /// Simple pre-write transformation - no complex serialization needed.
+    /// </summary>
+    private static void OptimizeEntityForStorage(TEntity entity, StorageOptimizationInfo optimizationInfo)
+    {
+        // Only optimize if needed and this is a string-keyed entity
+        if (!optimizationInfo.IsOptimized || typeof(TKey) != typeof(string))
+            return;
+
+        // Get the current string ID value
+        var idProperty = typeof(TEntity).GetProperty(optimizationInfo.IdPropertyName);
+        if (idProperty?.GetValue(entity) is not string stringId || string.IsNullOrEmpty(stringId))
+            return;
+
+        // Apply optimization based on type
+        switch (optimizationInfo.OptimizationType)
+        {
+            case StorageOptimizationType.Guid:
+                // For PostgreSQL, convert GUID string to PostgreSQL UUID format for efficient storage
+                if (Guid.TryParse(stringId, out var guid))
+                {
+                    // PostgreSQL UUID format is efficient for storage and indexing
+                    idProperty.SetValue(entity, guid.ToString("D")); // Ensure standard format
+                }
+                break;
+
+            // Future optimization types would go here
+        }
+    }
 
     private NpgsqlConnection Open()
     {
@@ -157,11 +205,22 @@ internal sealed class PostgresRepository<TEntity, TKey> :
 
     private static TEntity FromRow((string Id, string Json) row)
         => JsonConvert.DeserializeObject<TEntity>(row.Json)!;
-    private static (string Id, string Json) ToRow(TEntity e)
+
+    private (object Id, string Json) ToRowOptimized(TEntity e)
     {
         var json = JsonConvert.SerializeObject(e);
-        var id = e.Id!.ToString()!;
-        return (id, json);
+        var stringId = e.Id!.ToString()!;
+        // Apply storage optimization before serialization
+        OptimizeEntityForStorage(e, _optimizationInfo);
+        var optimizedId = e.Id!.ToString()!;
+        return (optimizedId, json);
+    }
+
+    // Legacy method for compatibility - now uses optimization internally
+    private (string Id, string Json) ToRow(TEntity e)
+    {
+        var optimized = ToRowOptimized(e);
+        return (optimized.Id.ToString()!, optimized.Json);
     }
 
     public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
@@ -170,7 +229,28 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         using var act = PgTelemetry.Activity.StartActivity("pg.get");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
-        var row = await conn.QuerySingleOrDefaultAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE \"Id\" = @Id", new { Id = id!.ToString()! });
+
+        // Use optimized ID conversion for query parameter
+        // Apply optimization to the ID for query parameter
+        string optimizedId;
+        if (_optimizationInfo.IsOptimized && typeof(TKey) == typeof(string) && id is string stringId)
+        {
+            if (_optimizationInfo.OptimizationType == StorageOptimizationType.Guid && Guid.TryParse(stringId, out var guid))
+                optimizedId = guid.ToString("D");
+            else
+                optimizedId = stringId;
+        }
+        else
+        {
+            optimizedId = id!.ToString()!;
+        }
+
+        // Note: The Id column in SELECT should be converted back to string for entity hydration
+        // The WHERE clause uses the optimized storage type
+        var row = await conn.QuerySingleOrDefaultAsync<(string Id, string Json)>(
+            $"SELECT \"Id\"::text, \"Json\"::text FROM {QualifiedTable} WHERE \"Id\" = @Id",
+            new { Id = optimizedId });
+
         return row == default ? null : FromRow(row);
     }
 
@@ -399,7 +479,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         foreach (var e in models)
         {
             ct.ThrowIfCancellationRequested();
-            var row = ToRow(e);
+            var row = ToRowOptimized(e);
             var affected = await conn.ExecuteAsync($"INSERT INTO {QualifiedTable} (\"Id\", \"Json\") VALUES (@Id, CAST(@Json AS jsonb)) ON CONFLICT (\"Id\") DO UPDATE SET \"Json\" = EXCLUDED.\"Json\"", new { row.Id, row.Json }, tx);
             count += affected > 0 ? 1 : 0;
         }
@@ -410,8 +490,19 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         await using var conn = Open();
-        var idArr = ids.Select(i => i!.ToString()!).ToArray();
-        return await conn.ExecuteAsync($"DELETE FROM {QualifiedTable} WHERE \"Id\" = ANY(@Ids)", new { Ids = idArr });
+        // Apply optimization to all IDs for bulk delete
+        var optimizedIds = ids.Select(id =>
+        {
+            if (_optimizationInfo.IsOptimized && typeof(TKey) == typeof(string) && id is string stringId)
+            {
+                if (_optimizationInfo.OptimizationType == StorageOptimizationType.Guid && Guid.TryParse(stringId, out var guid))
+                    return guid.ToString("D");
+                else
+                    return stringId;
+            }
+            return id!.ToString()!;
+        }).ToArray();
+        return await conn.ExecuteAsync($"DELETE FROM {QualifiedTable} WHERE \"Id\" = ANY(@Ids)", new { Ids = optimizedIds });
     }
 
     public async Task<int> DeleteAllAsync(CancellationToken ct = default)
@@ -459,7 +550,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
                 foreach (var e in upserts)
                 {
                     ct.ThrowIfCancellationRequested();
-                    var row = ToRow(e);
+                    var row = repo.ToRow(e);
                     await conn.ExecuteAsync($"INSERT INTO {repo.QualifiedTable} (\"Id\", \"Json\") VALUES (@Id, CAST(@Json AS jsonb)) ON CONFLICT (\"Id\") DO UPDATE SET \"Json\" = EXCLUDED.\"Json\"", new { row.Id, row.Json }, tx);
                 }
                 var deleted = 0;
@@ -696,6 +787,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         public bool SupportsJsonFunctions => true;
         public bool SupportsPersistedComputedColumns => true; // generated columns are stored
         public bool SupportsIndexesOnComputedColumns => true;
+        public string ProviderName => "postgresql";
     }
 
     private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)

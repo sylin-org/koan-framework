@@ -6,10 +6,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Core;
+using Koan.Data.Core.Optimization;
 
 namespace Koan.Flow.Model;
 
 // Canonical model base marker; no behavior beyond Entity<T>
+// All Flow entities are automatically optimized for storage efficiency
+[OptimizeStorage(Reason = "Flow entity base class - all Flow entities use optimized storage")]
 public abstract class FlowEntity<TModel> : Entity<TModel> where TModel : FlowEntity<TModel>, new() { }
 
 // Value-object base marker; derives from Entity<T> so standard EntityController<> can be used.

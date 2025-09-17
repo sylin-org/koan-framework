@@ -10,18 +10,18 @@ public sealed class ServiceAuthOptions
     public bool EnableTokenCaching { get; init; } = true;
 
     // Service Discovery
-    public bool EnableAutoDiscovery { get; init; } = true; // Dev only by default
+    public bool EnableAutoDiscovery { get; set; } = true; // Dev only by default
     public ServiceDiscoveryMode DiscoveryMode { get; init; } = ServiceDiscoveryMode.Auto;
     public Dictionary<string, string> ServiceEndpoints { get; init; } = new();
 
     // Authentication
     public string TokenEndpoint { get; init; } = "/.testoauth/token";
-    public string ClientId { get; init; } = string.Empty; // Auto-generated if empty
-    public string ClientSecret { get; init; } = string.Empty; // Auto-generated in dev
-    public string[] DefaultScopes { get; init; } = new[] { "koan:service" };
+    public string ClientId { get; set; } = string.Empty; // Auto-generated if empty
+    public string ClientSecret { get; set; } = string.Empty; // Auto-generated in dev
+    public string[] DefaultScopes { get; set; } = new[] { "koan:service" };
 
     // Security
-    public bool ValidateServerCertificate { get; init; } = true; // False in dev
+    public bool ValidateServerCertificate { get; set; } = true; // False in dev
     public TimeSpan HttpTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public int MaxRetryAttempts { get; init; } = 3;
 }

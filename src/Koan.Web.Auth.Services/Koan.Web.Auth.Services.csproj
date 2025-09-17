@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <ProjectReference Include="..\Koan.Web.Auth.TestProvider\Koan.Web.Auth.TestProvider.csproj" />
   </ItemGroup>
 
   <ItemGroup>
