@@ -312,7 +312,6 @@ public class SmartStringGuidSerializer : SerializerBase<string>
     public override string Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
     {
         var bsonType = context.Reader.GetCurrentBsonType();
-        Console.WriteLine($"[SMART-SERIALIZER] Deserialize called - BsonType: {bsonType}");
 
         switch (bsonType)
         {
@@ -322,19 +321,16 @@ public class SmartStringGuidSerializer : SerializerBase<string>
                 {
                     var guid = binaryData.ToGuid();
                     var result = guid.ToString("D");
-                    Console.WriteLine($"[SMART-SERIALIZER] Converted BinData to string GUID: {result}");
                     return result;
                 }
                 break;
 
             case BsonType.String:
                 var stringValue = context.Reader.ReadString();
-                Console.WriteLine($"[SMART-SERIALIZER] Read string value: {stringValue}");
                 return stringValue;
 
             case BsonType.Null:
                 context.Reader.ReadNull();
-                Console.WriteLine("[SMART-SERIALIZER] Read null value");
                 return null!;
         }
 
@@ -343,11 +339,9 @@ public class SmartStringGuidSerializer : SerializerBase<string>
 
     public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, string value)
     {
-        Console.WriteLine($"[SMART-SERIALIZER] Serialize called with value: {value}");
 
         if (value == null)
         {
-            Console.WriteLine("[SMART-SERIALIZER] Writing null value");
             context.Writer.WriteNull();
             return;
         }
@@ -355,14 +349,12 @@ public class SmartStringGuidSerializer : SerializerBase<string>
         // Only convert to GUID BinData if the string is a valid GUID
         if (Guid.TryParse(value, out var guid))
         {
-            Console.WriteLine($"[SMART-SERIALIZER] Converting string GUID {value} to BinData");
             // Store as native MongoDB UUID BinData for optimal performance and indexing
             var binaryData = new BsonBinaryData(guid, GuidRepresentation.Standard);
             context.Writer.WriteBinaryData(binaryData);
         }
         else
         {
-            Console.WriteLine($"[SMART-SERIALIZER] Keeping as string (not a GUID): {value}");
             // Keep as string if not a valid GUID
             context.Writer.WriteString(value);
         }
