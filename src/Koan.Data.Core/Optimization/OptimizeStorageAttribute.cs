@@ -56,12 +56,3 @@ public sealed class StorageOptimizationInfo
     public static readonly StorageOptimizationInfo None = new();
 }
 
-/// <summary>
-/// Legacy attribute for backward compatibility. Use OptimizeStorageAttribute instead.
-/// </summary>
-[Obsolete("Use OptimizeStorageAttribute instead")]
-[AttributeUsage(AttributeTargets.Class, Inherited = true)]
-public sealed class FlowEntityAttribute : Attribute
-{
-    public string Reason { get; set; } = "Legacy FlowEntity optimization";
-}

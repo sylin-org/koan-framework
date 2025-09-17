@@ -54,7 +54,7 @@ namespace Koan.Data.Core.Model
         // Example usage:
         // var result = GetMethodDelegate(typeof(TEntity), "FacadeMethodName")(entity, new object?[] { arg1, arg2 });
     [Key]
-        public TKey Id { get; set; } = default!;
+        public virtual TKey Id { get; set; } = default!;
 
         // Static conveniences forward to the data facade without exposing its namespace in domain types
         public static Task<TEntity?> Get(TKey id, CancellationToken ct = default)
@@ -489,10 +489,22 @@ namespace Koan.Data.Core.Model
 
     }
 
-    // Convenience for string-keyed entities
+    // Convenience for string-keyed entities with automatic GUID v7 generation
     public abstract partial class Entity<TEntity> : Entity<TEntity, string>
         where TEntity : class, Koan.Data.Abstractions.IEntity<string>
-    { }
+    {
+        private string? _id;
+
+        /// <summary>
+        /// Gets or sets the entity ID. Automatically generates a GUID v7 value on first access if not already set.
+        /// This promotes auto-safe ID patterns while allowing explicit override when needed.
+        /// </summary>
+        public override string Id
+        {
+            get => _id ??= Guid.CreateVersion7().ToString();
+            set => _id = value;
+        }
+    }
 }
 
 public static class EntityMetadataProvider

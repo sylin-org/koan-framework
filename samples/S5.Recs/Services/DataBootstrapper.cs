@@ -45,7 +45,7 @@ public class DataBootstrapper
             return;
         }
 
-        var seedId = Guid.NewGuid().ToString("N")[..8];
+        var seedId = Guid.CreateVersion7().ToString("N")[..8];
         Console.Error.WriteLine($"[DEBUG] Thread {threadId}: No existing MediaTypes found, proceeding with seeding (Seed ID: {seedId})...");
 
         var mediaTypes = new[]
@@ -114,7 +114,6 @@ public class DataBootstrapper
             {
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = animeType.Id!,
                     Name = "TV",
                     DisplayName = "TV Series",
@@ -123,7 +122,6 @@ public class DataBootstrapper
                 },
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = animeType.Id!,
                     Name = "Movie",
                     DisplayName = "Movie",
@@ -132,7 +130,6 @@ public class DataBootstrapper
                 },
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = animeType.Id!,
                     Name = "OVA",
                     DisplayName = "OVA",
@@ -141,7 +138,6 @@ public class DataBootstrapper
                 },
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = animeType.Id!,
                     Name = "Special",
                     DisplayName = "Special",
@@ -158,7 +154,6 @@ public class DataBootstrapper
             {
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = mangaType.Id!,
                     Name = "Manga",
                     DisplayName = "Manga",
@@ -167,7 +162,6 @@ public class DataBootstrapper
                 },
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = mangaType.Id!,
                     Name = "Oneshot",
                     DisplayName = "One-shot",
@@ -176,7 +170,6 @@ public class DataBootstrapper
                 },
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = mangaType.Id!,
                     Name = "Doujinshi",
                     DisplayName = "Doujinshi",
@@ -193,7 +186,6 @@ public class DataBootstrapper
             {
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = movieType.Id!,
                     Name = "Feature",
                     DisplayName = "Feature Film",
@@ -202,7 +194,6 @@ public class DataBootstrapper
                 },
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = movieType.Id!,
                     Name = "Short",
                     DisplayName = "Short Film",
@@ -219,7 +210,6 @@ public class DataBootstrapper
             {
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = bookType.Id!,
                     Name = "LightNovel",
                     DisplayName = "Light Novel",
@@ -228,7 +218,6 @@ public class DataBootstrapper
                 },
                 new MediaFormat
                 {
-                    Id = Guid.NewGuid().ToString(),
                     MediaTypeId = bookType.Id!,
                     Name = "Novel",
                     DisplayName = "Novel",

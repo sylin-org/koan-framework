@@ -20,10 +20,23 @@ public static class StorageOptimizationExtensions
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        return AggregateBags.GetOrAdd<TEntity, TKey, StorageOptimizationInfo>(
+        // DEBUG: MediaFormat specific logging
+        if (typeof(TEntity).Name == "MediaFormat")
+        {
+            Console.WriteLine($"[OPTIMIZATION-DEBUG] GetStorageOptimization called for MediaFormat<{typeof(TKey).Name}>");
+        }
+
+        var result = AggregateBags.GetOrAdd<TEntity, TKey, StorageOptimizationInfo>(
             serviceProvider,
             OptimizationBagKey,
             () => AnalyzeEntityOptimization<TEntity, TKey>());
+
+        if (typeof(TEntity).Name == "MediaFormat")
+        {
+            Console.WriteLine($"[OPTIMIZATION-DEBUG] GetStorageOptimization returning for MediaFormat: {result.OptimizationType}");
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -37,14 +50,33 @@ public static class StorageOptimizationExtensions
         var entityType = typeof(TEntity);
         var keyType = typeof(TKey);
 
+        // DEBUG: MediaFormat specific logging
+        if (entityType.Name == "MediaFormat")
+        {
+            Console.WriteLine($"[OPTIMIZATION-DEBUG] Analyzing MediaFormat - EntityType: {entityType.FullName}, KeyType: {keyType.Name}");
+        }
+
         // Only optimize string-keyed entities
         if (keyType != typeof(string))
+        {
+            if (entityType.Name == "MediaFormat")
+                Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - KeyType {keyType.Name} is not string, returning None");
             return StorageOptimizationInfo.None;
+        }
 
         // Get ID property name from framework metadata
         var idSpec = AggregateMetadata.GetIdSpec(entityType);
         if (idSpec == null)
+        {
+            if (entityType.Name == "MediaFormat")
+                Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - idSpec is null, returning None");
             return StorageOptimizationInfo.None;
+        }
+
+        if (entityType.Name == "MediaFormat")
+        {
+            Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - idSpec found: {idSpec.Prop.Name}");
+        }
 
         // Check for OptimizeStorageAttribute
         var optimizeAttr = entityType.GetCustomAttribute<OptimizeStorageAttribute>(inherit: true);
@@ -72,24 +104,24 @@ public static class StorageOptimizationExtensions
             }
         }
 
-        // Check legacy FlowEntityAttribute for backward compatibility
-        var flowAttr = entityType.GetCustomAttribute<FlowEntityAttribute>(inherit: true);
-        if (flowAttr != null)
-        {
-            return new StorageOptimizationInfo
-            {
-                OptimizationType = StorageOptimizationType.Guid,
-                IdPropertyName = idSpec.Prop.Name,
-                Reason = flowAttr.Reason
-            };
-        }
 
         // NEW: Smart detection for Entity<> vs Entity<,string> pattern
         // Only optimize Entity<Model> (implicit string), NOT Entity<Model, string> (explicit string)
         if (typeof(TKey) == typeof(string))
         {
-            return AnalyzeStringKeyedEntity<TEntity>(idSpec.Prop.Name);
+            if (entityType.Name == "MediaFormat")
+                Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Calling AnalyzeStringKeyedEntity for idProperty: {idSpec.Prop.Name}");
+
+            var result = AnalyzeStringKeyedEntity<TEntity>(idSpec.Prop.Name);
+
+            if (entityType.Name == "MediaFormat")
+                Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - AnalyzeStringKeyedEntity returned: {result.OptimizationType}, Reason: {result.Reason}");
+
+            return result;
         }
+
+        if (entityType.Name == "MediaFormat")
+            Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Key type not string, returning None");
 
         return StorageOptimizationInfo.None;
     }
@@ -102,21 +134,53 @@ public static class StorageOptimizationExtensions
     {
         var entityType = typeof(TEntity);
 
+        // DEBUG: MediaFormat specific logging
+        if (entityType.Name == "MediaFormat")
+        {
+            Console.WriteLine($"[OPTIMIZATION-DEBUG] AnalyzeStringKeyedEntity - Starting analysis for MediaFormat");
+            Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - EntityType: {entityType.FullName}, IdProperty: {idPropertyName}");
+        }
+
         // Walk up the inheritance chain to find Entity base classes
         var baseType = entityType.BaseType;
+        int level = 0;
         while (baseType != null)
         {
+            if (entityType.Name == "MediaFormat")
+            {
+                Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Level {level}: Checking baseType: {baseType.FullName}, IsGenericType: {baseType.IsGenericType}");
+            }
+
             if (baseType.IsGenericType)
             {
                 var genericTypeDef = baseType.GetGenericTypeDefinition();
                 var genericArgs = baseType.GetGenericArguments();
 
+                if (entityType.Name == "MediaFormat")
+                {
+                    Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Level {level}: GenericTypeDef: {genericTypeDef.Name}, GenericArgs.Length: {genericArgs.Length}");
+                    for (int i = 0; i < genericArgs.Length; i++)
+                    {
+                        Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Level {level}: GenericArgs[{i}]: {genericArgs[i].Name}");
+                    }
+                }
+
                 // Look for Entity base classes
                 if (genericTypeDef.Name.StartsWith("Entity", StringComparison.Ordinal))
                 {
+                    if (entityType.Name == "MediaFormat")
+                    {
+                        Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Level {level}: Found Entity base class: {genericTypeDef.Name}");
+                    }
+
                     // Check for Entity<TEntity> pattern (single generic - implicit string)
                     if (genericArgs.Length == 1 && genericArgs[0] == entityType)
                     {
+                        if (entityType.Name == "MediaFormat")
+                        {
+                            Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Level {level}: MATCH! Entity<T> pattern detected - returning GUID optimization");
+                        }
+
                         return new StorageOptimizationInfo
                         {
                             OptimizationType = StorageOptimizationType.Guid,
@@ -130,6 +194,11 @@ public static class StorageOptimizationExtensions
                         genericArgs[0] == entityType &&
                         genericArgs[1] == typeof(string))
                     {
+                        if (entityType.Name == "MediaFormat")
+                        {
+                            Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Level {level}: MATCH! Entity<T, string> pattern detected - returning NO optimization");
+                        }
+
                         return new StorageOptimizationInfo
                         {
                             OptimizationType = StorageOptimizationType.None,
@@ -139,7 +208,18 @@ public static class StorageOptimizationExtensions
                     }
                 }
             }
+            level++;
             baseType = baseType.BaseType;
+
+            if (entityType.Name == "MediaFormat")
+            {
+                Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Moving to next level {level}, baseType: {baseType?.FullName ?? "null"}");
+            }
+        }
+
+        if (entityType.Name == "MediaFormat")
+        {
+            Console.WriteLine($"[OPTIMIZATION-DEBUG] MediaFormat - Reached end of inheritance chain - returning NO optimization for IEntity<string>");
         }
 
         // For other IEntity<string> implementations, don't optimize (explicit choice)

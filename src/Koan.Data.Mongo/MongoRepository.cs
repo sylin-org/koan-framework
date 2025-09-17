@@ -50,6 +50,18 @@ internal sealed class MongoRepository<TEntity, TKey> :
         // Get storage optimization info from AggregateBag
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
 
+        // BSON serialization optimization is now handled globally by MongoOptimizationAutoRegistrar during bootstrap
+
+        // DEBUG: MediaFormat specific logging
+        if (typeof(TEntity).Name == "MediaFormat")
+        {
+            Console.WriteLine($"[REPOSITORY-DEBUG] MongoRepository<MediaFormat> - Retrieved optimization info:");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - OptimizationType: {_optimizationInfo.OptimizationType}");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - IsOptimized: {_optimizationInfo.IsOptimized}");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - IdPropertyName: {_optimizationInfo.IdPropertyName}");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - Reason: {_optimizationInfo.Reason}");
+        }
+
         // Initial collection name (may be set-scoped); will be recomputed per call if set changes
         _collectionName = Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         _collection = db.GetCollection<TEntity>(_collectionName);
@@ -108,37 +120,6 @@ internal sealed class MongoRepository<TEntity, TKey> :
         catch { /* best-effort */ }
     }
 
-    /// <summary>
-    /// Applies storage optimization to entity before writing to MongoDB.
-    /// Simple pre-write transformation - no complex serialization needed.
-    /// </summary>
-    private static void OptimizeEntityForStorage(TEntity entity, StorageOptimizationInfo optimizationInfo)
-    {
-        // Only optimize if needed and this is a string-keyed entity
-        if (!optimizationInfo.IsOptimized || typeof(TKey) != typeof(string))
-            return;
-
-        // Get the current string ID value
-        var idProperty = typeof(TEntity).GetProperty(optimizationInfo.IdPropertyName);
-        if (idProperty?.GetValue(entity) is not string stringId || string.IsNullOrEmpty(stringId))
-            return;
-
-        // Apply optimization based on type
-        switch (optimizationInfo.OptimizationType)
-        {
-            case StorageOptimizationType.Guid:
-                // For MongoDB, convert GUID string to binary format for efficient storage
-                if (Guid.TryParse(stringId, out var guid))
-                {
-                    // MongoDB will automatically handle GUID to binary conversion
-                    // The string API is preserved, but storage is optimized
-                    idProperty.SetValue(entity, guid.ToString("D")); // Ensure standard format
-                }
-                break;
-
-            // Future optimization types would go here
-        }
-    }
 
     public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
     {
@@ -191,11 +172,16 @@ internal sealed class MongoRepository<TEntity, TKey> :
         using var act = MongoTelemetry.Activity.StartActivity("mongo.upsert");
         act?.SetTag("entity", typeof(TEntity).FullName);
 
-        // Apply storage optimization before write
-        OptimizeEntityForStorage(model, _optimizationInfo);
+        // DEBUG: Track all upsert operations
+        if (typeof(TEntity).Name == "MediaFormat")
+        {
+            Console.WriteLine($"[UPSERT-DEBUG] UpsertAsync called for MediaFormat with ID: {model.Id}");
+        }
 
         var col = GetCollection();
         var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
+
+        // BSON serialization handles optimization transparently
         await col.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct);
         _logger?.LogDebug("Mongo upsert {Entity} id={Id}", typeof(TEntity).Name, model.Id);
         return model;
@@ -219,14 +205,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
         act?.SetTag("entity", typeof(TEntity).FullName);
         var col = GetCollection();
 
-        // Apply storage optimization to all models before write
-        var optimizedModels = models.ToList();
-        foreach (var model in optimizedModels)
-        {
-            OptimizeEntityForStorage(model, _optimizationInfo);
-        }
-
-        var writes = optimizedModels.Select(m => new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, m.Id), m) { IsUpsert = true });
+        // BSON serialization handles optimization transparently
+        var writes = models.Select(m => new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, m.Id), m) { IsUpsert = true });
         var res = await col.BulkWriteAsync(writes, cancellationToken: ct);
         var count = (int)(res.ModifiedCount + res.Upserts.Count);
         _logger?.LogInformation("Mongo bulk upsert {Entity} count={Count}", typeof(TEntity).Name, count);
@@ -321,8 +301,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
         public IBatchSet<TEntity, TKey> Add(TEntity entity)
         {
-            // Apply storage optimization before adding to batch
-            OptimizeEntityForStorage(entity, _repo._optimizationInfo);
+            // BSON serialization handles optimization transparently
             _ops.Add(new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, entity.Id), entity) { IsUpsert = true });
             return this;
         }
@@ -349,8 +328,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
                     if (current is not null)
                     {
                         mutate(current);
-                        // Apply storage optimization before adding mutated entity to batch
-                        OptimizeEntityForStorage(current, _repo._optimizationInfo);
+                        // BSON serialization handles optimization transparently
                         _ops.Add(new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, id), current) { IsUpsert = true });
                     }
                 }

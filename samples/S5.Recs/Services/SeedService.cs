@@ -46,7 +46,7 @@ internal sealed class SeedService : ISeedService
             throw new InvalidOperationException("No MediaTypes found. Please seed reference data first.");
         }
 
-        var jobId = Guid.NewGuid().ToString("n");
+        var jobId = Guid.CreateVersion7().ToString("n");
         _logger?.LogInformation("Starting multi-type import job {JobId} for source={Source} with {TypeCount} media types",
             jobId, source, mediaTypes.Count);
 
@@ -85,7 +85,7 @@ internal sealed class SeedService : ISeedService
         }
 
         Directory.CreateDirectory(_cacheDir);
-        var jobId = Guid.NewGuid().ToString("n");
+        var jobId = Guid.CreateVersion7().ToString("n");
         _progress[jobId] = (0, 0, 0, 0, false, null);
         _logger?.LogInformation("Multi-media seeding job {JobId} started. source={Source} mediaType={MediaType} limit={Limit} overwrite={Overwrite}",
             jobId, source, mediaTypeName, limit?.ToString() ?? "unlimited", overwrite);
@@ -209,7 +209,7 @@ internal sealed class SeedService : ISeedService
         var mediaItems = items.ToList();
 
         Directory.CreateDirectory(_cacheDir);
-        var jobId = Guid.NewGuid().ToString("n");
+        var jobId = Guid.CreateVersion7().ToString("n");
         var count = mediaItems.Count;
         _progress[jobId] = (count, count, 0, 0, false, null);
         _logger?.LogInformation("Vector-only upsert job {JobId} started from provided items. count={Count}", jobId, count);

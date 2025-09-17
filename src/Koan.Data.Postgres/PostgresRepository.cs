@@ -59,6 +59,15 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         // Get storage optimization info from AggregateBag
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
 
+        // DEBUG: MediaFormat specific logging
+        if (typeof(TEntity).Name == "MediaFormat")
+        {
+            Console.WriteLine($"[REPOSITORY-DEBUG] PostgresRepository<MediaFormat> - Retrieved optimization info:");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - OptimizationType: {_optimizationInfo.OptimizationType}");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - Reason: {_optimizationInfo.Reason}");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - IdPropertyName: {_optimizationInfo.IdPropertyName}");
+        }
+
         KoanEnv.TryInitialize(sp);
         _logger = (sp.GetService(typeof(ILogger<PostgresRepository<TEntity, TKey>>)) as ILogger)
                   ?? (sp.GetService(typeof(ILoggerFactory)) is ILoggerFactory lf
