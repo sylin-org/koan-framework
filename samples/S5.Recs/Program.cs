@@ -3,6 +3,7 @@ using Koan.Core.Modules;
 using Koan.Core.Observability;
 using Koan.Data.Core;
 using Koan.Web.Extensions;
+using Koan.Web.Backup.Initialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,6 +55,9 @@ var app = builder.Build();
 // Add authentication middleware
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Configure backup API endpoints (polling-based)
+app.UseKoanWebBackupDevelopment();
 
 // TestProvider endpoints are auto-mapped by its auto-registrar in Development.
 

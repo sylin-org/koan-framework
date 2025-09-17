@@ -17,4 +17,7 @@ public interface IStorageService
     // Presigned URLs when provider supports it
     Task<Uri> PresignReadAsync(string profile, string container, string key, TimeSpan expiry, CancellationToken ct = default);
     Task<Uri> PresignWriteAsync(string profile, string container, string key, TimeSpan expiry, string? contentType = null, CancellationToken ct = default);
+
+    // Container listing when provider supports it
+    IAsyncEnumerable<StorageObjectInfo> ListObjectsAsync(string profile, string container, string? prefix = null, CancellationToken ct = default);
 }

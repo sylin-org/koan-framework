@@ -186,8 +186,16 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         var schema = "dbo";
         var method = typeof(Core.Configuration.StorageNameRegistry).GetMethods()
             .First(m => m.Name == "GetOrCompute" && m.GetGenericArguments().Length == 2);
-        // Fallback: try to use string key if reflection fails (shouldn't in our codebase)
-        var table = (string)method.MakeGenericMethod(entity, typeof(string)).Invoke(null, new object?[] { _sp })!;
+
+        // Extract the actual TKey type from the entity's IEntity<TKey> interface
+        var entityInterface = entity.GetInterfaces()
+            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(Abstractions.IEntity<>));
+
+        if (entityInterface == null)
+            throw new InvalidOperationException($"Entity type {entity.Name} does not implement IEntity<TKey>");
+
+        var keyType = entityInterface.GetGenericArguments()[0];
+        var table = (string)method.MakeGenericMethod(entity, keyType).Invoke(null, new object?[] { _sp })!;
         return (schema, table);
     }
 

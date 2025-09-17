@@ -7,7 +7,7 @@ using Koan.Storage;
 using System.Security.Cryptography;
 using System.Text;
 
-public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IServerSideCopy
+public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IServerSideCopy, IListOperations
 {
     private readonly IOptionsMonitor<LocalStorageOptions> _options;
 
@@ -135,6 +135,116 @@ public sealed class LocalStorageProvider : IStorageProvider, IStatOperations, IS
         using var sha1 = SHA1.Create();
         var bytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(key));
         return Convert.ToHexString(bytes.AsSpan(0, 2)).ToLowerInvariant();
+    }
+
+    public async IAsyncEnumerable<StorageObjectInfo> ListObjectsAsync(string container, string? prefix = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var basePath = _options.CurrentValue.BasePath ?? throw new InvalidOperationException("Local storage BasePath not configured.");
+        var containerPath = Path.Combine(basePath, container ?? string.Empty);
+
+        if (!Directory.Exists(containerPath))
+            yield break;
+
+        var searchPath = containerPath;
+        var searchPattern = "*";
+
+        // Handle prefix filtering
+        if (!string.IsNullOrEmpty(prefix))
+        {
+            // Convert storage prefix to file system path
+            var prefixPath = prefix.Replace('/', Path.DirectorySeparatorChar);
+            var prefixDir = Path.GetDirectoryName(prefixPath);
+            var prefixFile = Path.GetFileName(prefixPath);
+
+            if (!string.IsNullOrEmpty(prefixDir))
+            {
+                searchPath = Path.Combine(containerPath, prefixDir);
+                if (!Directory.Exists(searchPath))
+                    yield break;
+            }
+
+            if (!string.IsNullOrEmpty(prefixFile))
+            {
+                searchPattern = prefixFile.Contains('*') ? prefixFile : $"{prefixFile}*";
+            }
+        }
+
+        // Enumerate files recursively
+        await foreach (var filePath in EnumerateFilesAsync(searchPath, searchPattern, prefix, containerPath, ct))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            StorageObjectInfo? objectInfo = null;
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                if (!fileInfo.Exists) continue;
+
+                // Convert absolute file path back to storage key
+                var relativePath = Path.GetRelativePath(containerPath, filePath);
+                var storageKey = relativePath.Replace(Path.DirectorySeparatorChar, '/');
+
+                objectInfo = new StorageObjectInfo(
+                    Key: storageKey,
+                    Size: fileInfo.Length,
+                    LastModified: fileInfo.LastWriteTimeUtc,
+                    ContentType: null, // Could be determined from extension if needed
+                    ETag: $"\"{fileInfo.LastWriteTimeUtc.Ticks:X}-{fileInfo.Length:X}\""
+                );
+            }
+            catch (Exception)
+            {
+                // Log warning but continue enumeration
+                // Note: In production, you might want to inject ILogger here
+                continue;
+            }
+
+            if (objectInfo != null)
+            {
+                yield return objectInfo;
+            }
+        }
+    }
+
+    private async IAsyncEnumerable<string> EnumerateFilesAsync(
+        string searchPath,
+        string searchPattern,
+        string? prefix,
+        string containerPath,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (!Directory.Exists(searchPath))
+            yield break;
+
+        // Get all subdirectories (shard directories)
+        var directories = Directory.GetDirectories(searchPath);
+
+        foreach (var directory in directories)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var files = Directory.GetFiles(directory, searchPattern, SearchOption.TopDirectoryOnly);
+
+            foreach (var file in files)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                // Additional prefix validation if needed
+                if (!string.IsNullOrEmpty(prefix))
+                {
+                    var relativePath = Path.GetRelativePath(containerPath, file);
+                    var storageKey = relativePath.Replace(Path.DirectorySeparatorChar, '/');
+
+                    if (!storageKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
+
+                yield return file;
+
+                // Yield control periodically for cancellation and other async operations
+                await Task.Yield();
+            }
+        }
     }
 
     private static async Task CopyRangeAsync(Stream from, Stream to, long bytesToCopy, CancellationToken ct)

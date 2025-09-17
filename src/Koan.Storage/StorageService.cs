@@ -223,6 +223,14 @@ public sealed class StorageService : IStorageService
         throw new NotSupportedException("Provider does not support presigned writes.");
     }
 
+    public IAsyncEnumerable<StorageObjectInfo> ListObjectsAsync(string profile, string container, string? prefix = null, CancellationToken ct = default)
+    {
+        var (provider, resolvedContainer) = Resolve(profile, container);
+        if (provider is IListOperations listOps)
+            return listOps.ListObjectsAsync(resolvedContainer, prefix, ct);
+        throw new NotSupportedException("Provider does not support object listing.");
+    }
+
     private (IStorageProvider Provider, string Container) Resolve(string profile, string container)
     {
         var opts = _options.CurrentValue;
