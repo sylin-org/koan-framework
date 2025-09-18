@@ -32,6 +32,20 @@ Welcome to the complete Koan Framework documentation. This guide will help you b
 - **[Usage Patterns](reference/architecture/patterns.md)** - Common patterns and best practices
 - **[Advanced Topics](reference/advanced-topics.md)** - Performance, scaling, production patterns
 
+## 🎯 Strategic Documentation
+
+### Framework Assessment & Direction
+- **[Framework Strategic Assessment 2025](architecture/framework-assessment-2025.md)** - Comprehensive technical and market evaluation
+- **[Implementation Roadmap 2025](architecture/implementation-roadmap-2025.md)** - Actionable improvement priorities with tracking
+- **[Container-Native Positioning (ARCH-0054)](decisions/ARCH-0054-framework-positioning-container-native.md)** - Strategic positioning and target market
+- **[Observability Over Escape Hatches (PROP-0053)](proposals/PROP-0053-observability-over-escape-hatches.md)** - Enhanced transparency approach
+
+### For Enterprise Architects & Decision Makers
+- **Technical Assessment**: Honest evaluation of framework strengths and challenges
+- **Market Positioning**: Container/swarm-native stack with complex scenario enablement
+- **Implementation Planning**: Tier-based roadmap with success metrics and tracking
+- **Strategic Evolution**: Quarterly review process for continuous alignment
+
 ## 📖 Guides & How-Tos
 
 ### Core Concepts
@@ -105,6 +119,12 @@ Welcome to the complete Koan Framework documentation. This guide will help you b
 1. [Engineering Guide](engineering/)
 2. [Testing Guide](support/testing-guide.md)
 3. [Architecture Decisions](decisions/)
+
+### **Strategic Planning?**
+1. [Framework Assessment 2025](architecture/framework-assessment-2025.md)
+2. [Implementation Roadmap 2025](architecture/implementation-roadmap-2025.md)
+3. [Container-Native Positioning](decisions/ARCH-0054-framework-positioning-container-native.md)
+4. [Observability Enhancement](proposals/PROP-0053-observability-over-escape-hatches.md)
 
 ---
 
