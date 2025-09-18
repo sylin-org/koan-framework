@@ -1,4 +1,4 @@
-# Koan.Secrets.Vault — TECHNICAL
+# Koan.Secrets.Vault - TECHNICAL
 
 Reference + architecture for the HashiCorp Vault secret provider.
 
@@ -11,9 +11,9 @@ Reference + architecture for the HashiCorp Vault secret provider.
 
 ## Contracts
 
-- `VaultSecretProvider : ISecretProvider` — resolves `SecretId` and returns `SecretValue`.
-- `VaultOptions` — strongly-typed options bound from `Koan:Secrets:Vault`.
-- `VaultHealthCheck` — checks `v1/sys/health`.
+- `VaultSecretProvider : ISecretProvider` - resolves `SecretId` and returns `SecretValue`.
+- `VaultOptions` - strongly-typed options bound from `Koan:Secrets:Vault`.
+- `VaultHealthCheck` - checks `v1/sys/health`.
 
 ### SecretId semantics
 

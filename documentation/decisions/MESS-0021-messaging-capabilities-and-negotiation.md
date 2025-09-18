@@ -5,15 +5,17 @@ domain: MESS
 status: Accepted
 title: Messaging capabilities and framework negotiation
 ---
- 
-# 0021 — Messaging capabilities and framework negotiation
+
+# 0021 - Messaging capabilities and framework negotiation
 
 Context
+
 - Koan.Mq aims for low-friction, semantic APIs (Send/On<T>) over multiple brokers.
 - Not all providers support the same features (e.g., delayed delivery, DLQ shape, exact once, scheduling).
 - We need a consistent way to declare provider capabilities and for the framework to adapt behavior safely.
 
 Decision
+
 - Introduce IMessagingCapabilities surfaced by each provider factory. Example flags:
   - DelayedDelivery (bool)
   - DeadLettering (bool)
@@ -40,11 +42,13 @@ Decision
   - Emit metrics for retries, DLQs, and delay application mode (native/fallback/none).
 
 Consequences
+
 - Uniform DX across providers; safer behavior when features are missing.
 - Clear, diagnosable runtime behavior via EffectiveMessagingPlan and logs.
 - Slight complexity in core negotiation code, but localized and testable.
 
 Examples
+
 - A message decorated with [DelaySeconds(30)] on a broker without delayed delivery will:
   - Use TTL+DLX if supported; otherwise log a warning and deliver immediately.
 - A bus configured with DLQ enabled on a provider without DLQ will:

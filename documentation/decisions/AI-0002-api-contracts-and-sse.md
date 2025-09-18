@@ -1,4 +1,4 @@
-# AI-0002 — AI API contracts and SSE format
+# AI-0002 - AI API contracts and SSE format
 
 Status: Proposed
 Date: 2025-08-19

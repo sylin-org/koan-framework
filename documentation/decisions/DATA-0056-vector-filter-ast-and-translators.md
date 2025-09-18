@@ -1,4 +1,4 @@
-# DATA-0056 — Vector Filter AST and Translators
+# DATA-0056 - Vector Filter AST and Translators
 
 Status: Accepted
 

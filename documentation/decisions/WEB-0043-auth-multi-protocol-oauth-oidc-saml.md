@@ -4,7 +4,7 @@ slug: auth-multi-protocol-oauth-oidc-saml
 domain: WEB
 status: Accepted
 date: 2025-08-23
-title: Koan.Web.Auth — multi-protocol authentication (OIDC, OAuth2, SAML) with pluggable adapters
+title: Koan.Web.Auth - multi-protocol authentication (OIDC, OAuth2, SAML) with pluggable adapters
 ---
 
 ## Context
@@ -59,7 +59,7 @@ Settings composition (defaults + overrides):
 - `Type` may be inferred from the adapter when omitted (e.g., `discord` implies `oauth2`). For generic adapters (e.g., arbitrary OIDC), `Type` is required.
 - Validation runs on the composed result; missing mandatory fields after composition produce a clear ProblemDetails error.
 
-Example (Discord) — minimal developer config overlays defaults:
+Example (Discord) - minimal developer config overlays defaults:
 
 ```
 "Koan:Web:Auth:Providers:discord": {
@@ -117,7 +117,7 @@ Trade-offs:
 
 ## References
 
-- WEB-0035 — EntityController transformers
-- ARCH-0040 — Config and constants naming
-- ARCH-0041 — Docs posture (instructions over tutorials)
-- OPS-0015 — Default configuration fallback
+- WEB-0035 - EntityController transformers
+- ARCH-0040 - Config and constants naming
+- ARCH-0041 - Docs posture (instructions over tutorials)
+- OPS-0015 - Default configuration fallback

@@ -4,7 +4,7 @@ slug: secrets-dev-alignment-and-provider-swap-guardrails
 domain: Architecture
 status: approved
 date: 2025-08-28
-title: Secrets — dev alignment and provider-swap guardrails
+title: Secrets - dev alignment and provider-swap guardrails
 ---
 
 ## Context
@@ -84,5 +84,5 @@ Tradeoffs
 
 ## References
 
-- ARCH-0050 — secrets management and configuration resolution
-- ARCH-0046 — Recipes: intention-driven bootstrap and layered config
+- ARCH-0050 - secrets management and configuration resolution
+- ARCH-0046 - Recipes: intention-driven bootstrap and layered config

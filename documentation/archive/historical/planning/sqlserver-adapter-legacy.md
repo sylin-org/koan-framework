@@ -105,9 +105,9 @@ var count = await exec.ExecuteAsync<int>(Instruction.Create("relational.sql.scal
 
 See also:
 
-- ADR-0050 (instruction name constants) — `decisions/DATA-0050-instruction-name-constants-and-scoping.md`
-- ADR-0051 (Direct routing via instruction executors) — `decisions/DATA-0051-direct-routing-via-instruction-executors.md`
-- ADR-0052 (Dapper boundary; Direct uses ADO.NET) — `decisions/DATA-0052-relational-dapper-boundary-and-direct-ado.md`
+- ADR-0050 (instruction name constants) - `decisions/DATA-0050-instruction-name-constants-and-scoping.md`
+- ADR-0051 (Direct routing via instruction executors) - `decisions/DATA-0051-direct-routing-via-instruction-executors.md`
+- ADR-0052 (Dapper boundary; Direct uses ADO.NET) - `decisions/DATA-0052-relational-dapper-boundary-and-direct-ado.md`
 
 ## Testing
 

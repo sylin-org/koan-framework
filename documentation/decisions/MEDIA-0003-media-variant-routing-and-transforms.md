@@ -14,7 +14,7 @@ Koan’s media pipeline streams original content with strong HTTP semantics (ETa
 ## Decision
 
 - Addressing (ID-first with filename flair)
-  - GET /api/media/{mediaId:guid}/{*filename} → filename is flair-only, ignored for lookup.
+  - GET /api/media/{mediaId:guid}/{\*filename} → filename is flair-only, ignored for lookup.
   - GET /api/media/{mediaId:guid}.{ext} → extension is flair-only.
 - Automatic operator resolution (deterministic)
   - Providers register: id (e.g., resize@1), supported content-types, canonical param names, and aliases (e.g., w:[w,width], h:[h,height], format, quality, fit).
@@ -31,7 +31,7 @@ Koan’s media pipeline streams original content with strong HTTP semantics (ETa
   - Hash: SHA-256 of the canonical JSON; encode base32/base64url. This is the variant key/id.
 - Short-circuit and creation
   - Before work: HEAD variants/{srcId}/{hash}/… (or id lookup) → if exists, 301/302 redirect to canonical variant URL (/api/media/{variantId}.{ext?}).
-  - On miss: run pipeline, persist variant with conditional create (CreateNew or If-None-Match: *). If another writer won, discard and redirect.
+  - On miss: run pipeline, persist variant with conditional create (CreateNew or If-None-Match: \*). If another writer won, discard and redirect.
   - Redirect code: 301 when the signature embeds source ETag and operator version (immutable); 302 otherwise.
   - Primitive-only rule: only original sources (no parentId) are eligible for transforms to prevent transform-of-transform explosions.
 - Unknown params (Relaxed vs Strict)
@@ -56,6 +56,7 @@ Koan’s media pipeline streams original content with strong HTTP semantics (ETa
 ### Providers (v1)
 
 - resize@1
+
   - Params (canonical → aliases):
     - w:[w,width], h:[h,height]
     - fit:[fit,mode] ∈ {cover, contain, fill, inside, outside} (default: contain)
@@ -65,6 +66,7 @@ Koan’s media pipeline streams original content with strong HTTP semantics (ETa
   - Rules: if only one of w/h provided, preserve aspect ratio; clamp to policy max; reject non-image.
 
 - rotate@1
+
   - Params: angle:[angle,a] ∈ {0,90,180,270}; exif:[autoOrient,orient] ∈ {true,false} (default: true)
   - Rules: apply auto-orient first (if exif=true), then angle; reject non-image.
 
@@ -80,11 +82,13 @@ Koan’s media pipeline streams original content with strong HTTP semantics (ETa
 ## Consequences
 
 Positive
+
 - Deterministic, collision-free IDs; no reprocessing for identical requests.
 - Ergonomic URLs with optional filename/extension flair; stable redirects to canonical variant ids.
 - Clear operator/version evolution via signature; cache safety with 301 when immutable.
 
 Negative
+
 - Startup registry discipline required (overlap detection/precedence) or the app fails in Strict mode.
 - Storage growth persists without GC policies.
 - Slight overhead for canonicalization/signature/HEAD check on first-hit.
@@ -92,7 +96,7 @@ Negative
 ## Implementation notes
 
 - Controllers
-  - Add id-based GET routes to sample controllers: /api/media/{id:guid}/{*filename?} and /api/media/{id:guid}.{ext}.
+  - Add id-based GET routes to sample controllers: /api/media/{id:guid}/{\*filename?} and /api/media/{id:guid}.{ext}.
   - On recognized transforms: normalize → signature → short-circuit/transform → conditional create → redirect.
 - Registry and normalization
   - Centralize operator and param/alias constants (no magic strings).
@@ -101,7 +105,7 @@ Negative
   - Read query in arrival order; on duplicates for the same canonical key, keep the first value and drop the rest. In Strict mode, 400 when conflicting duplicates are detected.
   - Provide normalize/validate helpers per operator; reject invalid combos (400).
 - Concurrency and storage
-  - Use provider-level conditional create (CreateNew or If-None-Match: *). On conflict, redirect.
+  - Use provider-level conditional create (CreateNew or If-None-Match: \*). On conflict, redirect.
   - Store variant metadata: parentId, signature payload, content-type, createdAt, lastAccessed.
   - Enforce primitive-only eligibility before any transform work; return 409/400 when parentId is present.
 - Observability
@@ -112,16 +116,16 @@ Negative
 
 ## Follow-ups
 
-1) Implement overlap detector and precedence policy in the operator registry (+ unit tests).
-2) Add per-entity decorators and global options for policies; wire strict/relaxed modes.
-3) Implement resize@1 provider (w,h,fit,q,format) with safety limits and tests.
-4) Add GC policy job (TTL/caps) and last-access tracking (lightweight).
-5) Extend samples and docs with id-based routes and canonical redirect examples.
+1. Implement overlap detector and precedence policy in the operator registry (+ unit tests).
+2. Add per-entity decorators and global options for policies; wire strict/relaxed modes.
+3. Implement resize@1 provider (w,h,fit,q,format) with safety limits and tests.
+4. Add GC policy job (TTL/caps) and last-access tracking (lightweight).
+5. Extend samples and docs with id-based routes and canonical redirect examples.
 
 ## References
 
-- MEDIA-0001 — Media pillar baseline and storage integration
-- MEDIA-0002 — S6 Social Creator sample and htmx UI
-- WEB-0035 — EntityController transformers
-- DATA-0061 — Data access pagination and streaming
+- MEDIA-0001 - Media pillar baseline and storage integration
+- MEDIA-0002 - S6 Social Creator sample and htmx UI
+- WEB-0035 - EntityController transformers
+- DATA-0061 - Data access pagination and streaming
 - docs/reference/media.md (caching headers, controller semantics)

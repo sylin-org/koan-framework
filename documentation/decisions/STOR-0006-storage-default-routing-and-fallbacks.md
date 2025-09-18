@@ -14,13 +14,13 @@ Koan storage supports profiles and routing rules. For small apps and development
 Decision
 
 - Add options to control defaulting:
-  - StorageOptions.DefaultProfile: string? — used when no profile is provided by the caller.
+  - StorageOptions.DefaultProfile: string? - used when no profile is provided by the caller.
   - StorageOptions.FallbackMode: Disabled | SingleProfileOnly | NamedDefault. Default: SingleProfileOnly.
   - StorageOptions.ValidateOnStart: bool. Default: true.
 - Resolution order when caller does not specify a profile:
-  1) Use DefaultProfile when set; must exist in Profiles.
-  2) If FallbackMode == SingleProfileOnly and Profiles has exactly one item, use it and emit a warning/audit.
-  3) Otherwise, fail with a clear error.
+  1. Use DefaultProfile when set; must exist in Profiles.
+  2. If FallbackMode == SingleProfileOnly and Profiles has exactly one item, use it and emit a warning/audit.
+  3. Otherwise, fail with a clear error.
 - If the caller specifies an explicit profile, resolution requires an exact match (fail fast if unknown).
 
 Scope
@@ -47,4 +47,5 @@ Follow-ups
 References
 
 - STOR-0001, STOR-0003
+
 ---

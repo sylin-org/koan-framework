@@ -19,8 +19,8 @@ internal static class Planner
         {
             return fromFile!;
         }
-    // 2) Discovery-driven draft (manifest-only)
-    var draft = ProjectDependencyAnalyzer.DiscoverDraft(profile);
+        // 2) Discovery-driven draft (manifest-only)
+        var draft = ProjectDependencyAnalyzer.DiscoverDraft(profile);
         if (draft is not null)
         {
             var overrides = Overrides.Load();
@@ -215,7 +215,7 @@ internal static class Planner
                 var s = services[i];
                 if (s.Ports.Count > 0)
                 {
-                    // convert to container-only (0:container) — compose exporter will skip publishing host when host==0
+                    // convert to container-only (0:container) - compose exporter will skip publishing host when host==0
                     var newPorts = s.Ports.Select(p => (0, p.Container)).ToList();
                     services[i] = s with { Ports = newPorts };
                 }

@@ -17,13 +17,13 @@ Decision
 - Create Koan.Web.Storage with attribute-routed controllers and transformers per WEB-0035 for payload shaping.
 - Primary controller: StorageController<T> where T : IEntity, IStorageObject.
 - Routes (indicative):
-  - POST /storage — create + upload (multipart or streamed body). Return 201 (sync) or 202 (async) with Id.
-  - GET /storage/{id} — metadata; supports ETag/If-None-Match.
-  - GET /storage/{id}/content — binary content; supports Range (206) when provider is seekable; otherwise 200 with Accept-Ranges: none.
-  - GET /storage/{id}/download — force download with Content-Disposition: attachment; filename normalization and safe fallback.
-  - PATCH /storage/{id}/tags — add/remove tags idempotently.
-  - POST /storage/{id}/transfer?profile=X — initiate transfer; returns 202 if async or 200 upon completion.
-  - DELETE /storage/{id} — soft or hard delete per policy.
+  - POST /storage - create + upload (multipart or streamed body). Return 201 (sync) or 202 (async) with Id.
+  - GET /storage/{id} - metadata; supports ETag/If-None-Match.
+  - GET /storage/{id}/content - binary content; supports Range (206) when provider is seekable; otherwise 200 with Accept-Ranges: none.
+  - GET /storage/{id}/download - force download with Content-Disposition: attachment; filename normalization and safe fallback.
+  - PATCH /storage/{id}/tags - add/remove tags idempotently.
+  - POST /storage/{id}/transfer?profile=X - initiate transfer; returns 202 if async or 200 upon completion.
+  - DELETE /storage/{id} - soft or hard delete per policy.
 - Status/headers
   - ETag represents entity concurrency token (not necessarily ContentHash).
   - Accept-Ranges: bytes only when seek/range supported.

@@ -6,13 +6,13 @@
 [![.NET](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/download)
 [![Framework Version](https://img.shields.io/badge/Version-v0.2.18-green.svg)](https://github.com/yourusername/koan-framework/releases)
 
-Koan transforms enterprise .NET development through intelligent defaults, provider transparency, and container-native orchestration. Write once, deploy anywhere—from SQLite in development to PostgreSQL in production, from local Docker to Kubernetes at scale.
+Koan transforms enterprise .NET development through intelligent defaults, provider transparency, and container-native orchestration. Write once, deploy anywhere-from SQLite in development to PostgreSQL in production, from local Docker to Kubernetes at scale.
 
 ## Why Koan?
 
 **87% reduction in service setup time.** What takes 23 minutes in traditional .NET takes 3 minutes with Koan.
 
-**Zero authentication configuration.** OAuth, JWT, service-to-service—all handled automatically with production-grade security.
+**Zero authentication configuration.** OAuth, JWT, service-to-service-all handled automatically with production-grade security.
 
 **Provider transparency.** Your data access code works unchanged across PostgreSQL, MongoDB, Redis, Vector DBs, and more.
 
@@ -37,6 +37,7 @@ dotnet run
 ```
 
 **You just created:**
+
 - Full REST API with CRUD operations
 - Automatic validation and error handling
 - Health monitoring with `/health` endpoint
@@ -82,6 +83,7 @@ var similar = await Product.Query("eco-friendly laptop");
 ## Enterprise-Grade Features, Zero Configuration
 
 ### Multi-Service Authentication
+
 ```csharp
 [KoanService("inventory-service", ProvidedScopes = new[] { "inventory:read" })]
 [ApiController]
@@ -97,11 +99,12 @@ public class InventoryController : ControllerBase
 }
 ```
 
-**Zero manual configuration:** OAuth providers, JWT tokens, service-to-service authentication, token refresh—all handled automatically.
+**Zero manual configuration:** OAuth providers, JWT tokens, service-to-service authentication, token refresh-all handled automatically.
 
 ### AI Integration
+
 ```csharp
-// Works with Ollama, OpenAI, Azure OpenAI—auto-selects based on availability
+// Works with Ollama, OpenAI, Azure OpenAI-auto-selects based on availability
 [HttpPost("recommend")]
 public async Task<IActionResult> GetRecommendations([FromServices] IAiService ai, [FromBody] ProductQuery query)
 {
@@ -116,6 +119,7 @@ public async Task<IActionResult> GetRecommendations([FromServices] IAiService ai
 ```
 
 ### Event-Driven Architecture
+
 ```csharp
 // Dynamic entity processing with sophisticated materialization
 public class OrderEvent : DynamicFlowEntity<OrderEvent>
@@ -138,6 +142,7 @@ Flow.OnUpdate<OrderEvent>(async (ref orderEvent, current, metadata) =>
 ## Container-Native by Design
 
 ### Intelligent Container Orchestration
+
 ```bash
 # Automatic Docker Compose generation with health checks
 Koan export compose --profile Local
@@ -150,33 +155,37 @@ Koan status --json
 ```
 
 **Profiles for every environment:**
+
 - **Local:** Bind mounts, exposed ports, development conveniences
 - **CI:** Named volumes, isolated testing, parallel execution
 - **Staging:** Production-like with debugging enabled
 - **Production:** Minimal surface area, maximum security
 
 ### Multi-Runtime Support
+
 Koan automatically detects and works with:
+
 - **Docker:** Full Compose support with JSON parsing
 - **Podman:** Native support with format compatibility
 - **Kubernetes:** Service mesh integration and health checks
 
 ## Framework Capabilities at Scale
 
-| Component | Technologies Supported | Zero-Config |
-|-----------|----------------------|-------------|
-| **Data Storage** | PostgreSQL, MongoDB, SQLite, Redis, Weaviate, JSON Files | Yes |
-| **Authentication** | Google, Microsoft, Discord, OIDC, Custom JWT | Yes |
-| **Messaging** | RabbitMQ, Azure Service Bus, In-Memory | Yes |
-| **Storage** | Local Files, AWS S3, Azure Blob Storage | Yes |
-| **AI Providers** | Ollama, OpenAI, Azure OpenAI (extensible) | Yes |
-| **Containers** | Docker, Podman (auto-detection) | Yes |
+| Component          | Technologies Supported                                   | Zero-Config |
+| ------------------ | -------------------------------------------------------- | ----------- |
+| **Data Storage**   | PostgreSQL, MongoDB, SQLite, Redis, Weaviate, JSON Files | Yes         |
+| **Authentication** | Google, Microsoft, Discord, OIDC, Custom JWT             | Yes         |
+| **Messaging**      | RabbitMQ, Azure Service Bus, In-Memory                   | Yes         |
+| **Storage**        | Local Files, AWS S3, Azure Blob Storage                  | Yes         |
+| **AI Providers**   | Ollama, OpenAI, Azure OpenAI (extensible)                | Yes         |
+| **Containers**     | Docker, Podman (auto-detection)                          | Yes         |
 
-**63 modules across 8 functional categories**—use what you need, when you need it.
+**63 modules across 8 functional categories**-use what you need, when you need it.
 
 ## Architecture That Scales
 
 ### Multi-Provider Applications
+
 ```csharp
 [SourceAdapter("postgres")]   // User data in PostgreSQL
 public class User : Entity<User> { /* ... */ }
@@ -192,6 +201,7 @@ public class ProductEmbedding : Entity<ProductEmbedding> { /* ... */ }
 ```
 
 ### Enterprise Observability
+
 ```csharp
 // Built-in structured logging with business context
 using var scope = _logger.BeginScope(new Dictionary<string, object>
@@ -225,6 +235,7 @@ public class DatabaseHealthContributor : IHealthContributor
 ## When to Choose Koan
 
 **Perfect for:**
+
 - **Microservices** requiring service-to-service authentication
 - **Event-driven architectures** with complex processing requirements
 - **AI-enabled applications** needing provider-agnostic integration
@@ -233,6 +244,7 @@ public class DatabaseHealthContributor : IHealthContributor
 - **Teams prioritizing long-term productivity** over initial simplicity
 
 **Consider alternatives when:**
+
 - Building simple CRUD apps without distributed system needs
 - Requiring specific integrations not supported by Koan's abstractions
 - Working with legacy systems that can't adopt containerization
@@ -241,11 +253,13 @@ public class DatabaseHealthContributor : IHealthContributor
 ## Learn More
 
 ### Quick Start
+
 - **[5-Minute Quickstart](documentation/getting-started/quickstart.md)** - Get running immediately
 - **[Getting Started Guide](documentation/getting-started/getting-started.md)** - Complete walkthrough
 - **[Framework Overview](documentation/getting-started/overview.md)** - Architecture deep-dive
 
 ### Reference Documentation
+
 - **[Core Reference](documentation/reference/core/index.md)** - Auto-registration, health checks, configuration
 - **[Data Reference](documentation/reference/data/index.md)** - Multi-provider data access patterns
 - **[Web Reference](documentation/reference/web/index.md)** - Controllers, authentication, transformers
@@ -258,6 +272,7 @@ public class DatabaseHealthContributor : IHealthContributor
 - **[Troubleshooting Guide](documentation/support/troubleshooting.md)** - Comprehensive problem-solving guide
 
 ### Implementation Guides
+
 - **[Building APIs](documentation/guides/building-apis.md)** - REST endpoints and business logic
 - **[Data Modeling](documentation/guides/data-modeling.md)** - Entity design and relationships
 - **[AI Integration](documentation/guides/ai-integration.md)** - Chat, embeddings, RAG patterns
@@ -273,11 +288,13 @@ public class DatabaseHealthContributor : IHealthContributor
 ## Getting Started
 
 1. **Install the CLI** (recommended):
+
    ```bash
    ./scripts/cli-all.ps1
    ```
 
 2. **Or use NuGet packages directly**:
+
    ```bash
    dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
    ```
@@ -289,6 +306,7 @@ public class DatabaseHealthContributor : IHealthContributor
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 **Key contribution areas:**
+
 - New data providers and adapters
 - Additional authentication providers
 - Container orchestration improvements
@@ -297,6 +315,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## Enterprise Support
 
 For enterprise adoption, architecture guidance, and production deployment support:
+
 - Review our [Architecture Principles](documentation/architecture/principles.md) for technical framework philosophy
 - Consult the [Complete Documentation](documentation/README.md) for adoption planning
 - Explore [troubleshooting guide](documentation/support/troubleshooting.md) for operational patterns
@@ -309,4 +328,4 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 **Koan Framework: Zero-configuration .NET for teams that build to last.**
 
-*Build sophisticated services with intelligent defaults. Deploy anywhere with container-native orchestration. Scale with enterprise-grade patterns built-in.*
+_Build sophisticated services with intelligent defaults. Deploy anywhere with container-native orchestration. Scale with enterprise-grade patterns built-in._

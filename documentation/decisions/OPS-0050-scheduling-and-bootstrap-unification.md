@@ -1,5 +1,5 @@
 ---
-title: OPS-0050 — Scheduling core and Bootstrap unification (readiness-gated, auto-registered)
+title: OPS-0050 - Scheduling core and Bootstrap unification (readiness-gated, auto-registered)
 status: Accepted
 date: 2025-08-21
 ---

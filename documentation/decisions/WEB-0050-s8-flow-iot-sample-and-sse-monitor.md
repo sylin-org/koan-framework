@@ -33,7 +33,7 @@ We want a sample (S8) that demonstrates Koan Flow’s ingest → associate → p
 ## Consequences
 
 - Pros: Clear illustration of Flow’s provider-neutral aggregation; assets domain with multiple device kinds; real-time DX via SSE without polling; clean JSON via namespaced tags.
-- Cons: SSE scaling requires sticky sessions or pub/sub; event ordering is best-effort; additional sample materializers add moving parts—kept intentionally thin.
+- Cons: SSE scaling requires sticky sessions or pub/sub; event ordering is best-effort; additional sample materializers add moving parts-kept intentionally thin.
 
 ## Implementation notes
 

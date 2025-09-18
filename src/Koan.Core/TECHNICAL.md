@@ -1,6 +1,6 @@
 ---
 uid: reference.modules.Koan.core
-title: Koan.Core — Technical Reference
+title: Koan.Core - Technical Reference
 description: Core utilities, primitives, and conventions used across Koan modules.
 since: 0.2.x
 packages: [Sylin.Koan.Core]

@@ -4,7 +4,7 @@ slug: secrets-management-and-configuration-resolution
 domain: Architecture
 status: approved
 date: 2025-08-28
-title: Secrets management — provider chain, configuration resolution, and orchestration references
+title: Secrets management - provider chain, configuration resolution, and orchestration references
 ---
 
 ## Context
@@ -65,7 +65,7 @@ In scope
 Out of scope (this ADR)
 
 - Provider-specific details beyond minimal options (Vault/Kubernetes/SOPS follow their own docs if needed).
-- Cloud managers (AKV/ASM/GSN) — optional, separate packages.
+- Cloud managers (AKV/ASM/GSN) - optional, separate packages.
 
 ## Consequences
 
@@ -125,8 +125,8 @@ Safety
 
 ## References
 
-- ARCH-0046 — Recipes: intention-driven bootstrap and layered config
-- ARCH-0047 — Orchestration hosting/providers/exporters as adapters
-- ARCH-0048 — Endpoint resolution and persistence mounts
-- ARCH-0040 — Config and constants naming
+- ARCH-0046 - Recipes: intention-driven bootstrap and layered config
+- ARCH-0047 - Orchestration hosting/providers/exporters as adapters
+- ARCH-0048 - Endpoint resolution and persistence mounts
+- ARCH-0040 - Config and constants naming
   \*\*\* End Patch

@@ -12,7 +12,7 @@ namespace Koan.Web.Extensions.Moderation;
 /// </summary>
 public sealed class StandardModerationFlow<TEntity> : IModerationFlow<TEntity>, IModerationValidator<TEntity>
 {
-	// Validator defaults — permissive, with minimal guards that don't require I/O
+	// Validator defaults - permissive, with minimal guards that don't require I/O
 	public ValueTask<FlowResult> ValidateSubmit(TransitionContext<TEntity> ctx, CancellationToken ct)
 		=> ValueTask.FromResult(FlowResult.Success);
 
@@ -45,7 +45,7 @@ public sealed class StandardModerationFlow<TEntity> : IModerationFlow<TEntity>, 
 		return ValueTask.FromResult(FlowResult.Success);
 	}
 
-	// Before* hooks — pure and fast by convention; default no-ops
+	// Before* hooks - pure and fast by convention; default no-ops
 	public ValueTask<FlowResult> BeforeSubmit(TransitionContext<TEntity> ctx, CancellationToken ct)
 		=> ValueTask.FromResult(FlowResult.Success);
 
@@ -61,7 +61,7 @@ public sealed class StandardModerationFlow<TEntity> : IModerationFlow<TEntity>, 
 	public ValueTask<FlowResult> BeforeReturn(TransitionContext<TEntity> ctx, CancellationToken ct)
 		=> ValueTask.FromResult(FlowResult.Success);
 
-	// After* hooks — post-commit side effects; default no-ops
+	// After* hooks - post-commit side effects; default no-ops
 	public ValueTask AfterSubmitted(TransitionContext<TEntity> ctx, CancellationToken ct)
 		=> ValueTask.CompletedTask;
 

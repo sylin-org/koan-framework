@@ -1,8 +1,8 @@
 # Koan Feature Catalog (Value-centered) - v0.2.18
 
-A modular .NET framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
+A modular .NET framework that standardizes data, web, messaging, and AI patterns with strong governance and observability-so teams ship faster with fewer surprises, and platforms scale with consistency.
 
-## Summary — Pillars at a glance
+## Summary - Pillars at a glance
 
 - Core
   - Unified runtime/config, health/readiness, secure defaults, auto-registration, boot reports, optional OpenTelemetry.
@@ -30,6 +30,7 @@ A modular .NET framework that standardizes data, web, messaging, and AI patterns
   - DevHost CLI and adapters to bring up local dependencies (Docker/Podman) and export deterministic artifacts (Compose v2 today). Profile-aware behavior (local/ci run; staging/prod export-only), scoped readiness waits, port-conflict policy, endpoint hints, and single-binary distribution (dist/bin/Koan.exe) with publish/install scripts.
 
 References
+
 - Data: docs/reference/data-access.md
 - Web Capabilities: docs/reference/web-capabilities.md
 - Storage: docs/reference/storage.md
@@ -79,7 +80,7 @@ References
   - HTTP payload transformers for flexible request/response shaping with auto-discovery.
   - Web capabilities (reference controllers): Moderation, SoftDelete, and Audit exposed via generic controllers with canonical, DX-friendly routes that align with `EntityController<T>` shapes. No bespoke controllers required; discovered via ApplicationPart with route prefix configuration.
   - Set-based scoping: capability routes and entity REST endpoints accept `?set=` to scope operations consistently with Data `WithSet(...)` semantics (defaults apply per controller). See ADR WEB-0046.
-  - Capability authorization: layered resolution for each capability action — Entity override → Global Defaults → DefaultBehavior (Allow/Deny). Named policy helpers (KoanWebPolicyNames) and an enforcement attribute (RequireCapability) integrate with ASP.NET Authorization. See ADR WEB-0047.
+  - Capability authorization: layered resolution for each capability action - Entity override → Global Defaults → DefaultBehavior (Allow/Deny). Named policy helpers (KoanWebPolicyNames) and an enforcement attribute (RequireCapability) integrate with ASP.NET Authorization. See ADR WEB-0047.
   - GraphQL endpoints auto-generated from IEntity<> types with HotChocolate integration.
   - Centralized Web Authentication with pluggable IdP adapters and safe flows:
     - Provider discovery: GET /.well-known/auth/providers
@@ -87,7 +88,7 @@ References
     - Adapters: Google, Microsoft, Discord, generic OIDC, and a Dev TestProvider for local workflows
     - Production gating of discovery/challenge; cookie-based user session and single sign-out via logout
 - Scheduling
-  - Background job orchestrator with OnStartup tasks, per-task timeouts, health facts, and readiness gating. Auto-registered; tasks discovered via DI — no bespoke reflection.
+  - Background job orchestrator with OnStartup tasks, per-task timeouts, health facts, and readiness gating. Auto-registered; tasks discovered via DI - no bespoke reflection.
   - Sample: S5 bootstrap task seeds local data and optional vectors on first run without gating readiness by default.
 - Messaging
   - Capability-aware, cross-broker semantics (aliases, DLQ/retry, idempotency) with simple handler wiring.
@@ -95,7 +96,7 @@ References
   - Redis-based inbox service for message processing and deduplication (Koan.Service.Inbox.Redis):
     - Endpoints: GET /v1/inbox/{key}, POST /v1/inbox/mark-processed
     - Config via Koan:Inbox:Redis:ConnectionString (or ConnectionStrings:InboxRedis)
-    - Optional discovery announce on RabbitMQ (Koan:Messaging:Buses:rabbit:*)
+    - Optional discovery announce on RabbitMQ (Koan:Messaging:Buses:rabbit:\*)
   - HTTP and in-memory inbox implementations for testing and lightweight scenarios.
 - AI
   - Turnkey inference (streaming chat, embeddings) with minimal config; Redis-first vector + cache; RAG defaults; observability and budgets; optional sidecar/central proxy; one-call AddKoanAI() and auto-boot discovery.
@@ -119,7 +120,7 @@ References
   - Auto-registration across modules reduces boilerplate; templates and samples rely on controllers-only routing (no inline endpoints).
   - DevHost CLI streamlines local runs and CI exports; Windows-first scripts help publish/install/verify a single-file `Koan` binary.
   - Container-smart defaults and discovery lists for adapters and AI providers; see Guides → "Container-smart defaults" and ADR OPS-0051.
-  
+
 ## Recipes
 
 - Intention-driven bootstrap bundles that apply best-practice operational wiring on top of modules you already reference.
@@ -130,7 +131,7 @@ References
 - Deterministic options layering: Provider defaults < Recipe defaults < AppSettings/Env < Code overrides < Forced overrides (disabled by default; gated by `Koan:Recipes:AllowOverrides` + per-recipe `Koan:Recipes:<Name>:ForceOverrides`).
 - Capability gating: recipes only apply when prereqs exist (check registered services or configured options). Avoid duplicate wiring.
 - Diagnostics: stable EventIds (Applying 41000, AppliedOk 41001, SkippedNotActive 41002, SkippedShouldApplyFalse 41003, DryRun 41004, ApplyFailed 41005) and a dry-run mode via `Koan:Recipes:DryRun=true` to preview without DI mutations.
-- Guardrails: infra-only wiring (no inline endpoints), controller-only HTTP surface, no magic values—use options/constants.
+- Guardrails: infra-only wiring (no inline endpoints), controller-only HTTP surface, no magic values-use options/constants.
 - Example package: `Koan.Recipe.Observability` adds health checks and resilient HttpClient policies when applicable.
 
 ## Scenarios and benefits
@@ -159,7 +160,7 @@ References
 - Observability-first: spans/metrics + boot reports enable SLOs and faster incident response.
   - Explicit opt-in for OpenTelemetry via AddKoanObservability() to avoid surprise telemetry and double-pipeline conflicts; configurable via Koan:Observability.
 - Binary storage standardization: consistent storage patterns across providers (local today; cloud adapters next) with clear capability flags and profile policy.
-- On-ramp path: adapters → transfer/replication → AI-aware indexing → RAG—value compounds with low switching cost.
+- On-ramp path: adapters → transfer/replication → AI-aware indexing → RAG-value compounds with low switching cost.
 - Protocol interop: optional adapters for gRPC (internal), OpenAI-compatible shim, MCP (Model Context Protocol), and AI-RPC to meet teams where they are.
 
 ## Risks and guardrails
@@ -199,10 +200,12 @@ References
   - AI provider ecosystem: Ollama integration for local models with streaming and health checks; OpenAI-compatible patterns.
 
 - Web & capabilities
+
   - Capability Matrix endpoint: GET /.well-known/Koan/capabilities to report registered aggregates, providers, and flags (informational; protect or disable in prod).
   - Authorization posture presets: Allow-by-default or Deny-by-default with per-entity overrides and Defaults mapping to named policies; sample wiring in S7.ContentPlatform.
 
 - Storage
+
   - Cloud providers: S3/Azure Blob/GCS adapters with presigned URLs, multi-part/resumable uploads, and lifecycle policies.
   - Pipeline steps: ingest policy hooks (size/MIME validation, DLP/AV scan, quarantine) with staging strategies.
   - HTTP surface: Koan.Web.Storage controllers with correct range/ETag/caching semantics and optional presign redirects.
@@ -237,4 +240,3 @@ References
 ---
 
 See also: `docs/decisions/index.md` for architectural decisions and `docs/guides/*` for topic guides.
-

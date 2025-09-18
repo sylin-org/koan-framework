@@ -1,4 +1,4 @@
-# S8.Flow — IoT Monitor with Multi-Key Aggregation and SSE
+# S8.Flow - IoT Monitor with Multi-Key Aggregation and SSE
 
 This sample demonstrates Koan Flow aggregating IoT telemetry from multiple adapters into unified device views using namespaced tags and multi-key association, with a live SSE-powered monitor UI.
 
@@ -32,7 +32,7 @@ This sample demonstrates Koan Flow aggregating IoT telemetry from multiple adapt
 
 ## References
 
-- WEB-0050 — S8 Flow IoT sample and SSE monitor (ADR)
-- WEB-0035 — EntityController transformers
-- DATA-0061 — All/Query/Stream/Pager patterns
-- AI-0002 — API contracts and SSE format
+- WEB-0050 - S8 Flow IoT sample and SSE monitor (ADR)
+- WEB-0035 - EntityController transformers
+- DATA-0061 - All/Query/Stream/Pager patterns
+- AI-0002 - API contracts and SSE format

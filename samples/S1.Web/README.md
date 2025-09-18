@@ -1,4 +1,4 @@
-# S1.Web — Koan Framework Relationship System Demo
+# S1.Web - Koan Framework Relationship System Demo
 
 This enhanced S1 sample demonstrates the new relationship system in Koan Framework, showcasing instance-based relationship navigation, batch loading, and streaming capabilities, along with a minimal AngularJS UI.
 
@@ -22,6 +22,7 @@ Category (1) ──┘
 ## API Endpoints
 
 ### Standard CRUD Operations
+
 - Health endpoint: GET /api/health
 - CRUD base routes: /api/todo, /api/users, /api/categories, /api/todoitems
 - Bulk ops: POST /api/todo/bulk and DELETE /api/todo/bulk
@@ -29,6 +30,7 @@ Category (1) ──┘
 - Pagination headers: X-Total-Count, X-Page, X-Page-Size, X-Total-Pages, plus RFC 5988 Link
 
 ### Relationship System Features
+
 - **Seeding with relationships**: POST /api/todo/seed-with-relationships
 - **Relationship demo**: GET /api/todo/relationship-demo/{id}
 - **Streaming demo**: GET /api/todo/streaming-demo
@@ -37,6 +39,7 @@ Category (1) ──┘
 ## Quick Testing Guide
 
 ### 1. Setup Data with Relationships
+
 ```bash
 # Create users
 POST /api/users/seed/5
@@ -49,6 +52,7 @@ POST /api/todo/seed-with-relationships
 ```
 
 ### 2. Test New Relationship Features
+
 ```bash
 # Get enriched todos with RelationshipGraph format
 GET /api/todo?with=all

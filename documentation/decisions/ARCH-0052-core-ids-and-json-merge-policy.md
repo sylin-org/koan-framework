@@ -32,7 +32,7 @@ Koan standardizes on Newtonsoft.Json for JSON handling and is introducing a smal
   - Union (default)
   - Replace (strongest entire array replaces weaker arrays)
   - Concat (append weaker arrays after stronger arrays)
-  - Union-by-key (advanced): when configured with a key and both arrays are objects holding that key, merge by key — preserve order from the stronger array, keep stronger values on conflicts, and append unseen keys from weaker arrays.
+  - Union-by-key (advanced): when configured with a key and both arrays are objects holding that key, merge by key - preserve order from the stronger array, keep stronger values on conflicts, and append unseen keys from weaker arrays.
 
 ## Scope
 

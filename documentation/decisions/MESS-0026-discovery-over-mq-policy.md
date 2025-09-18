@@ -5,17 +5,20 @@ domain: MESS
 status: Accepted
 title: Optional discovery-over-MQ (ping/announce) policy and gating
 ---
- 
-# 0026 — Optional discovery-over-MQ (ping/announce) policy and gating
+
+# 0026 - Optional discovery-over-MQ (ping/announce) policy and gating
 
 Context
+
 - In compose/dev, auto-discovering ancillary services (e.g., Inbox microservice) reduces config and improves DX.
 - In production, we want explicit configuration and fewer moving parts.
 
 Decision
+
 - Provide an optional MQ-based ping/announce mechanism for dev/compose. Off by default in Production, On in other environments. Overridden by the global Magic flag (Koan:AllowMagicInProduction). Discovery runs only when no explicit inbox endpoint is configured.
 
 Mechanics
+
 - Aliases
   - Koan.discovery.ping.{bus}.{group}
   - Koan.discovery.announce.{bus}.{group}
@@ -31,10 +34,12 @@ Mechanics
   - Client picks a candidate deterministically (priority/name), caches for N minutes, and logs selection
 
 Gating and precedence
+
 - If Koan:Messaging:Inbox:Endpoint (or Provider) is set → skip discovery
 - Else Discovery:Enabled follows env defaults: On in non-Production, Off in Production
 
 Implementation details (as shipped)
+
 - Ping routing key: `Koan.discovery.ping.{bus}.{group}`. The client publishes with `reply-to` (auto queue) and `correlationId`.
 - Announce: services SHOULD reply to `reply-to` with the same `correlationId` and payload containing an endpoint URL, e.g. `{ "endpoint": "http://host:port" }`.
 - The discovery client binds a temp queue to `Koan.discovery.announce.#` to be compatible with announce broadcasts, but primarily listens using `reply-to` for direct responses.
@@ -46,11 +51,13 @@ Implementation details (as shipped)
 - Koan:AllowMagicInProduction=true overrides env gating
 
 Operational safety
+
 - Namespaced routing by bus/group
 - No secrets in payloads; only auth hints
 - Bounded retries and single warning when no responses
 
 Consequences
+
 - Better zero-config DX in compose/k8s labs
 - Predictable, secure defaults for production
 - Clear precedence and logging for operator clarity

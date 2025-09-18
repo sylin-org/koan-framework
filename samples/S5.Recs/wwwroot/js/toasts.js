@@ -1,4 +1,4 @@
-﻿// Toast utility (classic script) — exposes window.showToast
+﻿// Toast utility (classic script) - exposes window.showToast
 (function(){
   function showToast(message, type){
     const cont = document.getElementById('toastContainer');

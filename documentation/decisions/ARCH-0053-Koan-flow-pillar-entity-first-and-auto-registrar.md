@@ -4,7 +4,7 @@ slug: Koan-flow-pillar-entity-first-and-auto-registrar
 domain: Architecture
 status: accepted
 date: 2025-08-30
-title: Koan.Flow pillar — Entity-first pipeline with per-view sets and AutoRegistrar defaults
+title: Koan.Flow pillar - Entity-first pipeline with per-view sets and AutoRegistrar defaults
 ---
 
 ## Context
@@ -16,7 +16,7 @@ We need a neutral ingestion→association→projection pipeline that aligns with
 - Introduce Koan.Flow as a new pillar consisting of Core (runtime/contracts) and Web (controllers), with auto-registration via IKoanAutoRegistrar.
 - Entity-first design: a single Record entity uses sets to represent ETL stages (intake/standardized/keyed). KeyIndex/ReferenceItem, ProjectionTask, ProjectionView<T>, RejectionReport, PolicyBundle are separate entities.
 - Projections use per-view sets (ProjectionView<T>.Set(viewName)).
-- Provider neutrality: no persistence adapters. Entities use first-class statics from Koan.Data.*
+- Provider neutrality: no persistence adapters. Entities use first-class statics from Koan.Data.\*
 - Defaults via FlowOptions: batch size, stage concurrency, stage TTLs (7 days for intake/standardized/keyed, projection tasks; 30 days for rejections), DLQ enabled, default view name.
 - Delivery adapters: default delivery is MQ for resilience; DLQ names are defined as constants.
 

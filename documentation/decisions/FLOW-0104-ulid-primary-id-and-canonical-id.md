@@ -1,4 +1,4 @@
-# FLOW-0104 — ULID as Primary Id with CanonicalId (Business Key)
+# FLOW-0104 - ULID as Primary Id with CanonicalId (Business Key)
 
 Status: Approved
 
@@ -17,8 +17,8 @@ Status: Approved
 
 Adopt a dual-identifier model for Flow entities:
 
-- Id: ULID string — primary identifier for transport, URLs, and storage (aligns with Entity<>)
-- CanonicalId: string — stable business key produced by aggregation keys and association rules
+- Id: ULID string - primary identifier for transport, URLs, and storage (aligns with Entity<>)
+- CanonicalId: string - stable business key produced by aggregation keys and association rules
 
 Mint the ULID during the Associate step when a new canonical entity is first created. Preserve and propagate both identifiers across the Flow stack (Stage → Keyed → Projections/Views → APIs). Add bidirectional lookups and indexes (ULID ↔ CanonicalId). Expose dual API routes (by ULID and by CanonicalId).
 
@@ -83,11 +83,11 @@ References: ARCH-0052 (Core IDs) and FLOW-0101/0102 (bindings, identity map, ali
 
 ## Migration Plan
 
-1) Add ULID (Id) to canonical registry and unique index on CanonicalId; deploy.
-2) Backfill existing canonicals lacking ULID; build ULID↔CanonicalId map.
-3) Switch projections to write with ULID keys; add read-compat for CanonicalId during deprecation window.
-4) Expose dual routes; update docs and Swagger.
-5) Remove CanonicalId-only doc keys after deprecation window if desired.
+1. Add ULID (Id) to canonical registry and unique index on CanonicalId; deploy.
+2. Backfill existing canonicals lacking ULID; build ULID↔CanonicalId map.
+3. Switch projections to write with ULID keys; add read-compat for CanonicalId during deprecation window.
+4. Expose dual routes; update docs and Swagger.
+5. Remove CanonicalId-only doc keys after deprecation window if desired.
 
 ## References
 

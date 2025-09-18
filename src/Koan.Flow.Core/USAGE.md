@@ -1,4 +1,4 @@
-# Koan.Flow.Core — Developer Usage Guide
+# Koan.Flow.Core - Developer Usage Guide
 
 A comprehensive guide for building data processing pipelines with Koan.Flow, from basic concepts to advanced enterprise scenarios.
 
@@ -32,6 +32,7 @@ Koan.Flow is designed to solve common challenges in modern data processing:
 ### When to Use Koan.Flow
 
 **Perfect for:**
+
 - Customer data platforms (CDP)
 - IoT telemetry aggregation
 - Multi-source data integration
@@ -39,6 +40,7 @@ Koan.Flow is designed to solve common challenges in modern data processing:
 - Master data management (MDM)
 
 **Consider alternatives for:**
+
 - Simple batch ETL jobs
 - Single-source data transformations
 - Systems requiring microsecond latency
@@ -66,7 +68,7 @@ Intake → Standardize → Key → Associate → Project → Materialize
 - **FlowEntity**: Your canonical data model (e.g., Customer, Device, Order)
 - **StageRecord**: A single piece of data as it moves through the pipeline
 - **ReferenceId**: Unique identifier for a logical entity across all sources
-    - In Flow, ReferenceId (CanonicalId) is the business key derived from aggregation tags. A separate ULID is minted for transport/storage as Id.
+  - In Flow, ReferenceId (CanonicalId) is the business key derived from aggregation tags. A separate ULID is minted for transport/storage as Id.
 - **Aggregation Tags**: Fields used to determine if records belong to the same entity
 - **Canonical View**: The current, merged state of an entity
 - **Lineage View**: Historical trail showing how the entity evolved
@@ -141,10 +143,10 @@ public sealed class Customer : FlowEntity<Customer>
 {
     [AggregationTag("email")]
     public string? Email { get; set; }
-    
+
     [AggregationTag("phone")]
     public string? Phone { get; set; }
-    
+
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
     public DateTime? DateOfBirth { get; set; }
@@ -153,6 +155,7 @@ public sealed class Customer : FlowEntity<Customer>
 ```
 
 **Key Points:**
+
 - Inherit from `FlowEntity<T>` where T is your model
 - Use `[AggregationTag]` to mark fields used for entity resolution
 - Other properties are data fields that will be aggregated
@@ -229,7 +232,7 @@ public async Task<IActionResult> GetCustomer(string referenceId)
     var customer = await DynamicFlowEntity<Customer>.Get(referenceId);
     if (customer == null)
         return NotFound();
-        
+
     return Ok(customer.Model);
 }
 
@@ -257,19 +260,19 @@ public sealed class Contact : FlowEntity<Contact>
     // Primary identifiers
     [AggregationTag("email")]
     public string? Email { get; set; }
-    
+
     [AggregationTag("phone")]
     public string? Phone { get; set; }
-    
+
     // Secondary identifiers (multiple tags on one property)
     [AggregationTag("socialSecurity")]
     [AggregationTag("taxId")]
     public string? GovernmentId { get; set; }
-    
+
     // Nested path support
     [AggregationTag("account.number")]
     public string? AccountNumber { get; set; }
-    
+
     // Regular data fields (not used for aggregation)
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
@@ -412,7 +415,7 @@ When you need to resolve parked records (e.g., after fixing data quality issues 
 
 ```csharp
 [HttpPost("admin/heal/{parkedId}")]
-public async Task<IActionResult> HealParkedRecord(string parkedId, 
+public async Task<IActionResult> HealParkedRecord(string parkedId,
     [FromServices] IFlowActions flowActions)
 {
     using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
@@ -429,7 +432,7 @@ public async Task<IActionResult> HealParkedRecord(string parkedId,
                 Email = "corrected-email@example.com",
                 Phone = "+1-555-000-0000",
                 IsVerified = true
-            }, 
+            },
             healingReason: "Manual correction after data quality review",
             ct: HttpContext.RequestAborted);
 
@@ -447,7 +450,7 @@ public class AddressResolutionService : BackgroundService
 {
     private readonly IFlowActions _flowActions;
     private readonly IGeocoder _geocoder;
-    
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -456,24 +459,24 @@ public class AddressResolutionService : BackgroundService
             await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
         }
     }
-    
+
     private async Task ProcessParkedAddresses(CancellationToken ct)
     {
         using var context = DataSetContext.With(FlowSets.StageShort(FlowSets.Parked));
         var parkedRecords = await ParkedRecord<Location>.FirstPage(100, ct);
         var waitingRecords = parkedRecords.Where(pr => pr.ReasonCode == "WAITING_ADDRESS_RESOLVE");
-        
+
         foreach (var parkedRecord in waitingRecords)
         {
             try
             {
-                var address = parkedRecord.Data?.TryGetValue("address", out var addr) == true ? 
+                var address = parkedRecord.Data?.TryGetValue("address", out var addr) == true ?
                              addr?.ToString() : null;
                 if (string.IsNullOrEmpty(address)) continue;
-                
+
                 // Resolve the address using external service
                 var geocoded = await _geocoder.GeocodeAsync(address, ct);
-                
+
                 // Heal with the resolved data using full data dictionary control
                 var resolvedData = new Dictionary<string, object?>(parkedRecord.Data!, StringComparer.OrdinalIgnoreCase)
                 {
@@ -483,9 +486,9 @@ public class AddressResolutionService : BackgroundService
                     ["confidence"] = geocoded.Confidence,
                     ["resolved"] = true
                 };
-                
-                await parkedRecord.HealAsync(_flowActions, resolvedData, 
-                    healingReason: $"Address resolved via geocoding service", 
+
+                await parkedRecord.HealAsync(_flowActions, resolvedData,
+                    healingReason: $"Address resolved via geocoding service",
                     ct: ct);
             }
             catch (Exception ex)
@@ -511,13 +514,13 @@ public async Task<IActionResult> GetCanonicalContact(string referenceId)
     using (DataSetContext.With(FlowSets.ViewShort(Constants.Views.Canonical)))
     {
         var canonical = await CanonicalProjection<Contact>.Get($"{Constants.Views.Canonical}::{referenceId}");
-        
+
         if (canonical?.Model == null)
             return NotFound();
-            
+
         // The Model property contains the merged data from all sources
         var contact = canonical.Model as IDictionary<string, object?>;
-        
+
         return Ok(new
         {
             ReferenceId = canonical.ReferenceId,
@@ -545,13 +548,13 @@ public async Task<IActionResult> GetContactLineage(string referenceId)
     using (DataSetContext.With(FlowSets.ViewShort(Constants.Views.Lineage)))
     {
         var lineage = await LineageProjection<Contact>.Get($"{Constants.Views.Lineage}::{referenceId}");
-        
+
         if (lineage?.View == null)
             return NotFound();
-            
+
         // The View property contains field -> value -> sources mapping
         var lineageData = lineage.View as IDictionary<string, object?>;
-        
+
         return Ok(new
         {
             ReferenceId = lineage.ReferenceId,
@@ -586,10 +589,10 @@ public sealed class ContactSummaryProjection<TModel> : ProjectionView<TModel, Co
 {
     [Index]
     public string? Email { get; set; }
-    
-    [Index] 
+
+    [Index]
     public string? Company { get; set; }
-    
+
     public int SourceCount { get; set; }
     public DateTime LastActivity { get; set; }
     public string[] Tags { get; set; } = Array.Empty<string>();
@@ -618,7 +621,7 @@ public sealed class CrmEnvelope
 {
     [EntityLink(typeof(Contact), LinkKind.ExternalId)]
     public required string CrmContactId { get; init; }
-    
+
     public required string System { get; init; } = "crm";
     public required string Adapter { get; init; } = "salesforce";
 }
@@ -637,7 +640,7 @@ public async Task IngestFromCrm(CrmContactData data)
             [Constants.Envelope.System] = "crm",
             [Constants.Envelope.Adapter] = "salesforce",
             [nameof(CrmEnvelope.CrmContactId)] = data.Id,
-            
+
             // Actual data
             ["email"] = data.Email,
             ["firstName"] = data.FirstName,
@@ -662,12 +665,12 @@ When Flow encounters an external ID it hasn't seen before, it creates a provisio
 public async Task<IActionResult> GetIdentityLinks()
 {
     var links = await IdentityLink<Contact>.FirstPage(100);
-    
+
     return Ok(links.Select(link => new
     {
         link.Id,
         link.System,
-        link.Adapter, 
+        link.Adapter,
         link.ExternalId,
         link.ReferenceId,
         link.Provisional,
@@ -682,12 +685,12 @@ public async Task<IActionResult> ConfirmIdentityLink(string linkId)
     var link = await IdentityLink<Contact>.Get(linkId);
     if (link == null)
         return NotFound();
-        
+
     // Remove provisional status
     link.Provisional = false;
     link.ExpiresAt = null;
     await link.Save();
-    
+
     return Ok();
 }
 ```
@@ -704,10 +707,10 @@ public sealed class Customer : FlowEntity<Customer>
 {
     [AggregationTag("customerId")]
     public string? CustomerId { get; set; }
-    
+
     [AggregationTag("email")]
     public string? Email { get; set; }
-    
+
     public string? Name { get; set; }
     public string? Company { get; set; }
 }
@@ -717,10 +720,10 @@ public sealed class Order : FlowEntity<Order>
 {
     [AggregationTag("orderId")]
     public string? OrderId { get; set; }
-    
+
     [AggregationTag("orderNumber")]
     public string? OrderNumber { get; set; }
-    
+
     // Link to customer (not an aggregation tag)
     public string? CustomerId { get; set; }
     public decimal? Amount { get; set; }
@@ -732,7 +735,7 @@ public sealed class OrderItem : FlowEntity<OrderItem>
 {
     [AggregationTag("lineItemId")]
     public string? LineItemId { get; set; }
-    
+
     public string? OrderId { get; set; }
     public string? ProductId { get; set; }
     public int? Quantity { get; set; }
@@ -751,13 +754,13 @@ public sealed class EnterpriseCustomer : FlowEntity<EnterpriseCustomer>
     [AggregationTag("taxId")]
     [AggregationTag("federalId")]
     public string? TaxIdentifier { get; set; }
-    
+
     [AggregationTag("dunsNumber")]
     public string? DunsNumber { get; set; }
-    
+
     [AggregationTag("domain")]
     public string? EmailDomain { get; set; }
-    
+
     public string? LegalName { get; set; }
     public string? TradeName { get; set; }
     public string? Industry { get; set; }
@@ -785,7 +788,7 @@ public async Task IngestTimeSeriesData(SensorReading reading)
             ["temperature"] = reading.Temperature,
             ["humidity"] = reading.Humidity,
             ["batteryLevel"] = reading.BatteryLevel,
-            ["location"] = new 
+            ["location"] = new
             {
                 lat = reading.Latitude,
                 lng = reading.Longitude
@@ -804,10 +807,10 @@ public sealed class SensorData : FlowEntity<SensorData>
 {
     [AggregationTag("sensorId")]
     public string? SensorId { get; set; }
-    
+
     [AggregationTag("deviceId")]
     public string? DeviceId { get; set; }
-    
+
     public decimal? Temperature { get; set; }
     public decimal? Humidity { get; set; }
     public decimal? BatteryLevel { get; set; }
@@ -858,12 +861,12 @@ Use the Flow actions system for programmatic control:
 public class FlowManagementController : ControllerBase
 {
     private readonly IFlowActions _flowActions;
-    
+
     public FlowManagementController(IFlowActions flowActions)
     {
         _flowActions = flowActions;
     }
-    
+
     [HttpPost("seed/{model}")]
     public async Task<IActionResult> SeedModel(string model, [FromBody] object payload)
     {
@@ -871,14 +874,14 @@ public class FlowManagementController : ControllerBase
         await _flowActions.SeedAsync(model, referenceId, payload);
         return Ok(new { ReferenceId = referenceId });
     }
-    
+
     [HttpGet("report/{model}")]
     public async Task<IActionResult> GetModelReport(string model)
     {
         await _flowActions.ReportAsync(model, "admin-report", new { RequestedAt = DateTime.UtcNow });
         return Ok(new { Message = "Report requested" });
     }
-    
+
     [HttpPost("ping/{model}")]
     public async Task<IActionResult> PingModel(string model)
     {
@@ -896,17 +899,17 @@ Implement custom business logic during projection:
 public class CustomerMonitor : IFlowMonitor<Customer>
 {
     private readonly ILogger<CustomerMonitor> _logger;
-    
+
     public CustomerMonitor(ILogger<CustomerMonitor> logger)
     {
         _logger = logger;
     }
-    
+
     public Task OnProjectedAsync(FlowMonitorContext context, CancellationToken ct = default)
     {
         var model = context.Model;
         var policies = context.Policies;
-        
+
         // Business rule: VIP customers get special handling
         if (IsVipCustomer(model))
         {
@@ -914,26 +917,26 @@ public class CustomerMonitor : IFlowMonitor<Customer>
             policies["dataRetention"] = "extended";
             _logger.LogInformation("VIP customer detected: {Email}", model.GetValueOrDefault("email"));
         }
-        
+
         // Data quality: normalize phone numbers
         if (model.TryGetValue("phone", out var phone) && phone is string phoneStr)
         {
             model["phone"] = NormalizePhoneNumber(phoneStr);
         }
-        
+
         // Set last updated timestamp
         model["lastProcessed"] = DateTimeOffset.UtcNow;
-        
+
         return Task.CompletedTask;
     }
-    
+
     private bool IsVipCustomer(IDictionary<string, object?> model)
     {
         // Example: customers from certain companies are VIP
         var company = model.GetValueOrDefault("company")?.ToString()?.ToLowerInvariant();
         return company?.Contains("enterprise") == true || company?.Contains("corp") == true;
     }
-    
+
     private string NormalizePhoneNumber(string phone)
     {
         // Simple normalization - remove all non-digits, add +1 prefix if US number
@@ -965,7 +968,7 @@ public async Task<IActionResult> GetFlowHealth()
         Rejections = await GetRejectionStats(),
         Processing = await GetProcessingStats()
     };
-    
+
     return Ok(health);
 }
 
@@ -974,7 +977,7 @@ private async Task<object> GetStageHealth()
     var intakeCount = await GetStageCount<Customer>(FlowSets.Intake);
     var keyedCount = await GetStageCount<Customer>(FlowSets.Keyed);
     var parkedCount = await GetStageCount<Customer>(FlowSets.Parked);
-    
+
     return new
     {
         Intake = intakeCount,
@@ -997,7 +1000,7 @@ private async Task<object> GetRejectionStats()
 {
     var rejections = await RejectionReport.FirstPage(100);
     var recentRejections = rejections.Where(r => r.CreatedAt > DateTimeOffset.UtcNow.AddHours(-1));
-    
+
     return new
     {
         TotalCount = rejections.Count(),
@@ -1035,7 +1038,7 @@ public class ErrorHandlingService : IFlowMonitor<Customer>
 {
     private readonly ILogger<ErrorHandlingService> _logger;
     private readonly IMessageBus _messageBus;
-    
+
     public async Task OnProjectedAsync(FlowMonitorContext context, CancellationToken ct = default)
     {
         try
@@ -1046,7 +1049,7 @@ public class ErrorHandlingService : IFlowMonitor<Customer>
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing customer {ReferenceId}", context.ReferenceId);
-            
+
             // Send to error handling queue
             await _messageBus.SendAsync(new CustomerProcessingError
             {
@@ -1054,7 +1057,7 @@ public class ErrorHandlingService : IFlowMonitor<Customer>
                 Error = ex.Message,
                 Timestamp = DateTimeOffset.UtcNow
             }, ct);
-            
+
             // Don't rethrow - let the projection complete but mark for review
             context.Policies["hasError"] = "true";
             context.Policies["errorMessage"] = ex.Message;
@@ -1083,11 +1086,11 @@ public void ConfigureFlow(IServiceCollection services)
             "small" => 50,
             _ => 200
         };
-        
+
         // Enable aggressive purging in high-volume scenarios
         o.PurgeEnabled = true;
         o.PurgeInterval = TimeSpan.FromMinutes(1);
-        
+
         // Shorter TTLs for high-volume models
         if (IsHighVolumeEnvironment())
         {
@@ -1106,20 +1109,20 @@ public void ConfigureFlow(IServiceCollection services)
 public async Task<IActionResult> ReprojectEntity(string referenceId)
 {
     // Audit the operation
-    _logger.LogWarning("Manual reproject requested by {User} for {ReferenceId}", 
+    _logger.LogWarning("Manual reproject requested by {User} for {ReferenceId}",
                       User.Identity?.Name, referenceId);
-    
+
     // Implement rate limiting
     var rateLimitKey = $"reproject:{User.Identity?.Name}";
     if (!await _rateLimiter.TryAcquireAsync(rateLimitKey, 1, TimeSpan.FromMinutes(5)))
     {
         return StatusCode(429, "Rate limit exceeded");
     }
-    
+
     // Trigger reproject
     var runtime = HttpContext.RequestServices.GetRequiredService<IFlowRuntime>();
     await runtime.ReprojectAsync(referenceId);
-    
+
     return Ok();
 }
 ```
@@ -1133,6 +1136,7 @@ public async Task<IActionResult> ReprojectEntity(string referenceId)
 **Symptoms**: Records stuck in intake, not moving to keyed stage
 
 **Causes & Solutions**:
+
 ```csharp
 // Check for missing aggregation tags
 var model = FlowRegistry.GetAggregationTags(typeof(Customer));
@@ -1154,6 +1158,7 @@ foreach (var rejection in rejections.Where(r => r.CreatedAt > DateTimeOffset.Utc
 **Symptoms**: Records being parked with `MULTI_OWNER_COLLISION`
 
 **Investigation**:
+
 ```csharp
 [HttpGet("debug/collisions")]
 public async Task<IActionResult> InvestigateCollisions()
@@ -1162,7 +1167,7 @@ public async Task<IActionResult> InvestigateCollisions()
     {
             var parked = await Data<ParkedRecord<Customer>, string>
                 .Query(p => p.ReasonCode == Constants.Rejections.MultiOwnerCollision);
-            
+
             return Ok(parked.Select(p => new
         {
             p.Id,
@@ -1180,9 +1185,10 @@ public async Task<IActionResult> InvestigateCollisions()
 **Symptoms**: High memory usage, slow processing
 
 **Solutions**:
+
 ```csharp
 // Reduce batch sizes
-services.Configure<FlowOptions>(o => 
+services.Configure<FlowOptions>(o =>
 {
     o.BatchSize = 50; // Reduce from default
     o.PurgeEnabled = true;
@@ -1194,7 +1200,7 @@ services.Configure<FlowOptions>(o =>
 public async Task<IActionResult> GetStageSizes()
 {
     var sizes = new Dictionary<string, int>();
-    
+
     foreach (var stage in new[] { FlowSets.Intake, FlowSets.Keyed, FlowSets.Parked })
     {
         using (DataSetContext.With(FlowSets.StageShort(stage)))
@@ -1203,7 +1209,7 @@ public async Task<IActionResult> GetStageSizes()
             sizes[stage] = count;
         }
     }
-    
+
     return Ok(sizes);
 }
 ```
@@ -1239,7 +1245,7 @@ public async Task<IActionResult> GetProcessingStatus(string referenceId)
         PendingTasks = await GetPendingTasks<Customer>(referenceId),
         StageRecords = await GetStageRecords<Customer>(referenceId)
     };
-    
+
     return Ok(status);
 }
 
@@ -1265,7 +1271,7 @@ public class FlowMetricsService : BackgroundService
             await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
         }
     }
-    
+
     private async Task LogMetrics()
     {
         var metrics = new
@@ -1277,7 +1283,7 @@ public class FlowMetricsService : BackgroundService
             CanonicalCount = await GetCanonicalCount<Customer>(),
             RecentRejections = await GetRecentRejectionCount()
         };
-        
+
         _logger.LogInformation("Flow Metrics: {@Metrics}", metrics);
     }
 }
@@ -1411,10 +1417,10 @@ Create a robust command dispatcher that handles retries, circuit breaking, and r
 ```csharp
 public interface ICommandDispatcher
 {
-    Task<CommandResult> SendAsync<TCommand>(string targetService, TCommand command, 
+    Task<CommandResult> SendAsync<TCommand>(string targetService, TCommand command,
                                           CancellationToken cancellationToken = default);
-    Task<CommandResult> SendWithRetryAsync<TCommand>(string targetService, TCommand command, 
-                                                   int maxRetries = 3, 
+    Task<CommandResult> SendWithRetryAsync<TCommand>(string targetService, TCommand command,
+                                                   int maxRetries = 3,
                                                    CancellationToken cancellationToken = default);
 }
 
@@ -1426,7 +1432,7 @@ public class MessageBusCommandDispatcher : ICommandDispatcher
     private readonly Dictionary<string, string> _serviceRoutes;
 
     public MessageBusCommandDispatcher(
-        IMessageBus messageBus, 
+        IMessageBus messageBus,
         ICircuitBreaker circuitBreaker,
         IOptions<ServiceRoutingOptions> routingOptions,
         ILogger<MessageBusCommandDispatcher> logger)
@@ -1437,11 +1443,11 @@ public class MessageBusCommandDispatcher : ICommandDispatcher
         _serviceRoutes = routingOptions.Value.Routes;
     }
 
-    public async Task<CommandResult> SendAsync<TCommand>(string targetService, TCommand command, 
+    public async Task<CommandResult> SendAsync<TCommand>(string targetService, TCommand command,
                                                        CancellationToken cancellationToken = default)
     {
         var correlationId = Guid.NewGuid().ToString();
-        
+
         try
         {
             await _circuitBreaker.ExecuteAsync(async () =>
@@ -1464,14 +1470,14 @@ public class MessageBusCommandDispatcher : ICommandDispatcher
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch command to {Service}: {Command}", 
+            _logger.LogError(ex, "Failed to dispatch command to {Service}: {Command}",
                            targetService, typeof(TCommand).Name);
             return new CommandResult(false, ex.Message);
         }
     }
 
-    public async Task<CommandResult> SendWithRetryAsync<TCommand>(string targetService, TCommand command, 
-                                                                int maxRetries = 3, 
+    public async Task<CommandResult> SendWithRetryAsync<TCommand>(string targetService, TCommand command,
+                                                                int maxRetries = 3,
                                                                 CancellationToken cancellationToken = default)
     {
         for (int attempt = 1; attempt <= maxRetries; attempt++)
@@ -1485,7 +1491,7 @@ public class MessageBusCommandDispatcher : ICommandDispatcher
             if (attempt < maxRetries)
             {
                 var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt)); // Exponential backoff
-                _logger.LogWarning("Command dispatch attempt {Attempt} failed, retrying in {Delay}s: {Error}", 
+                _logger.LogWarning("Command dispatch attempt {Attempt} failed, retrying in {Delay}s: {Error}",
                                  attempt, delay.TotalSeconds, result.ErrorMessage);
                 await Task.Delay(delay, cancellationToken);
             }
@@ -1632,11 +1638,11 @@ public class CustomerValidationRule : IBusinessRule<Customer>
     public async Task<RuleResult> EvaluateAsync(FlowEntity<Customer> entity, RuleContext context)
     {
         var customer = entity.Model;
-        
+
         // Age validation
         if (customer.Age < 18)
             return RuleResult.Fail("Customer must be 18 or older");
-            
+
         // Credit check for high-value customers
         if (customer.EstimatedValue > 10000)
         {
@@ -1644,11 +1650,11 @@ public class CustomerValidationRule : IBusinessRule<Customer>
             if (creditScore < 650)
                 return RuleResult.Fail($"Credit score too low: {creditScore}");
         }
-        
+
         // Geographic restrictions
         if (RestrictedRegions.Contains(customer.Region))
             return RuleResult.Fail($"Service not available in region: {customer.Region}");
-            
+
         return RuleResult.Pass(new { CreditScore = await GetCreditScore(customer.Id) });
     }
 }
@@ -1662,39 +1668,39 @@ public class RiskAssessmentRule : IBusinessRule<Customer>
     {
         var customer = entity.Model;
         var riskScore = await CalculateRiskScore(customer);
-        
+
         // Set risk-based properties in context
         context.Properties["RiskScore"] = riskScore;
         context.Properties["RiskTier"] = GetRiskTier(riskScore);
-        
+
         // High-risk customers require manual review
         if (riskScore > 80)
         {
             context.Properties["RequiresManualReview"] = true;
             return RuleResult.Fail("High risk customer requires manual review");
         }
-        
+
         return RuleResult.Pass();
     }
-    
+
     private async Task<int> CalculateRiskScore(Customer customer)
     {
         // Complex risk calculation logic
         var score = 0;
-        
+
         // Check transaction history
         var recentTransactions = await GetRecentTransactions(customer.Id);
         if (recentTransactions.Count(t => t.Amount > 5000) > 3)
             score += 30;
-            
+
         // Check identity verification
         if (!customer.IsIdentityVerified)
             score += 25;
-            
+
         // Check against watchlists
         if (await IsOnWatchlist(customer.Id))
             score += 50;
-            
+
         return Math.Min(score, 100);
     }
 }
@@ -1704,7 +1710,7 @@ public class RiskAssessmentRule : IBusinessRule<Customer>
 
 Create a processor that applies rules between Flow stages:
 
-```csharp
+````csharp
 public class RuleBasedProcessor<TModel> : IFlowProcessor<TModel>
 {
     private readonly IEnumerable<IBusinessRule<TModel>> _rules;
@@ -1735,14 +1741,14 @@ public class RuleBasedProcessor<TModel> : IFlowProcessor<TModel>
                 {
                     _logger.LogWarning("Rule {RuleName} failed for entity {ReferenceId}: {Reason}",
                                      rule.Name, entity.ReferenceId, result.Reason);
-                    
+
                     return ProcessingResult<TModel>.Rejected(
                         entity,
                         $"Business rule violation: {result.Reason}",
-                        new { 
-                            FailedRule = rule.Name, 
+                        new {
+                            FailedRule = rule.Name,
                             AppliedRules = appliedRules,
-                            RuleContext = context.Properties 
+                            RuleContext = context.Properties
                         });
                 }
 
@@ -1755,18 +1761,18 @@ public class RuleBasedProcessor<TModel> : IFlowProcessor<TModel>
             {
                 _logger.LogError(ex, "Error evaluating rule {RuleName} for entity {ReferenceId}",
                                rule.Name, entity.ReferenceId);
-                
+
                 // Continue with other rules or fail fast based on configuration
                 return ProcessingResult<TModel>.Rejected(
-                    entity, 
+                    entity,
                     $"Rule evaluation error: {rule.Name}",
                     new { Exception = ex.Message });
             }
         }
 
         // All rules passed - enhance entity with rule results
-        var enhancedEntity = entity with 
-        { 
+        var enhancedEntity = entity with
+        {
             Properties = entity.Properties
                 .Concat(context.Properties)
                 .Concat(ruleData.SelectMany(kv => new[] { new KeyValuePair<string, object>($"Rule_{kv.Key}", kv.Value) }))
@@ -1831,7 +1837,7 @@ public sealed class ContactsController : ControllerBase
         return await GetById(refItem.Id); // refItem.Id is ULID
     }
 }
-```
+````
 
 ### Example: Enrich records after Associate
 
@@ -1870,12 +1876,13 @@ public record ProcessingResult<TModel>(
     string? ErrorMessage = null,
     object? Metadata = null)
 {
-    public static ProcessingResult<TModel> Success(FlowEntity<TModel> entity, object? metadata = null) 
+    public static ProcessingResult<TModel> Success(FlowEntity<TModel> entity, object? metadata = null)
         => new(true, entity, null, metadata);
-    public static ProcessingResult<TModel> Rejected(FlowEntity<TModel> entity, string error, object? metadata = null) 
+    public static ProcessingResult<TModel> Rejected(FlowEntity<TModel> entity, string error, object? metadata = null)
         => new(false, entity, error, metadata);
 }
 ```
+
 ### Conditional Routing Rules
 
 Implement rules that determine entity routing and processing paths:
@@ -1889,25 +1896,25 @@ public class RoutingRule : IBusinessRule<Customer>
     public async Task<RuleResult> EvaluateAsync(FlowEntity<Customer> entity, RuleContext context)
     {
         var customer = entity.Model;
-        
+
         // Determine processing path based on customer attributes
         var routingDecision = customer.Type switch
         {
-            "Premium" => new RoutingDecision 
-            { 
-                Path = "premium-pipeline", 
+            "Premium" => new RoutingDecision
+            {
+                Path = "premium-pipeline",
                 Priority = "high",
                 RequiredApprovals = new[] { "manager" }
             },
-            "Enterprise" => new RoutingDecision 
-            { 
-                Path = "enterprise-pipeline", 
+            "Enterprise" => new RoutingDecision
+            {
+                Path = "enterprise-pipeline",
                 Priority = "critical",
                 RequiredApprovals = new[] { "director", "compliance" }
             },
-            _ => new RoutingDecision 
-            { 
-                Path = "standard-pipeline", 
+            _ => new RoutingDecision
+            {
+                Path = "standard-pipeline",
                 Priority = "normal",
                 RequiredApprovals = Array.Empty<string>()
             }
@@ -1992,12 +1999,12 @@ public class ConfigurableRuleEngine<TModel>
 {
     private readonly IRuleRepository _ruleRepository;
     private readonly IServiceProvider _serviceProvider;
-    
+
     public async Task<List<IBusinessRule<TModel>>> GetActiveRulesAsync(string context)
     {
         var ruleConfigs = await _ruleRepository.GetActiveRulesAsync(typeof(TModel).Name, context);
         var rules = new List<IBusinessRule<TModel>>();
-        
+
         foreach (var config in ruleConfigs)
         {
             var ruleType = Type.GetType(config.RuleTypeName);
@@ -2011,7 +2018,7 @@ public class ConfigurableRuleEngine<TModel>
                 rules.Add(rule);
             }
         }
-        
+
         return rules.OrderBy(r => r.Priority).ToList();
     }
 }
@@ -2022,6 +2029,7 @@ public class ConfigurableRuleEngine<TModel>
 This comprehensive guide provides developers with everything needed to build sophisticated data processing pipelines with Koan.Flow. Start with the basic concepts and gradually adopt the advanced patterns as your requirements grow.
 
 For additional resources, see:
+
 - [S8.Flow Sample Application](https://github.com/sylin-labs/Koan-framework/tree/dev/samples/S8.Flow)
 - [Koan Framework Documentation](https://github.com/sylin-labs/Koan-framework/tree/dev/docs)
 - [Architecture Decisions](https://github.com/sylin-labs/Koan-framework/tree/dev/docs/decisions)
@@ -2031,15 +2039,15 @@ For additional resources, see:
 Keep these nearby patterns in mind when applying Flow in a broader app:
 
 - Messaging commands and retries: use IMessageHandler<T> and the message bus for reliable command delivery and idempotency. See Messaging reference and samples:
-    - Reference: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/reference/messaging.md
-    - RabbitMQ adapter samples: https://github.com/sylin-labs/Koan-framework/tree/dev/src/Koan.Messaging.RabbitMq
+  - Reference: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/reference/messaging.md
+  - RabbitMQ adapter samples: https://github.com/sylin-labs/Koan-framework/tree/dev/src/Koan.Messaging.RabbitMq
 - HTTP APIs via controllers: expose routes with attribute-routed MVC controllers only; avoid inline MapGet/MapPost. Guidance and ADRs:
-    - Engineering guidance: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/engineering/index.md
-    - Web HTTP API: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/api/web-http-api.md
+  - Engineering guidance: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/engineering/index.md
+  - Web HTTP API: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/api/web-http-api.md
 - Data access at scale: prefer FirstPage/Page or streaming (AllStream/QueryStream) for large sets; avoid unbounded All/Query. Background:
-    - Guide: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/guides/data/all-query-streaming-and-pager.md
-    - ADR: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md
+  - Guide: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/guides/data/all-query-streaming-and-pager.md
+  - ADR: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md
 - OpenAPI/Swagger: enable discoverability and client generation with Koan.Web.Swagger.
-    - Reference: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/api/openapi-generation.md
+  - Reference: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/api/openapi-generation.md
 - Constants and options: centralize route keys, headers, and toggles; avoid magic values.
-    - ADR: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/decisions/ARCH-0040-config-and-constants-naming.md
+  - ADR: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/decisions/ARCH-0040-config-and-constants-naming.md

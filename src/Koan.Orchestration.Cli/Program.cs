@@ -219,7 +219,7 @@ static async Task<int> UpAsync(string[] args)
         var newPlan = Planner.ApplyPortConflictSkip(plan, profile, out skipped);
         if (skipped.Count > 0)
         {
-            Console.WriteLine($"warning: ports in use on host — skipping services: {string.Join(", ", skipped)} (ports: {string.Join(", ", initialConflicts)})");
+            Console.WriteLine($"warning: ports in use on host - skipping services: {string.Join(", ", skipped)} (ports: {string.Join(", ", initialConflicts)})");
             plan = newPlan;
         }
     }
@@ -267,7 +267,7 @@ static async Task<int> UpAsync(string[] args)
     // Non-prod default: warn and continue when ports are occupied by host services
     if (profile != Profile.Prod && conflicts.Count > 0 && conflictsMode != "fail")
     {
-        Console.WriteLine($"warning: ports in use on host — continuing: {string.Join(", ", conflicts)}");
+        Console.WriteLine($"warning: ports in use on host - continuing: {string.Join(", ", conflicts)}");
     }
 
     try
@@ -560,7 +560,7 @@ static async Task<int> InspectAsync(string[] args)
                 }
             })
         };
-    Console.WriteLine(JsonConvert.SerializeObject(payload));
+        Console.WriteLine(JsonConvert.SerializeObject(payload));
         return 0;
     }
 
@@ -854,7 +854,7 @@ static string Titleize(string id)
 
 // Best-effort: infer auth adapter capabilities from project references (Google/Microsoft/Discord/OIDC)
 // Attribute-based: read referenced assemblies to find AuthProviderDescriptorAttribute without loading runtime DI
-// (intentionally removed) — SoC: capabilities are sourced from the generated manifest only
+// (intentionally removed) - SoC: capabilities are sourced from the generated manifest only
 
 static async Task<int> LogsAsync(string[] args)
 {

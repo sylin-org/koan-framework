@@ -1,4 +1,4 @@
-# AI-0006 — Data formats and grounding (Parquet, JSON-LD, Schema.org)
+# AI-0006 - Data formats and grounding (Parquet, JSON-LD, Schema.org)
 
 Status: Proposed
 Date: 2025-08-19

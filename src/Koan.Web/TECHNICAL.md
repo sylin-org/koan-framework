@@ -1,6 +1,6 @@
 ---
 uid: reference.modules.Koan.web
-title: Koan.Web — Technical Reference
+title: Koan.Web - Technical Reference
 description: Contracts, configuration, and architecture for Koan’s ASP.NET Core integration.
 since: 0.2.x
 packages: [Sylin.Koan.Web]
@@ -66,5 +66,5 @@ source: src/Koan.Web/
 ## References
 
 - Web API: `/docs/api/web-http-api.md`
-- Decision — transformers: `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
+- Decision - transformers: `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
 - Engineering guardrails: `/docs/engineering/index.md`

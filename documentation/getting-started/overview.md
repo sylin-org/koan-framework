@@ -22,7 +22,7 @@ validation: 2025-01-17
 
 **Build services like you're talking to your code, not fighting it.**
 
-Koan is a modular .NET backend framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
+Koan is a modular .NET backend framework that standardizes data, web, messaging, and AI patterns with strong governance and observability-so teams ship faster with fewer surprises, and platforms scale with consistency.
 
 Whether you're spinning up a quick prototype or scaling into enterprise-grade patterns, Koan keeps the path clear. Start with a three-file API. Add messaging, vector search, or AI when you're ready. Nothing more, nothing less.
 
@@ -222,7 +222,7 @@ public class Todo : Entity<Todo>
 
 ## 🌱 A Framework That Grows With You
 
-Koan isn't trying to impress you with magic. It earns trust by staying out of your way—until you need more.
+Koan isn't trying to impress you with magic. It earns trust by staying out of your way-until you need more.
 
 - Add AI? One line.
 - Need vector search? Drop in a package.

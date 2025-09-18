@@ -1,4 +1,4 @@
-# AI-0007 — Inference servers interop (KServe, vLLM, TGI)
+# AI-0007 - Inference servers interop (KServe, vLLM, TGI)
 
 Status: Proposed
 Date: 2025-08-19

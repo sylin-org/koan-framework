@@ -1,4 +1,4 @@
-# AI-0004 — Secrets provider and per-tenant key management
+# AI-0004 - Secrets provider and per-tenant key management
 
 Status: Proposed
 Date: 2025-08-19

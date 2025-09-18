@@ -18,7 +18,7 @@ Decision
 - Introduce Koan.Storage (core, transport-agnostic) and Koan.Web.Storage (HTTP endpoints) as separate modules.
 - Define a canonical entity and a properties-only interface:
   - IStorageObject: metadata contract (no IO methods).
-  - StorageObject : Entity<StorageObject>, IStorageObject — the default model with first-class static data methods (All/Query/Stream/Page).
+  - StorageObject : Entity<StorageObject>, IStorageObject - the default model with first-class static data methods (All/Query/Stream/Page).
 - Providers are thin and IO-only:
   - IStorageProvider: OpenRead/OpenRange (optional), Write, Delete, Exists, Copy, GetProperties, PresignRead (optional).
   - Provider capabilities are discoverable (sequential vs seekable/range; presign support).
@@ -78,7 +78,7 @@ Implementation notes
 - Prefer temp-file staging only when pipeline steps require full-blob inspection.
 - Keep entity free of IO; DX helpers live in an IStorageClient service with optional extension methods.
 - Use Background jobs for large transfers; copy-then-switch with hash verification.
- - LocalStorageProvider specifics: enforce base path; normalize/validate keys; ensure directories exist; write to temp file then move; open with FileOptions.Asynchronous and FileShare.Read for readers; set ReadOnly attribute post-commit when policy requires immutability; use sparse file support and memory-mapped IO only if justified.
+- LocalStorageProvider specifics: enforce base path; normalize/validate keys; ensure directories exist; write to temp file then move; open with FileOptions.Asynchronous and FileShare.Read for readers; set ReadOnly attribute post-commit when policy requires immutability; use sparse file support and memory-mapped IO only if justified.
 
 Follow-ups
 

@@ -1,4 +1,4 @@
-# AI-0003 — Tokenization and cost strategy
+# AI-0003 - Tokenization and cost strategy
 
 Status: Proposed
 Date: 2025-08-19

@@ -1,4 +1,4 @@
-# DATA-0059 — Entity-first facade and Save semantics (docs and vectors)
+# DATA-0059 - Entity-first facade and Save semantics (docs and vectors)
 
 Status: Proposed
 
@@ -9,6 +9,7 @@ Date: 2025-08-21
 Developers interact with entities most of the time, not repositories. Today, saving a document and saving its vector often require two different calls and sometimes different repository instances. This increases cognitive load, especially in samples and small services.
 
 We want an entity-first facade that:
+
 - Centralizes common actions (Save, Delete, Get) with predictable defaults
 - Keeps vector operations explicit but co-located
 - Supports batch operations ergonomically
@@ -18,8 +19,8 @@ We want an entity-first facade that:
 
 Introduce a static facade `Entity<T>` exposing role-focused helpers for common operations:
 
-- `Entity<T>.Doc.Save(entity, ct)` — resolves Source adapter via attributes/defaults and saves the document
-- `Entity<T>.Vector.Save(entity, embedding, ct)` — resolves Vector adapter and saves vector payload for the entity
+- `Entity<T>.Doc.Save(entity, ct)` - resolves Source adapter via attributes/defaults and saves the document
+- `Entity<T>.Vector.Save(entity, embedding, ct)` - resolves Vector adapter and saves vector payload for the entity
 - `Entity<T>.Doc.Get(id, ct)`
 - `Entity<T>.Doc.Delete(id, ct)`
 - Batch helpers:
@@ -27,6 +28,7 @@ Introduce a static facade `Entity<T>` exposing role-focused helpers for common o
   - `Entity<T>.Vector.SaveMany(IEnumerable<VectorEntity<T>> items, ct)`
 
 Additionally, expose policy helpers for common orchestration:
+
 - `Entity<T>.SaveWithVector(entity, embedder, vectorizerOptions, ct)`
 - A `VectorEntity<T>` DTO: `{ T Entity; ReadOnlyMemory<float> Vector; string? Anchor; IDictionary<string, object>? Metadata; }`
 
@@ -40,8 +42,8 @@ These are thin wrappers over `IDataService` and repositories; they do not bypass
 
 ## Alternatives considered
 
-- Keep only repository-first API — flexible but verbose for common cases
-- Extension methods on `IDataService` instead of a facade — viable, but `Entity<T>` groups the contract discovery better and reads naturally
+- Keep only repository-first API - flexible but verbose for common cases
+- Extension methods on `IDataService` instead of a facade - viable, but `Entity<T>` groups the contract discovery better and reads naturally
 
 ## Migration notes
 

@@ -4,7 +4,7 @@ slug: capability-authorization-fallback-and-defaults
 domain: Web
 status: accepted
 date: 2025-08-28
-title: Capability authorization — global allow/deny fallback and per-entity defaults
+title: Capability authorization - global allow/deny fallback and per-entity defaults
 ---
 
 ## Context
@@ -20,15 +20,18 @@ Koan exposes generic capability controllers for moderation, soft-delete, and aud
 Adopt a layered authorization resolution policy for capability actions with a global fallback:
 
 Fallback order (highest to lowest)
-1) Entity-specific mapping for the action
-2) Global Defaults mapping for the action
-3) Global DefaultBehavior (Allow or Deny)
+
+1. Entity-specific mapping for the action
+2. Global Defaults mapping for the action
+3. Global DefaultBehavior (Allow or Deny)
 
 Global posture
+
 - Standard posture: Allow-by-default
 - Supported alternative: Deny-by-default (only mapped actions are allowed)
 
 Scope
+
 - Applies to capability controllers: Moderation, SoftDelete, Audit.
 - Does not define identity/claims issuance. It only specifies resolution and fallback.
 
@@ -41,12 +44,14 @@ Scope
 ## Implementation notes
 
 Options (conceptual)
+
 - CapabilityAuthorizationOptions
   - DefaultBehavior: Allow | Deny
   - Defaults: CapabilityPolicy (Moderation, SoftDelete, Audit)
   - Entities: Dictionary<string, CapabilityPolicy>
 
 Resolution
+
 - Input: entityType, capabilityAction, user principal
 - Resolve mapping via Entity → Defaults → DefaultBehavior
 - If mapping exists, evaluate user permission per app’s auth provider
@@ -58,13 +63,13 @@ Allow-by-default with targeted overrides
 // Program.cs
 opts.Authorization = new CapabilityAuthorizationOptions
 {
-    DefaultBehavior = CapabilityDefaultBehavior.Allow,
-    Defaults = new CapabilityPolicy { /* map common permissions */ },
-    Entities =
-    {
-        ["Article"] = new CapabilityPolicy { /* stricter Approve mapping */ },
-        ["Author"] = new CapabilityPolicy { /* soft-delete overrides */ }
-    }
+DefaultBehavior = CapabilityDefaultBehavior.Allow,
+Defaults = new CapabilityPolicy { /_ map common permissions _/ },
+Entities =
+{
+["Article"] = new CapabilityPolicy { /_ stricter Approve mapping _/ },
+["Author"] = new CapabilityPolicy { /_ soft-delete overrides _/ }
+}
 };
 
 Deny-by-default (strict)
@@ -72,6 +77,7 @@ Deny-by-default (strict)
 opts.Authorization.DefaultBehavior = CapabilityDefaultBehavior.Deny; // unmapped actions → 403
 
 Error/edge cases
+
 - Missing entity mapping and no default: allow or deny based on DefaultBehavior
 - Unknown capability action: treat as unmapped → DefaultBehavior
 - Bulk operations: evaluate action per endpoint (e.g., DeleteMany)
@@ -83,5 +89,5 @@ Error/edge cases
 
 ## References
 
-- WEB-0046 — Entity capabilities — short endpoints and set routing
+- WEB-0046 - Entity capabilities - short endpoints and set routing
 - Web capability controllers reference: docs/reference/web-capabilities.md

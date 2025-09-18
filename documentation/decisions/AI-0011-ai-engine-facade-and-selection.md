@@ -1,4 +1,4 @@
-# AI-0011 — AI Engine facade and selection API
+# AI-0011 - AI Engine facade and selection API
 
 Status: Accepted
 Date: 2025-08-21

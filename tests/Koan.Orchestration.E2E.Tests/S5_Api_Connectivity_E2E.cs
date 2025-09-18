@@ -105,7 +105,7 @@ public class S5_Api_Connectivity_E2E
                     var probeResp = await probe.GetAsync($"http://127.0.0.1:{ApiPort}/health/live");
                     if (probeResp.IsSuccessStatusCode)
                     {
-                        Console.WriteLine("TCP readiness timed out, but HTTP /health/live succeeded — proceeding.");
+                        Console.WriteLine("TCP readiness timed out, but HTTP /health/live succeeded - proceeding.");
                         tcpReady = true;
                     }
                 }
@@ -377,7 +377,7 @@ public class S5_Api_Connectivity_E2E
         foreach (var port in ports)
         {
             if (!IsPortOpen(port)) continue;
-            Console.WriteLine($"Port {port} is in use — attempting to free it by stopping containers that publish it.");
+            Console.WriteLine($"Port {port} is in use - attempting to free it by stopping containers that publish it.");
             TryStopContainersPublishingPort(composeTool, port);
         }
 

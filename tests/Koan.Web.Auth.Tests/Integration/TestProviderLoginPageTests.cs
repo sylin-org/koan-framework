@@ -30,12 +30,12 @@ public class TestProviderLoginPageTests
                 app.UseEndpoints(e => e.MapKoanTestProviderEndpoints());
             });
 
-    using var server = new TestServer(builder);
-    var client = server.CreateClient();
+        using var server = new TestServer(builder);
+        var client = server.CreateClient();
         var resp = await client.GetAsync("/.testoauth/login.html");
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         Assert.StartsWith("text/html", resp.Content.Headers.ContentType?.MediaType);
         var html = await resp.Content.ReadAsStringAsync();
-        Assert.Contains("Koan TestProvider — Sign in", html);
+        Assert.Contains("Koan TestProvider - Sign in", html);
     }
 }

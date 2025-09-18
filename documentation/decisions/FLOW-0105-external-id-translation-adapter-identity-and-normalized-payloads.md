@@ -8,9 +8,10 @@ related:
   - FLOW-0104-ulid-primary-id-and-canonical-id.md
 ---
 
-# FLOW-0105 — External ID translation, adapter identity, and normalized payload ingestion
+# FLOW-0105 - External ID translation, adapter identity, and normalized payload ingestion
 
 Contract (at a glance)
+
 - Inputs:
   - Messages produced by adapter hosts annotated with `[FlowAdapter(system, adapter)]`.
   - Envelope metadata auto-stamped: `adapter.system`, `adapter.name`.
@@ -38,30 +39,30 @@ Adapters ingest data from external systems and should not depend on the orchestr
 
 ## Decision
 
-1) Adapter identity via attribute
+1. Adapter identity via attribute
 
 - Introduce `[FlowAdapter(system, adapter)]` on adapter hosts (publishers/ingesters). The runtime stamps every message with:
-  - `adapter.system` — stable identifier for the source system (centralized constant).
-  - `adapter.name` — adapter variant/name.
+  - `adapter.system` - stable identifier for the source system (centralized constant).
+  - `adapter.name` - adapter variant/name.
 
-2) External IDs live in the envelope (not the model)
+2. External IDs live in the envelope (not the model)
 
 - Carry native IDs as envelope metadata: `identifier.external.<system> = <value>` (0..N entries).
 - Models remain transport-agnostic; do not add `NativeId`/`SourceId` to `FlowEntity`/`FlowValueObject`.
 
-3) Parent relationships are declared on the model
+3. Parent relationships are declared on the model
 
 - Use `[ParentKey]` on properties (e.g., `Sensor.DeviceId`) to declare canonical links. Adapters never set canonical IDs; the resolver fills them.
 
-4) Contractless ingestion (normalized bag) is first-class
+4. Contractless ingestion (normalized bag) is first-class
 
 - A normalized bag carries:
-  - `model` — the canonical entity key (e.g., `Keys.Device.Key`).
+  - `model` - the canonical entity key (e.g., `Keys.Device.Key`).
   - Arbitrary field paths (case-insensitive, dotted permitted) with values.
   - Link hints: `reference.<entityKey>.external.<system> = <externalId>`.
 - The pipeline maps bag fields to the model and resolves links using the ExternalId index.
 
-5) ExternalId index and resolution
+5. ExternalId index and resolution
 
 - Maintain an index mapping `(entityKey, system, externalId) -> canonicalId`.
 - On entity create/update, when external IDs are present in the envelope, upsert entries into the index for that entity key.
@@ -74,6 +75,7 @@ Adapters ingest data from external systems and should not depend on the orchestr
 ## Alternatives considered
 
 - Adding `NativeId`/`SourceId` to all models:
+
   - Rejected. Couples models to transport concerns, does not scale to multi-source events.
 
 - Overloading `[ParentKey]` with native-id translation flags:
@@ -82,16 +84,19 @@ Adapters ingest data from external systems and should not depend on the orchestr
 ## Consequences
 
 Pros
+
 - Clean separation of concerns; models remain canonical-only.
 - Adapters stay ignorant of canonical IDs and can send in bulk.
 - Deterministic metadata schema (reserved keys), centralized constants (ARCH-0040).
 - Works for both strong-typed and contractless ingestion.
 
 Cons
+
 - Requires maintaining an ExternalId index and resolver step.
 - Ambiguity when multiple systems provide conflicting IDs; must be disambiguated by explicit system keys and policy.
 
 Edge cases
+
 - Unknown external ID → backoff, park, DLQ with actionable reason.
 - Duplicate mappings → conflict or replace per configuration.
 - High-volume streams → resolver must batch lookups and cache hot entries.

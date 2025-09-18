@@ -61,9 +61,9 @@ String query WHERE suffix or full SELECT supported. Property tokens map to proje
 
 See also:
 
-- ADR-0050 (instruction name constants) — `decisions/DATA-0050-instruction-name-constants-and-scoping.md`
-- ADR-0051 (Direct routing via instruction executors) — `decisions/DATA-0051-direct-routing-via-instruction-executors.md`
-- ADR-0052 (Dapper boundary; Direct uses ADO.NET) — `decisions/DATA-0052-relational-dapper-boundary-and-direct-ado.md`
+- ADR-0050 (instruction name constants) - `decisions/DATA-0050-instruction-name-constants-and-scoping.md`
+- ADR-0051 (Direct routing via instruction executors) - `decisions/DATA-0051-direct-routing-via-instruction-executors.md`
+- ADR-0052 (Dapper boundary; Direct uses ADO.NET) - `decisions/DATA-0052-relational-dapper-boundary-and-direct-ado.md`
 
 ## Testing
 
@@ -75,8 +75,8 @@ Docker detection and endpoints:
 
 - The tests now probe the Docker daemon directly and pass a stable endpoint to Testcontainers.
 - Honors `DOCKER_HOST` when set; otherwise falls back to platform defaults:
-    - Windows: `npipe://./pipe/docker_engine` (falls back to `http://localhost:2375` if needed)
-    - Linux/macOS: `unix:///var/run/docker.sock` (falls back to `http://localhost:2375`)
+  - Windows: `npipe://./pipe/docker_engine` (falls back to `http://localhost:2375` if needed)
+  - Linux/macOS: `unix:///var/run/docker.sock` (falls back to `http://localhost:2375`)
 - Sets `TESTCONTAINERS_RYUK_DISABLED=true` to avoid occasional stream hijack issues on Windows.
 
 If Docker is not reachable and no connection string is provided, tests no-op to keep CI green. Provide a Postgres connection string to force execution without Docker:

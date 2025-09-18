@@ -1,4 +1,4 @@
-# AI-0008 — AI adapters and registry
+# AI-0008 - AI adapters and registry
 
 Status: Proposed
 Date: 2025-08-19
@@ -10,16 +10,19 @@ We want a pluggable AI adapter abstraction so Koan can connect to different yet 
 
 ## Decision
 
- First-party adapters: Koan.Ai.Provider.Ollama (first), Koan.AI.Adapter.OpenAI (subset). Others can be community.
+First-party adapters: Koan.Ai.Provider.Ollama (first), Koan.AI.Adapter.OpenAI (subset). Others can be community.
+
 ### Adapter identity and capabilities (contract)
 
-1) Identity
+1. Identity
+
 - AdapterId: string (stable, unique within app)
 - Kind: enum (Ollama, OpenAI, Anthropic, Gemini, LocalServer, Unknown)
 - Endpoint: Uri (or connection descriptor)
 - Labels: Dictionary<string,string> for routing (region, tier, pool, model-family, owner)
 
-2) Capabilities (feature flags and metadata)
+2. Capabilities (feature flags and metadata)
+
 - SupportsChat: bool
 - SupportsStreaming: bool
 - SupportsEmbeddings: bool
@@ -33,7 +36,8 @@ We want a pluggable AI adapter abstraction so Koan can connect to different yet 
 - CostHints: optional pricing/cost unit hints for budgeting (tokens/sec, req/sec, dollars?)
 - Version: string (provider/server version)
 
-3) Operations
+3. Operations
+
 - ListModelsAsync(cancellation)
 - GetCapabilitiesAsync(cancellation)
 - ChatAsync(request, cancellation) → ChatResponse (non-stream)
@@ -42,11 +46,13 @@ We want a pluggable AI adapter abstraction so Koan can connect to different yet 
 - HealthCheckAsync(cancellation) → AdapterHealth (status, latency, lastError)
 - WarmupAsync(optional)
 
-4) Error/consistency
+4. Error/consistency
+
 - All operations must map provider errors to a normalized error model and attach ProviderErrorCode in extensions.
 - Tokenization numbers may be approximate; expose a TokenizationMethod descriptor per adapter.
 
-5) Configuration
+5. Configuration
+
 - Each adapter binds strongly-typed Options (e.g., OllamaOptions { BaseUrl, DefaultModel, Timeout, Headers }).
 - Secrets are obtained via the AI Secrets provider ADR (AI-0004).
 
@@ -66,10 +72,10 @@ We want a pluggable AI adapter abstraction so Koan can connect to different yet 
 ### HTTP surface alignment
 
 - The controllers expose:
-  - GET /ai/capabilities — merged from the registry
-  - GET /ai/models — flattened list with adapterId and model metadata
-  - POST /ai/chat and /ai/chat/stream — accept optional adapter/model hints
-  - POST /ai/embeddings — accept optional adapter/model hints
+  - GET /ai/capabilities - merged from the registry
+  - GET /ai/models - flattened list with adapterId and model metadata
+  - POST /ai/chat and /ai/chat/stream - accept optional adapter/model hints
+  - POST /ai/embeddings - accept optional adapter/model hints
 - Requests may carry headers to influence selection (e.g., X-Koan-AI-Adapter, X-Koan-AI-Model, X-Koan-AI-RoutePolicy). These map to router policies in AI-0009.
 
 ## Consequences
@@ -89,6 +95,7 @@ We want a pluggable AI adapter abstraction so Koan can connect to different yet 
 Scope: Development only (KoanEnv.IsDevelopment). Controlled by options ai:autoDiscovery:enabled (default true in Dev, false elsewhere). Explicit configuration always wins over discovery.
 
 Heuristics (performed in parallel with short timeouts ≤ 250ms per probe):
+
 - Host endpoints:
   - http://localhost:11434
   - http://127.0.0.1:11434
@@ -101,16 +108,19 @@ Heuristics (performed in parallel with short timeouts ≤ 250ms per probe):
   - Koan_AI_OLLAMA_URLS (semicolon/comma-separated)
 
 Probe method: GET /api/tags with 200–500ms overall budget; if reachable, fetch /api/show for a small sample model to refine metadata. Register each reachable endpoint as an Ollama adapter with:
+
 - AdapterId: ollama@{host}:{port}
 - Labels: { discovered: "true", pool: "dev", family: inferred-from-model-name }
 
 Safety and controls:
+
 - Only active when KoanEnv.IsDevelopment == true and ai:autoDiscovery:enabled == true
 - Can be disabled via env Koan_AI_AUTODISCOVERY=0 or ai:autoDiscovery:enabled=false
 - Never runs in Production by default; in non-Dev, explicit configuration is required
 - Discovery adds adapters but does not override explicitly-declared adapters with the same AdapterId
 
 DX:
+
 - Log concise discovery summary: candidates tried, successes, and final registry entries
 - Expose /ai/capabilities with a "discovered": true flag on auto-added entries
 
@@ -121,58 +131,54 @@ Binding root: "Koan:Ai" (strongly-typed options). Supports multiple services per
 appsettings.json shape (illustrative):
 
 Koan:
-  Ai:
-    AutoDiscovery:
-      Enabled: true
-      AllowInNonDev: false
-      ProbeTimeoutMs: 250
-    Health:
-      Required: false
-    Router:
-      DefaultPolicy: "wrw+health+least-pending"  # Dev default; Prod default: "health+least-pending"
-      Capacity:
-        MaxInflightPerAdapter: 32
-        Queue:
-          MaxDepth: 128
-          Strategy: "fifo"
-      Hedging:
-        AfterMs: null
-      Timeouts:
-        ChatMs: 60000
-        EmbeddingsMs: 30000
-      Weights:
-        # adapterId → weight; enables WRR when present
-        ollama-a: 2
-        ollama-b: 1
-    Services:
-      Ollama:
-        - Id: "ollama-a"
-          BaseUrl: "http://host.docker.internal:11434"
-          DefaultModel: "llama3.1:8b"
-          Weight: 2
-          Labels:
-            pool: "alpha"
-            family: "llama3"
-        - Id: "ollama-b"
-          BaseUrl: "http://host.docker.internal:11435"
-          DefaultModel: "llama3.1:8b"
-          Weight: 1
-          Labels:
-            pool: "beta"
-            family: "llama3"
-      OpenAI:
-        - Id: "openai"
-          BaseUrl: "https://api.openai.com/v1"
-          ApiKey: "env:OPENAI_API_KEY"   # resolved via AI secrets provider (AI-0004)
-          DefaultModel: "gpt-4o-mini"
-          Labels:
-            tier: "paid"
-    Aliases:
-      # alias → provider-scoped model names
-      "llama3.1:8b": ["ollama:llama3.1:8b"]
-      "gpt-lite": ["openai:gpt-4o-mini"]
+Ai:
+AutoDiscovery:
+Enabled: true
+AllowInNonDev: false
+ProbeTimeoutMs: 250
+Health:
+Required: false
+Router:
+DefaultPolicy: "wrw+health+least-pending" # Dev default; Prod default: "health+least-pending"
+Capacity:
+MaxInflightPerAdapter: 32
+Queue:
+MaxDepth: 128
+Strategy: "fifo"
+Hedging:
+AfterMs: null
+Timeouts:
+ChatMs: 60000
+EmbeddingsMs: 30000
+Weights: # adapterId → weight; enables WRR when present
+ollama-a: 2
+ollama-b: 1
+Services:
+Ollama: - Id: "ollama-a"
+BaseUrl: "http://host.docker.internal:11434"
+DefaultModel: "llama3.1:8b"
+Weight: 2
+Labels:
+pool: "alpha"
+family: "llama3" - Id: "ollama-b"
+BaseUrl: "http://host.docker.internal:11435"
+DefaultModel: "llama3.1:8b"
+Weight: 1
+Labels:
+pool: "beta"
+family: "llama3"
+OpenAI: - Id: "openai"
+BaseUrl: "https://api.openai.com/v1"
+ApiKey: "env:OPENAI_API_KEY" # resolved via AI secrets provider (AI-0004)
+DefaultModel: "gpt-4o-mini"
+Labels:
+tier: "paid"
+Aliases: # alias → provider-scoped model names
+"llama3.1:8b": ["ollama:llama3.1:8b"]
+"gpt-lite": ["openai:gpt-4o-mini"]
 
 Strongly-typed options (sketch):
+
 - AiOptions { AutoDiscovery, Health, Router, Services, Aliases }
 - ServicesOptions { List<OllamaServiceOptions>, List<OpenAiServiceOptions>, ... }
 - OllamaServiceOptions { Id, BaseUrl, DefaultModel?, Weight?, Labels:Dictionary, Headers?, Timeouts?, Enabled? }
@@ -181,21 +187,24 @@ Strongly-typed options (sketch):
 ## Bootstrapping
 
 services.AddKoan() auto-wires AI with sane defaults and environment-aware discovery:
+
 - AddKoan():
   - Binds Koan:Ai options
   - Calls AddAi(options)
-  - Registers providers declared under Koan:Ai:Services:*
+  - Registers providers declared under Koan:Ai:Services:\*
   - If none declared and environment is Development (or non-Prod when configured), runs auto-discovery for Ollama and registers any found endpoints
   - Adds routing automatically; if only one eligible provider is present, IAi bypasses the router
 
 Manual opt-in remains supported:
+
 - services.AddAi().AddOllama("ollama-a", url).AddRouting();
 
-Public API for callers remains IAi (PromptAsync/StreamAsync/EmbedAsync) and the HTTP controllers under /ai/*.
+Public API for callers remains IAi (PromptAsync/StreamAsync/EmbedAsync) and the HTTP controllers under /ai/\*.
 
 ## Persistence
 
 The AI runtime may persist internal state using Koan’s Entity patterns on the default database or a configured connection:
+
 - Entities (examples): AiServiceState (health snapshots), AiCallRecord (request/response metadata), AiBudget (quota usage), AiRouteDecision (audit)
 - Options: Koan:Ai:Persistence { Enabled: false, ConnectionName: null, Schema/TablePrefix: "Ai" }
 - Persistence is off by default; when enabled, it augments telemetry with durable audit trails and quota enforcement.

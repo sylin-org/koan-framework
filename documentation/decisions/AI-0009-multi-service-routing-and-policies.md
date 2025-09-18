@@ -1,4 +1,4 @@
-# AI-0009 — Multi-service routing, load balancing, and policies
+# AI-0009 - Multi-service routing, load balancing, and policies
 
 Status: Proposed
 Date: 2025-08-19
@@ -13,6 +13,7 @@ Users may run multiple inference backends of the same kind (e.g., two or more Ol
 Introduce an AI Router in Koan.AI.Core with pluggable policies. It selects an adapter/endpoint per request using model hints, labels, health, and policy inputs. It exposes selection results to controllers and observability.
 
 ### Router contract
+
 - SelectAsync(intent, requestMetadata, cancellation) → RouteDecision
   - intent: Chat, ChatStream, Embeddings
   - requestMetadata: model hint, tenant, budget, latency preference, maxTokens
@@ -20,6 +21,7 @@ Introduce an AI Router in Koan.AI.Core with pluggable policies. It selects an ad
 - Execute helpers wrap adapter calls to apply timeouts, hedging, and streaming guarantees.
 
 ### Built-in policies
+
 - RoundRobin (per adapter pool)
 - WeightedRoundRobin (weights via config/labels)
 - LeastPending (pending inflight counter per adapter)
@@ -32,6 +34,7 @@ Introduce an AI Router in Koan.AI.Core with pluggable policies. It selects an ad
 - Hedging (duplicate after T ms; cancel loser on first success)
 
 ### Headers and options
+
 - X-Koan-AI-Adapter: force a specific adapter id (admins only)
 - X-Koan-AI-Model: model hint or alias (e.g., llama3.1:8b)
 - X-Koan-AI-RoutePolicy: named policy (rr, wrw, least-pending, sticky:session)
@@ -40,6 +43,7 @@ Introduce an AI Router in Koan.AI.Core with pluggable policies. It selects an ad
 - X-Koan-AI-Timeout: per-request timeout
 
 ### Auto-wire and default flow
+
 - Auto-wire: If the AdapterRegistry contains 2+ eligible adapters for the intent/model, the Router is engaged automatically; controllers delegate selection with no extra setup.
 - Sane defaults:
   - Development: default policy = WeightedRoundRobin + HealthAware with LeastPending as a tiebreaker; discovered adapters default weight=1.
@@ -50,12 +54,14 @@ Introduce an AI Router in Koan.AI.Core with pluggable policies. It selects an ad
 - Admission control: If CapacityGuard limits are reached, requests are queued up to queue.maxDepth, otherwise 429/503 is returned with a Retry-After hint.
 
 ### Health, metrics, and backpressure
+
 - Router maintains per-adapter health: success/failure counts, EWMA latency, last error, circuit breaker state
 - Expose /ai/health and include router status in /ai/capabilities
 - CapacityGuard rejects or queues when adapters exceed inflight; queue depth is observable
 - SSE streaming: ensure monotonic chunk ordering; on hedging, only one stream is surfaced
 
 #### Overall AI health and core telemetry wiring
+
 - Engagement: If the registry has ≥ 1 adapter, the AI subsystem is considered engaged and contributes to app health (see ARCH-0013).
 - Rollup states (component: "ai"):
   - Healthy: all registered adapters report Healthy
@@ -74,12 +80,14 @@ Introduce an AI Router in Koan.AI.Core with pluggable policies. It selects an ad
   - App-level health surfaces AI as a component entry aligned to ARCH-0013 health announcements.
 
 ### Multi-Ollama scenarios
+
 - Two Ollama instances with identical models: use WeightedRoundRobin + HealthAware for smooth load
 - Heterogeneous pool (8B + 3B): ModelAware routes large prompts to 8B, short to 3B
 - Tenant isolation: Labels pool=alpha/beta; StickyBySession keeps users on their pool
 - Batch embedding jobs: LeastPending + CapacityGuard; optional backoff/retry on 429
 
 ### Configuration and overrides
+
 - Router options (excerpt):
   - router.defaultPolicy: rr | wrw | least-pending | sticky:session | health+least-pending (composable)
   - router.capacity.maxInflightPerAdapter: int (default 32)
@@ -89,29 +97,31 @@ Introduce an AI Router in Koan.AI.Core with pluggable policies. It selects an ad
 - Headers can hint per-request routing (see above); admin-only headers may be rejected for non-admin callers.
 
 ### Recommended namespaces and API shape
+
 - Namespaces (terse, semantic):
-  - Koan.AI — root abstractions and DI entrypoints (AddAi)
-  - Koan.AI.Contracts — request/response DTOs and interfaces (IAi, IAiRouter)
-  - Koan.AI.Runtime — runtime services (Router, Health, Inflight, Policies)
-  - Koan.AI.Catalog — provider registry and model catalog
-  - Koan.AI.Providers.Ollama — Ollama provider (HTTP client, mapping)
-  - Koan.AI.AspNet — MVC controllers and wiring
+  - Koan.AI - root abstractions and DI entrypoints (AddAi)
+  - Koan.AI.Contracts - request/response DTOs and interfaces (IAi, IAiRouter)
+  - Koan.AI.Runtime - runtime services (Router, Health, Inflight, Policies)
+  - Koan.AI.Catalog - provider registry and model catalog
+  - Koan.AI.Providers.Ollama - Ollama provider (HTTP client, mapping)
+  - Koan.AI.AspNet - MVC controllers and wiring
 - Primary entrypoint:
   - IAi with PromptAsync(request), StreamAsync(request), and EmbedAsync(request)
   - IAi internally consults IAiRouter when 2+ eligible providers exist; otherwise calls the single provider directly
 - DI surface:
   - services.AddAi(o => { o.AutoDiscovery = DevDefault; o.DefaultPolicy = DevDefault; })
-      .AddOllama("ollama-a", url)
-      .AddOllama("ollama-b", url2)
-      .AddRouting();
+    .AddOllama("ollama-a", url)
+    .AddOllama("ollama-b", url2)
+    .AddRouting();
   - Or via top-level:
     - services.AddKoan(); // Auto-binds Koan:Ai, registers declared services, runs Dev auto-discovery if none declared, and self-registers routing
 
 ### Minimal flows (behavioral)
-1) Single provider, no routing
+
+1. Single provider, no routing
    - Setup: services.AddAi().AddOllama("ollama-a", url);
    - Behavior: IAi.PromptAsync("Hey") sends all prompts to ollama-a; router stays inactive.
-2) Two providers, routing auto-engaged
+2. Two providers, routing auto-engaged
    - Setup: services.AddAi().AddOllama("ollama-a", url).AddOllama("ollama-b", url2).AddRouting();
    - Behavior: IAi.PromptAsync("Hey") remains the only entry point. Router selects per policy:
      - Back-to-back prompts: first → A, second → B (due to LeastPending/WRR), then follow policy as load/health changes.
@@ -129,6 +139,7 @@ Introduce an AI Router in Koan.AI.Core with pluggable policies. It selects an ad
 - SSE SLOs and backpressure guidelines remain as in AI-0002.
 
 ### Development auto-discovery interplay
+
 - Auto-discovered adapters (see AI-0008) are labeled discovered=true and pool=dev by default.
 - Default policy in Development: WeightedRoundRobin + HealthAware across explicit + discovered adapters.
 - Production safety: In non-Development, discovered adapters are ignored unless ai:autoDiscovery:allowInNonDev=true is set.

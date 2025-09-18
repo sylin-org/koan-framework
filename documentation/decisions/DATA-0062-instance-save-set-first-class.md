@@ -7,13 +7,13 @@ date: 2025-08-28
 title: Instance Save(set) is first-class; Data<TEntity,TKey>.Upsert(..., set) is second-class
 ---
 
-# ADR DATA-0062 — Instance Save(set) as first-class DX
+# ADR DATA-0062 - Instance Save(set) as first-class DX
 
 ## Context
 
 - Koan already supports logical entity "sets" that route to parallel physical stores by suffixing the storage name with `#<set>` (see DATA-0030 and `StorageNameRegistry`).
 - Today, set-targeted operations are exposed primarily via the generic facade (`Data<TEntity,TKey>.UpsertAsync(entity, set)`, `GetAsync(id, set)`, etc.). While functional, it isn't the most ergonomic path for application code that works with instances.
-- We want a natural, entity-centric developer experience: `model.Save("Audit")`, `models.Save("Moderation")` — without forcing consumers to hop to the static facade.
+- We want a natural, entity-centric developer experience: `model.Save("Audit")`, `models.Save("Moderation")` - without forcing consumers to hop to the static facade.
 
 ## Decision
 
@@ -27,6 +27,7 @@ title: Instance Save(set) is first-class; Data<TEntity,TKey>.Upsert(..., set) is
 - Treat `Data<TEntity,TKey>.UpsertAsync(entity, set)` and other set-aware statics as second-class escape hatches. They remain available and supported.
 
 Optional (recommended) enhancements
+
 - Introduce a small `DataSetKey` typed wrapper to avoid magic strings, with well-known constants: `Primary`, `Audit`, `DeleteFlags`, `Moderation`, `Outbox`. Add overloads that accept `DataSetKey` in addition to `string`.
 
 ## Scope
@@ -58,6 +59,6 @@ Optional (recommended) enhancements
 
 ## References
 
-- DATA-0030 — Entity sets routing and storage suffixing
-- ARCH-0040 — Config and constants naming
+- DATA-0030 - Entity sets routing and storage suffixing
+- ARCH-0040 - Config and constants naming
 - `Koan.Data.Core.DataSetContext`, `Koan.Data.Core.Configuration.StorageNameRegistry`

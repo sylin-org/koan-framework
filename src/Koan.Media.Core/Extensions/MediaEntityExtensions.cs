@@ -14,7 +14,7 @@ public static class MediaEntityExtensions
     => Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService
            ?? throw new InvalidOperationException("IStorageService not available");
 
-    // Url helper — presigned when supported; falls back to a routed fetch URL (left to Web layer later)
+    // Url helper - presigned when supported; falls back to a routed fetch URL (left to Web layer later)
     public static async Task<Uri> Url<TEntity>(this TEntity media, TimeSpan? ttl = null, CancellationToken ct = default)
         where TEntity : class, IMediaObject
     {

@@ -1,4 +1,4 @@
-# DATA-0058 — Adapter role attributes and explicit entity store mapping
+# DATA-0058 - Adapter role attributes and explicit entity store mapping
 
 Status: Accepted
 
@@ -14,16 +14,17 @@ We already use `[Storage(Name=…)]` for logical set naming and `[DataAdapter("�
 
 Introduce role-specific attributes to explicitly map entities to adapters:
 
-- `[SourceAdapter("<provider>")]` — declares the primary/document adapter for the entity (for example, `mongo`, `postgres`, `sqlite`).
-- `[VectorAdapter("<provider>")]` — declares the vector adapter for the entity (for example, `weaviate`, `redis`, `pgvector`).
+- `[SourceAdapter("<provider>")]` - declares the primary/document adapter for the entity (for example, `mongo`, `postgres`, `sqlite`).
+- `[VectorAdapter("<provider>")]` - declares the vector adapter for the entity (for example, `weaviate`, `redis`, `pgvector`).
 
 These can be applied independently on the same entity type. Continue to use `[Storage(Name=…, Namespace?=…)]` for the logical set/class name. The attributes don’t carry tunables; adapter-specific options remain in typed options/config.
 
 Resolution precedence in `DataService` and repositories:
-1) Per-operation override (explicit repository/adapter requested programmatically)
-2) Entity-level attribute for the relevant role
-3) Application/module default adapter for that role
-4) If no adapter is resolvable, fail fast with a clear diagnostic (do not silently pick an arbitrary adapter)
+
+1. Per-operation override (explicit repository/adapter requested programmatically)
+2. Entity-level attribute for the relevant role
+3. Application/module default adapter for that role
+4. If no adapter is resolvable, fail fast with a clear diagnostic (do not silently pick an arbitrary adapter)
 
 This keeps routing predictable and self-documenting at the entity declaration.
 
@@ -62,6 +63,7 @@ public sealed class AnimeDoc : IEntity<string>
 ## Testability
 
 Add unit tests around `DataService` resolution to assert:
+
 - Attribute-driven routing for doc and vector roles
 - Per-operation override precedence
 - Clear exception when no adapter is resolvable

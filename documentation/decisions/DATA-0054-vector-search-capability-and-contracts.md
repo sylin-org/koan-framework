@@ -1,4 +1,4 @@
-# DATA-0054 — Vector Search capability and contracts
+# DATA-0054 - Vector Search capability and contracts
 
 Status: Accepted
 Date: 2025-08-20

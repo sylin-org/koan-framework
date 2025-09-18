@@ -23,7 +23,7 @@ public static class FlowSets
         return name;
     }
 
-    // Full set names (include model segment) — still useful for some providers/scopes
+    // Full set names (include model segment) - still useful for some providers/scopes
     public static string Stage<TModel>(string stage) => $"flow.{ModelName<TModel>()}.{stage}";
     public static string Stage(Type model, string stage) => $"flow.{ModelName(model)}.{stage}";
     public static string View<TModel>(string view) => $"flow.{ModelName<TModel>()}.views.{view}";
@@ -31,7 +31,7 @@ public static class FlowSets
     public static string TaskSet<TModel>() => $"flow.{ModelName<TModel>()}.{Tasks}";
     public static string TaskSet(Type model) => $"flow.{ModelName(model)}.{Tasks}";
 
-    // Short set names (no model segment) — used with storage base overridden to model full name
+    // Short set names (no model segment) - used with storage base overridden to model full name
     public static string StageShort(string stage) => $"flow.{stage}";
     public static string ViewShort(string view) => $"flow.views.{view}";
     public static string TasksShort() => $"flow.{Tasks}";

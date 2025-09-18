@@ -4,7 +4,7 @@ slug: STOR-0008-storage-dx-stream-and-key-first-helpers
 domain: storage
 status: accepted
 date: 2025-08-24
-title: Storage DX — stream reads and key-first helpers on StorageEntity
+title: Storage DX - stream reads and key-first helpers on StorageEntity
 ---
 
 Context

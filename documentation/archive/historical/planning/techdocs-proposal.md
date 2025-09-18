@@ -1,12 +1,12 @@
 ---
 ## Summary
 
-S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koan capabilities with a clear role-based permission model. It emphasizes clean, controller-based HTTP APIs, first-class data-access statics, deny-by-default capability enforcement, Postgres storage (FTS + pgvector), and AI-assisted authoring via an adapter-friendly abstraction. The UI is minimal (single-page, static) to keep attention on Koan's server-side design, testability, and ops posture. **No live collaboration features** — this is a focused demo of Koan's modular architecture.
+S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koan capabilities with a clear role-based permission model. It emphasizes clean, controller-based HTTP APIs, first-class data-access statics, deny-by-default capability enforcement, Postgres storage (FTS + pgvector), and AI-assisted authoring via an adapter-friendly abstraction. The UI is minimal (single-page, static) to keep attention on Koan's server-side design, testability, and ops posture. **No live collaboration features** - this is a focused demo of Koan's modular architecture.
 
 ### Role model
 - **Readers**: All users can view published content, search, and browse collections.
 - **Authors**: Can create drafts, edit their own content, submit for moderation, and use AI assists.
-- **Moderators**: Can approve/reject/return submissions, manage any content, perform soft-delete/restore, and access audit trails.le: S7 TechDocs (realigned) — Proposal: Postgres, AI, Vector
+- **Moderators**: Can approve/reject/return submissions, manage any content, perform soft-delete/restore, and access audit trails.le: S7 TechDocs (realigned) - Proposal: Postgres, AI, Vector
 description: A focused, no-collab initial release to demonstrate Koan’s modular capabilities using Postgres storage, full-text + vector search, and AI-assisted authoring.
 ---
 
@@ -140,24 +140,25 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koa
 
 ## Role-based permissions matrix
 
-| Action | Reader | Author | Moderator |
-|--------|--------|--------|-----------|
-| View published content | ✓ | ✓ | ✓ |
-| Search (FTS + semantic) | ✓ | ✓ | ✓ |
-| Browse collections | ✓ | ✓ | ✓ |
-| Create drafts | ✗ | ✓ | ✓ |
-| Edit own drafts | ✗ | ✓ | ✓ |
-| Edit any content | ✗ | ✗ | ✓ |
-| Submit for moderation | ✗ | ✓ | ✓ |
-| Access moderation queue | ✗ | ✗ | ✓ |
-| Approve/reject/return | ✗ | ✗ | ✓ |
-| Soft-delete/restore | ✗ | ✗ | ✓ |
-| Access audit trails | ✗ | ✗ | ✓ |
-| Revert from audit | ✗ | ✗ | ✓ |
-| AI assists (tags/summary/etc.) | ✗ | ✓ | ✓ |
-| Manage attachments | ✗ | ✓ (own) | ✓ (any) |
+| Action                         | Reader | Author  | Moderator |
+| ------------------------------ | ------ | ------- | --------- |
+| View published content         | ✓      | ✓       | ✓         |
+| Search (FTS + semantic)        | ✓      | ✓       | ✓         |
+| Browse collections             | ✓      | ✓       | ✓         |
+| Create drafts                  | ✗      | ✓       | ✓         |
+| Edit own drafts                | ✗      | ✓       | ✓         |
+| Edit any content               | ✗      | ✗       | ✓         |
+| Submit for moderation          | ✗      | ✓       | ✓         |
+| Access moderation queue        | ✗      | ✗       | ✓         |
+| Approve/reject/return          | ✗      | ✗       | ✓         |
+| Soft-delete/restore            | ✗      | ✗       | ✓         |
+| Access audit trails            | ✗      | ✗       | ✓         |
+| Revert from audit              | ✗      | ✗       | ✓         |
+| AI assists (tags/summary/etc.) | ✗      | ✓       | ✓         |
+| Manage attachments             | ✗      | ✓ (own) | ✓ (any)   |
 
 ### Capability mappings
+
 - **View capabilities**: All users (no explicit capability required for published content)
 - **Author capabilities**: `Content.Create`, `Content.EditOwn`, `Content.Submit`, `AI.Assist`
 - **Moderator capabilities**: All Author capabilities + `Moderation.Queue`, `Moderation.Approve`, `Moderation.Reject`, `Moderation.Return`, `SoftDelete.Mark`, `SoftDelete.Restore`, `Audit.List`, `Audit.Revert`, `Content.EditAny`

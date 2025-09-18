@@ -15,12 +15,14 @@ We also needed predictable, opt-in persistence for containerized adapters so dat
 
 ## Decision
 
-1) Adapter-declared endpoints via attributes
+1. Adapter-declared endpoints via attributes
+
 - Introduce DefaultEndpointAttribute on adapter factories with: Scheme, DefaultHost, ContainerPort, Protocol, ImagePrefixes, and optional UriPattern.
 - UriPattern, when present, takes precedence when rendering endpoints (status live/hints). It may include {host} and {port} placeholders.
 - The CLI discovers these attributes at startup and registers an endpoint resolver. Endpoint formatting uses adapter-declared data first; otherwise falls back to conservative heuristics.
 
-2) Persistence mounts via attributes
+2. Persistence mounts via attributes
+
 - Introduce HostMountAttribute(containerPath) for adapters to declare container data directories that should be bind-mounted in local dev.
 - The Compose exporter discovers HostMount + DefaultEndpointAttribute(ImagePrefixes) pairs and automatically injects bind mounts: ./Data/{serviceId} -> <containerPath>, unless the plan already declares a binding to that path.
 - A small image-name heuristic remains as a soft fallback when no attributes match.
@@ -51,6 +53,6 @@ We also needed predictable, opt-in persistence for containerized adapters so dat
 
 ## References
 
-- ARCH-0047 — Orchestration: hosting providers and exporters as adapters
+- ARCH-0047 - Orchestration: hosting providers and exporters as adapters
 - docs/reference/orchestration.md
 - docs/engineering/orchestration-spi.md

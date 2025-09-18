@@ -4,10 +4,10 @@ slug: WEB-0041-graphql-module-and-controller
 domain: WEB
 status: Accepted
 date: 2025-08-19
-title: GraphQL module (Koan.Web.GraphQl) — controller-hosted schema from IEntity<>, typed filters/sorts, display field
+title: GraphQL module (Koan.Web.GraphQl) - controller-hosted schema from IEntity<>, typed filters/sorts, display field
 ---
- 
-# ADR 0041: GraphQL module (Koan.Web.GraphQl) — controller-hosted schema from IEntity<>, typed filters/sorts, display field
+
+# ADR 0041: GraphQL module (Koan.Web.GraphQl) - controller-hosted schema from IEntity<>, typed filters/sorts, display field
 
 ## Context
 
@@ -61,6 +61,7 @@ title: GraphQL module (Koan.Web.GraphQl) — controller-hosted schema from IEnti
 ## Implementation plan
 
 Phase 0: Module scaffold and bootstrapping
+
 - Project `Koan.Web.GraphQl` with folders: `Controllers`, `Types`, `Inputs`, `Resolvers`, `Dataloaders`, `Options`, `Infrastructure`.
 - `Infrastructure/Constants.cs` (route "/graphql", default limits).
 - `ServiceCollectionExtensions.AddKoanGraphQl()`:
@@ -71,6 +72,7 @@ Phase 0: Module scaffold and bootstrapping
 - Tests: DI wiring and controller smoke test.
 
 Phase 1: Queries (read path)
+
 - `ObjectType<TEntity>` generator including `display` field.
 - Connection types and `pageInfo`.
 - Query fields: singular by id; plural with `filter/sort/page/size/set`.
@@ -79,17 +81,20 @@ Phase 1: Queries (read path)
 - Tests: filter/sort → `QueryOptions` mapping; pagination and `totalCount`; `CanRead` guard; complexity limits.
 
 Phase 2: Mutations (write path)
+
 - `<Entity>Input` from public writable props.
 - Mutations: upsert one/many; delete one/many using `RepositoryFacade/IBatchSet`.
 - Guards: `CanWrite/CanRemove`; map to GraphQL error extensions.
 - Tests: upsert round-trip; batch ops; guard failures; id generation parity.
 
 Phase 3: Dataloaders and polish
+
 - Id-based dataloaders; relation loaders as needed.
 - Depth/complexity/timeouts; enforce page size ceiling.
 - Dev-only IDE toggle; docs and SDL export.
 
 ## Acceptance criteria
+
 - `AddKoanGraphQl` exposes schema for all discovered `IEntity<>` types without manual wiring.
 - Queries/mutations use the same repositories and respect hooks/policies.
 - Typed filters/sorts correctly translate to `QueryOptions` (unit-tested).
@@ -111,6 +116,7 @@ Phase 3: Dataloaders and polish
   - Heavy queries if fields are over-exposed; mitigate with complexity limits and selective exposure.
 
 ## References
+
 - ADR-0029: JSON filter language and endpoint
 - ADR-0031: Filter ignore-case option
 - ADR-0032: Paging pushdown and in-memory fallback
@@ -118,10 +124,12 @@ Phase 3: Dataloaders and polish
 - ADR-0040: Config and constants naming
 
 ## Out of scope (now)
+
 - PATCH/JsonPatch; use typed updates instead.
 - Subscriptions; consider later with messaging.
 - Transformers in GraphQL; use explicit fields/types.
 
 ## Follow-ups
+
 - Add a sample enabling both `EntityController<Todo>` and GraphQL for `Todo`.
 - Docs for filter input syntax and examples per adapter.

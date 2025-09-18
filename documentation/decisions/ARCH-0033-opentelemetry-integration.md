@@ -1,13 +1,14 @@
-# 0033 — OpenTelemetry integration (tracing + metrics)
+# 0033 - OpenTelemetry integration (tracing + metrics)
 
 ---
+
 id: ARCH-0033
 slug: ARCH-0033-opentelemetry-integration
 domain: ARCH
 status: Accepted
 date: 2025-08-17
----
 
+---
 
 ## Context
 
@@ -16,6 +17,7 @@ Koan needs a first-class, optional observability story that works across console
 ## Decision
 
 - Provide a core bootstrap `AddKoanObservability(Action<ObservabilityOptions>?)` in `Koan.Core` which:
+
   - Attaches OpenTelemetry Resource with service name/version derived from the entry assembly.
   - Enables tracing and metrics when `Koan:Observability:Enabled` is true, or when OTLP env vars are provided.
   - Instruments ASP.NET Core (when present) and `HttpClient` automatically.
@@ -34,6 +36,7 @@ Koan needs a first-class, optional observability story that works across console
 ## Configuration
 
 - Appsettings:
+
   - `Koan:Observability:Enabled` (bool, default: true in dev)
   - `Koan:Observability:Traces:Enabled` (bool, default: true)
   - `Koan:Observability:Traces:SampleRate` (double 0..1, default: 0.1)

@@ -4,10 +4,10 @@ slug: ARCH-0041-docs-posture-instructions-over-tutorials
 domain: ARCH
 status: Accepted
 date: 2025-08-22
-title: Documentation posture — instructions and references over tutorials/courses
+title: Documentation posture - instructions and references over tutorials/courses
 ---
 
-# ADR 0041: Documentation posture — instructions and references over tutorials/courses
+# ADR 0041: Documentation posture - instructions and references over tutorials/courses
 
 ## Context
 

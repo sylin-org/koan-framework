@@ -53,7 +53,7 @@ public sealed class CapabilitiesTests
         submit.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Reviewer queue and approve with transform
-    var queue = await client.GetAsync("/api/items/moderation/queue?page=1&size=10");
+        var queue = await client.GetAsync("/api/items/moderation/queue?page=1&size=10");
         queue.StatusCode.Should().Be(HttpStatusCode.OK);
         var approve = await client.PostAsJsonAsync($"/api/items/{id}/moderate/approve", new { transform = new { name = "Published" } });
         approve.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -78,7 +78,7 @@ public sealed class CapabilitiesTests
         var restore = await client.PostAsync($"/api/items/{id}/restore", content: null);
         restore.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        // Revert to version 1 (if exists) — tolerate 404 if snapshot not present
+        // Revert to version 1 (if exists) - tolerate 404 if snapshot not present
         var revert = await client.PostAsJsonAsync($"/api/items/{id}/audit/revert", new { version = 1 });
         revert.StatusCode.Should().BeOneOf(HttpStatusCode.NoContent, HttpStatusCode.NotFound);
     }

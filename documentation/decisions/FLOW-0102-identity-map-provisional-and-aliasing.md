@@ -18,31 +18,36 @@ The Flow runtime must stay type‑agnostic while supporting high‑volume value 
 
 ## Decision
 
-1) Identity map (type‑agnostic)
+1. Identity map (type‑agnostic)
+
    - Key: (entityType, system, adapter, externalId) → canonicalId (ULID).
    - Status: provisional | confirmed.
    - Policy: provisional‑on‑miss for value objects; GC stale provisional entries after 2 days (configurable).
 
-2) Aliasing (merge semantics)
+2. Aliasing (merge semantics)
+
    - Support alias records to unify canonical IDs when references converge.
    - Hard cap alias chain length to 1. On merge, rewrite existing aliases to point directly to the terminal canonicalId; resolvers must always return the terminal ID.
 
-3) Value‑object ingest
+3. Value‑object ingest
+
    - Treat VOs as append‑only; duplicates are acceptable; source eventId not required.
    - On mapping failures beyond provisional creation (e.g., policy/validation failure), park entries in a parallel set and sweep periodically to promote when resolvable.
 
-4) Attribute‑driven, default‑on indexing
+4. Attribute‑driven, default‑on indexing
+
    - Introduce an attribute under `Koan.Flow.Attributes` to mark VO properties that link to entities:
-       - Deprecated: `EntityLinkAttribute(Type flowEntityType, LinkKind kind)` where `kind ∈ { CanonicalId, ExternalId }`.
-          Use reserved keys `identifier.external.{source}` in intake payloads instead; mapping uses `system|adapter|externalId` composites.
+     - Deprecated: `EntityLinkAttribute(Type flowEntityType, LinkKind kind)` where `kind ∈ { CanonicalId, ExternalId }`.
+       Use reserved keys `identifier.external.{source}` in intake payloads instead; mapping uses `system|adapter|externalId` composites.
    - Enable indexing by default for any VO property decorated with this attribute:
      - If `CanonicalId`: index (property, capturedAt DESC).
      - If `ExternalId`: index (system, adapter, property, capturedAt DESC).
 
-5) Sensor → Device relationship (sample baseline)
+5. Sensor → Device relationship (sample baseline)
+
    - Add `deviceId` (ULID) FK on `Sensor` to reference `Device`. Keep business keys optional for diagnostics.
 
-6) Minimal VO envelope (type‑agnostic)
+6. Minimal VO envelope (type‑agnostic)
    - Envelope fields: `system`, `adapter`, `capturedAt`, optional `source` string, and the VO payload.
    - VO payload includes one or more entries under reserved `identifier.external.*` keys to drive mapping and indexing.
 
@@ -75,8 +80,8 @@ Applies to the Flow pillar (runtime, workers, and samples such as S8). Type‑ag
 
 ## References
 
-- FLOW‑0101 — Flow bindings, canonical IDs, and value‑object ingest
-- DATA‑0061 — Data access semantics (All/Query; streaming; pager)
-- DATA‑0030 — Entity sets routing and storage suffixing
-- ARCH‑0052 — Core IDs (ShortId + ULID) and JSON merge policy
-- WEB‑0035 — EntityController transformers
+- FLOW‑0101 - Flow bindings, canonical IDs, and value‑object ingest
+- DATA‑0061 - Data access semantics (All/Query; streaming; pager)
+- DATA‑0030 - Entity sets routing and storage suffixing
+- ARCH‑0052 - Core IDs (ShortId + ULID) and JSON merge policy
+- WEB‑0035 - EntityController transformers

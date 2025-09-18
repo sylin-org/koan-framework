@@ -1,4 +1,4 @@
-# AI-0005 — Protocol surfaces (gRPC, OpenAI shim, MCP, AI-RPC)
+# AI-0005 - Protocol surfaces (gRPC, OpenAI shim, MCP, AI-RPC)
 
 Status: Proposed
 Date: 2025-08-19

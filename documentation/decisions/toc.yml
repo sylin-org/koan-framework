@@ -4,9 +4,9 @@
    items:
     - name: Foundational SoC namespaces and Abstractions
       href: ARCH-0045-foundational-soc-namespaces-and-abstractions.md
-    - name: Per-project companion docs — README + TECHNICAL
+    - name: Per-project companion docs - README + TECHNICAL
       href: ARCH-0042-per-project-companion-docs.md
-    - name: Lightweight parity roadmap — Observability/Resilience/Recipes
+    - name: Lightweight parity roadmap - Observability/Resilience/Recipes
       href: ARCH-0043-lightweight-parity-roadmap.md
     - name: Standardized module config, dev defaults, and discovery
       href: ARCH-0044-standardized-module-config-and-discovery.md
@@ -16,19 +16,19 @@
       href: ARCH-0034-ddd-documentation-and-glossary.md
     - name: KoanEnv static runtime
       href: ARCH-0039-Koanenv-static-runtime.md
-    - name: Docs posture — instructions over tutorials
+    - name: Docs posture - instructions over tutorials
       href: ARCH-0041-docs-posture-instructions-over-tutorials.md
-    - name: Recipes — intention-driven bootstrap and layered config
+    - name: Recipes - intention-driven bootstrap and layered config
       href: ARCH-0046-recipes-intention-driven-bootstrap-and-layered-config.md
-    - name: Orchestration — hosting providers and exporters as adapters
+    - name: Orchestration - hosting providers and exporters as adapters
       href: ARCH-0047-orchestration-hosting-and-exporters-as-pluggable-adapters.md
     - name: Endpoint resolution and persistence mounts
       href: ARCH-0048-endpoint-resolution-and-persistence-mounts.md
     - name: Unified service metadata and discovery
       href: ARCH-0049-unified-service-metadata-and-discovery.md
-    - name: Secrets management — provider chain and configuration resolution
+    - name: Secrets management - provider chain and configuration resolution
       href: ARCH-0050-secrets-management-and-configuration-resolution.md
-    - name: Secrets — dev alignment and provider-swap guardrails
+    - name: Secrets - dev alignment and provider-swap guardrails
       href: ARCH-0051-secrets-dev-alignment-and-provider-swap-guardrails.md
     - name: Core IDs (ShortId + ULID) and JSON merge policy
       href: ARCH-0052-core-ids-and-json-merge-policy.md
@@ -62,7 +62,7 @@
       href: DATA-0051-direct-routing-via-instruction-executors.md
     - name: Dapper boundary; Direct uses ADO.NET
       href: DATA-0052-relational-dapper-boundary-and-direct-ado.md
-    - name: DATA-0054 — vector search capability and contracts
+    - name: DATA-0054 - vector search capability and contracts
       href: DATA-0054-vector-search-capability-and-contracts.md
     - name: SQLite DDL policy
       href: DATA-0046-sqlite-schema-governance-ddl-policy.md
@@ -126,7 +126,7 @@
       href: WEB-0042-graphql-naming-and-discovery.md
     - name: EntityController transformers
       href: WEB-0035-entitycontroller-transformers.md
-    - name: Entity moderation controller — standard flow and hooks
+    - name: Entity moderation controller - standard flow and hooks
       href: WEB-0048-entity-moderation-controller-standard-flow.md
     - name: Multi-protocol authentication (OIDC/OAuth2/SAML)
       href: WEB-0043-auth-multi-protocol-oauth-oidc-saml.md
@@ -134,11 +134,11 @@
       href: WEB-0044-web-auth-discovery-and-health.md
     - name: Auth provider adapters as separate modules
       href: WEB-0045-auth-provider-adapters-separate-projects.md
-    - name: Entity capabilities — short endpoints and set routing
+    - name: Entity capabilities - short endpoints and set routing
       href: WEB-0046-entity-capabilities-short-endpoints-and-set-routing.md
-    - name: Capability authorization — fallback and defaults
+    - name: Capability authorization - fallback and defaults
       href: WEB-0047-capability-authorization-fallback-and-defaults.md
-    - name: Role attribution layer — claims transformation
+    - name: Role attribution layer - claims transformation
       href: WEB-0049-role-attribution-layer-and-claims-transformation.md
 - name: Messaging (MESS)
   items:
@@ -156,7 +156,7 @@
       href: MESS-0026-discovery-over-mq-policy.md
     - name: Standalone MQ services and naming
       href: MESS-0027-standalone-mq-services-and-naming.md
-    - name: MQ provisioning — plan/diff/apply and modes
+    - name: MQ provisioning - plan/diff/apply and modes
       href: MESS-0028-mq-provisioning-plan-diff-apply-modes.md
     - name: Terse handler delegates and semantic aliases
       href: MESS-0029-terse-handler-delegates-and-aliases.md
@@ -166,7 +166,7 @@
        href: FLOW-0101-bindings-canonical-ids-and-vo-ingest.md
      - name: Identity map, provisional mappings, aliasing (cap=1), and VO indexing
        href: FLOW-0102-identity-map-provisional-and-aliasing.md
-     - name: Flow DX toolkit — controllers, monitor, adapter metadata, actions
+     - name: Flow DX toolkit - controllers, monitor, adapter metadata, actions
        href: FLOW-0103-flow-dx-toolkit-controllers-monitor-adapter.md
      - name: ULID primary id with CanonicalId (business key)
        href: FLOW-0104-ulid-primary-id-and-canonical-id.md
@@ -190,7 +190,7 @@
        href: STOR-0006-storage-default-routing-and-fallbacks.md
      - name: DX helpers (naming and semantics)
        href: STOR-0007-storage-dx-helpers.md
-     - name: DX — stream reads and key-first helpers
+     - name: DX - stream reads and key-first helpers
        href: STOR-0008-storage-dx-stream-and-key-first-helpers.md
  - name: Media (MEDIA)
    items:

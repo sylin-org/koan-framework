@@ -28,7 +28,7 @@ Decision
   - TryOpenRange: open and Seek; return 206-capable handle when supported; reject if file locked or not seekable.
   - Delete: best-effort removal with retries; return bool.
   - Copy: File.Copy to destination path (may cross profiles if both are Local with different bases); otherwise orchestrator performs stream copy.
-  - Properties: stat from filesystem (size, lastModified); ETag not from filesystem—use entity concurrency token.
+  - Properties: stat from filesystem (size, lastModified); ETag not from filesystem-use entity concurrency token.
 
 Scope
 

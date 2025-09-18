@@ -26,7 +26,7 @@ public sealed class RequireCapabilityAttribute : Attribute, IAsyncAuthorizationF
 
         if (authorizer is null || opts is null)
         {
-            // No capability policy registered — allow by default for backward-compat.
+            // No capability policy registered - allow by default for backward-compat.
             return Task.CompletedTask;
         }
 
@@ -44,7 +44,8 @@ public sealed class RequireCapabilityAttribute : Attribute, IAsyncAuthorizationF
                 Status = StatusCodes.Status403Forbidden,
                 Title = "Forbidden",
                 Detail = $"Capability '{_action}' denied by policy for entity '{entityType.Name}'."
-            }) { StatusCode = StatusCodes.Status403Forbidden };
+            })
+            { StatusCode = StatusCodes.Status403Forbidden };
         }
         return Task.CompletedTask;
     }

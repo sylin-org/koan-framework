@@ -1,4 +1,4 @@
-# DATA-0060 — Vector module split and clean separation (Koan.Data.Vector)
+# DATA-0060 - Vector module split and clean separation (Koan.Data.Vector)
 
 Status: Accepted
 
@@ -12,7 +12,7 @@ Introduce a dedicated module/package Koan.Data.Vector and move all vector-facing
 
 - In Koan.Data.Vector.Abstractions (new): IVectorSearchRepository, IVectorAdapterFactory, VectorCapabilities, VectorQueryOptions/Result/Match, VectorEmbeddingAttribute, [VectorAdapter].
 - In Koan.Data.Vector (new): IVectorService (resolution and caching), AddKoanDataVector(IServiceCollection) with options binding, VectorDefaultsOptions, facades VectorData<TEntity,TKey>/VectorData<TEntity> (Upsert/Delete/Search + SaveWithVector/SaveManyWithVector), extensions for IServiceProvider and health.
-	- Developer-facing facade: Vector<TEntity> provides terse ergonomics without touching Core. Methods: Save((id, vector, metadata)), Save(IEnumerable<...>), Search(options). Example: await Vector<MyDoc>.Save(items, ct).
+  - Developer-facing facade: Vector<TEntity> provides terse ergonomics without touching Core. Methods: Save((id, vector, metadata)), Save(IEnumerable<...>), Search(options). Example: await Vector<MyDoc>.Save(items, ct).
 - In Koan.Data.Core (remove): Data<TEntity,TKey>.Vector nested facade, SaveWithVector helpers in AggregateExtensions, IDataService vector helpers (TryGetVectorRepository/GetRequiredVectorRepository), VectorDefaultsOptions.
 - Resolution precedence: [VectorAdapter] attribute → VectorDefaultsOptions.DefaultProvider → Source provider (from [SourceAdapter]/[DataAdapter]) → first available IVectorAdapterFactory → fail fast.
 

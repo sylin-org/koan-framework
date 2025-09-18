@@ -12,6 +12,7 @@ title: Koan.Web.Auth discovery payload and initialization reporting
 We introduced Koan.Web.Auth to support multiple authentication protocols (OIDC, OAuth2, SAML). Provider discovery (a single well-known endpoint) powers the client UX. We also want reliable runtime visibility during startup about which providers are detected and their protocol types to aid configuration and ops.
 
 On top of the initial design (WEB-0043), we need:
+
 - Initialization logs to explicitly list detected providers with type (e.g., "Google (OIDC), Discord (OAuth)").
 - Discovery payload to indicate a provider health state so UIs can disable or annotate providers when configuration is incomplete.
 
@@ -36,10 +37,12 @@ On top of the initial design (WEB-0043), we need:
 ## Consequences
 
 Pros:
+
 - Clearer operator/developer visibility at startup.
 - Client UIs can present only viable sign-in options.
 
 Cons/Trade-offs:
+
 - Static health checks can produce false positives (e.g., wrong values but present). A future active probe mode could mitigate.
 
 ## Implementation notes
@@ -56,6 +59,6 @@ Cons/Trade-offs:
 
 ## References
 
-- WEB-0043 — Multi-protocol authentication (OIDC/OAuth2/SAML)
-- ARCH-0040 — Config and constants naming
-- ARCH-0041 — Docs posture (instructions over tutorials)
+- WEB-0043 - Multi-protocol authentication (OIDC/OAuth2/SAML)
+- ARCH-0040 - Config and constants naming
+- ARCH-0041 - Docs posture (instructions over tutorials)

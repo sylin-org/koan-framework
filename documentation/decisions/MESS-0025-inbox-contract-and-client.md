@@ -5,17 +5,20 @@ domain: MESS
 status: Accepted
 title: Inbox contract, client behavior, and provider discovery
 ---
- 
-# 0025 — Inbox contract, client behavior, and provider discovery
+
+# 0025 - Inbox contract, client behavior, and provider discovery
 
 Context
+
 - Koan supports consumer-side idempotency via an Inbox. We need a portable contract so providers (Redis/SQL/Mongo/microservice) remain pluggable.
 - The Koan client should follow a minimal, robust flow without hard dependencies on any specific store.
 
 Decision
+
 - Introduce a minimal SDK contract (IInboxStore) for client-side integration, plus a standardized microservice wire protocol for external providers.
 
 Client SDK contract
+
 - IInboxStore (in Koan.Messaging.Core)
   - Task<bool> IsProcessedAsync(string key)
   - Task MarkProcessedAsync(string key)
@@ -26,6 +29,7 @@ Client SDK contract
   - On failure: do not mark; retries proceed via MQ policy
 
 External microservice contract (v1)
+
 - POST /v1/inbox/try-begin { key, owner?, leaseSeconds? } → { status: Acquired|Processed|Busy, leaseId?, expiresAt? }
 - POST /v1/inbox/mark-processed { key, leaseId }
 - POST /v1/inbox/release { key, leaseId }
@@ -36,15 +40,18 @@ External microservice contract (v1)
   - Retention via TTL (Redis) or cleanup jobs (SQL/Mongo)
 
 Keying & retention
+
 - Include bus, group, alias to avoid cross-tenant collisions.
 - Retain processed keys for 7–30 days (configurable).
 - Lease length 30–120s (implementation-specific for external providers).
 
 Discovery & selection
+
 - Library continues to use SDK interfaces.
 - For external microservices, selection is by explicit config; optional MQ discovery detailed in ADR-0026.
 
 Consequences
+
 - Inbox providers remain interchangeable.
 - Minimal client behavior avoids double-processing and extra coupling.
 - External microservices get a clear, versioned API to implement.
