@@ -241,20 +241,28 @@ public class DatabaseHealthContributor : IHealthContributor
 ## 📚 Learn More
 
 ### Quick Start
-- **[5-Minute Quickstart](docs/quickstart.md)** - Get running immediately
-- **[Getting Started Guide](docs/reference/getting-started.md)** - Complete walkthrough
-- **[Framework Overview](docs/reference/framework-overview.md)** - Architecture deep-dive
+- **[5-Minute Quickstart](documentation/getting-started/quickstart.md)** - Get running immediately
+- **[Getting Started Guide](documentation/getting-started/getting-started.md)** - Complete walkthrough
+- **[Framework Overview](documentation/getting-started/overview.md)** - Architecture deep-dive
 
 ### Reference Documentation
-- **[Koan Capabilities Reference](docs/reference/koan-capabilities)** - Complete module catalog
-- **[Framework Strategic Assessment](docs/architecture/framework-assessment-2025.md)** - Technical analysis for architects
-- **[Container-Native Positioning](docs/decisions/ARCH-0054-framework-positioning-container-native.md)** - Strategic positioning
+- **[Core Reference](documentation/reference/core/index.md)** - Auto-registration, health checks, configuration
+- **[Data Reference](documentation/reference/data/index.md)** - Multi-provider data access patterns
+- **[Web Reference](documentation/reference/web/index.md)** - Controllers, authentication, transformers
+- **[AI Reference](documentation/reference/ai/index.md)** - AI integration and vector search
+- **[Flow Reference](documentation/reference/flow/index.md)** - Data pipeline and ingestion patterns
+- **[Messaging Reference](documentation/reference/messaging/index.md)** - Commands, announcements, flow events
+- **[Storage Reference](documentation/reference/storage/index.md)** - File/blob storage and routing
+- **[Orchestration Reference](documentation/reference/orchestration/index.md)** - Container orchestration and CLI
+- **[Architecture Principles](documentation/architecture/principles.md)** - Framework design philosophy
+- **[Troubleshooting Guide](documentation/support/troubleshooting.md)** - Comprehensive problem-solving guide
 
 ### Implementation Guides
-- **[Core Concepts](docs/guides/core/)** - Hosting, composition, patterns
-- **[Data Layer](docs/guides/data/)** - Multi-provider strategies and optimization
-- **[AI Integration](docs/guides/ai/)** - Chat, embeddings, RAG patterns
-- **[Authentication](docs/reference/pillars/authentication.md)** - OAuth, JWT, service security
+- **[Building APIs](documentation/guides/building-apis.md)** - REST endpoints and business logic
+- **[Data Modeling](documentation/guides/data-modeling.md)** - Entity design and relationships
+- **[AI Integration](documentation/guides/ai-integration.md)** - Chat, embeddings, RAG patterns
+- **[Authentication Setup](documentation/guides/authentication-setup.md)** - Multi-provider authentication
+- **[Performance Guide](documentation/guides/performance.md)** - Optimization and monitoring
 
 ## 🔧 Requirements
 
@@ -274,7 +282,7 @@ public class DatabaseHealthContributor : IHealthContributor
    dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
    ```
 
-3. **Follow the quickstart** above or visit our [5-minute guide](docs/quickstart.md)
+3. **Follow the quickstart** above or visit our [5-minute guide](documentation/getting-started/quickstart.md)
 
 ## 🤝 Contributing
 
@@ -289,9 +297,9 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## 🏢 Enterprise Support
 
 For enterprise adoption, architecture guidance, and production deployment support:
-- Review our [Strategic Assessment](docs/architecture/framework-assessment-2025.md) for technical evaluation
-- Consult the [Implementation Roadmap](docs/architecture/implementation-roadmap-2025.md) for adoption planning
-- Explore [enterprise capabilities](docs/reference/koan-capabilities/koan-capabilities-reference.md) and operational patterns
+- Review our [Architecture Principles](documentation/architecture/principles.md) for technical framework philosophy
+- Consult the [Complete Documentation](documentation/README.md) for adoption planning
+- Explore [troubleshooting guide](documentation/support/troubleshooting.md) for operational patterns
 
 ## 📄 License
 
