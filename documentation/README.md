@@ -4,13 +4,13 @@
 
 Welcome to the complete Koan Framework documentation. This restructured documentation provides clear, validated, and maintainable guidance for building modern .NET backend services.
 
-## 🚀 Getting Started
+## Getting Started
 
 - **[5-Minute Quickstart](getting-started/quickstart.md)** - Get a Koan API running in 5 minutes
 - **[Framework Overview](getting-started/overview.md)** - Architecture, philosophy, and capabilities
 - **[Installation Guide](getting-started/installation.md)** - Step-by-step setup and configuration
 
-## 📚 Reference Documentation
+## Reference Documentation
 
 ### Core Framework Components
 - **[Core](reference/core/)** - Foundation, auto-registration, health checks
@@ -24,7 +24,7 @@ Welcome to the complete Koan Framework documentation. This restructured document
 - **[Orchestration](reference/orchestration/)** - DevHost CLI, container management
 - **[Scheduling](reference/scheduling/)** - Background jobs, startup tasks
 
-## 🎯 Task-Oriented Guides
+## Task-Oriented Guides
 
 ### Common Development Tasks
 - **[Building APIs](guides/building-apis.md)** - REST and GraphQL API development
@@ -40,7 +40,7 @@ Welcome to the complete Koan Framework documentation. This restructured document
 - **[Multi-Provider Data](guides/multi-provider-data.md)** - SQL, NoSQL, Vector, JSON stores
 - **[Media Handling](guides/media-handling.md)** - File uploads, transforms, streaming
 
-## 🏗️ Architecture & Engineering
+## Architecture & Engineering
 
 ### High-Level Architecture
 - **[Framework Principles](architecture/principles.md)** - Design philosophy and core tenets

@@ -577,7 +577,7 @@ static async Task<int> InspectAsync(string[] args)
         var available = (bool)p.GetType().GetProperty("available")!.GetValue(p)!;
         var eng = p.GetType().GetProperty("engine")!.GetValue(p)!;
         var engVer = (string?)eng.GetType().GetProperty("Version")!.GetValue(eng) ?? string.Empty;
-        var status = available ? "✓" : "✗";
+        var status = available ? "OK" : "FAIL";
         Console.WriteLine($"{id,-13} {status,-9} {engVer}");
     }
     Console.WriteLine();
@@ -636,7 +636,7 @@ static async Task<int> InspectAsync(string[] args)
         var md = manifestDetails?.FirstOrDefault(m => m.Id.Equals(s.Id, StringComparison.OrdinalIgnoreCase));
         var ports = s.Ports is null || s.Ports.Count == 0 ? "internal" :
                     s.Ports.Any(p => p.Host > 0) ? string.Join(", ", s.Ports.Where(p => p.Host > 0).Select(p => p.Host.ToString())) : "internal";
-        var health = s.Health is null ? "-" : "✓";
+        var health = s.Health is null ? "-" : "OK";
         var type = s.Type switch
         {
             ServiceType.App => "app",

@@ -55,7 +55,7 @@ public static class KoanLogger
 
     public static void LogKoanDiscover(ILogger logger, string providerType, string connectionString, bool success)
     {
-        var status = success ? "✓" : "✗";
+        var status = success ? "OK" : "FAIL";
         LogKoanEvent(logger, LogLevel.Information, "Koan:discover", $"{providerType}: {connectionString} {status}");
     }
 

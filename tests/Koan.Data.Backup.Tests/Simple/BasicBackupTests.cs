@@ -47,7 +47,7 @@ public class BasicBackupTests
         manifest.Entities.Should().HaveCount(1);
         manifest.Entities.First().EntityType.Should().Be("TestEntity");
 
-        _output.WriteLine($"✅ BackupManifest created with {manifest.Entities.Count} entities");
+        _output.WriteLine($"BackupManifest created with {manifest.Entities.Count} entities");
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class BasicBackupTests
         options.Tags.Should().BeEmpty();
         options.Metadata.Should().BeEmpty();
 
-        _output.WriteLine("✅ BackupOptions has correct default values");
+        _output.WriteLine("BackupOptions has correct default values");
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public class BasicBackupTests
         options.UseBulkMode.Should().BeTrue();
         options.OptimizationLevel.Should().Be("Balanced");
 
-        _output.WriteLine("✅ RestoreOptions has correct default values");
+        _output.WriteLine("RestoreOptions has correct default values");
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class BasicBackupTests
         entityInfo.ItemCount.Should().BeGreaterThan(0);
         entityInfo.SizeBytes.Should().BeGreaterThan(0);
 
-        _output.WriteLine($"✅ Compression ratio: {compressionRatio:P2} ({entityInfo.SizeBytes} / {estimatedOriginalSize})");
+        _output.WriteLine($"Compression ratio: {compressionRatio:P2} ({entityInfo.SizeBytes} / {estimatedOriginalSize})");
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class BasicBackupTests
         verification.CompressionRatio.Should().BeInRange(0.0, 1.0);
         verification.OverallChecksum.Should().NotBeNullOrEmpty();
 
-        _output.WriteLine($"✅ Verification: {verification.TotalItemCount} items, {verification.TotalSizeBytes:N0} bytes, {verification.CompressionRatio:P1} compression");
+        _output.WriteLine($"Verification: {verification.TotalItemCount} items, {verification.TotalSizeBytes:N0} bytes, {verification.CompressionRatio:P1} compression");
     }
 
     [Theory]
@@ -147,7 +147,7 @@ public class BasicBackupTests
         manifest.Status.Should().Be(status);
         Enum.IsDefined(typeof(BackupStatus), status).Should().BeTrue();
 
-        _output.WriteLine($"✅ BackupStatus.{status} is valid");
+        _output.WriteLine($"BackupStatus.{status} is valid");
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public class BasicBackupTests
         globalOptions.IncludeEntityTypes.Should().HaveCount(2);
         globalOptions.BatchSize.Should().Be(1000); // Inherited from BackupOptions
 
-        _output.WriteLine($"✅ GlobalBackupOptions: {globalOptions.MaxConcurrency} concurrency, {globalOptions.IncludeEntityTypes?.Length} entity types");
+        _output.WriteLine($"GlobalBackupOptions: {globalOptions.MaxConcurrency} concurrency, {globalOptions.IncludeEntityTypes?.Length} entity types");
     }
 
     [Fact]
@@ -197,6 +197,6 @@ public class BasicBackupTests
         result.Entities.Should().HaveCount(1);
         result.DiscoveryDuration.Should().BeGreaterThan(TimeSpan.Zero);
 
-        _output.WriteLine($"✅ Discovery: {result.TotalAssembliesScanned} assemblies, {result.TotalTypesExamined} types, {result.DiscoveryDuration.TotalMilliseconds}ms");
+        _output.WriteLine($"Discovery: {result.TotalAssembliesScanned} assemblies, {result.TotalTypesExamined} types, {result.DiscoveryDuration.TotalMilliseconds}ms");
     }
 }

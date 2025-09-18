@@ -8,7 +8,7 @@
 
 Koan transforms enterprise .NET development through intelligent defaults, provider transparency, and container-native orchestration. Write once, deploy anywhere—from SQLite in development to PostgreSQL in production, from local Docker to Kubernetes at scale.
 
-## 🎯 Why Koan?
+## Why Koan?
 
 **87% reduction in service setup time.** What takes 23 minutes in traditional .NET takes 3 minutes with Koan.
 
@@ -16,7 +16,7 @@ Koan transforms enterprise .NET development through intelligent defaults, provid
 
 **Provider transparency.** Your data access code works unchanged across PostgreSQL, MongoDB, Redis, Vector DBs, and more.
 
-## ⚡ Zero to Production in 60 Seconds
+## Zero to Production in 60 Seconds
 
 ```bash
 # 1. Create project
@@ -37,17 +37,17 @@ dotnet run
 ```
 
 **You just created:**
-- ✅ Full REST API with CRUD operations
-- ✅ Automatic validation and error handling
-- ✅ Health monitoring with `/health` endpoint
-- ✅ OpenAPI documentation at `/swagger`
-- ✅ Structured logging and observability
-- ✅ Auto-generated GUID v7 IDs
-- ✅ Production-ready security headers
+- Full REST API with CRUD operations
+- Automatic validation and error handling
+- Health monitoring with `/health` endpoint
+- OpenAPI documentation at `/swagger`
+- Structured logging and observability
+- Auto-generated GUID v7 IDs
+- Production-ready security headers
 
 Visit `http://localhost:5000/swagger` to explore your API.
 
-## 🔄 Provider Transparency in Action
+## Provider Transparency in Action
 
 **Define your model once, run anywhere:**
 
@@ -79,7 +79,7 @@ var similar = await Product.Query("eco-friendly laptop");
 
 **Intelligent provider selection:** Install `Koan.Data.Postgres`, and your app automatically uses PostgreSQL when available, gracefully falls back to SQLite in development. Your entity methods work identically across all providers.
 
-## 🚀 Enterprise-Grade Features, Zero Configuration
+## Enterprise-Grade Features, Zero Configuration
 
 ### Multi-Service Authentication
 ```csharp
@@ -135,7 +135,7 @@ Flow.OnUpdate<OrderEvent>(async (ref orderEvent, current, metadata) =>
 });
 ```
 
-## 🐳 Container-Native by Design
+## Container-Native by Design
 
 ### Intelligent Container Orchestration
 ```bash
@@ -161,20 +161,20 @@ Koan automatically detects and works with:
 - **Podman:** Native support with format compatibility
 - **Kubernetes:** Service mesh integration and health checks
 
-## 📊 Framework Capabilities at Scale
+## Framework Capabilities at Scale
 
 | Component | Technologies Supported | Zero-Config |
 |-----------|----------------------|-------------|
-| **Data Storage** | PostgreSQL, MongoDB, SQLite, Redis, Weaviate, JSON Files | ✅ |
-| **Authentication** | Google, Microsoft, Discord, OIDC, Custom JWT | ✅ |
-| **Messaging** | RabbitMQ, Azure Service Bus, In-Memory | ✅ |
-| **Storage** | Local Files, AWS S3, Azure Blob Storage | ✅ |
-| **AI Providers** | Ollama, OpenAI, Azure OpenAI (extensible) | ✅ |
-| **Containers** | Docker, Podman (auto-detection) | ✅ |
+| **Data Storage** | PostgreSQL, MongoDB, SQLite, Redis, Weaviate, JSON Files | Yes |
+| **Authentication** | Google, Microsoft, Discord, OIDC, Custom JWT | Yes |
+| **Messaging** | RabbitMQ, Azure Service Bus, In-Memory | Yes |
+| **Storage** | Local Files, AWS S3, Azure Blob Storage | Yes |
+| **AI Providers** | Ollama, OpenAI, Azure OpenAI (extensible) | Yes |
+| **Containers** | Docker, Podman (auto-detection) | Yes |
 
 **63 modules across 8 functional categories**—use what you need, when you need it.
 
-## 🏗️ Architecture That Scales
+## Architecture That Scales
 
 ### Multi-Provider Applications
 ```csharp
@@ -213,7 +213,7 @@ public class DatabaseHealthContributor : IHealthContributor
 }
 ```
 
-## 📈 Performance & Production Benefits
+## Performance & Production Benefits
 
 - **95% reduction** in manual service registration through auto-discovery
 - **100% elimination** of manual JWT/Auth configuration
@@ -222,9 +222,9 @@ public class DatabaseHealthContributor : IHealthContributor
 - **Memory-conscious patterns** with performance monitoring
 - **Bulk operations** optimized per provider
 
-## 🎯 When to Choose Koan
+## When to Choose Koan
 
-**✅ Perfect for:**
+**Perfect for:**
 - **Microservices** requiring service-to-service authentication
 - **Event-driven architectures** with complex processing requirements
 - **AI-enabled applications** needing provider-agnostic integration
@@ -232,13 +232,13 @@ public class DatabaseHealthContributor : IHealthContributor
 - **Container-first deployments** on Docker, Kubernetes, or service mesh
 - **Teams prioritizing long-term productivity** over initial simplicity
 
-**❓ Consider alternatives when:**
+**Consider alternatives when:**
 - Building simple CRUD apps without distributed system needs
 - Requiring specific integrations not supported by Koan's abstractions
 - Working with legacy systems that can't adopt containerization
 - Teams that prefer explicit configuration over intelligent conventions
 
-## 📚 Learn More
+## Learn More
 
 ### Quick Start
 - **[5-Minute Quickstart](documentation/getting-started/quickstart.md)** - Get running immediately
@@ -264,13 +264,13 @@ public class DatabaseHealthContributor : IHealthContributor
 - **[Authentication Setup](documentation/guides/authentication-setup.md)** - Multi-provider authentication
 - **[Performance Guide](documentation/guides/performance.md)** - Optimization and monitoring
 
-## 🔧 Requirements
+## Requirements
 
 - **.NET 9 SDK** or later
 - **Docker** or **Podman** (for container orchestration)
 - **Optional:** Koan CLI for enhanced development experience
 
-## 🚀 Getting Started
+## Getting Started
 
 1. **Install the CLI** (recommended):
    ```bash
@@ -284,7 +284,7 @@ public class DatabaseHealthContributor : IHealthContributor
 
 3. **Follow the quickstart** above or visit our [5-minute guide](documentation/getting-started/quickstart.md)
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
@@ -294,14 +294,14 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - Container orchestration improvements
 - Documentation and examples
 
-## 🏢 Enterprise Support
+## Enterprise Support
 
 For enterprise adoption, architecture guidance, and production deployment support:
 - Review our [Architecture Principles](documentation/architecture/principles.md) for technical framework philosophy
 - Consult the [Complete Documentation](documentation/README.md) for adoption planning
 - Explore [troubleshooting guide](documentation/support/troubleshooting.md) for operational patterns
 
-## 📄 License
+## License
 
 Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 

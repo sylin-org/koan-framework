@@ -36,14 +36,14 @@ offering both simple one-line operations and sophisticated enterprise-grade func
 
 ### Key Features
 
-- **🚀 Async Operations**: All backup/restore operations run asynchronously with real-time progress tracking
-- **📊 Real-time Progress**: WebSocket-based progress updates via SignalR
-- **🔍 Entity Discovery**: Automatic discovery and backup of all Entity<> types
-- **⚡ Streaming Architecture**: Memory-efficient processing of large datasets
-- **🗜️ Smart Compression**: ZIP compression with configurable levels
-- **🛡️ Verification**: Built-in backup integrity verification
-- **🔧 Adapter Optimization**: Database-specific optimizations for faster restores
-- **📱 Multi-Provider**: Works across SQL, NoSQL, Vector, and JSON storage
+- **Async Operations**: All backup/restore operations run asynchronously with real-time progress tracking
+- **Real-time Progress**: WebSocket-based progress updates via SignalR
+- **Entity Discovery**: Automatic discovery and backup of all Entity<> types
+- **Streaming Architecture**: Memory-efficient processing of large datasets
+- **Smart Compression**: ZIP compression with configurable levels
+- **Verification**: Built-in backup integrity verification
+- **Adapter Optimization**: Database-specific optimizations for faster restores
+- **Multi-Provider**: Works across SQL, NoSQL, Vector, and JSON storage
 
 ### Usage Patterns
 

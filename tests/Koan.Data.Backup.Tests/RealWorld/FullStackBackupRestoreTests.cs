@@ -54,14 +54,14 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
 
     public async Task InitializeAsync()
     {
-        _output.WriteLine("🚀 Starting database containers...");
+        _output.WriteLine("Starting database containers...");
 
         // Start containers
         await _mongoContainer.StartAsync();
 
         var mongoConnectionString = _mongoContainer.GetConnectionString();
 
-        _output.WriteLine($"📊 Database connections:");
+        _output.WriteLine($"Database connections:");
         _output.WriteLine($"   SQLite: {_sqliteConnectionString}");
         _output.WriteLine($"   MongoDB: {mongoConnectionString}");
 
@@ -118,7 +118,7 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
         runtime?.Discover();
         runtime?.Start();
 
-        _output.WriteLine("✅ Koan host started with database providers");
+        _output.WriteLine("Koan host started with database providers");
 
         // Warmup the data layer
         await WarmupDataLayer();
@@ -127,7 +127,7 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task Full_Stack_Backup_Restore_With_Real_Databases_Should_Work()
     {
-        _output.WriteLine("\n🎯 Starting full-stack backup/restore test...");
+        _output.WriteLine("\nStarting full-stack backup/restore test...");
 
         // Step 1: Create and save real data to databases
         await CreateAndSaveTestData();
@@ -153,12 +153,12 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
         // Step 8: Verify restored data matches original
         await VerifyRestoredData();
 
-        _output.WriteLine("🎉 Full-stack backup/restore test completed successfully!");
+        _output.WriteLine("Full-stack backup/restore test completed successfully!");
     }
 
     private async Task CreateAndSaveTestData()
     {
-        _output.WriteLine("📝 Creating and saving test data...");
+        _output.WriteLine("Creating and saving test data...");
 
         // Create test users (SQLite)
         for (int i = 1; i <= 10; i++)
@@ -179,7 +179,7 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
             _originalUsers.Add(user);
 
             var savedUser = await Data<TestEntityUser, Guid>.UpsertAsync(user);
-            _output.WriteLine($"   💾 Saved user: {savedUser.Name} (ID: {savedUser.Id}) to SQLite");
+            _output.WriteLine($"   Saved user: {savedUser.Name} (ID: {savedUser.Id}) to SQLite");
         }
 
         // Create test products (MongoDB)
@@ -197,32 +197,32 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
             _originalProducts.Add(product);
 
             var savedProduct = await Data<TestEntityProduct, string>.UpsertAsync(product);
-            _output.WriteLine($"   🍃 Saved product: {savedProduct.Name} (ID: {savedProduct.Id}) to MongoDB");
+            _output.WriteLine($"   Saved product: {savedProduct.Name} (ID: {savedProduct.Id}) to MongoDB");
         }
 
 
-        _output.WriteLine($"✅ Created {_originalUsers.Count} users, {_originalProducts.Count} products");
+        _output.WriteLine($"Created {_originalUsers.Count} users, {_originalProducts.Count} products");
     }
 
     private async Task VerifyDataInDatabases()
     {
-        _output.WriteLine("🔍 Verifying data was saved to databases...");
+        _output.WriteLine("Verifying data was saved to databases...");
 
         // Verify users in SQLite
         var savedUsers = await Data<TestEntityUser, Guid>.All();
         savedUsers.Should().HaveCount(_originalUsers.Count, "All users should be saved to SQLite");
-        _output.WriteLine($"   ✅ SQLite: {savedUsers.Count} users found");
+        _output.WriteLine($"   SQLite: {savedUsers.Count} users found");
 
         // Verify products in MongoDB
         var savedProducts = await Data<TestEntityProduct, string>.All();
         savedProducts.Should().HaveCount(_originalProducts.Count, "All products should be saved to MongoDB");
-        _output.WriteLine($"   ✅ MongoDB: {savedProducts.Count} products found");
+        _output.WriteLine($"   MongoDB: {savedProducts.Count} products found");
 
     }
 
     private async Task<BackupManifest> PerformFullBackup()
     {
-        _output.WriteLine("📦 Performing full backup...");
+        _output.WriteLine("Performing full backup...");
 
         var backupService = _host!.Services.GetRequiredService<IBackupService>();
         var backupName = $"fullstack-test-{DateTime.UtcNow:yyyyMMdd-HHmmss}";
@@ -242,7 +242,7 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
         manifest.Status.Should().Be(BackupStatus.Completed);
         manifest.Entities.Should().HaveCountGreaterOrEqualTo(2, "Should backup at least 2 entity types");
 
-        _output.WriteLine($"✅ Backup completed:");
+        _output.WriteLine($"Backup completed:");
         _output.WriteLine($"   Name: {manifest.Name}");
         _output.WriteLine($"   Entities: {manifest.Entities.Count}");
         _output.WriteLine($"   Total items: {manifest.Verification.TotalItemCount}");
@@ -250,7 +250,7 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
 
         foreach (var entity in manifest.Entities)
         {
-            _output.WriteLine($"   📋 {entity.EntityType}: {entity.ItemCount} items, {entity.Provider} provider");
+            _output.WriteLine($"   {entity.EntityType}: {entity.ItemCount} items, {entity.Provider} provider");
         }
 
         return manifest;
@@ -258,13 +258,13 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
 
     private async Task VerifyBackupFiles(BackupManifest manifest)
     {
-        _output.WriteLine("📂 Verifying backup files...");
+        _output.WriteLine("Verifying backup files...");
 
         var backupPath = Path.Combine(_tempDirectory, "backups", $"{manifest.Name}-{manifest.CreatedAt:yyyyMMdd-HHmmss}.zip");
         File.Exists(backupPath).Should().BeTrue($"Backup file should exist at {backupPath}");
 
         var fileInfo = new FileInfo(backupPath);
-        _output.WriteLine($"   📄 Backup file: {fileInfo.Length:N0} bytes");
+        _output.WriteLine($"   Backup file: {fileInfo.Length:N0} bytes");
 
         // Verify ZIP structure
         using var archive = ZipFile.OpenRead(backupPath);
@@ -279,42 +279,42 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
         {
             var entry = archive.GetEntry(expectedFile);
             entry.Should().NotBeNull($"Entity file {expectedFile} should exist in backup");
-            _output.WriteLine($"   📄 {expectedFile}: {entry!.Length:N0} bytes");
+            _output.WriteLine($"   {expectedFile}: {entry!.Length:N0} bytes");
         }
 
         // Check verification files
         archive.GetEntry("verification/checksums.json").Should().NotBeNull("Checksums file should exist");
         archive.GetEntry("verification/schema-snapshots.json").Should().NotBeNull("Schema snapshots should exist");
 
-        _output.WriteLine("✅ All backup files verified");
+        _output.WriteLine("All backup files verified");
     }
 
     private async Task ClearDatabases()
     {
-        _output.WriteLine("🗑️ Clearing databases...");
+        _output.WriteLine("Clearing databases...");
 
         // Clear all entities from all databases
         await Data<TestEntityUser, Guid>.DeleteAllAsync();
         await Data<TestEntityProduct, string>.DeleteAllAsync();
 
-        _output.WriteLine("✅ All databases cleared");
+        _output.WriteLine("All databases cleared");
     }
 
     private async Task VerifyDatabasesEmpty()
     {
-        _output.WriteLine("🔍 Verifying databases are empty...");
+        _output.WriteLine("Verifying databases are empty...");
 
         var users = await Data<TestEntityUser, Guid>.All();
         var products = await Data<TestEntityProduct, string>.All();
         users.Should().BeEmpty("SQLite should be empty");
         products.Should().BeEmpty("MongoDB should be empty");
 
-        _output.WriteLine("✅ All databases confirmed empty");
+        _output.WriteLine("All databases confirmed empty");
     }
 
     private async Task PerformFullRestore(string backupName)
     {
-        _output.WriteLine("📥 Performing full restore...");
+        _output.WriteLine("Performing full restore...");
 
         var restoreService = _host!.Services.GetRequiredService<IRestoreService>();
 
@@ -329,12 +329,12 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
 
         await restoreService.RestoreAllEntitiesAsync(backupName, options);
 
-        _output.WriteLine("✅ Restore completed");
+        _output.WriteLine("Restore completed");
     }
 
     private async Task VerifyRestoredData()
     {
-        _output.WriteLine("🔍 Verifying restored data...");
+        _output.WriteLine("Verifying restored data...");
 
         // Verify users restored to SQLite
         var restoredUsers = await Data<TestEntityUser, Guid>.All();
@@ -349,7 +349,7 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
             restoredUser.Age.Should().Be(originalUser.Age);
             restoredUser.IsActive.Should().Be(originalUser.IsActive);
         }
-        _output.WriteLine($"   ✅ SQLite: {restoredUsers.Count}/{_originalUsers.Count} users restored correctly");
+        _output.WriteLine($"   SQLite: {restoredUsers.Count}/{_originalUsers.Count} users restored correctly");
 
         // Verify products restored to MongoDB
         var restoredProducts = await Data<TestEntityProduct, string>.All();
@@ -363,21 +363,21 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
             restoredProduct.Price.Should().Be(originalProduct.Price);
             restoredProduct.Category.Should().Be(originalProduct.Category);
         }
-        _output.WriteLine($"   ✅ MongoDB: {restoredProducts.Count}/{_originalProducts.Count} products restored correctly");
+        _output.WriteLine($"   MongoDB: {restoredProducts.Count}/{_originalProducts.Count} products restored correctly");
 
 
-        _output.WriteLine("🎉 All data verified - backup/restore cycle successful!");
+        _output.WriteLine("All data verified - backup/restore cycle successful!");
     }
 
     private async Task WarmupDataLayer()
     {
-        _output.WriteLine("🔥 Warming up data layer...");
+        _output.WriteLine("Warming up data layer...");
 
         // Ensure entity configurations are loaded
         var discoveryService = _host!.Services.GetRequiredService<IEntityDiscoveryService>();
         await discoveryService.WarmupAllEntitiesAsync();
 
-        _output.WriteLine("✅ Data layer warmed up");
+        _output.WriteLine("Data layer warmed up");
     }
 
     public async Task DisposeAsync()

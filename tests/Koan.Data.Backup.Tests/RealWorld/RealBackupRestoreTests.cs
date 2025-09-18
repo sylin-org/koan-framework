@@ -93,7 +93,7 @@ public class RealBackupRestoreTests : IDisposable
         await VerifyBackupArchiveStructure(backupPath, manifest);
         await VerifyBackupDataIntegrity(backupPath, _originalUsers);
 
-        _output.WriteLine($"✅ Backup created successfully:");
+        _output.WriteLine($"Backup created successfully:");
         _output.WriteLine($"   File: {backupPath}");
         _output.WriteLine($"   Size: {new FileInfo(backupPath).Length:N0} bytes");
         _output.WriteLine($"   Entities: {entityInfo.ItemCount}");
@@ -152,7 +152,7 @@ public class RealBackupRestoreTests : IDisposable
             restoredUser.CreatedAt.Should().BeCloseTo(originalUser.CreatedAt, TimeSpan.FromSeconds(1));
         }
 
-        _output.WriteLine($"✅ Restore verified successfully:");
+        _output.WriteLine($"Restore verified successfully:");
         _output.WriteLine($"   Original users: {_originalUsers.Count}");
         _output.WriteLine($"   Restored users: {restoredUsersFromFile.Count}");
         _output.WriteLine($"   All data integrity checks passed");
@@ -210,7 +210,7 @@ public class RealBackupRestoreTests : IDisposable
             foundBackup.Status.Should().Be(BackupStatus.Completed);
         }
 
-        _output.WriteLine($"✅ Discovery verified successfully:");
+        _output.WriteLine($"Discovery verified successfully:");
         _output.WriteLine($"   Created backups: {manifests.Count}");
         _output.WriteLine($"   Discovered backups: {catalog.TotalCount}");
         _output.WriteLine($"   All backups found and validated");
@@ -279,11 +279,11 @@ public class RealBackupRestoreTests : IDisposable
             restoredProduct.Category.Should().Be(originalProduct.Category);
         }
 
-        _output.WriteLine($"✅ JSON Lines format verified:");
+        _output.WriteLine($"JSON Lines format verified:");
         _output.WriteLine($"   Total lines: {lineCount}");
         _output.WriteLine($"   Valid JSON lines: {validJsonCount}");
         _output.WriteLine($"   Products restored: {products.Count}");
-        _output.WriteLine($"   Data integrity: ✅ Passed");
+        _output.WriteLine($"   Data integrity: Passed");
     }
 
     private List<TestUser> CreateRealTestUsers()

@@ -42,28 +42,28 @@ Act as a senior technical advisor to an experienced enterprise architect who:
 
 #### 1. Auto-Registration Pattern
 ```csharp
-// ✅ Correct: Only need .AddKoan() - modules self-register
+// Correct: Only need .AddKoan() - modules self-register
 services.AddKoan();
 
-// ❌ Anti-pattern: Manual service registration when framework provides auto-registration
+// Anti-pattern: Manual service registration when framework provides auto-registration
 services.AddScoped<IUserRepository, UserRepository>();
 services.AddDbContext<MyContext>();
 ```
 
 #### 2. Entity-First Development
 ```csharp
-// ✅ First-class usage: Entity<T> with auto GUID v7
+// First-class usage: Entity<T> with auto GUID v7
 public class Todo : Entity<Todo> {
     public string Title { get; set; } = "";
     // Id automatically generated as GUID v7 on first access
 }
 
-// ✅ Framework usage: Entity<T,K> for custom keys
+// Framework usage: Entity<T,K> for custom keys
 public class NumericEntity : Entity<NumericEntity, int> {
     // Manual key management for specific scenarios
 }
 
-// ✅ Usage patterns
+// Usage patterns
 var todo = new Todo { Title = "Buy milk" }; // ID auto-generated
 await todo.Save(); // Transparent across all providers
 var loaded = await Todo.Get(todo.Id); // Works with any provider
@@ -71,7 +71,7 @@ var loaded = await Todo.Get(todo.Id); // Works with any provider
 
 #### 3. Provider Capability Detection
 ```csharp
-// ✅ Framework handles capability differences transparently
+// Framework handles capability differences transparently
 var capabilities = Data<Todo, string>.QueryCaps;
 // Automatic fallback when provider lacks features
 var todos = await Todo.Query("complex filter"); // Pushdown or in-memory
@@ -79,7 +79,7 @@ var todos = await Todo.Query("complex filter"); // Pushdown or in-memory
 
 #### 4. Environment-Aware Development
 ```csharp
-// ✅ Use KoanEnv for environment detection
+// Use KoanEnv for environment detection
 if (KoanEnv.IsDevelopment) {
     // Development-only code
 }
@@ -95,7 +95,7 @@ if (KoanEnv.AllowMagicInProduction) {
 
 ### Critical Anti-Patterns to Detect
 
-#### ❌ Manual Repository Pattern
+#### Manual Repository Pattern
 ```csharp
 // Wrong: Bypassing framework entity patterns
 public class TodoService {
@@ -105,7 +105,7 @@ public class TodoService {
 }
 ```
 
-#### ✅ Koan Entity-First Pattern
+#### Koan Entity-First Pattern
 ```csharp
 // Correct: Use entity static methods
 public class TodoService {
@@ -114,7 +114,7 @@ public class TodoService {
 }
 ```
 
-#### ❌ Manual Controller Implementation
+#### Manual Controller Implementation
 ```csharp
 // Wrong: Manual CRUD endpoints
 [ApiController]
@@ -123,7 +123,7 @@ public class TodosController : ControllerBase {
 }
 ```
 
-#### ✅ Koan EntityController Pattern
+#### Koan EntityController Pattern
 ```csharp
 // Correct: Inherit framework controller
 [Route("api/[controller]")]
@@ -150,16 +150,16 @@ public class TodosController : EntityController<Todo> {
 ### Multi-Agent Coordination Examples
 ```markdown
 User: "I need to track user actions and generate analytics"
-→ Launch Koan-flow-specialist (event tracking) + Koan-data-architect (analytics storage) in parallel
-→ Synthesize their recommendations into cohesive solution
+Launch Koan-flow-specialist (event tracking) + Koan-data-architect (analytics storage) in parallel
+Synthesize their recommendations into cohesive solution
 
 User: "My app is slow and I'm not sure why"
-→ Launch Koan-performance-optimizer + Koan-data-architect to analyze query patterns
-→ Consider Koan-bootstrap-specialist if initialization issues suspected
+Launch Koan-performance-optimizer + Koan-data-architect to analyze query patterns
+Consider Koan-bootstrap-specialist if initialization issues suspected
 
 User: "I want to add a payment service"
-→ Launch Koan-framework-specialist (compliance) + Koan-extension-architect (integration patterns)
-→ Guide through proper auto-registration and capability reporting
+Launch Koan-framework-specialist (compliance) + Koan-extension-architect (integration patterns)
+Guide through proper auto-registration and capability reporting
 ```
 
 ### Agent Consultation Guidelines for Enterprise Advisory
@@ -294,7 +294,7 @@ var assemblies = AppDomain.CurrentDomain.GetAssemblies()
 if (KoanEnv.IsDevelopment) {
     KoanEnv.DumpSnapshot(logger);
     // Look for provider election decisions:
-    // [INFO] Koan:discover postgresql: server=localhost... ✓
+    // [INFO] Koan:discover postgresql: server=localhost... OK
     // [INFO] Koan:modules storage→postgresql
 }
 ```
@@ -303,10 +303,10 @@ if (KoanEnv.IsDevelopment) {
 
 #### Entity Pattern Problems
 ```csharp
-// ✅ Check Entity<T> inheritance for auto GUID v7
+// Check Entity<T> inheritance for auto GUID v7
 public class Todo : Entity<Todo> // Auto GUID v7 generation
 
-// ✅ Verify Data<T,K> usage for provider transparency
+// Verify Data<T,K> usage for provider transparency
 var todos = await Todo.All(); // Works across all providers
 var capabilities = Data<Todo, string>.QueryCaps;
 ```
@@ -355,10 +355,10 @@ var mongoTodos = await Todo.All();
 
 #### Streaming vs Materialization
 ```csharp
-// ❌ Memory issues with large datasets
+// Memory issues with large datasets
 var allTodos = await Todo.All(); // Materializes everything
 
-// ✅ Use streaming for large datasets
+// Use streaming for large datasets
 await foreach (var todo in Todo.AllStream(batchSize: 1000)) {
     // Process in batches
 }

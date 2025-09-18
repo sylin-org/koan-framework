@@ -9,7 +9,7 @@ public static class KoanLoggerExtensions
 
     public static void LogKoanDiscover(this ILogger logger, string providerType, string connectionString, bool success)
     {
-        var status = success ? "✓" : "✗";
+        var status = success ? "OK" : "FAIL";
         logger.LogInformation("[Koan:discover] {ProviderType}: {ConnectionString} {Status}", 
             providerType, connectionString, status);
     }

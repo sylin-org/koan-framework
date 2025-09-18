@@ -6,7 +6,7 @@ using Koan.Messaging;
 namespace S8.Flow.Api.Controllers;
 
 /// <summary>
-/// ✨ BEAUTIFUL FLOW API DEMONSTRATION ✨
+/// BEAUTIFUL FLOW API DEMONSTRATION
 /// Showcases the new messaging-first Flow patterns with elegant syntax.
 /// </summary>
 [ApiController]
@@ -31,12 +31,12 @@ public class FlowDemoController : ControllerBase
             Code = request?.Code ?? "DEMO"
         };
 
-        // ✨ BEAUTIFUL: Routes through messaging → orchestrator → Flow intake
+        // BEAUTIFUL: Routes through messaging → orchestrator → Flow intake
         await device.Send();
 
         return Ok(new
         {
-            message = "✅ Device sent via messaging-first Flow patterns!",
+            message = "Device sent via messaging-first Flow patterns!",
             device = device.Id,
             route = "Messaging → [FlowOrchestrator] → Flow Intake → Processing Pipeline"
         });
@@ -60,13 +60,13 @@ public class FlowDemoController : ControllerBase
             Code = request?.Code ?? "TARGET"
         };
 
-        // ✨ BEAUTIFUL: Send to specific target via messaging
+        // BEAUTIFUL: Send to specific target via messaging
         // Targeted send is obsolete; use messaging pattern or document as not supported
         await device.Send();
 
         return Ok(new
         {
-            message = $"✅ Device sent to target '{target}' via messaging!",
+            message = $"Device sent to target '{target}' via messaging!",
             device = device.Id,
             target,
             route = $"Messaging → Target({target}) → Flow Processing"
@@ -89,12 +89,12 @@ public class FlowDemoController : ControllerBase
             Source = "demo-api"
         };
 
-        // ✨ BEAUTIFUL: Value objects route through messaging too
+        // BEAUTIFUL: Value objects route through messaging too
         await reading.Send();
 
         return Ok(new
         {
-            message = "✅ Reading sent via messaging-first Flow patterns!",
+            message = "Reading sent via messaging-first Flow patterns!",
             reading = new { reading.SensorId, reading.Value, reading.Unit },
             route = "Messaging → [FlowOrchestrator] → Flow Intake → Processing Pipeline"
         });

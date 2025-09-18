@@ -118,11 +118,11 @@ This guide covers Koan's data access patterns and best practices.
 Always prefer first-class static methods for data access:
 
 ```csharp
-// ✅ Preferred approach
+// Preferred approach
 var items = await Item.All(ct);
 var filtered = await Item.Query(q => q.Where(x => x.IsActive), ct);
 
-// ❌ Avoid generic facades when possible  
+// Avoid generic facades when possible  
 var items = await Data<Item, string>.All(ct);
 ```
 

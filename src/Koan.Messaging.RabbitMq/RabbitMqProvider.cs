@@ -285,7 +285,7 @@ internal class RabbitMqConsumer : IMessageConsumer
 
             _channel.BasicConsume(_queueName, autoAck: false, consumer: _consumer);
 
-            _logger?.LogDebug("🎧 RabbitMQ consumer started for queue {QueueName}", _queueName);
+            _logger?.LogDebug("RabbitMQ consumer started for queue {QueueName}", _queueName);
         }, cancellationToken);
     }
 

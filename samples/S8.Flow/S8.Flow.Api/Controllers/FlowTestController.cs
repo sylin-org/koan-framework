@@ -23,7 +23,7 @@ public class FlowTestController : ControllerBase
         {
             return Ok(new
             {
-                status = "✅ Flow messaging system is available",
+                status = "Flow messaging system is available",
                 messaging = "Entity.Send() pattern available",
                 transport = "TransportEnvelope system active"
             });
@@ -32,7 +32,7 @@ public class FlowTestController : ControllerBase
         {
             return StatusCode(500, new
             {
-                status = "❌ Flow orchestrator API failed",
+                status = "Flow orchestrator API failed",
                 error = ex.Message
             });
         }
@@ -78,7 +78,7 @@ public class FlowTestController : ControllerBase
 
             return Ok(new
             {
-                status = "✅ Successfully created Flow entities",
+                status = "Successfully created Flow entities",
                 device = new { device.Id, device.Manufacturer, device.Model },
                 sensor = new { sensor.SensorId, sensor.Code, sensor.Unit },
                 reading = new { reading.SensorId, reading.Value, reading.Unit },
@@ -89,7 +89,7 @@ public class FlowTestController : ControllerBase
         {
             return StatusCode(500, new
             {
-                status = "❌ Failed to create Flow entities",
+                status = "Failed to create Flow entities",
                 error = ex.Message,
                 stack_trace = ex.StackTrace
             });
@@ -122,7 +122,7 @@ public class FlowTestController : ControllerBase
 
             return Ok(new
             {
-                status = "✅ Successfully sent entity via Flow messaging pipeline!",
+                status = "Successfully sent entity via Flow messaging pipeline!",
                 device = new { device.Id, device.Manufacturer, device.Model },
                 pipeline = "entity.Send() → Messaging → [FlowOrchestrator] → Flow Intake → Processing",
                 message = "If you see this, the beautiful messaging-first architecture is working!"
@@ -132,7 +132,7 @@ public class FlowTestController : ControllerBase
         {
             return StatusCode(500, new
             {
-                status = "❌ Failed to send entity via Flow pipeline",
+                status = "Failed to send entity via Flow pipeline",
                 error = ex.Message,
                 inner_error = ex.InnerException?.Message,
                 stack_trace = ex.StackTrace,

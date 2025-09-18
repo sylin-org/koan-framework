@@ -135,7 +135,7 @@ public sealed class BootReport
         {
             case DecisionType.ConnectionAttempt:
                 if (!options.ShowConnectionAttempts) return;
-                var status = decision.Decision == "success" ? "✓" : "✗";
+                var status = decision.Decision == "success" ? "OK" : "FAIL";
                 FormatLogLine(sb, "I", timestamp, "Koan:discover", $"{decision.Category}: {Koan.Core.Redaction.DeIdentify(decision.ConnectionString ?? "")} {status}");
                 break;
 
