@@ -49,23 +49,35 @@ Visit `http://localhost:5000/swagger` to explore your API.
 
 ## 🔄 Provider Transparency in Action
 
+**Define your model once, run anywhere:**
+
+```csharp
+// Your domain model - inherits from Entity<T> for automatic capabilities
+public class Product : Entity<Product>
+{
+    public string Name { get; set; } = "";
+    public decimal Price { get; set; }
+    public string Category { get; set; } = "";
+}
+```
+
 **The same code, different storage backends:**
 
 ```csharp
-// Development: SQLite (zero config)
-var products = await Data<Product, string>.All();
+// Development: SQLite (zero config, file-based)
+var products = await Product.All();
 
-// Staging: PostgreSQL (just change connection string)
-var products = await Data<Product, string>.All();
+// Staging: PostgreSQL (just add connection string)
+var products = await Product.All();
 
 // Production: MongoDB (same API, different capabilities)
-var products = await Data<Product, string>.All();
+var products = await Product.All();
 
 // Analytics: Vector DB (semantic search enabled)
-var similar = await Data<Product, string>.Query("eco-friendly laptop");
+var similar = await Product.Query("eco-friendly laptop");
 ```
 
-**Auto-provider selection:** Install `Koan.Data.Postgres`, and your app automatically uses PostgreSQL when available, falls back to SQLite in development.
+**Intelligent provider selection:** Install `Koan.Data.Postgres`, and your app automatically uses PostgreSQL when available, gracefully falls back to SQLite in development. Your entity methods work identically across all providers.
 
 ## 🚀 Enterprise-Grade Features, Zero Configuration
 
