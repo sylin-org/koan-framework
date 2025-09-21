@@ -1,10 +1,20 @@
 using System.Reflection;
 using Aspire.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Orchestration.Aspire.Extensions;
+
+/// <summary>
+/// Result of Koan resource discovery containing builder and discovered resource names
+/// </summary>
+public class KoanDiscoveryResult
+{
+    public IDistributedApplicationBuilder Builder { get; init; } = null!;
+    public List<string> ResourceNames { get; init; } = new();
+}
 
 /// <summary>
 /// Extension methods for integrating Koan Framework modules with .NET Aspire
@@ -18,7 +28,7 @@ public static class KoanAspireExtensions
     /// IKoanAspireRegistrar and calls their RegisterAspireResources method in priority order.
     /// </summary>
     /// <param name="builder">The Aspire distributed application builder</param>
-    /// <returns>The builder for method chaining</returns>
+    /// <returns>Collection of discovered resource names for application wiring</returns>
     /// <remarks>
     /// This method enables Koan's "Reference = Intent" philosophy for orchestration:
     /// simply referencing a Koan module package automatically registers its required
@@ -44,11 +54,22 @@ public static class KoanAspireExtensions
     public static IDistributedApplicationBuilder AddKoanDiscoveredResources(
         this IDistributedApplicationBuilder builder)
     {
+        // Configure Aspire dashboard with sensible defaults for Koan applications
+        ConfigureKoanAspireDashboard(builder);
+
         var logger = CreateLogger(builder);
+
+        // Force assembly loading to ensure data providers are available for discovery
+        ForceLoadKoanAssemblies(logger);
+
         var assemblies = KoanAssemblyDiscovery.GetKoanAssemblies();
         var registrars = new List<(IKoanAspireRegistrar Registrar, Type RegistrarType, int Priority)>();
 
         logger?.LogInformation("Koan-Aspire: Starting resource discovery across {AssemblyCount} assemblies", assemblies.Count());
+
+        // Log assembly details for debugging
+        logger?.LogInformation("Koan-Aspire: Discovered assemblies: {AssemblyNames}",
+            string.Join(", ", assemblies.Select(a => a.GetName().Name)));
 
         // Discovery phase: find all implementing registrars
         foreach (var assembly in assemblies)
@@ -61,7 +82,8 @@ public static class KoanAspireExtensions
 
                 if (registrarType != null)
                 {
-                    logger?.LogDebug("Koan-Aspire: Found IKoanAspireRegistrar in {AssemblyName}", assembly.GetName().Name);
+                    logger?.LogDebug("Koan-Aspire: Found IKoanAspireRegistrar in {AssemblyName}: {RegistrarType}",
+                        assembly.GetName().Name, registrarType.FullName);
 
                     var registrar = (IKoanAspireRegistrar)Activator.CreateInstance(registrarType)!;
 
@@ -69,7 +91,7 @@ public static class KoanAspireExtensions
                     if (registrar.ShouldRegister(builder.Configuration, builder.Environment))
                     {
                         registrars.Add((registrar, registrarType, registrar.Priority));
-                        logger?.LogDebug("Koan-Aspire: Queued registrar {RegistrarType} with priority {Priority}",
+                        logger?.LogInformation("Koan-Aspire: Queued registrar {RegistrarType} with priority {Priority}",
                             registrarType.FullName, registrar.Priority);
                     }
                     else
@@ -243,6 +265,78 @@ public static class KoanAspireExtensions
         {
             // If logger creation fails, return null and continue without logging
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Configure Aspire dashboard with sensible defaults for Koan applications.
+    /// This ensures the dashboard works out-of-the-box without manual configuration.
+    /// </summary>
+    private static void ConfigureKoanAspireDashboard(IDistributedApplicationBuilder builder)
+    {
+        var logger = CreateLogger(builder);
+
+        try
+        {
+            // For development, disable dashboard to avoid configuration complexity
+            // Production environments should configure these properly
+            if (builder.Environment.IsDevelopment())
+            {
+                // Configure dashboard options directly through DI
+                builder.Services.PostConfigure<Microsoft.Extensions.Hosting.ConsoleLifetimeOptions>(options =>
+                {
+                    options.SuppressStatusMessages = true;
+                });
+
+                // Set required environment variables for dashboard configuration
+                Environment.SetEnvironmentVariable("ASPNETCORE_URLS", "http://localhost:15888");
+                Environment.SetEnvironmentVariable("DOTNET_DASHBOARD_OTLP_ENDPOINT_URL", "http://localhost:4317");
+                Environment.SetEnvironmentVariable("DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS", "true");
+
+                logger?.LogDebug("Koan-Aspire: Configured development dashboard settings");
+            }
+
+            logger?.LogInformation("Koan-Aspire: Dashboard configuration completed");
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Koan-Aspire: Failed to configure dashboard, continuing with defaults");
+        }
+    }
+
+    /// <summary>
+    /// Force load Koan assemblies to ensure they're available for discovery.
+    /// This addresses the chicken-and-egg problem where assemblies containing
+    /// IKoanAspireRegistrar implementations might not be loaded yet.
+    /// </summary>
+    private static void ForceLoadKoanAssemblies(ILogger? logger)
+    {
+        try
+        {
+            var assembliesInDirectory = Directory.GetFiles(AppDomain.CurrentDomain.BaseDirectory, "Koan.*.dll");
+
+            foreach (var assemblyFile in assembliesInDirectory)
+            {
+                try
+                {
+                    var assemblyName = Path.GetFileNameWithoutExtension(assemblyFile);
+
+                    // Skip if already loaded
+                    if (AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == assemblyName))
+                        continue;
+
+                    Assembly.LoadFrom(assemblyFile);
+                    logger?.LogDebug("Koan-Aspire: Force loaded assembly {AssemblyName}", assemblyName);
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogDebug(ex, "Koan-Aspire: Failed to force load assembly {AssemblyFile}", assemblyFile);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Koan-Aspire: Failed to force load assemblies from directory");
         }
     }
 

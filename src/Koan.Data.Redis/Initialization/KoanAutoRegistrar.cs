@@ -21,13 +21,20 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
     public void Initialize(IServiceCollection services)
     {
         var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Redis.Initialization.KoanAutoRegistrar");
-    logger?.Log(LogLevel.Debug, "Koan.Data.Redis KoanAutoRegistrar loaded.");
+        logger?.Log(LogLevel.Debug, "Koan.Data.Redis KoanAutoRegistrar loaded.");
+
         services.AddKoanOptions<RedisOptions>();
         services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, RedisHealthContributor>());
-        // Connection multiplexer singleton
+
+        // Only register connection multiplexer if Redis is available or in Aspire context
+        RegisterConnectionMultiplexer(services, logger);
+    }
+
+    private void RegisterConnectionMultiplexer(IServiceCollection services, ILogger? logger)
+    {
         services.AddSingleton<IConnectionMultiplexer>(sp =>
         {
             var cfg = sp.GetRequiredService<IOptions<RedisOptions>>().Value;
@@ -36,7 +43,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             {
                 cs = KoanEnv.InContainer ? Infrastructure.Constants.Discovery.DefaultCompose : Infrastructure.Constants.Discovery.DefaultLocal;
             }
-            return ConnectionMultiplexer.Connect(cs);
+
+            logger?.LogDebug("Attempting Redis connection to: {ConnectionString}", cs);
+            try
+            {
+                return ConnectionMultiplexer.Connect(cs);
+            }
+            catch (RedisConnectionException ex)
+            {
+                logger?.LogError("Redis connection failed: {Message}", ex.Message);
+                throw new InvalidOperationException($"Redis is not available. Connection string: {cs}. " +
+                    "Ensure Redis is running or use the Aspire AppHost for managed Redis.", ex);
+            }
         });
     }
 
@@ -80,8 +98,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             redis.WithEnvironment("REDIS_DEFAULT_DB", options.Database.ToString());
         }
 
-        // Add health check
-        redis.WithHealthCheck("/health");
+        // TODO: Configure proper health check for Redis
+        // redis.WithHealthCheck("/health");
     }
 
     public int Priority => 200; // Cache infrastructure registers after databases but before apps

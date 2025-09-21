@@ -97,7 +97,7 @@ public interface IKoanAspireRegistrar
     /// public bool ShouldRegister(IConfiguration cfg, IHostEnvironment env)
     /// {
     ///     // Only register Ollama in development environments
-    ///     return env.IsDevelopment() && cfg.GetValue("Koan:AI:EnableOllama", false);
+    ///     return env.IsDevelopment() &amp;&amp; cfg.GetValue("Koan:AI:EnableOllama", false);
     /// }
     /// </code>
     /// </example>

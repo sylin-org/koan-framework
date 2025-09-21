@@ -78,15 +78,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             postgres.WithEnvironment("POSTGRES_PASSWORD", connectionParts.Password);
         }
 
-        // Add health check using the standard PostgreSQL health check
-        postgres.WithHealthCheck("/health");
+        // TODO: Configure proper health check for PostgreSQL
+        // postgres.WithHealthCheck("/health"); // This pattern doesn't work for database resources
     }
 
     public int Priority => 100; // Infrastructure resources register early
 
     public bool ShouldRegister(IConfiguration configuration, IHostEnvironment environment)
     {
-        // Register in development environments or when explicitly configured
+        // Register in development environments automatically (Reference = Intent)
+        // or when explicitly configured in other environments
         return environment.IsDevelopment() || HasExplicitConfiguration(configuration);
     }
 
