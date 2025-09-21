@@ -69,7 +69,7 @@ internal sealed class SeedService : ISeedService
         return jobId;
     }
 
-    public async Task<string> StartAsync(string source, string mediaTypeName, int? limit, bool overwrite, CancellationToken ct)
+    public Task<string> StartAsync(string source, string mediaTypeName, int? limit, bool overwrite, CancellationToken ct)
     {
         // Prevent concurrent imports to avoid service saturation
         lock (_importLock)
@@ -201,7 +201,7 @@ internal sealed class SeedService : ISeedService
             }
         }, ct);
 
-        return jobId;
+        return Task.FromResult(jobId);
     }
 
     public Task<string> StartVectorUpsertAsync(IEnumerable<Media> items, CancellationToken ct)

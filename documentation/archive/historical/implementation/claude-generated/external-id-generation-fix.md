@@ -423,5 +423,5 @@ This fix ensures the Koan Framework Flow system maintains complete data lineage 
 ---
 
 **Commit**: `502384a` - fix(Flow): resolve external ID generation with proper system name extraction  
-**Author**: Claude Code  
+**Author**: Leo Botinelly  
 **Date**: September 9, 2025

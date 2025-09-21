@@ -15,16 +15,16 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     where TEntity : class, IStorageObject
 {
     // IStorageObject properties (minimal baseline, derived types may add more fields)
-    public string Key { get; protected internal set; } = string.Empty;
-    public string? Name { get; protected internal set; }
-    public string? ContentType { get; protected internal set; }
-    public long Size { get; protected internal set; }
-    public string? ContentHash { get; protected internal set; }
-    public DateTimeOffset CreatedAt { get; protected internal set; }
-    public DateTimeOffset? UpdatedAt { get; protected internal set; }
-    public string? Provider { get; protected internal set; }
-    public string? Container { get; protected internal set; }
-    public IReadOnlyDictionary<string, string>? Tags { get; protected internal set; }
+    public string Key { get; set; } = string.Empty;
+    public string? Name { get; set; }
+    public string? ContentType { get; set; }
+    public long Size { get; set; }
+    public string? ContentHash { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
+    public string? Provider { get; set; }
+    public string? Container { get; set; }
+    public IReadOnlyDictionary<string, string>? Tags { get; set; }
 
     // Resolve target profile/container from attribute or options default
     private static (string Profile, string Container) ResolveBinding(string? overrideContainer = null)

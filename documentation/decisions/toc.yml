@@ -41,9 +41,9 @@
         - name: External ID Correlation Framework
           href: DATA-0070-external-id-correlation.md
         - name: Messaging envelope transformers
-            href: DATA-0072-messaging-envelope-transformers.md
-          - name: Parent relationship attribute explicit type
-            href: DATA-0072-parent-relationship-attribute-explicit-type.md
+          href: DATA-0072-messaging-envelope-transformers.md
+        - name: Parent relationship attribute explicit type
+          href: DATA-0072-parent-relationship-attribute-explicit-type.md
         - name: Use JObject for Dynamic Entity Models
           href: DATA-0073-jobject-for-dynamic-entities.md
         - name: Vector module split and clean separation
@@ -112,35 +112,35 @@
        href: WEB-0050-s8-flow-iot-sample-and-sse-monitor.md
      - name: Flow Messaging Refactor
        href: WEB-0060-flow-messaging-refactor.md
+     - name: Web templates and rate limiters
+       href: WEB-0012-web-templates-and-rate-limiters.md
+     - name: GraphQL module and controller
+       href: WEB-0041-graphql-module-and-controller.md
+     - name: GraphQL naming and discovery
+       href: WEB-0042-graphql-naming-and-discovery.md
+     - name: EntityController transformers
+       href: WEB-0035-entitycontroller-transformers.md
+     - name: Entity moderation controller - standard flow and hooks
+       href: WEB-0048-entity-moderation-controller-standard-flow.md
+     - name: Multi-protocol authentication (OIDC/OAuth2/SAML)
+       href: WEB-0043-auth-multi-protocol-oauth-oidc-saml.md
+     - name: Web auth discovery and health
+       href: WEB-0044-web-auth-discovery-and-health.md
+     - name: Auth provider adapters as separate modules
+       href: WEB-0045-auth-provider-adapters-separate-projects.md
+     - name: Entity capabilities - short endpoints and set routing
+       href: WEB-0046-entity-capabilities-short-endpoints-and-set-routing.md
+     - name: Capability authorization - fallback and defaults
+       href: WEB-0047-capability-authorization-fallback-and-defaults.md
+     - name: Role attribution layer - claims transformation
+       href: WEB-0049-role-attribution-layer-and-claims-transformation.md
  - name: Flow (FLOW)
    items:
      - name: External ID translation & adapter identity
        href: FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md
      - name: Direct seeding bypass FlowActions
        href: FLOW-0110-flow-direct-seeding-bypass-flowactions.md
-    - name: Web templates and rate limiters
-      href: WEB-0012-web-templates-and-rate-limiters.md
-    - name: GraphQL module and controller
-      href: WEB-0041-graphql-module-and-controller.md
-    - name: GraphQL naming and discovery
-      href: WEB-0042-graphql-naming-and-discovery.md
-    - name: EntityController transformers
-      href: WEB-0035-entitycontroller-transformers.md
-    - name: Entity moderation controller - standard flow and hooks
-      href: WEB-0048-entity-moderation-controller-standard-flow.md
-    - name: Multi-protocol authentication (OIDC/OAuth2/SAML)
-      href: WEB-0043-auth-multi-protocol-oauth-oidc-saml.md
-    - name: Web auth discovery and health
-      href: WEB-0044-web-auth-discovery-and-health.md
-    - name: Auth provider adapters as separate modules
-      href: WEB-0045-auth-provider-adapters-separate-projects.md
-    - name: Entity capabilities - short endpoints and set routing
-      href: WEB-0046-entity-capabilities-short-endpoints-and-set-routing.md
-    - name: Capability authorization - fallback and defaults
-      href: WEB-0047-capability-authorization-fallback-and-defaults.md
-    - name: Role attribution layer - claims transformation
-      href: WEB-0049-role-attribution-layer-and-claims-transformation.md
-- name: Messaging (MESS)
+ - name: Messaging (MESS)
   items:
     - name: Messaging capabilities and negotiation
       href: MESS-0021-messaging-capabilities-and-negotiation.md

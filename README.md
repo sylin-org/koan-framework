@@ -1,20 +1,27 @@
 # Koan Framework
 
-**Zero-configuration .NET for the container-native era. Build sophisticated services that just work.**
+**Smart Development Made Simple**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/download)
-[![Framework Version](https://img.shields.io/badge/Version-v0.2.18-green.svg)](https://github.com/yourusername/koan-framework/releases)
+[![Framework Version](https://img.shields.io/badge/Version-v0.2.18-green.svg)](https://github.com/sylin-org/koan-framework/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/sylin-org/koan-framework)](https://github.com/sylin-org/koan-framework/stargazers)
 
-Koan transforms enterprise .NET development through intelligent defaults, provider transparency, and container-native orchestration. Write once, deploy anywhere-from SQLite in development to PostgreSQL in production, from local Docker to Kubernetes at scale.
+> **Early-stage framework eliminating .NET boilerplate and configuration chaos. Join us in building the developer experience we wish we had.**
 
-## Why Koan?
+Koan Framework is developing intelligent entity-first patterns for .NET developers. Our goal: eliminate the hours of setup that every project requires while maintaining the power and flexibility .NET developers expect.
 
-**87% reduction in service setup time.** What takes 23 minutes in traditional .NET takes 3 minutes with Koan.
+## Early Stage, High Impact
 
-**Zero authentication configuration.** OAuth, JWT, service-to-service-all handled automatically with production-grade security.
+**We're building Koan in public** with a small but growing community. Version 0.2.18 represents the foundation we're building on:
 
-**Provider transparency.** Your data access code works unchanged across PostgreSQL, MongoDB, Redis, Vector DBs, and more.
+**Core entity patterns** - Define models, get working APIs
+**Multi-provider data access** - Same code, different storage backends
+**Auto-registration system** - Add packages, get functionality
+**AI integration** - Vector stores and embeddings (in development)
+**Performance optimization** - Production benchmarks (planned)
+
+**Your feedback shapes what we build next.**
 
 ## Zero to Production in 60 Seconds
 
@@ -80,9 +87,9 @@ var similar = await Product.Query("eco-friendly laptop");
 
 **Intelligent provider selection:** Install `Koan.Data.Postgres`, and your app automatically uses PostgreSQL when available, gracefully falls back to SQLite in development. Your entity methods work identically across all providers.
 
-## Enterprise-Grade Features, Zero Configuration
+## Vision: Smart Patterns for Common Scenarios
 
-### Multi-Service Authentication
+### Service-to-Service Authentication (Planned)
 
 ```csharp
 [KoanService("inventory-service", ProvidedScopes = new[] { "inventory:read" })]
@@ -92,19 +99,19 @@ public class InventoryController : ControllerBase
     [CallsService("pricing-service", RequiredScopes = new[] { "pricing:read" })]
     public async Task<IActionResult> GetInventoryWithPricing([FromService] IKoanServiceClient client)
     {
-        // Automatic JWT token acquisition, service discovery, and secure communication
+        // Vision: Automatic JWT token acquisition, service discovery, and secure communication
         var pricing = await client.GetAsync<PricingData>("pricing-service", "/api/pricing");
         return Ok(new { inventory = GetInventory(), pricing });
     }
 }
 ```
 
-**Zero manual configuration:** OAuth providers, JWT tokens, service-to-service authentication, token refresh-all handled automatically.
+**Development goal:** Eliminate manual OAuth setup, JWT configuration, and service discovery complexity.
 
-### AI Integration
+### AI Integration (In Development)
 
 ```csharp
-// Works with Ollama, OpenAI, Azure OpenAI-auto-selects based on availability
+// Vision: Simple AI integration with provider auto-selection
 [HttpPost("recommend")]
 public async Task<IActionResult> GetRecommendations([FromServices] IAiService ai, [FromBody] ProductQuery query)
 {
@@ -117,6 +124,8 @@ public async Task<IActionResult> GetRecommendations([FromServices] IAiService ai
     return Ok(new { similar, recommendation });
 }
 ```
+
+**Current status:** Vector storage foundation in place, AI provider abstraction in development.
 
 ### Event-Driven Architecture
 
@@ -223,32 +232,52 @@ public class DatabaseHealthContributor : IHealthContributor
 }
 ```
 
-## Performance & Production Benefits
+## Current Capabilities & Development Goals
 
-- **95% reduction** in manual service registration through auto-discovery
-- **100% elimination** of manual JWT/Auth configuration
-- **Multi-level caching** with intelligent invalidation
-- **Circuit breakers** and graceful degradation built-in
-- **Memory-conscious patterns** with performance monitoring
-- **Bulk operations** optimized per provider
+**What's working today:**
+- Auto-discovery eliminates manual service registration
+- Entity-first patterns reduce boilerplate
+- Multi-provider data access (SQLite, PostgreSQL, MongoDB)
+- Zero-configuration project setup
 
-## When to Choose Koan
+**In active development:**
+- Performance benchmarking and optimization
+- AI provider abstractions and vector storage
+- Advanced caching strategies
+- Production monitoring and health checks
 
-**Perfect for:**
+## When to Try Koan
 
-- **Microservices** requiring service-to-service authentication
-- **Event-driven architectures** with complex processing requirements
-- **AI-enabled applications** needing provider-agnostic integration
-- **Multi-tenant applications** with sophisticated data isolation
-- **Container-first deployments** on Docker, Kubernetes, or service mesh
-- **Teams prioritizing long-term productivity** over initial simplicity
+**Koan is great for experimentation if you:**
 
-**Consider alternatives when:**
+- Want to eliminate .NET project setup boilerplate
+- Are interested in entity-first development patterns
+- Need multi-provider data access in your applications
+- Want to contribute to framework development
+- Are curious about "smart defaults" approaches to .NET
 
-- Building simple CRUD apps without distributed system needs
-- Requiring specific integrations not supported by Koan's abstractions
-- Working with legacy systems that can't adopt containerization
-- Teams that prefer explicit configuration over intelligent conventions
+**Consider waiting if you:**
+
+- Need production-ready features for critical applications
+- Require extensive documentation and community support
+- Want stable APIs without breaking changes
+- Prefer mature frameworks with proven track records
+
+## Join Our Development Community
+
+**We're looking for early adopters who want to:**
+
+- **Shape the framework** - Your use cases directly influence our roadmap
+- **Contribute code** - Help build the patterns you wish existed
+- **Provide feedback** - Real-world usage guides our priorities
+- **Be recognized** - Early contributors get lasting credit as framework builders
+
+**Ways to get involved:**
+- **Star the repository** to show support
+- **Report issues** you encounter
+- **Suggest features** based on your needs
+- **Submit pull requests** for improvements
+- **Join discussions** about framework design
 
 ## Learn More
 
@@ -326,6 +355,6 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 ---
 
-**Koan Framework: Zero-configuration .NET for teams that build to last.**
+**Koan Framework: Smart Development Made Simple**
 
-_Build sophisticated services with intelligent defaults. Deploy anywhere with container-native orchestration. Scale with enterprise-grade patterns built-in._
+_Early-stage .NET framework eliminating boilerplate and configuration chaos. Join us in building the developer experience we wish we had._

@@ -20,7 +20,7 @@ public class ServiceDemoController : ControllerBase
 
     [HttpGet("test-service-auth")]
     [CallsService("ai-service", RequiredScopes = new[] { "ml:inference" })]
-    public async Task<IActionResult> TestServiceAuth()
+    public IActionResult TestServiceAuth()
     {
         _logger.LogInformation("Testing service authentication...");
 
@@ -60,7 +60,7 @@ public class ServiceDemoController : ControllerBase
     [HttpPost("multi-service-call")]
     [CallsService("ai-service", RequiredScopes = new[] { "ml:inference" })]
     [CallsService("analytics-service", RequiredScopes = new[] { "analytics:write" }, Optional = true)]
-    public async Task<IActionResult> MultiServiceCall([FromBody] ProcessingRequest request)
+    public IActionResult MultiServiceCall([FromBody] ProcessingRequest request)
     {
         _logger.LogInformation("Processing request with multiple service calls");
 

@@ -209,7 +209,7 @@ public class RestoreController : ControllerBase
     [HttpGet("history")]
     [ProducesResponseType(typeof(RestoreHistoryResponse), 200)]
     [ProducesResponseType(500)]
-    public async Task<ActionResult<RestoreHistoryResponse>> GetRestoreHistory(
+    public ActionResult<RestoreHistoryResponse> GetRestoreHistory(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default)

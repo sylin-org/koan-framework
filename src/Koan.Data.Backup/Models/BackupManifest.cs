@@ -5,7 +5,6 @@ namespace Koan.Data.Backup.Models;
 
 public class BackupManifest : StorageEntity<BackupManifest>
 {
-    public string Name { get; set; } = default!;
     public string Description { get; set; } = string.Empty;
     public string[] Tags { get; set; } = Array.Empty<string>();
     public DateTimeOffset CreatedAt { get; set; }

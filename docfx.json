@@ -1,0 +1,113 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "files": [
+            "src/**/*.csproj"
+          ],
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/*Tests.csproj",
+            "**/*.Test.csproj"
+          ]
+        }
+      ],
+      "dest": "api",
+      "includePrivateMembers": false,
+      "disableGitFeatures": false,
+      "disableDefaultFilter": false,
+      "noRestore": true,
+      "namespaceLayout": "flattened",
+      "memberLayout": "samePage",
+      "allowCompilationErrors": true
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "api/**.yml",
+          "api/index.md"
+        ]
+      },
+      {
+        "files": [
+          "documentation/**.md",
+          "docs/index.md",
+          "docs/toc.yml"
+        ],
+        "exclude": [
+          "**/obj/**",
+          "**/bin/**",
+          "documentation/archive/**",
+          "documentation/decisions/toc.yml"
+        ]
+      },
+      {
+        "files": [
+          "README.md",
+          "CONTRIBUTING.md"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [
+          "images/**",
+          "other/website/assets/**"
+        ]
+      }
+    ],
+    "overwrite": [
+      {
+        "files": [
+          "apidoc/**.md"
+        ],
+        "exclude": [
+          "obj/**",
+          "bin/**"
+        ]
+      }
+    ],
+    "dest": "artifacts/other/website/docs",
+    "globalMetadataFiles": [],
+    "fileMetadataFiles": [],
+    "template": [
+      "default",
+      "modern"
+    ],
+    "postProcessors": [],
+    "keepFileLink": false,
+    "disableGitFeatures": false,
+    "globalMetadata": {
+      "_appTitle": "Koan Framework Documentation",
+      "_appName": "Koan Framework",
+      "_appFooter": "Koan Framework - Talk to your code, don't fight it",
+      "_enableSearch": true,
+      "_enableNewTab": true,
+      "_disableContribution": false,
+      "_gitContribute": {
+        "repo": "https://github.com/sylin-org/koan-framework",
+        "branch": "main"
+      },
+      "_gitUrlPattern": "github",
+      "pdf": false
+    },
+    "fileMetadata": {
+      "_appTitle": {
+        "documentation/decisions/**": "Architecture Decisions - Koan Framework",
+        "documentation/guides/**": "Developer Guides - Koan Framework",
+        "documentation/reference/**": "API Reference - Koan Framework",
+        "api/**": "API Documentation - Koan Framework"
+      },
+      "_tocTitle": {
+        "documentation/decisions/**": "Decisions",
+        "documentation/guides/**": "Guides",
+        "documentation/reference/**": "Reference",
+        "api/**": "API"
+      }
+    }
+  }
+}

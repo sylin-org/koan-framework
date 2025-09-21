@@ -9,42 +9,7 @@ namespace S5.Recs.Controllers;
 
 [ApiController]
 [Route("api/data/library")]
-public class LibraryEntryController : EntityController<LibraryEntry, string>
-{
-	[HttpGet("_whoami")] // GET /api/data/library/_whoami
-	public IActionResult WhoAmI() => Ok(new
-	{
-		Controller = GetType().FullName,
-		BaseType = GetType().BaseType?.FullName,
-		Assembly = GetType().Assembly.FullName,
-		Timestamp = DateTimeOffset.UtcNow
-	});
-
-	// Only one DebugHeaders endpoint should exist. If ambiguous, remove duplicates in other files.
-	[HttpGet("_debugheaders")]
-	public new IActionResult DebugHeaders()
-	{
-		var headers = new Dictionary<string, string>();
-		foreach (var h in Request.Headers)
-			headers[h.Key] = h.Value.ToString();
-		var query = new Dictionary<string, string>();
-		foreach (var q in Request.Query)
-			query[q.Key] = q.Value.ToString();
-		return Ok(new
-		{
-			Headers = headers,
-			Query = query,
-			Path = Request.Path,
-			Method = Request.Method,
-			Timestamp = DateTimeOffset.UtcNow
-		});
-	}
-
-	public override async Task<IActionResult> GetCollection(CancellationToken ct)
-	{
-	return await base.GetCollection(ct);
-	}
-}
+public class LibraryEntryController : EntityController<LibraryEntry, string> { }
 
 [ApiController]
 [Route("api/data/users")]

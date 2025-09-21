@@ -27,6 +27,7 @@ validation: 2025-01-17
 **Cause**: Missing `KoanAutoRegistrar` or assembly not loaded
 
 **Solution**:
+
 ```csharp
 // 1. Verify AddKoan() is called
 builder.Services.AddKoan();
@@ -54,6 +55,7 @@ var assemblies = AppDomain.CurrentDomain.GetAssemblies()
 **Symptom**: Missing modules in boot logs
 
 **Diagnostic**:
+
 ```csharp
 // Enable debug logging
 builder.Logging.SetMinimumLevel(LogLevel.Debug);
@@ -66,6 +68,7 @@ if (KoanEnv.IsDevelopment)
 ```
 
 **Expected Output**:
+
 ```
 [INFO] Koan:modules data→postgresql
 [INFO] Koan:modules web→controllers
@@ -79,6 +82,7 @@ if (KoanEnv.IsDevelopment)
 **Symptom**: Manual repository injection errors
 
 **Wrong**:
+
 ```csharp
 public class TodoService
 {
@@ -87,6 +91,7 @@ public class TodoService
 ```
 
 **Right**:
+
 ```csharp
 public class TodoService
 {
@@ -99,6 +104,7 @@ public class TodoService
 **Symptom**: Wrong provider elected or no provider found
 
 **Diagnostic**:
+
 ```csharp
 // Check provider capabilities
 var capabilities = Data<Todo, string>.QueryCaps;
@@ -109,6 +115,7 @@ logger.LogInformation("Provider elected: {Provider}", capabilities.ProviderName)
 ```
 
 **Configuration Fix**:
+
 ```json
 {
   "Koan": {
@@ -129,6 +136,7 @@ logger.LogInformation("Provider elected: {Provider}", capabilities.ProviderName)
 **Cause**: Wrong entity pattern
 
 **Fix**:
+
 ```csharp
 // ✅ Auto-optimized - uses GUID v7, stored as binary
 public class Order : Entity<Order>
@@ -148,6 +156,7 @@ public class Category : Entity<Category, string>
 **Symptom**: Slow queries or unexpected in-memory processing
 
 **Diagnostic**:
+
 ```csharp
 // Check if query is pushed down to database
 var capabilities = Data<Product, string>.QueryCaps;
@@ -162,6 +171,7 @@ else
 ```
 
 **Fix**:
+
 ```csharp
 // ✅ Simple queries get pushed down
 var products = await Product.Where(p => p.Category == "Electronics");
@@ -181,6 +191,7 @@ var complex = await Product.Query()
 **Cause**: Missing controller registration or wrong inheritance
 
 **Fix**:
+
 ```csharp
 // ✅ Correct controller pattern
 [Route("api/[controller]")]
@@ -200,12 +211,14 @@ public class TodosController : ControllerBase // Missing EntityController<T>
 **Symptom**: 401 Unauthorized on protected endpoints
 
 **Diagnostic**:
+
 ```bash
 # Check auth providers
 curl http://localhost:5000/.well-known/auth/providers
 ```
 
 **Configuration Check**:
+
 ```json
 {
   "Koan": {
@@ -228,6 +241,7 @@ curl http://localhost:5000/.well-known/auth/providers
 **Symptom**: `/api/health` returns unhealthy
 
 **Diagnostic**:
+
 ```bash
 # Check individual health endpoints
 curl http://localhost:5000/api/health/live    # Liveness
@@ -235,6 +249,7 @@ curl http://localhost:5000/api/health/ready   # Readiness
 ```
 
 **Fix**:
+
 ```csharp
 // Implement custom health check
 public class DatabaseHealthCheck : IHealthContributor
@@ -264,12 +279,14 @@ public class DatabaseHealthCheck : IHealthContributor
 **Symptom**: AI requests fail with connection errors
 
 **Diagnostic**:
+
 ```bash
 # Check if Ollama is running
 curl http://localhost:11434/api/tags
 ```
 
 **Fix**:
+
 ```bash
 # Install and start Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
@@ -278,6 +295,7 @@ ollama serve
 ```
 
 **Configuration**:
+
 ```json
 {
   "Koan": {
@@ -297,6 +315,7 @@ ollama serve
 **Symptom**: Empty results from vector search
 
 **Diagnostic**:
+
 ```csharp
 // Check if embeddings are generated
 var doc = await Document.ById("test-id");
@@ -304,6 +323,7 @@ logger.LogInformation("Embedding length: {Length}", doc.ContentEmbedding?.Length
 ```
 
 **Fix**:
+
 ```csharp
 // Ensure VectorField attribute is present
 public class Document : Entity<Document>
@@ -328,6 +348,7 @@ await document.Save();
 **Symptom**: 429 errors from AI endpoints
 
 **Fix**:
+
 ```json
 {
   "Koan": {
@@ -351,6 +372,7 @@ await document.Save();
 **Cause**: Case mismatch between C# properties and JSON serialization
 
 **Diagnostic**:
+
 ```csharp
 // Check aggregation key extraction
 [AggregationKey("inventory.serial")] // ✅ Use camelCase in attribute
@@ -358,12 +380,13 @@ public string SerialNumber { get; set; } = ""; // PascalCase property is fine
 ```
 
 **JSON Structure**:
+
 ```json
 {
   "id": "dev:123",
   "model": {
     "inventory": {
-      "serial": "DEV-001"  // Must match aggregation key path
+      "serial": "DEV-001" // Must match aggregation key path
     }
   }
 }
@@ -374,6 +397,7 @@ public string SerialNumber { get; set; } = ""; // PascalCase property is fine
 **Symptom**: Flow entities fail to resolve parent references
 
 **Fix**:
+
 ```csharp
 // Send with external ID reference
 var sensorData = new DynamicFlowEntity<Sensor>
@@ -399,6 +423,7 @@ var sensorData = new DynamicFlowEntity<Sensor>
 **Symptom**: Flow adapters not processing data
 
 **Diagnostic**:
+
 ```json
 {
   "Koan": {
@@ -414,6 +439,7 @@ var sensorData = new DynamicFlowEntity<Sensor>
 ```
 
 **Fix**:
+
 ```csharp
 // Ensure adapter is properly attributed
 [FlowAdapter("oem", "device-sync", DefaultSource = "oem-hub")]
@@ -430,6 +456,7 @@ public class DeviceAdapter : BackgroundService
 **Symptom**: Messaging not working, connection errors
 
 **Diagnostic**:
+
 ```bash
 # Check RabbitMQ status
 docker ps | grep rabbitmq
@@ -437,6 +464,7 @@ curl http://localhost:15672/api/overview
 ```
 
 **Configuration**:
+
 ```json
 {
   "Koan": {
@@ -460,6 +488,7 @@ curl http://localhost:15672/api/overview
 **Symptom**: Messages sent but handlers not triggered
 
 **Fix**:
+
 ```csharp
 // Ensure handler is properly registered
 public class OrderProcessor : BackgroundService
@@ -480,6 +509,7 @@ public class OrderProcessor : BackgroundService
 **Symptom**: Messages repeatedly failing
 
 **Diagnostic**:
+
 ```csharp
 // Check dead letter handling
 await this.On<DeadLetterMessage>(async (dlq, sp, ct) =>
@@ -496,6 +526,7 @@ await this.On<DeadLetterMessage>(async (dlq, sp, ct) =>
 **Symptom**: 413 or 415 errors on file uploads
 
 **Configuration**:
+
 ```json
 {
   "Koan": {
@@ -508,6 +539,7 @@ await this.On<DeadLetterMessage>(async (dlq, sp, ct) =>
 ```
 
 **Fix**:
+
 ```csharp
 // Implement content validation
 public class ContentValidationStep : IStoragePipelineStep
@@ -531,6 +563,7 @@ public class ContentValidationStep : IStoragePipelineStep
 **Symptom**: Storage operations fail with profile errors
 
 **Fix**:
+
 ```json
 {
   "Koan": {
@@ -555,6 +588,7 @@ public class ContentValidationStep : IStoragePipelineStep
 **Symptom**: `Koan up` fails with engine detection errors
 
 **Diagnostic**:
+
 ```bash
 # Check available engines
 Koan doctor
@@ -562,6 +596,7 @@ Koan doctor --json
 ```
 
 **Fix**:
+
 ```bash
 # Install Docker Desktop or Podman Desktop
 # Then force specific engine
@@ -574,6 +609,7 @@ Koan up --engine podman
 **Symptom**: Services fail to start due to port conflicts
 
 **Fix**:
+
 ```bash
 # Use different base port
 Koan up --base-port 9000
@@ -588,6 +624,7 @@ Koan up --conflicts warn  # Continue with warnings
 **Symptom**: `Koan up` times out waiting for services
 
 **Diagnostic**:
+
 ```bash
 # Check container status
 Koan status
@@ -599,6 +636,7 @@ docker compose -f .Koan/compose.yml logs
 ```
 
 **Fix**:
+
 ```bash
 # Increase timeout
 Koan up --timeout 600
@@ -614,6 +652,7 @@ Koan logs --service postgres
 **Symptom**: High memory consumption
 
 **Diagnostic**:
+
 ```csharp
 // Check for memory leaks in data access
 // ❌ Loading all data into memory
@@ -631,6 +670,7 @@ await foreach (var user in User.AllStream(batchSize: 1000))
 **Symptom**: Database operations taking too long
 
 **Fix**:
+
 ```csharp
 // ✅ Use proper filtering and pagination
 var products = await Product.Query()
@@ -651,6 +691,7 @@ var filtered = allProducts.Where(p => p.Category == category).Take(50);
 **Symptom**: Configuration not being read
 
 **Fix**:
+
 ```bash
 # Use double underscore for nested configuration
 export Koan__Data__DefaultProvider=Postgres
@@ -674,6 +715,7 @@ export Koan__Data__Postgres__ConnectionString="Host=localhost;Database=app"
 **Symptom**: Sensitive configuration not found
 
 **Fix**:
+
 ```bash
 # Use user secrets in development
 dotnet user-secrets set "Koan:Data:Postgres:ConnectionString" "Host=localhost;Database=app;Username=user;Password=secret"
@@ -740,6 +782,7 @@ logger.LogInformation("Entity optimization: {Type} - {Reason}",
 ### Framework Logs
 
 Look for structured log entries with these prefixes:
+
 - `[INFO] Koan:modules` - Auto-registration status
 - `[INFO] Koan:discover` - Provider discovery
 - `[ERROR] Koan:` - Framework errors
@@ -747,7 +790,7 @@ Look for structured log entries with these prefixes:
 ### Community Support
 
 - Report issues at: https://github.com/anthropics/claude-code/issues
-- Use `/help` command in Claude Code
+- Use `/help` command in Leo Botinelly
 - Check ADRs in `/documentation/decisions/` for design decisions
 
 ---

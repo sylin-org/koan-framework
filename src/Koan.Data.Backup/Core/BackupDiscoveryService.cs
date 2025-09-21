@@ -47,7 +47,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             var profilesToScan = options.StorageProfiles ?? await GetAllStorageProfilesAsync(ct);
 
             // Discover backups from each profile with controlled concurrency
-            var semaphore = new SemaphoreSlim(options.MaxConcurrency);
+            using var semaphore = new SemaphoreSlim(options.MaxConcurrency);
             var discoveryTasks = profilesToScan.Select(async profile =>
             {
                 await semaphore.WaitAsync(ct);
@@ -60,7 +60,6 @@ public class BackupDiscoveryService : IBackupDiscoveryService
                     semaphore.Release();
                 }
             });
-
             var profileCatalogs = await Task.WhenAll(discoveryTasks);
 
             // Combine all catalogs

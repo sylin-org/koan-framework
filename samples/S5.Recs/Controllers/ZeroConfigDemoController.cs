@@ -34,7 +34,7 @@ public class ZeroConfigDemoController : ControllerBase
     /// </summary>
     [HttpGet("test-zero-config")]
     [CallsService("ai-service", RequiredScopes = new[] { "ai:inference" })]
-    public async Task<IActionResult> TestZeroConfiguration()
+    public IActionResult TestZeroConfiguration()
     {
         _logger.LogInformation("Testing zero-configuration service authentication...");
 
@@ -102,7 +102,7 @@ public class ZeroConfigDemoController : ControllerBase
     [CallsService("analytics-service", RequiredScopes = new[] { "analytics:write" })]
     [CallsService("user-service", RequiredScopes = new[] { "users:read" })]
     [CallsService("notification-service", RequiredScopes = new[] { "notifications:send" }, Optional = true)]
-    public async Task<IActionResult> MultiServiceZeroConfig([FromBody] DemoRequest request)
+    public IActionResult MultiServiceZeroConfig([FromBody] DemoRequest request)
     {
         _logger.LogInformation("Testing multi-service zero-configuration...");
 
