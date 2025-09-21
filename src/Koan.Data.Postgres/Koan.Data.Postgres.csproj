@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
     <ProjectReference Include="..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
-  <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Aspire\Koan.Orchestration.Aspire.csproj" />
   </ItemGroup>
 </Project>
