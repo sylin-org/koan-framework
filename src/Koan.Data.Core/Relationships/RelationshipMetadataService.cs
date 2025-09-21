@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.Abstractions;
 
 namespace Koan.Data.Core.Relationships
@@ -119,8 +120,9 @@ namespace Koan.Data.Core.Relationships
         {
             var childRelationships = new List<(string, Type)>();
 
-            // Find all types in loaded assemblies that have ParentAttribute pointing to parentType
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            // Find all types in cached assemblies that have ParentAttribute pointing to parentType
+            // Use cached assemblies instead of bespoke AppDomain scanning
+            var assemblies = AssemblyCache.Instance.GetAllAssemblies();
 
             foreach (var assembly in assemblies)
             {

@@ -9,12 +9,18 @@ public static class AppBootstrapper
 {
     public static void InitializeModules(IServiceCollection services)
     {
-        // Build a closure of loaded + referenced assemblies
+        // Build a closure of loaded + referenced assemblies and populate AssemblyCache
         var set = new Dictionary<string, Assembly>(StringComparer.OrdinalIgnoreCase);
+        var cache = AssemblyCache.Instance;
+
         void AddAsm(Assembly a)
         {
             var name = a.GetName().Name ?? string.Empty;
-            if (!set.ContainsKey(name)) set[name] = a;
+            if (!set.ContainsKey(name))
+            {
+                set[name] = a;
+                cache.AddAssembly(a); // Cache for reuse by other components
+            }
         }
 
         foreach (var a in AppDomain.CurrentDomain.GetAssemblies()) AddAsm(a);

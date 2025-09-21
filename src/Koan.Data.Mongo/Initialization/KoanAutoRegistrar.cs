@@ -8,6 +8,7 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
 
@@ -155,10 +156,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     private static string[] DiscoverAvailableDataProviders()
     {
-        // Scan loaded assemblies for other data providers
+        // Scan cached assemblies for other data providers
         var providers = new List<string> { "Mongo" }; // Always include self
 
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = AssemblyCache.Instance.GetAllAssemblies();
         foreach (var asm in assemblies)
         {
             var name = asm.GetName().Name ?? "";

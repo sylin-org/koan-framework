@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
@@ -38,7 +39,8 @@ public static class AddKoanGraphQlExtensions
         // Bind typed options
         services.AddKoanOptions<GraphQlOptions>(Infrastructure.Constants.Configuration.Section);
 
-        var entityTypes = AppDomain.CurrentDomain.GetAssemblies()
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var entityTypes = AssemblyCache.Instance.GetAllAssemblies()
             .Where(a => !a.IsDynamic)
             .SelectMany(SafeGetTypes)
             .Where(t => !t.IsAbstract && t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntity<>)))

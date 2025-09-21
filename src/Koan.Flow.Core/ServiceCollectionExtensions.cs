@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
@@ -1039,7 +1040,8 @@ public static class ServiceCollectionExtensions
     private static List<Type> DiscoverModels()
     {
         var result = new List<Type>();
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = AssemblyCache.Instance.GetAllAssemblies();
         foreach (var asm in assemblies)
         {
             Type?[] types;
@@ -1254,7 +1256,8 @@ public static class ServiceCollectionExtensions
             var defaultOrchestratorType = typeof(Koan.Flow.Core.Orchestration.DefaultFlowOrchestrator);
 
             // Check all loaded assemblies for classes with [FlowOrchestrator]
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            // Use cached assemblies instead of bespoke AppDomain scanning
+            foreach (var assembly in AssemblyCache.Instance.GetAllAssemblies())
             {
                 try
                 {
