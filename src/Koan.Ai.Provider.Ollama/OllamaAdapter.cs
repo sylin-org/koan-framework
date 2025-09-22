@@ -1,23 +1,53 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
+using Koan.Core.Adapters;
+using Koan.Orchestration.Attributes;
+using Koan.Orchestration.Models;
+using Koan.Orchestration;
 using System.Text;
 
 namespace Koan.Ai.Provider.Ollama;
 
-internal sealed class OllamaAdapter : IAiAdapter
+/// <summary>
+/// Configuration options for Ollama adapter
+/// </summary>
+public class OllamaOptions
+{
+    public string? DefaultModel { get; set; } = "llama2";
+}
+
+internal sealed class OllamaAdapter : BaseKoanAdapter, IAiAdapter
 {
     private readonly HttpClient _http;
     private readonly string _defaultModel;
-    private readonly ILogger<OllamaAdapter>? _logger;
-    public string Id { get; }
-    public string Name { get; }
-    public string Type => Infrastructure.Constants.Adapter.Type;
+    private UnifiedServiceMetadata? _orchestrationContext;
 
-    public OllamaAdapter(string id, string name, HttpClient http, string? defaultModel, ILogger<OllamaAdapter>? logger = null)
-    { Id = id; Name = name; _http = http; _defaultModel = defaultModel ?? string.Empty; _logger = logger; }
+    public override ServiceType ServiceType => ServiceType.Ai;
+    public override string AdapterId => "ollama";
+    public override string DisplayName => "Ollama AI Provider";
+
+    public override AdapterCapabilities Capabilities => AdapterCapabilities.Create()
+        .WithHealth(HealthCapabilities.Basic | HealthCapabilities.ConnectionHealth | HealthCapabilities.ResponseTime)
+        .WithConfiguration(ConfigurationCapabilities.EnvironmentVariables | ConfigurationCapabilities.ConfigurationFiles | ConfigurationCapabilities.OrchestrationAware)
+        .WithSecurity(SecurityCapabilities.None)
+        .WithData(ExtendedQueryCapabilities.VectorSearch | ExtendedQueryCapabilities.SemanticSearch | ExtendedQueryCapabilities.Embeddings)
+        .WithCustom("chat", "streaming", "local_models");
+
+    public string Id => AdapterId;
+    public override string Name => DisplayName;
+    public string Type => "ollama";
+
+    public OllamaAdapter(HttpClient http, ILogger<OllamaAdapter> logger, IConfiguration configuration)
+        : base(logger, configuration)
+    {
+        _http = http;
+        var options = GetOptions<OllamaOptions>();
+        _defaultModel = options.DefaultModel ?? "llama2";
+    }
 
     public bool CanServe(AiChatRequest request)
     {
@@ -41,13 +71,13 @@ internal sealed class OllamaAdapter : IAiAdapter
         if (request.Options?.Think is bool thinkFlag)
             bodyObj["think"] = thinkFlag;
         var body = bodyObj;
-        _logger?.LogDebug("Ollama: POST {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);
+        Logger.LogDebug("Ollama: POST {Path} model={Model}", "/api/generate", model);
     var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-    using var resp = await _http.PostAsync(Infrastructure.Constants.Api.GeneratePath, new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
+    using var resp = await _http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            _logger?.LogWarning("Ollama: generate failed ({Status}) body={Body}", (int)resp.StatusCode, text);
+            Logger.LogWarning("Ollama: generate failed ({Status}) body={Body}", (int)resp.StatusCode, text);
         }
     resp.EnsureSuccessStatusCode();
     var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -77,9 +107,9 @@ internal sealed class OllamaAdapter : IAiAdapter
         if (request.Options?.Think is bool thinkFlag2)
             streamBody["think"] = thinkFlag2;
     var body = JsonConvert.SerializeObject(streamBody, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-        using var httpReq = new HttpRequestMessage(HttpMethod.Post, Infrastructure.Constants.Api.GeneratePath)
+        using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/generate")
         { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-        _logger?.LogDebug("Ollama: STREAM {Path} model={Model}", Infrastructure.Constants.Api.GeneratePath, model);
+        Logger.LogDebug("Ollama: STREAM {Path} model={Model}", "/api/generate", model);
         using var resp = await _http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
         await foreach (var part in ReadJsonLinesAsync<OllamaGenerateResponse>(resp, ct))
@@ -104,11 +134,11 @@ internal sealed class OllamaAdapter : IAiAdapter
             // Ollama embeddings API expects 'prompt' as the input field
             var body = new { model, prompt = input };
             var payload = JsonConvert.SerializeObject(body);
-            using var resp = await _http.PostAsync(Infrastructure.Constants.Api.EmbeddingsPath, new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
+            using var resp = await _http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode)
             {
                 var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                _logger?.LogWarning("Ollama: embeddings failed ({Status}) body={Body}", (int)resp.StatusCode, text);
+                Logger.LogWarning("Ollama: embeddings failed ({Status}) body={Body}", (int)resp.StatusCode, text);
             }
             resp.EnsureSuccessStatusCode();
             var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -117,13 +147,13 @@ internal sealed class OllamaAdapter : IAiAdapter
             vectors.Add(doc.embedding ?? Array.Empty<float>());
         }
         var dim = vectors.FirstOrDefault()?.Length ?? 0;
-        _logger?.LogDebug("Ollama: embeddings ok model={Model} dim={Dim} count={Count}", model, dim, vectors.Count);
+        Logger.LogDebug("Ollama: embeddings ok model={Model} dim={Dim} count={Count}", model, dim, vectors.Count);
         return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = dim };
     }
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
     {
-    using var resp = await _http.GetAsync(Infrastructure.Constants.Discovery.TagsPath, ct).ConfigureAwait(false);
+    using var resp = await _http.GetAsync("/api/tags", ct).ConfigureAwait(false);
     resp.EnsureSuccessStatusCode();
     var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
     var doc = JsonConvert.DeserializeObject<OllamaTagsResponse>(json);
@@ -253,6 +283,149 @@ internal sealed class OllamaAdapter : IAiAdapter
     {
         public List<OllamaTag> models { get; set; } = new();
     }
+    protected override async Task InitializeAdapterAsync(CancellationToken cancellationToken = default)
+    {
+        var baseUrl = GetConnectionString();
+        if (!string.IsNullOrEmpty(baseUrl) && _http.BaseAddress == null)
+        {
+            _http.BaseAddress = new Uri(baseUrl);
+        }
+
+        await TestConnectivityAsync(cancellationToken);
+        Logger.LogInformation("[{AdapterId}] Ollama connection established", AdapterId);
+    }
+
+    [OrchestrationAware]
+    public async Task InitializeWithOrchestrationAsync(UnifiedServiceMetadata orchestrationContext, CancellationToken cancellationToken = default)
+    {
+        _orchestrationContext = orchestrationContext;
+        Logger.LogInformation("[{AdapterId}] Initializing with orchestration context: {ServiceKind}", AdapterId, orchestrationContext.ServiceKind);
+
+        var baseUrl = GetConnectionString();
+        if (!string.IsNullOrEmpty(baseUrl))
+        {
+            _http.BaseAddress = new Uri(baseUrl);
+        }
+
+        if (orchestrationContext.HasCapability("container_managed"))
+        {
+            Logger.LogInformation("[{AdapterId}] Container is orchestration-managed, waiting for readiness", AdapterId);
+            await WaitForContainerReadiness(cancellationToken);
+        }
+
+        await TestConnectivityAsync(cancellationToken);
+        Logger.LogInformation("[{AdapterId}] Ollama connection established using orchestration-aware initialization", AdapterId);
+    }
+
+    protected override async Task<IReadOnlyDictionary<string, object?>?> CheckAdapterHealthAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            using var response = await _http.GetAsync("/", cancellationToken);
+            stopwatch.Stop();
+
+            var healthData = new Dictionary<string, object?>
+            {
+                ["status"] = response.IsSuccessStatusCode ? "healthy" : "unhealthy",
+                ["response_time_ms"] = stopwatch.ElapsedMilliseconds,
+                ["base_url"] = _http.BaseAddress?.ToString(),
+                ["default_model"] = _defaultModel,
+                ["orchestration_aware"] = _orchestrationContext != null
+            };
+
+            if (_orchestrationContext != null)
+            {
+                healthData["orchestration_mode"] = _orchestrationContext.IsOrchestrationAware ? "managed" : "standalone";
+                healthData["capabilities"] = _orchestrationContext.Capabilities;
+            }
+
+            try
+            {
+                var models = await ListModelsAsync(cancellationToken);
+                healthData["available_models"] = models.Count;
+                healthData["model_list"] = models.Take(5).Select(m => m.Name).ToArray();
+            }
+            catch (Exception ex)
+            {
+                healthData["models_error"] = ex.Message;
+            }
+
+            return healthData;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "[{AdapterId}] Health check failed", AdapterId);
+            return new Dictionary<string, object?>
+            {
+                ["status"] = "unhealthy",
+                ["error"] = ex.Message,
+                ["orchestration_aware"] = _orchestrationContext != null
+            };
+        }
+    }
+
+    protected override Task<IReadOnlyDictionary<string, object?>?> GetAdapterBootstrapMetadataAsync(CancellationToken cancellationToken = default)
+    {
+        var metadata = new Dictionary<string, object?>
+        {
+            ["base_url"] = _http.BaseAddress?.ToString(),
+            ["default_model"] = _defaultModel,
+            ["provider"] = "Ollama",
+            ["features"] = new[] { "chat", "streaming", "embeddings", "local_models" },
+            ["runtime_capabilities"] = Capabilities.GetCapabilitySummary()
+        };
+
+        if (_orchestrationContext != null)
+        {
+            metadata["orchestration"] = new
+            {
+                service_kind = _orchestrationContext.ServiceKind.ToString(),
+                is_managed = _orchestrationContext.IsOrchestrationAware,
+                capabilities = _orchestrationContext.Capabilities,
+                deployment_aware = true
+            };
+        }
+        else
+        {
+            metadata["orchestration"] = new { deployment_aware = false };
+        }
+
+        return Task.FromResult<IReadOnlyDictionary<string, object?>?>(metadata);
+    }
+
+    private async Task TestConnectivityAsync(CancellationToken cancellationToken)
+    {
+        using var response = await _http.GetAsync("/", cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    private async Task WaitForContainerReadiness(CancellationToken cancellationToken)
+    {
+        const int maxRetries = 30;
+        const int delayMs = 1000;
+
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                using var response = await _http.GetAsync("/", cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    Logger.LogInformation("[{AdapterId}] Container is ready (attempt {Attempt})", AdapterId, i + 1);
+                    return;
+                }
+            }
+            catch (Exception ex) when (i < maxRetries - 1)
+            {
+                Logger.LogDebug(ex, "[{AdapterId}] Container not ready yet (attempt {Attempt}), retrying...", AdapterId, i + 1);
+                await Task.Delay(delayMs, cancellationToken);
+            }
+        }
+
+        throw new InvalidOperationException($"Container failed to become ready after {maxRetries} attempts");
+    }
+
     private sealed class OllamaTag
     {
         public string? name { get; set; }

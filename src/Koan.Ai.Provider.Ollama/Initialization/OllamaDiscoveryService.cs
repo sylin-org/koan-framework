@@ -211,7 +211,12 @@ internal sealed class OllamaDiscoveryService : IHostedService
             var client = new HttpClient { BaseAddress = baseAddress, Timeout = TimeSpan.FromSeconds(60) };
             var id = $"ollama@{baseAddress.Host}:{baseAddress.Port}";
             var adapterLogger = _sp.GetService<Microsoft.Extensions.Logging.ILogger<OllamaAdapter>>();
-            var adapter = new OllamaAdapter(id, $"Ollama ({serviceUrl})", client, defaultModel: defaultModel, adapterLogger);
+
+            // Create minimal configuration for the adapter
+            var configBuilder = new Microsoft.Extensions.Configuration.ConfigurationBuilder();
+            var adapterConfig = configBuilder.Build();
+
+            var adapter = new OllamaAdapter(client, adapterLogger, adapterConfig);
 
             _logger.LogDebug("Registering Ollama adapter: {AdapterId} at {Url}", id, serviceUrl);
             _registry.Add(adapter);

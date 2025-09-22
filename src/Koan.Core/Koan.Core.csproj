@@ -26,4 +26,13 @@
   <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
+  <!-- Explicitly exclude adapter files to prevent Docker build conflicts -->
+  <ItemGroup>
+    <Compile Remove="Adapters/**/*.cs" />
+    <Compile Remove="**/Adapters/**/*.cs" />
+    <Compile Remove="../Koan.Core.Adapters/**/*.cs" />
+    <None Remove="Adapters/**/*" />
+    <None Remove="**/Adapters/**/*" />
+  </ItemGroup>
+
 </Project>
