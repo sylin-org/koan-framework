@@ -10,7 +10,9 @@ using MongoDB.Bson.Serialization.Conventions;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
+using Koan.Core.Orchestration;
 using Koan.Data.Abstractions;
+using Koan.Data.Mongo.Orchestration;
 
 namespace Koan.Data.Mongo.Initialization;
 
@@ -49,6 +51,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(new ServiceDescriptor(typeof(Abstractions.Naming.INamingDefaultsProvider), typeof(MongoNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
+
+        // Register orchestration evaluator for dependency management
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, MongoOrchestrationEvaluator>());
 
         // Apply MongoDB GUID optimization directly for v3.5.0 compatibility
         Console.WriteLine("[MONGO-KOAN-AUTO-REGISTRAR] Applying MongoDB GUID optimization directly...");

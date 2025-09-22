@@ -6,7 +6,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Core.Orchestration;
 using Koan.Data.Abstractions;
+using Koan.Data.Redis.Orchestration;
 using StackExchange.Redis;
 using Koan.Orchestration.Aspire;
 using Aspire.Hosting;
@@ -28,6 +30,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, RedisHealthContributor>());
+
+        // Register orchestration evaluator for dependency management
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, RedisOrchestrationEvaluator>());
 
         // Only register connection multiplexer if Redis is available or in Aspire context
         RegisterConnectionMultiplexer(services, logger);

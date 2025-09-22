@@ -5,155 +5,225 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using Koan.Ai.Provider.Ollama.Options;
 using Koan.AI.Contracts.Routing;
+using Koan.Core.Orchestration;
 
 namespace Koan.Ai.Provider.Ollama.Initialization;
 
+/// <summary>
+/// Orchestration-aware Ollama discovery service using centralized service discovery.
+/// Replaces hardcoded candidate logic with unified Koan orchestration patterns.
+/// </summary>
 internal sealed class OllamaDiscoveryService : IHostedService
 {
     private readonly IServiceProvider _sp;
     private readonly IConfiguration _cfg;
     private readonly IAiAdapterRegistry _registry;
     private readonly ILogger<OllamaDiscoveryService> _logger;
+    private readonly IOrchestrationAwareServiceDiscovery _serviceDiscovery;
+
     public OllamaDiscoveryService(IServiceProvider sp, IConfiguration cfg, IAiAdapterRegistry registry)
-    { 
-        _sp = sp; 
-        _cfg = cfg; 
-        _registry = registry; 
-        _logger = sp.GetService<ILogger<OllamaDiscoveryService>>() 
+    {
+        _sp = sp;
+        _cfg = cfg;
+        _registry = registry;
+        _logger = sp.GetService<ILogger<OllamaDiscoveryService>>()
                  ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<OllamaDiscoveryService>.Instance;
+        _serviceDiscovery = new OrchestrationAwareServiceDiscovery(cfg, null);
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         try
         {
-            _logger.LogDebug("OllamaDiscoveryService starting...");
-            var envIsDev = Core.KoanEnv.IsDevelopment;
-            var aiOpts = _sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.AI.Contracts.Options.AiOptions>>()?.Value;
-            var autoDiscovery = aiOpts?.AutoDiscoveryEnabled ?? envIsDev;
-            // Provider-scoped default: allow discovery in non-dev unless explicitly disabled via AiOptions
-            var allowNonDev = aiOpts?.AllowDiscoveryInNonDev ?? true;
-            _logger.LogDebug("Discovery settings: envIsDev={EnvIsDev}, autoDiscovery={AutoDiscovery}, allowNonDev={AllowNonDev}", envIsDev, autoDiscovery, allowNonDev);
-            if (!autoDiscovery) 
+            _logger.LogDebug("Ollama Orchestration-Aware Discovery starting...");
+            _logger.LogDebug("OrchestrationMode: {Mode}", _serviceDiscovery.CurrentMode);
+
+            // Check if discovery should be enabled
+            if (!ShouldPerformDiscovery())
             {
-                _logger.LogDebug("Auto-discovery disabled, skipping");
-                return Task.CompletedTask;
-            }
-            if (!envIsDev && !allowNonDev) 
-            {
-                _logger.LogDebug("Non-dev environment and discovery not allowed in non-dev, skipping");
-                return Task.CompletedTask;
+                _logger.LogDebug("Auto-discovery disabled or not applicable, skipping");
+                return;
             }
 
-            // If explicit Ollama services are configured, do not auto-discover
-            try
+            // If explicit Ollama services are configured, skip auto-discovery
+            if (HasExplicitConfiguration())
             {
-                var configured = _cfg.GetSection(Infrastructure.Constants.Configuration.ServicesRoot)
-                    .Get<OllamaServiceOptions[]>() ?? Array.Empty<OllamaServiceOptions>();
-                _logger.LogDebug("Found {ConfigCount} configured Ollama services", configured.Length);
-                var enabledCount = configured.Count(s => s.Enabled);
-                _logger.LogDebug("Found {EnabledCount} enabled configured Ollama services", enabledCount);
-                if (configured.Any(s => s.Enabled))
-                {
-                    _logger.LogDebug("Explicit enabled services found, skipping auto-discovery");
-                    return Task.CompletedTask;
-                }
-            }
-            catch (Exception ex) 
-            { 
-                _logger.LogDebug(ex, "Error checking configured services, proceeding with discovery");
+                _logger.LogDebug("Explicit Ollama services configured, skipping auto-discovery");
+                return;
             }
 
-            // If the app requires specific models, use the first as the default for discovered adapters
-            string? defaultModel = null;
-            try { defaultModel = _cfg.GetSection("Koan:Ai:Ollama:RequiredModels").Get<string[]>()?.FirstOrDefault(); } catch { }
+            // Get required model for validation
+            var defaultModel = GetRequiredModel();
             _logger.LogDebug("Default model for discovered adapters: {DefaultModel}", defaultModel ?? "none");
 
-            var candidateUrls = CollectCandidateUrls(_cfg).ToList();
-            _logger.LogDebug("Testing {UrlCount} candidate URLs for Ollama discovery", candidateUrls.Count);
-            
-            foreach (var u in candidateUrls)
-            {
-                _logger.LogDebug("Testing Ollama endpoint: {Url}", u);
-                try
-                {
-                    using var http = new HttpClient { BaseAddress = u, Timeout = TimeSpan.FromMilliseconds(400) };
-                    using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(450));
-                    var resp = http.GetAsync(Infrastructure.Constants.Discovery.TagsPath, cts.Token).GetAwaiter().GetResult();
-                    _logger.LogDebug("Response from {Url}: {StatusCode}", u, resp.StatusCode);
-                    if (!resp.IsSuccessStatusCode) continue;
+            // Use centralized orchestration-aware service discovery
+            var discoveryOptions = CreateOllamaDiscoveryOptions(defaultModel);
+            var result = await _serviceDiscovery.DiscoverServiceAsync("ollama", discoveryOptions, cancellationToken);
 
-                    // If a required model is specified, ensure the endpoint has it before registering
-                    if (!string.IsNullOrWhiteSpace(defaultModel))
-                    {
-                        try
-                        {
-                            var payload = resp.Content.ReadAsStringAsync(cts.Token).GetAwaiter().GetResult();
-                            var hasModel = EndpointHasModel(payload, defaultModel);
-                            _logger.LogDebug("Endpoint {Url} has required model '{Model}': {HasModel}", u, defaultModel, hasModel);
-                            if (!hasModel)
-                                continue; // try next candidate
-                        }
-                        catch (Exception ex) 
-                        { 
-                            _logger.LogDebug(ex, "Error checking model availability at {Url}, proceeding anyway", u);
-                        }
-                    }
-                    var client = new HttpClient { BaseAddress = u, Timeout = TimeSpan.FromSeconds(60) };
-                    var id = $"ollama@{u.Host}:{u.Port}";
-                    var logger = _sp.GetService<Microsoft.Extensions.Logging.ILogger<OllamaAdapter>>();
-                    var adapter = new OllamaAdapter(id, $"Ollama ({u})", client, defaultModel: defaultModel, logger);
-                    _logger.LogDebug("Registering Ollama adapter: {AdapterId} at {Url}", id, u);
-                    _registry.Add(adapter);
-                    // Register only the first viable endpoint (host-first policy)
-                    _logger.LogDebug("Successfully registered first viable Ollama endpoint, stopping discovery");
-                    break;
-                }
-                catch (Exception ex) 
-                { 
-                    _logger.LogDebug(ex, "Error testing endpoint {Url}", u);
-                }
+            _logger.LogInformation("Ollama discovered via {Method}: {ServiceUrl}",
+                result.DiscoveryMethod, result.ServiceUrl);
+
+            if (!result.IsHealthy)
+            {
+                _logger.LogWarning("Discovered Ollama service failed health check but proceeding anyway");
             }
+
+            // Create and register adapter
+            await RegisterOllamaAdapter(result.ServiceUrl, defaultModel, cancellationToken);
         }
-        catch (Exception ex) 
-        { 
-            _logger.LogError(ex, "Unexpected error in OllamaDiscoveryService");
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error in Ollama orchestration-aware discovery");
         }
-        return Task.CompletedTask;
+    }
+
+    private bool ShouldPerformDiscovery()
+    {
+        var envIsDev = Core.KoanEnv.IsDevelopment;
+        var aiOpts = _sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.AI.Contracts.Options.AiOptions>>()?.Value;
+        var autoDiscovery = aiOpts?.AutoDiscoveryEnabled ?? envIsDev;
+        var allowNonDev = aiOpts?.AllowDiscoveryInNonDev ?? true;
+
+        _logger.LogDebug("Discovery settings: envIsDev={EnvIsDev}, autoDiscovery={AutoDiscovery}, allowNonDev={AllowNonDev}",
+            envIsDev, autoDiscovery, allowNonDev);
+
+        if (!autoDiscovery) return false;
+        if (!envIsDev && !allowNonDev) return false;
+
+        return true;
+    }
+
+    private bool HasExplicitConfiguration()
+    {
+        try
+        {
+            var configured = _cfg.GetSection(Infrastructure.Constants.Configuration.ServicesRoot)
+                .Get<OllamaServiceOptions[]>() ?? Array.Empty<OllamaServiceOptions>();
+
+            _logger.LogDebug("Found {ConfigCount} configured Ollama services", configured.Length);
+            var enabledCount = configured.Count(s => s.Enabled);
+            _logger.LogDebug("Found {EnabledCount} enabled configured Ollama services", enabledCount);
+
+            return configured.Any(s => s.Enabled);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error checking configured services, proceeding with discovery");
+            return false;
+        }
+    }
+
+    private string? GetRequiredModel()
+    {
+        try
+        {
+            return _cfg.GetSection("Koan:Ai:Ollama:RequiredModels").Get<string[]>()?.FirstOrDefault();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private ServiceDiscoveryOptions CreateOllamaDiscoveryOptions(string? requiredModel)
+    {
+        // Get legacy environment variable candidates for backward compatibility
+        var legacyCandidates = GetLegacyCandidatesFromEnvironment();
+
+        var discoveryOptions = ServiceDiscoveryExtensions.ForOllama();
+
+        return discoveryOptions with
+        {
+            AdditionalCandidates = legacyCandidates,
+            HealthCheck = new HealthCheckOptions
+            {
+                HealthCheckPath = Infrastructure.Constants.Discovery.TagsPath,
+                Timeout = TimeSpan.FromMilliseconds(450),
+                Required = !string.IsNullOrWhiteSpace(requiredModel), // Strict if model required
+                CustomHealthCheck = !string.IsNullOrWhiteSpace(requiredModel)
+                    ? (url, ct) => ValidateModelAvailability(url, requiredModel, ct)
+                    : null
+            },
+            ExplicitConfigurationSections = new[]
+            {
+                "Koan:AI:Ollama",
+                "Koan:Services:Ollama",
+                Infrastructure.Constants.Configuration.ServicesRoot
+            }
+        };
+    }
+
+    private string[] GetLegacyCandidatesFromEnvironment()
+    {
+        var candidates = new List<string>();
+
+        // Legacy environment variable support
+        var envBaseUrl = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.EnvBaseUrl);
+        if (!string.IsNullOrWhiteSpace(envBaseUrl))
+        {
+            candidates.Add(envBaseUrl);
+        }
+
+        var envList = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.EnvList);
+        if (!string.IsNullOrWhiteSpace(envList))
+        {
+            candidates.AddRange(envList.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+        }
+
+        return candidates.ToArray();
+    }
+
+    private async Task<bool> ValidateModelAvailability(string serviceUrl, string requiredModel, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(450) };
+            var tagsUrl = new Uri(new Uri(serviceUrl), Infrastructure.Constants.Discovery.TagsPath).ToString();
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromMilliseconds(450));
+
+            var response = await httpClient.GetAsync(tagsUrl, cts.Token);
+            if (!response.IsSuccessStatusCode) return false;
+
+            var payload = await response.Content.ReadAsStringAsync(cts.Token);
+            var hasModel = EndpointHasModel(payload, requiredModel);
+
+            _logger.LogDebug("Model validation for {ServiceUrl}: required '{Model}' = {HasModel}",
+                serviceUrl, requiredModel, hasModel);
+
+            return hasModel;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error validating model availability at {ServiceUrl}", serviceUrl);
+            return false;
+        }
+    }
+
+    private async Task RegisterOllamaAdapter(string serviceUrl, string? defaultModel, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var baseAddress = new Uri(serviceUrl);
+            var client = new HttpClient { BaseAddress = baseAddress, Timeout = TimeSpan.FromSeconds(60) };
+            var id = $"ollama@{baseAddress.Host}:{baseAddress.Port}";
+            var adapterLogger = _sp.GetService<Microsoft.Extensions.Logging.ILogger<OllamaAdapter>>();
+            var adapter = new OllamaAdapter(id, $"Ollama ({serviceUrl})", client, defaultModel: defaultModel, adapterLogger);
+
+            _logger.LogDebug("Registering Ollama adapter: {AdapterId} at {Url}", id, serviceUrl);
+            _registry.Add(adapter);
+            _logger.LogInformation("Successfully registered Ollama adapter via orchestration-aware discovery");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error registering Ollama adapter for {ServiceUrl}", serviceUrl);
+        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-    private static IEnumerable<Uri> CollectCandidateUrls(IConfiguration? cfg)
-    {
-        // Preserve insertion order while de-duplicating
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var ordered = new List<string>();
-        void Add(string url)
-        {
-            if (string.IsNullOrWhiteSpace(url)) return;
-            var u = url.Trim();
-            if (seen.Add(u)) ordered.Add(u);
-        }
-        // Highest precedence: explicit single var
-        var fromEnv = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.EnvBaseUrl);
-        Add(fromEnv ?? string.Empty);
-        // Next: multi-endpoint env list, keep given order
-        var multi = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.EnvList);
-        if (!string.IsNullOrWhiteSpace(multi))
-        {
-            foreach (var part in multi.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) Add(part);
-        }
-        // Finally: sensible defaults in strict host-first order
-        Add($"http://{Infrastructure.Constants.Discovery.Localhost}:{Infrastructure.Constants.Discovery.DefaultPort}");
-        Add($"http://{Infrastructure.Constants.Discovery.Loopback}:{Infrastructure.Constants.Discovery.DefaultPort}");
-        Add($"http://{Infrastructure.Constants.Discovery.HostDocker}:{Infrastructure.Constants.Discovery.DefaultPort}");
-        Add($"http://{Infrastructure.Constants.Discovery.WellKnownServiceName}:{Infrastructure.Constants.Discovery.DefaultPort}");
-        foreach (var s in ordered)
-        {
-            if (Uri.TryCreate(s, UriKind.Absolute, out var uri)) yield return uri;
-        }
-    }
 
     private static bool EndpointHasModel(string json, string required)
     {

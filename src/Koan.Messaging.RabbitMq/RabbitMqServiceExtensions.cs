@@ -3,7 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Orchestration;
 using Koan.Messaging;
+using Koan.Messaging.RabbitMq.Orchestration;
 
 namespace Koan.Messaging.RabbitMq;
 
@@ -20,7 +22,10 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         // Register RabbitMQ as a messaging provider
         services.TryAddEnumerable(ServiceDescriptor.Transient<IMessagingProvider, RabbitMqProvider>());
-        
+
+        // Register orchestration evaluator for dependency management
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, RabbitMqOrchestrationEvaluator>());
+
         // Add core messaging if not already added
         services.AddKoanMessaging();
     }
@@ -28,63 +33,74 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        
-        // NEW: Decision logging for RabbitMQ connection discovery
-        var connectionAttempts = new List<(string source, string connectionString, bool available)>();
-        
-        // Check environment variables first
+
+        // Use centralized orchestration-aware service discovery
+        var serviceDiscovery = new OrchestrationAwareServiceDiscovery(cfg);
+
+        try
+        {
+            // Create RabbitMQ-specific discovery options
+            var discoveryOptions = ServiceDiscoveryExtensions.ForRabbitMQ();
+
+            // Add legacy environment variable support
+            var envCandidates = GetLegacyEnvironmentCandidates();
+            if (envCandidates.Length > 0)
+            {
+                discoveryOptions = discoveryOptions with
+                {
+                    AdditionalCandidates = envCandidates
+                };
+            }
+
+            // Discover RabbitMQ service
+            var discoveryTask = serviceDiscovery.DiscoverServiceAsync("rabbitmq", discoveryOptions);
+            var result = discoveryTask.GetAwaiter().GetResult();
+
+            report.AddDiscovery($"orchestration-{result.DiscoveryMethod}", result.ServiceUrl);
+            report.AddConnectionAttempt("Messaging.RabbitMq", result.ServiceUrl, result.IsHealthy);
+
+            // Log provider election decision
+            var availableProviders = DiscoverAvailableMessagingProviders();
+            report.AddProviderElection("Messaging", "RabbitMQ", availableProviders,
+                "highest priority provider with orchestration-aware discovery");
+        }
+        catch (Exception ex)
+        {
+            report.AddDiscovery("orchestration-fallback", "amqp://guest:guest@localhost:5672");
+            report.AddConnectionAttempt("Messaging.RabbitMq", "amqp://guest:guest@localhost:5672", false);
+            report.AddSetting("Discovery.Error", ex.Message);
+        }
+
+        report.AddSetting("Priority", "100 (High - preferred provider)");
+        report.AddSetting("OrchestrationMode", KoanEnv.OrchestrationMode.ToString());
+        report.AddSetting("Configuration", "Orchestration-aware service discovery enabled");
+    }
+    
+    private static string[] GetLegacyEnvironmentCandidates()
+    {
+        var candidates = new List<string>();
+
+        // Check legacy environment variables for backward compatibility
         var envUrl = Environment.GetEnvironmentVariable("RABBITMQ_URL");
         if (!string.IsNullOrWhiteSpace(envUrl))
         {
-            report.AddDiscovery("environment-RABBITMQ_URL", envUrl);
-            connectionAttempts.Add(("environment", envUrl, true));
+            candidates.Add(envUrl);
         }
-        
-        var KoanEnvUrl = Environment.GetEnvironmentVariable("Koan_RABBITMQ_URL");
-        if (!string.IsNullOrWhiteSpace(KoanEnvUrl))
+
+        var koanEnvUrl = Environment.GetEnvironmentVariable("Koan_RABBITMQ_URL");
+        if (!string.IsNullOrWhiteSpace(koanEnvUrl))
         {
-            report.AddDiscovery("environment-Koan_RABBITMQ_URL", KoanEnvUrl);
-            connectionAttempts.Add(("environment", KoanEnvUrl, true));
+            candidates.Add(koanEnvUrl);
         }
-        
-        // Auto-discovery based on container environment
-        string discoveredUrl;
-        if (KoanEnv.InContainer)
-        {
-            discoveredUrl = "amqp://guest:guest@rabbitmq:5672";
-            report.AddDiscovery("container-discovery", discoveredUrl);
-            connectionAttempts.Add(("container-discovery", discoveredUrl, true));
-        }
-        else
-        {
-            discoveredUrl = "amqp://guest:guest@localhost:5672";
-            report.AddDiscovery("localhost-fallback", discoveredUrl);
-            connectionAttempts.Add(("localhost-fallback", discoveredUrl, true));
-        }
-        
-        // Log connection attempts (we can't actually test connections during bootstrap without blocking)
-        foreach (var attempt in connectionAttempts)
-        {
-            report.AddConnectionAttempt("Messaging.RabbitMq", attempt.connectionString, attempt.available);
-        }
-        
-        // Log provider election decision
-        var availableProviders = DiscoverAvailableMessagingProviders();
-        if (connectionAttempts.Any())
-        {
-            report.AddProviderElection("Messaging", "RabbitMQ", availableProviders, "highest priority provider with available connections");
-        }
-        
-        report.AddSetting("Priority", "100 (High - preferred provider)");
-        report.AddSetting("DefaultContainerHost", "rabbitmq:5672");
-        report.AddSetting("DefaultLocalHost", "localhost:5672");
+
+        return candidates.ToArray();
     }
-    
+
     private static string[] DiscoverAvailableMessagingProviders()
     {
         // Scan loaded assemblies for other messaging providers
         var providers = new List<string> { "RabbitMQ" }; // Always include self
-        
+
         var assemblies = AppDomain.CurrentDomain.GetAssemblies();
         foreach (var asm in assemblies)
         {
@@ -95,11 +111,11 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
                 providers.Add(providerName);
             }
         }
-        
+
         // InMemory is always available as fallback
         if (!providers.Contains("InMemory"))
             providers.Add("InMemory");
-        
+
         return providers.ToArray();
     }
 }

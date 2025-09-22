@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using Koan.Core.Orchestration;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Orchestration.Aspire.SelfOrchestration;
@@ -16,9 +17,9 @@ public class DockerContainerManager : IKoanContainerManager
         _logger = logger;
     }
 
-    public async Task<string> StartContainerAsync(DependencyDescriptor dependency, string sessionId, CancellationToken cancellationToken = default)
+    public async Task<string> StartContainerAsync(DependencyDescriptor dependency, string appInstance, string sessionId, CancellationToken cancellationToken = default)
     {
-        var containerName = $"{dependency.Name}-{sessionId}";
+        var containerName = $"{dependency.Name}-{appInstance}";
 
         // Check if container already exists and is running
         if (await IsContainerRunningAsync(containerName, cancellationToken))
@@ -30,7 +31,7 @@ public class DockerContainerManager : IKoanContainerManager
         // Stop and remove any existing container with the same name
         await StopContainerAsync(containerName, cancellationToken);
 
-        var dockerCommand = BuildDockerRunCommand(dependency, containerName, sessionId);
+        var dockerCommand = BuildDockerRunCommand(dependency, containerName, appInstance, sessionId);
         _logger.LogDebug("Starting container with command: {Command}", dockerCommand);
 
         var result = await ExecuteDockerCommandAsync(dockerCommand, cancellationToken);
@@ -263,19 +264,21 @@ public class DockerContainerManager : IKoanContainerManager
         }
     }
 
-    private string BuildDockerRunCommand(DependencyDescriptor dependency, string containerName, string sessionId)
+    private string BuildDockerRunCommand(DependencyDescriptor dependency, string containerName, string appInstance, string sessionId)
     {
         var cmd = new StringBuilder();
         cmd.Append($"run -d --name {containerName}");
 
         // Add port mapping
-        if (dependency.TargetPort.HasValue)
+        cmd.Append($" -p {dependency.Port}:{dependency.Port}");
+
+        // Add additional ports if specified
+        if (dependency.Ports != null)
         {
-            cmd.Append($" -p {dependency.Port}:{dependency.TargetPort.Value}");
-        }
-        else
-        {
-            cmd.Append($" -p {dependency.Port}:{dependency.Port}");
+            foreach (var (externalPort, internalPort) in dependency.Ports)
+            {
+                cmd.Append($" -p {externalPort}:{internalPort}");
+            }
         }
 
         // Add labels for tracking and cleanup (enhanced with app identity)
@@ -286,7 +289,6 @@ public class DockerContainerManager : IKoanContainerManager
 
         // Add app identity labels for crash recovery
         var appId = Environment.GetEnvironmentVariable("KOAN_APP_ID") ?? "UnknownApp";
-        var appInstance = Environment.GetEnvironmentVariable("KOAN_APP_INSTANCE") ?? appId;
         cmd.Append($" --label koan.app-id={appId}");
         cmd.Append($" --label koan.app-instance={appInstance}");
 

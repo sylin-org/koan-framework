@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using Koan.Core;
+using Koan.Core.Orchestration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -16,6 +17,7 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
     private readonly IKoanContainerManager _containerManager;
     private readonly ILogger<KoanDependencyOrchestrator> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IEnumerable<IKoanOrchestrationEvaluator> _orchestrationEvaluators;
     private readonly List<DependencyDescriptor> _managedDependencies = new();
     private readonly string _sessionId;
     private readonly string _appId;
@@ -25,11 +27,13 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
     public KoanDependencyOrchestrator(
         IKoanContainerManager containerManager,
         ILogger<KoanDependencyOrchestrator> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IEnumerable<IKoanOrchestrationEvaluator> orchestrationEvaluators)
     {
         _containerManager = containerManager;
         _logger = logger;
         _configuration = configuration;
+        _orchestrationEvaluators = orchestrationEvaluators;
 
         // Generate app identity using KISS approach
         _appId = Assembly.GetEntryAssembly()?.GetName().Name ?? "UnknownApp";
@@ -53,29 +57,31 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
         };
     }
 
-    public async Task StartDependenciesAsync(CancellationToken cancellationToken = default)
+    public async Task<List<string>> StartDependenciesAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Self-orchestration starting dependency discovery for session {SessionId}", _sessionId);
 
-        // Discover dependencies from loaded assemblies
-        var dependencies = DiscoverRequiredDependencies();
+        // Discover dependencies using orchestration evaluators
+        var dependencies = await DiscoverRequiredDependenciesAsync(cancellationToken);
 
         if (dependencies.Count == 0)
         {
             _logger.LogInformation("No dependencies discovered - continuing without orchestration");
-            return;
+            return new List<string>();
         }
 
         _logger.LogInformation("Self-orchestration starting {Count} dependencies: {Dependencies}",
             dependencies.Count, string.Join(", ", dependencies.Select(d => d.Name)));
 
         // Start dependencies in priority order
+        var startedContainers = new List<string>();
         foreach (var dependency in dependencies.OrderBy(d => d.StartupPriority))
         {
             try
             {
-                var containerName = await _containerManager.StartContainerAsync(dependency, _sessionId, cancellationToken);
+                var containerName = await _containerManager.StartContainerAsync(dependency, _appInstance, _sessionId, cancellationToken);
                 _managedDependencies.Add(dependency);
+                startedContainers.Add(containerName);
 
                 _logger.LogDebug("Waiting for {DependencyName} to become healthy...", dependency.Name);
                 var isHealthy = await _containerManager.WaitForContainerHealthyAsync(containerName, dependency, cancellationToken);
@@ -97,6 +103,7 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
         }
 
         _logger.LogInformation("All dependencies started successfully - application ready to start");
+        return startedContainers;
     }
 
     public async Task StopDependenciesAsync(CancellationToken cancellationToken = default)
@@ -136,168 +143,66 @@ public class KoanDependencyOrchestrator : IKoanDependencyOrchestrator
         return $"{appId}-{hashHex[..8].ToLowerInvariant()}";
     }
 
-    private List<DependencyDescriptor> DiscoverRequiredDependencies()
+    private async Task<List<DependencyDescriptor>> DiscoverRequiredDependenciesAsync(CancellationToken cancellationToken = default)
     {
         var dependencies = new List<DependencyDescriptor>();
-        var koanAssemblies = KoanEnv.KoanAssemblies;
 
-        _logger.LogDebug("Checking {AssemblyCount} cached Koan assemblies for dependencies", koanAssemblies.Length);
+        _logger.LogDebug("Discovering dependencies using {EvaluatorCount} orchestration evaluators", _orchestrationEvaluators.Count());
 
-        // Create a fast lookup for assembly names
-        var assemblyNames = new HashSet<string>(
-            koanAssemblies.Select(a => a.GetName().Name ?? ""),
-            StringComparer.OrdinalIgnoreCase);
-
-        // Scan for Koan data providers and AI services using KoanEnv assembly information
-        if (assemblyNames.Contains("Koan.Data.Postgres"))
+        // Create orchestration context
+        var context = new OrchestrationContext
         {
-            dependencies.Add(CreatePostgresDependency());
-            _logger.LogDebug("Discovered Postgres dependency");
-        }
+            Mode = KoanEnv.OrchestrationMode,
+            SessionId = _sessionId,
+            AppId = _appId,
+            AppInstance = _appInstance,
+            EnvironmentVariables = _koanEnvironmentVariables
+        };
 
-        if (assemblyNames.Contains("Koan.Data.Redis"))
+        // Evaluate all services in parallel for performance
+        var evaluationTasks = _orchestrationEvaluators.Select(async evaluator =>
         {
-            dependencies.Add(CreateRedisDependency());
-            _logger.LogDebug("Discovered Redis dependency");
-        }
+            try
+            {
+                _logger.LogDebug("Evaluating {ServiceName} orchestration requirements", evaluator.ServiceName);
+                var decision = await evaluator.EvaluateAsync(_configuration, context);
+                return new { Evaluator = evaluator, Decision = decision };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to evaluate {ServiceName} orchestration requirements", evaluator.ServiceName);
+                var skipDecision = new OrchestrationDecision
+                {
+                    Action = OrchestrationAction.Skip,
+                    Reason = $"Failed to evaluate: {ex.Message}"
+                };
+                return new { Evaluator = evaluator, Decision = skipDecision };
+            }
+        });
 
-        if (assemblyNames.Contains("Koan.AI.Ollama"))
-        {
-            dependencies.Add(CreateOllamaDependency());
-            _logger.LogDebug("Discovered Ollama dependency");
-        }
+        var evaluationResults = await Task.WhenAll(evaluationTasks);
 
-        if (assemblyNames.Contains("Koan.AI.Weaviate"))
+        // Process results and collect dependencies that need provisioning
+        foreach (var result in evaluationResults)
         {
-            dependencies.Add(CreateWeaviateDependency());
-            _logger.LogDebug("Discovered Weaviate dependency");
+            if (result.Decision.Action == default)
+            {
+                _logger.LogWarning("Skipping {ServiceName} due to evaluation failure", result.Evaluator.ServiceName);
+                continue;
+            }
+
+            var decision = result.Decision;
+            _logger.LogInformation("[{ServiceName}] Decision: {Action} - {Reason}",
+                result.Evaluator.ServiceName, decision.Action, decision.Reason);
+
+            if (decision.Action == OrchestrationAction.ProvisionContainer && decision.DependencyDescriptor != null)
+            {
+                dependencies.Add(decision.DependencyDescriptor);
+                _logger.LogDebug("Added {ServiceName} to provisioning queue", result.Evaluator.ServiceName);
+            }
         }
 
         return dependencies;
     }
 
-    private Dictionary<string, string> CreateEnvironmentVariables(string dependencyType, Dictionary<string, string>? serviceSpecific = null)
-    {
-        var environment = new Dictionary<string, string>(_koanEnvironmentVariables)
-        {
-            ["KOAN_DEPENDENCY_TYPE"] = dependencyType
-        };
-
-        if (serviceSpecific != null)
-        {
-            foreach (var kvp in serviceSpecific)
-            {
-                environment[kvp.Key] = kvp.Value;
-            }
-        }
-
-        return environment;
-    }
-
-    private DependencyDescriptor CreatePostgresDependency()
-    {
-        // Read configuration using same patterns as PostgresOptionsConfigurator
-        var databaseName = Configuration.ReadFirst(_configuration, "KoanAspireDemo",
-            "Koan:Data:Postgres:Database",
-            "Koan:Data:Database",
-            "ConnectionStrings:Database");
-
-        // Try to extract credentials from existing connection strings
-        var username = "postgres";  // Default
-        var password = "postgres";  // Default
-
-        // Check for explicit username/password configuration
-        var configuredUsername = Configuration.ReadFirst(_configuration, "",
-            "Koan:Data:Postgres:Username",
-            "Koan:Data:Username");
-        if (!string.IsNullOrWhiteSpace(configuredUsername))
-        {
-            username = configuredUsername;
-        }
-
-        var configuredPassword = Configuration.ReadFirst(_configuration, "",
-            "Koan:Data:Postgres:Password",
-            "Koan:Data:Password");
-        if (!string.IsNullOrWhiteSpace(configuredPassword))
-        {
-            password = configuredPassword;
-        }
-
-        return new DependencyDescriptor
-        {
-            Name = "postgres",
-            Image = "postgres:17.0",
-            Port = 5432,
-            StartupPriority = 100,
-            HealthTimeout = TimeSpan.FromSeconds(30),
-            HealthCheckCommand = "pg_isready -h localhost -p 5432",
-            Environment = CreateEnvironmentVariables("postgres", new Dictionary<string, string>
-            {
-                ["POSTGRES_DB"] = databaseName,
-                ["POSTGRES_USER"] = username,
-                ["POSTGRES_PASSWORD"] = password
-            }),
-            Volumes = new List<string>
-            {
-                $"koan-postgres-{_sessionId}:/var/lib/postgresql/data"
-            }
-        };
-    }
-
-    private DependencyDescriptor CreateRedisDependency()
-    {
-        return new DependencyDescriptor
-        {
-            Name = "redis",
-            Image = "redis:7.4",
-            Port = 6379,
-            StartupPriority = 200,
-            HealthTimeout = TimeSpan.FromSeconds(15),
-            HealthCheckCommand = "redis-cli ping",
-            Environment = CreateEnvironmentVariables("redis"),
-            Volumes = new List<string>
-            {
-                $"koan-redis-{_sessionId}:/data"
-            }
-        };
-    }
-
-    private DependencyDescriptor CreateOllamaDependency()
-    {
-        return new DependencyDescriptor
-        {
-            Name = "ollama",
-            Image = "ollama/ollama:latest",
-            Port = 11434,
-            StartupPriority = 500,
-            HealthTimeout = TimeSpan.FromSeconds(60),
-            Environment = CreateEnvironmentVariables("ollama"),
-            Volumes = new List<string>
-            {
-                $"koan-ollama-{_sessionId}:/root/.ollama"
-            }
-        };
-    }
-
-    private DependencyDescriptor CreateWeaviateDependency()
-    {
-        return new DependencyDescriptor
-        {
-            Name = "weaviate",
-            Image = "semitechnologies/weaviate:latest",
-            Port = 8080,
-            StartupPriority = 300,
-            HealthTimeout = TimeSpan.FromSeconds(45),
-            Environment = CreateEnvironmentVariables("weaviate", new Dictionary<string, string>
-            {
-                ["QUERY_DEFAULTS_LIMIT"] = "25",
-                ["AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED"] = "true",
-                ["PERSISTENCE_DATA_PATH"] = "/var/lib/weaviate"
-            }),
-            Volumes = new List<string>
-            {
-                $"koan-weaviate-{_sessionId}:/var/lib/weaviate"
-            }
-        };
-    }
 }
