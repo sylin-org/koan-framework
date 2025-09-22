@@ -9,7 +9,7 @@ namespace Koan.Ai.Provider.Ollama;
     ContainerImage = "ollama/ollama",
     DefaultTag = "latest",
     DefaultPorts = new[] { 11434 },
-    Capabilities = new[] { "protocol=http", "embeddings=true" },
+    Capabilities = new[] { "protocol=http", "embeddings=true", "default_model=all-minilm" },
     Volumes = new[] { "./Data/ollama:/root/.ollama" },
     AppEnv = new[]
     {

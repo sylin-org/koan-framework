@@ -17,7 +17,7 @@ namespace Koan.Ai.Provider.Ollama;
 /// </summary>
 public class OllamaOptions
 {
-    public string? DefaultModel { get; set; } = "llama2";
+    public string? DefaultModel { get; set; }
 }
 
 internal sealed class OllamaAdapter : BaseKoanAdapter, IAiAdapter
@@ -46,7 +46,9 @@ internal sealed class OllamaAdapter : BaseKoanAdapter, IAiAdapter
     {
         _http = http;
         var options = GetOptions<OllamaOptions>();
-        _defaultModel = options.DefaultModel ?? "llama2";
+        var serviceDefault = GetServiceDefaultModel();
+
+        _defaultModel = options.DefaultModel ?? serviceDefault ?? "all-minilm";
     }
 
     public bool CanServe(AiChatRequest request)
@@ -424,6 +426,34 @@ internal sealed class OllamaAdapter : BaseKoanAdapter, IAiAdapter
         }
 
         throw new InvalidOperationException($"Container failed to become ready after {maxRetries} attempts");
+    }
+
+    private string? GetServiceDefaultModel()
+    {
+        try
+        {
+            // Read default model from KoanService attribute metadata
+            var serviceDescriptorType = typeof(OllamaServiceDescriptor);
+            var koanServiceAttribute = serviceDescriptorType.GetCustomAttributes(typeof(Koan.Orchestration.Attributes.KoanServiceAttribute), false)
+                .FirstOrDefault() as Koan.Orchestration.Attributes.KoanServiceAttribute;
+
+            if (koanServiceAttribute?.Capabilities != null)
+            {
+                foreach (var capability in koanServiceAttribute.Capabilities)
+                {
+                    if (capability.StartsWith("default_model=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return capability.Substring("default_model=".Length);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "GetServiceDefaultModel: Failed to read default model from service metadata");
+        }
+
+        return null;
     }
 
     private sealed class OllamaTag

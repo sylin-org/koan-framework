@@ -21,8 +21,8 @@ REM Clean up any existing containers from previous runs (self-orchestration hand
 echo [INFO] Starting Koan Aspire Integration in standalone mode...
 echo [INFO] Self-orchestration will provision dependencies automatically
 
-REM Launch browser after a delay (background task)
-start "" powershell -WindowStyle Hidden -Command "Start-Sleep 5; Start-Process 'http://localhost:8080'"
+REM Launch browser after a delay - open Aspire dashboard (background task)
+start "" powershell -WindowStyle Hidden -Command "Start-Sleep 5; Start-Process 'http://localhost:15888'"
 
 REM Start the application - self-orchestration will handle Docker containers
 dotnet run --urls http://localhost:8080

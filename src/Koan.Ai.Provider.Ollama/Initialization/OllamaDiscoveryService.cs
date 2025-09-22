@@ -179,7 +179,7 @@ internal sealed class OllamaDiscoveryService : IHostedService
     {
         try
         {
-            using var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(450) };
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
             var tagsUrl = new Uri(new Uri(serviceUrl), Infrastructure.Constants.Discovery.TagsPath).ToString();
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -194,11 +194,103 @@ internal sealed class OllamaDiscoveryService : IHostedService
             _logger.LogDebug("Model validation for {ServiceUrl}: required '{Model}' = {HasModel}",
                 serviceUrl, requiredModel, hasModel);
 
+            // If model is missing, attempt to download it
+            if (!hasModel)
+            {
+                _logger.LogInformation("Required model '{Model}' not found at {ServiceUrl}, attempting to download...",
+                    requiredModel, serviceUrl);
+
+                var downloadSuccess = await PullModelAsync(serviceUrl, requiredModel, cancellationToken);
+                if (downloadSuccess)
+                {
+                    _logger.LogInformation("Successfully downloaded model '{Model}' at {ServiceUrl}",
+                        requiredModel, serviceUrl);
+                    return true;
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to download required model '{Model}' at {ServiceUrl}",
+                        requiredModel, serviceUrl);
+                    return false;
+                }
+            }
+
             return hasModel;
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Error validating model availability at {ServiceUrl}", serviceUrl);
+            return false;
+        }
+    }
+
+    private async Task<bool> PullModelAsync(string serviceUrl, string modelName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(10) }; // Model downloads can be large
+            var pullUrl = new Uri(new Uri(serviceUrl), "/api/pull").ToString();
+
+            var pullRequest = new
+            {
+                name = modelName,
+                stream = false // Use non-streaming for simpler implementation
+            };
+
+            var requestContent = new StringContent(
+                Newtonsoft.Json.JsonConvert.SerializeObject(pullRequest),
+                System.Text.Encoding.UTF8,
+                "application/json");
+
+            _logger.LogInformation("Initiating model download: {Model} from {ServiceUrl}", modelName, serviceUrl);
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromMinutes(10)); // Allow up to 10 minutes for download
+
+            var response = await httpClient.PostAsync(pullUrl, requestContent, cts.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cts.Token);
+                _logger.LogWarning("Model pull failed ({StatusCode}): {Error}",
+                    response.StatusCode, errorContent);
+                return false;
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync(cts.Token);
+            _logger.LogDebug("Model pull response: {Response}", responseContent);
+
+            // Verify the model was actually downloaded by checking tags again
+            await Task.Delay(1000, cancellationToken); // Brief delay for Ollama to index the model
+            return await VerifyModelDownloaded(serviceUrl, modelName, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Model download timed out for '{Model}' at {ServiceUrl}", modelName, serviceUrl);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error downloading model '{Model}' from {ServiceUrl}", modelName, serviceUrl);
+            return false;
+        }
+    }
+
+    private async Task<bool> VerifyModelDownloaded(string serviceUrl, string modelName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var tagsUrl = new Uri(new Uri(serviceUrl), Infrastructure.Constants.Discovery.TagsPath).ToString();
+
+            var response = await httpClient.GetAsync(tagsUrl, cancellationToken);
+            if (!response.IsSuccessStatusCode) return false;
+
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+            return EndpointHasModel(payload, modelName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error verifying model download at {ServiceUrl}", serviceUrl);
             return false;
         }
     }
