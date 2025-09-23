@@ -25,6 +25,9 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<KoanWebMarker>();
 
         services.AddKoanOptions<KoanWebOptions>(ConfigurationConstants.Web.Section);
+        services.AddOptions<EntityEndpointOptions>();
+        services.TryAddScoped<EntityRequestContextBuilder>();
+
         // Core web bits expected by Koan Web apps
         services.AddRouting();
         // Add controllers with NewtonsoftJson for JSON Patch
@@ -51,6 +54,8 @@ public static class ServiceCollectionExtensions
 
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, OptionalTransformerInputFormatterConfigurator>());
         services.AddKoanOptions<WebPipelineOptions>(ConfigurationConstants.Web.Section + ":Pipeline");
+        services.TryAddSingleton<IEntityEndpointDescriptorProvider, DefaultEntityEndpointDescriptorProvider>();
+        services.TryAddScoped(typeof(IEntityHookPipeline<>), typeof(DefaultEntityHookPipeline<>));
         services.TryAddScoped(typeof(IEntityEndpointService<,>), typeof(EntityEndpointService<,>));
 
         return services;

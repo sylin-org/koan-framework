@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
@@ -42,8 +43,12 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     protected virtual bool CanWrite => true;
     protected virtual bool CanRemove => true;
 
-    private IEntityEndpointService<TEntity, TKey> EndpointService
-        => _endpointService ??= HttpContext.RequestServices.GetRequiredService<IEntityEndpointService<TEntity, TKey>>();
+    protected IEntityEndpointService<TEntity, TKey> EndpointService =>
+        _endpointService ?? HttpContext.RequestServices.GetRequiredService<IEntityEndpointService<TEntity, TKey>>();
+
+    private EntityEndpointOptions EndpointOptions => HttpContext.RequestServices.GetRequiredService<IOptions<EntityEndpointOptions>>().Value;
+
+    private EntityRequestContextBuilder ContextBuilder => HttpContext.RequestServices.GetRequiredService<EntityRequestContextBuilder>();
 
     protected virtual string GetDisplay(TEntity e)
     {
@@ -56,7 +61,10 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     }
 
     private EntityRequestContext CreateRequestContext(QueryOptions options, CancellationToken ct)
-        => new EntityRequestContext(HttpContext.RequestServices, options, ct, HttpContext);
+        => ContextBuilder.Build(options, ct, HttpContext, HttpContext?.User);
+
+    private IActionResult ResolveShortCircuit(EntityEndpointResult result)
+        => result.ShortCircuitResult ?? PrepareResponse(result.ShortCircuitPayload ?? result.Payload);
 
     private static Dictionary<string, string?> ToQueryDictionary(IQueryCollection query)
     {
@@ -68,14 +76,23 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         return dict;
     }
 
-    private bool GetBooleanQueryValue(IQueryCollection query, string key)
+    private string? GetRelationshipParameter(IQueryCollection query)
     {
-        if (!query.TryGetValue(key, out var value)) return false;
-        var text = value.ToString();
-        return text.Equals("true", StringComparison.OrdinalIgnoreCase)
-            || text.Equals("1")
-            || text.Equals("yes", StringComparison.OrdinalIgnoreCase)
-            || text.Equals("on", StringComparison.OrdinalIgnoreCase);
+        if (!EndpointOptions.AllowRelationshipExpansion) return null;
+        return query.TryGetValue("with", out var value) ? value.ToString() : null;
+    }
+
+    private string? GetShapeParameter(IQueryCollection query)
+    {
+        if (!query.TryGetValue("shape", out var value)) return null;
+        var shape = value.ToString();
+        return EndpointOptions.IsShapeAllowed(shape) ? shape : null;
+    }
+
+    private static bool GetBooleanQueryValue(IQueryCollection query, string key)
+    {
+        return query.TryGetValue(key, out var value) &&
+               bool.TryParse(value.ToString(), out var result) && result;
     }
 
     private KoanDataBehaviorAttribute? GetBehavior()
@@ -83,31 +100,73 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
     protected virtual QueryOptions BuildOptions()
     {
-        var q = HttpContext.Request.Query;
-        var opts = new QueryOptions();
-        var beh = GetBehavior();
-        if (q.TryGetValue("q", out var vq)) opts.Q = vq.FirstOrDefault();
-        if (q.TryGetValue("page", out var vp) && int.TryParse(vp, out var p) && p > 0) opts.Page = p; else opts.Page = 1;
-        var maxSize = beh?.MaxPageSize ?? KoanWebConstants.Defaults.MaxPageSize;
-        var defSize = beh?.DefaultPageSize ?? KoanWebConstants.Defaults.DefaultPageSize;
-        if (q.TryGetValue("size", out var vs) && int.TryParse(vs, out var s) && s > 0) opts.PageSize = Math.Min(s, maxSize); else opts.PageSize = defSize;
-        if (q.TryGetValue("sort", out var vsort))
+        var query = HttpContext.Request.Query;
+        var behavior = GetBehavior();
+        var defaults = EndpointOptions;
+
+        var opts = new QueryOptions
+        {
+            Page = 1,
+            PageSize = behavior?.DefaultPageSize ?? defaults.DefaultPageSize,
+            View = defaults.DefaultView
+        };
+
+        if (query.TryGetValue("q", out var vq))
+        {
+            opts.Q = vq.FirstOrDefault();
+        }
+
+        if (query.TryGetValue("page", out var vp) && int.TryParse(vp, out var page) && page > 0)
+        {
+            opts.Page = page;
+        }
+
+        var maxSize = behavior?.MaxPageSize ?? defaults.MaxPageSize;
+        if (query.TryGetValue("size", out var vs) && int.TryParse(vs, out var size) && size > 0)
+        {
+            opts.PageSize = Math.Min(size, maxSize);
+        }
+
+        if (query.TryGetValue("sort", out var vsort))
         {
             foreach (var spec in vsort.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 var desc = spec.StartsWith('-');
                 var field = desc ? spec[1..] : spec;
-                if (!string.IsNullOrWhiteSpace(field)) opts.Sort.Add(new SortSpec(field, desc));
+                if (!string.IsNullOrWhiteSpace(field))
+                {
+                    opts.Sort.Add(new SortSpec(field, desc));
+                }
             }
         }
-        if (q.TryGetValue("dir", out var vdir) && opts.Sort.Count == 1)
+
+        if (query.TryGetValue("dir", out var vdir) && opts.Sort.Count == 1)
         {
-            var d = vdir.ToString();
-            if (string.Equals(d, "desc", StringComparison.OrdinalIgnoreCase))
+            var direction = vdir.ToString();
+            if (string.Equals(direction, "desc", StringComparison.OrdinalIgnoreCase))
+            {
                 opts.Sort[0] = new SortSpec(opts.Sort[0].Field, true);
+            }
         }
-        if (q.TryGetValue("output", out var vout)) opts.Shape = vout.ToString();
-        if (q.TryGetValue("view", out var vview)) opts.View = vview.ToString();
+
+        if (query.TryGetValue("output", out var vout))
+        {
+            var shape = vout.ToString();
+            if (defaults.IsShapeAllowed(shape))
+            {
+                opts.Shape = shape;
+            }
+        }
+
+        if (query.TryGetValue("view", out var vview))
+        {
+            opts.View = vview.ToString();
+        }
+        else if (string.IsNullOrWhiteSpace(opts.View))
+        {
+            opts.View = defaults.DefaultView;
+        }
+
         return opts;
     }
 
@@ -157,8 +216,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             FilterJson = query.TryGetValue("filter", out var f) ? f.ToString() : null,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null,
             IgnoreCase = GetBooleanQueryValue(query, "ignoreCase"),
-            With = query.TryGetValue("with", out var withVal) ? withVal.ToString() : null,
-            Shape = query.TryGetValue("shape", out var shapeVal) ? shapeVal.ToString() : null,
+            With = GetRelationshipParameter(query),
+            Shape = GetShapeParameter(query) ?? options.Shape,
             ForcePagination = behavior?.MustPaginate ?? false,
             Accept = HttpContext.Request.Headers["Accept"].ToString(),
             BasePath = HttpContext.Request.Path.HasValue ? HttpContext.Request.Path.Value : "/",
@@ -170,7 +229,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
         if (result.IsShortCircuited)
         {
-            return result.ShortCircuitResult!;
+            return ResolveShortCircuit(result);
         }
 
         return PrepareResponse(result.Payload ?? result.Items);
@@ -219,7 +278,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited)
         {
-            return result.ShortCircuitResult!;
+            return ResolveShortCircuit(result);
         }
         return PrepareResponse(result.Payload ?? result.Items);
     }
@@ -237,7 +296,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         };
         var result = await EndpointService.GetNewAsync(request);
         ApplyResponseMetadata(result);
-        if (result.IsShortCircuited) return result.ShortCircuitResult!;
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
     }
 
@@ -253,12 +312,12 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Context = context,
             Id = id,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null,
-            With = query.TryGetValue("with", out var withVal) ? withVal.ToString() : null,
+            With = GetRelationshipParameter(query),
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };
         var result = await EndpointService.GetByIdAsync(request);
         ApplyResponseMetadata(result);
-        if (result.IsShortCircuited) return result.ShortCircuitResult!;
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
     }
 
@@ -279,7 +338,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         };
         var result = await EndpointService.UpsertAsync(request);
         ApplyResponseMetadata(result);
-        if (result.IsShortCircuited) return result.ShortCircuitResult!;
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
     }
 
@@ -300,7 +359,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         };
         var result = await EndpointService.UpsertManyAsync(request);
         ApplyResponseMetadata(result);
-        if (result.IsShortCircuited) return result.ShortCircuitResult!;
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload);
     }
 
@@ -320,7 +379,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         };
         var result = await EndpointService.DeleteAsync(request);
         ApplyResponseMetadata(result);
-        if (result.IsShortCircuited) return result.ShortCircuitResult!;
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
     }
 
@@ -340,7 +399,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         };
         var result = await EndpointService.DeleteManyAsync(request);
         ApplyResponseMetadata(result);
-        if (result.IsShortCircuited) return result.ShortCircuitResult!;
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload);
     }
 
@@ -360,7 +419,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         };
         var result = await EndpointService.DeleteByQueryAsync(request);
         ApplyResponseMetadata(result);
-        if (result.IsShortCircuited) return result.ShortCircuitResult!;
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload);
     }
 
@@ -378,7 +437,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         };
         var result = await EndpointService.DeleteAllAsync(request);
         ApplyResponseMetadata(result);
-        if (result.IsShortCircuited) return result.ShortCircuitResult!;
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload);
     }
 
@@ -399,7 +458,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         };
         var result = await EndpointService.PatchAsync(request);
         ApplyResponseMetadata(result);
-        if (result.IsShortCircuited) return result.ShortCircuitResult!;
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
     }
 }
@@ -407,6 +466,23 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 public abstract class EntityController<TEntity> : EntityController<TEntity, string>
     where TEntity : class, IEntity<string>
 { }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

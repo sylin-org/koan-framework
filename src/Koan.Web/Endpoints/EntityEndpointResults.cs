@@ -1,16 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Koan.Web.Endpoints;
 
 public class EntityEndpointResult
 {
-    public EntityEndpointResult(EntityRequestContext context, object? payload, IActionResult? shortCircuit = null)
+    public EntityEndpointResult(EntityRequestContext context, object? payload, object? shortCircuit = null)
     {
         Context = context ?? throw new ArgumentNullException(nameof(context));
         Payload = payload;
-        ShortCircuitResult = shortCircuit;
+        ShortCircuitPayload = shortCircuit;
         Headers = new Dictionary<string, string>(context.Headers, StringComparer.OrdinalIgnoreCase);
         Warnings = context.Warnings.ToArray();
     }
@@ -19,9 +20,11 @@ public class EntityEndpointResult
 
     public object? Payload { get; }
 
-    public IActionResult? ShortCircuitResult { get; }
+    public object? ShortCircuitPayload { get; }
 
-    public bool IsShortCircuited => ShortCircuitResult is not null;
+    public IActionResult? ShortCircuitResult => ShortCircuitPayload as IActionResult;
+
+    public bool IsShortCircuited => ShortCircuitPayload is not null;
 
     public IReadOnlyDictionary<string, string> Headers { get; }
 
@@ -30,7 +33,7 @@ public class EntityEndpointResult
 
 public sealed class EntityCollectionResult<TEntity> : EntityEndpointResult
 {
-    public EntityCollectionResult(EntityRequestContext context, IReadOnlyList<TEntity> items, int totalCount, object? payload, IActionResult? shortCircuit = null)
+    public EntityCollectionResult(EntityRequestContext context, IReadOnlyList<TEntity> items, int totalCount, object? payload, object? shortCircuit = null)
         : base(context, payload, shortCircuit)
     {
         Items = items;
@@ -44,7 +47,7 @@ public sealed class EntityCollectionResult<TEntity> : EntityEndpointResult
 
 public sealed class EntityModelResult<TEntity> : EntityEndpointResult
 {
-    public EntityModelResult(EntityRequestContext context, TEntity? model, object? payload, IActionResult? shortCircuit = null)
+    public EntityModelResult(EntityRequestContext context, TEntity? model, object? payload, object? shortCircuit = null)
         : base(context, payload, shortCircuit)
     {
         Model = model;
@@ -52,7 +55,3 @@ public sealed class EntityModelResult<TEntity> : EntityEndpointResult
 
     public TEntity? Model { get; }
 }
-
-
-
-

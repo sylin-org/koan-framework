@@ -1,10 +1,11 @@
 using System;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Abstractions;
 using Koan.Web.Endpoints;
-using System.Linq;
-using System.Security.Claims;
 
 namespace Koan.Web.Hooks;
 
@@ -38,12 +39,17 @@ public sealed class HookContext<TEntity>
 
     public IReadOnlyList<string> Warnings => Request.Warnings as IReadOnlyList<string> ?? Request.Warnings.ToArray();
 
-    private IActionResult? _shortCircuit;
+    private object? _shortCircuit;
 
-    public void ShortCircuit(IActionResult result) => _shortCircuit = result;
+    public void ShortCircuit(IActionResult result)
+        => _shortCircuit = result ?? throw new ArgumentNullException(nameof(result));
+
+    public void ShortCircuit(object payload)
+        => _shortCircuit = payload ?? throw new ArgumentNullException(nameof(payload));
 
     public bool IsShortCircuited => _shortCircuit is not null;
 
-    public IActionResult? ShortCircuitResult => _shortCircuit;
-}
+    public object? ShortCircuitPayload => _shortCircuit;
 
+    public IActionResult? ShortCircuitResult => _shortCircuit as IActionResult;
+}

@@ -1,10 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.Extensions.DependencyInjection;
+
 using Microsoft.Extensions.Logging;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
@@ -20,13 +21,16 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     where TKey : notnull
 {
     private readonly IDataService _dataService;
+    private readonly IEntityHookPipeline<TEntity> _hookPipeline;
     private readonly ILogger<EntityEndpointService<TEntity, TKey>>? _logger;
 
     public EntityEndpointService(
         IDataService dataService,
+        IEntityHookPipeline<TEntity> hookPipeline,
         ILogger<EntityEndpointService<TEntity, TKey>>? logger = null)
     {
         _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
+        _hookPipeline = hookPipeline ?? throw new ArgumentNullException(nameof(hookPipeline));
         _logger = logger;
     }
 
@@ -36,24 +40,24 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
-        var runner = CreateRunner(context);
-        var hookContext = new HookContext<TEntity>(context);
+        var hookContext = _hookPipeline.CreateContext(context);
 
-        if (!await runner.BuildOptionsAsync(hookContext, context.Options))
+        if (!await _hookPipeline.BuildOptionsAsync(hookContext, context.Options))
         {
             return CollectionShortCircuit(context, hookContext);
         }
 
-        if (!await runner.BeforeCollectionAsync(hookContext, context.Options))
+        if (!await _hookPipeline.BeforeCollectionAsync(hookContext, context.Options))
         {
             return CollectionShortCircuit(context, hookContext);
         }
 
         IReadOnlyList<TEntity> repositoryItems;
         int total;
+        bool repositoryHandledPagination;
         try
         {
-            (repositoryItems, total) = await QueryCollectionAsync(repo, request, context.Options, context.CancellationToken);
+            (repositoryItems, total, repositoryHandledPagination) = await QueryCollectionAsync(repo, request, context.Options, context.CancellationToken);
         }
         catch (InvalidOperationException ex)
         {
@@ -62,7 +66,11 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         var list = repositoryItems.ToList();
-        if (request.ForcePagination || ShouldPaginate(context, request))
+        if (context.Options.Sort.Count > 0)
+        {
+            list = ApplySort(list, context.Options.Sort);
+        }
+        if (!repositoryHandledPagination && (request.ForcePagination || ShouldPaginate(context, request)))
         {
             (list, total) = ApplyPagination(list, context.Options.Page, context.Options.PageSize, total);
             context.Headers["Koan-InMemory-Paging"] = "true";
@@ -81,7 +89,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             }
         }
 
-        if (!await runner.AfterCollectionAsync(hookContext, list))
+        if (!await _hookPipeline.AfterCollectionAsync(hookContext, list))
         {
             return CollectionShortCircuit(context, hookContext);
         }
@@ -98,7 +106,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         ApplyViewHeader(context, request.Accept);
 
-        var emit = await runner.EmitCollectionAsync(hookContext, payload);
+        var emit = await _hookPipeline.EmitCollectionAsync(hookContext, payload);
         payload = emit.replaced ? emit.payload : payload;
         CopyHookHeaders(context, hookContext);
 
@@ -111,15 +119,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
-        var runner = CreateRunner(context);
-        var hookContext = new HookContext<TEntity>(context);
+        var hookContext = _hookPipeline.CreateContext(context);
 
-        if (!await runner.BuildOptionsAsync(hookContext, context.Options))
+        if (!await _hookPipeline.BuildOptionsAsync(hookContext, context.Options))
         {
             return CollectionShortCircuit(context, hookContext);
         }
 
-        if (!await runner.BeforeCollectionAsync(hookContext, context.Options))
+        if (!await _hookPipeline.BeforeCollectionAsync(hookContext, context.Options))
         {
             return CollectionShortCircuit(context, hookContext);
         }
@@ -137,6 +144,10 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         var list = repositoryItems.ToList();
+        if (context.Options.Sort.Count > 0)
+        {
+            list = ApplySort(list, context.Options.Sort);
+        }
         if (context.Options.PageSize > 0)
         {
             (list, total) = ApplyPagination(list, context.Options.Page, context.Options.PageSize, total);
@@ -146,14 +157,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             context.Headers["X-Total-Count"] = total.ToString();
         }
 
-        if (!await runner.AfterCollectionAsync(hookContext, list))
+        if (!await _hookPipeline.AfterCollectionAsync(hookContext, list))
         {
             return CollectionShortCircuit(context, hookContext);
         }
 
         ApplyViewHeader(context, request.Accept);
 
-        var emit = await runner.EmitCollectionAsync(hookContext, list);
+        var emit = await _hookPipeline.EmitCollectionAsync(hookContext, list);
         var payload = emit.replaced ? emit.payload : list;
         CopyHookHeaders(context, hookContext);
 
@@ -166,15 +177,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
-        var runner = CreateRunner(context);
-        var hookContext = new HookContext<TEntity>(context);
+        var hookContext = _hookPipeline.CreateContext(context);
 
         var model = Activator.CreateInstance<TEntity>();
-        await runner.AfterModelFetchAsync(hookContext, model);
+        await _hookPipeline.AfterModelFetchAsync(hookContext, model);
 
         ApplyViewHeader(context, request.Accept);
 
-        var emit = await runner.EmitModelAsync(hookContext, model!);
+        var emit = await _hookPipeline.EmitModelAsync(hookContext, model!);
         var payload = emit.replaced ? emit.payload : model;
         CopyHookHeaders(context, hookContext);
 
@@ -187,17 +197,16 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
-        var runner = CreateRunner(context);
-        var hookContext = new HookContext<TEntity>(context);
+        var hookContext = _hookPipeline.CreateContext(context);
 
-        if (!await runner.BeforeModelFetchAsync(hookContext, request.Id?.ToString() ?? string.Empty))
+        if (!await _hookPipeline.BeforeModelFetchAsync(hookContext, request.Id?.ToString() ?? string.Empty))
         {
             return ModelShortCircuit(context, hookContext);
         }
 
         using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
-        await runner.AfterModelFetchAsync(hookContext, model);
+        await _hookPipeline.AfterModelFetchAsync(hookContext, model);
         if (model is null)
         {
             CopyHookHeaders(context, hookContext);
@@ -213,7 +222,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         ApplyViewHeader(context, request.Accept);
-        var emit = await runner.EmitModelAsync(hookContext, model);
+        var emit = await _hookPipeline.EmitModelAsync(hookContext, model);
         var payload = emit.replaced ? emit.payload : model;
         CopyHookHeaders(context, hookContext);
         return new EntityModelResult<TEntity>(context, model, payload);
@@ -225,10 +234,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
-        var runner = CreateRunner(context);
-        var hookContext = new HookContext<TEntity>(context);
+        var hookContext = _hookPipeline.CreateContext(context);
 
-        await runner.BeforeSaveAsync(hookContext, request.Model);
+        await _hookPipeline.BeforeSaveAsync(hookContext, request.Model);
 
         TEntity saved;
         if (!string.IsNullOrWhiteSpace(request.Set))
@@ -241,10 +249,10 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             saved = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
         }
 
-        await runner.AfterSaveAsync(hookContext, saved);
+        await _hookPipeline.AfterSaveAsync(hookContext, saved);
 
         ApplyViewHeader(context, request.Accept);
-        var emit = await runner.EmitModelAsync(hookContext, saved);
+        var emit = await _hookPipeline.EmitModelAsync(hookContext, saved);
         var payload = emit.replaced ? emit.payload : saved;
         CopyHookHeaders(context, hookContext);
         return new EntityModelResult<TEntity>(context, saved, payload);
@@ -256,8 +264,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
-        var runner = CreateRunner(context);
-        var hookContext = new HookContext<TEntity>(context);
+        var hookContext = _hookPipeline.CreateContext(context);
 
         var list = request.Models.ToList();
         if (list.Count == 0)
@@ -271,7 +278,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         foreach (var model in list)
         {
-            await runner.BeforeSaveAsync(hookContext, model);
+            await _hookPipeline.BeforeSaveAsync(hookContext, model);
         }
 
         using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
@@ -279,7 +286,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         foreach (var model in list)
         {
-            await runner.AfterSaveAsync(hookContext, model);
+            await _hookPipeline.AfterSaveAsync(hookContext, model);
         }
 
         var writes = WriteCaps(repo);
@@ -294,8 +301,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
-        var runner = CreateRunner(context);
-        var hookContext = new HookContext<TEntity>(context);
+        var hookContext = _hookPipeline.CreateContext(context);
 
         using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.GetAsync(request.Id, context.CancellationToken);
@@ -304,16 +310,16 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
         }
 
-        await runner.BeforeDeleteAsync(hookContext, model);
+        await _hookPipeline.BeforeDeleteAsync(hookContext, model);
         var ok = await Data<TEntity, TKey>.DeleteAsync(request.Id, context.CancellationToken);
         if (!ok)
         {
             return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
         }
-        await runner.AfterDeleteAsync(hookContext, model);
+        await _hookPipeline.AfterDeleteAsync(hookContext, model);
 
         ApplyViewHeader(context, request.Accept);
-        var emit = await runner.EmitModelAsync(hookContext, model);
+        var emit = await _hookPipeline.EmitModelAsync(hookContext, model);
         var payload = emit.replaced ? emit.payload : model;
         CopyHookHeaders(context, hookContext);
         return new EntityModelResult<TEntity>(context, model, payload);
@@ -355,10 +361,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         context.Capabilities = Capabilities(repo);
 
-        var runner = CreateRunner(context);
-        var hookContext = new HookContext<TEntity>(context);
+        var hookContext = _hookPipeline.CreateContext(context);
 
-        await runner.BeforePatchAsync(hookContext, request.Id?.ToString() ?? string.Empty, request.Patch);
+        await _hookPipeline.BeforePatchAsync(hookContext, request.Id?.ToString() ?? string.Empty, request.Patch);
 
         using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var original = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
@@ -379,26 +384,15 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             }
         }
 
-        await runner.BeforeSaveAsync(hookContext, working!);
+        await _hookPipeline.BeforeSaveAsync(hookContext, working!);
         var saved = await working!.Upsert<TEntity, TKey>(context.CancellationToken);
-        await runner.AfterPatchAsync(hookContext, saved);
+        await _hookPipeline.AfterPatchAsync(hookContext, saved);
 
         ApplyViewHeader(context, request.Accept);
-        var emit = await runner.EmitModelAsync(hookContext, saved);
+        var emit = await _hookPipeline.EmitModelAsync(hookContext, saved);
         var payload = emit.replaced ? emit.payload : saved;
         CopyHookHeaders(context, hookContext);
         return new EntityModelResult<TEntity>(context, saved, payload);
-    }
-
-    private static HookRunner<TEntity> CreateRunner(EntityRequestContext context)
-    {
-        var services = context.Services;
-        return new HookRunner<TEntity>(
-            services.GetServices<IAuthorizeHook<TEntity>>(),
-            services.GetServices<IRequestOptionsHook<TEntity>>(),
-            services.GetServices<ICollectionHook<TEntity>>(),
-            services.GetServices<IModelHook<TEntity>>(),
-            services.GetServices<IEmitHook<TEntity>>());
     }
 
     private static IQueryCapabilities Capabilities(IDataRepository<TEntity, TKey> repo)
@@ -448,8 +442,75 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var items = source.Skip(skip).Take(pageSize).ToList();
         return (items, total);
     }
+    private static List<TEntity> ApplySort(List<TEntity> source, IReadOnlyList<SortSpec> sorts)
+    {
+        if (sorts is null || sorts.Count == 0) return source;
 
-    private async Task<(IReadOnlyList<TEntity> Items, int Total)> QueryCollectionAsync(
+        IOrderedEnumerable<TEntity>? ordered = null;
+        IEnumerable<TEntity> working = source;
+
+        foreach (var sort in sorts)
+        {
+            if (string.IsNullOrWhiteSpace(sort.Field))
+            {
+                continue;
+            }
+
+            var selector = CreateKeySelector(sort.Field);
+            if (selector is null)
+            {
+                continue;
+            }
+
+            ordered = ordered is null
+                ? (sort.Desc ? working.OrderByDescending(selector) : working.OrderBy(selector))
+                : (sort.Desc ? ordered.ThenByDescending(selector) : ordered.ThenBy(selector));
+        }
+
+        return ordered is null ? source : ordered.ToList();
+    }
+
+    private static Func<TEntity, object?>? CreateKeySelector(string field)
+    {
+        var segments = field.Split(".", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length == 0)
+        {
+            return null;
+        }
+
+        var props = new PropertyInfo[segments.Length];
+        var currentType = typeof(TEntity);
+
+        for (var i = 0; i < segments.Length; i++)
+        {
+            var prop = currentType.GetProperty(segments[i], BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+            if (prop is null)
+            {
+                return null;
+            }
+
+            props[i] = prop;
+            currentType = prop.PropertyType;
+        }
+
+        return entity =>
+        {
+            object? value = entity;
+            foreach (var prop in props)
+            {
+                if (value is null)
+                {
+                    return null;
+                }
+
+                value = prop.GetValue(value);
+            }
+            return value;
+        };
+    }
+
+
+    private async Task<(IReadOnlyList<TEntity> Items, int Total, bool RepositoryHandledPagination)> QueryCollectionAsync(
         IDataRepository<TEntity, TKey> repo,
         EntityCollectionRequest request,
         QueryOptions options,
@@ -464,10 +525,12 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             }
 
             IReadOnlyList<TEntity> items;
+            bool paginationHandled = false;
             if (repo is ILinqQueryRepositoryWithOptions<TEntity, TKey> lrepoOpts)
             {
                 var dq = new Koan.Data.Abstractions.DataQueryOptions(options.Page, options.PageSize);
                 items = await lrepoOpts.QueryAsync(predicate!, dq, cancellationToken);
+                paginationHandled = true;
             }
             else
             {
@@ -476,16 +539,18 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
             int total;
             try { total = await lrepo.CountAsync(predicate!, cancellationToken); } catch { total = items.Count; }
-            return (items, total);
+            return (items, total, paginationHandled);
         }
 
         if (!string.IsNullOrWhiteSpace(options.Q) && repo is IStringQueryRepository<TEntity, TKey> srepo)
         {
             IReadOnlyList<TEntity> items;
+            bool paginationHandled = false;
             if (repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
             {
                 var dq = new Koan.Data.Abstractions.DataQueryOptions(options.Page, options.PageSize);
                 items = await srepoOpts.QueryAsync(options.Q!, dq, cancellationToken);
+                paginationHandled = true;
             }
             else
             {
@@ -494,7 +559,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
             int total;
             try { total = await srepo.CountAsync(options.Q!, cancellationToken); } catch { total = items.Count; }
-            return (items, total);
+            return (items, total, paginationHandled);
         }
 
         if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
@@ -503,13 +568,13 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             var items = await repoOpts.QueryAsync(null, dq, cancellationToken);
             int total;
             try { total = await repoOpts.CountAsync(null, cancellationToken); } catch { total = items.Count; }
-            return (items, total);
+            return (items, total, true);
         }
 
         var fallback = await repo.QueryAsync(null, cancellationToken);
         int fallbackTotal;
         try { fallbackTotal = await repo.CountAsync(null, cancellationToken); } catch { fallbackTotal = fallback.Count; }
-        return (fallback, fallbackTotal);
+        return (fallback, fallbackTotal, false);
     }
 
     private async Task<(IReadOnlyList<TEntity> Items, int Total)> QueryCollectionFromBodyAsync(
@@ -664,21 +729,23 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     private static EntityCollectionResult<TEntity> CollectionShortCircuit(EntityRequestContext context, HookContext<TEntity> hookContext)
     {
         CopyHookHeaders(context, hookContext);
-        if (hookContext.ShortCircuitResult is IActionResult action)
+        var shortCircuit = hookContext.ShortCircuitPayload;
+        if (shortCircuit is IActionResult action)
         {
             return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), 0, null, action);
         }
-        return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), 0, Array.Empty<TEntity>());
+        return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), 0, shortCircuit, shortCircuit);
     }
 
     private static EntityModelResult<TEntity> ModelShortCircuit(EntityRequestContext context, HookContext<TEntity> hookContext)
     {
         CopyHookHeaders(context, hookContext);
-        if (hookContext.ShortCircuitResult is IActionResult action)
+        var shortCircuit = hookContext.ShortCircuitPayload;
+        if (shortCircuit is IActionResult action)
         {
             return new EntityModelResult<TEntity>(context, default, null, action);
         }
-        return new EntityModelResult<TEntity>(context, default, null);
+        return new EntityModelResult<TEntity>(context, default, shortCircuit, shortCircuit);
     }
 
     private sealed record RepositoryCapabilities(QueryCapabilities Value) : IQueryCapabilities
@@ -691,5 +758,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         public WriteCapabilities Writes => Value;
     }
 }
+
+
+
+
+
+
+
+
+
 
 

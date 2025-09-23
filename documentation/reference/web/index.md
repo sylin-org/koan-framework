@@ -48,6 +48,14 @@ public class ProductsController : EntityController<Product>
 }
 ```
 
+## Entity Endpoint Service
+The shared orchestration layer introduced in v0.2.18+ extracts pagination, dataset routing, hook execution, and response shaping into `IEntityEndpointService`. REST controllers already delegate to it; other adapters (GraphQL, MCP, jobs, agents) can reuse the same behaviour by constructing an `EntityRequestContext` and calling the service.
+Key pieces:
+- `IEntityHookPipeline` so all surfaces share the same hook sequencing.
+- `EntityEndpointOptions` and `EntityRequestContextBuilder` for consistent defaults and context creation.
+- `IEntityEndpointDescriptorProvider` for operation metadata consumed by MCP, CLI, or GraphQL tooling.
+See [Entity Endpoint Service](entity-endpoint-service.md) for setup, examples, and configuration tips.
+
 ## Custom Controllers
 
 ```csharp
