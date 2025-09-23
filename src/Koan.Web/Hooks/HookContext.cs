@@ -1,6 +1,9 @@
+using System;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Abstractions;
+using Koan.Web.Endpoints;
+using System.Linq;
 using System.Security.Claims;
 
 namespace Koan.Web.Hooks;
@@ -10,20 +13,37 @@ namespace Koan.Web.Hooks;
 /// </summary>
 public sealed class HookContext<TEntity>
 {
-    public HttpContext Http { get; init; } = default!;
-    public IServiceProvider Services { get; init; } = default!;
-    public QueryOptions Options { get; init; } = default!;
-    public IQueryCapabilities Capabilities { get; init; } = default!;
-    public IDictionary<string, string> ResponseHeaders { get; } = new Dictionary<string, string>();
-    public ClaimsPrincipal User => Http.User;
-    public CancellationToken Ct { get; init; }
+    public HookContext(EntityRequestContext requestContext)
+    {
+        Request = requestContext ?? throw new ArgumentNullException(nameof(requestContext));
+    }
+
+    public EntityRequestContext Request { get; }
+
+    public HttpContext? Http => Request.HttpContext;
+
+    public IServiceProvider Services => Request.Services;
+
+    public QueryOptions Options => Request.Options;
+
+    public IQueryCapabilities Capabilities => Request.Capabilities;
+
+    public IDictionary<string, string> ResponseHeaders => Request.Headers;
+
+    public ClaimsPrincipal User => Request.User;
+
+    public CancellationToken Ct => Request.CancellationToken;
+
+    public void Warn(string msg) => Request.Warn(msg);
+
+    public IReadOnlyList<string> Warnings => Request.Warnings as IReadOnlyList<string> ?? Request.Warnings.ToArray();
 
     private IActionResult? _shortCircuit;
-    public void ShortCircuit(IActionResult result) => _shortCircuit = result;
-    public bool IsShortCircuited => _shortCircuit != null;
-    public IActionResult? ShortCircuitResult => _shortCircuit;
 
-    private readonly List<string> _warnings = new();
-    public void Warn(string msg) => _warnings.Add(msg);
-    public IReadOnlyList<string> Warnings => _warnings;
+    public void ShortCircuit(IActionResult result) => _shortCircuit = result;
+
+    public bool IsShortCircuited => _shortCircuit is not null;
+
+    public IActionResult? ShortCircuitResult => _shortCircuit;
 }
+
