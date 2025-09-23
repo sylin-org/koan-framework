@@ -1,0 +1,205 @@
+<!-- Users Management - Basic Entity Demo -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-users"></i> User Management</h2>
+            <div class="feature-highlight">
+                Entity&lt;User&gt; Pattern
+            </div>
+        </div>
+        <p class="text-muted">
+            This page demonstrates the basic <code>Entity&lt;User&gt;</code> pattern with minimal EntityController implementation.
+            Even the simplest entity gets full CRUD capabilities, auto GUID v7 generation, and multi-provider support.
+        </p>
+    </div>
+</div>
+
+<!-- Create New User -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5><i class="fas fa-user-plus"></i> Create New User</h5>
+            </div>
+            <div class="card-body">
+                <form ng-submit="createUser()">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Username</label>
+                                <input type="text" class="form-control" ng-model="newUser.username" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" ng-model="newUser.email" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Display Name</label>
+                                <input type="text" class="form-control" ng-model="newUser.displayName" required>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-success" ng-disabled="loading || !newUser.username">
+                        <i class="fas fa-save"></i> Create User
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Users List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-list"></i> Users</h5>
+                <div>
+                    <span class="badge bg-light text-dark">{{users.length}} users</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div ng-if="loading" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading users...</p>
+                </div>
+
+                <div ng-if="!loading && users.length === 0" class="text-center text-muted">
+                    <i class="fas fa-users fa-3x mb-3"></i>
+                    <p>No users found.</p>
+                    <p>Create some users to see the Entity&lt;User&gt; pattern in action.</p>
+                </div>
+
+                <div ng-if="!loading && users.length > 0">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Display Name</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Joined</th>
+                                    <th>ID (GUID v7)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr ng-repeat="user in users">
+                                    <td>
+                                        <strong>{{user.displayName}}</strong>
+                                    </td>
+                                    <td>
+                                        <code>{{user.username}}</code>
+                                    </td>
+                                    <td>
+                                        <a href="mailto:{{user.email}}">{{user.email}}</a>
+                                    </td>
+                                    <td>
+                                        <small>{{user.joinedAt | date:'short'}}</small>
+                                    </td>
+                                    <td>
+                                        <code class="small">{{user.id}}</code>
+                                        <br>
+                                        <small class="text-success">
+                                            <i class="fas fa-check"></i> Auto-generated
+                                        </small>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Framework Features Info -->
+                    <div class="demo-section mt-4">
+                        <h6><i class="fas fa-info-circle"></i> Entity&lt;User&gt; Features Demonstrated</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul class="list-unstyled small">
+                                    <li><i class="fas fa-check text-success"></i> Auto GUID v7 generation for Id property</li>
+                                    <li><i class="fas fa-check text-success"></i> Automatic JoinedAt timestamp</li>
+                                    <li><i class="fas fa-check text-success"></i> Zero-boilerplate controller</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul class="list-unstyled small">
+                                    <li><i class="fas fa-check text-success"></i> Full CRUD operations</li>
+                                    <li><i class="fas fa-check text-success"></i> Multi-provider storage support</li>
+                                    <li><i class="fas fa-check text-success"></i> JSON serialization handled automatically</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- GUID v7 Explanation -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h6><i class="fas fa-fingerprint"></i> GUID v7 Auto-Generation</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    The Koan Framework automatically generates GUID v7 identifiers for <code>Entity&lt;T&gt;</code> instances.
+                    GUID v7 provides several advantages over traditional GUIDs:
+                </p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Benefits of GUID v7</h6>
+                        <ul class="small">
+                            <li><strong>Sortable:</strong> Maintains creation order</li>
+                            <li><strong>Distributed:</strong> No coordination required</li>
+                            <li><strong>Collision-resistant:</strong> Cryptographically secure</li>
+                            <li><strong>Database-friendly:</strong> Excellent clustering properties</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Framework Implementation</h6>
+                        <ul class="small">
+                            <li><strong>Automatic:</strong> Generated on first access</li>
+                            <li><strong>Lazy:</strong> Only when needed</li>
+                            <li><strong>Provider-agnostic:</strong> Works with all storage backends</li>
+                            <li><strong>Deterministic:</strong> Same ID across provider switches</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Simple Controller Code -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h6><i class="fas fa-code"></i> Complete Controller Implementation</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    This is the complete C# code for the UsersController - notice the zero boilerplate:
+                </p>
+                <div class="code-block">
+                    <pre><code>[Route("api/[controller]")]
+public class UsersController : EntityController&lt;User&gt;
+{
+    // Inherits all CRUD operations automatically
+    // Demonstrates that even the simplest controller gets full functionality
+}</code></pre>
+                </div>
+                <p class="small text-muted mt-3">
+                    <strong>That's it!</strong> The framework provides all the functionality you see on this page with zero additional code.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,97 @@
+# S10.DevPortal Docker Compose - Multi-Provider Demo Stack
+name: koan-s10-devportal
+
+services:
+  # Main application - Koan Framework demo
+  api:
+    build:
+      context: ../../..
+      dockerfile: samples/S10.DevPortal/Dockerfile
+    ports:
+      - "5090:5090"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5090"
+      # Override connection strings for containerized providers
+      Koan__Data__Mongo__ConnectionString: "mongodb://mongo:27017/DevPortal"
+      Koan__Data__Postgres__ConnectionString: "Host=postgres;Port=5432;Database=devportal;Username=postgres;Password=dev"
+      Koan__Data__Sqlite__ConnectionString: "Data Source=/app/data/devportal.db"
+    depends_on:
+      - mongo
+      - postgres
+    volumes:
+      # Persist SQLite data
+      - sqlite-data:/app/data
+    networks:
+      - devportal-network
+
+  # MongoDB - NoSQL Document Store
+  mongo:
+    image: mongo:7.0
+    container_name: devportal-mongo
+    ports:
+      - "5091:27017"
+    environment:
+      MONGO_INITDB_DATABASE: DevPortal
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - devportal-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/DevPortal --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL - Advanced Relational Database
+  postgres:
+    image: postgres:16
+    container_name: devportal-postgres
+    ports:
+      - "5092:5432"
+    environment:
+      POSTGRES_DB: devportal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - devportal-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d devportal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Optional caching/session store (for future demos)
+  redis:
+    image: redis:7-alpine
+    container_name: devportal-redis
+    ports:
+      - "5093:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - devportal-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+# Named volumes for data persistence
+volumes:
+  mongo-data:
+    driver: local
+  postgres-data:
+    driver: local
+  sqlite-data:
+    driver: local
+  redis-data:
+    driver: local
+
+# Dedicated network for service communication
+networks:
+  devportal-network:
+    driver: bridge
