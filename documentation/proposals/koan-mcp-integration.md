@@ -2,577 +2,206 @@
 
 **Status:** Draft
 **Author:** Koan Framework Team
-**Date:** January 2025
-**Version:** 1.0
+**Date:** February 2025
+**Version:** 1.1
 
 ## Abstract
 
-This proposal outlines the design and implementation of `Koan.Mcp` - a module that automatically transforms Koan web APIs into Model Context Protocol (MCP) servers. Following Koan's "Reference = Intent" philosophy, developers can expose existing `EntityController<T>` APIs to Large Language Models (LLMs) with minimal code changes.
+This proposal describes `Koan.Mcp`, an optional module that turns Koan entity endpoints into Model Context Protocol (MCP) tools once the HTTP-bound orchestration logic has been extracted into the shared `EntityEndpointService` layer (see `documentation/proposals/entity-endpoint-service-extraction.md`). By consuming the new service abstractions instead of instantiating MVC controllers directly, MCP gains parity with REST and GraphQL surfaces while preserving Koan's "Reference = Intent" philosophy: reference the package, opt-in the entity, and LLM agents can safely call it.
 
 **Key Design Principles:**
-- **DRY (Don't Repeat Yourself)**: Leverages existing `AssemblyCache` and reflection infrastructure from Koan.Core
-- **KISS (Keep It Simple, Stupid)**: Reuses established discovery patterns instead of creating new reflection code
-- **Clean Architecture**: `[Comment]` attributes on base class + `[McpController]` opt-in maintains separation of concerns
+- **Protocol Reuse**: Build on `EntityEndpointService` so REST, GraphQL, and MCP share the same behaviour and hook pipeline.
+- **Attribute-Guided Opt-In**: Lightweight attributes advertise MCP intent without coupling controller logic to MCP.
+- **Zero Configuration**: Package reference + attribute enables MCP, sensible defaults work out of the box.
+- **Extendable Metadata**: Tool descriptions and schemas derive from endpoint descriptors, with room for custom overrides.
+
+**Prerequisite:** Complete the Entity Endpoint Service extraction outlined in `documentation/proposals/entity-endpoint-service-extraction.md`.
 
 ## Background
 
 ### What is MCP?
 
-The Model Context Protocol (MCP) is an open standard introduced by Anthropic that enables standardized communication between Large Language Models and external data sources, tools, and services. MCP follows a client-server architecture where:
+The Model Context Protocol (MCP) is an open standard introduced by Anthropic that allows Large Language Models to interact with external systems through a consistent JSON-RPC 2.0 interface. Servers expose tools, resources, and prompts; clients discover and invoke them on behalf of an LLM. MCP is rapidly becoming the lingua franca for agent-style integrations.
 
-- **Servers** expose Tools, Resources, and Prompts via JSON-RPC 2.0
-- **Clients** discover and execute tools on behalf of LLMs
-- **Tools** are functions that LLMs can call to perform specific actions
+### Current Gap
 
-### Problem Statement
+Today, exposing a Koan entity API to LLMs requires a bespoke MCP server that re-implements query parsing, hook execution, validation, and response shaping. This duplicates logic already living in `EntityController<TEntity, TKey>` and breaks the "Reference = Intent" developer promise.
 
-Currently, exposing Koan APIs to LLMs requires:
-1. Manual MCP server implementation
-2. Duplicating business logic
-3. Custom parameter mapping and validation
-4. Separate deployment and maintenance
-
-This violates Koan's principle of eliminating boilerplate and configuration complexity.
+With the planned extraction of the controller logic into `EntityEndpointService` (`documentation/proposals/entity-endpoint-service-extraction.md`), Koan gains a protocol-neutral execution surface. `Koan.Mcp` will sit on top of that service to provide an AI-oriented protocol adapter.
 
 ### Goals
 
-1. **Zero Configuration**: Add package reference, get MCP functionality
-2. **Clean Architecture**: No coupling between EntityController and MCP concerns
-3. **Rich Tool Descriptions**: Meaningful metadata for LLM understanding
-4. **Template System**: Consistent descriptions across entity types
-5. **Progressive Enhancement**: Support custom business logic alongside CRUD operations
+1. **Rapid Enablement**: Developers opt-in entities for MCP exposure via attributes or configuration; no manual MCP wiring.
+2. **Behaviour Parity**: MCP tools mirror REST semantics—hooks, dataset routing, pagination, validation all reuse the shared service.
+3. **Rich Metadata**: MCP tool definitions include meaningful summaries, schemas, and examples to improve LLM success.
+4. **Secure by Default**: Respect existing Koan auth policies and scopes; expose configuration for MCP-specific guards.
+5. **Composable Transports**: Support STDIO for local DevHost workflows and HTTP(S)/WebSocket for remote scenarios.
+
+---
 
 ## Proposed Solution
 
-### Core Architecture
+### Architectural Overview
 
-The solution uses a **comment-attribute approach** that maintains separation of concerns:
+Once `EntityEndpointService` is available, `Koan.Mcp` introduces an MCP adapter that:
 
-```csharp
-// EntityController base class (in Koan.Web)
-public abstract class EntityController<TEntity, TKey> : ControllerBase
-{
-    [Comment("List all <TEntity> items with optional filtering and pagination")]
-    [HttpGet("")]
-    public virtual async Task<IActionResult> GetCollection(CancellationToken ct) { ... }
+1. **Discovers Eligible Endpoints**: Uses Koan's assembly cache and the existing auto-registration pattern to locate `IEntityEndpointDescriptor` instances. Only descriptors tagged with `[McpEntity]` (new attribute) or enabled via configuration are exposed.
+2. **Generates Tool Definitions**: Converts descriptors (operations, shapes, filters, mutation capabilities) into MCP `Tool` definitions, including JSON Schemas sourced from `EntityEndpointService` metadata and optional overrides.
+3. **Executes via Service Layer**: Dispatches MCP tool calls through `IEntityEndpointService<TEntity, TKey>` rather than invoking controllers, ensuring consistent hook execution and dataset handling without requiring `HttpContext`.
+4. **Formats Responses**: Transforms `EntityEndpointResult` payloads and metadata into MCP responses (`content`, `isError`, warnings). HTTP-centric headers become structured diagnostics accessible to clients.
+5. **Hosts MCP Server**: Provides pluggable transports (STDIO, HTTP+SSE, WebSocket) through a hosted service that can run alongside existing REST endpoints.
 
-    [Comment("Retrieve a specific <TEntity> by its unique identifier")]
-    [HttpGet("{id}")]
-    public virtual async Task<IActionResult> GetById([FromRoute] TKey id, CancellationToken ct) { ... }
-
-    [Comment("Create a new <TEntity> or update an existing one")]
-    [HttpPost("")]
-    public virtual async Task<IActionResult> Upsert([FromBody] TEntity model, CancellationToken ct) { ... }
-
-    [Comment("Delete a <TEntity> by its identifier")]
-    [HttpDelete("{id}")]
-    public virtual async Task<IActionResult> Delete([FromRoute] TKey id, CancellationToken ct) { ... }
-}
-
-// Developer implementation (minimal)
-[McpController]
-public class TodosController : EntityController<Todo> { }
-
-// Custom methods when needed
-[McpController]
-public class ProjectsController : EntityController<Project>
-{
-    [Comment("Generate AI-powered risk analysis for a <TEntity>")]
-    [HttpPost("{id}/analyze-risks")]
-    public async Task<IActionResult> AnalyzeRisks(string id) { ... }
-}
+```
+┌────────────────────┐       ┌────────────────────────┐       ┌──────────────────────┐
+│ MCP Client (LLM)   │  RPC  │ Koan.Mcp Transport     │  →    │ EntityEndpointService │
+│  • Claude Desktop  │──────▶│  • STDIO / HTTP / WS   │──────▶│  • Shared CRUD logic │
+│  • Agentic Runtime │       │  • Tool Registry       │       │  • Hook Pipeline      │
+└────────────────────┘       └────────────────────────┘       └──────────────────────┘
 ```
 
-### Template Processing
+### Opt-In Model
 
-The `<TEntity>` placeholder in comment attributes gets replaced with actual type names:
+- **`[McpEntity]` Attribute**: Developers decorate an entity controller or a dedicated descriptor class to signal MCP availability. The attribute can override defaults (tool prefix, description templates, security scopes).
+- **Configuration Fallback**: `appsettings` can enable MCP globally or per entity using `Koan:Mcp:Entities` with allow/deny lists for environments.
 
-- `"List all <TEntity> items"` → `"List all Todo items"` (TodosController)
-- `"List all <TEntity> items"` → `"List all Project items"` (ProjectsController)
+### Metadata Source
 
-## Implementation Details
+`EntityEndpointService` exposes descriptors describing available operations (collection query, get, create/update, delete, bulk, patch) along with arguments, validation rules, and hook metadata. `Koan.Mcp` consumes these descriptors to:
 
-### Module Structure
+- Build JSON Schema for tool parameters (filters, body payloads, identifiers).
+- Inject templated descriptions using entity names and custom annotations (`McpDescriptionAttribute` optional for overrides).
+- Surface capability flags (read/write/remove) so clients understand which tools exist.
+
+### Execution Flow
+
+1. MCP request arrives (`tools/call`, `resources/read`, etc.).
+2. Transport resolves the matching tool and creates an `EntityEndpointInvocation` with:
+   - `EntityRequestContext` seeded from MCP session (user claims, dataset selection, pagination hints).
+   - Arguments converted into the expected request contract (e.g., `EntityCollectionRequest`).
+3. Service executes the operation; hooks fire as usual.
+4. Result metadata (warnings, pagination) is included in the MCP response's `content` and optional `diagnostics` extension.
+
+### Module Structure (Revised)
 
 ```
 src/Koan.Mcp/
 ├── Abstractions/
-│   ├── IMcpServer.cs                 # Server interface
-│   └── McpToolDefinition.cs          # Tool metadata
+│   ├── IMcpServer.cs
+│   ├── McpToolDefinition.cs
+│   └── McpInvocationContext.cs
 ├── Attributes/
-│   └── McpControllerAttribute.cs     # Opt-in controller decoration
-├── Infrastructure/
-│   ├── McpServer.cs                  # Core MCP server implementation
-│   ├── StdioTransport.cs             # STDIO transport for local use
-│   └── HttpSseTransport.cs           # HTTP+SSE transport for remote
+│   ├── McpEntityAttribute.cs
+│   └── McpDescriptionAttribute.cs
 ├── Discovery/
-│   ├── McpControllerDiscovery.cs     # Leverages AssemblyCache for discovery
-│   ├── McpToolGenerator.cs           # Generate MCP tools from controllers
-│   └── TemplateProcessor.cs          # Process comment templates
+│   ├── McpEntityRegistry.cs        # Scans descriptors via AssemblyCache
+│   └── DescriptorMapper.cs         # Maps EntityEndpoint descriptors to MCP tools
 ├── Execution/
-│   ├── ToolExecutor.cs               # Execute controller methods as tools
-│   └── ParameterConverter.cs         # Convert JSON args to method params
-├── Initialization/
-│   └── KoanAutoRegistrar.cs          # Follows existing auto-registration patterns
-└── Options/
-    └── McpServerOptions.cs           # Server configuration
+│   ├── EndpointToolExecutor.cs     # Calls IEntityEndpointService
+│   └── SchemaBuilder.cs            # Generates JSON Schema from descriptors
+├── Hosting/
+│   ├── McpServer.cs
+│   ├── StdioTransport.cs
+│   ├── HttpSseTransport.cs
+│   └── WebSocketTransport.cs
+├── Options/
+│   └── McpServerOptions.cs
+└── Initialization/
+    └── KoanAutoRegistrar.cs
 ```
 
-**Key Simplifications:**
-- **Leverages AssemblyCache**: Uses existing `AssemblyCache.Instance` instead of custom assembly scanning
-- **Follows Established Patterns**: Discovery and registration follow patterns from `KoanBackgroundServiceAutoRegistrar`
-- **Reuses Safe Type Loading**: Uses proven `GetTypesFromAssembly` error handling pattern
-- **Minimal Reflection Code**: Most reflection infrastructure already exists in Koan.Core
+### Tool Generation
 
-### Key Components
-
-#### 1. Controller Discovery (Leveraging Existing Infrastructure)
+Instead of reflecting the MVC action methods, `DescriptorMapper` reads the shared descriptor model:
 
 ```csharp
-public class McpControllerDiscovery
+public McpToolDefinition Map(EntityEndpointDescriptor descriptor)
 {
-    public IEnumerable<Type> DiscoverMcpControllers()
+    var schema = _schemaBuilder.Build(descriptor.Parameters);
+    return new McpToolDefinition
     {
-        // Use existing AssemblyCache instead of AppDomain.GetAssemblies()
-        return AssemblyCache.Instance.GetAllAssemblies()
-            .SelectMany(a => GetTypesFromAssembly(a))
-            .Where(t => t.HasAttribute<McpControllerAttribute>())
-            .Where(t => IsEntityController(t));
-    }
-
-    private bool IsEntityController(Type type)
-    {
-        return type.BaseType?.IsGenericType == true &&
-               type.BaseType.GetGenericTypeDefinition() == typeof(EntityController<,>);
-    }
-
-    // Reuse existing pattern from KoanBackgroundServiceAutoRegistrar
-    private static Type[] GetTypesFromAssembly(Assembly assembly)
-    {
-        try
-        {
-            return assembly.GetTypes();
-        }
-        catch (ReflectionTypeLoadException ex)
-        {
-            // Handle partial load - return types that loaded successfully
-            return ex.Types.Where(t => t != null).Cast<Type>().ToArray();
-        }
-        catch
-        {
-            return Array.Empty<Type>();
-        }
-    }
-}
-```
-
-#### 2. Tool Generation
-
-```csharp
-public class McpToolGenerator
-{
-    public IEnumerable<McpToolDefinition> GenerateFromController(Type controllerType)
-    {
-        var entityType = GetEntityType(controllerType);
-        var prefix = entityType.Name.ToLowerInvariant() + "_";
-
-        // Generate tools from EntityController<T> methods
-        foreach (var method in GetControllerMethods(controllerType))
-        {
-            var comment = method.GetCustomAttribute<CommentAttribute>()?.Value ?? "";
-            var description = _templateProcessor.Process(comment, entityType);
-
-            yield return new McpToolDefinition
-            {
-                Name = prefix + GetActionName(method),
-                Description = description,
-                Schema = _schemaGenerator.Generate(method, entityType)
-            };
-        }
-    }
-}
-```
-
-#### 3. Template Processing
-
-```csharp
-public class TemplateProcessor
-{
-    private readonly Dictionary<string, Func<Type, string>> _replacements = new()
-    {
-        ["<TEntity>"] = type => type.Name,
-        ["<TEntities>"] = type => Pluralize(type.Name),
-        ["<entity>"] = type => type.Name.ToLowerInvariant(),
-        ["<entities>"] = type => Pluralize(type.Name).ToLowerInvariant(),
+        Name = descriptor.ToolName,
+        Description = descriptor.GetDescription(),
+        InputSchema = schema,
+        RequiredScopes = descriptor.RequiredScopes,
+        SupportsStreaming = descriptor.SupportsStreaming,
     };
-
-    public string Process(string template, Type entityType)
-    {
-        var result = template;
-        foreach (var (placeholder, resolver) in _replacements)
-        {
-            result = result.Replace(placeholder, resolver(entityType));
-        }
-        return result;
-    }
 }
 ```
 
-#### 4. Auto-Registration (Following Existing Patterns)
+`EntityEndpointDescriptor` comes from the service layer and already knows which hooks run, whether pagination applies, and what inputs it accepts.
 
-```csharp
-public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
-{
-    public string ModuleName => "Koan.Mcp";
-    public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
+### Transport Strategy
 
-    public void Initialize(IServiceCollection services)
-    {
-        // Configure MCP options with defaults
-        services.Configure<McpServerOptions>(options =>
-        {
-            options.Enabled = true;
-            options.Transport = "STDIO";
-            options.Port = 8080;
-        });
+- **STDIO**: Default for local DevHost or CLI experiences; gated behind configuration in production.
+- **HTTP+SSE**: Enables remote MCP clients via long-lived SSE sessions.
+- **WebSocket**: Optional advanced transport for bidirectional streaming once available.
 
-        // Discover MCP controllers using existing infrastructure
-        var discoveredControllers = DiscoverMcpControllers();
+Each transport shares the same registry and executor, differing only in framing and session lifecycle.
 
-        if (!discoveredControllers.Any())
-        {
-            // No MCP controllers found - skip registration
-            return;
-        }
+### Security Model
 
-        // Register core MCP services
-        services.AddSingleton<IMcpServer, McpServer>();
-        services.AddSingleton<McpControllerDiscovery>();
-        services.AddSingleton<McpToolGenerator>();
-        services.AddSingleton<TemplateProcessor>();
-        services.AddSingleton<ToolExecutor>();
+- Inherits Koan authentication/authorization via `EntityRequestContext` (when the MCP client authenticates, the resulting principal flows into the hook pipeline).
+- MCP-specific scopes can be declared via `[McpEntity(RequiredScopes = ...)]` or configuration.
+- Supports rate limiting and audit logging using existing Koan middleware (transport hosts expose events to the logging pipeline).
 
-        // Register transport layers
-        services.AddSingleton<StdioTransport>();
-        services.AddSingleton<HttpSseTransport>();
+---
 
-        // Register as hosted service
-        services.AddHostedService<McpServerHostedService>();
-    }
+## Prerequisite Alignment
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-    {
-        report.AddModule(ModuleName, ModuleVersion);
+`Koan.Mcp` depends on the successful delivery of the `EntityEndpointService` extraction. Key touchpoints:
 
-        var enabled = cfg.Read("Koan:Mcp:Enabled", true);
-        var transport = cfg.Read("Koan:Mcp:Transport", "STDIO");
+- **Descriptor Access**: MCP must obtain operation metadata from the shared service (`IEntityEndpointDescriptorProvider`).
+- **Context Construction**: MCP transports build `EntityRequestContext` instances without `HttpContext`, leveraging the protocol-agnostic design.
+- **Hook Compatibility**: The hook pipeline must tolerate non-HTTP contexts while still exposing `HttpContext` when available.
 
-        var controllerCount = DiscoverMcpControllers().Count();
+If the extraction timeline slips, MCP implementation should pause after scaffolding the registry and transport shells until the shared service is ready.
 
-        report.AddSetting("MCP Enabled", enabled.ToString());
-        report.AddSetting("MCP Transport", transport);
-        report.AddSetting("MCP Controllers Discovered", controllerCount.ToString());
-    }
+---
 
-    // Follow existing discovery pattern from other auto-registrars
-    private IEnumerable<McpControllerInfo> DiscoverMcpControllers()
-    {
-        return AssemblyCache.Instance.GetAllAssemblies()
-            .SelectMany(a => GetTypesFromAssembly(a))
-            .Where(t => !t.IsAbstract && t.HasAttribute<McpControllerAttribute>())
-            .Where(t => IsEntityController(t))
-            .Select(t => new McpControllerInfo
-            {
-                ControllerType = t,
-                EntityType = GetEntityType(t),
-                Attribute = t.GetCustomAttribute<McpControllerAttribute>()
-            });
-    }
+## Migration Plan
 
-    // Reuse established safe type loading pattern
-    private static Type[] GetTypesFromAssembly(Assembly assembly)
-    {
-        try
-        {
-            return assembly.GetTypes();
-        }
-        catch (ReflectionTypeLoadException ex)
-        {
-            return ex.Types.Where(t => t != null).Cast<Type>().ToArray();
-        }
-        catch
-        {
-            return Array.Empty<Type>();
-        }
-    }
-}
-```
+### Phase 0: Foundation (Blocked by Prerequisite)
+- [ ] Ship `EntityEndpointService` and descriptor APIs (`documentation/proposals/entity-endpoint-service-extraction.md`).
+- [ ] Update documentation to guide hook authors on protocol-neutral practices.
 
-## Usage Examples
+### Phase 1: MCP Core
+- [ ] Implement descriptor registry and mapping (`McpEntityRegistry`, `DescriptorMapper`).
+- [ ] Build transport-agnostic executor that calls `IEntityEndpointService`.
+- [ ] Provide STDIO transport and minimal configuration surface.
+- [ ] Deliver initial unit tests covering descriptor mapping and execution flow.
 
-### Basic Todo API to MCP Server
+### Phase 2: Metadata & Tooling
+- [ ] Add schema generation, description templating, and overrides (`McpDescriptionAttribute`).
+- [ ] Implement HTTP+SSE transport with authentication.
+- [ ] Produce example project and walkthrough documentation.
 
-```bash
-# 1. Create project and add Koan packages
-dotnet new web -n TodoMcpApi && cd TodoMcpApi
-dotnet add package Koan.Core
-dotnet add package Koan.Web
-dotnet add package Koan.Data.Sqlite
-dotnet add package Koan.Mcp    # <-- Enables MCP automatically
+### Phase 3: Advanced Integrations
+- [ ] Streaming support and WebSocket transport.
+- [ ] Flow/event integration for notification-style MCP resources.
+- [ ] Diagnostics, observability hooks, and admin tooling.
 
-# 2. Define entity
-# Models/Todo.cs
-public class Todo : Entity<Todo>
-{
-    public string Title { get; set; } = "";
-    public bool IsCompleted { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-}
-
-# 3. Add controller
-# Controllers/TodosController.cs
-[ApiController]
-[Route("api/[controller]")]
-[McpController]  // <-- Only addition needed
-public class TodosController : EntityController<Todo> { }
-
-# 4. Run and MCP server is automatically available
-dotnet run
-```
-
-**Generated MCP Tools:**
-- `todo_list` - "List all Todo items with optional filtering and pagination"
-- `todo_get` - "Retrieve a specific Todo by its unique identifier"
-- `todo_create` - "Create a new Todo or update an existing one"
-- `todo_delete` - "Delete a Todo by its identifier"
-
-### Advanced Business Logic Integration
-
-```csharp
-[McpController]
-public class ProjectsController : EntityController<Project>
-{
-    [Comment("Analyze <TEntity> risk factors using AI and historical data")]
-    [HttpPost("{id}/analyze-risks")]
-    public async Task<IActionResult> AnalyzeRisks(string id)
-    {
-        var project = await Project.Get(id);
-        if (project == null) return NotFound();
-
-        var risks = await _aiService.AnalyzeProjectRisks(project);
-        return Ok(risks);
-    }
-
-    [Comment("Generate progress report for <TEntity> with team productivity metrics")]
-    [HttpPost("{id}/progress-report")]
-    public async Task<IActionResult> GenerateProgressReport(string id)
-    {
-        var project = await Project.Get(id);
-        var metrics = await _analyticsService.GetProjectMetrics(project);
-        var report = await _reportGenerator.CreateProgressReport(project, metrics);
-        return Ok(report);
-    }
-}
-```
-
-**Generated Additional Tools:**
-- `project_analyze_risks` - "Analyze Project risk factors using AI and historical data"
-- `project_generate_progress_report` - "Generate progress report for Project with team productivity metrics"
-
-### Configuration Options
-
-```json
-// appsettings.json
-{
-  "Koan": {
-    "Mcp": {
-      "Enabled": true,
-      "Transport": "STDIO",           // STDIO, HTTP+SSE, WebSocket
-      "Port": 8080,
-      "EnabledControllers": ["TodosController", "ProjectsController"],
-      "ToolPrefix": {
-        "UseEntityName": true,
-        "Format": "snake_case"        // snake_case, camelCase, PascalCase
-      },
-      "Authentication": {
-        "Type": "OAuth2.1",
-        "Scopes": ["api:read", "api:write"]
-      }
-    }
-  }
-}
-```
-
-## Generated MCP Tool Examples
-
-### Tool Discovery Response
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "tools": [
-      {
-        "name": "todo_list",
-        "description": "List all Todo items with optional filtering and pagination",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "completed": {"type": "boolean", "description": "Filter by completion status"},
-            "page": {"type": "integer", "description": "Page number for pagination"},
-            "size": {"type": "integer", "description": "Items per page"}
-          }
-        }
-      },
-      {
-        "name": "todo_create",
-        "description": "Create a new Todo or update an existing one",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "title": {"type": "string", "description": "Todo title"},
-            "isCompleted": {"type": "boolean", "description": "Completion status"}
-          },
-          "required": ["title"]
-        }
-      },
-      {
-        "name": "project_analyze_risks",
-        "description": "Analyze Project risk factors using AI and historical data",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "id": {"type": "string", "description": "Project identifier"}
-          },
-          "required": ["id"]
-        }
-      }
-    ]
-  }
-}
-```
-
-### Tool Execution Example
-
-```json
-// LLM Request
-{
-  "jsonrpc": "2.0",
-  "id": "req-001",
-  "method": "tools/call",
-  "params": {
-    "name": "todo_create",
-    "arguments": {
-      "title": "Implement MCP integration",
-      "isCompleted": false
-    }
-  }
-}
-
-// MCP Server Response
-{
-  "jsonrpc": "2.0",
-  "id": "req-001",
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "Todo created successfully with ID: 01913b8c-8b2a-7000-8000-000000000000"
-      }
-    ],
-    "isError": false
-  }
-}
-```
+---
 
 ## Benefits
 
-### 1. Developer Experience
-- **Zero Configuration**: Add package reference, get MCP functionality
-- **Familiar Patterns**: Uses standard .NET attributes and conventions
-- **Progressive Enhancement**: Start simple, add complexity as needed
-- **IntelliSense Support**: Full type safety and code completion
+- **Consistency**: MCP, REST, and GraphQL align on behaviour, reducing bug surface and maintenance.
+- **Developer Velocity**: Opt-in attribute + package reference exposes entities to LLM agents without bespoke code.
+- **AI Readiness**: Rich schemas and metadata increase success rates for agent tools and automated workflows.
+- **Extensibility**: Descriptor-based design allows third parties to supply custom tool generators or transports.
 
-### 2. Architecture Quality (DRY/KISS Principles)
-- **Clean Separation**: EntityController remains MCP-agnostic
-- **Reuses Existing Infrastructure**: Leverages `AssemblyCache`, established discovery patterns
-- **No Code Duplication**: Follows proven reflection patterns from other auto-registrars
-- **Minimal Complexity**: Simple template processing with established error handling
-- **Framework Consistency**: Uses same patterns as background services, Flow, etc.
-
-### 3. Enterprise Ready
-- **Multi-Provider Support**: Works with any Koan data provider
-- **Authentication Integration**: Leverages Koan's auth system
-- **Monitoring & Observability**: Integrates with Koan's diagnostics
-- **Container Native**: Works with Koan's orchestration tools
-
-### 4. AI-First Design
-- **Rich Tool Descriptions**: LLMs can understand and use tools effectively
-- **Parameter Validation**: Automatic validation with meaningful error messages
-- **Tool Discovery**: Dynamic tool listing with comprehensive metadata
-- **Error Handling**: Graceful failures with actionable error messages
-
-### 5. Implementation Efficiency (Leveraging Koan.Core)
-- **Proven Reflection Infrastructure**: Uses `AssemblyCache.Instance` for assembly access
-- **Established Error Handling**: Reuses `ReflectionTypeLoadException` patterns
-- **Consistent Discovery**: Follows same attribute-based discovery as other modules
-- **Reduced Testing Surface**: Core reflection logic already tested in Koan.Core
-
-## Migration Path
-
-### Phase 1: Core Implementation
-- [ ] Implement `Koan.Mcp` module structure
-- [ ] Add `CommentAttribute` to EntityController base methods
-- [ ] Create tool discovery and generation services
-- [ ] Implement STDIO transport for local development
-
-### Phase 2: Enhanced Features
-- [ ] Add HTTP+SSE transport for remote connections
-- [ ] Implement authentication and authorization
-- [ ] Add configuration options and environment detection
-- [ ] Create comprehensive documentation and examples
-
-### Phase 3: Advanced Integration
-- [ ] Integrate with Koan AI services for enhanced tool capabilities
-- [ ] Add Flow integration for event-driven MCP operations
-- [ ] Implement resource providers for data access patterns
-- [ ] Add monitoring and diagnostics for MCP operations
+---
 
 ## Considerations
 
-### Security
-- OAuth 2.1 integration for remote connections
-- Scope-based access control for tool execution
-- Rate limiting and usage quotas
-- Audit logging for tool executions
+- **Auth Surface**: Transport-level authentication must integrate with Koan identity providers; out-of-process clients require secure token exchange.
+- **Transport Selection**: STDIO is unsuitable for many production deployments; configuration must default to safe choices.
+- **Adoption Curve**: MCP ecosystem is emerging; prioritise documentation and samples to validate usefulness.
+- **Testing**: End-to-end tests should run MCP calls against sample entities, comparing results to REST responses to guarantee parity.
 
-### Performance
-- Tool discovery caching to avoid reflection overhead
-- Async execution patterns for all tool operations
-- Connection pooling for HTTP transport
-- Efficient JSON serialization/deserialization
-
-### Compatibility
-- .NET 9+ required for advanced features
-- Backward compatibility with existing EntityController implementations
-- Support for custom validation attributes
-- Integration with existing Koan middleware pipeline
+---
 
 ## Conclusion
 
-This proposal provides a comprehensive solution for integrating Koan APIs with the Model Context Protocol while maintaining clean architecture and excellent developer experience. The comment-attribute approach elegantly solves separation of concerns while providing rich tool descriptions through a simple template system.
+By anchoring MCP integration on the shared `EntityEndpointService`, Koan can offer a first-class AI protocol adapter without duplicating controller logic or compromising maintainability. The prerequisite extraction lays the groundwork for reliable cross-protocol behaviour; `Koan.Mcp` adds discovery, metadata, and transport hosting so LLM-driven tooling becomes a natural extension of existing applications.
 
-The implementation follows **DRY and KISS principles** by leveraging Koan.Core's existing infrastructure:
-- **AssemblyCache**: Eliminates duplicate assembly scanning code
-- **Established Discovery Patterns**: Reuses proven type discovery from other auto-registrars
-- **Safe Error Handling**: Leverages existing `ReflectionTypeLoadException` handling
-- **Consistent Registration**: Follows same patterns as background services and other modules
-
-The implementation follows Koan's core principles:
-- **Reference = Intent**: Adding Koan.Mcp enables MCP functionality
-- **Entity-First Development**: Leverages existing Entity<T> patterns
-- **Multi-Provider Transparency**: Works across all Koan data providers
-- **Zero Configuration**: Minimal code changes required
-- **Framework Consistency**: Uses established infrastructure rather than reinventing
-
-This positions Koan as a leader in AI-first API development, making it trivial for developers to expose their business logic to Large Language Models while maintaining production-ready architecture, security, and minimal implementation complexity through intelligent reuse of existing framework capabilities.
+Once the extraction milestone is complete, this proposal delivers the missing protocol surface called out in ADR `documentation/decisions/AI-0005-protocol-surfaces.md`, positioning Koan as the .NET framework that treats AI agents as first-class consumers alongside REST and GraphQL.
