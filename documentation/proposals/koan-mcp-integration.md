@@ -1,207 +1,169 @@
 # Koan MCP Integration Proposal
 
-**Status:** Draft
+**Status:** Draft (Prerequisite Delivered)
 **Author:** Koan Framework Team
 **Date:** February 2025
-**Version:** 1.1
+**Version:** 1.2
 
 ## Abstract
 
-This proposal describes `Koan.Mcp`, an optional module that turns Koan entity endpoints into Model Context Protocol (MCP) tools once the HTTP-bound orchestration logic has been extracted into the shared `EntityEndpointService` layer (see `documentation/proposals/entity-endpoint-service-extraction.md`). By consuming the new service abstractions instead of instantiating MVC controllers directly, MCP gains parity with REST and GraphQL surfaces while preserving Koan's "Reference = Intent" philosophy: reference the package, opt-in the entity, and LLM agents can safely call it.
+`Koan.Mcp` is an optional module that exposes Koan entity endpoints to Large Language Models via the Model Context Protocol (MCP). With the Entity Endpoint Service extraction delivered in Koan v0.2.18, the framework now offers a protocol-neutral execution surface; MCP can reuse that surface to provide behaviour parity with REST and GraphQL while remaining configuration-light. This document redefines the proposal around the new baseline, outlines the transport architecture, and documents the work required to ship an initial release.
 
-**Key Design Principles:**
-- **Protocol Reuse**: Build on `EntityEndpointService` so REST, GraphQL, and MCP share the same behaviour and hook pipeline.
-- **Attribute-Guided Opt-In**: Lightweight attributes advertise MCP intent without coupling controller logic to MCP.
-- **Zero Configuration**: Package reference + attribute enables MCP, sensible defaults work out of the box.
-- **Extendable Metadata**: Tool descriptions and schemas derive from endpoint descriptors, with room for custom overrides.
+## Motivation
 
-**Prerequisite:** Complete the Entity Endpoint Service extraction outlined in `documentation/proposals/entity-endpoint-service-extraction.md`.
+- **LLM-ready interactions**: Koan customers increasingly want agents (Claude Desktop, Cursor, VS Code agents) to call runtime endpoints using the MCP standard.
+- **Avoid re-implementing controllers**: Prior integrations cloned controller logic, leading to drift. `IEntityEndpointService` lets MCP map calls to shared orchestration instead.
+- **Reference = Intent**: Installing `Koan.Mcp` and decorating entities should be enough to expose tools; no bespoke servers or manual JSON-RPC wiring.
+- **Future protocol family**: The descriptor metadata introduced with the extraction enables a unified discovery story for REST, GraphQL, MCP, jobs, and other surfaces.
 
-## Background
+## Prerequisite Status
 
-### What is MCP?
+- Entity Endpoint Service extraction: **Delivered** (Koan v0.2.18) — request/response contracts, context builder, hook pipeline abstraction, descriptor provider.
+- Documentation for non-HTTP reuse: **Delivered** (`documentation/reference/web/entity-endpoint-service.md`).
 
-The Model Context Protocol (MCP) is an open standard introduced by Anthropic that allows Large Language Models to interact with external systems through a consistent JSON-RPC 2.0 interface. Servers expose tools, resources, and prompts; clients discover and invoke them on behalf of an LLM. MCP is rapidly becoming the lingua franca for agent-style integrations.
+## Solution Overview
 
-### Current Gap
+`Koan.Mcp` consists of three pillars: discovery, execution, and transport hosting.
 
-Today, exposing a Koan entity API to LLMs requires a bespoke MCP server that re-implements query parsing, hook execution, validation, and response shaping. This duplicates logic already living in `EntityController<TEntity, TKey>` and breaks the "Reference = Intent" developer promise.
+1. **Discovery**
+   - `McpEntityAttribute` marks entities or descriptor types for exposure.
+   - `McpEntityRegistry` queries `IEntityEndpointDescriptorProvider` to assemble tool metadata: operation kinds, supported shapes, dataset routing, pagination defaults.
+   - Optional configuration (`Koan:Mcp`) provides allow/deny lists, transport settings, and schema overrides.
 
-With the planned extraction of the controller logic into `EntityEndpointService` (`documentation/proposals/entity-endpoint-service-extraction.md`), Koan gains a protocol-neutral execution surface. `Koan.Mcp` will sit on top of that service to provide an AI-oriented protocol adapter.
+2. **Execution**
+   - `EndpointToolExecutor` resolves `IEntityEndpointService<TEntity, TKey>`, maps MCP requests to the appropriate request DTO, and forwards the call.
+   - Responses (success, validation errors, hook short circuits) are normalized into MCP tool responses with structured diagnostics and warnings.
+   - Streaming hooks are future-compatible: the executor captures emitter output for transport layers that support incremental delivery.
 
-### Goals
-
-1. **Rapid Enablement**: Developers opt-in entities for MCP exposure via attributes or configuration; no manual MCP wiring.
-2. **Behaviour Parity**: MCP tools mirror REST semantics—hooks, dataset routing, pagination, validation all reuse the shared service.
-3. **Rich Metadata**: MCP tool definitions include meaningful summaries, schemas, and examples to improve LLM success.
-4. **Secure by Default**: Respect existing Koan auth policies and scopes; expose configuration for MCP-specific guards.
-5. **Composable Transports**: Support STDIO for local DevHost workflows and HTTP(S)/WebSocket for remote scenarios.
-
----
-
-## Proposed Solution
-
-### Architectural Overview
-
-Once `EntityEndpointService` is available, `Koan.Mcp` introduces an MCP adapter that:
-
-1. **Discovers Eligible Endpoints**: Uses Koan's assembly cache and the existing auto-registration pattern to locate `IEntityEndpointDescriptor` instances. Only descriptors tagged with `[McpEntity]` (new attribute) or enabled via configuration are exposed.
-2. **Generates Tool Definitions**: Converts descriptors (operations, shapes, filters, mutation capabilities) into MCP `Tool` definitions, including JSON Schemas sourced from `EntityEndpointService` metadata and optional overrides.
-3. **Executes via Service Layer**: Dispatches MCP tool calls through `IEntityEndpointService<TEntity, TKey>` rather than invoking controllers, ensuring consistent hook execution and dataset handling without requiring `HttpContext`.
-4. **Formats Responses**: Transforms `EntityEndpointResult` payloads and metadata into MCP responses (`content`, `isError`, warnings). HTTP-centric headers become structured diagnostics accessible to clients.
-5. **Hosts MCP Server**: Provides pluggable transports (STDIO, HTTP+SSE, WebSocket) through a hosted service that can run alongside existing REST endpoints.
+3. **Transport Hosting**
+   - `StdioTransport` supplies the default local experience (DevHost, dotnet run, CLI shells).
+   - `HttpSseTransport` offers a lightweight remote option for IDEs that connect over HTTP + Server-Sent Events.
+   - `WebSocketTransport` remains optional for long-lived sessions and streaming once protocol support stabilizes.
+   - All transports reuse a shared session manager, capability handshake, and logging hooks.
 
 ```
-┌────────────────────┐       ┌────────────────────────┐       ┌──────────────────────┐
-│ MCP Client (LLM)   │  RPC  │ Koan.Mcp Transport     │  →    │ EntityEndpointService │
-│  • Claude Desktop  │──────▶│  • STDIO / HTTP / WS   │──────▶│  • Shared CRUD logic │
-│  • Agentic Runtime │       │  • Tool Registry       │       │  • Hook Pipeline      │
-└────────────────────┘       └────────────────────────┘       └──────────────────────┘
++----------------+      JSON-RPC 2.0      +----------------------+      +----------------------------+
+| MCP Clients    | <--------------------> | Koan.Mcp Transport   | -->  | IEntityEndpointService(...) |
+| - Claude       |                        | - STDIO / HTTP / WS  |      | - Hook pipeline            |
+| - Agent IDEs   |                        | - Tool Registry      |      | - Dataset routing          |
++----------------+                        +----------------------+      +----------------------------+
 ```
 
-### Opt-In Model
-
-- **`[McpEntity]` Attribute**: Developers decorate an entity controller or a dedicated descriptor class to signal MCP availability. The attribute can override defaults (tool prefix, description templates, security scopes).
-- **Configuration Fallback**: `appsettings` can enable MCP globally or per entity using `Koan:Mcp:Entities` with allow/deny lists for environments.
-
-### Metadata Source
-
-`EntityEndpointService` exposes descriptors describing available operations (collection query, get, create/update, delete, bulk, patch) along with arguments, validation rules, and hook metadata. `Koan.Mcp` consumes these descriptors to:
-
-- Build JSON Schema for tool parameters (filters, body payloads, identifiers).
-- Inject templated descriptions using entity names and custom annotations (`McpDescriptionAttribute` optional for overrides).
-- Surface capability flags (read/write/remove) so clients understand which tools exist.
-
-### Execution Flow
-
-1. MCP request arrives (`tools/call`, `resources/read`, etc.).
-2. Transport resolves the matching tool and creates an `EntityEndpointInvocation` with:
-   - `EntityRequestContext` seeded from MCP session (user claims, dataset selection, pagination hints).
-   - Arguments converted into the expected request contract (e.g., `EntityCollectionRequest`).
-3. Service executes the operation; hooks fire as usual.
-4. Result metadata (warnings, pagination) is included in the MCP response's `content` and optional `diagnostics` extension.
-
-### Module Structure (Revised)
+## Module Layout (proposed)
 
 ```
 src/Koan.Mcp/
-├── Abstractions/
-│   ├── IMcpServer.cs
-│   ├── McpToolDefinition.cs
-│   └── McpInvocationContext.cs
-├── Attributes/
-│   ├── McpEntityAttribute.cs
-│   └── McpDescriptionAttribute.cs
-├── Discovery/
-│   ├── McpEntityRegistry.cs        # Scans descriptors via AssemblyCache
-│   └── DescriptorMapper.cs         # Maps EntityEndpoint descriptors to MCP tools
-├── Execution/
-│   ├── EndpointToolExecutor.cs     # Calls IEntityEndpointService
-│   └── SchemaBuilder.cs            # Generates JSON Schema from descriptors
-├── Hosting/
-│   ├── McpServer.cs
-│   ├── StdioTransport.cs
-│   ├── HttpSseTransport.cs
-│   └── WebSocketTransport.cs
-├── Options/
-│   └── McpServerOptions.cs
-└── Initialization/
-    └── KoanAutoRegistrar.cs
+  McpEntityAttribute.cs
+  McpEntityRegistry.cs
+  DescriptorMapper.cs
+  Schema/
+    SchemaBuilder.cs
+    SchemaExtensions.cs
+  Execution/
+    EndpointToolExecutor.cs
+    RequestTranslator.cs
+    ResponseTranslator.cs
+  Hosting/
+    McpServer.cs
+    StdioTransport.cs
+    HttpSseTransport.cs
+    WebSocketTransport.cs
+  Options/
+    McpServerOptions.cs
+    TransportOptions.cs
+  Initialization/
+    KoanMcpAutoRegistrar.cs
 ```
 
-### Tool Generation
+## Tool Definition Strategy
 
-Instead of reflecting the MVC action methods, `DescriptorMapper` reads the shared descriptor model:
+- `DescriptorMapper` converts `EntityEndpointDescriptor` data into MCP tool definitions.
+- JSON Schema payloads originate from entity metadata, augmented by optional `McpDescriptionAttribute` hints for human-readable descriptions.
+- Operations map as follows:
+  - `Collection` / `Query` -> list tools (with filter, paging parameters).
+  - `GetById` / `GetNew` -> read tools.
+  - `Upsert`, `UpsertMany`, `Patch` -> mutation tools with request body schema.
+  - `Delete*` operations -> destructive tools surfaced only when `AllowMutations` is true.
+- Schema builder respects allowed shapes, relationship toggles, and dataset routing flags to guide LLM request construction.
 
-```csharp
-public McpToolDefinition Map(EntityEndpointDescriptor descriptor)
-{
-    var schema = _schemaBuilder.Build(descriptor.Parameters);
-    return new McpToolDefinition
-    {
-        Name = descriptor.ToolName,
-        Description = descriptor.GetDescription(),
-        InputSchema = schema,
-        RequiredScopes = descriptor.RequiredScopes,
-        SupportsStreaming = descriptor.SupportsStreaming,
-    };
-}
-```
+## Transport Behaviour
 
-`EntityEndpointDescriptor` comes from the service layer and already knows which hooks run, whether pagination applies, and what inputs it accepts.
+### STDIO (default)
+- Runs as a hosted service alongside the application (enabled via configuration or `[McpEntity(EnableStdio = true)]`).
+- Streams JSON-RPC messages via standard input/output for local agents.
+- Intended for development scenarios; can be disabled in production by configuration.
 
-### Transport Strategy
+### HTTP + SSE
+- Exposes `/mcp/sse` endpoint guarded by Koan authentication middleware.
+- Keeps a long-lived SSE channel to deliver responses and streaming updates.
+- Ideal for remote IDEs or managed MCP clients that cannot spawn STDIO child processes.
 
-- **STDIO**: Default for local DevHost or CLI experiences; gated behind configuration in production.
-- **HTTP+SSE**: Enables remote MCP clients via long-lived SSE sessions.
-- **WebSocket**: Optional advanced transport for bidirectional streaming once available.
+### WebSocket (optional)
+- Provides bidirectional messaging for future streaming scenarios (chunked results, patch previews).
+- Requires explicit opt-in and TLS when exposed beyond localhost.
 
-Each transport shares the same registry and executor, differing only in framing and session lifecycle.
+## Security & Governance
 
-### Security Model
-
-- Inherits Koan authentication/authorization via `EntityRequestContext` (when the MCP client authenticates, the resulting principal flows into the hook pipeline).
-- MCP-specific scopes can be declared via `[McpEntity(RequiredScopes = ...)]` or configuration.
-- Supports rate limiting and audit logging using existing Koan middleware (transport hosts expose events to the logging pipeline).
-
----
-
-## Prerequisite Alignment
-
-`Koan.Mcp` depends on the successful delivery of the `EntityEndpointService` extraction. Key touchpoints:
-
-- **Descriptor Access**: MCP must obtain operation metadata from the shared service (`IEntityEndpointDescriptorProvider`).
-- **Context Construction**: MCP transports build `EntityRequestContext` instances without `HttpContext`, leveraging the protocol-agnostic design.
-- **Hook Compatibility**: The hook pipeline must tolerate non-HTTP contexts while still exposing `HttpContext` when available.
-
-If the extraction timeline slips, MCP implementation should pause after scaffolding the registry and transport shells until the shared service is ready.
-
----
+- Authentication piggybacks on existing Koan identity providers; transports construct `EntityRequestContext` with the authenticated principal.
+- Authorization scopes can be declared via `[McpEntity(RequiredScopes = ...)]` and enforced before the executor runs.
+- Rate limiting hooks into Koan middleware; transports publish diagnostic events compatible with Koan observability (Serilog, OpenTelemetry).
+- Audit logging: each tool invocation records entity type, operation, dataset, and caller identity.
 
 ## Migration Plan
 
-### Phase 0: Foundation (Blocked by Prerequisite)
-- [ ] Ship `EntityEndpointService` and descriptor APIs (`documentation/proposals/entity-endpoint-service-extraction.md`).
-- [ ] Update documentation to guide hook authors on protocol-neutral practices.
+| Phase | Scope | Status |
+| --- | --- | --- |
+| 0. Foundation | Entity Endpoint Service extraction; documentation for non-HTTP contexts. | ✅ Koan v0.2.18 |
+| 1. Core Runtime | Attribute, registry, descriptor mapper, executor, STDIO transport, minimal configuration, unit tests. | ⬜ Pending |
+| 2. Metadata & Remote Access | Schema builder enhancements, HTTP+SSE transport, sample project, docs. | ⬜ Pending |
+| 3. Advanced Capabilities | Streaming/WebSocket support, flow/event surfaces, diagnostics dashboard, deployment guidance. | ⬜ Pending |
 
-### Phase 1: MCP Core
-- [ ] Implement descriptor registry and mapping (`McpEntityRegistry`, `DescriptorMapper`).
-- [ ] Build transport-agnostic executor that calls `IEntityEndpointService`.
-- [ ] Provide STDIO transport and minimal configuration surface.
-- [ ] Deliver initial unit tests covering descriptor mapping and execution flow.
+### Detailed Tasks (Phase 1)
 
-### Phase 2: Metadata & Tooling
-- [ ] Add schema generation, description templating, and overrides (`McpDescriptionAttribute`).
-- [ ] Implement HTTP+SSE transport with authentication.
-- [ ] Produce example project and walkthrough documentation.
+- [ ] Implement `McpEntityAttribute` with overrides (custom name, description, required scopes, disable mutations).
+- [ ] Build `McpEntityRegistry` that caches descriptors and watches for configuration changes.
+- [ ] Implement `DescriptorMapper` + `SchemaBuilder` (initial schema support: IDs, paging, filtering, body payloads).
+- [ ] Create `EndpointToolExecutor` covering all CRUD verbs; include parity tests comparing REST vs MCP results.
+- [ ] Deliver `StdioTransport` with JSON-RPC plumbing, heartbeats, and graceful shutdown.
+- [ ] Add unit tests and integration harness exercising a sample entity end-to-end.
 
-### Phase 3: Advanced Integrations
-- [ ] Streaming support and WebSocket transport.
-- [ ] Flow/event integration for notification-style MCP resources.
-- [ ] Diagnostics, observability hooks, and admin tooling.
+### Phase 2 Highlights
+
+- [ ] Enrich schema descriptions with hook-provided summaries and examples.
+- [ ] Add `HttpSseTransport` secured by bearer tokens and Koan middleware.
+- [ ] Produce documentation: quickstart, sample configuration, CLI walkthrough.
+- [ ] Deliver sample MCP client scripts for validation.
+
+### Phase 3 Highlights
+
+- [ ] Implement optional WebSocket transport with streaming emit hook support.
+- [ ] Integrate Koan Flow events for notification-style MCP resources.
+- [ ] Provide diagnostics endpoints (current sessions, tool metrics).
+- [ ] Author deployment guide (reverse proxies, TLS, scaling considerations).
+
+## Risks & Mitigations
+
+| Risk | Description | Mitigation |
+| --- | --- | --- |
+| Tool overload | Exposing every operation can overwhelm LLMs. | Allow opt-out per operation, provide curated descriptions/examples. |
+| Schema drift | Entities may add fields without updating descriptors. | Leverage descriptor provider cache invalidation and validation tests. |
+| Security gaps | Misconfigured transports could bypass existing auth flows. | Default to disabled transports; require explicit configuration and Koan auth integration. |
+| Streaming complexity | WebSocket streaming ties into hook emission semantics. | Ship streaming behind feature flag; reuse emitter hooks for consistency. |
+
+## Open Questions
+
+1. Should MCP expose query builder helpers (saved filters) as separate tools?
+2. How do we communicate pagination metadata to LLMs (headers vs response payload)?
+3. Do we need per-tenant throttling when MCP is exposed outside the cluster?
+4. What metrics should the initial release emit for observability parity with REST?
+
+## References
+
+- `documentation/reference/web/entity-endpoint-service.md`
+- `src/Koan.Web/Endpoints/*`
+- Model Context Protocol specification: https://modelcontextprotocol.io
+- ADR `documentation/decisions/AI-0005-protocol-surfaces.md`
 
 ---
 
-## Benefits
-
-- **Consistency**: MCP, REST, and GraphQL align on behaviour, reducing bug surface and maintenance.
-- **Developer Velocity**: Opt-in attribute + package reference exposes entities to LLM agents without bespoke code.
-- **AI Readiness**: Rich schemas and metadata increase success rates for agent tools and automated workflows.
-- **Extensibility**: Descriptor-based design allows third parties to supply custom tool generators or transports.
-
----
-
-## Considerations
-
-- **Auth Surface**: Transport-level authentication must integrate with Koan identity providers; out-of-process clients require secure token exchange.
-- **Transport Selection**: STDIO is unsuitable for many production deployments; configuration must default to safe choices.
-- **Adoption Curve**: MCP ecosystem is emerging; prioritise documentation and samples to validate usefulness.
-- **Testing**: End-to-end tests should run MCP calls against sample entities, comparing results to REST responses to guarantee parity.
-
----
-
-## Conclusion
-
-By anchoring MCP integration on the shared `EntityEndpointService`, Koan can offer a first-class AI protocol adapter without duplicating controller logic or compromising maintainability. The prerequisite extraction lays the groundwork for reliable cross-protocol behaviour; `Koan.Mcp` adds discovery, metadata, and transport hosting so LLM-driven tooling becomes a natural extension of existing applications.
-
-Once the extraction milestone is complete, this proposal delivers the missing protocol surface called out in ADR `documentation/decisions/AI-0005-protocol-surfaces.md`, positioning Koan as the .NET framework that treats AI agents as first-class consumers alongside REST and GraphQL.
+This proposal supersedes earlier drafts and reflects the delivered prerequisite architecture. Feedback on scope, sequencing, and transport assumptions is welcome before Phase 1 execution begins.
