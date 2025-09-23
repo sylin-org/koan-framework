@@ -27,13 +27,13 @@ internal sealed class DefaultAiRouter : IAiRouter
 
     public async Task<Contracts.Models.AiEmbeddingsResponse> EmbedAsync(Contracts.Models.AiEmbeddingsRequest request, CancellationToken ct = default)
     {
-        var rr = Interlocked.Increment(ref _rr);
-        var list = _registry.All;
-        var adapter = list.Skip(rr % Math.Max(1, list.Count)).FirstOrDefault();
+        var adapter = await PickAdapterForEmbeddingsAsync(request, ct);
         if (adapter is null)
             throw new InvalidOperationException("No AI providers available. Add an adapter (e.g., Ollama) or enable Dev auto-discovery.");
-        _logger?.LogDebug("AI Router: Embeddings via adapter {AdapterId} ({AdapterType}), model={Model}", adapter.Id, adapter.Type, request.Model ?? "<default>");
-        return await adapter.EmbedAsync(request, ct).ConfigureAwait(false);
+
+        var response = await adapter.EmbedAsync(request, ct).ConfigureAwait(false);
+
+        return response;
     }
 
     private Contracts.Adapters.IAiAdapter? PickAdapter(Contracts.Models.AiChatRequest request)
@@ -59,5 +59,48 @@ internal sealed class DefaultAiRouter : IAiRouter
         var any = list[(start) % list.Count];
         _logger?.LogDebug("AI Router: Fallback picked adapter {AdapterId}", any.Id);
         return any;
+    }
+
+    private async Task<Contracts.Adapters.IAiAdapter?> PickAdapterForEmbeddingsAsync(Contracts.Models.AiEmbeddingsRequest request, CancellationToken ct)
+    {
+        var list = _registry.All;
+        if (list.Count == 0) return null;
+
+        // If no specific model requested, use round-robin
+        if (string.IsNullOrWhiteSpace(request.Model))
+        {
+            var rr = Interlocked.Increment(ref _rr);
+            var adapter = list.Skip(rr % list.Count).FirstOrDefault();
+            return adapter;
+        }
+
+        // Find adapter that supports the requested model
+        foreach (var adapter in list)
+        {
+            try
+            {
+                var models = await adapter.ListModelsAsync(ct);
+                var hasModel = models.Any(m =>
+                    string.Equals(m.Name, request.Model, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(m.Name.Split(':')[0], request.Model, StringComparison.OrdinalIgnoreCase));
+
+                if (hasModel)
+                {
+                    return adapter;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Error checking models for adapter {AdapterId}: {Error}",
+                    adapter.Id, ex.Message);
+                continue;
+            }
+        }
+
+        // Fallback: return first available adapter
+        var fallbackAdapter = list.FirstOrDefault();
+        _logger?.LogWarning("No adapter found for model '{Model}', using fallback {FallbackId}",
+            request.Model, fallbackAdapter?.Id ?? "<null>");
+        return fallbackAdapter;
     }
 }

@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;
+using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
@@ -13,6 +15,7 @@ namespace S5.Recs.Services;
 internal sealed class RecsService : IRecsService
 {
     private readonly IServiceProvider _sp;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<RecsService>? _logger;
 
     // Demo data for fallback scenarios
@@ -62,9 +65,10 @@ internal sealed class RecsService : IRecsService
         }
     };
 
-    public RecsService(IServiceProvider sp, ILogger<RecsService>? logger = null)
+    public RecsService(IServiceProvider sp, IConfiguration configuration, ILogger<RecsService>? logger = null)
     {
         _sp = sp;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -200,10 +204,14 @@ internal sealed class RecsService : IRecsService
         var ai = Koan.AI.Ai.TryResolve();
         if (ai is null) return Array.Empty<float>();
 
+        var model = GetConfiguredModel();
+
         if (!string.IsNullOrWhiteSpace(text))
         {
-            var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { text! } }, ct);
-            return emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+            var request = new AiEmbeddingsRequest { Input = new() { text! }, Model = model };
+            var emb = await ai.EmbedAsync(request, ct);
+            var vector = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+            return vector;
         }
 
         if (!string.IsNullOrWhiteSpace(anchorMediaId))
@@ -212,8 +220,10 @@ internal sealed class RecsService : IRecsService
             if (anchorMedia != null)
             {
                 var textAnchor = $"{anchorMedia.Title}\n\n{anchorMedia.Synopsis}\nGenres: {string.Join(", ", anchorMedia.Genres ?? Array.Empty<string>())}";
-                var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { textAnchor } }, ct);
-                return emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+                var request = new AiEmbeddingsRequest { Input = new() { textAnchor }, Model = model };
+                var emb = await ai.EmbedAsync(request, ct);
+                var vector = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+                return vector;
             }
         }
 
@@ -222,18 +232,55 @@ internal sealed class RecsService : IRecsService
             var profile = await UserProfileDoc.Get(userId!, ct);
             if (profile?.PrefVector is { Length: > 0 } pv)
             {
-                return pv;
+                // Validate cached vector dimensions match current model expectations
+                // If we're using all-minilm (384 dims) but cached vector is llama2 (4096 dims), invalidate cache
+                const int expectedDimensions = 384; // all-minilm expected dimensions
+                if (pv.Length == expectedDimensions)
+                {
+                    return pv;
+                }
+                else
+                {
+
+                    // Invalidate the cached profile vector by clearing it
+                    profile.PrefVector = null;
+                    await profile.Save();
+
+                    // Continue to regenerate the vector below instead of using cached one
+                }
             }
         }
 
         if (preferTags is { Length: > 0 })
         {
             var tagText = $"Tags: {string.Join(", ", preferTags.Where(t => !string.IsNullOrWhiteSpace(t)))}";
-            var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { tagText } }, ct);
-            return emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+            var request = new AiEmbeddingsRequest { Input = new() { tagText }, Model = model };
+            var emb = await ai.EmbedAsync(request, ct);
+            var vector = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+            return vector;
         }
 
         return Array.Empty<float>();
+    }
+
+    private string GetConfiguredModel()
+    {
+        try
+        {
+            // Use Koan.Core Configuration helpers to read from multiple possible locations
+            var result = Configuration.ReadFirst(_configuration, "all-minilm",
+                "Koan:Services:ollama:DefaultModel",
+                "Koan:Ai:Ollama:DefaultModel",
+                "Koan:Ai:Ollama:RequiredModels:0"  // First element of RequiredModels array
+            );
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error in GetConfiguredModel()");
+            return "all-minilm";
+        }
     }
 
     private async Task<List<Media>> ApplyFilters(IEnumerable<Media> media, string[]? genres, int? episodesMax, string? mediaTypeFilter, string? userId, CancellationToken ct)

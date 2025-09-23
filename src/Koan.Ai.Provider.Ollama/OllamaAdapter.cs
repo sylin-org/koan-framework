@@ -49,6 +49,8 @@ internal sealed class OllamaAdapter : BaseKoanAdapter, IAiAdapter
         var serviceDefault = GetServiceDefaultModel();
 
         _defaultModel = options.DefaultModel ?? serviceDefault ?? "all-minilm";
+        Logger.LogInformation("Ollama adapter '{AdapterId}' model resolution: options.DefaultModel='{OptionsDefault}', serviceDefault='{ServiceDefault}', final='{Final}'",
+            Id, options.DefaultModel, serviceDefault, _defaultModel);
     }
 
     public bool CanServe(AiChatRequest request)
@@ -136,6 +138,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter, IAiAdapter
             // Ollama embeddings API expects 'prompt' as the input field
             var body = new { model, prompt = input };
             var payload = JsonConvert.SerializeObject(body);
+
             using var resp = await _http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode)
             {
@@ -144,12 +147,15 @@ internal sealed class OllamaAdapter : BaseKoanAdapter, IAiAdapter
             }
             resp.EnsureSuccessStatusCode();
             var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
             var doc = JsonConvert.DeserializeObject<OllamaEmbeddingsResponse>(json)
                       ?? throw new InvalidOperationException("Empty response from Ollama.");
-            vectors.Add(doc.embedding ?? Array.Empty<float>());
+
+            var embedding = doc.embedding ?? Array.Empty<float>();
+
+            vectors.Add(embedding);
         }
         var dim = vectors.FirstOrDefault()?.Length ?? 0;
-        Logger.LogDebug("Ollama: embeddings ok model={Model} dim={Dim} count={Count}", model, dim, vectors.Count);
         return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = dim };
     }
 
