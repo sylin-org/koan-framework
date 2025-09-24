@@ -1,0 +1,147 @@
+body {
+    background-color: #f8f9fc;
+}
+
+.navbar-brand {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.badge.status-connected {
+    background-color: #198754;
+}
+
+.badge.status-connecting {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge.status-disconnected {
+    background-color: #dc3545;
+}
+
+.stat-card {
+    background-color: #ffffff;
+    border-radius: 0.6rem;
+    padding: 1.25rem;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    margin-bottom: 1.5rem;
+}
+
+.stat-card h5 {
+    font-size: 1.05rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.65rem;
+    font-weight: 600;
+}
+
+.stat-muted {
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+.schema-json {
+    background-color: #0d1117;
+    color: #d2e2ff;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.85rem;
+    overflow: auto;
+}
+
+.tool-card {
+    border-radius: 0.75rem;
+    border: 1px solid #e1e4f2;
+    background-color: #ffffff;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+    margin-bottom: 1.5rem;
+}
+
+.tool-card .card-header {
+    background-color: transparent;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.tool-card .card-body {
+    padding-top: 0.75rem;
+}
+
+.scope-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    background-color: rgba(13, 110, 253, 0.15);
+    color: #0d6efd;
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.transport-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.5rem;
+    background-color: rgba(25, 135, 84, 0.15);
+    color: #198754;
+    font-size: 0.8rem;
+    margin-right: 0.45rem;
+    margin-bottom: 0.35rem;
+}
+
+.timeline {
+    border-left: 2px solid #dee2e6;
+    padding-left: 1.5rem;
+    margin-left: 0.6rem;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.timeline-item::before {
+    content: "";
+    position: absolute;
+    left: -1.75rem;
+    top: 0.4rem;
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 50%;
+    background-color: #0d6efd;
+}
+
+textarea.form-control {
+    min-height: 220px;
+    font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+pre.result-json {
+    background-color: #1b2433;
+    color: #e9f1ff;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+    overflow: auto;
+}
+
+.badge.bg-secondary {
+    font-size: 0.85rem;
+}
+
+.card-subtitle {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.footer {
+    background-color: #f1f4f9;
+}
