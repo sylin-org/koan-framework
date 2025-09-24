@@ -28,24 +28,23 @@ public sealed class SafetyDigestService : ISafetyDigestService
         var lookback = request.LookbackDays <= 0 ? 14 : request.LookbackDays;
         var since = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-lookback));
 
-        var events = await AdverseEventReport.Query(queryable =>
+        var allEvents = await AdverseEventReport.All(ct).ConfigureAwait(false);
+
+        var query = allEvents.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(request.TrialSiteId))
         {
-            var q = queryable;
-            if (!string.IsNullOrWhiteSpace(request.TrialSiteId))
-            {
-                q = q.Where(e => e.TrialSiteId == request.TrialSiteId);
-            }
+            query = query.Where(e => e.TrialSiteId == request.TrialSiteId);
+        }
 
-            q = q.Where(e => e.OnsetDate >= since);
+        query = query.Where(e => e.OnsetDate >= since);
 
-            if (request.MinimumSeverity.HasValue)
-            {
-                var min = request.MinimumSeverity.Value;
-                q = q.Where(e => e.Severity >= min);
-            }
+        if (request.MinimumSeverity.HasValue)
+        {
+            var min = request.MinimumSeverity.Value;
+            query = query.Where(e => e.Severity >= min);
+        }
 
-            return q.OrderByDescending(e => e.OnsetDate);
-        }, ct).ConfigureAwait(false);
+        var events = query.OrderByDescending(e => e.OnsetDate).ToList();
 
         var max = request.MaxEvents <= 0 ? 25 : Math.Min(request.MaxEvents, 100);
         var eventList = events.Take(max).ToList();

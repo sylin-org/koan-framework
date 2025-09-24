@@ -33,30 +33,28 @@ public sealed class VisitPlanningService : IVisitPlanningService
             ? new HashSet<string>(request.ParticipantIds, StringComparer.OrdinalIgnoreCase)
             : null;
 
-        var visits = await ParticipantVisit.Query(queryable =>
+        var allVisits = await ParticipantVisit.All(ct).ConfigureAwait(false);
+
+        var query = allVisits.AsEnumerable().Where(v => v.TrialSiteId == request.TrialSiteId);
+
+        if (participantFilter is not null)
         {
-            var q = queryable.Where(v => v.TrialSiteId == request.TrialSiteId);
-            if (participantFilter is not null)
-            {
-                q = q.Where(v => participantFilter.Contains(v.ParticipantId));
-            }
+            query = query.Where(v => participantFilter.Contains(v.ParticipantId));
+        }
 
-            if (request.StartWindow.HasValue)
-            {
-                var start = request.StartWindow.Value;
-                q = q.Where(v => v.ScheduledAt >= start);
-            }
+        if (request.StartWindow.HasValue)
+        {
+            var start = request.StartWindow.Value;
+            query = query.Where(v => v.ScheduledAt >= start);
+        }
 
-            if (request.EndWindow.HasValue)
-            {
-                var end = request.EndWindow.Value;
-                q = q.Where(v => v.ScheduledAt <= end);
-            }
+        if (request.EndWindow.HasValue)
+        {
+            var end = request.EndWindow.Value;
+            query = query.Where(v => v.ScheduledAt <= end);
+        }
 
-            return q;
-        }, ct).ConfigureAwait(false);
-
-        var visitList = visits.ToList();
+        var visitList = query.ToList();
         if (visitList.Count == 0)
         {
             return new VisitPlanningResult(Array.Empty<VisitAdjustment>(), true, "No visits found for the supplied criteria.", null, Array.Empty<VisitDiagnostic>());

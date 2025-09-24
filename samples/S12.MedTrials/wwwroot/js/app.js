@@ -3,7 +3,7 @@
 
     var app = angular.module('MedTrialsApp', ['ngRoute']);
 
-    app.config(['$routeProvider', function ($routeProvider) {
+    app.config(['$routeProvider', '$locationProvider', function ($routeProvider, $locationProvider) {
         $routeProvider
             .when('/overview', {
                 templateUrl: 'views/overview.html',
@@ -22,6 +22,9 @@
                 controller: 'DocumentsController'
             })
             .otherwise({ redirectTo: '/overview' });
+
+        // Configure hash prefix for AngularJS 1.6+ compatibility
+        $locationProvider.hashPrefix('');
     }]);
 
     app.run(['$rootScope', '$location', function ($rootScope, $location) {

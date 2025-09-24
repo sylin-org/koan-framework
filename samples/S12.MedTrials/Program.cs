@@ -35,8 +35,6 @@ if (app.Environment.IsDevelopment())
     try { Directory.CreateDirectory(dataPath); } catch { /* best effort */ }
 }
 
-app.UseKoanSwagger();
-
 app.Run();
 
 namespace S12.MedTrials

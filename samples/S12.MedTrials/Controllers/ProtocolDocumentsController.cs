@@ -26,8 +26,8 @@ public sealed class ProtocolDocumentsController : EntityController<ProtocolDocum
         return Ok(result);
     }
 
-    [HttpPost("query")]
-    public async Task<ActionResult<ProtocolDocumentQueryResult>> Query([FromBody] ProtocolDocumentQueryRequest request, CancellationToken ct)
+    [HttpPost("search")]
+    public async Task<ActionResult<ProtocolDocumentQueryResult>> Search([FromBody] ProtocolDocumentQueryRequest request, CancellationToken ct)
     {
         var result = await _documents.QueryAsync(request, ct).ConfigureAwait(false);
         return Ok(result);

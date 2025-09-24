@@ -209,16 +209,16 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
 
         if (matches.Count == 0)
         {
-            var deterministic = await ProtocolDocument.Query(queryable =>
-            {
-                if (!string.IsNullOrWhiteSpace(request.TrialSiteId))
-                {
-                    queryable = queryable.Where(d => d.TrialSiteId == request.TrialSiteId);
-                }
+            var allDocs = await ProtocolDocument.All(ct).ConfigureAwait(false);
+            var query = allDocs.AsEnumerable();
 
-                return queryable.Where(d => d.ExtractedText.Contains(request.Query, StringComparison.OrdinalIgnoreCase)
-                    || d.Title.Contains(request.Query, StringComparison.OrdinalIgnoreCase));
-            }, ct).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(request.TrialSiteId))
+            {
+                query = query.Where(d => d.TrialSiteId == request.TrialSiteId);
+            }
+
+            var deterministic = query.Where(d => d.ExtractedText.Contains(request.Query, StringComparison.OrdinalIgnoreCase)
+                    || d.Title.Contains(request.Query, StringComparison.OrdinalIgnoreCase)).ToList();
 
             foreach (var doc in deterministic)
             {

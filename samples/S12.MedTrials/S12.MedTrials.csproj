@@ -27,6 +27,10 @@
     <ProjectReference Include="..\..\src\Koan.AI.Web\Koan.AI.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Ai.Provider.Ollama\Koan.Ai.Provider.Ollama.csproj" />
     <ProjectReference Include="..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
+    <!-- Auth core and dev TestProvider for Development login/testing -->
+    <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth.TestProvider\Koan.Web.Auth.TestProvider.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth.Services\Koan.Web.Auth.Services.csproj" />
   </ItemGroup>
 
   <ItemGroup>

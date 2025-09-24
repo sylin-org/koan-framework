@@ -29,7 +29,7 @@
                 return unwrap($http.post(baseUrl + '/protocol-documents/ingest', payload));
             },
             queryDocuments: function (payload) {
-                return unwrap($http.post(baseUrl + '/protocol-documents/query', payload));
+                return unwrap($http.post(baseUrl + '/protocol-documents/search', payload));
             }
         };
     }]);

@@ -2,7 +2,13 @@
     <div class="col-lg-4">
         <div class="card shadow-sm">
             <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-route"></i> Visit Planner</h5>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0"><i class="fas fa-route"></i> Visit Planner</h5>
+                    <div>
+                        <span class="badge bg-secondary bg-opacity-25 text-muted small me-1">AI</span>
+                        <span class="badge bg-secondary bg-opacity-25 text-muted small">Custom Service</span>
+                    </div>
+                </div>
                 <div class="mb-3">
                     <label class="form-label">Trial Site</label>
                     <select class="form-select" ng-model="form.trialSiteId" ng-options="(site.id || site.Id) as (site.name || site.Name) for site in sites"></select>
@@ -41,7 +47,11 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="card-title mb-0"><i class="fas fa-users"></i> Upcoming visits</h5>
-                    <span class="text-muted small">{{visits.length}} records</span>
+                    <div>
+                        <span class="badge bg-secondary bg-opacity-25 text-muted small me-1">Entity&lt;T&gt;</span>
+                        <span class="badge bg-secondary bg-opacity-25 text-muted small me-2">REST</span>
+                        <span class="text-muted small">{{visits.length}} records</span>
+                    </div>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
