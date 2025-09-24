@@ -1,7 +1,7 @@
 ---
 type: GUIDE
 domain: core
-title: "5-Minute Koan Experience: From Simple to Sophisticated"
+title: "From Simple to Sophisticated"
 audience: [developers, architects, ai-agents]
 last_updated: 2025-01-17
 framework_version: "v0.2.18+"
@@ -9,11 +9,11 @@ status: current
 validation: 2025-01-17
 ---
 
-# 5-Minute Koan Experience: From Simple to Sophisticated
+# From Simple to Sophisticated
 
-**Try it. Be delighted. Watch simple patterns scale to sophisticated solutions.**
+**Watch simple patterns scale to sophisticated solutions.**
 
-**Target Audience**: Developers ready to experience the future of .NET development
+**Target Audience**: Developers exploring modern .NET development patterns
 **Framework Version**: v0.2.18+
 
 ---
@@ -25,11 +25,11 @@ This quickstart demonstrates Koan's core promise: **sophisticated applications t
 ## Prerequisites
 
 - **.NET 9 SDK** or later
-- **5 minutes** of curiosity
+- **5 minutes** of time
 
 ---
 
-## **Step 1: Try it, be delighted** *(2 minutes)*
+## **Step 1: Get started quickly** *(2 minutes)*
 
 Create a sophisticated API in under 2 minutes:
 
@@ -84,7 +84,7 @@ curl http://localhost:5000/api/todos
 curl http://localhost:5000/api/health
 ```
 
-**Feeling:** *"This is how .NET development should feel."*
+**Result:** Complete REST API with zero configuration in under 2 minutes.
 
 ---
 
@@ -131,11 +131,11 @@ public class TodosController : EntityController<Todo>
 dotnet add package Koan.Messaging.InMemory
 ```
 
-**Feeling:** *"One pattern that grows with my needs."*
+**Result:** Same pattern scales from simple operations to enterprise messaging.
 
 ---
 
-## **Step 3: AI feels native** *(1 minute)*
+## **Step 3: AI with native feel** *(1 minute)*
 
 Add AI capabilities through familiar patterns:
 
@@ -182,7 +182,7 @@ curl "http://localhost:5000/api/todos/[your-todo-id]/suggestions"
 curl "http://localhost:5000/api/todos/semantic-search?query=work projects"
 ```
 
-**Feeling:** *"AI without the complexity - it just works."*
+**Result:** AI integration through familiar dependency injection patterns.
 
 ---
 
@@ -243,7 +243,7 @@ koan export compose --profile Local
 # - Environment-specific settings
 ```
 
-**Feeling:** *"Small team, sophisticated solutions - the framework does the heavy lifting."*
+**Result:** Event-driven architecture and multi-provider data access with minimal code.
 
 ---
 
@@ -264,7 +264,7 @@ docker build -t my-koan-app .
 # builder.Services.AddKoan() works seamlessly with Aspire orchestration
 ```
 
-**Feeling:** *"It fits perfectly into how I already work."*
+**Result:** Works seamlessly with existing .NET tooling and workflows.
 
 ---
 
@@ -320,9 +320,9 @@ In 5 minutes, you created:
 
 ---
 
-**You've experienced the future of .NET development. Welcome to Koan.**
+**You've built a sophisticated application using simple, consistent patterns.**
 
-*Try it. Be delighted. Build sophisticated apps with simple patterns.*
+*Build sophisticated apps with simple patterns.*
 
 ---
 

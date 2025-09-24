@@ -11,9 +11,9 @@
 
 ---
 
-## The Koan Experience: From Simple to Sophisticated in Minutes
+## From Simple to Sophisticated in Minutes
 
-### **1. Try it, be delighted**
+### **1. Get started quickly**
 
 ```bash
 # 2 minutes to working API
@@ -42,7 +42,7 @@ dotnet run
 # Structured logging and telemetry
 ```
 
-**Result:** *"This is how .NET development should feel."*
+**Result:** Full REST API with enterprise features in under 2 minutes.
 
 ---
 
@@ -72,7 +72,7 @@ await new TodoCompleted { TodoId = todo.Id }.Send();  // Same pattern extends
 
 ---
 
-### **3. AI feels native**
+### **3. AI with native feel**
 
 ```csharp
 // Reference = Intent
@@ -152,7 +152,7 @@ dotnet build, dotnet test, dotnet publish
 
 ---
 
-## Why Developers Choose Koan
+## Why Choose Koan
 
 | **What You Want** | **How Koan Delivers** |
 |-------------------|----------------------|
@@ -168,7 +168,7 @@ dotnet build, dotnet test, dotnet publish
 
 ### **For Individual Developers**
 ```bash
-# Try the 5-minute experience
+# Try the quickstart
 git clone https://github.com/koan-framework/quickstart
 cd quickstart && dotnet run
 
@@ -197,7 +197,7 @@ dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 
 ---
 
-## The Technology Behind the Magic
+## Technology Stack
 
 **70+ integrated modules spanning:**
 - **Data**: PostgreSQL, MongoDB, SQLite, Redis, Vector databases
@@ -207,7 +207,7 @@ dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 - **Orchestration**: Docker, Podman, Aspire, CLI automation
 - **Enterprise**: Secrets management, observability, backup, health monitoring
 
-**All working in harmony so you don't have to make them work together.**
+**Integrated modules that work together without configuration.**
 
 ---
 
@@ -223,7 +223,7 @@ dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 
 ## Community & Contribution
 
-**Join our growing community of developers building the future of .NET development:**
+**Community and contribution:**
 
 - **Star the repository** to show support
 - **Report issues** you encounter
@@ -231,7 +231,7 @@ dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 - **Submit pull requests** for improvements
 - **Join discussions** about framework design
 
-**Your feedback directly influences our roadmap.**
+Feedback and contributions help improve the framework.
 
 ---
 
@@ -239,7 +239,7 @@ dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 
 - **.NET 9 SDK** or later
 - **Docker** or **Podman** (for container features)
-- **5 minutes** to be delighted
+- **5 minutes** to get started
 
 ### Install & Run
 ```bash
@@ -254,14 +254,14 @@ dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
 dotnet run
 ```
 
-**In 2 minutes, you'll understand why developers are choosing Koan for sophisticated applications.**
+**Get a working application with enterprise features in under 2 minutes.**
 
 ---
 
 ## Enterprise Support & Documentation
 
 - **[Complete Documentation](documentation/README.md)** - Architecture, patterns, and guides
-- **[5-Minute Quickstart](documentation/getting-started/quickstart.md)** - Get running immediately
+- **[Quickstart Guide](documentation/getting-started/quickstart.md)** - Get running immediately
 - **[Enterprise Architecture Guide](documentation/architecture/principles.md)** - Strategic framework adoption
 - **[Troubleshooting Guide](documentation/support/troubleshooting.md)** - Solutions to common challenges
 
@@ -275,6 +275,6 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 ---
 
-**Koan Framework: Try it. Be delighted. Build sophisticated apps with simple patterns.**
+**Koan Framework: Build sophisticated apps with simple patterns.**
 
-*The .NET framework that makes small teams capable of sophisticated solutions.*
+*A .NET framework that makes small teams capable of sophisticated solutions.*

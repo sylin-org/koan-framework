@@ -22,9 +22,9 @@ validation: 2025-01-17
 
 Koan Framework embodies five core experiences that transform how you build .NET applications:
 
-1. **Try it, be delighted** - Immediate productivity and pleasant surprises
+1. **Get started quickly** - Immediate productivity and zero configuration
 2. **Entity<> scales elegantly** - One pattern from CRUD to enterprise architecture
-3. **AI feels native** - AI integration through familiar patterns
+3. **AI with native feel** - AI integration through familiar patterns
 4. **Intelligent automation** - Small teams build sophisticated solutions
 5. **Works with what you know** - Enhances your existing .NET workflow
 
@@ -59,7 +59,7 @@ docker --version
 
 ---
 
-## Chapter 1: Your First Koan Application *(Try it, be delighted)*
+## Chapter 1: Your First Koan Application *(Get started quickly)*
 
 ### **The 2-Minute API**
 
@@ -207,7 +207,7 @@ curl http://localhost:5000/api/health
 - **Structured logging** - Rich telemetry with correlation IDs
 - **Development tools** - Swagger UI and detailed error pages
 
-**This is the "Try it, be delighted" experience - sophisticated features through simple patterns.**
+**This demonstrates immediate productivity - sophisticated features through simple patterns.**
 
 ---
 
@@ -1448,7 +1448,7 @@ Explore real-world implementations in the [samples directory](../../samples/):
 
 **The Result:** You can now build sophisticated, AI-native, event-driven applications using simple, consistent patterns that scale from prototype to enterprise production.
 
-**Welcome to the future of .NET development. Welcome to Koan.**
+**You now have comprehensive knowledge of Koan Framework patterns.**
 
 ---
 

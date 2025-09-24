@@ -443,9 +443,9 @@ koan export compose --profile Production
 
 ---
 
-**Ready to transform your enterprise development capabilities?**
+**Next Steps**
 
-**Start with the pilot project approach and experience the future of .NET development.**
+**Begin with the pilot project approach to evaluate Koan Framework for your organization.**
 
 ---
 
