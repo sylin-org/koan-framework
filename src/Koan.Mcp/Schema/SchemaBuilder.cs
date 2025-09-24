@@ -26,6 +26,7 @@ public sealed class SchemaBuilder
 
     private readonly IServiceProvider _services;
     private readonly ILogger<SchemaBuilder> _logger;
+    private readonly HashSet<string> _warnedEntities = new();
 
     public SchemaBuilder(IServiceProvider services, ILogger<SchemaBuilder> logger)
     {
@@ -315,16 +316,26 @@ public sealed class SchemaBuilder
         var schema = CreateObjectSchema().WithDescription(description);
         var props = new JsonObject();
         var required = new JsonArray();
+        var missingDescriptions = new List<string>();
+
         foreach (var property in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (property.GetGetMethod() is null) continue;
-            var propSchema = CreateSchemaForProperty(property, operation);
+            var propSchema = CreateSchemaForProperty(property, operation, missingDescriptions);
             if (propSchema is null) continue;
             props[property.Name] = propSchema;
             if (IsRequired(property))
             {
                 required.Add(property.Name);
             }
+        }
+
+        if (missingDescriptions.Count > 0 && _warnedEntities.Add(entityType.FullName ?? entityType.Name))
+        {
+            _logger.LogWarning("{Entity}: Missing metadata for {Count} properties: [{Properties}]. Using fallback.",
+                entityType.Name,
+                missingDescriptions.Count,
+                string.Join(", ", missingDescriptions));
         }
 
         schema["properties"] = props;
@@ -342,9 +353,9 @@ public sealed class SchemaBuilder
         return requiredAttribute is not null && !requiredAttribute.AllowEmptyStrings;
     }
 
-    private JsonObject? CreateSchemaForProperty(PropertyInfo property, EntityEndpointOperationKind? operation)
+    private JsonObject? CreateSchemaForProperty(PropertyInfo property, EntityEndpointOperationKind? operation, List<string>? missingDescriptions = null)
     {
-        var schema = CreateSimpleTypeSchema(property.PropertyType, GetPropertyDescription(property, operation));
+        var schema = CreateSimpleTypeSchema(property.PropertyType, GetPropertyDescription(property, operation, missingDescriptions));
         if (schema is null)
         {
             _logger.LogDebug("Skipping property {Property} on {Entity} because it cannot be translated to JSON schema.", property.Name, property.DeclaringType?.FullName);
@@ -352,7 +363,7 @@ public sealed class SchemaBuilder
         return schema;
     }
 
-    private string? GetPropertyDescription(PropertyInfo property, EntityEndpointOperationKind? operation)
+    private string? GetPropertyDescription(PropertyInfo property, EntityEndpointOperationKind? operation, List<string>? missingDescriptions = null)
     {
         foreach (var attribute in property.GetCustomAttributes<McpDescriptionAttribute>())
         {
@@ -379,7 +390,7 @@ public sealed class SchemaBuilder
             return description.Description;
         }
 
-        _logger.LogWarning("Property {Property} on {Entity} is missing description metadata. Using property name as fallback.", property.Name, property.DeclaringType?.FullName);
+        missingDescriptions?.Add(property.Name);
         return property.Name;
     }
 
