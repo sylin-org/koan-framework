@@ -16,10 +16,10 @@ public class SystemHealthMonitor : KoanBackgroundServiceBase
     public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
     {
         using var periodicTimer = new PeriodicTimer(TimeSpan.FromMinutes(5));
-        
+
         while (!cancellationToken.IsCancellationRequested && await periodicTimer.WaitForNextTickAsync(cancellationToken))
         {
-            Logger.LogInformation("Performing system health check...");
+            Logger.LogDebug("Performing system health check...");
             // Health check logic here
             await Task.Delay(1000, cancellationToken); // Simulate work
         }

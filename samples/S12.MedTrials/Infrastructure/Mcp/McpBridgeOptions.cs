@@ -21,7 +21,7 @@ public sealed class McpBridgeOptions
             return null;
         }
 
-        var normalized = BaseUrl.EndsWith('/', StringComparison.Ordinal)
+        var normalized = BaseUrl.EndsWith("/", StringComparison.Ordinal)
             ? BaseUrl
             : BaseUrl + "/";
 

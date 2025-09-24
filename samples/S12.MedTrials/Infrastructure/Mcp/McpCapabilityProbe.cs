@@ -15,6 +15,8 @@ internal sealed class McpCapabilityProbe : BackgroundService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IOptionsMonitor<McpBridgeOptions> _options;
     private readonly ILogger<McpCapabilityProbe> _logger;
+    private int _lastToolCount = -1;
+    private int _lastTransportCount = -1;
 
     public McpCapabilityProbe(IHttpClientFactory httpClientFactory, IOptionsMonitor<McpBridgeOptions> options, ILogger<McpCapabilityProbe> logger)
     {
@@ -77,10 +79,19 @@ internal sealed class McpCapabilityProbe : BackgroundService
                 return;
             }
 
-            _logger.LogInformation(
-                "MCP capability probe discovered {ToolCount} tools across {TransportCount} transports.",
-                document.Tools.Count,
-                document.Transports.Count);
+            var toolCount = document.Tools.Count;
+            var transportCount = document.Transports.Count;
+
+            if (_lastToolCount != toolCount || _lastTransportCount != transportCount)
+            {
+                _logger.LogInformation(
+                    "MCP capability probe discovered {ToolCount} tools across {TransportCount} transports.",
+                    toolCount,
+                    transportCount);
+
+                _lastToolCount = toolCount;
+                _lastTransportCount = transportCount;
+            }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
