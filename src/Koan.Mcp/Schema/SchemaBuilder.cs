@@ -8,8 +8,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Koan.Data.Core;
 using Koan.Mcp.Options;
+using Koan.Mcp;
 using Koan.Web.Endpoints;
 using Microsoft.Extensions.Logging;
+using static Koan.Mcp.Schema.SchemaExtensions;
 
 namespace Koan.Mcp.Schema;
 
@@ -90,13 +92,13 @@ public sealed class SchemaBuilder
             EntityEndpointOperationKind.DeleteByQuery => BuildDeleteByQuerySchema(operation),
             EntityEndpointOperationKind.DeleteAll => BuildDeleteAllSchema(operation),
             EntityEndpointOperationKind.Patch => BuildPatchSchema(entityType, keyType),
-            _ => CreateBaseSchema()
+            _ => CreateObjectSchema()
         };
     }
 
     private JsonObject BuildCollectionSchema(EntityEndpointDescriptor descriptor, EntityEndpointOperationDescriptor operation)
     {
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
         var metadata = descriptor.Metadata;
 
@@ -151,7 +153,7 @@ public sealed class SchemaBuilder
 
     private JsonObject BuildQuerySchema(EntityEndpointDescriptor descriptor, EntityEndpointOperationDescriptor operation)
     {
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
         props["filter"] = CreateStringProperty("JSON filter expression used to construct the query.");
         props["ignoreCase"] = CreateBooleanProperty("When true string comparisons ignore case sensitivity.");
@@ -165,7 +167,7 @@ public sealed class SchemaBuilder
 
     private static JsonObject BuildGetNewSchema()
     {
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
         props["accept"] = CreateStringProperty("Optional Accept header override (view negotiation).");
         return schema;
@@ -173,7 +175,7 @@ public sealed class SchemaBuilder
 
     private JsonObject BuildGetByIdSchema(Type keyType, EntityEndpointOperationDescriptor operation)
     {
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
         props["id"] = CreateSimpleTypeSchema(keyType, "Entity identifier used to load the model.");
         if (operation.SupportsDatasetRouting)
@@ -192,9 +194,9 @@ public sealed class SchemaBuilder
     private JsonObject BuildUpsertSchema(Type entityType, EntityEndpointDescriptor descriptor)
     {
         _ = descriptor;
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
-        props["model"] = BuildEntitySchema(entityType, "Entity payload to insert or update.");
+        props["model"] = BuildEntitySchema(entityType, "Entity payload to insert or update.", EntityEndpointOperationKind.Upsert);
         props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         props["accept"] = CreateStringProperty("Optional Accept header override (view negotiation).");
         schema["required"] = new JsonArray { "model" };
@@ -204,13 +206,13 @@ public sealed class SchemaBuilder
     private JsonObject BuildUpsertManySchema(Type entityType, EntityEndpointDescriptor descriptor)
     {
         _ = descriptor;
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
         props["models"] = new JsonObject
         {
             ["type"] = "array",
             ["description"] = "Collection of entity payloads to insert or update.",
-            ["items"] = BuildEntitySchema(entityType)
+            ["items"] = BuildEntitySchema(entityType, operation: EntityEndpointOperationKind.UpsertMany)
         };
         props["set"] = CreateStringProperty("Dataset key when routing to a specific tenant or dataset.");
         schema["required"] = new JsonArray { "models" };
@@ -219,7 +221,7 @@ public sealed class SchemaBuilder
 
     private JsonObject BuildDeleteSchema(Type keyType, EntityEndpointOperationDescriptor operation)
     {
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
         props["id"] = CreateSimpleTypeSchema(keyType, "Entity identifier targeted for deletion.");
         schema["required"] = new JsonArray { "id" };
@@ -232,7 +234,7 @@ public sealed class SchemaBuilder
 
     private JsonObject BuildDeleteManySchema(Type keyType, EntityEndpointOperationDescriptor operation)
     {
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
         props["ids"] = new JsonObject
         {
@@ -250,7 +252,7 @@ public sealed class SchemaBuilder
 
     private JsonObject BuildDeleteByQuerySchema(EntityEndpointOperationDescriptor operation)
     {
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
         props["query"] = CreateStringProperty("Query expression used to select records for deletion.");
         schema["required"] = new JsonArray { "query" };
@@ -263,7 +265,7 @@ public sealed class SchemaBuilder
 
     private JsonObject BuildDeleteAllSchema(EntityEndpointOperationDescriptor operation)
     {
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         if (operation.SupportsDatasetRouting)
         {
             var props = (JsonObject)schema["properties"]!;
@@ -274,7 +276,7 @@ public sealed class SchemaBuilder
 
     private JsonObject BuildPatchSchema(Type entityType, Type keyType)
     {
-        var schema = CreateBaseSchema();
+        var schema = CreateObjectSchema();
         var props = (JsonObject)schema["properties"]!;
         props["id"] = CreateSimpleTypeSchema(keyType, "Entity identifier targeted for patching.");
         props["patch"] = new JsonObject
@@ -308,21 +310,15 @@ public sealed class SchemaBuilder
         return schema;
     }
 
-    private JsonObject BuildEntitySchema(Type entityType, string? description = null)
+    private JsonObject BuildEntitySchema(Type entityType, string? description = null, EntityEndpointOperationKind? operation = null)
     {
-        var schema = new JsonObject
-        {
-            ["type"] = "object",
-            ["description"] = description,
-            ["additionalProperties"] = false
-        };
-
+        var schema = CreateObjectSchema().WithDescription(description);
         var props = new JsonObject();
         var required = new JsonArray();
         foreach (var property in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (property.GetGetMethod() is null) continue;
-            var propSchema = CreateSchemaForProperty(property);
+            var propSchema = CreateSchemaForProperty(property, operation);
             if (propSchema is null) continue;
             props[property.Name] = propSchema;
             if (IsRequired(property))
@@ -346,9 +342,9 @@ public sealed class SchemaBuilder
         return requiredAttribute is not null && !requiredAttribute.AllowEmptyStrings;
     }
 
-    private JsonObject? CreateSchemaForProperty(PropertyInfo property)
+    private JsonObject? CreateSchemaForProperty(PropertyInfo property, EntityEndpointOperationKind? operation)
     {
-        var schema = CreateSimpleTypeSchema(property.PropertyType, GetPropertyDescription(property));
+        var schema = CreateSimpleTypeSchema(property.PropertyType, GetPropertyDescription(property, operation));
         if (schema is null)
         {
             _logger.LogDebug("Skipping property {Property} on {Entity} because it cannot be translated to JSON schema.", property.Name, property.DeclaringType?.FullName);
@@ -356,8 +352,21 @@ public sealed class SchemaBuilder
         return schema;
     }
 
-    private string? GetPropertyDescription(PropertyInfo property)
+    private string? GetPropertyDescription(PropertyInfo property, EntityEndpointOperationKind? operation)
     {
+        foreach (var attribute in property.GetCustomAttributes<McpDescriptionAttribute>())
+        {
+            if (attribute.Operation is null)
+            {
+                return attribute.Description;
+            }
+
+            if (operation.HasValue && attribute.Operation == operation.Value)
+            {
+                return attribute.Description;
+            }
+        }
+
         var display = property.GetCustomAttribute<DisplayAttribute>();
         if (!string.IsNullOrWhiteSpace(display?.Description))
         {
@@ -489,32 +498,5 @@ public sealed class SchemaBuilder
         return type == typeof(float) || type == typeof(double) || type == typeof(decimal);
     }
 
-    private static JsonObject CreateStringProperty(string description)
-    {
-        return new JsonObject
-        {
-            ["type"] = "string",
-            ["description"] = description
-        };
-    }
-
-    private static JsonObject CreateBooleanProperty(string description)
-    {
-        return new JsonObject
-        {
-            ["type"] = "boolean",
-            ["description"] = description
-        };
-    }
-
-    private static JsonObject CreateBaseSchema()
-    {
-        return new JsonObject
-        {
-            ["type"] = "object",
-            ["additionalProperties"] = false,
-            ["properties"] = new JsonObject()
-        };
-    }
 }
 
