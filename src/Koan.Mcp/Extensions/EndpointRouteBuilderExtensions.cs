@@ -4,6 +4,7 @@ using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -53,12 +54,12 @@ public static class EndpointRouteBuilderExtensions
         }
 
         group.MapGet("sse", transport.AcceptStreamAsync)
-            .Produces("text/event-stream")
-            .WithName("KoanMcpSseStream");
+            .WithName("KoanMcpSseStream")
+            .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "text/event-stream"));
 
         group.MapPost("rpc", transport.SubmitRequestAsync)
-            .Produces("application/json")
-            .WithName("KoanMcpRpcSubmit");
+            .WithName("KoanMcpRpcSubmit")
+            .WithMetadata(new ProducesResponseTypeAttribute(typeof(IResult), StatusCodes.Status202Accepted, "application/json"));
 
         if (options.PublishCapabilityEndpoint && capabilityReporter is not null)
         {
@@ -67,8 +68,8 @@ public static class EndpointRouteBuilderExtensions
                 var document = await capabilityReporter.GetCapabilitiesAsync(context.RequestAborted).ConfigureAwait(false);
                 await context.Response.WriteAsJsonAsync(document, cancellationToken: context.RequestAborted).ConfigureAwait(false);
             })
-            .Produces("application/json")
-            .WithName("KoanMcpCapabilities");
+            .WithName("KoanMcpCapabilities")
+            .WithMetadata(new ProducesResponseTypeAttribute(typeof(McpCapabilityDocument), StatusCodes.Status200OK, "application/json"));
         }
 
         return endpoints;

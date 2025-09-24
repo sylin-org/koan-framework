@@ -14,7 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="..\S12.MedTrials.Core\S12.MedTrials.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Core.Observability\Koan.Core.Observability.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />

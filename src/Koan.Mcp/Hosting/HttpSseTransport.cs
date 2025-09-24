@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -57,13 +58,13 @@ public sealed class HttpSseTransport
                 KoanEnv.EnvironmentName);
         }
 
-        if ((KoanEnv.IsProduction || KoanEnv.InContainer) && !context.Request.IsHttps)
+        if (KoanEnv.IsProduction && !KoanEnv.InContainer && !context.Request.IsHttps)
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             await context.Response.WriteAsJsonAsync(new
             {
                 error = "https_required",
-                message = "HTTP+SSE transport requires HTTPS in production environments."
+                message = "HTTP+SSE transport requires HTTPS in non-containerized production environments."
             }, cancellationToken: context.RequestAborted).ConfigureAwait(false);
             return;
         }

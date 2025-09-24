@@ -1,3 +1,4 @@
+using Koan.AI.Web;
 using Koan.Core.Observability;
 using Koan.Data.Core;
 using Koan.Data.Vector;

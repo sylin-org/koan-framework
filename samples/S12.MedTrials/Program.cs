@@ -5,6 +5,7 @@ using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Web.Extensions;
 using Koan.Web.Swagger;
+using S12.MedTrials;
 using S12.MedTrials.Infrastructure;
 using S12.MedTrials.Infrastructure.Mcp;
 
