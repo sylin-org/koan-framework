@@ -29,4 +29,20 @@ public sealed class McpTransportOptions
     /// Logging category used by MCP transports when emitting structured diagnostics.
     /// </summary>
     public string LoggerCategory { get; set; } = "Koan.Transport.Mcp";
+
+    private TimeSpan _sseKeepAliveInterval = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// Size of the buffer used when flushing SSE payloads.
+    /// </summary>
+    public int SseBufferSize { get; set; } = 8192;
+
+    /// <summary>
+    /// Interval used to publish keep-alive heartbeats on SSE streams.
+    /// </summary>
+    public TimeSpan SseKeepAliveInterval
+    {
+        get => _sseKeepAliveInterval;
+        set => _sseKeepAliveInterval = value <= TimeSpan.Zero ? TimeSpan.FromSeconds(15) : value;
+    }
 }

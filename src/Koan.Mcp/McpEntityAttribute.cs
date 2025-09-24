@@ -28,10 +28,78 @@ public sealed class McpEntityAttribute : Attribute
     /// </summary>
     public bool AllowMutations { get; set; } = true;
 
+    private bool _enableStdio = true;
+    private bool _enableHttpSse = true;
+    private McpTransportMode? _enabledTransports;
+
     /// <summary>
     /// Allows opting into STDIO transport at the entity level when server defaults disable it.
     /// </summary>
-    public bool EnableStdio { get; set; } = true;
+    public bool EnableStdio
+    {
+        get => _enabledTransports?.HasFlag(McpTransportMode.Stdio) ?? _enableStdio;
+        set
+        {
+            _enableStdio = value;
+            if (_enabledTransports.HasValue)
+            {
+                _enabledTransports = value
+                    ? _enabledTransports.Value | McpTransportMode.Stdio
+                    : _enabledTransports.Value & ~McpTransportMode.Stdio;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Allows opting into HTTP + SSE transport at the entity level when server defaults disable it.
+    /// </summary>
+    public bool EnableHttpSse
+    {
+        get => _enabledTransports?.HasFlag(McpTransportMode.HttpSse) ?? _enableHttpSse;
+        set
+        {
+            _enableHttpSse = value;
+            if (_enabledTransports.HasValue)
+            {
+                _enabledTransports = value
+                    ? _enabledTransports.Value | McpTransportMode.HttpSse
+                    : _enabledTransports.Value & ~McpTransportMode.HttpSse;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Optional per-entity authentication requirement. When null the server default is used.
+    /// </summary>
+    public bool? RequireAuthentication { get; set; }
+
+    /// <summary>
+    /// Configures the set of transports the entity participates in.
+    /// </summary>
+    public McpTransportMode EnabledTransports
+    {
+        get
+        {
+            if (_enabledTransports is { } transports)
+            {
+                return transports;
+            }
+
+            var mode = McpTransportMode.None;
+            if (_enableStdio)
+            {
+                mode |= McpTransportMode.Stdio;
+            }
+
+            if (_enableHttpSse)
+            {
+                mode |= McpTransportMode.HttpSse;
+            }
+
+            return mode;
+        }
+        set => _enabledTransports = value;
+    }
 
     /// <summary>
     /// Optional raw schema override. When provided the registry bypasses automatic schema generation.

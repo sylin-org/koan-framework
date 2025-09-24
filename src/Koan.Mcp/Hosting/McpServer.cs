@@ -30,6 +30,9 @@ public sealed class McpServer
     public IReadOnlyList<McpEntityRegistration> GetRegistrationsForStdio()
         => _registry.RegistrationsForStdio();
 
+    public IReadOnlyList<McpEntityRegistration> GetRegistrationsForHttpSse()
+        => _registry.RegistrationsForHttpSse();
+
     public McpRpcHandler CreateHandler()
     {
         var handlerLogger = _loggerFactory.CreateLogger<McpRpcHandler>();
