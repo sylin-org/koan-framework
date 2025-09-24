@@ -5,7 +5,8 @@ Couchbase adapter that brings Koan's repository abstractions to Couchbase bucket
 ## Features
 
 - Options-first configuration with orchestration-aware defaults (`ConnectionString=auto`, `Bucket=Koan`).
-- `IDataRepository` implementation with bulk upsert/delete, batch orchestration, and instruction execution (`EnsureCreated`, `Clear`).
+- `IDataRepository` implementation with bulk upsert/delete, transactional batches, and instruction execution (`EnsureCreated`, `Clear`).
+- LINQ predicate support translated to parameterised N1QL for common comparison and string operators.
 - N1QL query support via raw statements or `CouchbaseQueryDefinition` objects.
 - Guardrail-aware paging when `DataQueryOptions` are supplied.
 - Health contributor and telemetry activity source (`Koan.Data.Couchbase`).
