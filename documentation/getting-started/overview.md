@@ -278,7 +278,7 @@ Everything integrates naturally. No glue scripts. No boilerplate.
 - ✅ **Stable**: Core, Data, Web, Storage, Messaging
 - ✅ **Production Ready**: All adapters, health system, orchestration
 - ✅ **AI Integration**: Ollama provider, vector search, RAG patterns
-- 🔄 **Active Development**: Flow pipeline enhancement, MCP integration
+- 🔄 **Active Development**: Flow pipeline enhancement, MCP HTTP+SSE transport, IDE integrations
 
 ### Near-term Roadmap
 

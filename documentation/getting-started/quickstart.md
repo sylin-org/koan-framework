@@ -100,6 +100,7 @@ curl http://localhost:5000/api/health
 
 - **[Complete Guide](getting-started.md)** - Full step-by-step walkthrough
 - **[Framework Overview](overview.md)** - Architecture and capabilities
+- **[Expose MCP over HTTP + SSE](../guides/mcp-http-sse-howto.md)** - Serve Koan tools to remote IDEs in minutes
 - **[Add Authentication](../guides/authentication-setup.md)** - Multi-provider auth setup
 - **[Explore Samples](../../../samples/)** - Real-world examples
 
