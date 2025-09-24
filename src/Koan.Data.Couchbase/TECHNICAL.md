@@ -7,8 +7,10 @@
 - `DurabilityLevel` (string) can be set to Couchbase durability levels when stronger write semantics are required.
 
 ## Repository
-- `CouchbaseRepository<TEntity, TKey>` implements `IDataRepositoryWithOptions` plus bulk operations.
+- `CouchbaseRepository<TEntity, TKey>` implements `IDataRepositoryWithOptions`, `ILinqQueryRepositoryWithOptions`, and `IOptimizedDataRepository` to mirror the Mongo adapter surface.
 - Keys are normalized to strings, respecting storage optimization hints for GUID identifiers.
+- Expression predicates are translated into parameterised N1QL via `CouchbaseLinqQueryTranslator` supporting comparisons, logical operators, `Contains`, `StartsWith`, and `EndsWith`.
+- Bulk mutations run in parallel with optional durability and leverage Couchbase distributed transactions when `BatchOptions.RequireAtomic` is requested.
 - N1QL execution uses `CouchbaseQueryDefinition` to pass statements + parameters; string queries are accepted for quick usage.
 - `EnsureCreated` delegates to the bucket collection manager to create scopes/collections when required.
 - `DeleteAll` issues a `DELETE ... RETURNING META().id` statement and returns affected count.
