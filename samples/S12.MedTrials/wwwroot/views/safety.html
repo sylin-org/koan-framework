@@ -1,0 +1,73 @@
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h5 class="card-title"><i class="fas fa-heart-pulse"></i> Safety Digest</h5>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Lookback (days)</label>
+                <input type="number" class="form-control" ng-model="form.lookbackDays" min="1" max="60">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Trial Site</label>
+                <input type="text" class="form-control" ng-model="form.trialSiteId" placeholder="Optional site ID">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Minimum severity</label>
+                <select class="form-select" ng-model="form.minimumSeverity">
+                    <option value="">All severities</option>
+                    <option value="Mild">Mild</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="Severe">Severe</option>
+                    <option value="LifeThreatening">LifeThreatening</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" ng-click="summarise()" ng-disabled="loading">
+                    <span ng-if="!loading"><i class="fas fa-sync"></i> Refresh</span>
+                    <span ng-if="loading" class="spinner-border spinner-border-sm" role="status"></span>
+                </button>
+            </div>
+        </div>
+        <p class="text-muted small mt-2">Digest reuses the same service MCP tools call, ensuring consistent diagnostics.</p>
+    </div>
+</div>
+
+<div class="card shadow-sm" ng-if="summary">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+            <h5 class="card-title mb-0">Digest</h5>
+            <span class="badge" ng-class="{ 'bg-warning text-dark': summary.degraded, 'bg-success': !summary.degraded }">
+                <i class="fas" ng-class="{ 'fa-triangle-exclamation': summary.degraded, 'fa-circle-check': !summary.degraded }"></i>
+                {{summary.degraded ? 'Fallback' : 'AI Generated'}}
+            </span>
+        </div>
+        <pre class="mt-3 mb-0 digest-text" ng-bind="summary.summary"></pre>
+    </div>
+</div>
+
+<div class="card shadow-sm mt-4" ng-if="events.length">
+    <div class="card-body">
+        <h5 class="card-title"><i class="fas fa-notes-medical"></i> Recent Adverse Events</h5>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Participant</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr ng-repeat="event in events">
+                        <td>{{event.onsetDate || event.OnsetDate}}</td>
+                        <td>{{event.participantId || event.ParticipantId}}</td>
+                        <td><span class="badge bg-danger" ng-class="{ 'bg-warning text-dark': (event.severity || event.Severity) === 'Moderate' }">{{event.severity || event.Severity}}</span></td>
+                        <td>{{event.status || event.Status}}</td>
+                        <td>{{event.description || event.Description}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
