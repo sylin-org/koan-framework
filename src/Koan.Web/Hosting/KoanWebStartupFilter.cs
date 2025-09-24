@@ -6,6 +6,7 @@ using Koan.Core;
 using Koan.Web.Infrastructure;
 using Koan.Web.Options;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace Koan.Web.Hosting;
 
@@ -115,6 +116,17 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                     {
                         // MVC controllers handle all endpoints including health
                         endpoints.MapControllers();
+
+                        try
+                        {
+                            var extensionType = Type.GetType("Koan.Mcp.Extensions.EndpointRouteBuilderExtensions, Koan.Mcp", throwOnError: false);
+                            var mapMethod = extensionType?.GetMethod("MapKoanMcpEndpoints", BindingFlags.Public | BindingFlags.Static);
+                            mapMethod?.Invoke(null, new object[] { endpoints });
+                        }
+                        catch
+                        {
+                            // MCP transport not available; ignore.
+                        }
                     });
                 }
                 if (pipeline.UseRateLimiter)

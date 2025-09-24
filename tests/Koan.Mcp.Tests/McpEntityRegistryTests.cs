@@ -214,7 +214,58 @@ public sealed class McpEntityRegistryTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => executor.ExecuteAsync(deleteTool, args, cts.Token));
     }
 
-    private static ServiceProvider BuildServiceProvider()
+    [Fact]
+    public void Registry_respects_http_sse_defaults()
+    {
+        using var provider = BuildServiceProvider();
+        var registry = provider.GetRequiredService<McpEntityRegistry>();
+
+        var registration = registry.Registrations.Single(r => r.EntityType == typeof(TestEntity));
+        registration.EnableHttpSse.Should().BeTrue();
+        registry.RegistrationsForHttpSse().Should().Contain(registration);
+    }
+
+    [Fact]
+    public void Registry_respects_http_sse_override()
+    {
+        using var provider = BuildServiceProvider(services =>
+        {
+            services.Configure<McpServerOptions>(opts =>
+            {
+                opts.EntityOverrides["TestEntity"] = new McpEntityOverride
+                {
+                    EnabledTransports = McpTransportMode.Stdio
+                };
+            });
+        });
+
+        var registry = provider.GetRequiredService<McpEntityRegistry>();
+        var registration = registry.Registrations.Single(r => r.EntityType == typeof(TestEntity));
+        registration.EnabledTransports.Should().Be(McpTransportMode.Stdio);
+        registry.RegistrationsForHttpSse().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Registry_applies_require_authentication_override()
+    {
+        using var provider = BuildServiceProvider(services =>
+        {
+            services.Configure<McpServerOptions>(opts =>
+            {
+                opts.RequireAuthentication = true;
+                opts.EntityOverrides["TestEntity"] = new McpEntityOverride
+                {
+                    RequireAuthentication = false
+                };
+            });
+        });
+
+        var registry = provider.GetRequiredService<McpEntityRegistry>();
+        var registration = registry.Registrations.Single(r => r.EntityType == typeof(TestEntity));
+        registration.RequireAuthentication.Should().BeFalse();
+    }
+
+    private static ServiceProvider BuildServiceProvider(Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddDebug().SetMinimumLevel(LogLevel.Debug));
@@ -225,6 +276,8 @@ public sealed class McpEntityRegistryTests
         {
             opts.EnableStdioTransport = false;
         });
+
+        configure?.Invoke(services);
 
         services.AddSingleton<Koan.Data.Core.IAggregateIdentityManager, Koan.Data.Core.AggregateIdentityManager>();
         services.AddSingleton<Koan.Data.Abstractions.IDataAdapterFactory, StubDataAdapterFactory>();

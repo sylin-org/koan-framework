@@ -89,6 +89,12 @@ public sealed class McpEntityRegistry
     public IReadOnlyList<McpEntityRegistration> RegistrationsForStdio()
         => Snapshot.Items.Where(r => r.EnableStdio).ToList();
 
+    /// <summary>
+    /// Returns registrations that have HTTP + SSE enabled.
+    /// </summary>
+    public IReadOnlyList<McpEntityRegistration> RegistrationsForHttpSse()
+        => Snapshot.Items.Where(r => r.EnableHttpSse).ToList();
+
     private RegistrySnapshot Snapshot
     {
         get
@@ -161,7 +167,8 @@ public sealed class McpEntityRegistry
                 descriptor,
                 tools,
                 displayName,
-                entityOverride?.EnableStdio ?? effectiveAttribute.EnableStdio);
+                effectiveAttribute.EnabledTransports,
+                effectiveAttribute.RequireAuthentication ?? entityOverride?.RequireAuthentication);
 
             registrations.Add(registration);
             AddIndex(registrationIndex, type.FullName, registration);
@@ -267,16 +274,26 @@ public sealed class McpEntityRegistry
             ? entityOverride.RequiredScopes
             : attribute.RequiredScopes;
 
-        return new McpEntityAttribute
+        var merged = new McpEntityAttribute
         {
             Name = entityOverride.Name ?? attribute.Name,
             Description = entityOverride.Description ?? attribute.Description,
             AllowMutations = entityOverride.AllowMutations ?? attribute.AllowMutations,
-            EnableStdio = entityOverride.EnableStdio ?? attribute.EnableStdio,
             SchemaOverride = entityOverride.SchemaOverride ?? attribute.SchemaOverride,
             ToolPrefix = attribute.ToolPrefix,
+            RequireAuthentication = entityOverride.RequireAuthentication ?? attribute.RequireAuthentication,
             RequiredScopes = scopes.Length == 0 ? Array.Empty<string>() : scopes.ToArray()
         };
+
+        merged.EnableStdio = entityOverride.EnableStdio ?? attribute.EnableStdio;
+        merged.EnableHttpSse = entityOverride.EnableHttpSse ?? attribute.EnableHttpSse;
+
+        if (entityOverride.EnabledTransports is McpTransportMode transports)
+        {
+            merged.EnabledTransports = transports;
+        }
+
+        return merged;
     }
 
     private static bool IsEntityAllowed(McpServerOptions options, Type entityType, string displayName)

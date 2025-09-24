@@ -104,6 +104,7 @@ src/Koan.Mcp/
 - Exposes `/mcp/sse` endpoint guarded by Koan authentication middleware.
 - Keeps a long-lived SSE channel to deliver responses and streaming updates.
 - Ideal for remote IDEs or managed MCP clients that cannot spawn STDIO child processes.
+- Hands-on walkthrough: [Expose MCP over HTTP + SSE](../guides/mcp-http-sse-howto.md).
 
 ### WebSocket (optional)
 - Provides bidirectional messaging for future streaming scenarios (chunked results, patch previews).

@@ -36,6 +36,7 @@ Welcome to the complete Koan Framework documentation. This restructured document
 
 ### Specialized Implementations
 - **[AI Integration](guides/ai-integration.md)** - Adding intelligence to applications
+- **[Expose MCP over HTTP + SSE](guides/mcp-http-sse-howto.md)** - Stream Koan tools to remote IDEs and agents
 - **[Event-Driven Architecture](guides/event-driven.md)** - Messaging and event sourcing
 - **[Multi-Provider Data](guides/multi-provider-data.md)** - SQL, NoSQL, Vector, JSON stores
 - **[Media Handling](guides/media-handling.md)** - File uploads, transforms, streaming

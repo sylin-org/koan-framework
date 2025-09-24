@@ -1,4 +1,5 @@
 using System;
+using Koan.Mcp.Diagnostics;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
@@ -26,6 +27,7 @@ public static class ServiceCollectionExtensions
 
         services.TryAddSingleton<SchemaBuilder>();
         services.TryAddSingleton<DescriptorMapper>();
+        services.TryAddSingleton<TimeProvider>(_ => TimeProvider.System);
         services.TryAddSingleton<McpEntityRegistry>();
         services.TryAddSingleton<RequestTranslator>();
         services.TryAddSingleton<ResponseTranslator>();
@@ -33,6 +35,13 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IMcpTransportDispatcher, StreamJsonRpcTransportDispatcher>();
         services.TryAddSingleton<McpServer>();
         services.AddHostedService<StdioTransport>();
+
+        services.TryAddSingleton<HttpSseSessionManager>();
+        services.AddHostedService(sp => sp.GetRequiredService<HttpSseSessionManager>());
+        services.TryAddSingleton<HttpSseTransport>();
+        services.TryAddSingleton<IMcpCapabilityReporter, HttpSseCapabilityReporter>();
+
+        services.AddCors();
 
         return services;
     }

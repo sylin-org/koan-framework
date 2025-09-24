@@ -42,6 +42,11 @@ HTTP+SSE transport enables:
 - **Transport Agnostic**: Share executor/registry logic between STDIO and HTTP+SSE
 - **Progressive Enhancement**: HTTP+SSE builds on existing Phase 1 infrastructure
 
+### Related Documentation
+
+- **Implementation Guide** – [Expose MCP over HTTP + SSE](../guides/mcp-http-sse-howto.md) walks through enabling the transport, authenticating clients, and validating JSON-RPC traffic end-to-end in under fifteen minutes.
+- **Integration Strategy** – [Koan MCP Integration Proposal](koan-mcp-integration.md) tracks the broader MCP roadmap and shows how the HTTP transport fits alongside STDIO and future WebSocket phases.
+
 ## Current State Analysis
 
 ### What's Implemented (STDIO Transport)
@@ -96,6 +101,20 @@ internal sealed class HttpSseTransport : BackgroundService
 | **CORS Support** | N/A | Configurable origins | ❌ Missing |
 | **Rate Limiting** | N/A | Per-user limits | ❌ Missing |
 | **Health Monitoring** | ✅ IHealthAggregator | ❌ Not implemented |
+
+## Review Highlights
+
+### Strengths confirmed during implementation review
+
+- The GET-based `/mcp/sse` handshake plus dedicated POST `/mcp/rpc` endpoint matches mainstream SSE expectations, allowing stock HTTP tooling and reverse proxies to participate without special framing rules.
+- Capability discovery is now a first-class HTTP surface at `/mcp/capabilities`, keeping Koan’s “reference = intent” boot story intact while giving dashboards and hosted IDEs a simple JSON contract to inspect.
+- Auto-registration through `KoanWebStartupFilter` preserves the familiar configuration-first DX: once `EnableHttpSseTransport` is true the web pipeline maps the endpoints, publishes boot diagnostics, and enforces authorization consistently.
+
+### Remaining gaps and mitigation plan
+
+- `HttpSseRpcBridge` currently routes JSON-RPC methods directly rather than using `IMcpTransportDispatcher`; the manual loop is well-covered by unit tests but is marked for replacement once `StreamJsonRpc` exposes an SSE-friendly message handler.
+- Health reporting now surfaces connection counts and keep-alive cadence, but additional transport metrics (latency, payload size) are tracked for a future observability milestone.
+- Documentation and samples continue to grow—this proposal links to the new hands-on how-to guide so developers can validate the transport end-to-end while the full sample refresh is in progress.
 
 ## Proposed Solution
 
@@ -284,7 +303,6 @@ public sealed class HttpSseSessionManager : IHostedService, IDisposable
             _options.CurrentValue.Transport.SseKeepAliveInterval);
         return Task.CompletedTask;
     }
-
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _heartbeatTimer?.Dispose();
@@ -360,55 +378,96 @@ public sealed class HttpSseSession : IDisposable
 }
 ```
 
-#### 3. StreamJsonRpc Bridge
+#### 3. JSON-RPC Bridge
 
 **File:** `src/Koan.Mcp/Hosting/HttpSseRpcBridge.cs`
 
 ```csharp
 public sealed class HttpSseRpcBridge : IAsyncDisposable
 {
-    private readonly Channel<JsonRpcMessage> _inbound = Channel.CreateUnbounded<JsonRpcMessage>();
-    private readonly JsonRpc _rpc;
+    private readonly Channel<JsonRpcEnvelope> _requests = Channel.CreateUnbounded<JsonRpcEnvelope>(new()
+    {
+        SingleReader = true,
+        AllowSynchronousContinuations = false
+    });
+    private readonly CancellationTokenSource _cts;
+    private readonly Task _processingTask;
+    private readonly McpRpcHandler _handler;
 
     public HttpSseRpcBridge(
-        IMcpTransportDispatcher dispatcher,
+        McpServer server,
+        McpEntityRegistry registry,
+        IOptionsMonitor<McpServerOptions> options,
         HttpSseSession session,
         ILogger<HttpSseRpcBridge> logger)
     {
-        var handler = new SseJsonRpcMessageHandler(session, _inbound);
-        _rpc = new JsonRpc(handler, dispatcher);
-        _rpc.TraceSource.Switch.Level = SourceLevels.Information;
-        _rpc.StartListening();
+        _handler = server.CreateHandler();
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(session.Cancellation.Token);
+        _processingTask = Task.Run(ProcessAsync);
     }
 
-    public ValueTask SubmitAsync(JsonRpcRequest request, CancellationToken cancellationToken)
-        => _inbound.Writer.WriteAsync(request, cancellationToken);
+    public ValueTask SubmitAsync(JsonRpcEnvelope request, CancellationToken cancellationToken)
+    {
+        if (!_requests.Writer.TryWrite(request))
+        {
+            return new ValueTask(_requests.Writer.WriteAsync(request, cancellationToken).AsTask());
+        }
 
-    public Task Completion => _rpc.Completion;
+        return ValueTask.CompletedTask;
+    }
+
+    private async Task ProcessAsync()
+    {
+        await foreach (var envelope in _requests.Reader.ReadAllAsync(_cts.Token).ConfigureAwait(false))
+        {
+            await DispatchAsync(envelope, _cts.Token).ConfigureAwait(false);
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {
-        _inbound.Writer.TryComplete();
+        _cts.Cancel();
         try
         {
-            await _rpc.Completion.ConfigureAwait(false);
+            await _processingTask.ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
         }
+        finally
+        {
+            _cts.Dispose();
+        }
     }
 }
+```
 
-internal sealed class SseJsonRpcMessageHandler : IJsonRpcMessageHandler
+- `DispatchAsync` forwards `tools/list`, `tools/call`, and `ping` invocations to the shared `McpRpcHandler`, ensuring HTTP + SSE clients continue to reuse Koan’s endpoint metadata, request translation, and diagnostics pipeline.
+- Access control honours per-entity `RequireAuthentication` and `RequiredScopes` declarations before invoking the executor, mirroring the STDIO transport’s guardrails.
+- Heartbeats, acknowledgements, and final results are streamed back to the client by enqueuing serialized `ServerSentEvent` payloads on the active session.
+
+> **Future improvement:** once StreamJsonRpc exposes a message handler abstraction suited for SSE transports, the bridge can swap to the shared `IMcpTransportDispatcher` to remove the remaining custom dispatch loop.
+
+#### 4. Server-Sent Event Primitives
+
+**File:** `src/Koan.Mcp/Hosting/ServerSentEvent.cs`
+
+```csharp
+public readonly record struct ServerSentEvent(string Event, JsonNode Payload)
 {
-    private readonly HttpSseSession _session;
-    private readonly Channel<JsonRpcMessage> _inbound;
+    public static ServerSentEvent Connected(string sessionId, DateTimeOffset timestamp) =>
+        new("connected", JsonNode.Parse(JsonSerializer.Serialize(new
+        {
+            sessionId,
+            timestamp
+        }))!);
 
-    public SseJsonRpcMessageHandler(HttpSseSession session, Channel<JsonRpcMessage> inbound)
-    {
-        _session = session;
-        _inbound = inbound;
-    }
+    public static ServerSentEvent Heartbeat(object payload) =>
+        new("heartbeat", JsonNode.Parse(JsonSerializer.Serialize(payload))!);
+
+    public static ServerSentEvent FromJsonRpc(JsonRpcMessage message) =>
+        new(message is JsonRpcError ? "error" : "result",
+            JsonNode.Parse(JsonSerializer.Serialize(message))!);
 
     public async ValueTask<JsonRpcMessage> ReadAsync(CancellationToken cancellationToken)
     {

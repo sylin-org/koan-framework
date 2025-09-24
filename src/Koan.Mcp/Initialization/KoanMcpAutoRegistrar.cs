@@ -29,6 +29,24 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
         var enableStdio = section.GetValue("EnableStdioTransport", true);
         report.AddSetting("EnableStdioTransport", enableStdio.ToString());
 
+        var enableHttpSse = section.GetValue("EnableHttpSseTransport", false);
+        report.AddSetting("EnableHttpSseTransport", enableHttpSse.ToString());
+
+        var requireAuth = section.GetValue<bool?>("RequireAuthentication");
+        if (requireAuth.HasValue)
+        {
+            report.AddSetting("RequireAuthentication", requireAuth.Value.ToString());
+        }
+
+        var route = section.GetValue<string?>("HttpSseRoute");
+        if (!string.IsNullOrWhiteSpace(route))
+        {
+            report.AddSetting("HttpSseRoute", route);
+        }
+
+        var publishCapabilities = section.GetValue("PublishCapabilityEndpoint", true);
+        report.AddSetting("PublishCapabilityEndpoint", publishCapabilities.ToString());
+
         var allowed = section.GetSection("AllowedEntities").Get<string[]>() ?? Array.Empty<string>();
         if (allowed.Length > 0)
         {
