@@ -29,7 +29,7 @@ This quickstart demonstrates Koan's core promise: **sophisticated applications t
 
 ---
 
-## ✨ **Step 1: Try it, be delighted** *(2 minutes)*
+## **Step 1: Try it, be delighted** *(2 minutes)*
 
 Create a sophisticated API in under 2 minutes:
 
@@ -68,7 +68,7 @@ app.Run();
 dotnet run
 ```
 
-**🎉 Result:** Full REST API with health checks, telemetry, auto-generated GUID v7 IDs, SQLite database - zero configuration.
+**Result:** Full REST API with health checks, telemetry, auto-generated GUID v7 IDs, SQLite database - zero configuration.
 
 **Test it:**
 ```bash
@@ -88,7 +88,7 @@ curl http://localhost:5000/api/health
 
 ---
 
-## 🎯 **Step 2: Entity<> scales elegantly** *(1 minute)*
+## **Step 2: Entity<> scales elegantly** *(1 minute)*
 
 Add messaging with the same pattern:
 
@@ -135,7 +135,7 @@ dotnet add package Koan.Messaging.InMemory
 
 ---
 
-## 🤖 **Step 3: AI feels native** *(1 minute)*
+## **Step 3: AI feels native** *(1 minute)*
 
 Add AI capabilities through familiar patterns:
 
@@ -186,7 +186,7 @@ curl "http://localhost:5000/api/todos/semantic-search?query=work projects"
 
 ---
 
-## ⚡ **Step 4: Intelligent Automation** *(1 minute)*
+## **Step 4: Intelligent Automation** *(1 minute)*
 
 Scale to event-driven architecture and multi-provider data:
 
@@ -247,7 +247,7 @@ koan export compose --profile Local
 
 ---
 
-## 🔧 **Step 5: Works with what you know**
+## **Step 5: Works with what you know**
 
 Koan enhances your existing .NET workflow:
 
@@ -268,17 +268,17 @@ docker build -t my-koan-app .
 
 ---
 
-## 🎉 **What You Just Built**
+## **What You Just Built**
 
 In 5 minutes, you created:
 
-- ✅ **REST API** with full CRUD operations
-- ✅ **Event-driven architecture** with business logic
-- ✅ **AI integration** with chat and semantic search
-- ✅ **Multi-provider data access** (SQLite → PostgreSQL → Vector)
-- ✅ **Health checks and telemetry** (automatic)
-- ✅ **Container deployment** configuration (generated)
-- ✅ **Enterprise observability** (built-in)
+- **REST API** with full CRUD operations
+- **Event-driven architecture** with business logic
+- **AI integration** with chat and semantic search
+- **Multi-provider data access** (SQLite → PostgreSQL → Vector)
+- **Health checks and telemetry** (automatic)
+- **Container deployment** configuration (generated)
+- **Enterprise observability** (built-in)
 
 **All through the simple Entity<> pattern.**
 
@@ -303,17 +303,17 @@ In 5 minutes, you created:
 
 ## Next Steps
 
-### 👨‍💻 **For Individual Developers**
+### **For Individual Developers**
 - **[Complete Getting Started Guide](getting-started.md)** - Deep dive into patterns
 - **[Building APIs Guide](../guides/building-apis.md)** - Advanced API patterns
 - **[AI Integration Guide](../guides/ai-integration.md)** - Comprehensive AI patterns
 
-### 🏢 **For Teams & Architects**
+### **For Teams & Architects**
 - **[Enterprise Architecture Guide](../architecture/principles.md)** - Strategic framework adoption
 - **[Sample Applications](../../samples/)** - Real-world implementations
 - **[Container Orchestration](../guides/orchestration.md)** - Production deployment patterns
 
-### 🤖 **For AI-First Development**
+### **For AI-First Development**
 - **[MCP Integration Guide](../guides/mcp-http-sse-howto.md)** - AI-assisted development workflow
 - **[Vector Search Patterns](../guides/vector-search.md)** - Semantic search implementation
 - **[Chat Integration Patterns](../guides/chat-integration.md)** - Conversational interfaces

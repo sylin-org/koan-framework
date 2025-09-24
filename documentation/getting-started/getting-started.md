@@ -22,11 +22,11 @@ validation: 2025-01-17
 
 Koan Framework embodies five core experiences that transform how you build .NET applications:
 
-1. **✨ Try it, be delighted** - Immediate productivity and pleasant surprises
-2. **🎯 Entity<> scales elegantly** - One pattern from CRUD to enterprise architecture
-3. **🤖 AI feels native** - AI integration through familiar patterns
-4. **⚡ Intelligent automation** - Small teams build sophisticated solutions
-5. **🔧 Works with what you know** - Enhances your existing .NET workflow
+1. **Try it, be delighted** - Immediate productivity and pleasant surprises
+2. **Entity<> scales elegantly** - One pattern from CRUD to enterprise architecture
+3. **AI feels native** - AI integration through familiar patterns
+4. **Intelligent automation** - Small teams build sophisticated solutions
+5. **Works with what you know** - Enhances your existing .NET workflow
 
 This guide will take you through each experience systematically, building from simple concepts to sophisticated real-world applications.
 
@@ -160,12 +160,12 @@ app.Run();
 dotnet run
 
 # Application automatically provides:
-# ✅ REST API at http://localhost:5000/api/todos
-# ✅ Health checks at http://localhost:5000/api/health
-# ✅ Swagger UI at http://localhost:5000/swagger (development)
-# ✅ Auto-generated GUID v7 IDs
-# ✅ SQLite database with zero configuration
-# ✅ Structured logging and telemetry
+# REST API at http://localhost:5000/api/todos
+# Health checks at http://localhost:5000/api/health
+# Swagger UI at http://localhost:5000/swagger (development)
+# Auto-generated GUID v7 IDs
+# SQLite database with zero configuration
+# Structured logging and telemetry
 ```
 
 ### **Test the API**
@@ -787,11 +787,11 @@ koan export compose --profile Staging --output staging-compose.yml
 koan export compose --profile Production --output production-compose.yml
 
 # Generated files include:
-# ✅ Service definitions with proper dependencies
-# ✅ Health check configurations
-# ✅ Environment-specific networking
-# ✅ Volume configurations for data persistence
-# ✅ Resource limits and scaling policies
+# Service definitions with proper dependencies
+# Health check configurations
+# Environment-specific networking
+# Volume configurations for data persistence
+# Resource limits and scaling policies
 ```
 
 Example generated `production-compose.yml`:
@@ -1421,27 +1421,27 @@ Explore real-world implementations in the [samples directory](../../samples/):
 
 **You've experienced the complete Koan Framework transformation:**
 
-### **✨ Chapter 1: Try it, be delighted**
+### **Chapter 1: Try it, be delighted**
 - Created sophisticated REST API in 2 minutes
 - Experienced zero-configuration productivity
 - Discovered pleasant surprises (health checks, telemetry, GUID v7)
 
-### **🎯 Chapter 2: Entity<> scales elegantly**
+### **Chapter 2: Entity<> scales elegantly**
 - Extended same pattern to messaging and events
 - Learned Reference = Intent dependency management
 - Built event-driven architecture with familiar APIs
 
-### **🤖 Chapter 3: AI feels native**
+### **Chapter 3: AI feels native**
 - Integrated AI through standard dependency injection
 - Added semantic search and chat capabilities
 - Enhanced business logic with AI insights
 
-### **⚡ Chapter 4: Intelligent automation**
+### **Chapter 4: Intelligent automation**
 - Scaled across multiple data providers seamlessly
 - Generated sophisticated deployment artifacts automatically
 - Implemented enterprise observability and monitoring
 
-### **🔧 Chapter 5: Works with what you know**
+### **Chapter 5: Works with what you know**
 - Integrated with standard ASP.NET Core patterns
 - Used familiar tooling (Docker, testing, CI/CD)
 - Enhanced existing workflows without replacement

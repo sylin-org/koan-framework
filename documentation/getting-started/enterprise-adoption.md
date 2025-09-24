@@ -110,11 +110,11 @@ Flow.OnUpdate<CustomerOrder>(async (order, previous) => {
 koan export compose --profile Production
 
 # Validate enterprise requirements
-# ✅ Health monitoring and alerting
-# ✅ Secrets management integration
-# ✅ Observability and logging
-# ✅ Container orchestration ready
-# ✅ Multi-environment configuration
+# Health monitoring and alerting
+# Secrets management integration
+# Observability and logging
+# Container orchestration ready
+# Multi-environment configuration
 ```
 
 **Success Metrics:**
@@ -218,14 +218,14 @@ public class LegacyIntegrationController : EntityController<CustomerEvent>
 
 **Architecture Review Checklist:**
 ```markdown
-✅ Entity models follow domain-driven design principles
-✅ Controllers inherit from EntityController<> or justify custom implementation
-✅ Dependencies declared through package references (Reference = Intent)
-✅ Event-driven patterns use Flow.OnUpdate<> handlers
-✅ AI integration follows IAiService dependency injection patterns
-✅ Multi-provider strategy documented and tested
-✅ Health checks and observability configured
-✅ Container deployment artifacts generated and reviewed
+Entity models follow domain-driven design principles
+Controllers inherit from EntityController<> or justify custom implementation
+Dependencies declared through package references (Reference = Intent)
+Event-driven patterns use Flow.OnUpdate<> handlers
+AI integration follows IAiService dependency injection patterns
+Multi-provider strategy documented and tested
+Health checks and observability configured
+Container deployment artifacts generated and reviewed
 ```
 
 ### **Security and Compliance**
@@ -268,11 +268,11 @@ koan export compose --profile Staging
 koan export compose --profile Production
 
 # Generated artifacts include:
-# ✅ Service definitions with dependencies
-# ✅ Health check configurations
-# ✅ Environment variable templates
-# ✅ Network security configurations
-# ✅ Volume and data persistence strategies
+# Service definitions with dependencies
+# Health check configurations
+# Environment variable templates
+# Network security configurations
+# Volume and data persistence strategies
 ```
 
 **Operational Excellence:**

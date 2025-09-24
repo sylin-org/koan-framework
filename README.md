@@ -13,7 +13,7 @@
 
 ## The Koan Experience: From Simple to Sophisticated in Minutes
 
-### ✨ **1. Try it, be delighted**
+### **1. Try it, be delighted**
 
 ```bash
 # 2 minutes to working API
@@ -36,17 +36,17 @@ public class TodosController : EntityController<Todo> { }
 
 ```bash
 dotnet run
-# ✅ Full REST API with health checks
-# ✅ Auto-generated GUID v7 IDs
-# ✅ SQLite database (zero config)
-# ✅ Structured logging and telemetry
+# Full REST API with health checks
+# Auto-generated GUID v7 IDs
+# SQLite database (zero config)
+# Structured logging and telemetry
 ```
 
 **Result:** *"This is how .NET development should feel."*
 
 ---
 
-### 🎯 **2. Entity<> scales elegantly**
+### **2. Entity<> scales elegantly**
 
 ```csharp
 // Same pattern, growing capabilities
@@ -72,7 +72,7 @@ await new TodoCompleted { TodoId = todo.Id }.Send();  // Same pattern extends
 
 ---
 
-### 🤖 **3. AI feels native**
+### **3. AI feels native**
 
 ```csharp
 // Reference = Intent
@@ -92,7 +92,7 @@ var similar = await Product.SemanticSearch("eco-friendly laptops");
 
 ---
 
-### ⚡ **4. Intelligent Automation**
+### **4. Intelligent Automation**
 
 ```csharp
 // Small teams, sophisticated solutions
@@ -120,7 +120,7 @@ var similar = await Todo.SemanticSearch("urgent");   // → Vector DB
 
 ---
 
-### 🔧 **5. Works with what you know**
+### **5. Works with what you know**
 
 ```csharp
 // Standard .NET patterns, enhanced
@@ -166,7 +166,7 @@ dotnet build, dotnet test, dotnet publish
 
 ## Quick Start Paths
 
-### 👨‍💻 **For Individual Developers**
+### **For Individual Developers**
 ```bash
 # Try the 5-minute experience
 git clone https://github.com/koan-framework/quickstart
@@ -177,7 +177,7 @@ dotnet new web -n MyApp
 dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
 ```
 
-### 🏢 **For Teams & Architects**
+### **For Teams & Architects**
 ```bash
 # Explore enterprise patterns
 git clone https://github.com/koan-framework/enterprise-sample
@@ -186,7 +186,7 @@ cd enterprise-sample && ./start.bat
 # See: AI integration, event sourcing, multi-provider data, container orchestration
 ```
 
-### 🚀 **For AI-First Projects**
+### **For AI-First Projects**
 ```bash
 # Start with AI-native patterns
 dotnet new web -n AiApp
@@ -225,11 +225,11 @@ dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 
 **Join our growing community of developers building the future of .NET development:**
 
-- ⭐ **Star the repository** to show support
-- 🐛 **Report issues** you encounter
-- 💡 **Suggest features** based on your needs
-- 🛠️ **Submit pull requests** for improvements
-- 💬 **Join discussions** about framework design
+- **Star the repository** to show support
+- **Report issues** you encounter
+- **Suggest features** based on your needs
+- **Submit pull requests** for improvements
+- **Join discussions** about framework design
 
 **Your feedback directly influences our roadmap.**
 
