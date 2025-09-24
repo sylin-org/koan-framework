@@ -10,6 +10,7 @@ S12.MedTrials demonstrates how Koan's AI and MCP pillars combine to deliver an a
 - **AngularJS SPA** – Served from the API project's `wwwroot` with Bootstrap styling, route-based controllers, and Koan REST integrations.
 - **Seeded data** – A hosted worker seeds demo sites, visits, documents, and adverse events so the UI and APIs light up immediately after `dotnet run`.
 - **Dedicated MCP host** – `S12.MedTrials.McpService` runs as a standalone HTTP+SSE transport with zero-config development settings and a capability probe wired into the primary API.
+- **MCP console** – `S12.MedTrials.McpService/wwwroot` ships an AngularJS client to inspect capabilities, browse tool schemas, and execute JSON-RPC calls over the live session.
 
 ## Running the sample
 
@@ -49,6 +50,7 @@ The API listens on `http://localhost:5110` (see `AppManifest`). Swagger UI and t
 - Swagger: `http://localhost:5110/swagger`
 - SPA: `http://localhost:5110/index.html`
 - MCP HTTP+SSE: `http://localhost:5114/mcp`
+- MCP Console: `http://localhost:5114/index.html`
 
 **Note:** When running locally, ensure MongoDB, Weaviate, and Ollama are running separately on the ports configured in `appsettings.Development.json`.
 
