@@ -1,0 +1,89 @@
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-upload"></i> Ingest Document</h5>
+                <div class="mb-3">
+                    <label class="form-label">Title</label>
+                    <input type="text" class="form-control" ng-model="ingestModel.title" placeholder="Protocol Amendment">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Document type</label>
+                    <input type="text" class="form-control" ng-model="ingestModel.documentType">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Trial site (optional)</label>
+                    <input type="text" class="form-control" ng-model="ingestModel.trialSiteId" placeholder="Trial site ID">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tags</label>
+                    <input type="text" class="form-control" ng-model="ingestModel.tags" placeholder="e.g. safety, dosing">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Content</label>
+                    <textarea class="form-control" ng-model="ingestModel.content"></textarea>
+                </div>
+                <button class="btn btn-success w-100" ng-click="ingest()" ng-disabled="loading">
+                    <span ng-if="!loading"><i class="fas fa-save"></i> Ingest</span>
+                    <span ng-if="loading" class="spinner-border spinner-border-sm" role="status"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-search"></i> Semantic Query</h5>
+                <div class="mb-3">
+                    <label class="form-label">Question</label>
+                    <input type="text" class="form-control" ng-model="queryModel.query" placeholder="What are the latest dose adjustments?">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Trial site (optional)</label>
+                    <input type="text" class="form-control" ng-model="queryModel.trialSiteId">
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="include-content" ng-model="queryModel.includeContent">
+                    <label class="form-check-label" for="include-content">Include full content in response</label>
+                </div>
+                <button class="btn btn-primary" ng-click="search()" ng-disabled="loading">
+                    <span ng-if="!loading"><i class="fas fa-search"></i> Search</span>
+                    <span ng-if="loading" class="spinner-border spinner-border-sm" role="status"></span>
+                </button>
+            </div>
+        </div>
+        <div class="card shadow-sm" ng-if="queryResults">
+            <div class="card-body">
+                <h5 class="card-title">Results</h5>
+                <p class="small text-muted" ng-if="queryResults.degraded">Vector search unavailable - deterministic fallback used.</p>
+                <div class="list-group">
+                    <a class="list-group-item list-group-item-action" ng-repeat="match in (queryResults.matches || [])">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{match.document.title || match.document.Title}}</h6>
+                            <small class="text-muted">Score: {{match.score | number:2}}</small>
+                        </div>
+                        <p class="mb-1" ng-if="match.snippet">{{match.snippet}}</p>
+                        <small class="text-muted">Type: {{match.document.documentType || match.document.DocumentType}}</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="card shadow-sm mt-4" ng-if="documents.length">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-book"></i> Library</h5>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item" ng-repeat="doc in documents">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>{{doc.title || doc.Title}}</strong>
+                                <span class="badge bg-secondary ms-2">{{doc.documentType || doc.DocumentType}}</span>
+                            </div>
+                            <small class="text-muted">Effective {{(doc.effectiveDate || doc.EffectiveDate) | date}}</small>
+                        </div>
+                        <p class="mb-0 text-muted small">{{doc.tags && doc.tags.join(', ') || (doc.Tags && doc.Tags.join(', '))}}</p>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
