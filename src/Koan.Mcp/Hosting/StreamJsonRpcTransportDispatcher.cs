@@ -30,7 +30,7 @@ public sealed class StreamJsonRpcTransportDispatcher : IMcpTransportDispatcher
         if (input is null) throw new ArgumentNullException(nameof(input));
         if (output is null) throw new ArgumentNullException(nameof(output));
 
-        var formatter = new JsonMessageFormatter
+        var formatter = new SystemTextJsonFormatter
         {
             JsonSerializerOptions = SerializerOptions
         };

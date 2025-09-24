@@ -29,7 +29,7 @@ public sealed class McpDescriptionAttribute : Attribute
     public string Description { get; }
 
     /// <summary>
-    /// Limits the description to the specified operation when provided.
+    /// Limits the description to the specified operation when provided. Defaults to None (applies to all operations).
     /// </summary>
-    public EntityEndpointOperationKind? Operation { get; set; }
+    public EntityEndpointOperationKind Operation { get; set; } = EntityEndpointOperationKind.None;
 }

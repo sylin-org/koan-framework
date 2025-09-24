@@ -11,7 +11,7 @@ using StreamJsonRpc;
 
 namespace Koan.Mcp.Hosting;
 
-internal sealed class McpRpcHandler
+public sealed class McpRpcHandler
 {
     private readonly McpEntityRegistry _registry;
     private readonly EndpointToolExecutor _executor;
@@ -53,7 +53,7 @@ internal sealed class McpRpcHandler
     [JsonRpcMethod("ping")]
     public Task<string> PingAsync() => Task.FromResult("pong");
 
-    internal sealed class ToolsCallParams
+    public sealed class ToolsCallParams
     {
         [JsonPropertyName("name")]
         public required string Name { get; init; }
@@ -62,7 +62,7 @@ internal sealed class McpRpcHandler
         public JsonObject? Arguments { get; init; }
     }
 
-    internal sealed class ToolsListResponse
+    public sealed class ToolsListResponse
     {
         [JsonPropertyName("tools")]
         public IReadOnlyList<ToolDescriptor> Tools { get; init; } = Array.Empty<ToolDescriptor>();
@@ -71,7 +71,7 @@ internal sealed class McpRpcHandler
         public object? Next { get; init; }
     }
 
-    internal sealed class ToolDescriptor
+    public sealed class ToolDescriptor
     {
         [JsonPropertyName("name")]
         public required string Name { get; init; }
@@ -106,7 +106,7 @@ internal sealed class McpRpcHandler
         }
     }
 
-    internal sealed class ToolsCallResult
+    public sealed class ToolsCallResult
     {
         [JsonPropertyName("success")]
         public bool Success { get; init; }

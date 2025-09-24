@@ -356,7 +356,7 @@ public sealed class SchemaBuilder
     {
         foreach (var attribute in property.GetCustomAttributes<McpDescriptionAttribute>())
         {
-            if (attribute.Operation is null)
+            if (attribute.Operation == EntityEndpointOperationKind.None)
             {
                 return attribute.Description;
             }

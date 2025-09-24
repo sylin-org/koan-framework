@@ -8,6 +8,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Threading;
 using Koan.Web.Endpoints;
+using Koan.Web.Hooks;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;

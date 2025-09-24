@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Mcp.Execution;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Mcp.Hosting;

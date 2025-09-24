@@ -125,18 +125,26 @@ public sealed class ResponseTranslator
                 obj["content"] = contentResult.Content ?? string.Empty;
                 break;
 
+            case UnauthorizedResult:
+                obj["statusCode"] = 401;
+                break;
+
+            case EmptyResult:
+                obj["statusCode"] = 204;
+                break;
+
             case StatusCodeResult statusCodeResult:
                 obj["statusCode"] = statusCodeResult.StatusCode;
                 break;
 
             case RedirectResult redirectResult:
-                obj["statusCode"] = redirectResult.StatusCode ?? 302;
+                obj["statusCode"] = redirectResult.Permanent ? 301 : 302;
                 obj["location"] = redirectResult.Url ?? string.Empty;
                 obj["permanent"] = redirectResult.Permanent;
                 break;
 
             case RedirectToRouteResult routeResult:
-                obj["statusCode"] = routeResult.StatusCode ?? 302;
+                obj["statusCode"] = routeResult.Permanent ? 301 : 302;
                 obj["routeName"] = routeResult.RouteName ?? string.Empty;
                 if (routeResult.RouteValues is not null)
                 {
@@ -183,18 +191,10 @@ public sealed class ResponseTranslator
 
                 break;
 
-            case UnauthorizedResult:
-                obj["statusCode"] = 401;
-                break;
-
-            case EmptyResult:
-                obj["statusCode"] = 204;
-                break;
-
             default:
                 if (actionResult is FileResult fileResult)
                 {
-                    obj["statusCode"] = fileResult.StatusCode ?? 200;
+                    obj["statusCode"] = 200;
                     obj["contentType"] = fileResult.ContentType ?? string.Empty;
                     if (!string.IsNullOrEmpty(fileResult.FileDownloadName))
                     {

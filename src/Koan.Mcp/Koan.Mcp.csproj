@@ -10,7 +10,7 @@
     <FileVersion>0.6.1</FileVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="StreamJsonRpc" Version="2.16.108" />
+    <PackageReference Include="StreamJsonRpc" Version="2.22.11" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.JsonPatch" Version="9.0.0" />
   </ItemGroup>
