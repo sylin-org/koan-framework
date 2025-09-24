@@ -19,6 +19,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private readonly IServiceProvider _sp;
     private readonly ILogger<WeaviateVectorRepository<TEntity, TKey>>? _logger;
     private volatile bool _schemaEnsured;
+    private volatile int _discoveredDimension = -1; // -1 means not discovered yet
 
     public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete;
 
@@ -38,9 +39,18 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private async Task EnsureSchemaAsync(CancellationToken ct)
     {
         if (_schemaEnsured) return;
+
+        // For backward compatibility, use configured dimension if no dimension discovered yet
+        var effectiveDimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension;
+        await EnsureSchemaAsync(effectiveDimension, ct);
+    }
+
+    private async Task EnsureSchemaAsync(int dimension, CancellationToken ct)
+    {
+        if (_schemaEnsured) return;
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.index.ensureCreated");
         var cls = ClassName;
-        _logger?.LogDebug("Weaviate: ensure schema base={Base} class={Class} (resolved from {EntityType})", _http.BaseAddress, cls, typeof(TEntity).Name);
+        _logger?.LogDebug("Weaviate: ensure schema base={Base} class={Class} (resolved from {EntityType}) dimension={Dimension}", _http.BaseAddress, cls, typeof(TEntity).Name, dimension);
         // Probe class
         var probe = await _http.GetAsync($"/v1/schema/{Uri.EscapeDataString(cls)}", ct);
         _logger?.LogDebug("Weaviate: GET /v1/schema/{Class} -> {Status}", cls, (int)probe.StatusCode);
@@ -142,6 +152,21 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     public async Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.upsert");
+
+        // Discover dimension from first embedding if not already discovered
+        if (_discoveredDimension == -1 && embedding.Length > 0)
+        {
+            _discoveredDimension = embedding.Length;
+            _logger?.LogInformation("Weaviate: discovered embedding dimension {Dimension} from first vector for class {Class}", _discoveredDimension, ClassName);
+        }
+        else if (_discoveredDimension > 0 && embedding.Length > 0 && _discoveredDimension != embedding.Length)
+        {
+            _logger?.LogWarning("Weaviate: dimension conflict detected! Previously discovered {PreviousDimension}, current embedding {CurrentDimension} for class {Class}. Updating discovery.", _discoveredDimension, embedding.Length, ClassName);
+            _discoveredDimension = embedding.Length;
+            // Reset schema to be recreated with new dimensions
+            _schemaEnsured = false;
+        }
+
         await EnsureSchemaAsync(ct);
         ValidateEmbedding(embedding);
         // Weaviate requires UUID ids; derive a deterministic UUID from the entity id (namespaced by class) for stable mapping
@@ -244,6 +269,14 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     public async Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.search");
+
+        // Discover dimension from query vector if not already discovered
+        if (_discoveredDimension == -1 && options.Query.Length > 0)
+        {
+            _discoveredDimension = options.Query.Length;
+            _logger?.LogDebug("Weaviate: discovered embedding dimension {Dimension} from query vector", _discoveredDimension);
+        }
+
         await EnsureSchemaAsync(ct);
         ValidateEmbedding(options.Query);
         var topK = options.TopK ?? _options.DefaultTopK;
@@ -276,8 +309,14 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
     private void ValidateEmbedding(float[] embedding)
     {
-        if (_options.Dimension > 0 && embedding.Length != _options.Dimension)
-            throw new ArgumentException($"Embedding dimension {embedding.Length} does not match configured {_options.Dimension}.");
+        // Use discovered dimension if available, otherwise fall back to configured dimension
+        var expectedDimension = _discoveredDimension > 0 ? _discoveredDimension : _options.Dimension;
+
+        if (expectedDimension > 0 && embedding.Length != expectedDimension)
+        {
+            var source = _discoveredDimension > 0 ? "discovered" : "configured";
+            throw new ArgumentException($"Embedding dimension {embedding.Length} does not match {source} {expectedDimension}.");
+        }
     }
 
     // Instruction execution: ensureCreated, stats, clear (destructive guard)

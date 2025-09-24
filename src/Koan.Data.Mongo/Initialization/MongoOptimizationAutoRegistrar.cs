@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Optimization;
 using Microsoft.Extensions.DependencyInjection;
@@ -94,7 +95,8 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
         Console.WriteLine("[MONGO-AUTO-REGISTRAR] Scanning assemblies for Entity<> types...");
 
         var optimizedTypes = new List<EntityOptimizationInfo>();
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = AssemblyCache.Instance.GetAllAssemblies()
             .Where(a => !a.IsDynamic && !IsSystemAssembly(a))
             .ToList();
 

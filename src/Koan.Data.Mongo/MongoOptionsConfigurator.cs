@@ -4,51 +4,62 @@ using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Koan.Core;
+using Koan.Core.Orchestration;
 
 namespace Koan.Data.Mongo;
 
 /// <summary>
-/// Auto-registration for Mongo adapter and health contributor during Koan initialization.
+/// Orchestration-aware MongoDB configuration using centralized service discovery.
+/// Replaces custom auto-detection with unified Koan orchestration patterns.
 /// </summary>
-// legacy initializer removed in favor of standardized auto-registrar
-
 internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<MongoOptionsConfigurator> logger) : IConfigureOptions<MongoOptions>
 {
     public void Configure(MongoOptions options)
     {
-        logger.LogInformation("MongoDB Auto-Configuration Started");
-        logger.LogInformation("Environment: {Environment}, InContainer: {InContainer}, IsProduction: {IsProduction}", 
-            KoanEnv.EnvironmentName, KoanEnv.InContainer, KoanEnv.IsProduction);
-        logger.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Database: '{Database}'", 
+        logger.LogInformation("MongoDB Orchestration-Aware Configuration Started");
+        logger.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
+            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
+        logger.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Database: '{Database}'",
             options.ConnectionString, options.Database);
-        
-        // Phase 1: Handle explicit configuration (highest priority)
-        var explicitConnectionString = Configuration.ReadFirst(
-            config,
-            defaultValue: string.Empty,
+
+        // Get database name and credentials for connection string construction
+        var databaseName = Configuration.ReadFirst(config, "KoanAspireDemo",
+            "Koan:Data:Mongo:Database",
+            "Koan:Data:Database",
+            "ConnectionStrings:Database");
+
+        var username = Configuration.ReadFirst(config, "",
+            "Koan:Data:Mongo:Username",
+            "Koan:Data:Username");
+
+        var password = Configuration.ReadFirst(config, "",
+            "Koan:Data:Mongo:Password",
+            "Koan:Data:Password");
+
+        // Use centralized orchestration-aware service discovery
+        var serviceDiscovery = new OrchestrationAwareServiceDiscovery(config, null);
+
+        // Check for explicit connection string first
+        var explicitConnectionString = Configuration.ReadFirst(config, "",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
             Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
-            
+
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            logger.LogInformation("Using explicit connection string from configuration: '{ConnectionString}'", explicitConnectionString);
+            logger.LogInformation("Using explicit connection string from configuration");
             options.ConnectionString = explicitConnectionString;
         }
-        else if (string.Equals(options.ConnectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
+                 string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            logger.LogInformation("Auto-detection mode activated - resolving MongoDB connection...");
-            options.ConnectionString = ResolveAutoConnection(logger);
-        }
-        else if (string.IsNullOrWhiteSpace(options.ConnectionString))
-        {
-            logger.LogInformation("No connection string provided - falling back to auto-detection");
-            options.ConnectionString = ResolveAutoConnection(logger);
+            logger.LogInformation("Auto-detection mode - using orchestration-aware service discovery");
+            options.ConnectionString = ResolveOrchestrationAwareConnection(serviceDiscovery, databaseName, username, password, logger);
         }
         else
         {
-            logger.LogInformation("Using pre-configured connection string: '{ConnectionString}'", options.ConnectionString);
+            logger.LogInformation("Using pre-configured connection string");
         }
         // Configure other options
         options.Database = Configuration.ReadFirst(
@@ -74,34 +85,63 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
         logger.LogInformation("Final MongoDB Configuration");
         logger.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
         logger.LogInformation("Database: {Database}", options.Database);
-        logger.LogInformation("MongoDB Auto-Configuration Complete");
+        logger.LogInformation("MongoDB Orchestration-Aware Configuration Complete");
     }
 
-    private string ResolveAutoConnection(ILogger logger)
+    private string ResolveOrchestrationAwareConnection(
+        IOrchestrationAwareServiceDiscovery serviceDiscovery,
+        string? databaseName,
+        string? username,
+        string? password,
+        ILogger logger)
     {
-        // Check if auto-detection is explicitly disabled first
-        if (IsAutoDetectionDisabled())
+        try
         {
-            logger.LogInformation("Auto-detection disabled via configuration - using localhost");
-            return MongoConstants.DefaultLocalUri;
-        }
+            // Check if auto-detection is explicitly disabled
+            if (IsAutoDetectionDisabled())
+            {
+                logger.LogInformation("Auto-detection disabled via configuration - using localhost");
+                return BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
+            }
 
-        // Phase 1: Environment variable list (highest priority for auto-detection)
-        var envConnection = TryEnvironmentVariableList(logger);
-        if (!string.IsNullOrWhiteSpace(envConnection)) 
+            // Create service discovery options with MongoDB-specific health checking
+            var discoveryOptions = ServiceDiscoveryExtensions.ForMongoDB(databaseName, username, password);
+
+            // Add MongoDB-specific health checking
+            discoveryOptions = discoveryOptions with
+            {
+                HealthCheck = new HealthCheckOptions
+                {
+                    CustomHealthCheck = async (connectionString, ct) =>
+                    {
+                        var normalizedConnection = NormalizeConnectionString(connectionString);
+                        return TryMongoPing(normalizedConnection, TimeSpan.FromMilliseconds(500));
+                    },
+                    Timeout = TimeSpan.FromMilliseconds(500),
+                    Required = !KoanEnv.IsProduction // Less strict in production
+                },
+                AdditionalCandidates = GetAdditionalCandidatesFromEnvironment()
+            };
+
+            // Use centralized service discovery
+            var discoveryTask = serviceDiscovery.DiscoverServiceAsync("mongodb", discoveryOptions);
+            var result = discoveryTask.GetAwaiter().GetResult();
+
+            logger.LogInformation("MongoDB discovered via {Method}: {ServiceUrl}",
+                result.DiscoveryMethod, result.ServiceUrl);
+
+            if (!result.IsHealthy && discoveryOptions.HealthCheck?.Required == true)
+            {
+                logger.LogWarning("Discovered MongoDB service failed health check but proceeding anyway");
+            }
+
+            return result.ServiceUrl;
+        }
+        catch (Exception ex)
         {
-            return envConnection;
+            logger.LogError(ex, "Error in orchestration-aware MongoDB discovery, falling back to localhost");
+            return BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
         }
-
-        // Phase 2: ConnectionStrings:Default fallback
-        var defaultConnection = TryDefaultConnectionString(logger);
-        if (!string.IsNullOrWhiteSpace(defaultConnection)) 
-        {
-            return defaultConnection;
-        }
-
-        // Phase 3: Smart environment-based auto-detection
-        return ResolveByEnvironment(logger);
     }
 
     private bool IsAutoDetectionDisabled()
@@ -110,92 +150,27 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
                || Configuration.Read(config, "Koan_DATA_MONGO_DISABLE_AUTO_DETECTION", false);
     }
 
-    private string? TryEnvironmentVariableList(ILogger logger)
+    private string[] GetAdditionalCandidatesFromEnvironment()
     {
-        try
-        {
-            var list = Environment.GetEnvironmentVariable(MongoConstants.EnvList);
-            if (string.IsNullOrWhiteSpace(list))
-            {
-                logger.LogInformation("Environment variable {EnvList} not set", MongoConstants.EnvList);
-                return null;
-            }
+        var candidates = new List<string>();
 
-            logger.LogInformation("Testing MongoDB URLs from {EnvList}: {List}", MongoConstants.EnvList, list);
-            foreach (var part in list.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var candidate = part.Trim();
-                if (string.IsNullOrWhiteSpace(candidate)) continue;
-                
-                var normalized = NormalizeConnectionString(candidate);
-                logger.LogInformation("  Testing: {ConnectionString}", normalized);
-                
-                if (TryMongoPing(normalized, TimeSpan.FromMilliseconds(500)))
-                {
-                    logger.LogInformation("  SUCCESS: {ConnectionString} is reachable", normalized);
-                    return normalized;
-                }
-                logger.LogInformation("  Failed: {ConnectionString} not reachable", normalized);
-            }
-            logger.LogInformation("No URLs from environment variable were reachable");
-        }
-        catch (Exception ex)
+        // Legacy environment variable support for backward compatibility
+        var envList = Environment.GetEnvironmentVariable(MongoConstants.EnvList);
+        if (!string.IsNullOrWhiteSpace(envList))
         {
-            logger.LogWarning(ex, "Error processing {EnvList}: {Message}", MongoConstants.EnvList, ex.Message);
+            candidates.AddRange(envList.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
         }
-        return null;
+
+        return candidates.ToArray();
     }
 
-    private string? TryDefaultConnectionString(ILogger logger)
+    private static string BuildMongoConnectionString(string hostname, int port, string? database, string? username, string? password)
     {
-        var cs = Configuration.Read(config, Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault, null);
-        if (!string.IsNullOrWhiteSpace(cs))
-        {
-            logger.LogInformation("Found ConnectionStrings:Default = '{ConnectionString}'", cs);
-            return cs;
-        }
-        logger.LogInformation("No ConnectionStrings:Default found");
-        return null;
-    }
-
-    private string ResolveByEnvironment(ILogger logger)
-    {
-        var isProd = KoanEnv.IsProduction;
-        var inContainer = KoanEnv.InContainer;
-
-        logger.LogInformation("Environment-based resolution: Production={Production}, Container={Container}", isProd, inContainer);
-        
-        if (isProd)
-        {
-            logger.LogInformation("Production environment: using secure default {DefaultUri}", MongoConstants.DefaultLocalUri);
-            return MongoConstants.DefaultLocalUri;
-        }
-
-        // Development environment: try smart detection with connectivity testing
-        logger.LogInformation("Development environment: testing connectivity...");
-        
-        var candidates = new[]
-        {
-            (MongoConstants.DefaultComposeUri, "container/compose hostname"),
-            (MongoConstants.DefaultLocalUri, "localhost")
-        };
-
-        foreach (var (uri, description) in candidates)
-        {
-            logger.LogInformation("  Testing {Description}: {Uri}", description, uri);
-            if (TryMongoPing(uri, TimeSpan.FromMilliseconds(500)))
-            {
-                logger.LogInformation("  SUCCESS: {Description} is reachable", description);
-                return uri;
-            }
-            logger.LogInformation("  Failed: {Description} not reachable", description);
-        }
-
-        // Nothing reachable - choose intelligent fallback
-        var fallback = inContainer ? MongoConstants.DefaultComposeUri : MongoConstants.DefaultLocalUri;
-        var reason = inContainer ? "container environment detected" : "bare metal environment detected";
-        logger.LogInformation("No MongoDB reachable - intelligent fallback: {Fallback} ({Reason})", fallback, reason);
-        return fallback;
+        var auth = string.IsNullOrEmpty(username) ? "" : $"{username}:{password ?? ""}@";
+        var db = string.IsNullOrEmpty(database) ? "" : $"/{database}";
+        return $"mongodb://{auth}{hostname}:{port}{db}";
     }
 
     private static string NormalizeConnectionString(string connectionString)

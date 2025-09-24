@@ -1,10 +1,11 @@
 using Koan.Core;
 using Koan.Core.Observability.Health;
+using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 
 namespace Koan.Data.Redis;
 
-internal sealed class RedisHealthContributor(IConnectionMultiplexer muxer) : IHealthContributor
+internal sealed class RedisHealthContributor(IServiceProvider serviceProvider) : IHealthContributor
 {
     public string Name => "data:redis";
     public bool IsCritical => true;
@@ -13,6 +14,8 @@ internal sealed class RedisHealthContributor(IConnectionMultiplexer muxer) : IHe
     {
         try
         {
+            // Lazy resolve the connection multiplexer only when health check runs
+            var muxer = serviceProvider.GetRequiredService<IConnectionMultiplexer>();
             var db = muxer.GetDatabase();
             // PING check
             var pong = await db.PingAsync();

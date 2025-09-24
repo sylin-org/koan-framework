@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>S10.DevPortal</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Core Koan Framework Dependencies -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <!-- Multi-Provider Support for Demo -->
+    <ProjectReference Include="..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Postgres\Koan.Data.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Sqlite\Koan.Data.Sqlite.csproj" />
+  </ItemGroup>
+
+  <!-- Static Files Configuration -->
+  <PropertyGroup>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="wwwroot\\**\\*" CopyToPublishDirectory="PreserveNewest" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

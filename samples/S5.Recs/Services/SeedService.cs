@@ -1,13 +1,14 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
-using S5.Recs.Options;
+using Koan.Ai.Provider.Ollama;
 using S5.Recs.Providers;
 using Koan.AI.Contracts;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
+using Koan.Core;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
@@ -563,8 +564,8 @@ internal sealed class SeedService : ISeedService
                 return 0;
             }
 
-            var opts = (IOptions<OllamaOptions>?)_sp.GetService(typeof(IOptions<OllamaOptions>));
-            var model = opts?.Value?.Model ?? "all-minilm";
+            var config = (IConfiguration?)_sp.GetService(typeof(IConfiguration));
+            var model = GetConfiguredModel(config);
 
             const int batchSize = 32;
             int total = 0;
@@ -613,8 +614,8 @@ internal sealed class SeedService : ISeedService
                 return 0;
             }
 
-            var opts = (IOptions<OllamaOptions>?)_sp.GetService(typeof(IOptions<OllamaOptions>));
-            var model = opts?.Value?.Model ?? "all-minilm";
+            var config = (IConfiguration?)_sp.GetService(typeof(IConfiguration));
+            var model = GetConfiguredModel(config);
 
             const int batchSize = 32;
             int total = 0;
@@ -647,6 +648,24 @@ internal sealed class SeedService : ISeedService
         catch
         {
             return 0;
+        }
+    }
+
+    private static string GetConfiguredModel(IConfiguration? configuration)
+    {
+        try
+        {
+            // Use Koan.Core Configuration helpers to read from multiple possible locations
+            var result = Configuration.ReadFirst(configuration, "all-minilm",
+                "Koan:Services:ollama:DefaultModel",
+                "Koan:Ai:Ollama:DefaultModel",
+                "Koan:Ai:Ollama:RequiredModels:0"  // First element of RequiredModels array
+            );
+            return result;
+        }
+        catch
+        {
+            return "all-minilm";
         }
     }
 

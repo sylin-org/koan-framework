@@ -23,37 +23,58 @@ Koan Framework is developing intelligent entity-first patterns for .NET develope
 
 **Your feedback shapes what we build next.**
 
-## Zero to Production in 60 Seconds
+## Quick Start: Todo API in 3 Steps
+
+**1. Create project and add Koan packages:**
 
 ```bash
-# 1. Create project
-dotnet new web && dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+dotnet new web -n TodoApi && cd TodoApi
+dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+```
 
-# 2. Add your domain model
-echo 'public class Product : Entity<Product> {
-    public string Name { get; set; } = "";
-    public decimal Price { get; set; }
-}' > Product.cs
+**2. Define your domain model:**
 
-# 3. Add API controller
-echo '[ApiController, Route("api/[controller]")]
-public class ProductsController : EntityController<Product> { }' > ProductsController.cs
+```csharp
+// Models/Todo.cs
+public class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+    public bool IsCompleted { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+```
 
-# 4. Run with zero configuration
+**3. Add controller and run:**
+
+```csharp
+// Controllers/TodosController.cs
+[ApiController]
+[Route("api/[controller]")]
+public class TodosController : EntityController<Todo> { }
+```
+
+```bash
 dotnet run
 ```
 
-**You just created:**
+**What you get automatically:**
 
-- Full REST API with CRUD operations
-- Automatic validation and error handling
-- Health monitoring with `/health` endpoint
-- OpenAPI documentation at `/swagger`
-- Structured logging and observability
-- Auto-generated GUID v7 IDs
-- Production-ready security headers
+- REST endpoints: GET, POST, PUT, DELETE `/api/todos`
+- Auto-generated GUID v7 IDs for new todos
+- Basic validation and error handling
+- Health check endpoint at `/api/health`
+- SQLite database (zero configuration)
 
-Visit `http://localhost:5000/swagger` to explore your API.
+**Try it:**
+```bash
+# Get all todos
+curl http://localhost:5000/api/todos
+
+# Create a todo
+curl -X POST http://localhost:5000/api/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Try Koan Framework", "isCompleted": false}'
+```
 
 ## Provider Transparency in Action
 

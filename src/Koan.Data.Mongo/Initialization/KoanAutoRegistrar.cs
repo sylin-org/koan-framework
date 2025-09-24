@@ -8,8 +8,11 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
+using Koan.Core.Orchestration;
 using Koan.Data.Abstractions;
+using Koan.Data.Mongo.Orchestration;
 
 namespace Koan.Data.Mongo.Initialization;
 
@@ -48,6 +51,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(new ServiceDescriptor(typeof(Abstractions.Naming.INamingDefaultsProvider), typeof(MongoNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
+
+        // Register orchestration evaluator for dependency management
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, MongoOrchestrationEvaluator>());
 
         // Apply MongoDB GUID optimization directly for v3.5.0 compatibility
         Console.WriteLine("[MONGO-KOAN-AUTO-REGISTRAR] Applying MongoDB GUID optimization directly...");
@@ -155,10 +161,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     private static string[] DiscoverAvailableDataProviders()
     {
-        // Scan loaded assemblies for other data providers
+        // Scan cached assemblies for other data providers
         var providers = new List<string> { "Mongo" }; // Always include self
 
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = AssemblyCache.Instance.GetAllAssemblies();
         foreach (var asm in assemblies)
         {
             var name = asm.GetName().Name ?? "";

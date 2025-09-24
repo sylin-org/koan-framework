@@ -3,7 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Ai.Provider.Ollama.Health;
+using Koan.Ai.Provider.Ollama.Orchestration;
 using Koan.Core;
+using Koan.Core.Orchestration;
 
 namespace Koan.Ai.Provider.Ollama.Initialization;
 
@@ -18,6 +20,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddOllamaFromConfig();
         services.AddSingleton<IHostedService, OllamaConfigRegistrationService>();
         services.AddSingleton<IHostedService, OllamaDiscoveryService>();
+
+        // Register orchestration evaluator for dependency management
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, OllamaOrchestrationEvaluator>());
+
         // Health reporter so readiness can reflect Ollama availability and models
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, OllamaHealthContributor>());
     }

@@ -1,3 +1,4 @@
+using Koan.Web.Endpoints;
 using HotChocolate.Execution.Configuration;
 using HotChocolate.Execution.Options;
 using HotChocolate.Language;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
@@ -38,7 +40,8 @@ public static class AddKoanGraphQlExtensions
         // Bind typed options
         services.AddKoanOptions<GraphQlOptions>(Infrastructure.Constants.Configuration.Section);
 
-        var entityTypes = AppDomain.CurrentDomain.GetAssemblies()
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var entityTypes = AssemblyCache.Instance.GetAllAssemblies()
             .Where(a => !a.IsDynamic)
             .SelectMany(SafeGetTypes)
             .Where(t => !t.IsAbstract && t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntity<>)))
@@ -496,7 +499,8 @@ public static class AddKoanGraphQlExtensions
                 var repo = _sp.GetRequiredService<IDataService>().GetRepository<TEntity, string>();
                 var caps = Caps(repo);
                 var opts = BuildOptions(http, q, page, size);
-                var hctx = new HookContext<TEntity> { Http = http, Services = http.RequestServices, Options = opts, Capabilities = caps, Ct = ctx.RequestAborted };
+                var requestCtx = new EntityRequestContext(http.RequestServices, opts, ctx.RequestAborted, http) { Capabilities = caps };
+                var hctx = new HookContext<TEntity>(requestCtx);
                 var runner = GetRunner(http);
 
                 var auth = await runner.AuthorizeAsync(hctx, new AuthorizeRequest { Method = "POST", Action = ActionType.Read, Scope = ActionScope.Collection });
@@ -565,7 +569,8 @@ public static class AddKoanGraphQlExtensions
                 var repo = _sp.GetRequiredService<IDataService>().GetRepository<TEntity, string>();
                 var caps = Caps(repo);
                 var opts = BuildOptions(http, null, 1, KoanWebConstants.Defaults.DefaultPageSize);
-                var hctx = new HookContext<TEntity> { Http = http, Services = http.RequestServices, Options = opts, Capabilities = caps, Ct = ctx.RequestAborted };
+                var requestCtx = new EntityRequestContext(http.RequestServices, opts, ctx.RequestAborted, http) { Capabilities = caps };
+                var hctx = new HookContext<TEntity>(requestCtx);
                 var runner = GetRunner(http);
 
                 var auth = await runner.AuthorizeAsync(hctx, new AuthorizeRequest { Method = "POST", Action = ActionType.Read, Scope = ActionScope.Model, Id = id });
@@ -600,7 +605,8 @@ public static class AddKoanGraphQlExtensions
                 var repo = _sp.GetRequiredService<IDataService>().GetRepository<TEntity, string>();
                 var caps = Caps(repo);
                 var opts = BuildOptions(http, null, 1, KoanWebConstants.Defaults.DefaultPageSize);
-                var hctx = new HookContext<TEntity> { Http = http, Services = http.RequestServices, Options = opts, Capabilities = caps, Ct = ctx.RequestAborted };
+                var requestCtx = new EntityRequestContext(http.RequestServices, opts, ctx.RequestAborted, http) { Capabilities = caps };
+                var hctx = new HookContext<TEntity>(requestCtx);
                 var runner = GetRunner(http);
 
                 var jobj = JObject.Parse(JsonConvert.SerializeObject(input));
@@ -759,3 +765,5 @@ public static class AddKoanGraphQlExtensions
         }
     }
 }
+
+

@@ -4,6 +4,7 @@ using Koan.Core.Observability;
 using Koan.Data.Core;
 using Koan.Web.Extensions;
 using Koan.Web.Backup.Initialization;
+using S5.Recs.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,9 +24,9 @@ Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.R
 // AI, Ollama, and Weaviate are auto-registered by their modules via Koan.Core discovery
 
 // Local services
-builder.Services.AddSingleton<S5.Recs.Services.ISeedService, S5.Recs.Services.SeedService>();
-builder.Services.AddSingleton<S5.Recs.Services.IRecsService, S5.Recs.Services.RecsService>();
-builder.Services.AddSingleton<S5.Recs.Services.IRecommendationSettingsProvider, S5.Recs.Services.RecommendationSettingsProvider>();
+builder.Services.AddSingleton<ISeedService, SeedService>();
+builder.Services.AddSingleton<IRecsService, RecsService>();
+builder.Services.AddSingleton<IRecommendationSettingsProvider, RecommendationSettingsProvider>();
 // Tag catalog options (censor list)
 builder.Services.AddKoanOptions<S5.Recs.Options.TagCatalogOptions>(builder.Configuration, "S5:Recs:Tags");
 // Scheduling: tasks are auto-discovered and registered by Koan.Scheduling's auto-registrar

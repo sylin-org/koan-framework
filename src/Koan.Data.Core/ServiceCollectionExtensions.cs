@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
 
@@ -25,7 +26,8 @@ public static class ServiceCollectionExtensions
         // If Koan.Data.Direct is referenced, auto-register it (no hard reference from Core)
         try
         {
-            var directReg = AppDomain.CurrentDomain.GetAssemblies()
+            // Use cached assemblies instead of bespoke AppDomain scanning
+            var directReg = AssemblyCache.Instance.GetAllAssemblies()
                 .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
                 .FirstOrDefault(t => t.IsSealed && t.IsAbstract == false && t.Name == "DirectRegistration" && t.Namespace == "Koan.Data.Direct");
             var mi = directReg?.GetMethod("AddKoanDataDirect", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);

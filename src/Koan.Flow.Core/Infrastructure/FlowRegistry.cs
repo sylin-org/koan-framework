@@ -254,7 +254,8 @@ public static class FlowRegistry
 
     private static void Scan()
     {
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = Koan.Core.Hosting.Bootstrap.AssemblyCache.Instance.GetAllAssemblies();
         foreach (var asm in assemblies)
         {
             Type?[] types;
