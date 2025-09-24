@@ -303,7 +303,6 @@ public sealed class HttpSseSessionManager : IHostedService, IDisposable
             _options.CurrentValue.Transport.SseKeepAliveInterval);
         return Task.CompletedTask;
     }
-
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _heartbeatTimer?.Dispose();
@@ -448,6 +447,42 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
 - Heartbeats, acknowledgements, and final results are streamed back to the client by enqueuing serialized `ServerSentEvent` payloads on the active session.
 
 > **Future improvement:** once StreamJsonRpc exposes a message handler abstraction suited for SSE transports, the bridge can swap to the shared `IMcpTransportDispatcher` to remove the remaining custom dispatch loop.
+
+#### 4. Server-Sent Event Primitives
+
+**File:** `src/Koan.Mcp/Hosting/ServerSentEvent.cs`
+
+```csharp
+public readonly record struct ServerSentEvent(string Event, JsonNode Payload)
+{
+    public static ServerSentEvent Connected(string sessionId, DateTimeOffset timestamp) =>
+        new("connected", JsonNode.Parse(JsonSerializer.Serialize(new
+        {
+            sessionId,
+            timestamp
+        }))!);
+
+    public static ServerSentEvent Heartbeat(object payload) =>
+        new("heartbeat", JsonNode.Parse(JsonSerializer.Serialize(payload))!);
+
+    public static ServerSentEvent FromJsonRpc(JsonRpcMessage message) =>
+        new(message is JsonRpcError ? "error" : "result",
+            JsonNode.Parse(JsonSerializer.Serialize(message))!);
+
+    public async ValueTask<JsonRpcMessage> ReadAsync(CancellationToken cancellationToken)
+    {
+        return await _inbound.Reader.ReadAsync(cancellationToken);
+    }
+
+    public ValueTask WriteAsync(JsonRpcMessage content, CancellationToken cancellationToken)
+    {
+        _session.Enqueue(ServerSentEvent.FromJsonRpc(content));
+        return ValueTask.CompletedTask;
+    }
+
+    public void Dispose() { }
+}
+```
 
 #### 4. Server-Sent Event Primitives
 
