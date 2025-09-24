@@ -85,3 +85,4 @@ Template: see 0000-template.md
 - 0010 - Prompt entrypoint and augmentation pipeline - AI-0010-entrypoint-and-augmentations.md
 - 0008 - AI adapters and registry - AI-0008-adapters-and-registry.md
 - 0009 - Multi-service routing, load balancing, and policies - AI-0009-multi-service-routing-and-policies.md
+- 0013 - S12.MedTrials sample adoption - AI-0013-s12-medtrials-sample.md

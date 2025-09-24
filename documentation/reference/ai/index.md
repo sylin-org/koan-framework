@@ -571,6 +571,12 @@ public class AiEmbeddingResponse
 }
 ```
 
+## Agentic Code Generation
+
+Looking for end-to-end guidance on agent-facing code generation workflows? See the
+[Agentic AI Code Generation Reference](agentic-code-generation.md) for structured prompting patterns, MCP tool wiring, and
+validation guardrails that align with the new S12.MedTrials sample.
+
 ---
 
 **Last Validation**: 2025-01-17 by Framework Specialist
