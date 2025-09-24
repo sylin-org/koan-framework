@@ -1,0 +1,6 @@
+@S9.Location.Api_HostAddress = http://localhost:5023
+
+GET {{S9.Location.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
