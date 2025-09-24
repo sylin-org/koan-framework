@@ -86,6 +86,13 @@ src/Koan.Mcp/
   - `Delete*` operations -> destructive tools surfaced only when `AllowMutations` is true.
 - Schema builder respects allowed shapes, relationship toggles, and dataset routing flags to guide LLM request construction.
 
+### Schema Developer Experience
+
+- Standard CRUD templates provide first-run schemas (e.g., `Collection`, `GetById`, `Upsert`) so teams can expose tools without authoring JSON manually.
+- Field descriptions pull from data annotations when present; fallback labels use the property name and emit warnings in diagnostics so missing metadata is obvious.
+- Per-entity schema artifacts are cached via `AggregateBags` with operation-specific bag keys, ensuring parity across transports while avoiding repeated reflection.
+- Optional overrides (`McpEntityAttribute.SchemaOverride`) and future metadata providers keep the escape hatch open for bespoke schemas or external documentation sources.
+
 ## Transport Behaviour
 
 ### STDIO (default)
@@ -101,6 +108,11 @@ src/Koan.Mcp/
 ### WebSocket (optional)
 - Provides bidirectional messaging for future streaming scenarios (chunked results, patch previews).
 - Requires explicit opt-in and TLS when exposed beyond localhost.
+
+### Logging & Diagnostics Defaults
+- When STDIO transport is enabled, Koan logs default to STDERR or another sink to keep the JSON-RPC stream clean; configuration helpers document the switch.
+- Remote transports emit structured events (`Koan.Transport.Mcp`) so existing observers capture session lifecycle, rate limiting hits, and warning propagation alongside REST traffic.
+- Heartbeat and session-metric hooks reuse Koan health reporting, enabling dashboards to show parity with HTTP endpoints out of the box.
 
 ## Security & Governance
 
@@ -141,6 +153,13 @@ src/Koan.Mcp/
 - [ ] Provide diagnostics endpoints (current sessions, tool metrics).
 - [ ] Author deployment guide (reverse proxies, TLS, scaling considerations).
 
+## JSON-RPC Runtime
+
+- `Koan.Mcp` standardizes on `StreamJsonRpc` for JSON-RPC 2.0 handling across STDIO, HTTP+SSE, and WebSocket transports.
+- A thin `IMcpTransportDispatcher` abstraction wraps the library so future transports or protocol upgrades can swap implementations without touching entity orchestration.
+- Serialization defaults align with Koan''s JSON configuration (System.Text.Json, camelCase, relaxed escaping) to keep MCP payloads consistent with REST and GraphQL.
+- Contract tests validate message framing, cancellation, and error propagation for each transport to ensure behaviour parity with REST controllers.
+
 ## Risks & Mitigations
 
 | Risk | Description | Mitigation |
@@ -161,6 +180,7 @@ src/Koan.Mcp/
 
 - `documentation/reference/web/entity-endpoint-service.md`
 - `src/Koan.Web/Endpoints/*`
+- `documentation/decisions/AI-0012-mcp-jsonrpc-runtime.md`
 - Model Context Protocol specification: https://modelcontextprotocol.io
 - ADR `documentation/decisions/AI-0005-protocol-surfaces.md`
 

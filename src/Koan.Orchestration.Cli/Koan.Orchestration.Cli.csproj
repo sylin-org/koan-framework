@@ -5,15 +5,18 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Koan.Orchestration.Cli</RootNamespace>
+    <Version>0.6.1</Version>
+    <AssemblyVersion>0.6.1</AssemblyVersion>
+    <FileVersion>0.6.1</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Orchestration.Renderers.Compose\Koan.Orchestration.Renderers.Compose.csproj" />
-  <ProjectReference Include="..\Koan.Orchestration.Provider.Docker\Koan.Orchestration.Provider.Docker.csproj" />
-  <ProjectReference Include="..\Koan.Orchestration.Provider.Podman\Koan.Orchestration.Provider.Podman.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Provider.Docker\Koan.Orchestration.Provider.Docker.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Provider.Podman\Koan.Orchestration.Provider.Podman.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
-  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>

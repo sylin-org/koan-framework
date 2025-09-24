@@ -4,8 +4,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-  <Description>Outbox implementation for Koan CQRS using MongoDB.</Description>
-  <PackageTags>$(CommonPackageTags);data;cqrs;outbox;mongodb</PackageTags>
+    <Description>Outbox implementation for Koan CQRS using MongoDB.</Description>
+    <PackageTags>$(CommonPackageTags);data;cqrs;outbox;mongodb</PackageTags>
+    <Version>0.6.1</Version>
+    <AssemblyVersion>0.6.1</AssemblyVersion>
+    <FileVersion>0.6.1</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Cqrs\Koan.Data.Cqrs.csproj" />
