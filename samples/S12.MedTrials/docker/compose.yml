@@ -44,8 +44,63 @@ services:
       Koan__Web__Auth__Services__ClientId: "s12-medtrials-spa"
       Koan__Web__Auth__Services__ClientSecret: "dev-secret-s12-medtrials-spa"
       Koan__Web__Auth__Services__DefaultScopes__0: "clinical:operations"
-      Koan__Mcp__EnableStdioTransport: "true"
+      S12__MedTrials__Mcp__BaseUrl: "http://mcp:5114/mcp/"
+      S12__MedTrials__Mcp__ProbeIntervalSeconds: "30"
+      S12__MedTrials__Mcp__LogCapabilities: "true"
       S12__MedTrials__Planner__MaxVisitsPerDay: "12"
+    volumes:
+      - ../data:/app/data
+    depends_on:
+      - mcp
+      - mongo
+      - weaviate
+  mcp:
+    build:
+      context: ../../..
+      dockerfile: samples/S12.MedTrials/Dockerfile.mcp
+    image: koan-s12-medtrials-mcp:dev
+    ports:
+      - "5114:5114"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5114"
+      Koan__Web__ExposeObservabilitySnapshot: "true"
+      Koan__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
+      Koan__Data__Mongo__Database: "KoanS12"
+      Koan__Data__Weaviate__Endpoint: "http://weaviate:8080"
+      Koan__Ai__AutoDiscoveryEnabled: "true"
+      Koan__Ai__AllowDiscoveryInNonDev: "true"
+      Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
+      Koan__Ai__Services__Ollama__0__Id: "ollama"
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Koan__Ai__Services__Ollama__0__DefaultModel: "all-minilm"
+      Koan__Ai__Services__Ollama__0__Enabled: "false"
+      Koan__Ai__Ollama__RequiredModels__0: "all-minilm"
+      Koan__Web__Auth__TestProvider__UseJwtTokens: "true"
+      Koan__Web__Auth__TestProvider__JwtIssuer: "koan-s12-medtrials-dev"
+      Koan__Web__Auth__TestProvider__JwtAudience: "s12-medtrials-client"
+      Koan__Web__Auth__TestProvider__JwtExpirationMinutes: "120"
+      Koan__Web__Auth__TestProvider__EnableClientCredentials: "true"
+      Koan__Web__Auth__TestProvider__AllowedScopes__0: "clinical:operations"
+      Koan__Web__Auth__TestProvider__AllowedScopes__1: "clinical:safety"
+      Koan__Web__Auth__TestProvider__AllowedScopes__2: "clinical:documents"
+      Koan__Web__Auth__TestProvider__RegisteredClients__s12-medtrials-spa__ClientId: "s12-medtrials-spa"
+      Koan__Web__Auth__TestProvider__RegisteredClients__s12-medtrials-spa__ClientSecret: "dev-secret-s12-medtrials-spa"
+      Koan__Web__Auth__TestProvider__RegisteredClients__s12-medtrials-spa__AllowedScopes__0: "clinical:operations"
+      Koan__Web__Auth__TestProvider__RegisteredClients__s12-medtrials-spa__AllowedScopes__1: "clinical:safety"
+      Koan__Web__Auth__TestProvider__RegisteredClients__s12-medtrials-spa__AllowedScopes__2: "clinical:documents"
+      Koan__Web__Auth__TestProvider__RegisteredClients__s12-medtrials-spa__Description: "S12 MedTrials SPA"
+      Koan__Web__Auth__Services__TokenEndpoint: "/.testoauth/token"
+      Koan__Web__Auth__Services__ClientId: "s12-medtrials-spa"
+      Koan__Web__Auth__Services__ClientSecret: "dev-secret-s12-medtrials-spa"
+      Koan__Web__Auth__Services__DefaultScopes__0: "clinical:operations"
+      Koan__Mcp__EnableHttpSseTransport: "true"
+      Koan__Mcp__AllowedOrigins__0: "http://localhost:5110"
+      Koan__Mcp__AllowedOrigins__1: "http://localhost:4200"
+      Koan__Mcp__AllowedOrigins__2: "http://localhost:5114"
+      Koan__Mcp__PublishCapabilityEndpoint: "true"
+      Koan__Mcp__RequireAuthentication: "false"
+      Koan__Mcp__MaxConcurrentConnections: "200"
     volumes:
       - ../data:/app/data
     depends_on:

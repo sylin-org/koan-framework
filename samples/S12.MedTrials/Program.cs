@@ -3,11 +3,10 @@ using Koan.AI.Web;
 using Koan.Core.Observability;
 using Koan.Data.Core;
 using Koan.Data.Vector;
-using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
 using Koan.Web.Swagger;
 using S12.MedTrials.Infrastructure;
-using S12.MedTrials.Services;
+using S12.MedTrials.Infrastructure.Mcp;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,14 +17,20 @@ builder.Services.AddKoan()
 
 builder.Services.AddKoanObservability();
 builder.Services.AddKoanDataVector();
-builder.Services.AddKoanMcp(builder.Configuration);
 builder.Services.AddKoanAiWeb();
 
-builder.Services.AddScoped<IProtocolDocumentService, ProtocolDocumentService>();
-builder.Services.AddScoped<IVisitPlanningService, VisitPlanningService>();
-builder.Services.AddScoped<ISafetyDigestService, SafetyDigestService>();
+builder.Services.AddMedTrialsCore();
+
+builder.Services.AddOptions<McpBridgeOptions>()
+    .Bind(builder.Configuration.GetSection(McpBridgeOptions.SectionName))
+    .Validate(options => !options.Enabled || options.TryGetBaseUri() is not null,
+        "S12 MedTrials MCP bridge requires a valid BaseUrl when enabled.")
+    .ValidateOnStart();
+
+builder.Services.AddHttpClient(McpHttpClientNames.McpBridge);
 
 builder.Services.AddHostedService<MedTrialsSeedWorker>();
+builder.Services.AddHostedService<McpCapabilityProbe>();
 
 var app = builder.Build();
 
