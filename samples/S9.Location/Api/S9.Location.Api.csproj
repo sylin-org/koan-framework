@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Core\S9.Location.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.8" />
+  </ItemGroup>
+
+</Project>
