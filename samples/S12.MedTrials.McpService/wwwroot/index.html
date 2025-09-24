@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html ng-app="MedTrialsMcpApp">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="mcp-base-route" content="/mcp">
+    <title>S12 MedTrials MCP Console</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body ng-controller="ShellController">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" ng-href="#/overview">
+                <i class="fas fa-network-wired"></i> MCP Console
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navLinks">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navLinks">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" ng-class="{ active: isActive('/overview') }" ng-href="#/overview">Overview</a></li>
+                    <li class="nav-item"><a class="nav-link" ng-class="{ active: isActive('/tools') }" ng-href="#/tools">Tools</a></li>
+                    <li class="nav-item"><a class="nav-link" ng-class="{ active: isActive('/explorer') }" ng-href="#/explorer">Explorer</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/swagger" target="_blank"><i class="fas fa-code"></i> API</a></li>
+                </ul>
+                <div class="d-flex align-items-center">
+                    <span class="badge" ng-class="statusBadgeClass(status.state)">
+                        <i class="fas fa-satellite-dish"></i>
+                        {{ status.state | uppercase }}
+                    </span>
+                    <span class="text-muted small ms-3" ng-if="status.sessionId">
+                        <i class="fas fa-id-badge"></i> {{ status.sessionId | limitTo: 12 }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div id="alert-area"></div>
+        <div ng-view></div>
+    </div>
+
+    <footer class="bg-light mt-5 py-4">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-4">
+                    <h6 class="text-uppercase">MCP Transport</h6>
+                    <p class="small text-muted mb-0">HTTP + SSE bridge exposing Koan tools for IDEs and agents.</p>
+                </div>
+                <div class="col-md-4">
+                    <ul class="list-unstyled small mb-0">
+                        <li><i class="fas fa-check text-success"></i> JSON-RPC 2.0 over resilient SSE sessions</li>
+                        <li><i class="fas fa-check text-success"></i> Capability document mirrors IDE discovery</li>
+                        <li><i class="fas fa-check text-success"></i> Tool explorer reuses live MCP executions</li>
+                    </ul>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <span class="badge bg-secondary"><i class="fas fa-flask"></i> S12 MedTrials Sample</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular-route.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/mcp-client.js"></script>
+    <script src="js/controllers.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0">Tool catalogue</h2>
+        <p class="text-muted mb-0">Descriptor metadata sourced directly from <code>tools/list</code>.</p>
+    </div>
+    <button type="button" class="btn btn-outline-primary" ng-click="refresh()" ng-disabled="loading">
+        <i class="fas fa-sync"></i> Refresh
+    </button>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <label class="form-label text-muted">Filter tools</label>
+        <input type="text" class="form-control" placeholder="Search by name, entity, or description" ng-model="filterText">
+    </div>
+    <div class="col-md-6 d-flex align-items-end justify-content-md-end mt-3 mt-md-0">
+        <div class="text-muted small">
+            {{ (tools | filter:filterPredicate).length }} of {{ tools.length }} tools visible
+        </div>
+    </div>
+</div>
+
+<div ng-if="loading" class="text-center my-5">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="text-muted mt-3">Discovering MCP tools…</p>
+</div>
+
+<div ng-if="!loading && tools.length === 0" class="alert alert-warning">
+    No tools were returned. Ensure entities are decorated with <code>McpEntityAttribute</code> and mutations are enabled when required.
+</div>
+
+<div class="tool-card card" ng-repeat="tool in tools | filter:filterPredicate">
+    <div class="card-header d-flex justify-content-between align-items-start">
+        <div>
+            <h5 class="mb-1">{{ tool.name }}</h5>
+            <div class="card-subtitle">{{ tool.entity || 'Unspecified entity' }} • {{ tool.operation || 'Operation' }}</div>
+        </div>
+        <div>
+            <span class="scope-pill" ng-if="tool.isMutation"><i class="fas fa-pen"></i> Mutation</span>
+            <span class="scope-pill" ng-if="tool.returnsCollection"><i class="fas fa-layer-group"></i> Collection</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">{{ tool.description || 'No description available.' }}</p>
+        <div class="mb-2" ng-if="tool.requiredScopes.length > 0">
+            <span class="scope-pill" ng-repeat="scope in tool.requiredScopes"><i class="fas fa-lock"></i> {{ scope }}</span>
+        </div>
+        <dl class="row small mb-3">
+            <dt class="col-sm-3">Entity</dt>
+            <dd class="col-sm-9">{{ tool.entity || '—' }}</dd>
+            <dt class="col-sm-3">Operation</dt>
+            <dd class="col-sm-9">{{ tool.operation || '—' }}</dd>
+            <dt class="col-sm-3">Returns collection</dt>
+            <dd class="col-sm-9">{{ tool.returnsCollection ? 'Yes' : 'No' }}</dd>
+            <dt class="col-sm-3">Mutation</dt>
+            <dd class="col-sm-9">{{ tool.isMutation ? 'Yes' : 'No' }}</dd>
+        </dl>
+        <button type="button" class="btn btn-sm btn-outline-secondary" ng-click="toggleSchema(tool)">
+            <i class="fas" ng-class="isSchemaVisible(tool) ? 'fa-eye-slash' : 'fa-eye'"></i>
+            {{ isSchemaVisible(tool) ? 'Hide schema' : 'Show schema' }}
+        </button>
+        <div class="mt-3" ng-if="isSchemaVisible(tool)">
+            <pre class="schema-json">{{ tool.schemaJson }}</pre>
+        </div>
+    </div>
+</div>
