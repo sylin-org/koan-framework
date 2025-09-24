@@ -19,7 +19,7 @@ builder.Services.AddKoan()
 builder.Services.AddKoanObservability();
 builder.Services.AddKoanSwagger(builder.Configuration);
 
-// Data layer — Single database (Mongo) across environments
+// Data layer - Single database (Mongo) across environments
 // Options auto-bind from configuration; defaults safe for Development
 builder.Services.AddMongoAdapter();
 

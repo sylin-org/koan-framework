@@ -12,6 +12,7 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
+using Koan.Data.Core.Optimization;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Collections.Concurrent;
@@ -23,6 +24,7 @@ namespace Koan.Data.Sqlite;
 
 internal sealed class SqliteRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
+    IOptimizedDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IStringQueryRepository<TEntity, TKey>,
     IDataRepositoryWithOptions<TEntity, TKey>,
@@ -48,7 +50,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly int _maxPageSize;
     private readonly ILogger _logger;
     private readonly RelationalMaterializationOptions _relOptions;
+    private readonly StorageOptimizationInfo _optimizationInfo;
     private static readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
+
+    // Storage optimization support
+    public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
     public SqliteRepository(IServiceProvider sp, SqliteOptions options, IStorageNameResolver resolver)
     {
@@ -68,6 +74,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         // Orchestration options (global, provider-agnostic)
         _relOptions = (sp.GetService(typeof(IOptions<RelationalMaterializationOptions>)) as IOptions<RelationalMaterializationOptions>)?.Value
                       ?? new RelationalMaterializationOptions();
+
+        // Get storage optimization info from AggregateBag
+        _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
+
+        _logger.LogDebug("[SQLite] Repository initialized for {EntityType} with optimization: {OptimizationType}, IsOptimized: {IsOptimized}",
+            typeof(TEntity).Name, _optimizationInfo.OptimizationType, _optimizationInfo.IsOptimized);
     }
 
     // Use central registry so DataSetContext is honored (set-aware names)
@@ -214,11 +226,55 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     // Basic serialization helpers
     private static TEntity FromRow((string Id, string Json) row)
         => JsonConvert.DeserializeObject<TEntity>(row.Json)!;
-    private static (string Id, string Json) ToRow(TEntity e)
+    private (string Id, string Json) ToRow(TEntity e)
     {
+        // Apply optimization before serialization
+        OptimizeEntityForStorage(e, _optimizationInfo);
+
         var json = JsonConvert.SerializeObject(e);
         var id = e.Id!.ToString()!;
         return (id, json);
+    }
+
+    /// <summary>
+    /// Applies storage optimization to entity before writing to database.
+    /// This follows the clean optimization approach using pre-write transformation.
+    /// </summary>
+    private static void OptimizeEntityForStorage(TEntity entity, StorageOptimizationInfo optimizationInfo)
+    {
+        if (!optimizationInfo.IsOptimized || typeof(TKey) != typeof(string))
+            return;
+
+        var idProperty = typeof(TEntity).GetProperty(optimizationInfo.IdPropertyName);
+        if (idProperty?.GetValue(entity) is not string stringId || string.IsNullOrEmpty(stringId))
+            return;
+
+        switch (optimizationInfo.OptimizationType)
+        {
+            case StorageOptimizationType.Guid:
+                if (Guid.TryParse(stringId, out var guid))
+                {
+                    // For SQLite, we keep as normalized string format
+                    idProperty.SetValue(entity, guid.ToString("D"));
+                }
+                break;
+        }
+    }
+
+    private static Type GetIdStorageType<TKey>(StorageOptimizationInfo optimizationInfo)
+        where TKey : notnull
+    {
+        // For non-string keys, use the key type directly (no optimization needed)
+        if (typeof(TKey) != typeof(string))
+            return typeof(TKey);
+
+        // For string keys, check if optimization is enabled
+        if (!optimizationInfo.IsOptimized)
+            return typeof(string);
+
+        // SQLite doesn't have native GUID types, so we keep as string but apply normalization
+        // The optimization happens during entity processing rather than storage type
+        return typeof(string);
     }
 
     public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
@@ -639,7 +695,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 foreach (var e in upserts)
                 {
                     ct.ThrowIfCancellationRequested();
-                    var row = ToRow(e);
+                    var row = repo.ToRow(e);
                     await conn.ExecuteAsync($"INSERT INTO [{repo.TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json }, tx);
                 }
                 var deleted = 0;
@@ -1071,6 +1127,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         public bool SupportsJsonFunctions => false;
         public bool SupportsPersistedComputedColumns => false;
         public bool SupportsIndexesOnComputedColumns => true;
+        public string ProviderName => "sqlite";
     }
 
     private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)

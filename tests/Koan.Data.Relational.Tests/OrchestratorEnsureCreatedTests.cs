@@ -106,6 +106,7 @@ public class OrchestratorEnsureCreatedTests
         public bool SupportsJsonFunctions { get; } = jsonFuncs;
         public bool SupportsPersistedComputedColumns { get; } = persisted;
         public bool SupportsIndexesOnComputedColumns { get; } = idxOnComputed;
+        public string ProviderName => "test";
     }
 
     private sealed class FakeDdlExecutor : IRelationalDdlExecutor

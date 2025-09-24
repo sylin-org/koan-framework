@@ -1,0 +1,149 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0">MCP Transport Overview</h2>
+        <p class="text-muted mb-0">Live capability document sourced from the HTTP + SSE bridge.</p>
+    </div>
+    <button type="button" class="btn btn-outline-primary" ng-click="refresh()" ng-disabled="loading">
+        <i class="fas fa-rotate"></i> Refresh
+    </button>
+</div>
+
+<div ng-if="loading" class="text-center my-5">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="text-muted mt-3">Loading capability document…</p>
+</div>
+
+<div ng-if="!loading && !capabilities" class="alert alert-warning">
+    Capability metadata is unavailable. Verify that the MCP transport publishes `/capabilities`.
+</div>
+
+<div ng-if="!loading && capabilities">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="stat-card">
+                <h5><i class="fas fa-toolbox text-primary"></i> Tools online</h5>
+                <div class="stat-value">{{ toolCount() }}</div>
+                <div class="stat-muted">{{ securedToolCount() }} require authentication</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <h5><i class="fas fa-plug text-success"></i> Transports</h5>
+                <div class="stat-value">{{ transports.length || 0 }}</div>
+                <div class="stat-muted">Primary endpoint: <code>{{ (primaryTransport() && primaryTransport().streamEndpoint) || '—' }}</code></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <h5><i class="fas fa-shield-alt text-info"></i> Session state</h5>
+                <div class="stat-value text-capitalize">{{ status.state }}</div>
+                <div class="stat-muted">Last heartbeat: {{ formatTimestamp(status.lastHeartbeat) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0">Transport topology</h5>
+                <small class="text-muted">Endpoints surfaced to IDE or agent clients.</small>
+            </div>
+            <span class="badge bg-light text-dark">{{ capabilities.version }}</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th scope="col">Transport</th>
+                            <th scope="col">Stream</th>
+                            <th scope="col">RPC Submit</th>
+                            <th scope="col">Capabilities</th>
+                            <th scope="col" class="text-center">Auth required</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="transport in transports">
+                            <td>
+                                <span class="transport-pill"><i class="fas fa-satellite"></i> {{ transport.kind }}</span>
+                            </td>
+                            <td><code>{{ transport.streamEndpoint }}</code></td>
+                            <td><code>{{ transport.submitEndpoint }}</code></td>
+                            <td>
+                                <code ng-if="transport.capabilityEndpoint">{{ transport.capabilityEndpoint }}</code>
+                                <span ng-if="!transport.capabilityEndpoint" class="text-muted">—</span>
+                            </td>
+                            <td class="text-center">
+                                <i class="fas" ng-class="transport.requireAuthentication ? 'fa-lock text-danger' : 'fa-unlock text-success'"></i>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Connection timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <h6>Session established</h6>
+                            <p class="text-muted mb-1">{{ formatTimestamp(status.connectedAt) }}</p>
+                            <small class="text-muted">Session ID {{ status.sessionId || '—' }}</small>
+                        </div>
+                        <div class="timeline-item">
+                            <h6>Last heartbeat</h6>
+                            <p class="text-muted mb-1">{{ formatTimestamp(status.lastHeartbeat) }}</p>
+                            <small class="text-muted">Maintained via server-sent events</small>
+                        </div>
+                        <div class="timeline-item">
+                            <h6>Last message</h6>
+                            <p class="text-muted mb-1">{{ formatTimestamp(status.lastMessageAt) }}</p>
+                            <small class="text-muted">Result or error streamed over SSE</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick start</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Use the stream ID delivered during the <code>connected</code> event to submit JSON-RPC envelopes.</p>
+                    <pre class="schema-json mb-3">curl -N "{{ status.streamEndpoint }}" \
+  -H "Accept: text/event-stream"</pre>
+                    <pre class="schema-json">curl -s "{{ status.rpcEndpoint }}" \
+  -H "Content-Type: application/json" \
+  -H "X-Mcp-Session: &lt;session-id&gt;" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"tools/list"}'</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Registered tools</h5>
+            <span class="badge bg-primary bg-opacity-25 text-primary">{{ toolCount() }} available</span>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 col-lg-4 mb-3" ng-repeat="tool in tools | limitTo:6">
+                    <div class="p-3 border rounded h-100">
+                        <h6 class="mb-1"><i class="fas fa-robot text-primary"></i> {{ tool.name }}</h6>
+                        <p class="text-muted small mb-2">{{ tool.description || 'No description provided.' }}</p>
+                        <span class="scope-pill" ng-if="tool.requireAuthentication"><i class="fas fa-lock"></i> Secured</span>
+                    </div>
+                </div>
+            </div>
+            <p class="text-muted small mb-0" ng-if="tools.length > 6">Open the <a ng-href="#/tools">tools catalogue</a> to inspect schemas and metadata.</p>
+        </div>
+    </div>
+</div>

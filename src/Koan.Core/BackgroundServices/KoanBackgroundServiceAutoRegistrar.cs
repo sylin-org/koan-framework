@@ -71,7 +71,8 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
 
     private IEnumerable<BackgroundServiceInfo> DiscoverBackgroundServices()
     {
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = AssemblyCache.Instance.GetAllAssemblies()
             .Where(a => !a.IsDynamic && !IsSystemAssembly(a))
             .ToArray();
 

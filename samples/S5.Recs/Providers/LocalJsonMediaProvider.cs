@@ -10,15 +10,16 @@ internal sealed class LocalJsonMediaProvider(ILogger<LocalJsonMediaProvider>? lo
 
     public MediaType[] SupportedTypes => Array.Empty<MediaType>();
 
-    public async Task<List<Media>> FetchAsync(MediaType mediaType, int limit, CancellationToken ct)
+    public Task<List<Media>> FetchAsync(MediaType mediaType, int limit, CancellationToken ct)
     {
         logger?.LogInformation("LocalJsonMediaProvider: No local data available, returning empty list for MediaType '{MediaType}'", mediaType.Name);
-        return [];
+        return Task.FromResult(new List<Media>());
     }
 
     public async IAsyncEnumerable<List<Media>> FetchStreamAsync(MediaType mediaType, int limit, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         logger?.LogInformation("LocalJsonMediaProvider: No local data available for streaming MediaType '{MediaType}'", mediaType.Name);
+        await Task.Yield();
         yield break;
     }
 }

@@ -2,9 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using MongoDB.Bson.Serialization;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
+using Koan.Data.Core.Optimization;
 using System.Linq.Expressions;
 
 namespace Koan.Data.Mongo;
@@ -34,6 +36,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     private readonly ILogger? _logger;
     private readonly int _defaultPageSize;
     private readonly int _maxPageSize;
+    private readonly StorageOptimizationInfo _optimizationInfo;
 
     public MongoRepository(MongoOptions options, IStorageNameResolver nameResolver, IServiceProvider sp)
     {
@@ -43,6 +46,22 @@ internal sealed class MongoRepository<TEntity, TKey> :
         var client = new MongoClient(options.ConnectionString);
         var db = client.GetDatabase(options.Database);
         _nameConv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator ?? ".", NameCasing.AsIs);
+
+        // Get storage optimization info from AggregateBag
+        _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
+
+        // BSON serialization optimization is now handled globally by MongoOptimizationAutoRegistrar during bootstrap
+
+        // DEBUG: MediaFormat specific logging
+        if (typeof(TEntity).Name == "MediaFormat")
+        {
+            Console.WriteLine($"[REPOSITORY-DEBUG] MongoRepository<MediaFormat> - Retrieved optimization info:");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - OptimizationType: {_optimizationInfo.OptimizationType}");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - IsOptimized: {_optimizationInfo.IsOptimized}");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - IdPropertyName: {_optimizationInfo.IdPropertyName}");
+            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - Reason: {_optimizationInfo.Reason}");
+        }
+
         // Initial collection name (may be set-scoped); will be recomputed per call if set changes
         _collectionName = Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         _collection = db.GetCollection<TEntity>(_collectionName);
@@ -74,6 +93,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
         return _collection;
     }
 
+
     private void CreateIndexesIfNeeded()
     {
         try
@@ -99,6 +119,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
         }
         catch { /* best-effort */ }
     }
+
 
     public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
     {
@@ -150,8 +171,17 @@ internal sealed class MongoRepository<TEntity, TKey> :
     {
         using var act = MongoTelemetry.Activity.StartActivity("mongo.upsert");
         act?.SetTag("entity", typeof(TEntity).FullName);
+
+        // DEBUG: Track all upsert operations
+        if (typeof(TEntity).Name == "MediaFormat")
+        {
+            Console.WriteLine($"[UPSERT-DEBUG] UpsertAsync called for MediaFormat with ID: {model.Id}");
+        }
+
         var col = GetCollection();
         var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
+
+        // BSON serialization handles optimization transparently
         await col.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct);
         _logger?.LogDebug("Mongo upsert {Entity} id={Id}", typeof(TEntity).Name, model.Id);
         return model;
@@ -174,6 +204,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
         using var act = MongoTelemetry.Activity.StartActivity("mongo.bulk.upsert");
         act?.SetTag("entity", typeof(TEntity).FullName);
         var col = GetCollection();
+
+        // BSON serialization handles optimization transparently
         var writes = models.Select(m => new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, m.Id), m) { IsUpsert = true });
         var res = await col.BulkWriteAsync(writes, cancellationToken: ct);
         var count = (int)(res.ModifiedCount + res.Upserts.Count);
@@ -269,6 +301,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
         public IBatchSet<TEntity, TKey> Add(TEntity entity)
         {
+            // BSON serialization handles optimization transparently
             _ops.Add(new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, entity.Id), entity) { IsUpsert = true });
             return this;
         }
@@ -295,6 +328,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
                     if (current is not null)
                     {
                         mutate(current);
+                        // BSON serialization handles optimization transparently
                         _ops.Add(new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, id), current) { IsUpsert = true });
                     }
                 }

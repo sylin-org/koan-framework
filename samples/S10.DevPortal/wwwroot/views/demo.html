@@ -1,0 +1,283 @@
+<!-- Framework Capabilities Demo Page -->
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-primary text-white rounded p-4 mb-4">
+            <h1 class="display-4">
+                <i class="fas fa-cogs"></i> Koan Framework Capabilities Demo
+            </h1>
+            <p class="lead">
+                Discover the power of entity-first development with multi-provider transparency,
+                zero-boilerplate controllers, and advanced relationship navigation.
+            </p>
+            <hr class="my-4">
+            <p>
+                This demo showcases live provider switching, bulk operations, set routing,
+                and the sophisticated auto-registration patterns that make Koan Framework unique.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5><i class="fas fa-database"></i> Demo Data Management</h5>
+            </div>
+            <div class="card-body">
+                <p>Seed the database with sample data to explore all framework capabilities.</p>
+                <button class="btn btn-success me-2" ng-click="seedDemoData()" ng-disabled="loading">
+                    <i class="fas fa-seedling"></i> Seed Demo Data
+                </button>
+                <button class="btn btn-outline-danger" ng-click="clearDemoData()" ng-disabled="loading">
+                    <i class="fas fa-trash"></i> Clear Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5><i class="fas fa-exchange-alt"></i> Provider Switching</h5>
+            </div>
+            <div class="card-body">
+                <p>Switch storage providers without changing a single line of code.</p>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-primary provider-button"
+                            ng-click="switchProvider('sqlite')" ng-disabled="loading">
+                        <i class="fas fa-file-alt"></i> SQLite
+                    </button>
+                    <button class="btn btn-outline-primary provider-button"
+                            ng-click="switchProvider('mongodb')" ng-disabled="loading">
+                        <i class="fas fa-leaf"></i> MongoDB
+                    </button>
+                    <button class="btn btn-outline-primary provider-button"
+                            ng-click="switchProvider('postgresql')" ng-disabled="loading">
+                        <i class="fas fa-elephant"></i> PostgreSQL
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Current Capabilities -->
+<div class="row mb-4" ng-if="capabilities">
+    <div class="col-12">
+        <div class="card capability-card">
+            <div class="card-header bg-dark text-white">
+                <h5><i class="fas fa-cogs"></i> Current Provider Capabilities</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6><i class="fas fa-search"></i> Query Capabilities</h6>
+                        <ul class="list-unstyled">
+                            <li ng-if="capabilities.query.supportsLinq">
+                                <i class="fas fa-check text-success"></i> LINQ Queries
+                            </li>
+                            <li ng-if="capabilities.query.supportsString">
+                                <i class="fas fa-check text-success"></i> String Queries
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6><i class="fas fa-edit"></i> Write Capabilities</h6>
+                        <ul class="list-unstyled">
+                            <li ng-if="capabilities.write.supportsBulkUpsert">
+                                <i class="fas fa-check text-success"></i> Bulk Upsert
+                            </li>
+                            <li ng-if="capabilities.write.supportsBulkDelete">
+                                <i class="fas fa-check text-success"></i> Bulk Delete
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6><i class="fas fa-cube"></i> Entity Patterns</h6>
+                        <div ng-repeat="entity in capabilities.entities" class="entity-info">
+                            <strong>{{entity.name}}:</strong> {{entity.description}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Demo Scenarios -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h3><i class="fas fa-play-circle"></i> Interactive Demonstrations</h3>
+        <p class="text-muted">Click on any scenario below to see the framework capabilities in action.</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4 mb-3" ng-repeat="scenario in scenarios">
+        <div class="card capability-card h-100">
+            <div class="card-body text-center">
+                <i class="{{scenario.icon}} fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">{{scenario.title}}</h5>
+                <p class="card-text">{{scenario.description}}</p>
+                <button class="btn btn-primary"
+                        ng-click="'switchProviders' === scenario.action ? null :
+                                 'bulkOperations' === scenario.action ? runBulkDemo(100) :
+                                 'setRouting' === scenario.action ? runSetRoutingDemo() :
+                                 'relationships' === scenario.action ? runRelationshipDemo() :
+                                 'performance' === scenario.action ? runPerformanceComparison() :
+                                 null"
+                        ng-disabled="loading">
+                    <span ng-if="loading" class="loading-spinner"></span>
+                    Run Demo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Results -->
+<div class="row mb-4" ng-if="performanceResults">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5><i class="fas fa-chart-line"></i> Performance Comparison Results</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Provider</th>
+                                <th>Record Count</th>
+                                <th>Query Duration</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr ng-repeat="result in performanceResults.comparison"
+                                ng-class="{'table-success': result.status === 'success', 'table-danger': result.status === 'failed'}">
+                                <td><strong>{{result.provider}}</strong></td>
+                                <td>{{result.recordCount}}</td>
+                                <td>{{formatTiming(result.queryDurationMs)}}</td>
+                                <td>
+                                    <span ng-if="result.status === 'success'" class="badge bg-success">
+                                        <i class="fas fa-check"></i> Success
+                                    </span>
+                                    <span ng-if="result.status === 'failed'" class="badge bg-danger">
+                                        <i class="fas fa-times"></i> Failed
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Operations Results -->
+<div class="row mb-4" ng-if="bulkResults">
+    <div class="col-12">
+        <div class="bulk-operations-demo">
+            <h5><i class="fas fa-layer-group"></i> Bulk Operations Results</h5>
+            <div class="row">
+                <div class="col-md-3">
+                    <h6>Records Generated</h6>
+                    <h2>{{bulkResults.recordsGenerated}}</h2>
+                </div>
+                <div class="col-md-3">
+                    <h6>Records Upserted</h6>
+                    <h2>{{bulkResults.recordsUpserted}}</h2>
+                </div>
+                <div class="col-md-3">
+                    <h6>Total Time</h6>
+                    <h2>{{formatTiming(bulkResults.timing.totalMs)}}</h2>
+                </div>
+                <div class="col-md-3">
+                    <h6>Insert Performance</h6>
+                    <h2>{{formatTiming(bulkResults.timing.insertMs)}}</h2>
+                </div>
+            </div>
+            <div class="mt-3">
+                <p><strong>Capabilities:</strong> {{bulkResults.capabilities}}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Relationship Demo Results -->
+<div class="row mb-4" ng-if="relationshipDemo">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5><i class="fas fa-project-diagram"></i> Relationship Navigation Demo</h5>
+            </div>
+            <div class="card-body">
+                <div ng-if="relationshipDemo.article">
+                    <h6>Article: "{{relationshipDemo.article.title}}"</h6>
+                    <div class="relationship-tree">
+                        <div ng-if="relationshipDemo.author">
+                            <strong>Author:</strong> {{relationshipDemo.author.displayName}} ({{relationshipDemo.author.username}})
+                        </div>
+                        <div ng-if="relationshipDemo.technology">
+                            <strong>Technology:</strong> {{relationshipDemo.technology.name}}
+                        </div>
+                        <div ng-if="relationshipDemo.comments && relationshipDemo.comments.length > 0">
+                            <strong>Comments ({{relationshipDemo.comments.length}}):</strong>
+                            <ul>
+                                <li ng-repeat="comment in relationshipDemo.comments">
+                                    {{comment.text | limitTo:100}}...
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div ng-if="!relationshipDemo.article">
+                    <p class="text-muted">No article data available. Please seed demo data first.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Set Routing Demo Results -->
+<div class="row mb-4" ng-if="setRoutingDemo">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h5><i class="fas fa-sitemap"></i> Set Routing Demonstration</h5>
+            </div>
+            <div class="card-body">
+                <p>{{setRoutingDemo.demo.message}}</p>
+                <p class="text-muted">{{setRoutingDemo.demo.explanation}}</p>
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>All Articles</h6>
+                        <p class="h4 text-primary">{{setRoutingDemo.all.length}}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Published</h6>
+                        <p class="h4 text-success">{{setRoutingDemo.published.length}}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Drafts</h6>
+                        <p class="h4 text-warning">{{setRoutingDemo.drafts.length}}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Indicator -->
+<div class="row" ng-if="loading">
+    <div class="col-12 text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Processing demonstration...</p>
+    </div>
+</div>

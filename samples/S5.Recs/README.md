@@ -2,7 +2,7 @@
 
 **This sample demonstrates how to build a complete recommendation engine using Koan.**
 
-AnimeRadar shows you how to create a modern content recommendation system by combining MongoDB for data storage, optional vector search with Weaviate, and AI embeddings via Ollama. The sample walks through building personalized recommendations, semantic search, user preference modeling, and a responsive web interface—all using Koan's modular architecture.
+AnimeRadar shows you how to create a modern content recommendation system by combining MongoDB for data storage, optional vector search with Weaviate, and AI embeddings via Ollama. The sample walks through building personalized recommendations, semantic search, user preference modeling, and a responsive web interface-all using Koan's modular architecture.
 
 ## What this sample teaches
 
@@ -30,11 +30,11 @@ Begin with popularity-based recommendations filtered by user preferences. This g
 Build a system to track user behaviors (ratings, favorites, viewing status) and use that data to build preference profiles. The sample shows how to weight genres and tags based on user interactions.
 
 **[4] Layer in semantic search**  
-Add vector embeddings to enable semantic search ("find something like Cowboy Bebop") alongside keyword-based filtering. 
+Add vector embeddings to enable semantic search ("find something like Cowboy Bebop") alongside keyword-based filtering.
 
-*But wait—what exactly is a vector database, and why would we need one?* Think of it this way: when you search for "space western," you're not just looking for media with those exact words. You want content that *feels* like space westerns—the themes, atmosphere, and storytelling style. Vector databases store mathematical representations (embeddings) of content that capture semantic meaning, not just keywords.
+_But wait-what exactly is a vector database, and why would we need one?_ Think of it this way: when you search for "space western," you're not just looking for media with those exact words. You want content that _feels_ like space westerns-the themes, atmosphere, and storytelling style. Vector databases store mathematical representations (embeddings) of content that capture semantic meaning, not just keywords.
 
-*How does this tie to user preferences?* As users rate content, we can build a "preference vector" that represents their taste in this mathematical space. Then we can find content that's similar to what they already love, even if it doesn't share obvious keywords.
+_How does this tie to user preferences?_ As users rate content, we can build a "preference vector" that represents their taste in this mathematical space. Then we can find content that's similar to what they already love, even if it doesn't share obvious keywords.
 
 The sample demonstrates graceful fallback when vector services are unavailable.
 
@@ -58,7 +58,7 @@ public class MediaDoc : Entity<MediaDoc>
     public List<string> Genres { get; set; } = [];
     public float Popularity { get; set; }
     public string Synopsis { get; set; } = string.Empty;
-    
+
     // Optional: Vector embeddings for semantic search
     public float[]? Vector { get; set; }
 }
@@ -89,7 +89,7 @@ public async Task<RecsResponse> GetRecommendations([FromBody] RecsRequest reques
     var query = _mediaCollection
         .Find(a => request.Genres.Count == 0 || a.Genres.Any(g => request.Genres.Contains(g)))
         .SortByDescending(a => a.Popularity);
-        
+
     var results = await query.Limit(request.TopK).ToListAsync();
     return new RecsResponse { Items = results };
 }
@@ -107,7 +107,7 @@ public async Task UpdateUserPreferences(string userId, string mediaId, int ratin
     // Get the media to extract genres
     var media = await _mediaCollection.Find(a => a.Id == mediaId).FirstOrDefaultAsync();
     if (media == null) return;
-    
+
     // Update user's genre preferences based on rating
     var profile = await GetOrCreateUserProfile(userId);
     foreach (var genre in media.Genres)
@@ -117,18 +117,18 @@ public async Task UpdateUserPreferences(string userId, string mediaId, int ratin
         var normalizedRating = (rating - 3f) / 2f; // Convert 1-5 to -1 to 1
         profile.GenreWeights[genre] = 0.1f * normalizedRating + 0.9f * currentWeight;
     }
-    
+
     await _profileCollection.ReplaceOneAsync(p => p.Id == profile.Id, profile);
 }
 ```
 
-*You might wonder: why use EWMA (Exponentially Weighted Moving Average) instead of just averaging ratings?* EWMA lets recent preferences influence the profile more than old ones, so if your taste changes, the system adapts. The α (alpha) value of 0.1 means new ratings have some impact but don't completely override your established preferences.
+_You might wonder: why use EWMA (Exponentially Weighted Moving Average) instead of just averaging ratings?_ EWMA lets recent preferences influence the profile more than old ones, so if your taste changes, the system adapts. The α (alpha) value of 0.1 means new ratings have some impact but don't completely override your established preferences.
 
 This creates user taste profiles that improve recommendations over time.
 
 **Step 4: Integrate vector search for semantic matching**
 
-*Here's where it gets interesting: how do we find content similar to what users already like?* Vector search lets you find semantically similar content:
+_Here's where it gets interesting: how do we find content similar to what users already like?_ Vector search lets you find semantically similar content:
 
 ```csharp
 // Generate embeddings for new content
@@ -136,7 +136,7 @@ public async Task GenerateEmbeddings(MediaDoc media)
 {
     var text = $"{media.Title} {string.Join(" ", media.Genres)} {media.Synopsis}";
     var embedding = await _aiService.GetEmbeddingAsync(text);
-    
+
     media.Vector = embedding;
     await _mediaCollection.ReplaceOneAsync(a => a.Id == media.Id, media);
 }
@@ -146,23 +146,23 @@ public async Task<List<MediaDoc>> FindSimilar(string mediaId, int count = 10)
 {
     var source = await _mediaCollection.Find(a => a.Id == mediaId).FirstOrDefaultAsync();
     if (source?.Vector == null) return [];
-    
+
     // Use vector database to find similar embeddings
     var similar = await _vectorDb.SearchAsync(source.Vector, count);
     return similar.Select(result => result.Payload).ToList();
 }
 ```
 
-*What exactly is a vector database, and why would we need one?* Think of it as a search engine that understands meaning, not just keywords. Traditional search looks for exact word matches. Vector search finds content with similar meanings—so searching "space cowboys" might surface "Firefly" even if that show's description never uses those exact words.
+_What exactly is a vector database, and why would we need one?_ Think of it as a search engine that understands meaning, not just keywords. Traditional search looks for exact word matches. Vector search finds content with similar meanings-so searching "space cowboys" might surface "Firefly" even if that show's description never uses those exact words.
 
 The vector database stores numerical representations (embeddings) of your content. When you search, it finds vectors that are "close" to your query vector in this multi-dimensional space. Closeness in vector space means similarity in meaning.
 
 **Step 5: Combine approaches for hybrid recommendations**
 
-*Why not just use one approach?* Different recommendation strategies excel in different situations:
+_Why not just use one approach?_ Different recommendation strategies excel in different situations:
 
 - **Popularity-based**: Great for new users with no history
-- **Preference-based**: Excellent for users with established tastes  
+- **Preference-based**: Excellent for users with established tastes
 - **Vector/semantic**: Powerful for discovery and content-based similarity
 
 The magic happens when you combine them:
@@ -171,12 +171,12 @@ The magic happens when you combine them:
 public async Task<List<MediaDoc>> GetSemanticRecommendations(string userId, string? searchText = null)
 {
     List<MediaDoc> candidates;
-    
+
     if (!string.IsNullOrEmpty(searchText))
     {
         // Generate embedding for search text
         var queryVector = await _aiService.GetEmbedding(searchText);
-        
+
         // Vector similarity search
         candidates = await _vectorStore.SearchSimilar(queryVector, topK: 100);
     }
@@ -194,13 +194,13 @@ public async Task<List<MediaDoc>> GetSemanticRecommendations(string userId, stri
             candidates = await GetPopularContent();
         }
     }
-    
+
     // Apply user preference scoring to rerank results
     var userProfile = await GetUserProfile(userId);
     return candidates
         .Select(media => new {
             Media = media,
-            Score = CalculatePersonalizedScore(media, userProfile) 
+            Score = CalculatePersonalizedScore(media, userProfile)
         })
         .OrderByDescending(x => x.Score)
         .Select(x => x.Media)
@@ -209,11 +209,11 @@ public async Task<List<MediaDoc>> GetSemanticRecommendations(string userId, stri
 }
 ```
 
-*Here's the key insight: vector search finds good candidates, but user preferences determine the final ranking.* This gives you both discovery (finding new content) and personalization (ranking by individual taste).
+_Here's the key insight: vector search finds good candidates, but user preferences determine the final ranking._ This gives you both discovery (finding new content) and personalization (ranking by individual taste).
 
 **Step 6: Build administrative interfaces**
 
-*Why separate admin interfaces from user interfaces?* Administrative tasks like seeding data and monitoring systems have different requirements—they need detailed feedback, longer timeouts, and often handle large datasets that would overwhelm a user-facing UI.
+_Why separate admin interfaces from user interfaces?_ Administrative tasks like seeding data and monitoring systems have different requirements-they need detailed feedback, longer timeouts, and often handle large datasets that would overwhelm a user-facing UI.
 
 Create tools for data management and system monitoring:
 
@@ -222,7 +222,7 @@ Create tools for data management and system monitoring:
 public async Task<ActionResult> StartSeeding([FromBody] SeedRequest request)
 {
     var jobId = Guid.NewGuid().ToString();
-    
+
     // Background task for data import
     _ = Task.Run(async () =>
     {
@@ -230,7 +230,7 @@ public async Task<ActionResult> StartSeeding([FromBody] SeedRequest request)
         {
             // Import content from external API (AniList, etc.)
             var items = await _contentProvider.FetchContent(request.Source, request.Limit);
-            
+
             // Generate embeddings if AI is available
             if (_aiService.IsAvailable)
             {
@@ -239,10 +239,10 @@ public async Task<ActionResult> StartSeeding([FromBody] SeedRequest request)
                     item.Vector = await _aiService.GetEmbedding(item.Synopsis);
                 }
             }
-            
+
             // Bulk insert with deduplication
             await _mediaCollection.BulkWrite(/* upsert operations */);
-            
+
             _logger.LogInformation("Seeding completed: {Count} items", items.Count);
         }
         catch (Exception ex)
@@ -250,125 +250,126 @@ public async Task<ActionResult> StartSeeding([FromBody] SeedRequest request)
             _logger.LogError(ex, "Seeding failed for job {JobId}", jobId);
         }
     });
-    
+
     return Ok(new { JobId = jobId });
 }
 ```
 
-*Why run this as a background task instead of blocking the API call?* Data seeding can take several minutes when processing thousands of items and generating embeddings. Users shouldn't have to wait with a frozen browser tab—they should get an immediate job ID and can check progress later.
+_Why run this as a background task instead of blocking the API call?_ Data seeding can take several minutes when processing thousands of items and generating embeddings. Users shouldn't have to wait with a frozen browser tab-they should get an immediate job ID and can check progress later.
 
-*What are embeddings, exactly?* Think of them as "coordinates" in a multi-dimensional space where similar content clusters together. When we convert media content into an embedding vector, we're essentially saying "this story lives at coordinates [0.2, -0.5, 0.8, ...]" in a space where similar stories are nearby.
+_What are embeddings, exactly?_ Think of them as "coordinates" in a multi-dimensional space where similar content clusters together. When we convert media content into an embedding vector, we're essentially saying "this story lives at coordinates [0.2, -0.5, 0.8, ...]" in a space where similar stories are nearby.
 
 This provides essential operations tooling for production deployment.
 
 **Step 7: Create a responsive user interface**
 
-*Why vanilla JavaScript instead of a framework?* For this sample, we want to show core concepts without framework-specific complexity. The patterns you learn here work regardless of whether you later adopt React, Vue, or another framework.
+_Why vanilla JavaScript instead of a framework?_ For this sample, we want to show core concepts without framework-specific complexity. The patterns you learn here work regardless of whether you later adopt React, Vue, or another framework.
 
 Build a modern web interface using progressive enhancement:
 
 ```javascript
 // Modular JavaScript architecture
 class RecommendationEngine {
-    async getRecommendations(filters = {}) {
-        const response = await fetch('/api/recs/query', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: this.currentUser.id,
-                topK: 50,
-                filters: filters,
-                preferTags: this.getSelectedTags()
-            })
-        });
-        
-        if (!response.ok) {
-            this.showError('Failed to load recommendations');
-            return [];
-        }
-        
-        return await response.json();
+  async getRecommendations(filters = {}) {
+    const response = await fetch("/api/recs/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: this.currentUser.id,
+        topK: 50,
+        filters: filters,
+        preferTags: this.getSelectedTags(),
+      }),
+    });
+
+    if (!response.ok) {
+      this.showError("Failed to load recommendations");
+      return [];
     }
-    
-    // Event delegation for dynamic content
-    setupEventHandlers() {
-        document.addEventListener('click', (e) => {
-            if (e.target.matches('[data-action="rate"]')) {
-                this.handleRating(e.target);
-            }
-            if (e.target.matches('[data-action="filter-tag"]')) {
-                this.handleTagFilter(e.target);
-            }
-        });
-    }
+
+    return await response.json();
+  }
+
+  // Event delegation for dynamic content
+  setupEventHandlers() {
+    document.addEventListener("click", (e) => {
+      if (e.target.matches('[data-action="rate"]')) {
+        this.handleRating(e.target);
+      }
+      if (e.target.matches('[data-action="filter-tag"]')) {
+        this.handleTagFilter(e.target);
+      }
+    });
+  }
 }
 ```
 
-*Why use event delegation instead of binding events to each card?* When you have 100+ content cards, creating 100+ event listeners is inefficient. Event delegation uses JavaScript's event bubbling—one listener on the document catches clicks from all child elements. It's faster and works with dynamically added content.
+_Why use event delegation instead of binding events to each card?_ When you have 100+ content cards, creating 100+ event listeners is inefficient. Event delegation uses JavaScript's event bubbling-one listener on the document catches clicks from all child elements. It's faster and works with dynamically added content.
 
 The sample demonstrates how to build rich interactions without complex frontend frameworks.
 
 ## Key patterns and techniques demonstrated
 
 **Hybrid recommendation scoring**  
-*Why combine multiple approaches instead of picking the "best" one?* Different recommendation methods excel in different situations. Vector similarity excels at content discovery, user preferences ensure personal relevance, and popularity provides a safety net for new users. Combining them gives you the strengths of each approach.
+_Why combine multiple approaches instead of picking the "best" one?_ Different recommendation methods excel in different situations. Vector similarity excels at content discovery, user preferences ensure personal relevance, and popularity provides a safety net for new users. Combining them gives you the strengths of each approach.
 
 **Graceful degradation**  
-*What happens when AI services go down?* The system falls back to preference-based and popularity recommendations. This ensures your application remains functional even when optional services fail. Users might not get semantic search, but they still get recommendations.
+_What happens when AI services go down?_ The system falls back to preference-based and popularity recommendations. This ensures your application remains functional even when optional services fail. Users might not get semantic search, but they still get recommendations.
 
 **Real-time preference learning**  
-*How quickly should the system adapt to new user behavior?* User interactions immediately update preference profiles using exponentially weighted moving averages (EWMA). This balances responsiveness to new preferences with stability from historical data—recent actions matter more, but don't completely override established patterns.
+_How quickly should the system adapt to new user behavior?_ User interactions immediately update preference profiles using exponentially weighted moving averages (EWMA). This balances responsiveness to new preferences with stability from historical data-recent actions matter more, but don't completely override established patterns.
 
 **Modular JavaScript architecture**  
-*Why not use a big framework for the frontend?* This sample shows that modern vanilla JavaScript can handle complex interactions cleanly. The patterns here (event delegation, module organization, progressive enhancement) work in any framework—or no framework at all.
+_Why not use a big framework for the frontend?_ This sample shows that modern vanilla JavaScript can handle complex interactions cleanly. The patterns here (event delegation, module organization, progressive enhancement) work in any framework-or no framework at all.
 
-# S5.Recs — Recommendation Sample App
+# S5.Recs - Recommendation Sample App
+
 **Production data management**  
-*What about real-world operations?* The sample includes comprehensive tooling: background job processing, data seeding pipelines, health monitoring, and administrative controls. These are the pieces you need for production deployment.
+_What about real-world operations?_ The sample includes comprehensive tooling: background job processing, data seeding pipelines, health monitoring, and administrative controls. These are the pieces you need for production deployment.
 
 ## What you'll build by following this sample
 
 **A complete recommendation system** with personalized feeds, semantic search, and user preference modeling
 
-
 **Administrative tools** for content management, system monitoring, and algorithm tuning
 **AI integration patterns** that enhance functionality without creating dependencies
 
-
-
 **Prerequisites (managed automatically by start.bat)**
-```bash
+
+````bash
 # Required: MongoDB for data storage
 docker run -d -p 27017:27017 mongo:latest
 
 # Optional: Weaviate for vector search
 
-# Optional: Ollama for local AI embeddings  
+# Optional: Ollama for local AI embeddings
 docker run -d -p 11434:11434 ollama/ollama
 ollama pull nomic-embed-text
 
 *Wait, why do we need all these services?* Great question! Let's break it down:
 
-- **MongoDB** stores your content and user data—this is required
-- **Weaviate** is a vector database that stores and searches embeddings—this enables semantic search like "find space westerns" 
-- **Ollama** runs AI models locally to convert text into embeddings—this powers the semantic understanding
+- **MongoDB** stores your content and user data-this is required
+- **Weaviate** is a vector database that stores and searches embeddings-this enables semantic search like "find space westerns"
+- **Ollama** runs AI models locally to convert text into embeddings-this powers the semantic understanding
 *Can't we just use regular text search?* You could, but you'd miss the magic. Vector search finds content based on meaning, not just keywords. "Romantic space adventure" might find you "Cowboy Bebop" even though those exact words don't appear in the description.
 
 **Start the application (recommended)**
 ```bash
 start.bat
-```
+````
 
 - Swagger UI: http://localhost:5084/swagger/index.html
 
-**Initialize with sample data**
-4. Navigate to `/` to browse recommendations
+**Initialize with sample data** 4. Navigate to `/` to browse recommendations
 
 **Try the features**
+
 - Search for media: "space western" or "slice of life romance"
 - Rate a few titles to see personalization kick in
 - Check your personal library and statistics
+
 ### Filters panel (AnimeRadar UX)
+
 - Rating: dual-range 0–5 stars with 0.5 step. Moving one thumb pushes the other so min ≤ max.
 - Year: dual-range over a rolling 30-year window up to the current year. Max at the top means “present”.
 - Labels update live (e.g., “Rating: 2–4.5★”, “Year: 2010–present”).
@@ -380,10 +381,12 @@ start.bat
 - Highlighting updates after render and whenever tag selection/weights change, so discovery feels responsive.
 
 ## Understanding the code structure
+
 **Controllers/** - API endpoints following Koan's controller-only routing pattern
-RecsController.cs     - Recommendation queries and rating submission
-UsersController.cs    - User profile creation and statistics
-AdminController.cs    - Data seeding and system administration
+RecsController.cs - Recommendation queries and rating submission
+UsersController.cs - User profile creation and statistics
+AdminController.cs - Data seeding and system administration
+
 ```
 
 RecsService.cs        - Core recommendation engine with hybrid scoring
@@ -392,6 +395,7 @@ SettingsService.cs    - Configuration management for tunable parameters
 ```
 
 **Models/** - Data contracts and entities
+
 ```
 MediaDoc.cs          - Content metadata with optional vector embeddings
 LibraryEntryDoc.cs   - User interaction tracking (ratings, favorites, status)
@@ -400,9 +404,10 @@ SettingsDoc.cs       - System configuration (recommendation parameters)
 ```
 
 **wwwroot/** - Static web interface using vanilla JavaScript
+
 ```
 js/index.page.js     - Main browsing interface logic
-js/dashboard.page.js - Administrative interface  
+js/dashboard.page.js - Administrative interface
 js/api.js           - API client with error handling
 js/cards.js         - Content rendering components
 js/filters.js       - Search and filtering logic
@@ -413,16 +418,16 @@ js/filters.js       - Search and filtering logic
 S5.Recs uses Koan.Web.Auth for centralized provider discovery and login flows. Sessions are cookie-based; the UI sends requests with `credentials: 'include'` so the browser carries the session cookie.
 
 - Discover providers (to render the Login menu):
-    - GET `/.well-known/auth/providers` → descriptors `{ id, name, protocol, enabled, state, icon?, scopes? }`.
-    - Present only `enabled` providers; `state` indicates basic config health (e.g., Healthy/Unhealthy).
+  - GET `/.well-known/auth/providers` → descriptors `{ id, name, protocol, enabled, state, icon?, scopes? }`.
+  - Present only `enabled` providers; `state` indicates basic config health (e.g., Healthy/Unhealthy).
 - Start login (challenge/redirect):
-    - GET `/auth/{provider}/challenge?return={relative-path}`.
-    - Server sets short-lived `state` and `return` cookies and redirects to the IdP.
+  - GET `/auth/{provider}/challenge?return={relative-path}`.
+  - Server sets short-lived `state` and `return` cookies and redirects to the IdP.
 - Complete login (callback):
-    - GET `/auth/{provider}/callback?code=...&state=...`.
-    - On success, the server signs in using cookie scheme `Koan.cookie` and performs a local redirect to the sanitized return path (default `/`).
+  - GET `/auth/{provider}/callback?code=...&state=...`.
+  - On success, the server signs in using cookie scheme `Koan.cookie` and performs a local redirect to the sanitized return path (default `/`).
 - Logout:
-    - GET or POST `/auth/logout?return=/` to clear the session and redirect.
+  - GET or POST `/auth/logout?return=/` to clear the session and redirect.
 
 Prompt and re-authentication
 
@@ -447,20 +452,24 @@ Development TestProvider (optional)
 This sample exposes several REST endpoints that demonstrate different aspects of building recommendation APIs:
 
 **Recommendations** (`/api/recs`)
+
 - `POST /query` - Get personalized recommendations with optional filters and search text
 - `POST /rate` - Submit user rating and automatically update preference profile
 
 **User Library** (`/api/library`)
+
 - `GET /{userId}` - Retrieve user's library with pagination, sorting, and status filtering
 - `PUT /{userId}/{mediaId}` - Update favorite status, watch state, or rating
 - `DELETE /{userId}/{mediaId}` - Remove item from user's library
 
 **User Management** (`/api/users`)
+
 - `GET /` - List all users (sample auto-creates default user if none exist)
 - `POST /` - Create new user profile
 - `GET /{id}/stats` - Get user's viewing statistics (favorites, watched, dropped counts)
 
 **Administration** (`/admin`)
+
 - `POST /seed/start` - Start background data import from external sources
 - `GET /seed/status/{jobId}` - Check import progress and status
 - `GET /stats` - System statistics (total content, users, vectors)

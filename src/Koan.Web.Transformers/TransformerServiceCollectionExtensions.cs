@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
 using Koan.Core.Extensions;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Web.Transformers;
 
@@ -49,7 +50,8 @@ public static class TransformerServiceCollectionExtensions
                     if (!enabled) return;
 
                     var reg = sp.GetRequiredService<ITransformerRegistry>();
-                    var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                    // Use cached assemblies instead of bespoke AppDomain scanning
+                    var assemblies = AssemblyCache.Instance.GetAllAssemblies();
                     foreach (var asm in assemblies)
                     {
                         Type[] types;

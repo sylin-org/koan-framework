@@ -158,7 +158,7 @@
                   <td>{{r.ts | date:'HH:mm:ss'}}</td>
                   <td>{{r.method}}</td>
                   <td><code>{{r.url}}</code></td>
-                  <td><span ng-class="{'text-secondary': r.status==0, 'ok': r.status>=200 && r.status<300, 'warn': r.status>=300 && r.status<400, 'danger': r.status>=400}">{{r.status || '—'}}</span></td>
+                  <td><span ng-class="{'text-secondary': r.status==0, 'ok': r.status>=200 && r.status<300, 'warn': r.status>=300 && r.status<400, 'danger': r.status>=400}">{{r.status || '-'}}</span></td>
                   <td>{{r.ms}}</td>
                 </tr>
               </tbody>
@@ -198,7 +198,7 @@
             <div class="col-12 col-md-6">Traces: <span class="text-light">{{vm.obs.traces.enabled}} @ {{vm.obs.traces.sampleRate}}</span></div>
             <div class="col-12 col-md-6">Exporter: <span class="text-light">{{vm.obs.traces.exporter.type}} {{vm.obs.traces.exporter.endpoint}}</span></div>
             <div class="col-12 col-md-6">Metrics: <span class="text-light">{{vm.obs.metrics.enabled}}</span></div>
-            <div class="col-12 col-md-6">TraceId (current): <span class="text-light">{{vm.obs.traces.currentTraceId || '—'}}</span></div>
+            <div class="col-12 col-md-6">TraceId (current): <span class="text-light">{{vm.obs.traces.currentTraceId || '-'}}</span></div>
           </div>
           <div class="text-secondary" ng-if="!vm.obs">No data (dev only unless enabled)</div>
         </div>

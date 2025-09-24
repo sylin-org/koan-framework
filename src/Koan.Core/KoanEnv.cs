@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Koan.Core.Hosting.Bootstrap;
+using System.Reflection;
 
 namespace Koan.Core;
 
@@ -25,6 +27,9 @@ public static class KoanEnv
             logger.LogInformation("IsCi: {IsCi}", snap.IsCi);
             logger.LogInformation("AllowMagicInProduction: {AllowMagicInProduction}", snap.AllowMagicInProduction);
             logger.LogInformation("ProcessStart: {ProcessStart:O}", snap.ProcessStart);
+            logger.LogInformation("OrchestrationMode: {OrchestrationMode}", snap.OrchestrationMode);
+            logger.LogInformation("SessionId: {SessionId}", snap.SessionId);
+            logger.LogInformation("KoanAssemblies: {KoanAssemblyCount} loaded", KoanAssemblies.Length);
         }
         else
         {
@@ -38,6 +43,9 @@ public static class KoanEnv
             Console.WriteLine($"  IsCi: {snap.IsCi}");
             Console.WriteLine($"  AllowMagicInProduction: {snap.AllowMagicInProduction}");
             Console.WriteLine($"  ProcessStart: {snap.ProcessStart:O}");
+            Console.WriteLine($"  OrchestrationMode: {snap.OrchestrationMode}");
+            Console.WriteLine($"  SessionId: {snap.SessionId}");
+            Console.WriteLine($"  KoanAssemblies: {KoanAssemblies.Length} loaded");
         }
     }
 
@@ -69,6 +77,80 @@ public static class KoanEnv
         catch { /* best effort */ }
     }
 
+    private static OrchestrationMode DetectOrchestrationMode(IConfiguration? cfg, bool isDevelopment, bool inContainer)
+    {
+        // Priority 1: Forced configuration override (highest priority)
+        var forcedModeString = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Orchestration.ForceOrchestrationMode, null);
+        if (!string.IsNullOrEmpty(forcedModeString) && Enum.TryParse<OrchestrationMode>(forcedModeString, true, out var forcedMode))
+        {
+            return forcedMode;
+        }
+
+        // Priority 2: Aspire AppHost (external orchestration takes precedence)
+        if (IsAspireAppHostContext(cfg))
+        {
+            return OrchestrationMode.AspireAppHost;
+        }
+
+        // Priority 3: Docker Compose (real-time detection)
+        if (IsDockerComposeContext(cfg))
+        {
+            return OrchestrationMode.DockerCompose;
+        }
+
+        // Priority 4: Kubernetes (real-time detection - requires strong evidence)
+        if (IsKubernetesContext(cfg))
+        {
+            return OrchestrationMode.Kubernetes;
+        }
+
+        // Priority 5: Self-orchestration (development host spawning containers)
+        if (ShouldSelfOrchestrate(cfg, isDevelopment, inContainer))
+        {
+            return OrchestrationMode.SelfOrchestrating;
+        }
+
+        // Default: Standalone mode (production with external dependencies)
+        return OrchestrationMode.Standalone;
+    }
+
+    private static bool IsAspireAppHostContext(IConfiguration? cfg)
+    {
+        return !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.AspireResourceName, null)) ||
+               !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.AspireUrls, null)) ||
+               !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Endpoint, null));
+    }
+
+    private static bool IsDockerComposeContext(IConfiguration? cfg)
+    {
+        return !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.ComposeProjectName, null)) ||
+               !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.ComposeService, null)) ||
+               !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.ComposeContainerName, null));
+    }
+
+    private static bool IsKubernetesContext(IConfiguration? cfg)
+    {
+        // Kubernetes requires strong evidence - not just hostname patterns
+        return !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KubernetesServiceHost, null)) ||
+               !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KubernetesServicePort, null)) ||
+               Directory.Exists("/var/run/secrets/kubernetes.io/serviceaccount");
+    }
+
+    private static bool ShouldSelfOrchestrate(IConfiguration? cfg, bool isDevelopment, bool inContainer)
+    {
+        // Don't self-orchestrate if already in a container
+        if (inContainer) return false;
+
+        // Don't self-orchestrate in production unless explicitly enabled
+        if (!isDevelopment && !Configuration.Read(cfg, Infrastructure.Constants.Configuration.Orchestration.EnableSelfOrchestration, false))
+        {
+            return false;
+        }
+
+        // In development, self-orchestrate if explicitly enabled or if it's the best option
+        return isDevelopment || Configuration.Read(cfg, Infrastructure.Constants.Configuration.Orchestration.EnableSelfOrchestration, false);
+    }
+
     private static Snapshot ComputeSnapshot(IConfiguration? cfg, IHostEnvironment? env)
     {
         var envName = env?.EnvironmentName
@@ -81,7 +163,7 @@ public static class KoanEnv
         bool isDev = env?.IsDevelopment() ?? string.Equals(envName, "Development", StringComparison.OrdinalIgnoreCase);
         bool isProd = env?.IsProduction() ?? string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase);
         bool isStg = env?.IsStaging() ?? string.Equals(envName, "Staging", StringComparison.OrdinalIgnoreCase);
-        // Check both colon and underscore env var names for Docker/K8s compatibility
+        // Check both colon and underscore env var names for Docker/K8s/Compose compatibility
         bool inContainer =
             // Colon-names (legacy Koan config)
             Configuration.Read(cfg, Infrastructure.Constants.Configuration.Env.DotnetRunningInContainer, false)
@@ -90,7 +172,11 @@ public static class KoanEnv
             // Colon-names (legacy Koan config)
             || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KubernetesServiceHost, null))
             // Underscore-names (standard Docker/K8s)
-            || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, "KUBERNETES_SERVICE_HOST", null));
+            || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, "KUBERNETES_SERVICE_HOST", null))
+            // Docker Compose environment detection
+            || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.ComposeProjectName, null))
+            || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.ComposeService, null))
+            || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.ComposeContainerName, null));
         bool isCi = Configuration.Read(cfg, Infrastructure.Constants.Configuration.Env.Ci, false)
                      || !string.IsNullOrEmpty(Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.TfBuild, null));
         // Read flag with precedence (env var overrides config) via KoanConfig
@@ -99,7 +185,13 @@ public static class KoanEnv
                 Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction,
                 false
             );
-        return new Snapshot(envName, isDev, isProd, isStg, inContainer, isCi, magic, DateTimeOffset.UtcNow);
+
+        // Detect orchestration mode using proper precedence
+        var orchestrationMode = DetectOrchestrationMode(cfg, isDev, inContainer);
+        var sessionId = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Env.KoanSessionId, null) ??
+                       Guid.NewGuid().ToString("N")[..8];
+
+        return new Snapshot(envName, isDev, isProd, isStg, inContainer, isCi, magic, DateTimeOffset.UtcNow, orchestrationMode, sessionId);
     }
 
     private static Snapshot Current => _initialized && _snap is not null ? _snap : ComputeSnapshot(null, null);
@@ -112,6 +204,9 @@ public static class KoanEnv
     public static bool IsCi => Current.IsCi;
     public static bool AllowMagicInProduction => Current.AllowMagicInProduction;
     public static DateTimeOffset ProcessStart => Current.ProcessStart;
+    public static OrchestrationMode OrchestrationMode => Current.OrchestrationMode;
+    public static string SessionId => Current.SessionId;
+    public static Assembly[] KoanAssemblies => AssemblyCache.Instance.GetKoanAssemblies();
 
     private sealed record Snapshot(
         string EnvironmentName,
@@ -121,6 +216,8 @@ public static class KoanEnv
         bool InContainer,
         bool IsCi,
         bool AllowMagicInProduction,
-        DateTimeOffset ProcessStart
+        DateTimeOffset ProcessStart,
+        OrchestrationMode OrchestrationMode,
+        string SessionId
     );
 }

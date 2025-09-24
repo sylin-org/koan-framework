@@ -71,7 +71,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     private IEnumerable<Type> DiscoverFlowAdapters()
     {
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = AssemblyCache.Instance.GetAllAssemblies();
         
         foreach (var assembly in assemblies)
         {
@@ -131,7 +132,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     private IEnumerable<Type> DiscoverFlowOrchestrators()
     {
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = AssemblyCache.Instance.GetAllAssemblies();
         
         foreach (var assembly in assemblies)
         {

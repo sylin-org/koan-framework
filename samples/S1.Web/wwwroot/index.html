@@ -97,7 +97,7 @@
               <td>{{r.ts | date:'HH:mm:ss'}}</td>
               <td>{{r.method}}</td>
               <td><code>{{r.url}}</code></td>
-              <td><span ng-class="{'muted': r.status==0, 'ok': r.status>=200 && r.status<300, 'warn': r.status>=300 && r.status<400, 'danger': r.status>=400}">{{r.status || '—'}}</span></td>
+              <td><span ng-class="{'muted': r.status==0, 'ok': r.status>=200 && r.status<300, 'warn': r.status>=300 && r.status<400, 'danger': r.status>=400}">{{r.status || '-'}}</span></td>
               <td>{{r.ms}}</td>
             </tr>
           </tbody>
@@ -142,8 +142,8 @@
               <td><code>{{a.type}}</code></td>
               <td><code>{{a.key}}</code></td>
               <td><code>{{a.provider}}</code></td>
-              <td>{{(a.query || []).join(', ') || '—'}}</td>
-              <td>{{(a.write || []).join(', ') || '—'}}</td>
+              <td>{{(a.query || []).join(', ') || '-'}}</td>
+              <td>{{(a.write || []).join(', ') || '-'}}</td>
             </tr>
           </tbody>
         </table>

@@ -46,7 +46,8 @@ internal sealed class AppRuntime : IAppRuntime
         var env = _sp.GetService<IHostEnvironment>();
         
         // Find and invoke all KoanAutoRegistrars to collect their reports
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = AssemblyCache.Instance.GetAllAssemblies();
         foreach (var asm in assemblies)
         {
             Type[] types;

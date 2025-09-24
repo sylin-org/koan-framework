@@ -1,0 +1,88 @@
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0"><i class="fas fa-route"></i> Visit Planner</h5>
+                    <div>
+                        <span class="badge bg-secondary bg-opacity-25 text-muted small me-1">AI</span>
+                        <span class="badge bg-secondary bg-opacity-25 text-muted small">Custom Service</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Trial Site</label>
+                    <select class="form-select" ng-model="form.trialSiteId" ng-options="(site.id || site.Id) as (site.name || site.Name) for site in sites"></select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Participant IDs (comma separated)</label>
+                    <input type="text" class="form-control" ng-model="form.participantIds" placeholder="e.g. P-10045, P-10112">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Max visits per day</label>
+                    <input type="number" class="form-control" ng-model="form.maxVisitsPerDay" min="3" max="24">
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="weekend-toggle" ng-model="form.allowWeekendVisits">
+                    <label class="form-check-label" for="weekend-toggle">Allow weekend scheduling</label>
+                </div>
+                <button class="btn btn-primary w-100" ng-click="plan()" ng-disabled="loading">
+                    <span ng-if="!loading"><i class="fas fa-magic"></i> Plan adjustments</span>
+                    <span ng-if="loading" class="spinner-border spinner-border-sm" role="status"></span>
+                </button>
+            </div>
+        </div>
+        <div class="card shadow-sm mt-3" ng-if="result">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Planner summary</h6>
+                <p class="mb-2" ng-bind="result.narrative"></p>
+                <span class="badge" ng-class="{ 'bg-warning text-dark': result.degraded, 'bg-success': !result.degraded }">
+                    <i class="fas" ng-class="{ 'fa-triangle-exclamation': result.degraded, 'fa-circle-check': !result.degraded }"></i>
+                    {{result.degraded ? 'Degraded' : 'AI assisted'}}
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0"><i class="fas fa-users"></i> Upcoming visits</h5>
+                    <div>
+                        <span class="badge bg-secondary bg-opacity-25 text-muted small me-1">Entity&lt;T&gt;</span>
+                        <span class="badge bg-secondary bg-opacity-25 text-muted small me-2">REST</span>
+                        <span class="text-muted small">{{visits.length}} records</span>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Participant</th>
+                                <th>Type</th>
+                                <th>Scheduled</th>
+                                <th>Status</th>
+                                <th>Proposed Adjustments</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr ng-repeat="visit in visits">
+                                <td>{{visit.participantId || visit.ParticipantId}}</td>
+                                <td>{{visit.visitType || visit.VisitType}}</td>
+                                <td>{{(visit.scheduledAt || visit.ScheduledAt) | date:'medium'}}</td>
+                                <td><span class="badge bg-secondary">{{visit.status || visit.Status}}</span></td>
+                                <td>
+                                    <ul class="list-unstyled mb-0" ng-if="(visit.proposedAdjustments || visit.ProposedAdjustments).length">
+                                        <li ng-repeat="adj in (visit.proposedAdjustments || visit.ProposedAdjustments)">
+                                            <i class="fas fa-arrow-right"></i> {{adj.summary || adj.Summary}}
+                                        </li>
+                                    </ul>
+                                    <span class="text-muted" ng-if="!(visit.proposedAdjustments || visit.ProposedAdjustments).length">—</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

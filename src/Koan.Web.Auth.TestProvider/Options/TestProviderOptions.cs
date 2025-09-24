@@ -19,4 +19,17 @@ public sealed class TestProviderOptions
     // Dev UX defaults (UI prepopulation)
     public string[] DefaultRoles { get; init; } = new[] { "reader" };
     public bool PersistPersona { get; init; } = true; // use LocalStorage in the login UI
+
+    // JWT Token Configuration
+    public bool UseJwtTokens { get; set; } = false;
+    public string JwtSigningKey { get; init; } = string.Empty; // Base64 encoded key; auto-generated if empty
+    public string JwtAlgorithm { get; init; } = "HS256";
+    public string JwtIssuer { get; set; } = "koan-test-provider";
+    public string JwtAudience { get; set; } = "koan-test-client";
+    public int JwtExpirationMinutes { get; init; } = 60;
+
+    // Client Credentials Support
+    public bool EnableClientCredentials { get; set; } = false;
+    public Dictionary<string, ClientCredentialsClient> RegisteredClients { get; init; } = new();
+    public string[] AllowedScopes { get; set; } = Array.Empty<string>();
 }

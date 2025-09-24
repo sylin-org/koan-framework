@@ -250,13 +250,13 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
             }}";
     }
 
-    private async Task<Media?> MapToMedia(JToken item, MediaType mediaType, CancellationToken ct)
+    private Task<Media?> MapToMedia(JToken item, MediaType mediaType, CancellationToken ct)
     {
         try
         {
             // Robust ID extraction
             var idTok = item["id"];
-            if (idTok?.Type != JTokenType.Integer) return null;
+            if (idTok?.Type != JTokenType.Integer) return Task.FromResult<Media?>(null);
             var rawId = idTok.Value<int>();
             var externalId = rawId.ToString();
 
@@ -382,12 +382,12 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                 UpdatedAt = DateTimeOffset.UtcNow
             };
 
-            return media;
+            return Task.FromResult<Media?>(media);
         }
         catch (Exception ex)
         {
             logger?.LogWarning(ex, "Failed to map AniList item to Media: {Item}", item.ToString());
-            return null;
+            return Task.FromResult<Media?>(null);
         }
     }
 

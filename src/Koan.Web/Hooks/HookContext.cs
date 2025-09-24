@@ -1,7 +1,11 @@
+using System;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Abstractions;
-using System.Security.Claims;
+using Koan.Web.Endpoints;
 
 namespace Koan.Web.Hooks;
 
@@ -10,20 +14,42 @@ namespace Koan.Web.Hooks;
 /// </summary>
 public sealed class HookContext<TEntity>
 {
-    public HttpContext Http { get; init; } = default!;
-    public IServiceProvider Services { get; init; } = default!;
-    public QueryOptions Options { get; init; } = default!;
-    public IQueryCapabilities Capabilities { get; init; } = default!;
-    public IDictionary<string, string> ResponseHeaders { get; } = new Dictionary<string, string>();
-    public ClaimsPrincipal User => Http.User;
-    public CancellationToken Ct { get; init; }
+    public HookContext(EntityRequestContext requestContext)
+    {
+        Request = requestContext ?? throw new ArgumentNullException(nameof(requestContext));
+    }
 
-    private IActionResult? _shortCircuit;
-    public void ShortCircuit(IActionResult result) => _shortCircuit = result;
-    public bool IsShortCircuited => _shortCircuit != null;
-    public IActionResult? ShortCircuitResult => _shortCircuit;
+    public EntityRequestContext Request { get; }
 
-    private readonly List<string> _warnings = new();
-    public void Warn(string msg) => _warnings.Add(msg);
-    public IReadOnlyList<string> Warnings => _warnings;
+    public HttpContext? Http => Request.HttpContext;
+
+    public IServiceProvider Services => Request.Services;
+
+    public QueryOptions Options => Request.Options;
+
+    public IQueryCapabilities Capabilities => Request.Capabilities;
+
+    public IDictionary<string, string> ResponseHeaders => Request.Headers;
+
+    public ClaimsPrincipal User => Request.User;
+
+    public CancellationToken Ct => Request.CancellationToken;
+
+    public void Warn(string msg) => Request.Warn(msg);
+
+    public IReadOnlyList<string> Warnings => Request.Warnings as IReadOnlyList<string> ?? Request.Warnings.ToArray();
+
+    private object? _shortCircuit;
+
+    public void ShortCircuit(IActionResult result)
+        => _shortCircuit = result ?? throw new ArgumentNullException(nameof(result));
+
+    public void ShortCircuit(object payload)
+        => _shortCircuit = payload ?? throw new ArgumentNullException(nameof(payload));
+
+    public bool IsShortCircuited => _shortCircuit is not null;
+
+    public object? ShortCircuitPayload => _shortCircuit;
+
+    public IActionResult? ShortCircuitResult => _shortCircuit as IActionResult;
 }

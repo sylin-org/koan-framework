@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S5.Recs - Backup Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .backup-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+
+        .operation-card {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: white;
+        }
+
+        .status-running { border-left: 4px solid #007bff; }
+        .status-completed { border-left: 4px solid #28a745; }
+        .status-failed { border-left: 4px solid #dc3545; }
+        .status-queued { border-left: 4px solid #ffc107; }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #007bff;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .form-group {
+            margin: 10px 0;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .log-container {
+            height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .backup-list {
+            margin-top: 20px;
+        }
+
+        .backup-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .entity-type-selection {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .entity-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="dashboard.html">Dashboard</a>
+            <a href="backup.html" class="active">Backup Management</a>
+            <a href="/swagger">API Docs</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1>🗄️ Backup & Restore Management</h1>
+        <p>Manage backups and restores for your S5.Recs application data.</p>
+
+        <!-- System Status -->
+        <div class="backup-section">
+            <h2>📊 System Status</h2>
+            <div id="system-status">
+                <p>Loading system status...</p>
+            </div>
+        </div>
+
+        <!-- Create Backup -->
+        <div class="backup-section">
+            <h2>📦 Create Backup</h2>
+
+            <div class="form-group">
+                <label for="backup-type">Backup Type:</label>
+                <select id="backup-type" onchange="toggleBackupOptions()">
+                    <option value="global">Global Backup (All Entities)</option>
+                    <option value="selective">Selective Backup</option>
+                    <option value="entity">Single Entity Type</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="backup-name">Backup Name:</label>
+                <input type="text" id="backup-name" placeholder="e.g., daily-backup-2025-01-23" required>
+            </div>
+
+            <div class="form-group">
+                <label for="backup-description">Description (optional):</label>
+                <textarea id="backup-description" rows="2" placeholder="Describe this backup..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="backup-tags">Tags (comma-separated):</label>
+                <input type="text" id="backup-tags" placeholder="e.g., production, daily, manual">
+            </div>
+
+            <!-- Entity Selection (hidden by default) -->
+            <div id="entity-selection" style="display: none;">
+                <h3>Select Entity Types:</h3>
+                <div id="entity-types" class="entity-type-selection">
+                    <p>Loading entity types...</p>
+                </div>
+            </div>
+
+            <!-- Single Entity Selection (hidden by default) -->
+            <div id="single-entity-selection" style="display: none;">
+                <div class="form-group">
+                    <label for="single-entity-type">Entity Type:</label>
+                    <select id="single-entity-type">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="createBackup()">🚀 Start Backup</button>
+        </div>
+
+        <!-- Active Operations -->
+        <div class="backup-section">
+            <h2>⚡ Active Operations</h2>
+            <div id="active-operations">
+                <p>No active operations.</p>
+            </div>
+        </div>
+
+        <!-- Backup Catalog -->
+        <div class="backup-section">
+            <h2>📋 Backup Catalog</h2>
+            <button class="btn btn-secondary" onclick="refreshBackupCatalog()">🔄 Refresh</button>
+            <div id="backup-catalog" class="backup-list">
+                <p>Loading backup catalog...</p>
+            </div>
+        </div>
+
+        <!-- Real-time Log -->
+        <div class="backup-section">
+            <h2>📝 Real-time Log</h2>
+            <div id="log-container" class="log-container"></div>
+            <button class="btn btn-secondary" onclick="clearLog()">Clear Log</button>
+        </div>
+    </main>
+
+    <script>
+        // Global state
+        let activeOperations = new Map();
+        let entityTypes = [];
+        let pollingInterval = null;
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadSystemStatus();
+            await loadEntityTypes();
+            await loadBackupCatalog();
+            await loadActiveOperations();
+
+            // Start polling for operation updates every 2 seconds
+            startPolling();
+        });
+
+        // Start polling for operation updates
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+
+            pollingInterval = setInterval(async () => {
+                await pollActiveOperations();
+                await loadSystemStatus();
+            }, 2000); // Poll every 2 seconds
+
+            log("🔄 Started polling for operation updates");
+        }
+
+        // Stop polling
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                log("⏸️ Stopped polling for updates");
+            }
+        }
+
+        // Poll for active operation updates
+        async function pollActiveOperations() {
+            const operationsToCheck = Array.from(activeOperations.keys());
+
+            for (const operationId of operationsToCheck) {
+                await checkOperationStatus(operationId);
+            }
+        }
+
+        // Check status of a specific operation
+        async function checkOperationStatus(operationId) {
+            try {
+                // Try backup operation first
+                let response = await fetch(`/api/backup/operations/${operationId}`);
+
+                if (!response.ok) {
+                    // Try restore operation
+                    response = await fetch(`/api/restore/operations/${operationId}`);
+                }
+
+                if (response.ok) {
+                    const operation = await response.json();
+                    const previousOp = activeOperations.get(operationId);
+
+                    // Update operation state
+                    activeOperations.set(operationId, operation);
+
+                    // Check for status changes and log them
+                    if (previousOp) {
+                        if (operation.status !== previousOp.status) {
+                            handleStatusChange(operationId, operation, previousOp.status);
+                        }
+
+                        // Check for progress updates
+                        if (operation.progress && previousOp.progress) {
+                            const prevPercent = previousOp.progress.percentComplete || 0;
+                            const currPercent = operation.progress.percentComplete || 0;
+
+                            if (Math.abs(currPercent - prevPercent) >= 5) { // Log every 5% progress
+                                log(`📊 Operation Progress [${operationId.substring(0, 8)}]: ${currPercent.toFixed(1)}% - ${operation.progress.currentStage}`);
+                            }
+                        }
+                    }
+
+                    displayActiveOperations();
+                } else if (response.status === 404) {
+                    // Operation not found, remove from tracking
+                    activeOperations.delete(operationId);
+                    displayActiveOperations();
+                }
+            } catch (error) {
+                log(`❌ Error checking operation ${operationId.substring(0, 8)}: ${error.message}`);
+            }
+        }
+
+        // Handle operation status changes
+        function handleStatusChange(operationId, operation, previousStatus) {
+            const shortId = operationId.substring(0, 8);
+
+            switch (operation.status) {
+                case 'Completed':
+                    log(`✅ Operation Completed [${shortId}]: ${operation.backupName || operation.operationName || 'Unknown'}`);
+
+                    // Auto-remove completed operations after 10 seconds
+                    setTimeout(() => {
+                        activeOperations.delete(operationId);
+                        displayActiveOperations();
+                    }, 10000);
+
+                    // Refresh backup catalog if this was a backup operation
+                    if (operation.result && operation.result.name) {
+                        refreshBackupCatalog();
+                    }
+                    break;
+
+                case 'Failed':
+                    log(`❌ Operation Failed [${shortId}]: ${operation.errorMessage || 'Unknown error'}`);
+                    break;
+
+                case 'Cancelled':
+                    log(`⏹️ Operation Cancelled [${shortId}]`);
+                    break;
+
+                case 'Running':
+                    if (previousStatus !== 'Running') {
+                        log(`▶️ Operation Started [${shortId}]: ${operation.backupName || operation.operationName || 'Unknown'}`);
+                    }
+                    break;
+            }
+        }
+
+        // Load system status
+        async function loadSystemStatus() {
+            try {
+                const response = await fetch('/api/backup/status');
+                if (response.ok) {
+                    const status = await response.json();
+                    displaySystemStatus(status);
+                } else {
+                    document.getElementById('system-status').innerHTML = '<p class="error">Failed to load system status</p>';
+                }
+            } catch (error) {
+                document.getElementById('system-status').innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Display system status
+        function displaySystemStatus(status) {
+            const statusHtml = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div>
+                        <strong>Status:</strong>
+                        <span style="color: ${status.status === 'Healthy' ? 'green' : 'red'}">
+                            ${status.status}
+                        </span>
+                    </div>
+                    <div><strong>Active Backups:</strong> ${status.activeBackupOperations}</div>
+                    <div><strong>Active Restores:</strong> ${status.activeRestoreOperations}</div>
+                    <div><strong>Discovered Entities:</strong> ${status.discoveredEntityTypes || 'N/A'}</div>
+                </div>
+            `;
+            document.getElementById('system-status').innerHTML = statusHtml;
+        }
+
+        // Load entity types
+        async function loadEntityTypes() {
+            try {
+                const response = await fetch('/api/entities');
+                if (response.ok) {
+                    entityTypes = await response.json();
+                    populateEntitySelections();
+                } else {
+                    log('❌ Failed to load entity types');
+                }
+            } catch (error) {
+                log(`❌ Error loading entity types: ${error.message}`);
+            }
+        }
+
+        // Populate entity selection UI
+        function populateEntitySelections() {
+            // Multi-select for selective backup
+            const entityContainer = document.getElementById('entity-types');
+            entityContainer.innerHTML = entityTypes.map(entity => `
+                <div class="entity-checkbox">
+                    <input type="checkbox" id="entity-${entity.entityType.name}" value="${entity.entityType.name}">
+                    <label for="entity-${entity.entityType.name}">${entity.entityType.name}</label>
+                </div>
+            `).join('');
+
+            // Single select for entity backup
+            const singleSelect = document.getElementById('single-entity-type');
+            singleSelect.innerHTML = '<option value="">Select an entity type...</option>' +
+                entityTypes.map(entity => `<option value="${entity.entityType.name}">${entity.entityType.name}</option>`).join('');
+        }
+
+        // Toggle backup options based on type
+        function toggleBackupOptions() {
+            const backupType = document.getElementById('backup-type').value;
+            const entitySelection = document.getElementById('entity-selection');
+            const singleEntitySelection = document.getElementById('single-entity-selection');
+
+            entitySelection.style.display = backupType === 'selective' ? 'block' : 'none';
+            singleEntitySelection.style.display = backupType === 'entity' ? 'block' : 'none';
+        }
+
+        // Create backup
+        async function createBackup() {
+            const backupType = document.getElementById('backup-type').value;
+            const name = document.getElementById('backup-name').value.trim();
+            const description = document.getElementById('backup-description').value.trim();
+            const tags = document.getElementById('backup-tags').value.split(',').map(t => t.trim()).filter(t => t);
+
+            if (!name) {
+                alert('Please enter a backup name');
+                return;
+            }
+
+            try {
+                let endpoint, payload;
+
+                if (backupType === 'global') {
+                    endpoint = '/api/backup/all';
+                    payload = {
+                        name,
+                        description: description || null,
+                        tags,
+                        compressionLevel: 'Optimal',
+                        batchSize: 1000,
+                        maxConcurrency: 2
+                    };
+                } else if (backupType === 'selective') {
+                    const selectedEntities = Array.from(document.querySelectorAll('#entity-types input:checked'))
+                        .map(cb => cb.value);
+
+                    if (selectedEntities.length === 0) {
+                        alert('Please select at least one entity type');
+                        return;
+                    }
+
+                    endpoint = '/api/backup/selective';
+                    payload = {
+                        name,
+                        description: description || null,
+                        tags,
+                        includeEntityTypes: selectedEntities,
+                        compressionLevel: 'Optimal',
+                        batchSize: 1000,
+                        maxConcurrency: 2
+                    };
+                } else { // entity
+                    const entityType = document.getElementById('single-entity-type').value;
+
+                    if (!entityType) {
+                        alert('Please select an entity type');
+                        return;
+                    }
+
+                    endpoint = `/api/entities/${entityType}/backup`;
+                    payload = {
+                        entityType,
+                        name,
+                        description: description || null,
+                        tags,
+                        compressionLevel: 'Optimal',
+                        batchSize: 1000
+                    };
+                }
+
+                log(`🚀 Starting ${backupType} backup: ${name}`);
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const operation = await response.json();
+                    log(`✅ Backup operation started: ${operation.operationId}`);
+
+                    activeOperations.set(operation.operationId, operation);
+                    displayActiveOperations();
+
+                    // Clear form
+                    document.getElementById('backup-name').value = '';
+                    document.getElementById('backup-description').value = '';
+                    document.getElementById('backup-tags').value = '';
+                } else {
+                    const error = await response.text();
+                    log(`❌ Failed to start backup: ${error}`);
+                }
+            } catch (error) {
+                log(`❌ Error creating backup: ${error.message}`);
+            }
+        }
+
+        // Load active operations from tracked operations
+        async function loadActiveOperations() {
+            // Poll existing tracked operations for their current status
+            await pollActiveOperations();
+            displayActiveOperations();
+        }
+
+        // Display active operations
+        function displayActiveOperations() {
+            const container = document.getElementById('active-operations');
+
+            if (activeOperations.size === 0) {
+                container.innerHTML = '<p>No active operations.</p>';
+                return;
+            }
+
+            const operationsHtml = Array.from(activeOperations.entries()).map(([id, op]) => `
+                <div class="operation-card status-${op.status.toLowerCase()}">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <h4>${op.backupName}</h4>
+                            <p><strong>Operation ID:</strong> ${id.substring(0, 16)}...</p>
+                            <p><strong>Status:</strong> ${op.status}</p>
+                            ${op.progress ? `
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${op.progress.percentComplete}%"></div>
+                                </div>
+                                <p><small>${op.progress.currentStage} - ${op.progress.percentComplete.toFixed(1)}%</small></p>
+                                ${op.progress.estimatedTimeRemaining ? `<p><small>ETA: ${op.progress.estimatedTimeRemaining}</small></p>` : ''}
+                            ` : ''}
+                            ${op.errorMessage ? `<p style="color: red;"><strong>Error:</strong> ${op.errorMessage}</p>` : ''}
+                        </div>
+                        <div>
+                            ${op.cancelUrl ? `<button class="btn btn-danger" onclick="cancelOperation('${id}')">Cancel</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = operationsHtml;
+        }
+
+        // Update operation progress
+        function updateOperationProgress(operationId, progress) {
+            if (activeOperations.has(operationId)) {
+                const operation = activeOperations.get(operationId);
+                operation.progress = progress;
+                operation.status = 'Running';
+                displayActiveOperations();
+            }
+        }
+
+        // Mark operation as completed
+        function markOperationCompleted(operationId) {
+            if (activeOperations.has(operationId)) {
+                const operation = activeOperations.get(operationId);
+                operation.status = 'Completed';
+                operation.cancelUrl = null;
+                displayActiveOperations();
+
+                // Remove from active operations after a delay
+                setTimeout(() => {
+                    activeOperations.delete(operationId);
+                    displayActiveOperations();
+                }, 10000);
+            }
+        }
+
+        // Mark operation as failed
+        function markOperationFailed(operationId, errorMessage) {
+            if (activeOperations.has(operationId)) {
+                const operation = activeOperations.get(operationId);
+                operation.status = 'Failed';
+                operation.errorMessage = errorMessage;
+                operation.cancelUrl = null;
+                displayActiveOperations();
+            }
+        }
+
+        // Mark operation as cancelled
+        function markOperationCancelled(operationId) {
+            if (activeOperations.has(operationId)) {
+                const operation = activeOperations.get(operationId);
+                operation.status = 'Cancelled';
+                operation.cancelUrl = null;
+                displayActiveOperations();
+            }
+        }
+
+        // Cancel operation
+        async function cancelOperation(operationId) {
+            try {
+                const response = await fetch(`/api/backup/operations/${operationId}/cancel`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    log(`⏹️ Cancellation requested for operation ${operationId.substring(0, 8)}`);
+                } else {
+                    log(`❌ Failed to cancel operation ${operationId.substring(0, 8)}`);
+                }
+            } catch (error) {
+                log(`❌ Error cancelling operation: ${error.message}`);
+            }
+        }
+
+        // Load backup catalog
+        async function loadBackupCatalog() {
+            try {
+                const response = await fetch('/api/backup/manifests?page=1&pageSize=10');
+                if (response.ok) {
+                    const catalog = await response.json();
+                    displayBackupCatalog(catalog);
+                } else {
+                    document.getElementById('backup-catalog').innerHTML = '<p class="error">Failed to load backup catalog</p>';
+                }
+            } catch (error) {
+                document.getElementById('backup-catalog').innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Display backup catalog
+        function displayBackupCatalog(catalog) {
+            const container = document.getElementById('backup-catalog');
+
+            if (!catalog.backups || catalog.backups.length === 0) {
+                container.innerHTML = '<p>No backups found.</p>';
+                return;
+            }
+
+            const backupsHtml = catalog.backups.map(backup => `
+                <div class="backup-item">
+                    <div>
+                        <h4>${backup.name}</h4>
+                        <p><strong>Created:</strong> ${new Date(backup.createdAt).toLocaleString()}</p>
+                        <p><strong>Status:</strong> ${backup.status}</p>
+                        <p><strong>Entities:</strong> ${backup.entities?.length || 0} types</p>
+                        ${backup.description ? `<p><em>${backup.description}</em></p>` : ''}
+                    </div>
+                    <div>
+                        <button class="btn btn-success" onclick="restoreBackup('${backup.id || backup.name}')">Restore</button>
+                        <button class="btn btn-secondary" onclick="verifyBackup('${backup.id || backup.name}')">Verify</button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = backupsHtml;
+        }
+
+        // Refresh backup catalog
+        function refreshBackupCatalog() {
+            loadBackupCatalog();
+        }
+
+        // Restore backup
+        async function restoreBackup(backupId) {
+            const confirmed = confirm(`Are you sure you want to restore backup "${backupId}"? This may overwrite existing data.`);
+            if (!confirmed) return;
+
+            try {
+                log(`🔄 Starting restore from backup: ${backupId}`);
+
+                const response = await fetch(`/api/restore/${backupId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        backupName: backupId,
+                        replaceExisting: false,
+                        disableConstraints: true,
+                        useBulkMode: true,
+                        optimizationLevel: 'Balanced'
+                    })
+                });
+
+                if (response.ok) {
+                    const operation = await response.json();
+                    log(`✅ Restore operation started: ${operation.operationId}`);
+
+                    // Track the restore operation
+                    activeOperations.set(operation.operationId, operation);
+                    displayActiveOperations();
+                } else {
+                    const error = await response.text();
+                    log(`❌ Failed to start restore: ${error}`);
+                }
+            } catch (error) {
+                log(`❌ Error starting restore: ${error.message}`);
+            }
+        }
+
+        // Verify backup
+        async function verifyBackup(backupId) {
+            try {
+                log(`🔍 Verifying backup: ${backupId}`);
+
+                const response = await fetch(`/api/backup/verify/${backupId}`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.isValid) {
+                        log(`✅ Backup verification passed: ${backupId}`);
+                    } else {
+                        log(`❌ Backup verification failed: ${result.issues?.join(', ') || 'Unknown issues'}`);
+                    }
+                } else {
+                    log(`❌ Failed to verify backup: ${backupId}`);
+                }
+            } catch (error) {
+                log(`❌ Error verifying backup: ${error.message}`);
+            }
+        }
+
+        // Logging functions
+        function log(message) {
+            const container = document.getElementById('log-container');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            container.appendChild(logEntry);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log-container').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

@@ -2,11 +2,11 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
+using Koan.Data.Core.Optimization;
 
 
 namespace S5.Recs.Models;
 
-[DataAdapter("mongo")]
 [Storage(Name = "MediaFormats")]
 public sealed class MediaFormat : Entity<MediaFormat>
 {

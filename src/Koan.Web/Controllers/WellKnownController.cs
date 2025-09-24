@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Extensions;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Observability;
 using Koan.Core.Observability.Health;
 using Koan.Data.Abstractions;
@@ -105,7 +106,8 @@ public sealed class WellKnownController(
     [HttpGet("aggregates")]
     public IActionResult Aggregates()
     {
-        var aggregates = AppDomain.CurrentDomain.GetAssemblies()
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var aggregates = AssemblyCache.Instance.GetAllAssemblies()
             .SelectMany(a => KoanWebHelpers.SafeGetTypes(a))
             .Where(t => t.IsClass && !t.IsAbstract)
             .Select(t => new { Type = t, Root = t.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntity<>)) })

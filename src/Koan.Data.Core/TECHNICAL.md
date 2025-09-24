@@ -1,6 +1,6 @@
 ---
 uid: reference.modules.Koan.data.core
-title: Koan.Data.Core — Technical Reference
+title: Koan.Data.Core - Technical Reference
 description: Contracts, options, design and operations for the Koan data core.
 since: 0.2.x
 packages: [Sylin.Koan.Data.Core]
@@ -84,6 +84,6 @@ source: src/Koan.Data.Core/
 
 ## References
 
-- ADR ARCH-0040 — config and constants naming: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`
-- ADR DATA-0061 — paging/streaming semantics: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
+- ADR ARCH-0040 - config and constants naming: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`
+- ADR DATA-0061 - paging/streaming semantics: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
 - Engineering guardrails: `/docs/engineering/index.md`

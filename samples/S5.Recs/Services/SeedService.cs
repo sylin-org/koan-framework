@@ -1,13 +1,14 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
-using S5.Recs.Options;
+using Koan.Ai.Provider.Ollama;
 using S5.Recs.Providers;
 using Koan.AI.Contracts;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
+using Koan.Core;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
@@ -46,7 +47,7 @@ internal sealed class SeedService : ISeedService
             throw new InvalidOperationException("No MediaTypes found. Please seed reference data first.");
         }
 
-        var jobId = Guid.NewGuid().ToString("n");
+        var jobId = Guid.CreateVersion7().ToString("n");
         _logger?.LogInformation("Starting multi-type import job {JobId} for source={Source} with {TypeCount} media types",
             jobId, source, mediaTypes.Count);
 
@@ -69,7 +70,7 @@ internal sealed class SeedService : ISeedService
         return jobId;
     }
 
-    public async Task<string> StartAsync(string source, string mediaTypeName, int? limit, bool overwrite, CancellationToken ct)
+    public Task<string> StartAsync(string source, string mediaTypeName, int? limit, bool overwrite, CancellationToken ct)
     {
         // Prevent concurrent imports to avoid service saturation
         lock (_importLock)
@@ -85,7 +86,7 @@ internal sealed class SeedService : ISeedService
         }
 
         Directory.CreateDirectory(_cacheDir);
-        var jobId = Guid.NewGuid().ToString("n");
+        var jobId = Guid.CreateVersion7().ToString("n");
         _progress[jobId] = (0, 0, 0, 0, false, null);
         _logger?.LogInformation("Multi-media seeding job {JobId} started. source={Source} mediaType={MediaType} limit={Limit} overwrite={Overwrite}",
             jobId, source, mediaTypeName, limit?.ToString() ?? "unlimited", overwrite);
@@ -201,7 +202,7 @@ internal sealed class SeedService : ISeedService
             }
         }, ct);
 
-        return jobId;
+        return Task.FromResult(jobId);
     }
 
     public Task<string> StartVectorUpsertAsync(IEnumerable<Media> items, CancellationToken ct)
@@ -209,7 +210,7 @@ internal sealed class SeedService : ISeedService
         var mediaItems = items.ToList();
 
         Directory.CreateDirectory(_cacheDir);
-        var jobId = Guid.NewGuid().ToString("n");
+        var jobId = Guid.CreateVersion7().ToString("n");
         var count = mediaItems.Count;
         _progress[jobId] = (count, count, 0, 0, false, null);
         _logger?.LogInformation("Vector-only upsert job {JobId} started from provided items. count={Count}", jobId, count);
@@ -563,8 +564,8 @@ internal sealed class SeedService : ISeedService
                 return 0;
             }
 
-            var opts = (IOptions<OllamaOptions>?)_sp.GetService(typeof(IOptions<OllamaOptions>));
-            var model = opts?.Value?.Model ?? "all-minilm";
+            var config = (IConfiguration?)_sp.GetService(typeof(IConfiguration));
+            var model = GetConfiguredModel(config);
 
             const int batchSize = 32;
             int total = 0;
@@ -613,8 +614,8 @@ internal sealed class SeedService : ISeedService
                 return 0;
             }
 
-            var opts = (IOptions<OllamaOptions>?)_sp.GetService(typeof(IOptions<OllamaOptions>));
-            var model = opts?.Value?.Model ?? "all-minilm";
+            var config = (IConfiguration?)_sp.GetService(typeof(IConfiguration));
+            var model = GetConfiguredModel(config);
 
             const int batchSize = 32;
             int total = 0;
@@ -647,6 +648,24 @@ internal sealed class SeedService : ISeedService
         catch
         {
             return 0;
+        }
+    }
+
+    private static string GetConfiguredModel(IConfiguration? configuration)
+    {
+        try
+        {
+            // Use Koan.Core Configuration helpers to read from multiple possible locations
+            var result = Configuration.ReadFirst(configuration, "all-minilm",
+                "Koan:Services:ollama:DefaultModel",
+                "Koan:Ai:Ollama:DefaultModel",
+                "Koan:Ai:Ollama:RequiredModels:0"  // First element of RequiredModels array
+            );
+            return result;
+        }
+        catch
+        {
+            return "all-minilm";
         }
     }
 

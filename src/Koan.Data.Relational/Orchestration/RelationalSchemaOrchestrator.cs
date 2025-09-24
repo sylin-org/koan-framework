@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Koan.Data.Core;
 using System.Collections.Concurrent;
 using System.Reflection;
+using Koan.Data.Core.Optimization;
 
 namespace Koan.Data.Relational.Orchestration;
 
@@ -102,8 +103,16 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         System.Diagnostics.Debug.WriteLine($"[ORCH] EnsureCreatedMaterializedAsync: Entity={entity.Name}, Schema={schema}, Table={table}");
         var projections = ProjectionResolver.Get(entity);
         var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
-        // Always add Id and Json columns
-        allColumns.Add(("Id", typeof(string), false, false, null, false));
+
+        // Always add Id and Json columns - use optimized storage type for Id
+        var optimizationInfo = _sp.GetStorageOptimization<TEntity, TKey>();
+        var idStorageType = GetIdStorageType<TKey>(optimizationInfo, features.ProviderName);
+
+        System.Diagnostics.Debug.WriteLine($"[ORCH] ID Storage Optimization: Entity={entity.Name}, Provider={features.ProviderName}, " +
+            $"OptimizationType={optimizationInfo.OptimizationType}, StorageType={idStorageType.Name}, " +
+            $"IsOptimized={optimizationInfo.IsOptimized}");
+
+        allColumns.Add(("Id", idStorageType, false, false, null, false));
         allColumns.Add(("Json", typeof(string), false, false, null, false));
         foreach (var p in projections)
         {
@@ -177,8 +186,16 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         var schema = "dbo";
         var method = typeof(Core.Configuration.StorageNameRegistry).GetMethods()
             .First(m => m.Name == "GetOrCompute" && m.GetGenericArguments().Length == 2);
-        // Fallback: try to use string key if reflection fails (shouldn't in our codebase)
-        var table = (string)method.MakeGenericMethod(entity, typeof(string)).Invoke(null, new object?[] { _sp })!;
+
+        // Extract the actual TKey type from the entity's IEntity<TKey> interface
+        var entityInterface = entity.GetInterfaces()
+            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(Abstractions.IEntity<>));
+
+        if (entityInterface == null)
+            throw new InvalidOperationException($"Entity type {entity.Name} does not implement IEntity<TKey>");
+
+        var keyType = entityInterface.GetGenericArguments()[0];
+        var table = (string)method.MakeGenericMethod(entity, keyType).Invoke(null, new object?[] { _sp })!;
         return (schema, table);
     }
 
@@ -219,4 +236,24 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
 
     private static bool IsDdlAllowed(RelationalMaterializationOptions options)
         => options.DdlPolicy == RelationalDdlPolicy.AutoCreate && (!Koan.Core.KoanEnv.IsProduction || options.AllowProductionDdl);
+
+    private static Type GetIdStorageType<TKey>(StorageOptimizationInfo optimizationInfo, string providerName)
+        where TKey : notnull
+    {
+        // For non-string keys, use the key type directly (no optimization needed)
+        if (typeof(TKey) != typeof(string))
+            return typeof(TKey);
+
+        // For string keys, check if optimization is enabled
+        if (!optimizationInfo.IsOptimized)
+            return typeof(string);
+
+        // Apply optimization based on type
+        return optimizationInfo.OptimizationType switch
+        {
+            StorageOptimizationType.Guid => typeof(Guid),
+            _ => typeof(string)
+        };
+    }
+
 }

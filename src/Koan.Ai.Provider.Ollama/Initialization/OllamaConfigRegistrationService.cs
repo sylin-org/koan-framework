@@ -25,7 +25,12 @@ internal sealed class OllamaConfigRegistrationService : IHostedService
                 {
                     var http = new HttpClient { BaseAddress = new Uri(opt.BaseUrl), Timeout = TimeSpan.FromSeconds(60) };
                     var logger = _sp.GetService<Microsoft.Extensions.Logging.ILogger<OllamaAdapter>>();
-                    var adapter = new OllamaAdapter(opt.Id, $"Ollama ({http.BaseAddress})", http, opt.DefaultModel, logger);
+
+                    // Create minimal configuration for the adapter
+                    var configBuilder = new Microsoft.Extensions.Configuration.ConfigurationBuilder();
+                    var adapterConfig = configBuilder.Build();
+
+                    var adapter = new OllamaAdapter(http, logger, adapterConfig);
                     _registry.Add(adapter);
                 }
                 catch { /* ignore invalid entries */ }

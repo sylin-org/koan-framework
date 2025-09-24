@@ -56,7 +56,16 @@ internal sealed class OllamaHealthContributor : IHealthContributor
 
         // Required models (optional): Koan:Ai:Ollama:RequiredModels: [ "all-minilm", ... ]
         var required = _cfg.GetSection("Koan:Ai:Ollama:RequiredModels").Get<string[]>() ?? Array.Empty<string>();
-        var missing = required.Where(r => !models.Contains(r)).ToArray();
+
+        // Debug logging
+        if (required.Length > 0)
+        {
+            var modelsList = string.Join(", ", models.Take(10).Select(m => $"'{m}'"));
+            data["debug.available_models"] = modelsList;
+            data["debug.required_models"] = string.Join(", ", required.Select(r => $"'{r}'"));
+        }
+
+        var missing = required.Where(r => !ModelExists(models, r)).ToArray();
         if (missing.Length > 0)
         {
             data["required.missing"] = missing;
@@ -64,5 +73,25 @@ internal sealed class OllamaHealthContributor : IHealthContributor
         }
 
         return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Healthy, null, null, data);
+    }
+
+    /// <summary>
+    /// Check if a model exists in the available models, handling tag variations.
+    /// Matches "all-minilm" against both "all-minilm" and "all-minilm:latest".
+    /// </summary>
+    private static bool ModelExists(HashSet<string> availableModels, string requiredModel)
+    {
+        if (string.IsNullOrEmpty(requiredModel)) return false;
+
+        return availableModels.Any(available =>
+        {
+            // Exact match
+            if (string.Equals(available, requiredModel, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Base name match (handle tags like :latest)
+            var baseName = available.Split(':')[0];
+            return string.Equals(baseName, requiredModel, StringComparison.OrdinalIgnoreCase);
+        });
     }
 }

@@ -1,15 +1,16 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Optimization;
 using Koan.Data.Core.Relationships;
 using Koan.Data.Vector.Abstractions;
 using S5.Recs.Infrastructure;
 
 namespace S5.Recs.Models;
 
-[DataAdapter("mongo")]
 [VectorAdapter("weaviate")]
 [Storage(Name = "Media")]
+[OptimizeStorage(OptimizationType = StorageOptimizationType.None, Reason = "Uses SHA512-based deterministic string IDs, not GUIDs")]
 public sealed class Media : Entity<Media>
 {
     [Parent(typeof(MediaType))]

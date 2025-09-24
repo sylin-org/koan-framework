@@ -382,7 +382,8 @@ public class ParentKeyResolutionService : BackgroundService
     private List<Type> DiscoverModelsWithParentKeys()
     {
         var result = new List<Type>();
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        // Use cached assemblies instead of bespoke AppDomain scanning
+        var assemblies = Koan.Core.Hosting.Bootstrap.AssemblyCache.Instance.GetAllAssemblies();
 
         foreach (var asm in assemblies)
         {

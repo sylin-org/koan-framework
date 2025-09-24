@@ -1,13 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Core primitives for Koan: configuration helper, environment snapshot (KoanEnv), constants, foundational abstractions, and background services with fluent API.</Description>
     <PackageTags>$(CommonPackageTags);core;configuration;options;environment;runtimesnapshot;constants;backgroundservices;fluentapi</PackageTags>
+    <Version>0.6.1</Version>
+    <AssemblyVersion>0.6.1</AssemblyVersion>
+    <FileVersion>0.6.1</FileVersion>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.8" />
@@ -23,7 +24,14 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.8.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.8.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.8.1" />
-  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
-
+  <!-- Explicitly exclude adapter files to prevent Docker build conflicts -->
+  <ItemGroup>
+    <Compile Remove="Adapters/**/*.cs" />
+    <Compile Remove="**/Adapters/**/*.cs" />
+    <Compile Remove="../Koan.Core.Adapters/**/*.cs" />
+    <None Remove="Adapters/**/*" />
+    <None Remove="**/Adapters/**/*" />
+  </ItemGroup>
 </Project>

@@ -7,12 +7,11 @@ using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Web.Endpoints;
 using Koan.Web.Infrastructure;
 using Koan.Web.Options;
 
 namespace Koan.Web.Extensions;
-
-
 
 public static class ServiceCollectionExtensions
 {
@@ -26,21 +25,20 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<KoanWebMarker>();
 
         services.AddKoanOptions<KoanWebOptions>(ConfigurationConstants.Web.Section);
+        services.AddOptions<EntityEndpointOptions>();
+        services.TryAddScoped<EntityRequestContextBuilder>();
+
         // Core web bits expected by Koan Web apps
         services.AddRouting();
         // Add controllers with NewtonsoftJson for JSON Patch
         services.AddControllers(o =>
         {
-            // Don’t implicitly require non-nullable reference types (NRT) during model binding.
-            // This allows POST bodies to omit Id and have it generated server-side.
             o.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
-            // If transformers package is referenced, register output filter and input formatter
             try
             {
                 var outputFilterType = Type.GetType("Koan.Web.Transformers.EntityOutputTransformFilter, Koan.Web.Transformers");
                 if (outputFilterType is not null)
                 {
-                    // Add as a global filter; attribute on controller will gate actual execution
                     o.Filters.Add(new TypeFilterAttribute(outputFilterType));
                 }
             }
@@ -48,19 +46,18 @@ public static class ServiceCollectionExtensions
         })
         .AddNewtonsoftJson(j =>
         {
-            // Emit camelCase JSON to match typical JS clients (id, name, ...)
             j.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
             j.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
-
             j.SerializerSettings.Converters.Add(new StringEnumConverter());
             j.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
-
         });
-        // Add input formatter via DI-aware options configurator (no early ServiceProvider build)
+
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, OptionalTransformerInputFormatterConfigurator>());
         services.AddKoanOptions<WebPipelineOptions>(ConfigurationConstants.Web.Section + ":Pipeline");
+        services.TryAddSingleton<IEntityEndpointDescriptorProvider, DefaultEntityEndpointDescriptorProvider>();
+        services.TryAddScoped(typeof(IEntityHookPipeline<>), typeof(DefaultEntityHookPipeline<>));
+        services.TryAddScoped(typeof(IEntityEndpointService<,>), typeof(EntityEndpointService<,>));
 
-        // Observability is wired in Koan.Core's AddKoanObservability; Koan.Web only ensures core web services are present.
         return services;
     }
 
@@ -71,7 +68,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // Launch templates and toggles
     public static IServiceCollection AsWebApi(this IServiceCollection services)
     {
         services.AddKoanWeb();
@@ -86,7 +82,7 @@ public static class ServiceCollectionExtensions
         services.Configure<WebPipelineOptions>(p =>
         {
             p.UseExceptionHandler = true;
-            p.UseRateLimiter = false; // opt-in via WithRateLimit()
+            p.UseRateLimiter = false;
         });
         return services;
     }
@@ -103,17 +99,12 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // Convenience toggle: mark app as proxied to skip security headers from Koan
     public static IServiceCollection AsProxiedApi(this IServiceCollection services)
     {
         services.Configure<KoanWebOptions>(o => o.IsProxiedApi = true);
         return services;
     }
 
-    // Correct spelling; prefer this going forward
     public static IServiceCollection SuppressSecurityHeaders(this IServiceCollection services)
         => services.AsProxiedApi();
-
 }
-
-// Internal DI-aware configurator to register optional transformer input formatter when package is present

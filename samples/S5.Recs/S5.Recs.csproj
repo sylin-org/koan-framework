@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
@@ -22,6 +23,9 @@
     <!-- Auth core and dev TestProvider for Development login/testing -->
     <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Auth.TestProvider\Koan.Web.Auth.TestProvider.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth.Services\Koan.Web.Auth.Services.csproj" />
+    <!-- Backup and Restore Web API -->
+    <ProjectReference Include="..\..\src\Koan.Web.Backup\Koan.Web.Backup.csproj" />
   <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
   </ItemGroup>
   <PropertyGroup>

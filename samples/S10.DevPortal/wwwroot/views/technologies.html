@@ -1,0 +1,223 @@
+<!-- Technologies Management - Hierarchical Relationships Demo -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-sitemap"></i> Technology Hierarchy</h2>
+            <div class="feature-highlight">
+                Relationship Navigation Demo
+            </div>
+        </div>
+        <p class="text-muted">
+            This page demonstrates hierarchical relationships and the framework's relationship navigation capabilities.
+            Technologies can have parent/child relationships and soft relationships via RelatedIds.
+        </p>
+    </div>
+</div>
+
+<!-- Create New Technology -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5><i class="fas fa-plus"></i> Create New Technology</h5>
+            </div>
+            <div class="card-body">
+                <form ng-submit="createTechnology()">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Name</label>
+                                <input type="text" class="form-control" ng-model="newTechnology.name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Parent Technology</label>
+                                <select class="form-select" ng-model="newTechnology.parentId">
+                                    <option value="">None (Root Technology)</option>
+                                    <option ng-repeat="tech in technologies" value="{{tech.id}}">
+                                        {{tech.name}}
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" rows="2" ng-model="newTechnology.description"
+                                 placeholder="Technology description..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Official URL</label>
+                        <input type="url" class="form-control" ng-model="newTechnology.officialUrl"
+                               placeholder="https://...">
+                    </div>
+                    <button type="submit" class="btn btn-success" ng-disabled="loading || !newTechnology.name">
+                        <i class="fas fa-save"></i> Create Technology
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Technologies List and Hierarchy View -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5><i class="fas fa-list"></i> Technologies</h5>
+            </div>
+            <div class="card-body">
+                <div ng-if="loading" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading technologies...</p>
+                </div>
+
+                <div ng-if="!loading && technologies.length === 0" class="text-center text-muted">
+                    <i class="fas fa-sitemap fa-3x mb-3"></i>
+                    <p>No technologies found.</p>
+                    <p>Create some technologies to see the hierarchy demonstration.</p>
+                </div>
+
+                <div ng-if="!loading && technologies.length > 0">
+                    <div class="list-group">
+                        <button ng-repeat="tech in technologies"
+                                class="list-group-item list-group-item-action"
+                                ng-class="{'active': selectedTechnology && selectedTechnology.id === tech.id}"
+                                ng-click="selectTechnology(tech)">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{tech.name}}</h6>
+                                <small>
+                                    <i class="fas fa-link" ng-if="tech.parentId"></i>
+                                    <i class="fas fa-star" ng-if="!tech.parentId"></i>
+                                </small>
+                            </div>
+                            <p class="mb-1 small">{{tech.description | limitTo:80}}...</p>
+                            <small class="text-muted">
+                                ID: <code>{{tech.id | limitTo:8}}...</code>
+                                <span ng-if="tech.parentId">
+                                    | Parent: <code>{{tech.parentId | limitTo:8}}...</code>
+                                </span>
+                            </small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <h5><i class="fas fa-project-diagram"></i> Relationship Details</h5>
+            </div>
+            <div class="card-body">
+                <div ng-if="!selectedTechnology" class="text-center text-muted">
+                    <i class="fas fa-mouse-pointer fa-3x mb-3"></i>
+                    <p>Select a technology to view its relationship hierarchy.</p>
+                </div>
+
+                <div ng-if="selectedTechnology && !hierarchy" class="text-center">
+                    <div class="spinner-border text-info" role="status">
+                        <span class="visually-hidden">Loading hierarchy...</span>
+                    </div>
+                    <p class="mt-2">Loading relationship data...</p>
+                </div>
+
+                <div ng-if="hierarchy">
+                    <h6><i class="fas fa-cube"></i> {{hierarchy.entity.name}}</h6>
+                    <p class="text-muted">{{hierarchy.entity.description}}</p>
+
+                    <div ng-if="hierarchy.entity.officialUrl" class="mb-3">
+                        <a href="{{hierarchy.entity.officialUrl}}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-external-link-alt"></i> Official Site
+                        </a>
+                    </div>
+
+                    <!-- Parent Relationship -->
+                    <div class="demo-section" ng-if="hierarchy.parent">
+                        <h6><i class="fas fa-level-up-alt"></i> Parent Technology</h6>
+                        <div class="relationship-tree">
+                            <strong>{{hierarchy.parent.name}}</strong>
+                            <br>
+                            <small class="text-muted">{{hierarchy.parent.description}}</small>
+                        </div>
+                    </div>
+
+                    <!-- Children Relationships -->
+                    <div class="demo-section" ng-if="hierarchy.children && hierarchy.children.length > 0">
+                        <h6><i class="fas fa-level-down-alt"></i> Child Technologies ({{hierarchy.children.length}})</h6>
+                        <div class="relationship-tree">
+                            <div ng-repeat="child in hierarchy.children" class="mb-2">
+                                <strong>{{child.name}}</strong>
+                                <br>
+                                <small class="text-muted">{{child.description | limitTo:60}}...</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Relatives Summary -->
+                    <div class="demo-section" ng-if="hierarchy.allRelatives">
+                        <h6><i class="fas fa-network-wired"></i> Relationship Graph Summary</h6>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="entity-info">
+                                    <strong>Parents:</strong> {{hierarchy.allRelatives.parents.length}}
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="entity-info">
+                                    <strong>Children:</strong> {{Object.keys(hierarchy.allRelatives.children).length}}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Framework Features -->
+                    <div class="demo-section mt-4">
+                        <h6><i class="fas fa-cogs"></i> Framework Features Used</h6>
+                        <ul class="list-unstyled small">
+                            <li><i class="fas fa-check text-success"></i> <code>GetParent&lt;Technology&gt;()</code></li>
+                            <li><i class="fas fa-check text-success"></i> <code>GetChildren&lt;Technology&gt;()</code></li>
+                            <li><i class="fas fa-check text-success"></i> <code>GetRelatives()</code></li>
+                            <li><i class="fas fa-check text-success"></i> Self-referencing Entity relationships</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Endpoints Demo -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h6><i class="fas fa-code"></i> Relationship Navigation Endpoints</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Custom endpoints added to <code>EntityController&lt;Technology&gt;</code> for relationship demonstration:
+                </p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="code-block">
+                            <div><strong>GET</strong> /api/technologies/{id}/children</div>
+                            <div><strong>GET</strong> /api/technologies/{id}/hierarchy</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="code-block">
+                            <div><strong>GET</strong> /api/technologies/{id}/related</div>
+                            <div><em>Plus all standard EntityController endpoints</em></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

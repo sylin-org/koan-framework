@@ -102,7 +102,7 @@
     const syns = Array.isArray(a.synonyms) ? a.synonyms.filter(Boolean) : [];
     const synEl=document.getElementById('synonyms'); if(synEl) synEl.innerHTML = syns.slice(0,maxChips).map(s=>`<span class="px-2 py-1 rounded bg-slate-800 text-gray-400 text-xs">${s}<\/span>`).join('');
 
-    const syn=document.getElementById('synopsis'); if(syn) syn.textContent = a.synopsis || a.description || '—';
+    const syn=document.getElementById('synopsis'); if(syn) syn.textContent = a.synopsis || a.description || '-';
     renderEntryState();
   }
 

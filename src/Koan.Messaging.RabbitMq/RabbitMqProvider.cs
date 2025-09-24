@@ -7,21 +7,25 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Koan.Core.Orchestration;
 
 namespace Koan.Messaging.RabbitMq;
 
 /// <summary>
-/// RabbitMQ implementation of IMessagingProvider with auto-discovery and zero configuration.
+/// RabbitMQ implementation of IMessagingProvider with orchestration-aware discovery.
 /// </summary>
 public class RabbitMqProvider : IMessagingProvider
 {
     private readonly ILogger<RabbitMqProvider>? _logger;
+    private readonly IConfiguration? _configuration;
     private string? _workingConnectionString;
 
-    public RabbitMqProvider(ILogger<RabbitMqProvider>? logger = null)
+    public RabbitMqProvider(ILogger<RabbitMqProvider>? logger = null, IConfiguration? configuration = null)
     {
         _logger = logger;
+        _configuration = configuration;
     }
 
     public string Name => "RabbitMQ";
@@ -31,25 +35,21 @@ public class RabbitMqProvider : IMessagingProvider
     {
         try
         {
-            var connectionStrings = GeneratePossibleConnectionStrings();
+            // Use orchestration-aware service discovery
+            var connectionString = await GetOrchestrationAwareConnectionStringAsync(cancellationToken);
 
-            foreach (var connectionString in connectionStrings)
+            _logger?.LogDebug("[RabbitMQ] Trying orchestration-aware connection: {ConnectionString}", MaskConnectionString(connectionString));
+            if (await TryConnectAsync(connectionString, cancellationToken))
             {
-                _logger?.LogDebug("[RabbitMQ] Trying connection: {ConnectionString}", MaskConnectionString(connectionString));
-                if (await TryConnectAsync(connectionString, cancellationToken))
-                {
-                    _workingConnectionString = connectionString;
-                    _logger?.LogDebug("[RabbitMQ] Connection successful: {ConnectionString}", MaskConnectionString(connectionString));
-                    return true;
-                }
-                else
-                {
-                    _logger?.LogDebug("[RabbitMQ] Connection failed: {ConnectionString}", MaskConnectionString(connectionString));
-                }
+                _workingConnectionString = connectionString;
+                _logger?.LogDebug("[RabbitMQ] Connection successful: {ConnectionString}", MaskConnectionString(connectionString));
+                return true;
             }
-
-            _logger?.LogDebug("[RabbitMQ] Not available - tried {Count} connection strings", connectionStrings.Count());
-            return false;
+            else
+            {
+                _logger?.LogDebug("[RabbitMQ] Connection failed: {ConnectionString}", MaskConnectionString(connectionString));
+                return false;
+            }
         }
         catch (Exception ex)
         {
@@ -68,26 +68,59 @@ public class RabbitMqProvider : IMessagingProvider
         return await Task.FromResult<IMessageBus>(new RabbitMqBus(_workingConnectionString, _logger));
     }
 
-    private IEnumerable<string> GeneratePossibleConnectionStrings()
+    private async Task<string> GetOrchestrationAwareConnectionStringAsync(CancellationToken cancellationToken = default)
     {
-        // Check environment variables first
-        if (Environment.GetEnvironmentVariable("RABBITMQ_URL") is string envUrl)
-            yield return envUrl;
-
-        if (Environment.GetEnvironmentVariable("Koan_RABBITMQ_URL") is string KoanUrl)
-            yield return KoanUrl;
-
-        // If no connection string is provided, use container-first logic
-        if (Koan.Core.KoanEnv.InContainer)
+        try
         {
-            // Try standardized container name (rabbitmq) with default port and user settings
-            yield return "amqp://guest:guest@rabbitmq:5672";
+            // Use centralized orchestration-aware service discovery
+            var serviceDiscovery = new OrchestrationAwareServiceDiscovery(_configuration);
+
+            // Create RabbitMQ-specific discovery options
+            var discoveryOptions = ServiceDiscoveryExtensions.ForRabbitMQ();
+
+            // Add legacy environment variable support for backward compatibility
+            var envCandidates = GetLegacyEnvironmentCandidates();
+            if (envCandidates.Length > 0)
+            {
+                discoveryOptions = discoveryOptions with
+                {
+                    AdditionalCandidates = envCandidates
+                };
+            }
+
+            // Discover RabbitMQ service
+            var result = await serviceDiscovery.DiscoverServiceAsync("rabbitmq", discoveryOptions, cancellationToken);
+
+            _logger?.LogDebug("[RabbitMQ] Orchestration-aware discovery result: {Method} -> {ConnectionString}",
+                result.DiscoveryMethod, MaskConnectionString(result.ServiceUrl));
+
+            return result.ServiceUrl;
         }
-        else
+        catch (Exception ex)
         {
-            // If not in container, try localhost
-            yield return "amqp://guest:guest@localhost:5672";
+            _logger?.LogWarning(ex, "[RabbitMQ] Orchestration-aware discovery failed, falling back to localhost");
+            return "amqp://guest:guest@localhost:5672";
         }
+    }
+
+    private string[] GetLegacyEnvironmentCandidates()
+    {
+        var candidates = new List<string>();
+
+        // Check legacy environment variables for backward compatibility
+        var envUrl = Environment.GetEnvironmentVariable("RABBITMQ_URL");
+        if (!string.IsNullOrWhiteSpace(envUrl))
+        {
+            candidates.Add(envUrl);
+        }
+
+        var koanEnvUrl = Environment.GetEnvironmentVariable("Koan_RABBITMQ_URL");
+        if (!string.IsNullOrWhiteSpace(koanEnvUrl))
+        {
+            candidates.Add(koanEnvUrl);
+        }
+
+        return candidates.ToArray();
     }
 
     private async Task<bool> TryConnectAsync(string connectionString, CancellationToken cancellationToken)
@@ -285,7 +318,7 @@ internal class RabbitMqConsumer : IMessageConsumer
 
             _channel.BasicConsume(_queueName, autoAck: false, consumer: _consumer);
 
-            _logger?.LogDebug("🎧 RabbitMQ consumer started for queue {QueueName}", _queueName);
+            _logger?.LogDebug("RabbitMQ consumer started for queue {QueueName}", _queueName);
         }, cancellationToken);
     }
 

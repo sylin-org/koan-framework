@@ -1,0 +1,45 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h4 mb-0">Trial Overview</h2>
+    <div>
+        <span class="badge bg-secondary bg-opacity-25 text-muted small me-1">Entity&lt;T&gt;</span>
+        <span class="badge bg-secondary bg-opacity-25 text-muted small">REST</span>
+    </div>
+</div>
+
+<div class="text-center my-4" ng-if="loading">
+    <div class="spinner-border text-primary" role="status"></div>
+</div>
+
+<div class="row g-3" ng-if="!loading">
+    <div class="col-md-6 col-lg-4" ng-repeat="site in sites">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-hospital"></i> {{site.name || site.Name}}</h5>
+                <p class="text-muted mb-1"><i class="fas fa-location-dot"></i> {{site.location || site.Location}}</p>
+                <p class="mb-1"><strong>PI:</strong> {{site.principalInvestigator || site.PrincipalInvestigator}}</p>
+                <p class="mb-1"><strong>Enrollment:</strong> {{site.currentEnrollment || site.CurrentEnrollment}} / {{site.enrollmentTarget || site.EnrollmentTarget}}</p>
+                <span class="badge bg-primary">{{site.regulatoryStatus || site.RegulatoryStatus}}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4" ng-if="visitSummary">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0"><i class="fas fa-calendar-check"></i> Visit Status</h5>
+            <div>
+                <span class="badge bg-secondary bg-opacity-25 text-muted small me-1">Entity&lt;T&gt;</span>
+                <span class="badge bg-secondary bg-opacity-25 text-muted small">REST</span>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-6 col-md-3" ng-repeat="(status, count) in visitSummary.byStatus">
+                <div class="stat-tile">
+                    <div class="h3 mb-0">{{count}}</div>
+                    <span class="text-muted text-uppercase small">{{status}}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

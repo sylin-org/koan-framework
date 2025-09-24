@@ -6,6 +6,7 @@ ASP.NET Core integration for Koan: controller-first routing, health endpoints, w
 - License: Apache-2.0
 
 ## Capabilities
+
 - MVC controller-first routing (attribute-routed)
 - Health endpoints and OpenAPI wiring (opt-in)
 - Transformers for payload shaping (see WEB-0035)
@@ -16,7 +17,7 @@ ASP.NET Core integration for Koan: controller-first routing, health endpoints, w
 dotnet add package Sylin.Koan.Web
 ```
 
-## Usage — quick examples
+## Usage - quick examples
 
 - Expose REST endpoints via controllers, not inline endpoints:
 
@@ -35,9 +36,11 @@ public sealed class ItemsController : EntityController<Item, Guid>
 See TECHNICAL.md for contracts, options, and integration details.
 
 ## Customization
+
 - Configuration and advanced usage are documented in [`TECHNICAL.md`](./TECHNICAL.md).
 
 ## References
+
 - Web API conventions: `/docs/api/web-http-api.md`
 - Decision: `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
 - Engineering guardrails: `/docs/engineering/index.md`
