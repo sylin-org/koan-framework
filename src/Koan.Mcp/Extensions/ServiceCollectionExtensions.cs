@@ -27,8 +27,11 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<SchemaBuilder>();
         services.TryAddSingleton<DescriptorMapper>();
         services.TryAddSingleton<McpEntityRegistry>();
+        services.TryAddSingleton<RequestTranslator>();
+        services.TryAddSingleton<ResponseTranslator>();
         services.TryAddSingleton<EndpointToolExecutor>();
         services.TryAddSingleton<IMcpTransportDispatcher, StreamJsonRpcTransportDispatcher>();
+        services.TryAddSingleton<McpServer>();
         services.AddHostedService<StdioTransport>();
 
         return services;

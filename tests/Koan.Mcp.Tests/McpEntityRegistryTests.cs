@@ -13,6 +13,7 @@ using Koan.Web.Endpoints;
 using Koan.Web.Extensions;
 using Koan.Web.Hooks;
 using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -51,6 +52,7 @@ public sealed class McpEntityRegistryTests
         var modelProps = modelSchema["properties"]!.AsObject();
         modelProps.Should().ContainKey(nameof(TestEntity.Name));
         modelProps[nameof(TestEntity.Name)]!.AsObject()["description"]!.GetValue<string>().Should().Be("Display name");
+        modelProps[nameof(TestEntity.Quantity)]!.AsObject()["description"]!.GetValue<string>().Should().Be("Units available for MCP upserts");
         modelSchema["required"]!.AsArray().Select(n => n!.GetValue<string>()).Should().Contain(nameof(TestEntity.Name));
     }
 
@@ -88,12 +90,128 @@ public sealed class McpEntityRegistryTests
 
         var mcpResult = await executor.ExecuteAsync(toolName, new JsonObject(), CancellationToken.None);
 
-        mcpResult.Success.Should().BeTrue( $"Failure: {mcpResult.ErrorCode} {mcpResult.ErrorMessage} {mcpResult.Diagnostics.ToJsonString()}"); 
+        mcpResult.Success.Should().BeTrue( $"Failure: {mcpResult.ErrorCode} {mcpResult.ErrorMessage} {mcpResult.Diagnostics.ToJsonString()}");
         var expectedPayload = JsonSerializer.SerializeToNode(directResult.Items, SerializerOptions)!.ToJsonString();
         mcpResult.Payload.Should().NotBeNull();
         mcpResult.Payload!.ToJsonString().Should().Be(expectedPayload);
         mcpResult.Headers.Should().ContainKey("X-Source").WhoseValue.Should().Be("stub");
         mcpResult.Warnings.Should().Contain("collection-warning");
+    }
+
+    [Fact]
+    public async Task Endpoint_executor_surfaces_validation_short_circuit()
+    {
+        using var provider = BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        var services = scope.ServiceProvider;
+        var executor = services.GetRequiredService<EndpointToolExecutor>();
+        var registry = services.GetRequiredService<McpEntityRegistry>();
+
+        var toolName = registry.Registrations.Single(r => r.EntityType == typeof(TestEntity))
+            .Tools.Single(t => t.Operation == EntityEndpointOperationKind.Upsert).Name;
+
+        var invalidModel = new JsonObject
+        {
+            ["model"] = JsonSerializer.SerializeToNode(new
+            {
+                id = Guid.NewGuid(),
+                name = string.Empty,
+                quantity = 5,
+                isActive = true
+            }, SerializerOptions)
+        };
+
+        var result = await executor.ExecuteAsync(toolName, invalidModel, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Warnings.Should().Contain("validation-warning");
+        result.ShortCircuit.Should().NotBeNull();
+        var shortCircuit = result.ShortCircuit!.AsObject();
+        shortCircuit["statusCode"]!.GetValue<int>().Should().Be(400);
+        shortCircuit["type"]!.GetValue<string>().Should().Be(nameof(BadRequestObjectResult));
+    }
+
+    [Fact]
+    public async Task Endpoint_executor_propagates_short_circuit_payload()
+    {
+        using var provider = BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        var services = scope.ServiceProvider;
+        var executor = services.GetRequiredService<EndpointToolExecutor>();
+        var registry = services.GetRequiredService<McpEntityRegistry>();
+
+        var toolName = registry.Registrations.Single(r => r.EntityType == typeof(TestEntity))
+            .Tools.Single(t => t.Operation == EntityEndpointOperationKind.Query).Name;
+
+        var arguments = new JsonObject { ["filter"] = "status:active" };
+
+        var result = await executor.ExecuteAsync(toolName, arguments, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.ShortCircuit.Should().NotBeNull();
+        var shortCircuit = result.ShortCircuit!.AsObject();
+        shortCircuit["reason"]!.GetValue<string>().Should().Be("query-short-circuit");
+        shortCircuit["filter"]!.GetValue<string>().Should().Be("status:active");
+    }
+
+    [Fact]
+    public async Task Endpoint_executor_handles_mutation_payload()
+    {
+        using var provider = BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        var services = scope.ServiceProvider;
+        var executor = services.GetRequiredService<EndpointToolExecutor>();
+        var registry = services.GetRequiredService<McpEntityRegistry>();
+
+        var toolName = registry.Registrations.Single(r => r.EntityType == typeof(TestEntity))
+            .Tools.Single(t => t.Operation == EntityEndpointOperationKind.Upsert).Name;
+
+        var modelId = Guid.NewGuid();
+        var arguments = new JsonObject
+        {
+            ["model"] = JsonSerializer.SerializeToNode(new
+            {
+                id = modelId,
+                name = "Gamma",
+                quantity = 7,
+                isActive = true
+            }, SerializerOptions)
+        };
+
+        var result = await executor.ExecuteAsync(toolName, arguments, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Payload.Should().NotBeNull();
+        var payload = result.Payload!.AsObject();
+        payload[nameof(TestEntity.Name)]!.GetValue<string>().Should().Be("Gamma");
+        payload[nameof(TestEntity.Quantity)]!.GetValue<int>().Should().Be(7);
+        result.Headers.Should().ContainKey("X-Upsert").WhoseValue.Should().Be("stub");
+    }
+
+    [Fact]
+    public async Task Endpoint_executor_respects_cancellation_token()
+    {
+        using var provider = BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        var services = scope.ServiceProvider;
+        var executor = services.GetRequiredService<EndpointToolExecutor>();
+        var registry = services.GetRequiredService<McpEntityRegistry>();
+
+        var deleteTool = registry.Registrations.Single(r => r.EntityType == typeof(TestEntity))
+            .Tools.Single(t => t.Operation == EntityEndpointOperationKind.Delete).Name;
+
+        var args = new JsonObject
+        {
+            ["id"] = JsonValue.Create("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        };
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => executor.ExecuteAsync(deleteTool, args, cts.Token));
     }
 
     private static ServiceProvider BuildServiceProvider()
@@ -125,6 +243,7 @@ public sealed class McpEntityRegistryTests
         [System.ComponentModel.DataAnnotations.Display(Description = "Display name")]
         public string Name { get; set; } = string.Empty;
 
+        [McpDescription("Units available for MCP upserts", Operation = EntityEndpointOperationKind.Upsert)]
         public int Quantity { get; set; }
         public bool IsActive { get; set; }
     }
@@ -151,9 +270,16 @@ public sealed class McpEntityRegistryTests
             return Task.FromResult(new EntityCollectionResult<TestEntity>(request.Context, _items, _items.Count, payload: null));
         }
 
-        public Task<EntityCollectionResult<TestEntity>> QueryAsync(EntityQueryRequest request) => throw new NotImplementedException();
+        public Task<EntityCollectionResult<TestEntity>> QueryAsync(EntityQueryRequest request)
+        {
+            var shortCircuit = new { reason = "query-short-circuit", filter = request.FilterJson };
+            return Task.FromResult(new EntityCollectionResult<TestEntity>(request.Context, _items, _items.Count, payload: null, shortCircuit: shortCircuit));
+        }
 
-        public Task<EntityModelResult<TestEntity>> GetNewAsync(EntityGetNewRequest request) => throw new NotImplementedException();
+        public Task<EntityModelResult<TestEntity>> GetNewAsync(EntityGetNewRequest request)
+        {
+            return Task.FromResult(new EntityModelResult<TestEntity>(request.Context, new TestEntity(), payload: null));
+        }
 
         public Task<EntityModelResult<TestEntity>> GetByIdAsync(EntityGetByIdRequest<Guid> request)
         {
@@ -161,11 +287,42 @@ public sealed class McpEntityRegistryTests
             return Task.FromResult(new EntityModelResult<TestEntity>(request.Context, model, payload: null));
         }
 
-        public Task<EntityModelResult<TestEntity>> UpsertAsync(EntityUpsertRequest<TestEntity> request) => throw new NotImplementedException();
+        public Task<EntityModelResult<TestEntity>> UpsertAsync(EntityUpsertRequest<TestEntity> request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Model.Name))
+            {
+                request.Context.Warn("validation-warning");
+                var details = new ValidationProblemDetails(new Dictionary<string, string[]> { ["Name"] = new[] { "Name is required." } })
+                {
+                    Status = 400
+                };
+                var badRequest = new BadRequestObjectResult(details) { StatusCode = 400 };
+                return Task.FromResult(new EntityModelResult<TestEntity>(request.Context, null, payload: null, shortCircuit: badRequest));
+            }
+
+            var existing = _items.FirstOrDefault(item => item.Id == request.Model.Id);
+            if (existing is null)
+            {
+                existing = new TestEntity { Id = request.Model.Id == Guid.Empty ? Guid.NewGuid() : request.Model.Id };
+                _items.Add(existing);
+            }
+
+            existing.Name = request.Model.Name;
+            existing.Quantity = request.Model.Quantity;
+            existing.IsActive = request.Model.IsActive;
+            request.Context.Headers["X-Upsert"] = "stub";
+
+            return Task.FromResult(new EntityModelResult<TestEntity>(request.Context, existing, payload: null));
+        }
 
         public Task<EntityEndpointResult> UpsertManyAsync(EntityUpsertManyRequest<TestEntity> request) => throw new NotImplementedException();
 
-        public Task<EntityModelResult<TestEntity>> DeleteAsync(EntityDeleteRequest<Guid> request) => throw new NotImplementedException();
+        public async Task<EntityModelResult<TestEntity>> DeleteAsync(EntityDeleteRequest<Guid> request)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(200), request.Context.CancellationToken);
+            var model = _items.FirstOrDefault(item => item.Id == request.Id);
+            return new EntityModelResult<TestEntity>(request.Context, model, payload: null);
+        }
 
         public Task<EntityEndpointResult> DeleteManyAsync(EntityDeleteManyRequest<Guid> request) => throw new NotImplementedException();
 

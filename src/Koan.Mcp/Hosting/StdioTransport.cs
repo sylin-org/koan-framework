@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Observability.Health;
-using Koan.Mcp.Execution;
 using Koan.Mcp.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -15,9 +14,7 @@ namespace Koan.Mcp.Hosting;
 
 public sealed class StdioTransport : BackgroundService
 {
-    private readonly IMcpTransportDispatcher _dispatcher;
-    private readonly McpEntityRegistry _registry;
-    private readonly EndpointToolExecutor _executor;
+    private readonly McpServer _server;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<StdioTransport> _logger;
     private readonly IOptionsMonitor<McpServerOptions> _optionsMonitor;
@@ -28,19 +25,17 @@ public sealed class StdioTransport : BackgroundService
     private DateTimeOffset _lastHeartbeatUtc;
     private int _entityCount;
     private int _toolCount;
+    private CancellationTokenSource? _sessionCts;
+    private Task? _sessionTask;
 
     public StdioTransport(
-        IMcpTransportDispatcher dispatcher,
-        McpEntityRegistry registry,
-        EndpointToolExecutor executor,
+        McpServer server,
         ILoggerFactory loggerFactory,
         ILogger<StdioTransport> logger,
         IOptionsMonitor<McpServerOptions> optionsMonitor,
         IHealthAggregator? healthAggregator = null)
     {
-        _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
-        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-        _executor = executor ?? throw new ArgumentNullException(nameof(executor));
+        _server = server ?? throw new ArgumentNullException(nameof(server));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
@@ -54,7 +49,7 @@ public sealed class StdioTransport : BackgroundService
         var options = _optionsMonitor.CurrentValue;
         var transportLogger = _loggerFactory.CreateLogger(options.Transport.LoggerCategory ?? "Koan.Transport.Mcp");
 
-        var registrations = _registry.RegistrationsForStdio();
+        var registrations = _server.GetRegistrationsForStdio();
         var globallyEnabled = options.EnableStdioTransport;
 
         if (!globallyEnabled && registrations.Count == 0)
@@ -83,10 +78,11 @@ public sealed class StdioTransport : BackgroundService
 
         Console.SetOut(Console.Error);
 
-        var handlerLogger = _loggerFactory.CreateLogger<McpRpcHandler>();
-        var handler = new McpRpcHandler(_registry, _executor, handlerLogger);
-
+        using var input = Console.OpenStandardInput();
+        using var output = Console.OpenStandardOutput();
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+
+        _sessionCts = linkedCts;
         _entityCount = registrations.Count;
         _toolCount = registrations.Sum(r => r.Tools.Count);
         _startedAtUtc = DateTimeOffset.UtcNow;
@@ -98,29 +94,90 @@ public sealed class StdioTransport : BackgroundService
         transportLogger.LogInformation("STDIO transport online with {ToolCount} tools.", _toolCount);
         PublishTransportHealth(HealthStatus.Healthy, "STDIO transport online.", options, _entityCount, _toolCount);
 
-        using var input = Console.OpenStandardInput();
-        using var output = Console.OpenStandardOutput();
+        var handler = _server.CreateHandler();
+        var runTask = _server.RunAsync(handler, input, output, linkedCts.Token);
+        _sessionTask = runTask;
 
         try
         {
-            await _dispatcher.RunAsync(handler, input, output, linkedCts.Token).ConfigureAwait(false);
+            await runTask.ConfigureAwait(false);
         }
         finally
         {
-            await linkedCts.CancelAsync().ConfigureAwait(false);
-            try
+            _sessionTask = null;
+            var cts = Interlocked.Exchange(ref _sessionCts, null);
+            if (cts is not null)
             {
-                await heartbeatTask.ConfigureAwait(false);
+                try
+                {
+                    await cts.CancelAsync().ConfigureAwait(false);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // already disposed
+                }
+                cts.Dispose();
             }
-            catch (OperationCanceledException)
+
+            if (heartbeatTask is not null)
             {
-                // expected during shutdown
+                try
+                {
+                    await heartbeatTask.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // expected during shutdown
+                }
             }
 
             _logger.LogInformation("MCP STDIO transport stopped.");
             transportLogger.LogInformation("STDIO transport offline.");
             PublishTransportHealth(HealthStatus.Degraded, "STDIO transport offline.", options, _entityCount, _toolCount);
         }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        var timeout = _optionsMonitor.CurrentValue.Transport.ShutdownTimeout;
+        var sessionTask = _sessionTask;
+        var cts = _sessionCts;
+
+        if (cts is not null)
+        {
+            try
+            {
+                await cts.CancelAsync().ConfigureAwait(false);
+            }
+            catch (ObjectDisposedException)
+            {
+                // already disposed
+            }
+        }
+
+        if (sessionTask is not null)
+        {
+            if (timeout > TimeSpan.Zero && !sessionTask.IsCompleted)
+            {
+                var delayTask = Task.Delay(timeout, cancellationToken);
+                var completed = await Task.WhenAny(sessionTask, delayTask).ConfigureAwait(false);
+                if (completed == sessionTask)
+                {
+                    await sessionTask.ConfigureAwait(false);
+                }
+                else
+                {
+                    _logger.LogWarning("STDIO transport did not shut down within {Timeout}.", timeout);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+            else
+            {
+                await sessionTask.ConfigureAwait(false);
+            }
+        }
+
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RunHeartbeatAsync(TimeSpan interval, ILogger transportLogger, CancellationToken cancellationToken, McpServerOptions options)
