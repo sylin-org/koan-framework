@@ -196,7 +196,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.all");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            return await collection.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct).ConfigureAwait(false);
+            var results = await collection.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct).ConfigureAwait(false);
+            return (IReadOnlyList<TEntity>)results;
         }, ct);
 
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
@@ -207,21 +208,24 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
             var cursor = collection.Find(Builders<TEntity>.Filter.Empty);
 
-            if (options is { Skip: > 0 })
+            // Convert Page/PageSize to Skip/Take for MongoDB driver
+            if (options is { Page: > 0, PageSize: > 0 })
             {
-                cursor = cursor.Skip((int)Math.Min(options.Skip, maxPageSize));
+                var skip = (options.Page.Value - 1) * options.PageSize.Value;
+                cursor = cursor.Skip(skip);
+                cursor = cursor.Limit((int)Math.Min(options.PageSize.Value, maxPageSize));
             }
-
-            if (options is { Take: > 0 })
+            else if (options is { PageSize: > 0 })
             {
-                cursor = cursor.Limit((int)Math.Min(options.Take, maxPageSize));
+                cursor = cursor.Limit((int)Math.Min(options.PageSize.Value, maxPageSize));
             }
             else if (options is null)
             {
                 cursor = cursor.Limit(defaultPageSize);
             }
 
-            return await cursor.ToListAsync(ct).ConfigureAwait(false);
+            var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
+            return (IReadOnlyList<TEntity>)results;
         }, ct);
 
     public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -237,21 +241,24 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
             var cursor = collection.Find(predicate);
 
-            if (options is { Skip: > 0 })
+            // Convert Page/PageSize to Skip/Take for MongoDB driver
+            if (options is { Page: > 0, PageSize: > 0 })
             {
-                cursor = cursor.Skip((int)Math.Min(options.Skip, maxPageSize));
+                var skip = (options.Page.Value - 1) * options.PageSize.Value;
+                cursor = cursor.Skip(skip);
+                cursor = cursor.Limit((int)Math.Min(options.PageSize.Value, maxPageSize));
             }
-
-            if (options is { Take: > 0 })
+            else if (options is { PageSize: > 0 })
             {
-                cursor = cursor.Limit((int)Math.Min(options.Take, maxPageSize));
+                cursor = cursor.Limit((int)Math.Min(options.PageSize.Value, maxPageSize));
             }
             else if (options is null)
             {
                 cursor = cursor.Limit(defaultPageSize);
             }
 
-            return await cursor.ToListAsync(ct).ConfigureAwait(false);
+            var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
+            return (IReadOnlyList<TEntity>)results;
         }, ct);
 
     public Task<int> CountAsync(object? query, CancellationToken ct = default)

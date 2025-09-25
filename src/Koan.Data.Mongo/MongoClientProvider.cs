@@ -151,9 +151,10 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
 
     public async ValueTask DisposeAsync()
     {
-        if (_client is IAsyncDisposable asyncDisposable)
+        // MongoClient doesn't implement IAsyncDisposable, but we can dispose if it implements IDisposable
+        if (_client is IDisposable disposable)
         {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            disposable.Dispose();
         }
 
         _client = null;

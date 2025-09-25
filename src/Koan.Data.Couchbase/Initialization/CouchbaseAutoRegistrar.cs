@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
@@ -33,7 +34,9 @@ public sealed class CouchbaseAutoRegistrar : IKoanAutoRegistrar
     public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var configurator = new CouchbaseOptionsConfigurator(cfg, null);
+        // Create default readiness options for boot report generation
+        var readinessOptions = Microsoft.Extensions.Options.Options.Create(new AdaptersReadinessOptions());
+        var configurator = new CouchbaseOptionsConfigurator(cfg, null, readinessOptions);
         var options = new CouchbaseOptions();
         configurator.Configure(options);
         report.AddSetting("Bucket", options.Bucket);

@@ -58,13 +58,18 @@ internal sealed class CouchbaseOptionsConfigurator(
             Constants.Configuration.Keys.DurabilityLevel) ?? options.DurabilityLevel;
 
         // Readiness defaults – allow global policy override with per-adapter tuning
-        options.Readiness.Policy = Configuration.ReadFirst(configuration, options.Readiness.Policy,
-            "Koan:Data:Couchbase:Readiness:Policy") ?? options.Readiness.Policy;
-
-        var readinessTimeout = Configuration.ReadFirst(configuration, options.Readiness.Timeout,
-            "Koan:Data:Couchbase:Readiness:Timeout");
-        if (readinessTimeout > TimeSpan.Zero)
+        var policyStr = Configuration.ReadFirst(configuration, options.Readiness.Policy.ToString(),
+            "Koan:Data:Couchbase:Readiness:Policy");
+        if (Enum.TryParse<ReadinessPolicy>(policyStr, out var policy))
         {
+            options.Readiness.Policy = policy;
+        }
+
+        var timeoutSecondsStr = Configuration.ReadFirst(configuration, ((int)options.Readiness.Timeout.TotalSeconds).ToString(),
+            "Koan:Data:Couchbase:Readiness:Timeout");
+        if (int.TryParse(timeoutSecondsStr, out var timeoutSeconds) && timeoutSeconds > 0)
+        {
+            var readinessTimeout = TimeSpan.FromSeconds(timeoutSeconds);
             options.Readiness.Timeout = readinessTimeout;
         }
         else if (options.Readiness.Timeout <= TimeSpan.Zero)

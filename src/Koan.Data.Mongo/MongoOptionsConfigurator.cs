@@ -88,13 +88,18 @@ internal sealed class MongoOptionsConfigurator(
 
         options.ConnectionString = NormalizeConnectionString(options.ConnectionString);
 
-        options.Readiness.Policy = Configuration.ReadFirst(config, options.Readiness.Policy,
-            "Koan:Data:Mongo:Readiness:Policy") ?? options.Readiness.Policy;
-
-        var readinessTimeout = Configuration.ReadFirst(config, options.Readiness.Timeout,
-            "Koan:Data:Mongo:Readiness:Timeout");
-        if (readinessTimeout > TimeSpan.Zero)
+        var policyStr = Configuration.ReadFirst(config, options.Readiness.Policy.ToString(),
+            "Koan:Data:Mongo:Readiness:Policy");
+        if (Enum.TryParse<ReadinessPolicy>(policyStr, out var policy))
         {
+            options.Readiness.Policy = policy;
+        }
+
+        var timeoutSecondsStr = Configuration.ReadFirst(config, ((int)options.Readiness.Timeout.TotalSeconds).ToString(),
+            "Koan:Data:Mongo:Readiness:Timeout");
+        if (int.TryParse(timeoutSecondsStr, out var timeoutSeconds) && timeoutSeconds > 0)
+        {
+            var readinessTimeout = TimeSpan.FromSeconds(timeoutSeconds);
             options.Readiness.Timeout = readinessTimeout;
         }
         else if (options.Readiness.Timeout <= TimeSpan.Zero)
