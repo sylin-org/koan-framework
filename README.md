@@ -92,11 +92,38 @@ var similar = await Product.SemanticSearch("eco-friendly laptops");
 
 ---
 
-### **4. Intelligent Automation**
+### **4. Semantic Streaming Pipelines**
 
 ```csharp
-// Small teams, sophisticated solutions
+// Complex AI workflows made simple - process 10,000 documents in one pipeline
 
+await Document.AllStream()
+    .Pipeline()
+    .ForEach(doc => {
+        doc.ProcessedAt = DateTime.UtcNow;
+        doc.Status = "processing";
+    })
+    .Tokenize(doc => $"{doc.Title} {doc.Content}")     // AI tokenization
+    .Embed(new AiEmbedOptions { Model = "all-minilm" }) // Generate embeddings
+    .Branch(branch => branch
+        .OnSuccess(success => success
+            .Save()                                     // Clean, semantic - no type pollution
+            .Notify(doc => $"Document '{doc.Title}' processed successfully"))
+        .OnFailure(failure => failure
+            .Trace(env => $"Failed: {env.Error?.Message}")
+            .Notify(doc => $"Processing failed for '{doc.Title}'")))
+    .ExecuteAsync();
+
+// What just happened:
+// ✓ Streamed 10K+ documents without memory issues
+// ✓ Generated AI embeddings with automatic batching
+// ✓ Stored documents (PostgreSQL) + vectors (Weaviate) in one .Save()
+// ✓ Branched success/failure paths with notifications
+// ✓ Full observability and error handling
+// ✓ All with clean, readable, semantic code
+```
+
+```csharp
 // Event-driven architecture through simple patterns
 Flow.OnUpdate<Todo>(async (todo, previous) => {
     if (todo.IsCompleted && !previous.IsCompleted) {
@@ -108,15 +135,9 @@ Flow.OnUpdate<Todo>(async (todo, previous) => {
     }
     return UpdateResult.Continue();
 });
-
-// Multi-provider scaling with zero code changes
-// dotnet add package Koan.Data.Postgres Koan.Data.Vector
-
-await todo.Save();                                    // → PostgreSQL
-var similar = await Todo.SemanticSearch("urgent");   // → Vector DB
 ```
 
-**Generate sophisticated architectures and deployment artifacts automatically. Functional prototypes in hours, not weeks.**
+**Semantic pipelines turn complex AI + data workflows into readable, maintainable code. Enterprise-grade streaming, embedding generation, and multi-provider storage in natural .NET patterns.**
 
 ---
 
@@ -192,7 +213,7 @@ cd enterprise-sample && ./start.bat
 dotnet new web -n AiApp
 dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 
-# Get: Chat APIs, semantic search, embedding generation, MCP integration
+# Get: Chat APIs, semantic search, embedding generation, streaming pipelines, MCP integration
 ```
 
 ---
@@ -202,20 +223,23 @@ dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 **70+ integrated modules spanning:**
 - **Data**: PostgreSQL, MongoDB, SQLite, Redis, Vector databases
 - **AI**: Ollama, OpenAI, Azure OpenAI, semantic search, embeddings
+- **Pipelines**: Semantic streaming, AI tokenization, cross-pillar integration
 - **Messaging**: RabbitMQ, Azure Service Bus, in-memory patterns
 - **Web**: Authentication (Google, Microsoft, Discord), GraphQL, transformers
 - **Orchestration**: Docker, Podman, Aspire, CLI automation
 - **Enterprise**: Secrets management, observability, backup, health monitoring
 
-**Integrated modules that work together without configuration.**
+**Integrated modules that work together seamlessly through semantic pipeline patterns.**
 
 ---
 
 ## What Teams Are Building
 
 - **AI-native applications** with chat, embeddings, and semantic search
+- **Streaming data pipelines** processing millions of documents with AI enrichment
 - **Event-driven architectures** with sophisticated business logic
 - **Multi-tenant SaaS** with provider transparency across environments
+- **Content processing workflows** that combine AI, vector search, and notifications
 - **Rapid prototypes** that scale to production without rewrites
 - **Enterprise applications** with governance-friendly deployment artifacts
 
