@@ -617,12 +617,17 @@ internal sealed class SeedService : ISeedService
             .Tokenize(m => BuildEmbeddingText(m), new AiTokenizeOptions { Model = model })
             .Branch(branch => branch
                 .OnSuccess(success => success
-                    .Store<Media>(entity => new { title = entity.Title, genres = entity.Genres, popularity = entity.Popularity })
+                    .Mutate(envelope =>
+                    {
+                        // Add metadata for vector storage before save
+                        envelope.Features["vector:metadata"] = new { title = envelope.Entity.Title, genres = envelope.Entity.Genres, popularity = envelope.Entity.Popularity };
+                    })
+                    .Save()
                     .Tap(env =>
                     {
-                        if (env.Metadata.TryGetValue("vector:affected", out var value) && value is int affected)
+                        if (env.Metadata.TryGetValue("vector:affected", out var value) && value is int affectedCount)
                         {
-                            Interlocked.Add(ref stored, affected);
+                            Interlocked.Add(ref stored, affectedCount);
                         }
                     }))
                 .OnFailure(failure => failure

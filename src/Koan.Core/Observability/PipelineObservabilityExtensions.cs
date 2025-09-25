@@ -34,11 +34,11 @@ public static class PipelineObservabilityExtensions
             var logger = ResolveLogger();
             if (logger is null)
             {
-                return ValueTask.CompletedTask;
+                return Task.CompletedTask;
             }
 
             logger.LogInformation(messageFactory(envelope));
-            return ValueTask.CompletedTask;
+            return Task.CompletedTask;
         });
     }
 
@@ -59,7 +59,7 @@ public static class PipelineObservabilityExtensions
         {
             var logger = ResolveLogger();
             logger?.LogInformation(messageFactory(envelope));
-            return ValueTask.CompletedTask;
+            return Task.CompletedTask;
         });
     }
 }

@@ -18,17 +18,17 @@ public static class PipelineFluentExtensions
     /// <summary>
     /// Applies a diagnostic tap to the pipeline.
     /// </summary>
-    public static PipelineBuilder<TEntity> Tap<TEntity>(this IAsyncEnumerable<TEntity> source, Func<PipelineEnvelope<TEntity>, CancellationToken, ValueTask> tap)
+    public static PipelineBuilder<TEntity> Tap<TEntity>(this IAsyncEnumerable<TEntity> source, Func<PipelineEnvelope<TEntity>, CancellationToken, Task> tap)
         => source.Pipeline().Tap(tap);
 
     /// <summary>
     /// Applies a diagnostic tap to the pipeline.
     /// </summary>
-    public static PipelineBuilder<TEntity> Tap<TEntity>(this PipelineBuilder<TEntity> builder, Func<PipelineEnvelope<TEntity>, CancellationToken, ValueTask> tap)
+    public static PipelineBuilder<TEntity> Tap<TEntity>(this PipelineBuilder<TEntity> builder, Func<PipelineEnvelope<TEntity>, CancellationToken, Task> tap)
     {
         if (builder is null) throw new ArgumentNullException(nameof(builder));
         if (tap is null) throw new ArgumentNullException(nameof(tap));
-        return builder.AddStage((envelope, ct) => tap(envelope, ct));
+        return builder.AddStage(tap);
     }
 
     /// <summary>
@@ -47,7 +47,7 @@ public static class PipelineFluentExtensions
         return builder.AddStage((envelope, _) =>
         {
             tap(envelope);
-            return ValueTask.CompletedTask;
+            return Task.CompletedTask;
         });
     }
 
@@ -62,7 +62,7 @@ public static class PipelineFluentExtensions
         return builder.AddStage((envelope, _) =>
         {
             tap(envelope);
-            return ValueTask.CompletedTask;
+            return Task.CompletedTask;
         });
     }
 
@@ -77,7 +77,7 @@ public static class PipelineFluentExtensions
         return builder.AddStage((envelope, _) =>
         {
             mutate(envelope);
-            return ValueTask.CompletedTask;
+            return Task.CompletedTask;
         });
     }
 

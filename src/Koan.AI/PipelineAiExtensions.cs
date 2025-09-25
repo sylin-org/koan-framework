@@ -24,10 +24,7 @@ public static class PipelineAiExtensions
 
         return builder.AddStage(async (envelope, ct) =>
         {
-            if (envelope.IsFaulted)
-            {
-                return;
-            }
+            if (envelope.IsFaulted) return;
 
             try
             {
@@ -38,10 +35,7 @@ public static class PipelineAiExtensions
                     return;
                 }
 
-                var request = new AiEmbeddingsRequest
-                {
-                    Model = options.Model
-                };
+                var request = new AiEmbeddingsRequest { Model = options.Model };
                 request.Input.Add(text);
 
                 var response = await Ai.Embed(request, ct).ConfigureAwait(false);

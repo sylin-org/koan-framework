@@ -1,5 +1,7 @@
 // Boot Koan via DI; JSON adapter self-registers; DataService provides repos
 
+using System.Linq;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using S0.ConsoleJsonRepo;
 using Koan.Data.Core;
@@ -31,9 +33,15 @@ var all = await Todo.All();
 Console.WriteLine($"Total items: {all.Count}");
 
 await Todo.AllStream()
-    .Where(t => t.Title.StartsWith("task", StringComparison.OrdinalIgnoreCase))
-    .ForEach(t => t.Title = $"{t.Title} ✅")
-    .Save<Todo>()
+    .Pipeline()
+    .ForEach(t =>
+    {
+        if (t.Title.StartsWith("task", StringComparison.OrdinalIgnoreCase))
+        {
+            t.Title = $"{t.Title} ✅";
+        }
+    })
+    .Save()
     .ExecuteAsync();
 
 var after = await Todo.All();

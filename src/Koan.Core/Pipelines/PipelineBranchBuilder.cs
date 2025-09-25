@@ -36,7 +36,7 @@ public sealed class PipelineBranchBuilder<TEntity>
         return this;
     }
 
-    internal Func<PipelineEnvelope<TEntity>, CancellationToken, ValueTask> Build()
+    internal Func<PipelineEnvelope<TEntity>, CancellationToken, Task> Build()
     {
         var success = _success.Build();
         var failure = _failure.Build();

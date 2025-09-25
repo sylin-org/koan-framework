@@ -17,5 +17,5 @@ public interface IPipelineStageBuilder<TEntity, TBuilder>
     /// </summary>
     /// <param name="stage">Delegate invoked for each envelope.</param>
     /// <returns>The builder for fluent chaining.</returns>
-    TBuilder AddStage(Func<PipelineEnvelope<TEntity>, CancellationToken, ValueTask> stage);
+    TBuilder AddStage(Func<PipelineEnvelope<TEntity>, CancellationToken, Task> stage);
 }

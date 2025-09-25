@@ -36,31 +36,54 @@ public static class PipelineDataExtensions
         return builder.AddStage((envelope, _) =>
         {
             action(envelope.Entity);
-            return ValueTask.CompletedTask;
+            return Task.CompletedTask;
         });
     }
 
-    public static TBuilder Save<TEntity, TBuilder, TKey>(this IPipelineStageBuilder<TEntity, TBuilder> builder)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-        where TBuilder : IPipelineStageBuilder<TEntity, TBuilder>
+    /// <summary>
+    /// Saves entities by unwrapping the envelope and calling the entity's standard Save method.
+    /// Clean, semantic, no type pollution.
+    /// </summary>
+    public static PipelineBuilder<TEntity> Save<TEntity>(this PipelineBuilder<TEntity> builder)
+        where TEntity : class, IEntity<string>
+    {
+        if (builder is null) throw new ArgumentNullException(nameof(builder));
+        return (PipelineBuilder<TEntity>)builder.AddStage(async (envelope, ct) =>
+        {
+            if (envelope.IsFaulted) return;
+
+            try
+            {
+                await envelope.Entity.Save(ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                envelope.RecordError(ex);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Saves entities in branch stages by unwrapping and calling entity's Save method.
+    /// </summary>
+    public static PipelineBranchStageBuilder<TEntity> Save<TEntity>(this PipelineBranchStageBuilder<TEntity> builder)
+        where TEntity : class, IEntity<string>
     {
         if (builder is null) throw new ArgumentNullException(nameof(builder));
         return builder.AddStage(async (envelope, ct) =>
         {
-            if (envelope.IsFaulted)
-            {
-                return;
-            }
+            if (envelope.IsFaulted) return;
 
-            await envelope.Entity.Save<TEntity, TKey>(ct).ConfigureAwait(false);
+            try
+            {
+                await envelope.Entity.Save(ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                envelope.RecordError(ex);
+            }
         });
     }
-
-    public static TBuilder Save<TEntity, TBuilder>(this IPipelineStageBuilder<TEntity, TBuilder> builder)
-        where TEntity : class, IEntity<string>
-        where TBuilder : IPipelineStageBuilder<TEntity, TBuilder>
-        => builder.Save<TEntity, TBuilder, string>();
 
     /// <summary>
     /// Simple batching helper that yields materialised windows while honouring backpressure.

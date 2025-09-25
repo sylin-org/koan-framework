@@ -20,16 +20,10 @@ public static class PipelineMessagingExtensions
         if (messageFactory is null) throw new ArgumentNullException(nameof(messageFactory));
         return builder.AddStage(async (envelope, ct) =>
         {
-            if (envelope.IsFaulted)
-            {
-                return;
-            }
+            if (envelope.IsFaulted) return;
 
             var message = messageFactory(envelope.Entity);
-            if (message is null)
-            {
-                return;
-            }
+            if (message is null) return;
 
             try
             {
@@ -50,16 +44,10 @@ public static class PipelineMessagingExtensions
         if (messageFactory is null) throw new ArgumentNullException(nameof(messageFactory));
         return builder.AddStage(async (envelope, ct) =>
         {
-            if (!envelope.IsFaulted)
-            {
-                return;
-            }
+            if (!envelope.IsFaulted) return;
 
             var message = messageFactory(envelope);
-            if (message is null)
-            {
-                return;
-            }
+            if (message is null) return;
 
             try
             {

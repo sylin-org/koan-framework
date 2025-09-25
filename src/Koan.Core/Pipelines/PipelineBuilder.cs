@@ -13,7 +13,7 @@ namespace Koan.Core.Pipelines;
 public sealed class PipelineBuilder<TEntity> : IPipelineStageBuilder<TEntity, PipelineBuilder<TEntity>>
 {
     private readonly IAsyncEnumerable<TEntity> _source;
-    private readonly List<Func<PipelineEnvelope<TEntity>, CancellationToken, ValueTask>> _stages = new();
+    private readonly List<Func<PipelineEnvelope<TEntity>, CancellationToken, Task>> _stages = new();
     private bool _sealed;
 
     internal PipelineBuilder(IAsyncEnumerable<TEntity> source)
@@ -22,10 +22,10 @@ public sealed class PipelineBuilder<TEntity> : IPipelineStageBuilder<TEntity, Pi
     }
 
     PipelineBuilder<TEntity> IPipelineStageBuilder<TEntity, PipelineBuilder<TEntity>>.AddStage(
-        Func<PipelineEnvelope<TEntity>, CancellationToken, ValueTask> stage)
+        Func<PipelineEnvelope<TEntity>, CancellationToken, Task> stage)
         => AddStage(stage);
 
-    internal PipelineBuilder<TEntity> AddStage(Func<PipelineEnvelope<TEntity>, CancellationToken, ValueTask> stage)
+    public PipelineBuilder<TEntity> AddStage(Func<PipelineEnvelope<TEntity>, CancellationToken, Task> stage)
     {
         if (stage is null) throw new ArgumentNullException(nameof(stage));
         if (_sealed) throw new InvalidOperationException("Pipeline is sealed; no stages can be appended after branching.");
