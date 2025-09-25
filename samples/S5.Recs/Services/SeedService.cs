@@ -4,14 +4,20 @@ using S5.Recs.Infrastructure;
 using S5.Recs.Models;
 using Koan.Ai.Provider.Ollama;
 using S5.Recs.Providers;
+using Koan.AI;
 using Koan.AI.Contracts;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
+using Koan.Core.Observability;
+using Koan.Core.Pipelines;
 using Koan.Core;
+using Koan.Messaging;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Newtonsoft.Json;
 
 namespace S5.Recs.Services;
@@ -555,7 +561,7 @@ internal sealed class SeedService : ISeedService
     {
         try
         {
-            var ai = Koan.AI.Ai.TryResolve();
+            var ai = Ai.TryResolve();
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)
@@ -566,33 +572,8 @@ internal sealed class SeedService : ISeedService
 
             var config = (IConfiguration?)_sp.GetService(typeof(IConfiguration));
             var model = GetConfiguredModel(config);
-
-            const int batchSize = 32;
-            int total = 0;
-            for (int i = 0; i < items.Count; i += batchSize)
-            {
-                var batch = items.Skip(i).Take(batchSize).ToList();
-                var inputs = batch.Select(m => BuildEmbeddingText(m)).ToList();
-                var emb = await ai.EmbedAsync(new Koan.AI.Contracts.Models.AiEmbeddingsRequest { Input = inputs, Model = model }, ct);
-                var tuples = new List<(string Id, float[] Embedding, object? Metadata)>(batch.Count);
-                for (int j = 0; j < batch.Count && j < emb.Vectors.Count; j++)
-                {
-                    var m = batch[j];
-                    tuples.Add((m.Id!, emb.Vectors[j], new { title = m.Title, genres = m.Genres, popularity = m.Popularity }));
-                }
-                int up;
-                try
-                {
-                    up = await Vector<Media>.Save(tuples, ct);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    _logger?.LogWarning(ex, "Vector repository unavailable or rejected upsert. Skipping vector upsert. Ensure Koan:Data:Weaviate:Endpoint is configured and reachable. Details: {Message}", ex.Message);
-                    return 0;
-                }
-                total += up;
-                _logger?.LogInformation("Vector upsert: batch {BatchStart}-{BatchEnd} size={Size} upserted={Upserted}", i + 1, Math.Min(i + batch.Count, items.Count), batch.Count, up);
-            }
+            var total = await RunVectorPipelineAsync(items, model, ct);
+            _logger?.LogInformation("Vector pipeline stored {Stored} embeddings for recommendation content", total);
             return total;
         }
         catch
@@ -605,7 +586,7 @@ internal sealed class SeedService : ISeedService
     {
         try
         {
-            var ai = Koan.AI.Ai.TryResolve();
+            var ai = Ai.TryResolve();
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)
@@ -616,39 +597,46 @@ internal sealed class SeedService : ISeedService
 
             var config = (IConfiguration?)_sp.GetService(typeof(IConfiguration));
             var model = GetConfiguredModel(config);
-
-            const int batchSize = 32;
-            int total = 0;
-            for (int i = 0; i < docs.Count; i += batchSize)
-            {
-                var batch = docs.Skip(i).Take(batchSize).ToList();
-                var inputs = batch.Select(d => BuildEmbeddingText(d)).ToList();
-                var emb = await ai.EmbedAsync(new Koan.AI.Contracts.Models.AiEmbeddingsRequest { Input = inputs, Model = model }, ct);
-                var tuples = new List<(string Id, float[] Embedding, object? Metadata)>(batch.Count);
-                for (int j = 0; j < batch.Count && j < emb.Vectors.Count; j++)
-                {
-                    var d = batch[j];
-                    tuples.Add((d.Id!, emb.Vectors[j], new { title = d.Title, genres = d.Genres, popularity = d.Popularity }));
-                }
-                int up;
-                try
-                {
-                    up = await Vector<Media>.Save(tuples, ct);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    _logger?.LogWarning(ex, "Vector repository unavailable or rejected upsert. Skipping vector upsert. Ensure Koan:Data:Weaviate:Endpoint is configured and reachable. Details: {Message}", ex.Message);
-                    return total;
-                }
-                total += up;
-                _logger?.LogInformation("Vector upsert (docs): batch {BatchStart}-{BatchEnd} size={Size} upserted={Upserted}", i + 1, Math.Min(i + batch.Count, docs.Count), batch.Count, up);
-            }
+            var total = await RunVectorPipelineAsync(docs, model, ct);
+            _logger?.LogInformation("Vector pipeline stored {Stored} embeddings for admin rebuild", total);
             return total;
         }
         catch
         {
             return 0;
         }
+    }
+
+    private async Task<int> RunVectorPipelineAsync(IEnumerable<Media> items, string? model, CancellationToken ct)
+    {
+        var stored = 0;
+        var failures = 0;
+
+        await items
+            .ToAsyncEnumerable()
+            .Tokenize(m => BuildEmbeddingText(m), new AiTokenizeOptions { Model = model })
+            .Branch(branch => branch
+                .OnSuccess(success => success
+                    .Store<Media>(entity => new { title = entity.Title, genres = entity.Genres, popularity = entity.Popularity })
+                    .Tap(env =>
+                    {
+                        if (env.Metadata.TryGetValue("vector:affected", out var value) && value is int affected)
+                        {
+                            Interlocked.Add(ref stored, affected);
+                        }
+                    }))
+                .OnFailure(failure => failure
+                    .Tap(_ => Interlocked.Increment(ref failures))
+                    .Trace(env => $"Vector pipeline failed for media {env.Entity.Id}: {env.Error?.Message ?? "unknown"}")
+                    .Notify(env => new VectorPipelineFailure(env.Entity.Id ?? string.Empty, env.Error?.Message ?? "Unknown error"))))
+            .ExecuteAsync(ct);
+
+        if (failures > 0)
+        {
+            _logger?.LogWarning("Vector pipeline encountered {Failures} failures", failures);
+        }
+
+        return stored;
     }
 
     private static string GetConfiguredModel(IConfiguration? configuration)
@@ -686,3 +674,5 @@ internal sealed class SeedService : ISeedService
         return text.Trim();
     }
 }
+
+internal sealed record VectorPipelineFailure(string MediaId, string Error);
