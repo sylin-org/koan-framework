@@ -1,3 +1,4 @@
+using Koan.Core.Adapters;
 using Koan.Data.Abstractions.Naming;
 using System.ComponentModel.DataAnnotations;
 
@@ -20,4 +21,6 @@ public sealed class MongoOptions
     // Paging guardrails (acceptance criteria 0044)
     public int DefaultPageSize { get; set; } = 50; // mirrors Koan.Web default
     public int MaxPageSize { get; set; } = 200;
+
+    public AdapterReadinessConfiguration Readiness { get; set; } = new();
 }

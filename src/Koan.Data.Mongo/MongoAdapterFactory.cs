@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
@@ -23,8 +22,9 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp) where TEntity : class, IEntity<TKey> where TKey : notnull
     {
-        var opts = sp.GetRequiredService<IOptions<MongoOptions>>().Value;
+        var provider = sp.GetRequiredService<MongoClientProvider>();
+        var options = sp.GetRequiredService<IOptionsMonitor<MongoOptions>>();
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
-        return new MongoRepository<TEntity, TKey>(opts, resolver, sp);
+        return new MongoRepository<TEntity, TKey>(provider, options, resolver, sp);
     }
 }

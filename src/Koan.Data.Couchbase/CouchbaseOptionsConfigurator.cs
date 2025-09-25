@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters;
 using Koan.Data.Couchbase.Infrastructure;
 
 namespace Koan.Data.Couchbase;
@@ -10,8 +11,14 @@ namespace Koan.Data.Couchbase;
 /// <summary>
 /// Provides orchestration-aware defaults for <see cref="CouchbaseOptions"/>.
 /// </summary>
-internal sealed class CouchbaseOptionsConfigurator(IConfiguration configuration, ILogger<CouchbaseOptionsConfigurator>? logger) : IConfigureOptions<CouchbaseOptions>
+internal sealed class CouchbaseOptionsConfigurator(
+    IConfiguration configuration,
+    ILogger<CouchbaseOptionsConfigurator>? logger,
+    IOptions<AdaptersReadinessOptions> readinessOptions)
+    : IConfigureOptions<CouchbaseOptions>
 {
+    private readonly AdaptersReadinessOptions _readinessDefaults = readinessOptions.Value;
+
     public void Configure(CouchbaseOptions options)
     {
         options.ConnectionString = ResolveConnectionString(options.ConnectionString);
@@ -49,6 +56,30 @@ internal sealed class CouchbaseOptionsConfigurator(IConfiguration configuration,
 
         options.DurabilityLevel = Configuration.ReadFirst(configuration, options.DurabilityLevel ?? string.Empty,
             Constants.Configuration.Keys.DurabilityLevel) ?? options.DurabilityLevel;
+
+        // Readiness defaults – allow global policy override with per-adapter tuning
+        options.Readiness.Policy = Configuration.ReadFirst(configuration, options.Readiness.Policy,
+            "Koan:Data:Couchbase:Readiness:Policy") ?? options.Readiness.Policy;
+
+        var readinessTimeout = Configuration.ReadFirst(configuration, options.Readiness.Timeout,
+            "Koan:Data:Couchbase:Readiness:Timeout");
+        if (readinessTimeout > TimeSpan.Zero)
+        {
+            options.Readiness.Timeout = readinessTimeout;
+        }
+        else if (options.Readiness.Timeout <= TimeSpan.Zero)
+        {
+            options.Readiness.Timeout = _readinessDefaults.DefaultTimeout;
+        }
+
+        options.Readiness.EnableReadinessGating = Configuration.Read(configuration,
+            "Koan:Data:Couchbase:Readiness:EnableReadinessGating",
+            options.Readiness.EnableReadinessGating);
+
+        if (options.Readiness.Timeout <= TimeSpan.Zero)
+        {
+            options.Readiness.Timeout = _readinessDefaults.DefaultTimeout;
+        }
 
         logger?.LogInformation("Couchbase configuration resolved. Connection={Connection}, Bucket={Bucket}, Scope={Scope}, Collection={Collection}",
             Redaction.DeIdentify(options.ConnectionString), options.Bucket, options.Scope ?? "<default>", options.Collection ?? "<convention>");

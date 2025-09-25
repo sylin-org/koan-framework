@@ -1,6 +1,7 @@
 using System;
-using Koan.Data.Abstractions.Naming;
 using System.ComponentModel.DataAnnotations;
+using Koan.Core.Adapters;
+using Koan.Data.Abstractions.Naming;
 
 namespace Koan.Data.Couchbase;
 
@@ -75,4 +76,9 @@ public sealed class CouchbaseOptions
     /// Optional durability level for mutations.
     /// </summary>
     public string? DurabilityLevel { get; set; }
+
+    /// <summary>
+    /// Readiness policy controlling adapter gating behaviour.
+    /// </summary>
+    public AdapterReadinessConfiguration Readiness { get; set; } = new();
 }

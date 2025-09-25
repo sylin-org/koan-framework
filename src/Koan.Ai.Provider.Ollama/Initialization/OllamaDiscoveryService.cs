@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using Koan.Ai.Provider.Ollama.Options;
 using Koan.AI.Contracts.Routing;
+using Koan.Core.Adapters;
+using Microsoft.Extensions.Options;
 using Koan.Core.Orchestration;
 
 namespace Koan.Ai.Provider.Ollama.Initialization;
@@ -308,7 +310,8 @@ internal sealed class OllamaDiscoveryService : IHostedService
             var configBuilder = new Microsoft.Extensions.Configuration.ConfigurationBuilder();
             var adapterConfig = configBuilder.Build();
 
-            var adapter = new OllamaAdapter(client, adapterLogger, adapterConfig);
+            var readinessDefaults = _sp.GetService<IOptions<AdaptersReadinessOptions>>()?.Value;
+            var adapter = new OllamaAdapter(client, adapterLogger, adapterConfig, readinessDefaults);
 
             _logger.LogDebug("Registering Ollama adapter: {AdapterId} at {Url}", id, serviceUrl);
             _registry.Add(adapter);

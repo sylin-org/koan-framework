@@ -1,19 +1,24 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.Core.Adapters;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core;
+using Koan.Data.Core.Configuration;
+using Koan.Data.Core.Optimization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
-using MongoDB.Bson.Serialization;
-using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Core;
-using Koan.Data.Core.Optimization;
-using System.Linq.Expressions;
 
 namespace Koan.Data.Mongo;
 
-/// <summary>
-/// Repository implementation backed by MongoDB collections; supports LINQ predicates and bulk operations.
-/// </summary>
 internal sealed class MongoRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
@@ -21,264 +26,383 @@ internal sealed class MongoRepository<TEntity, TKey> :
     IWriteCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
-    Abstractions.Instructions.IInstructionExecutor<TEntity>
+    IInstructionExecutor<TEntity>,
+    IAdapterReadiness,
+    IAdapterReadinessConfiguration
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    private IMongoCollection<TEntity> _collection;
-    private string _collectionName;
-    public QueryCapabilities Capabilities => QueryCapabilities.Linq;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete;
-
-    private readonly IStorageNameResolver _nameResolver;
+    private readonly MongoClientProvider _provider;
+    private readonly IOptionsMonitor<MongoOptions> _options;
     private readonly IServiceProvider _sp;
-    private readonly StorageNameResolver.Convention _nameConv;
     private readonly ILogger? _logger;
-    private readonly int _defaultPageSize;
-    private readonly int _maxPageSize;
     private readonly StorageOptimizationInfo _optimizationInfo;
+    private IMongoCollection<TEntity>? _collection;
+    private string _collectionName;
 
-    public MongoRepository(MongoOptions options, IStorageNameResolver nameResolver, IServiceProvider sp)
+    private static readonly ConcurrentDictionary<Type, bool> IndexesInitialized = new();
+
+    public MongoRepository(
+        MongoClientProvider provider,
+        IOptionsMonitor<MongoOptions> options,
+        IStorageNameResolver nameResolver,
+        IServiceProvider sp)
     {
-        _nameResolver = nameResolver;
+        _provider = provider;
+        _options = options;
         _sp = sp;
+        _ = nameResolver; // ensure resolver is materialized for convention overrides
         _logger = sp.GetService<ILogger<MongoRepository<TEntity, TKey>>>();
-        var client = new MongoClient(options.ConnectionString);
-        var db = client.GetDatabase(options.Database);
-        _nameConv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator ?? ".", NameCasing.AsIs);
-
-        // Get storage optimization info from AggregateBag
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
-
-        // BSON serialization optimization is now handled globally by MongoOptimizationAutoRegistrar during bootstrap
-
-        // DEBUG: MediaFormat specific logging
-        if (typeof(TEntity).Name == "MediaFormat")
-        {
-            Console.WriteLine($"[REPOSITORY-DEBUG] MongoRepository<MediaFormat> - Retrieved optimization info:");
-            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - OptimizationType: {_optimizationInfo.OptimizationType}");
-            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - IsOptimized: {_optimizationInfo.IsOptimized}");
-            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - IdPropertyName: {_optimizationInfo.IdPropertyName}");
-            Console.WriteLine($"[REPOSITORY-DEBUG] MediaFormat - Reason: {_optimizationInfo.Reason}");
-        }
-
-        // Initial collection name (may be set-scoped); will be recomputed per call if set changes
-        _collectionName = Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
-        _collection = db.GetCollection<TEntity>(_collectionName);
-        _defaultPageSize = options.DefaultPageSize > 0 ? options.DefaultPageSize : 50;
-        _maxPageSize = options.MaxPageSize > 0 ? options.MaxPageSize : 200;
-        CreateIndexesIfNeeded();
+        _collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
     }
-    private IMongoCollection<TEntity> GetCollection()
+
+    public QueryCapabilities Capabilities => QueryCapabilities.Linq;
+    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch;
+    public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
+
+    public AdapterReadinessState ReadinessState => _provider.ReadinessState;
+    public bool IsReady => _provider.IsReady;
+    public TimeSpan ReadinessTimeout => _provider.ReadinessTimeout;
+
+    public event EventHandler<ReadinessStateChangedEventArgs>? ReadinessStateChanged
     {
-        var name = Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
-        if (!string.Equals(name, _collectionName, StringComparison.Ordinal))
+        add => _provider.ReadinessStateChanged += value;
+        remove => _provider.ReadinessStateChanged -= value;
+    }
+
+    public ReadinessStateManager StateManager => _provider.StateManager;
+
+    public Task<bool> IsReadyAsync(CancellationToken ct = default) => _provider.IsReadyAsync(ct);
+
+    public Task WaitForReadinessAsync(TimeSpan? timeout = null, CancellationToken ct = default)
+        => _provider.WaitForReadinessAsync(timeout ?? Timeout, ct);
+
+    public ReadinessPolicy Policy => _options.CurrentValue.Readiness.Policy;
+
+    public TimeSpan Timeout
+    {
+        get
         {
-            var clientField = typeof(IMongoCollection<TEntity>).GetProperty("Database")?.GetValue(_collection) as IMongoDatabase;
-            // Fall back: rebuild from options if reflection fails
-            if (clientField is null)
-            {
-                var opts = _sp.GetRequiredService<IOptions<MongoOptions>>().Value;
-                var client = new MongoClient(opts.ConnectionString);
-                var db = client.GetDatabase(opts.Database);
-                _collection = db.GetCollection<TEntity>(name);
-            }
-            else
-            {
-                _collection = clientField.GetCollection<TEntity>(name);
-            }
-            _collectionName = name;
-            CreateIndexesIfNeeded();
+            var timeout = _options.CurrentValue.Readiness.Timeout;
+            return timeout > TimeSpan.Zero ? timeout : _provider.ReadinessTimeout;
         }
+    }
+
+    public bool EnableReadinessGating => _options.CurrentValue.Readiness.EnableReadinessGating;
+
+    private Task<TResult> ExecuteWithReadinessAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct)
+        => this.WithReadinessAsync(operation, ct);
+
+    private Task ExecuteWithReadinessAsync(Func<Task> operation, CancellationToken ct)
+        => this.WithReadinessAsync(operation, ct);
+
+    internal Task<TResult> ExecuteWithinReadinessAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct)
+        => ExecuteWithReadinessAsync(operation, ct);
+
+    private async Task<IMongoCollection<TEntity>> GetCollectionAsync(CancellationToken ct)
+    {
+        var desired = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        if (_collection is not null && string.Equals(desired, _collectionName, StringComparison.Ordinal))
+        {
+            return _collection;
+        }
+
+        var database = await _provider.GetDatabaseAsync(ct).ConfigureAwait(false);
+        _collection = database.GetCollection<TEntity>(desired);
+        _collectionName = desired;
+        CreateIndexesIfNeeded(_collection);
         return _collection;
     }
 
-
-    private void CreateIndexesIfNeeded()
+    private void CreateIndexesIfNeeded(IMongoCollection<TEntity> collection)
     {
+        if (!IndexesInitialized.TryAdd(typeof(TEntity), true))
+        {
+            return;
+        }
+
         try
         {
             var keys = Builders<TEntity>.IndexKeys.Ascending(x => x.Id);
-            _collection.Indexes.CreateOne(new CreateIndexModel<TEntity>(keys, new CreateIndexOptions { Unique = true, Name = "_id_unique" }));
-            // Best-effort: create secondary indexes based on IndexMetadata
+            collection.Indexes.CreateOne(new CreateIndexModel<TEntity>(keys, new CreateIndexOptions
+            {
+                Unique = true,
+                Name = "_id_unique"
+            }));
+
             var indexSpecs = IndexMetadata.GetIndexes(typeof(TEntity));
             foreach (var idx in indexSpecs)
             {
-                if (idx.IsPrimaryKey || idx.Properties.Count == 0) continue;
-                IndexKeysDefinition<TEntity>? def = null;
-                foreach (var p in idx.Properties)
+                if (idx.IsPrimaryKey || idx.Properties.Count == 0)
                 {
-                    var field = Builders<TEntity>.IndexKeys.Ascending(p.Name);
-                    def = def is null ? field : def.Ascending(p.Name);
+                    continue;
                 }
-                if (def is null) continue;
-                var name = !string.IsNullOrWhiteSpace(idx.Name) ? idx.Name! : $"ix_{string.Join("_", idx.Properties.Select(pp => pp.Name))}";
-                var options = new CreateIndexOptions { Name = name, Unique = idx.Unique };
-                _collection.Indexes.CreateOne(new CreateIndexModel<TEntity>(def, options));
+
+                IndexKeysDefinition<TEntity>? definition = null;
+                foreach (var property in idx.Properties)
+                {
+                    var field = Builders<TEntity>.IndexKeys.Ascending(property.Name);
+                    definition = definition is null ? field : definition.Ascending(property.Name);
+                }
+
+                if (definition is null)
+                {
+                    continue;
+                }
+
+                var name = !string.IsNullOrWhiteSpace(idx.Name)
+                    ? idx.Name!
+                    : $"ix_{string.Join("_", idx.Properties.Select(p => p.Name))}";
+
+                var options = new CreateIndexOptions
+                {
+                    Name = name,
+                    Unique = idx.Unique
+                };
+
+                collection.Indexes.CreateOne(new CreateIndexModel<TEntity>(definition, options));
             }
         }
-        catch { /* best-effort */ }
-    }
-
-
-    public async Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
-    {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.get");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var col = GetCollection();
-        var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
-        var result = await col.Find(filter).FirstOrDefaultAsync(ct);
-        // Removed verbose per-request get debug logging to reduce noise during parent aggregation lookups.
-        return result;
-    }
-
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
-    {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.query.all");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        // Guardrails: enforce server-side paging if possible to avoid unbounded materialization.
-        var col = GetCollection();
-        // DATA-0061: no-options should return the complete set (no implicit limit)
-        return await col.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct);
-    }
-
-    public async Task<int> CountAsync(object? query, CancellationToken ct = default)
-    {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.count");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var count = await GetCollection().CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct);
-        return (int)count;
-    }
-
-    public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var col = GetCollection();
-        // DATA-0061: no-options should return the complete set for this predicate
-        return await col.Find(predicate).ToListAsync(ct);
-    }
-
-    public async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.count.linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var count = await GetCollection().CountDocumentsAsync(predicate, cancellationToken: ct);
-        return (int)count;
-    }
-
-    public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
-    {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.upsert");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-
-        // DEBUG: Track all upsert operations
-        if (typeof(TEntity).Name == "MediaFormat")
+        catch
         {
-            Console.WriteLine($"[UPSERT-DEBUG] UpsertAsync called for MediaFormat with ID: {model.Id}");
+            // Best-effort index creation; failures should not block readiness.
         }
-
-        var col = GetCollection();
-        var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
-
-        // BSON serialization handles optimization transparently
-        await col.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct);
-        _logger?.LogDebug("Mongo upsert {Entity} id={Id}", typeof(TEntity).Name, model.Id);
-        return model;
     }
 
-    public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    private (int DefaultPageSize, int MaxPageSize) GetPagingGuardrails()
     {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.delete");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var col = GetCollection();
-        var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
-        var result = await col.DeleteOneAsync(filter, ct);
-        var deleted = result.DeletedCount > 0;
-        _logger?.LogDebug("Mongo delete {Entity} id={Id} deleted={Deleted}", typeof(TEntity).Name, id, deleted);
-        return deleted;
+        var snapshot = _options.CurrentValue;
+        var defaultPageSize = snapshot.DefaultPageSize > 0 ? snapshot.DefaultPageSize : 50;
+        var maxPageSize = snapshot.MaxPageSize > 0 ? snapshot.MaxPageSize : 200;
+        return (defaultPageSize, maxPageSize);
     }
 
-    public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
-    {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.bulk.upsert");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var col = GetCollection();
-
-        // BSON serialization handles optimization transparently
-        var writes = models.Select(m => new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, m.Id), m) { IsUpsert = true });
-        var res = await col.BulkWriteAsync(writes, cancellationToken: ct);
-        var count = (int)(res.ModifiedCount + res.Upserts.Count);
-        _logger?.LogInformation("Mongo bulk upsert {Entity} count={Count}", typeof(TEntity).Name, count);
-        return count;
-    }
-
-    public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
-    {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.bulk.delete");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var col = GetCollection();
-        var filter = Builders<TEntity>.Filter.In(x => x.Id, ids);
-        var res = await col.DeleteManyAsync(filter, ct);
-        var count = (int)res.DeletedCount;
-        _logger?.LogInformation("Mongo bulk delete {Entity} count={Count}", typeof(TEntity).Name, count);
-        return count;
-    }
-
-    public async Task<int> DeleteAllAsync(CancellationToken ct = default)
-    {
-        var col = GetCollection();
-        var res = await col.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct);
-        return (int)res.DeletedCount;
-    }
-
-    public IBatchSet<TEntity, TKey> CreateBatch() => new MongoBatch(this);
-
-    // Instruction execution for fast-path operations
-    public async Task<TResult> ExecuteAsync<TResult>(Abstractions.Instructions.Instruction instruction, CancellationToken ct = default)
-    {
-        using var act = MongoTelemetry.Activity.StartActivity("mongo.instruction");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        switch (instruction.Name)
+    public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
         {
-            case Abstractions.Instructions.DataInstructions.EnsureCreated:
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.get");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
+            return await collection.Find(filter).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        }, ct);
+
+    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.all");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            return await collection.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct).ConfigureAwait(false);
+        }, ct);
+
+    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, DataQueryOptions? options, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var (defaultPageSize, maxPageSize) = GetPagingGuardrails();
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var cursor = collection.Find(Builders<TEntity>.Filter.Empty);
+
+            if (options is { Skip: > 0 })
+            {
+                cursor = cursor.Skip((int)Math.Min(options.Skip, maxPageSize));
+            }
+
+            if (options is { Take: > 0 })
+            {
+                cursor = cursor.Limit((int)Math.Min(options.Take, maxPageSize));
+            }
+            else if (options is null)
+            {
+                cursor = cursor.Limit(defaultPageSize);
+            }
+
+            return await cursor.ToListAsync(ct).ConfigureAwait(false);
+        }, ct);
+
+    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+        => QueryAsync(predicate, null, ct);
+
+    public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+            var (defaultPageSize, maxPageSize) = GetPagingGuardrails();
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var cursor = collection.Find(predicate);
+
+            if (options is { Skip: > 0 })
+            {
+                cursor = cursor.Skip((int)Math.Min(options.Skip, maxPageSize));
+            }
+
+            if (options is { Take: > 0 })
+            {
+                cursor = cursor.Limit((int)Math.Min(options.Take, maxPageSize));
+            }
+            else if (options is null)
+            {
+                cursor = cursor.Limit(defaultPageSize);
+            }
+
+            return await cursor.ToListAsync(ct).ConfigureAwait(false);
+        }, ct);
+
+    public Task<int> CountAsync(object? query, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.count");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var count = await collection.CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct).ConfigureAwait(false);
+            return (int)count;
+        }, ct);
+
+    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.count.linq");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var count = await collection.CountDocumentsAsync(predicate, cancellationToken: ct).ConfigureAwait(false);
+            return (int)count;
+        }, ct);
+
+    public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.upsert");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
+            await collection.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct).ConfigureAwait(false);
+            _logger?.LogDebug("Mongo upsert {Entity} id={Id}", typeof(TEntity).Name, model.Id);
+            return model;
+        }, ct);
+
+    public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.delete");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
+            var result = await collection.DeleteOneAsync(filter, ct).ConfigureAwait(false);
+            var deleted = result.DeletedCount > 0;
+            _logger?.LogDebug("Mongo delete {Entity} id={Id} deleted={Deleted}", typeof(TEntity).Name, id, deleted);
+            return deleted;
+        }, ct);
+
+    public Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.bulk.upsert");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var writes = models
+                .Select(model => new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, model.Id), model)
                 {
-                    var col = GetCollection();
-                    var db = GetDatabase(col);
-                    // Ensure collection exists (will no-op if it already exists)
-                    var name = _collectionName;
+                    IsUpsert = true
+                })
+                .ToArray();
+
+            if (writes.Length == 0)
+            {
+                return 0;
+            }
+
+            var result = await collection.BulkWriteAsync(writes, cancellationToken: ct).ConfigureAwait(false);
+            var count = (int)(result.ModifiedCount + result.Upserts.Count);
+            _logger?.LogInformation("Mongo bulk upsert {Entity} count={Count}", typeof(TEntity).Name, count);
+            return count;
+        }, ct);
+
+    public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.bulk.delete");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var keys = ids as ICollection<TKey> ?? ids.ToArray();
+            if (keys.Count == 0)
+            {
+                return 0;
+            }
+
+            var filter = Builders<TEntity>.Filter.In(x => x.Id, keys);
+            var result = await collection.DeleteManyAsync(filter, ct).ConfigureAwait(false);
+            var count = (int)result.DeletedCount;
+            _logger?.LogInformation("Mongo bulk delete {Entity} count={Count}", typeof(TEntity).Name, count);
+            return count;
+        }, ct);
+
+    public Task<int> DeleteAllAsync(CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var result = await collection.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
+            return (int)result.DeletedCount;
+        }, ct);
+
+    public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.instruction");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+
+            switch (instruction.Name)
+            {
+                case DataInstructions.EnsureCreated:
+                {
+                    var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+                    var database = GetDatabase(collection);
+
                     try
                     {
-                        var existing = await db.ListCollectionNamesAsync(cancellationToken: ct);
-                        var names = await existing.ToListAsync(ct);
-                        if (!names.Contains(name, StringComparer.Ordinal))
+                        var existing = await database.ListCollectionNamesAsync(cancellationToken: ct).ConfigureAwait(false);
+                        var names = await existing.ToListAsync(ct).ConfigureAwait(false);
+                        if (!names.Contains(_collectionName, StringComparer.Ordinal))
                         {
-                            await db.CreateCollectionAsync(name, cancellationToken: ct);
-                            _logger?.LogInformation("Mongo ensureCreated created collection {Name}", name);
+                            await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
+                            _logger?.LogInformation("Mongo ensureCreated created collection {Name}", _collectionName);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", name);
+                        _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", _collectionName);
                     }
+
                     object ok = true;
                     return (TResult)ok;
                 }
-            case Abstractions.Instructions.DataInstructions.Clear:
+                case DataInstructions.Clear:
                 {
-                    var col = GetCollection();
-                    var res = await col.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
-                    object result = (int)res.DeletedCount;
+                    var deleted = await DeleteAllAsync(ct).ConfigureAwait(false);
+                    object result = deleted;
                     return (TResult)result;
                 }
-            default:
-                throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Mongo adapter for {typeof(TEntity).Name}.");
-        }
-    }
+                default:
+                    throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Mongo adapter for {typeof(TEntity).Name}.");
+            }
+        }, ct);
+
+    public IBatchSet<TEntity, TKey> CreateBatch() => new MongoBatch(this);
 
     private static IMongoDatabase GetDatabase(IMongoCollection<TEntity> collection)
     {
-        // Prefer direct property when available; fall back to reflection if needed.
         try
         {
             return collection.Database;
@@ -286,7 +410,11 @@ internal sealed class MongoRepository<TEntity, TKey> :
         catch
         {
             var prop = typeof(IMongoCollection<TEntity>).GetProperty("Database");
-            if (prop?.GetValue(collection) is IMongoDatabase db) return db;
+            if (prop?.GetValue(collection) is IMongoDatabase database)
+            {
+                return database;
+            }
+
             throw new InvalidOperationException("Unable to obtain Mongo database from collection.");
         }
     }
@@ -294,29 +422,39 @@ internal sealed class MongoRepository<TEntity, TKey> :
     private sealed class MongoBatch : IBatchSet<TEntity, TKey>
     {
         private readonly MongoRepository<TEntity, TKey> _repo;
-        private readonly List<WriteModel<TEntity>> _ops = new();
-        private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
+        private readonly List<WriteModel<TEntity>> _operations = new();
+        private readonly List<(TKey Id, Action<TEntity> Mutate)> _mutations = new();
 
         public MongoBatch(MongoRepository<TEntity, TKey> repo) => _repo = repo;
 
         public IBatchSet<TEntity, TKey> Add(TEntity entity)
         {
-            // BSON serialization handles optimization transparently
-            _ops.Add(new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, entity.Id), entity) { IsUpsert = true });
+            var filter = Builders<TEntity>.Filter.Eq(x => x.Id, entity.Id);
+            _operations.Add(new ReplaceOneModel<TEntity>(filter, entity) { IsUpsert = true });
             return this;
         }
+
         public IBatchSet<TEntity, TKey> Update(TEntity entity) => Add(entity);
+
         public IBatchSet<TEntity, TKey> Delete(TKey id)
         {
-            _ops.Add(new DeleteOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, id)));
+            var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
+            _operations.Add(new DeleteOneModel<TEntity>(filter));
             return this;
         }
+
         public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate)
         {
             _mutations.Add((id, mutate));
             return this;
         }
-        public IBatchSet<TEntity, TKey> Clear() { _ops.Clear(); _mutations.Clear(); return this; }
+
+        public IBatchSet<TEntity, TKey> Clear()
+        {
+            _operations.Clear();
+            _mutations.Clear();
+            return this;
+        }
 
         public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
         {
@@ -324,75 +462,73 @@ internal sealed class MongoRepository<TEntity, TKey> :
             {
                 foreach (var (id, mutate) in _mutations)
                 {
-                    var current = await _repo.GetAsync(id, ct);
+                    var current = await _repo.GetAsync(id, ct).ConfigureAwait(false);
                     if (current is not null)
                     {
                         mutate(current);
-                        // BSON serialization handles optimization transparently
-                        _ops.Add(new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, id), current) { IsUpsert = true });
+                        var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
+                        _operations.Add(new ReplaceOneModel<TEntity>(filter, current) { IsUpsert = true });
                     }
                 }
             }
-            if (_ops.Count == 0) return new BatchResult(0, 0, 0);
-            var collection = _repo.GetCollection();
 
-            // Honor RequireAtomic when requested
-            var requireAtomic = options?.RequireAtomic == true;
-            if (requireAtomic)
+            if (_operations.Count == 0)
             {
-                // Attempt transactional execution. Transactions require replica set/sharded cluster.
-                // If not supported by the deployment, signal NotSupported as per acceptance criteria.
-                var db = GetDatabase(collection);
-                var client = db.Client;
-                IClientSessionHandle? session = null;
-                try
+                return new BatchResult(0, 0, 0);
+            }
+
+            return await _repo.ExecuteWithinReadinessAsync(async () =>
+            {
+                var collection = await _repo.GetCollectionAsync(ct).ConfigureAwait(false);
+
+                if (options?.RequireAtomic == true)
                 {
-                    session = await client.StartSessionAsync(cancellationToken: ct).ConfigureAwait(false);
+                    var database = GetDatabase(collection);
+                    var client = database.Client;
+                    IClientSessionHandle? session = null;
+
                     try
                     {
-                        session.StartTransaction();
-                    }
-                    catch (MongoClientException ex) when (ex.Message.Contains("Transactions are not supported", StringComparison.OrdinalIgnoreCase))
-                    {
-                        session.Dispose();
-                        throw new NotSupportedException("MongoDB deployment does not support transactions; cannot honor RequireAtomic=true.", ex);
-                    }
+                        session = await client.StartSessionAsync(cancellationToken: ct).ConfigureAwait(false);
+                        try
+                        {
+                            session.StartTransaction();
+                        }
+                        catch (MongoClientException ex) when (ex.Message.Contains("Transactions are not supported", StringComparison.OrdinalIgnoreCase))
+                        {
+                            session.Dispose();
+                            throw new NotSupportedException("MongoDB deployment does not support transactions; cannot honor RequireAtomic=true.", ex);
+                        }
 
-                    var resTx = await collection.BulkWriteAsync(session, _ops, cancellationToken: ct).ConfigureAwait(false);
-                    await session.CommitTransactionAsync(ct).ConfigureAwait(false);
-                    return new BatchResult(resTx.Upserts.Count, (int)resTx.ModifiedCount, (int)resTx.DeletedCount);
+                        var result = await collection.BulkWriteAsync(session, _operations, cancellationToken: ct).ConfigureAwait(false);
+                        await session.CommitTransactionAsync(ct).ConfigureAwait(false);
+                        return new BatchResult(result.Upserts.Count, (int)result.ModifiedCount, (int)result.DeletedCount);
+                    }
+                    catch
+                    {
+                        if (session is not null)
+                        {
+                            try
+                            {
+                                await session.AbortTransactionAsync(ct).ConfigureAwait(false);
+                            }
+                            catch
+                            {
+                                // swallow abort failures
+                            }
+
+                            session.Dispose();
+                        }
+
+                        throw;
+                    }
                 }
-                catch
+                else
                 {
-                    if (session is not null)
-                    {
-                        try { await session.AbortTransactionAsync(ct).ConfigureAwait(false); } catch { /* swallow */ }
-                        session.Dispose();
-                    }
-                    throw;
+                    var result = await collection.BulkWriteAsync(_operations, cancellationToken: ct).ConfigureAwait(false);
+                    return new BatchResult(result.Upserts.Count, (int)result.ModifiedCount, (int)result.DeletedCount);
                 }
-            }
-            else
-            {
-                // Best-effort bulk write
-                var res = await collection.BulkWriteAsync(_ops, cancellationToken: ct).ConfigureAwait(false);
-                return new BatchResult(res.Upserts.Count, (int)res.ModifiedCount, (int)res.DeletedCount);
-            }
-        }
-
-        private static IMongoDatabase GetDatabase(IMongoCollection<TEntity> collection)
-        {
-            // Prefer direct property when available; fall back to reflection if needed.
-            try
-            {
-                return collection.Database;
-            }
-            catch
-            {
-                var prop = typeof(IMongoCollection<TEntity>).GetProperty("Database");
-                if (prop?.GetValue(collection) is IMongoDatabase db) return db;
-                throw new InvalidOperationException("Unable to obtain Mongo database from collection.");
-            }
+            }, ct).ConfigureAwait(false);
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
+using Koan.Core.Adapters;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
 
@@ -20,6 +21,8 @@ public static class CouchbaseRegistration
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, CouchbaseHealthContributor>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Abstractions.Naming.INamingDefaultsProvider, CouchbaseNamingDefaultsProvider>());
         services.AddSingleton<CouchbaseClusterProvider>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAsyncAdapterInitializer>(sp => sp.GetRequiredService<CouchbaseClusterProvider>()));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAdapterReadiness>(sp => sp.GetRequiredService<CouchbaseClusterProvider>()));
         services.AddSingleton<IDataAdapterFactory, CouchbaseAdapterFactory>();
         return services;
     }

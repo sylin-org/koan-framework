@@ -1,9 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Koan.Core;
+using Koan.Core.Adapters;
 using Koan.Core.Orchestration;
 
 namespace Koan.Data.Mongo;
@@ -12,8 +17,13 @@ namespace Koan.Data.Mongo;
 /// Orchestration-aware MongoDB configuration using centralized service discovery.
 /// Replaces custom auto-detection with unified Koan orchestration patterns.
 /// </summary>
-internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<MongoOptionsConfigurator> logger) : IConfigureOptions<MongoOptions>
+internal sealed class MongoOptionsConfigurator(
+    IConfiguration config,
+    ILogger<MongoOptionsConfigurator> logger,
+    IOptions<AdaptersReadinessOptions> readinessOptions) : IConfigureOptions<MongoOptions>
 {
+    private readonly AdaptersReadinessOptions _readinessDefaults = readinessOptions.Value;
+
     public void Configure(MongoOptions options)
     {
         logger.LogInformation("MongoDB Orchestration-Aware Configuration Started");
@@ -22,7 +32,6 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
         logger.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Database: '{Database}'",
             options.ConnectionString, options.Database);
 
-        // Get database name and credentials for connection string construction
         var databaseName = Configuration.ReadFirst(config, "KoanAspireDemo",
             "Koan:Data:Mongo:Database",
             "Koan:Data:Database",
@@ -36,10 +45,8 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
             "Koan:Data:Mongo:Password",
             "Koan:Data:Password");
 
-        // Use centralized orchestration-aware service discovery
         var serviceDiscovery = new OrchestrationAwareServiceDiscovery(config, null);
 
-        // Check for explicit connection string first
         var explicitConnectionString = Configuration.ReadFirst(config, "",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
             Infrastructure.Constants.Configuration.Keys.AltConnectionString,
@@ -61,14 +68,13 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
         {
             logger.LogInformation("Using pre-configured connection string");
         }
-        // Configure other options
+
         options.Database = Configuration.ReadFirst(
             config,
             defaultValue: options.Database,
             Infrastructure.Constants.Configuration.Keys.Database,
             Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
-        // Paging guardrails
         options.DefaultPageSize = Configuration.ReadFirst(
             config,
             defaultValue: options.DefaultPageSize,
@@ -80,8 +86,31 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
-        // Final connection string normalization and logging
         options.ConnectionString = NormalizeConnectionString(options.ConnectionString);
+
+        options.Readiness.Policy = Configuration.ReadFirst(config, options.Readiness.Policy,
+            "Koan:Data:Mongo:Readiness:Policy") ?? options.Readiness.Policy;
+
+        var readinessTimeout = Configuration.ReadFirst(config, options.Readiness.Timeout,
+            "Koan:Data:Mongo:Readiness:Timeout");
+        if (readinessTimeout > TimeSpan.Zero)
+        {
+            options.Readiness.Timeout = readinessTimeout;
+        }
+        else if (options.Readiness.Timeout <= TimeSpan.Zero)
+        {
+            options.Readiness.Timeout = _readinessDefaults.DefaultTimeout;
+        }
+
+        options.Readiness.EnableReadinessGating = Configuration.Read(config,
+            "Koan:Data:Mongo:Readiness:EnableReadinessGating",
+            options.Readiness.EnableReadinessGating);
+
+        if (options.Readiness.Timeout <= TimeSpan.Zero)
+        {
+            options.Readiness.Timeout = _readinessDefaults.DefaultTimeout;
+        }
+
         logger.LogInformation("Final MongoDB Configuration");
         logger.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
         logger.LogInformation("Database: {Database}", options.Database);
@@ -97,33 +126,25 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
     {
         try
         {
-            // Check if auto-detection is explicitly disabled
             if (IsAutoDetectionDisabled())
             {
                 logger.LogInformation("Auto-detection disabled via configuration - using localhost");
                 return BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
             }
 
-            // Create service discovery options with MongoDB-specific health checking
             var discoveryOptions = ServiceDiscoveryExtensions.ForMongoDB(databaseName, username, password);
 
-            // Add MongoDB-specific health checking
             discoveryOptions = discoveryOptions with
             {
                 HealthCheck = new HealthCheckOptions
                 {
-                    CustomHealthCheck = async (connectionString, ct) =>
-                    {
-                        var normalizedConnection = NormalizeConnectionString(connectionString);
-                        return TryMongoPing(normalizedConnection, TimeSpan.FromMilliseconds(500));
-                    },
+                    CustomHealthCheck = (candidate, _) => Task.FromResult(TryMongoPing(NormalizeConnectionString(candidate), TimeSpan.FromMilliseconds(500))),
                     Timeout = TimeSpan.FromMilliseconds(500),
-                    Required = !KoanEnv.IsProduction // Less strict in production
+                    Required = !KoanEnv.IsProduction
                 },
                 AdditionalCandidates = GetAdditionalCandidatesFromEnvironment()
             };
 
-            // Use centralized service discovery
             var discoveryTask = serviceDiscovery.DiscoverServiceAsync("mongodb", discoveryOptions);
             var result = discoveryTask.GetAwaiter().GetResult();
 
@@ -153,8 +174,6 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
     private string[] GetAdditionalCandidatesFromEnvironment()
     {
         var candidates = new List<string>();
-
-        // Legacy environment variable support for backward compatibility
         var envList = Environment.GetEnvironmentVariable(MongoConstants.EnvList);
         if (!string.IsNullOrWhiteSpace(envList))
         {
@@ -176,14 +195,14 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
     private static string NormalizeConnectionString(string connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString)) return connectionString;
-        
+
         var trimmed = connectionString.Trim();
         if (trimmed.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase))
         {
             return trimmed;
         }
-        
+
         return "mongodb://" + trimmed;
     }
 
@@ -194,11 +213,13 @@ internal sealed class MongoOptionsConfigurator(IConfiguration config, ILogger<Mo
             var settings = MongoClientSettings.FromConnectionString(connectionString);
             settings.ServerSelectionTimeout = timeout;
             var client = new MongoClient(settings);
-            // ping admin
             client.GetDatabase("admin").RunCommand<BsonDocument>(new BsonDocument("ping", 1));
             return true;
         }
-        catch { return false; }
+        catch
+        {
+            return false;
+        }
     }
 
     // Container detection uses KoanEnv static runtime snapshot per ADR-0039

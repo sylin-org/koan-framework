@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Core;
+using Koan.Core.Adapters;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
 using MongoDB.Bson.Serialization.Conventions;
@@ -20,6 +21,9 @@ public static class MongoRegistration
         if (configure is not null) services.Configure(configure);
         // Ensure health contributor is available even outside Koan bootstrap
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
+        services.AddSingleton<MongoClientProvider>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAsyncAdapterInitializer>(sp => sp.GetRequiredService<MongoClientProvider>()));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAdapterReadiness>(sp => sp.GetRequiredService<MongoClientProvider>()));
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
         return services;
     }

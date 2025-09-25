@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Koan.Ai.Provider.Ollama.Options;
 using Koan.AI.Contracts.Routing;
+using Koan.Core.Adapters;
 
 namespace Koan.Ai.Provider.Ollama.Initialization;
 
@@ -30,7 +32,8 @@ internal sealed class OllamaConfigRegistrationService : IHostedService
                     var configBuilder = new Microsoft.Extensions.Configuration.ConfigurationBuilder();
                     var adapterConfig = configBuilder.Build();
 
-                    var adapter = new OllamaAdapter(http, logger, adapterConfig);
+                    var readinessDefaults = _sp.GetService<IOptions<AdaptersReadinessOptions>>()?.Value;
+                    var adapter = new OllamaAdapter(http, logger, adapterConfig, readinessDefaults);
                     _registry.Add(adapter);
                 }
                 catch { /* ignore invalid entries */ }
