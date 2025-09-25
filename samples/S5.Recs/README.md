@@ -370,7 +370,7 @@ start.bat
 
 ### Filters panel (AnimeRadar UX)
 
-- Rating: dual-range 0–5 stars with 0.5 step. Moving one thumb pushes the other so min ≤ max.
+- Rating: dual-range 1–5 stars with 0.5 step. Moving one thumb pushes the other so min ≤ max.
 - Year: dual-range over a rolling 30-year window up to the current year. Max at the top means “present”.
 - Labels update live (e.g., “Rating: 2–4.5★”, “Year: 2010–present”).
 

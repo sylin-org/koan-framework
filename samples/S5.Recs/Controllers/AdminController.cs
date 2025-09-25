@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using S5.Recs.Infrastructure;
 using S5.Recs.Services;
 
@@ -160,6 +161,124 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         else
             q = q.OrderByDescending(t => t.MediaCount).ThenBy(t => t.Tag);
         return Ok(q.Select(t => new { tag = t.Tag, count = t.MediaCount }));
+    }
+
+    [HttpGet("tags/debug")] // Debug endpoint to analyze tag data issues
+    public async Task<IActionResult> DebugTagData(CancellationToken ct)
+    {
+        var allMedia = await Models.Media.All(ct);
+        var mediaCount = allMedia.Count();
+
+        var mediaWithTags = allMedia.Where(m => m.Tags != null && m.Tags.Length > 0).ToList();
+        var mediaWithTagsCount = mediaWithTags.Count;
+
+        // Extract all raw tags before filtering
+        var allRawTags = new List<string>();
+        foreach (var m in allMedia)
+        {
+            if (m.Genres is { Length: > 0 })
+                allRawTags.AddRange(m.Genres.Where(g => !string.IsNullOrWhiteSpace(g)).Select(g => g.Trim()));
+            if (m.Tags is { Length: > 0 })
+                allRawTags.AddRange(m.Tags.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()));
+        }
+
+        var uniqueRawTags = allRawTags.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        // Check preemptive filtering impact
+        var flaggedByPreemptive = uniqueRawTags.Where(Infrastructure.PreemptiveTagFilter.ShouldCensor).ToList();
+        var passedPreemptive = uniqueRawTags.Where(t => !Infrastructure.PreemptiveTagFilter.ShouldCensor(t)).ToList();
+
+        // Sample some tags that have/don't have data
+        var sampleMediaWithTags = mediaWithTags.Take(3).Select(m => new {
+            id = m.Id,
+            title = m.TitleEnglish ?? m.Title,
+            genreCount = m.Genres?.Length ?? 0,
+            tagCount = m.Tags?.Length ?? 0,
+            genres = m.Genres?.Take(5),
+            tags = m.Tags?.Take(5)
+        }).ToList();
+
+        return Ok(new {
+            totalMedia = mediaCount,
+            mediaWithTags = mediaWithTagsCount,
+            mediaWithTagsPercent = mediaCount > 0 ? Math.Round((double)mediaWithTagsCount / mediaCount * 100, 1) : 0,
+            totalRawTags = allRawTags.Count,
+            uniqueRawTags = uniqueRawTags.Count,
+            preemptiveFilterStats = new {
+                flaggedCount = flaggedByPreemptive.Count,
+                passedCount = passedPreemptive.Count,
+                flaggedPercent = uniqueRawTags.Count > 0 ? Math.Round((double)flaggedByPreemptive.Count / uniqueRawTags.Count * 100, 1) : 0,
+                sampleFlagged = flaggedByPreemptive.Take(10).ToList(),
+                samplePassed = passedPreemptive.Take(10).ToList()
+            },
+            sampleMediaWithTags,
+            currentTagStatCount = (await Models.TagStatDoc.All(ct)).Count()
+        });
+    }
+
+    [HttpGet("tags/counts")] // Compare tag counts between admin and public endpoints
+    public async Task<IActionResult> CompareTagCounts([FromServices] IOptions<S5.Recs.Options.TagCatalogOptions>? tagOptions, CancellationToken ct)
+    {
+        // Get all TagStatDoc records (what rebuild creates)
+        var allTagStats = await Models.TagStatDoc.All(ct);
+        var totalTagStatDocs = allTagStats.Count();
+
+        // Apply the same filtering logic as /api/tags
+        var opt = tagOptions?.Value?.CensorTags ?? Array.Empty<string>();
+        var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct);
+        var dyn = doc?.Tags?.ToArray() ?? Array.Empty<string>();
+        var censor = opt.Concat(dyn).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        var filteredTags = allTagStats.Where(t => !IsCensoredTag(t.Tag, censor)).ToList();
+        var publicTagCount = filteredTags.Count();
+
+        return Ok(new {
+            totalTagStatDocs = totalTagStatDocs,      // What rebuild creates
+            publicTagCount = publicTagCount,          // What /api/tags shows
+            filteredOut = totalTagStatDocs - publicTagCount,
+            censorRulesCount = censor.Length,
+            sampleCensorRules = censor.Take(10).ToArray(),
+            sampleFilteredOutTags = allTagStats
+                .Where(t => IsCensoredTag(t.Tag, censor))
+                .Take(10)
+                .Select(t => new { tag = t.Tag, count = t.MediaCount })
+                .ToArray()
+        });
+    }
+
+    private static bool IsCensoredTag(string tag, string[]? censor)
+        => !string.IsNullOrWhiteSpace(tag) &&
+           (censor?.Any(c => !string.IsNullOrWhiteSpace(c) && tag.Equals(c, StringComparison.OrdinalIgnoreCase)) ?? false);
+
+    [HttpGet("media/count")] // Quick media count check
+    public async Task<IActionResult> GetMediaCount(CancellationToken ct)
+    {
+        var allMedia = await Models.Media.All(ct);
+        var count = allMedia.Count();
+
+        // Sample a few media to check for tag data
+        var mediaWithTags = allMedia.Where(m => m.Tags != null && m.Tags.Length > 0).Take(10).ToList();
+        var mediaWithGenres = allMedia.Where(m => m.Genres != null && m.Genres.Length > 0).Take(10).ToList();
+
+        return Ok(new {
+            totalMediaCount = count,
+            sampleMediaWithTags = mediaWithTags.Select(m => new {
+                id = m.Id,
+                title = m.TitleEnglish ?? m.Title,
+                tagCount = m.Tags?.Length ?? 0,
+                genreCount = m.Genres?.Length ?? 0,
+                sampleTags = m.Tags?.Take(3).ToArray(),
+                sampleGenres = m.Genres?.Take(3).ToArray()
+            }).ToArray(),
+            sampleMediaWithGenres = mediaWithGenres.Select(m => new {
+                id = m.Id,
+                title = m.TitleEnglish ?? m.Title,
+                tagCount = m.Tags?.Length ?? 0,
+                genreCount = m.Genres?.Length ?? 0
+            }).ToArray(),
+            mediaWithTagsCount = allMedia.Count(m => m.Tags != null && m.Tags.Length > 0),
+            mediaWithGenresCount = allMedia.Count(m => m.Genres != null && m.Genres.Length > 0)
+        });
     }
 
     [HttpGet("tags/censor/hashes")] // Generate MD5 hashes for preemptive filtering

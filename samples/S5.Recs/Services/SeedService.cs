@@ -136,7 +136,7 @@ internal sealed class SeedService : ISeedService
                 var allData = new List<Media>(); // Keep for catalog building
 
                 // Use a large default if no limit specified, otherwise use provided limit
-                int effectiveLimit = limit ?? 10000; // Default to 10k items if no limit specified
+                int effectiveLimit = limit ?? 100000; // Default to 100k items if no limit specified (increased from 10k)
 
                 // Calculate per-media-type limit when importing all types
                 int limitPerType = mediaTypesToImport.Count > 1 ? Math.Max(1, effectiveLimit / mediaTypesToImport.Count) : effectiveLimit;
@@ -177,6 +177,21 @@ internal sealed class SeedService : ISeedService
                 // Build catalogs once docs are imported
                 try { await CatalogTagsAsync(allData, internalToken); } catch (Exception ex) { _logger?.LogWarning(ex, "Tag cataloging failed: {Message}", ex.Message); }
                 try { await CatalogGenresAsync(allData, internalToken); } catch (Exception ex) { _logger?.LogWarning(ex, "Genre cataloging failed: {Message}", ex.Message); }
+
+                // Auto-rebuild full tag catalog after large imports to ensure accurate counts across ALL media
+                if (totalImported >= 100) // Rebuild if significant number of items imported
+                {
+                    _logger?.LogInformation("Auto-rebuilding full tag catalog after importing {Count} items", totalImported);
+                    try
+                    {
+                        var catalogRebuildCount = await RebuildTagCatalogAsync(internalToken);
+                        _logger?.LogInformation("Full tag catalog rebuilt with {TagCount} tags", catalogRebuildCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Full tag catalog rebuild failed: {Message}", ex.Message);
+                    }
+                }
 
                 _progress[jobId] = (totalFetched, totalFetched, totalEmbedded, totalImported, true, null);
                 _logger?.LogInformation("Seeding job {JobId}: imported {Imported} docs into Couchbase", jobId, totalImported);
@@ -291,36 +306,57 @@ internal sealed class SeedService : ISeedService
     {
         try
         {
-            var docs = await Media.All(ct);
-            var extractedTags = ExtractTags(docs);
-
-            // Apply preemptive filtering during rebuild
+            // Use streaming to handle large datasets efficiently
             var flaggedTags = new List<string>();
             var cleanTags = new List<string>();
+            var processedMediaCount = 0;
+            var totalTagsExtracted = 0;
 
-            foreach (var tag in extractedTags)
+            _logger?.LogInformation("RebuildTagCatalog: Starting streaming rebuild of tag catalog");
+
+            await foreach (var media in Media.AllStream(1000, ct))
             {
-                if (Infrastructure.PreemptiveTagFilter.ShouldCensor(tag))
+                processedMediaCount++;
+
+                // Extract tags from this media item
+                var mediaTags = ExtractTagsFromSingleMedia(media);
+                totalTagsExtracted += mediaTags.Count();
+
+                // Apply preemptive filtering
+                foreach (var tag in mediaTags)
                 {
-                    flaggedTags.Add(tag);
+                    if (Infrastructure.PreemptiveTagFilter.ShouldCensor(tag))
+                    {
+                        flaggedTags.Add(tag);
+                    }
+                    else
+                    {
+                        cleanTags.Add(tag);
+                    }
                 }
-                else
+
+                // Log progress for large datasets
+                if (processedMediaCount % 10000 == 0)
                 {
-                    cleanTags.Add(tag);
+                    _logger?.LogInformation("RebuildTagCatalog: Processed {MediaCount} media items, extracted {TagCount} total tags",
+                        processedMediaCount, totalTagsExtracted);
                 }
             }
+
+            _logger?.LogInformation("RebuildTagCatalog: Completed processing {MediaCount} media documents", processedMediaCount);
+            _logger?.LogInformation("RebuildTagCatalog: Extracted {TagCount} total tags (with duplicates) from media", totalTagsExtracted);
 
             // Auto-add flagged tags to censor list
             if (flaggedTags.Count > 0)
             {
-                await AutoCensorTagsAsync(flaggedTags, ct);
-                _logger?.LogInformation("Preemptive filter auto-censored {Count} tags during catalog rebuild", flaggedTags.Count);
+                await AutoCensorTagsAsync(flaggedTags.Distinct().ToList(), ct);
+                _logger?.LogInformation("Preemptive filter auto-censored {Count} unique tags during catalog rebuild", flaggedTags.Distinct().Count());
             }
 
             var counts = CountTags(cleanTags);
             var tagDocs = BuildTagDocs(counts).ToList();
             var n = tagDocs.Any() ? await TagStatDoc.UpsertMany(tagDocs, ct) : 0;
-            _logger?.LogInformation("Rebuilt tag catalog: {Count} tags ({Censored} preemptively filtered)", counts.Count, flaggedTags.Count);
+            _logger?.LogInformation("Rebuilt tag catalog: {Count} unique tags ({Censored} preemptively filtered)", counts.Count, flaggedTags.Distinct().Count());
             return n;
         }
         catch (Exception ex)
@@ -426,6 +462,14 @@ internal sealed class SeedService : ISeedService
             if (m.Tags is { Length: > 0 })
                 foreach (var t in m.Tags) if (!string.IsNullOrWhiteSpace(t)) yield return t.Trim();
         }
+    }
+
+    private static IEnumerable<string> ExtractTagsFromSingleMedia(Media media)
+    {
+        if (media.Genres is { Length: > 0 })
+            foreach (var g in media.Genres) if (!string.IsNullOrWhiteSpace(g)) yield return g.Trim();
+        if (media.Tags is { Length: > 0 })
+            foreach (var t in media.Tags) if (!string.IsNullOrWhiteSpace(t)) yield return t.Trim();
     }
 
     private static IEnumerable<string> ExtractGenres(IEnumerable<Media> items)

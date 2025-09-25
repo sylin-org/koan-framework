@@ -320,7 +320,7 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
             double? averageScore = null;
             if (avgTok?.Type == JTokenType.Integer)
             {
-                averageScore = avgTok.Value<int>() / 10.0; // Convert from 0-100 to 0-10 scale
+                averageScore = (avgTok.Value<int>() / 100.0) * 4 + 1; // Convert from 0-100 to 1-5 scale
             }
 
             // Images

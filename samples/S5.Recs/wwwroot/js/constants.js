@@ -83,11 +83,11 @@ window.S5Const = Object.freeze({
     DIVERSITY_WEIGHT_STEP: 0.05
   }),
   RATING: Object.freeze({
-    STARS: 10,
+    STARS: 5,
     MIN: 1,
-    MAX: 10,
+    MAX: 5,
     DEFAULT_POPULARITY_SCORE: 0.7,
-    SCALE_MULTIPLIER: 10,
+    SCALE_MULTIPLIER: 5,
     ROUND_TO: 10, // round to 1 decimal place via *10 then /10
     STEP: 1
   }),

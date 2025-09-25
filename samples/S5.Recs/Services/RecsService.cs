@@ -186,7 +186,7 @@ internal sealed class RecsService : IRecsService
             AddedAt = DateTimeOffset.UtcNow
         };
 
-        entry.Rating = Math.Max(1, Math.Min(10, rating)); // 1-10 scale
+        entry.Rating = Math.Max(1, Math.Min(5, rating)); // 1-5 scale
         if (entry.Status == MediaStatus.PlanToConsume)
         {
             entry.Status = MediaStatus.Completed; // Auto-mark as completed when rating
@@ -417,7 +417,7 @@ internal sealed class RecsService : IRecsService
             foreach (var genre in media.Genres ?? Array.Empty<string>())
             {
                 profile.GenreWeights.TryGetValue(genre, out var oldWeight);
-                var target = rating / 10.0; // Convert to 0-1 scale
+                var target = (rating - 1) / 4.0; // Convert 1-5 to 0-1 scale
                 var updated = (1 - alpha) * oldWeight + alpha * target;
                 profile.GenreWeights[genre] = Math.Clamp(updated, 0, 1);
             }
@@ -425,7 +425,7 @@ internal sealed class RecsService : IRecsService
             foreach (var tag in media.Tags ?? Array.Empty<string>())
             {
                 profile.GenreWeights.TryGetValue(tag, out var oldWeight);
-                var target = (rating / 10.0) - 0.5; // Centered around 0.5
+                var target = ((rating - 1) / 4.0) - 0.5; // Convert 1-5, center around 0.5
                 var updated = (1 - alpha) * oldWeight + alpha * target;
                 profile.GenreWeights[tag] = Math.Clamp(updated, 0, 1);
             }

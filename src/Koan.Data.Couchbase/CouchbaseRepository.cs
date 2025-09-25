@@ -486,7 +486,10 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         var page = options?.Page is int p && p > 0 ? p : 1;
         var sizeReq = options?.PageSize;
         var size = sizeReq is int ps && ps > 0 ? ps : _options.DefaultPageSize;
+
+        // Apply MaxPageSize limit to user-requested page sizes
         if (size > _options.MaxPageSize) size = _options.MaxPageSize;
+
         var offset = (page - 1) * size;
         return (offset, size);
     }
