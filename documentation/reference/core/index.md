@@ -20,9 +20,37 @@ validation: 2025-01-17
 
 ## Overview
 
-Foundation layer providing auto-registration, health checks, and configuration.
+Foundation layer providing auto-registration, health checks, configuration, and semantic streaming pipelines.
 
 **Package**: `Koan.Core`
+
+## Semantic Streaming Pipelines
+
+Transform complex data workflows into readable, maintainable code patterns.
+
+```csharp
+await Document.AllStream()
+    .Pipeline()
+    .ForEach(doc => doc.Status = "processing")
+    .Tokenize(doc => doc.Content)                    // AI integration
+    .Embed(new AiEmbedOptions { Model = "all-minilm" })
+    .Branch(branch => branch
+        .OnSuccess(success => success
+            .Save()                                  // Clean, semantic API
+            .Notify(doc => new DocumentProcessed { Id = doc.Id }))
+        .OnFailure(failure => failure
+            .Trace(env => $"Failed: {env.Error?.Message}")
+            .Save()))
+    .ExecuteAsync();
+```
+
+**Key Features:**
+- **Cross-Pillar Integration**: AI, Data, Messaging, Observability work together
+- **Clean Semantic API**: `.Save()` instead of polluted generic types
+- **Stream Processing**: Handle millions of items without memory issues
+- **Natural Async**: Task-based interface for intuitive lambda expressions
+
+➤ **[Complete Pipeline Reference](semantic-streaming-pipelines.md)**
 
 ## Auto-Registration
 
