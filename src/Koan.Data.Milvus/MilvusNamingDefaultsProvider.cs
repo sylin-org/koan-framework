@@ -12,7 +12,7 @@ public sealed class MilvusNamingDefaultsProvider : INamingDefaultsProvider
     public StorageNameResolver.Convention GetConvention(IServiceProvider services)
     {
         var options = services.GetService<IOptions<MilvusOptions>>()?.Value;
-        return new StorageNameResolver.Convention(StorageNamingStyle.EntityType, "_", NameCasing.LowerCase);
+        return new StorageNameResolver.Convention(StorageNamingStyle.EntityType, "_", NameCasing.Lower);
     }
 
     public Func<Type, string?>? GetAdapterOverride(IServiceProvider services) => null;
