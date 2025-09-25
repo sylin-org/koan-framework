@@ -14,6 +14,16 @@ Step-by-step guides for building with Koan Framework:
 - [AI Integration](documentation/guides/ai-integration.md) - Add AI capabilities to your apps
 - [Authentication](documentation/guides/authentication-setup.md) - Zero-config OAuth, JWT, and service-to-service auth
 
+### 🚨 [Troubleshooting](documentation/guides/troubleshooting/)
+Common issues and their solutions:
+- **[Adapter Connection Issues](documentation/guides/troubleshooting/adapter-connection-issues.md)** - Database connectivity and provisioning failures
+- **[Bootstrap Failures](documentation/guides/troubleshooting/bootstrap-failures.md)** - Application startup and initialization problems
+
+### 🔬 [Deep Dive](documentation/guides/deep-dive/)
+Advanced architectural documentation:
+- **[Auto-Provisioning System](documentation/guides/deep-dive/auto-provisioning-system.md)** - How schema provisioning works automatically
+- **[Bootstrap Lifecycle](documentation/guides/deep-dive/bootstrap-lifecycle.md)** - Multi-layer application initialization process
+
 ### 📚 [API Reference](api/)
 Complete API documentation for all Koan modules:
 - **[Core](documentation/reference/core/index.md)** - Foundational abstractions and configuration

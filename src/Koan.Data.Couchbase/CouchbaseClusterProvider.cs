@@ -137,20 +137,24 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             // Use a fresh HttpClient instance to avoid auth header contamination
             using var checkClient = new HttpClient();
 
-            // First try without authentication (fresh cluster)
-            var response = await checkClient.GetAsync($"{baseUrl}/pools/default", ct).ConfigureAwait(false);
-            if (response.IsSuccessStatusCode)
-            {
-                return true;
-            }
+            // Try with authentication - only properly initialized clusters accept specific credentials
+            var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
+            checkClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
 
-            // If 401, try with authentication (already initialized cluster)
+            var response = await checkClient.GetAsync($"{baseUrl}/pools/default", ct).ConfigureAwait(false);
+
+            // If 401 Unauthorized, cluster exists but our credentials are wrong (uninitialized or different creds)
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
-                checkClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
-                var authResponse = await checkClient.GetAsync($"{baseUrl}/pools/default", ct).ConfigureAwait(false);
-                return authResponse.IsSuccessStatusCode;
+                return false;
+            }
+
+            // If successful with our credentials, verify we can actually access admin functions
+            if (response.IsSuccessStatusCode)
+            {
+                // Test if we can access the buckets endpoint - only works if properly initialized
+                var bucketResponse = await checkClient.GetAsync($"{baseUrl}/pools/default/buckets", ct).ConfigureAwait(false);
+                return bucketResponse.IsSuccessStatusCode;
             }
 
             return false;
@@ -231,6 +235,9 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
                     // Ensure bucket exists
                     await EnsureBucketExistsAsync(baseUrl, username, password, bucketName, ct).ConfigureAwait(false);
+
+                    // Wait for N1QL service to become query-ready
+                    await WaitForN1QLServiceReadinessAsync(baseUrl, username, password, ct).ConfigureAwait(false);
 
                     return true;
                 }
@@ -392,6 +399,10 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
                 _logger?.LogDebug("Connecting to Couchbase cluster at {ConnectionString}", Redaction.DeIdentify(options.ConnectionString));
                 _cluster = await Cluster.ConnectAsync(options.ConnectionString, clusterOptions).ConfigureAwait(false);
+
+                _logger?.LogDebug("Waiting for Couchbase cluster to finish bootstrapping");
+                await _cluster.WaitUntilReadyAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+                _logger?.LogDebug("Couchbase cluster bootstrap completed");
             }
         }
         finally
@@ -425,6 +436,10 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                     try
                     {
                         _bucket = await cluster.BucketAsync(options.Bucket).ConfigureAwait(false);
+
+                        // Wait for bucket to be ready before proceeding
+                        await _bucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+
                         _bucketName = options.Bucket;
                         _scopes.Clear();
                         _collections.Clear();
@@ -551,6 +566,56 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
     private static bool IsAlreadyExists(global::Couchbase.CouchbaseException ex)
     {
         return ex.Context?.Message?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private async Task WaitForN1QLServiceReadinessAsync(string baseUrl, string username, string password, CancellationToken ct)
+    {
+        const int maxRetries = 10; // Wait up to 30 seconds (3s * 10)
+        const int delayMs = 3000;
+
+        _logger?.LogDebug("Waiting for N1QL query service to become ready");
+
+        var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
+
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                using var queryClient = new HttpClient();
+                queryClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
+
+                // Execute a simple N1QL query to verify service readiness
+                var queryData = new FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("statement", "SELECT 1 AS test")
+                });
+
+                var response = await queryClient.PostAsync($"{baseUrl}/query/service", queryData, ct).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                    if (responseContent.Contains("\"test\":1") || responseContent.Contains("\"status\":\"success\""))
+                    {
+                        _logger?.LogInformation("N1QL query service is ready and responding");
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Waiting for N1QL service readiness (attempt {Attempt}/{MaxAttempts})", i + 1, maxRetries);
+            }
+
+            if (i < maxRetries - 1) // Don't wait on the last iteration
+            {
+                await Task.Delay(delayMs, ct).ConfigureAwait(false);
+            }
+        }
+
+        _logger?.LogWarning("N1QL service was not ready after {MaxRetries} attempts. Service may still be initializing.", maxRetries);
+        // Don't fail - transition to degraded state and let the application handle N1QL unavailability
+        _stateManager.TransitionTo(AdapterReadinessState.Degraded);
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)

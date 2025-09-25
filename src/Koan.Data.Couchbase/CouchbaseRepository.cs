@@ -380,13 +380,31 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         var manager = ctx.Bucket.Collections;
         if (!string.Equals(ctx.ScopeName, "_default", StringComparison.Ordinal))
         {
-            try { await manager.CreateScopeAsync(ctx.ScopeName).ConfigureAwait(false); }
-            catch (CouchbaseException ex) when (IsAlreadyExists(ex)) { }
+            try
+            {
+                await manager.CreateScopeAsync(ctx.ScopeName).ConfigureAwait(false);
+                _logger?.LogDebug("Created Couchbase scope: {Scope}", ctx.ScopeName);
+            }
+            catch (CouchbaseException ex) when (IsAlreadyExists(ex))
+            {
+                _logger?.LogDebug("Couchbase scope {Scope} already exists", ctx.ScopeName);
+            }
         }
 
         var spec = new CollectionSpec(ctx.ScopeName, ctx.CollectionName);
-        try { await manager.CreateCollectionAsync(spec).ConfigureAwait(false); }
-        catch (CouchbaseException ex) when (IsAlreadyExists(ex)) { }
+        try
+        {
+            await manager.CreateCollectionAsync(spec).ConfigureAwait(false);
+            _logger?.LogInformation("Created Couchbase collection: {Collection} in scope {Scope}", ctx.CollectionName, ctx.ScopeName);
+
+            // Wait for collection to be ready for N1QL queries
+            await Task.Delay(2000, ct).ConfigureAwait(false);
+            _logger?.LogDebug("Collection {Collection} ready for queries", ctx.CollectionName);
+        }
+        catch (CouchbaseException ex) when (IsAlreadyExists(ex))
+        {
+            _logger?.LogDebug("Couchbase collection {Collection} already exists", ctx.CollectionName);
+        }
     }
 
     private static bool IsAlreadyExists(CouchbaseException ex)
