@@ -1,6 +1,6 @@
 # Provider Readiness System - Framework Enhancement Proposal
 
-**Status:** Draft
+**Status:** Approved
 **Priority:** High
 **Scope:** Framework Enhancement
 **Primary Affected:** Koan.Core.Adapters, All External Resource Adapters
@@ -43,6 +43,18 @@ Introduce a **capability-based readiness system** in `Koan.Core.Adapters` that:
 3. **Non-Breaking**: Opt-in enhancement, existing code continues working
 4. **Configurable Policies**: Different strategies for different deployment scenarios
 
+### Alignment with Koan Framework Principles
+
+* **Reference = Intent** – Readiness capabilities are automatically surfaced through adapter registrars so merely referencing an adapter package is sufficient to light up the readiness system without bespoke wiring.
+* **Provider Transparency** – Operation gating is adapter-agnostic; once providers report Ready, entities continue to behave uniformly regardless of the backing technology.
+* **Entity-First Development** – Extension methods wrap existing entity operations so callers continue to invoke `Data<T>` APIs without additional ceremony or capability probing.
+* **Deterministic Configuration** – Central policies, deterministic defaults, and explicit overrides ensure startup behavior remains predictable across environments.
+
+### Desirability & Feasibility Snapshot
+
+* **Desirability** – Solves recurring startup instability, improves developer confidence, and introduces consistent observability around adapter readiness state, meeting high-priority DX goals.
+* **Feasibility** – Builds on existing capability and hosted-service patterns, enumerates adapter-specific rollout plans, and includes shared helpers (`ReadinessStateManager`, initialization services) to keep implementation straightforward for contributors.
+
 ## Technical Design
 
 ### Core Capabilities (Koan.Core.Adapters)
@@ -57,8 +69,8 @@ public enum AdapterReadinessState
 {
     Initializing,   // Starting up, performing async initialization
     Ready,          // Fully operational and ready for requests
-    Degraded,       // Partially functional, may have limitations
-    Failed          // Not operational, requires intervention
+    Degraded,       // Partially functional, surfaced alongside explicit limitations
+    Failed          // Not operational, requires intervention or retry
 }
 
 /// <summary>
@@ -79,6 +91,9 @@ public interface IAdapterReadiness
     /// <summary>Current readiness state</summary>
     AdapterReadinessState ReadinessState { get; }
 
+    /// <summary>Cheap readiness indicator for hot-path checks (Ready or Degraded)</summary>
+    bool IsReady { get; }
+
     /// <summary>Maximum time to wait for readiness</summary>
     TimeSpan ReadinessTimeout { get; }
 
@@ -90,6 +105,9 @@ public interface IAdapterReadiness
 
     /// <summary>Notifies when readiness state changes</summary>
     event EventHandler<ReadinessStateChangedEventArgs>? ReadinessStateChanged;
+
+    /// <summary>Provides thread-safe access to the shared readiness state manager</summary>
+    ReadinessStateManager StateManager { get; }
 }
 
 /// <summary>
@@ -134,6 +152,68 @@ public class ReadinessStateChangedEventArgs : EventArgs
 }
 
 /// <summary>
+/// Shared helper that enforces consistent readiness transitions, notifications, and wait semantics
+/// </summary>
+public sealed class ReadinessStateManager
+{
+    private readonly object _gate = new();
+    private AdapterReadinessState _state = AdapterReadinessState.Initializing;
+    private TaskCompletionSource _readySignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public AdapterReadinessState State
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _state;
+            }
+        }
+    }
+
+    public event EventHandler<ReadinessStateChangedEventArgs>? StateChanged;
+
+    public bool IsReady
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _state is AdapterReadinessState.Ready or AdapterReadinessState.Degraded;
+            }
+        }
+    }
+
+    public void TransitionTo(AdapterReadinessState newState)
+    {
+        AdapterReadinessState previous;
+
+        lock (_gate)
+        {
+            if (_state == newState)
+                return;
+
+            previous = _state;
+            _state = newState;
+
+            if (newState is AdapterReadinessState.Ready or AdapterReadinessState.Degraded)
+            {
+                _readySignal.TrySetResult();
+            }
+            else if (newState == AdapterReadinessState.Initializing && _readySignal.Task.IsCompleted)
+            {
+                _readySignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+        }
+
+        StateChanged?.Invoke(this, new ReadinessStateChangedEventArgs(previous, newState));
+    }
+
+    public Task WaitAsync(TimeSpan timeout, CancellationToken ct)
+        => _readySignal.Task.WaitAsync(timeout, ct);
+}
+
+/// <summary>
 /// Exception thrown when adapter operations are attempted before readiness
 /// </summary>
 public class AdapterNotReadyException : InvalidOperationException
@@ -149,6 +229,31 @@ public class AdapterNotReadyException : InvalidOperationException
     }
 }
 ```
+
+### Readiness State Semantics
+
+* **Initializing → Ready** – Triggered after all blocking dependencies complete successfully.
+* **Initializing → Degraded** – Allows adapters to serve critical paths while deferred capabilities warm up.
+* **Ready → Degraded** – Initiated when a partial outage is detected; operations must surface limitation metadata alongside results.
+* **Any → Failed** – Terminal failure that should raise alerts; adapters may attempt retries but must emit a state change.
+* **Failed → Initializing** – Used when recoveries begin; adapters should reset the readiness signal through `ReadinessStateManager`.
+
+All transitions must be coordinated through the helper to ensure thread-safe notifications and reliable wait semantics for dependents.
+
+### Fast-Path Readiness Checks
+
+Some adapters execute lightweight runtime operations where awaiting the asynchronous `IsReadyAsync` call would introduce avoidable allocations. The proposal therefore includes a synchronous `IsReady` flag sourced from the shared `ReadinessStateManager` to offer a cheap check in latency-sensitive scenarios.
+
+**Pros**
+
+* Enables micro-optimizations inside hot paths (e.g., caching layers) without requiring adapters to materialize throwaway `Task` instances.
+* Provides a consistent, thread-safe indicator because the value is derived from the centralized state manager instead of bespoke adapter fields.
+
+**Cons / Mitigations**
+
+* Risk of adapters bypassing policy enforcement—documentation must emphasize that `IsReady` is informational and should not replace gating when policies demand waits or exceptions.
+* Potential divergence if adapters hand-roll their own flags—by exposing the property directly on `ReadinessStateManager` and requiring implementations to delegate, we avoid duplicated state.
+* Degraded mode nuance—guidance clarifies that the flag returns `true` for both Ready and Degraded states; callers needing stricter semantics must inspect the full enum.
 
 ### Extension Methods (Koan.Core.Adapters)
 
@@ -192,7 +297,7 @@ public static class AdapterReadinessExtensions
                 break;
 
             case ReadinessPolicy.Degrade:
-                // Continue - let operation handle degraded state gracefully
+                // Continue - operations must surface adapter-provided degradation metadata
                 break;
         }
 
@@ -228,11 +333,19 @@ public class AdapterInitializationService : IHostedService
 {
     private readonly IServiceProvider _services;
     private readonly ILogger<AdapterInitializationService> _logger;
+    private readonly IReadOnlyCollection<IAdapterInitializationOrder> _orderingPolicies;
+    private readonly IRetryPolicyProvider _retryPolicies;
 
-    public AdapterInitializationService(IServiceProvider services, ILogger<AdapterInitializationService> logger)
+    public AdapterInitializationService(
+        IServiceProvider services,
+        ILogger<AdapterInitializationService> logger,
+        IEnumerable<IAdapterInitializationOrder> orderingPolicies,
+        IRetryPolicyProvider retryPolicies)
     {
         _services = services;
         _logger = logger;
+        _orderingPolicies = orderingPolicies.ToArray();
+        _retryPolicies = retryPolicies;
     }
 
     public async Task StartAsync(CancellationToken ct)
@@ -247,11 +360,13 @@ public class AdapterInitializationService : IHostedService
 
         _logger.LogInformation("Initializing {Count} async adapters", asyncInitializers.Count);
 
-        // Initialize adapters in parallel for better startup performance
-        var initTasks = asyncInitializers.Select(initializer =>
-            InitializeAdapterSafelyAsync(initializer, ct));
+        foreach (var wave in ApplyOrdering(asyncInitializers))
+        {
+            _logger.LogDebug("Starting initialization wave containing {Count} adapters", wave.Count);
 
-        await Task.WhenAll(initTasks);
+            var tasks = wave.Select(initializer => InitializeAdapterSafelyAsync(initializer, ct));
+            await Task.WhenAll(tasks);
+        }
 
         _logger.LogInformation("All async adapters initialized successfully");
     }
@@ -265,10 +380,15 @@ public class AdapterInitializationService : IHostedService
         {
             _logger.LogDebug("Initializing adapter: {AdapterType}", adapterType);
 
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(TimeSpan.FromMinutes(5)); // Global initialization timeout
+            var retryPolicy = _retryPolicies.GetPolicy(adapterType);
 
-            await initializer.InitializeAsync(timeoutCts.Token);
+            await retryPolicy.ExecuteAsync(async innerCt =>
+            {
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(innerCt);
+                timeoutCts.CancelAfter(TimeSpan.FromMinutes(5)); // Global initialization timeout
+
+                await initializer.InitializeAsync(timeoutCts.Token);
+            }, ct);
 
             _logger.LogDebug("Successfully initialized adapter: {AdapterType}", adapterType);
         }
@@ -276,19 +396,52 @@ public class AdapterInitializationService : IHostedService
         {
             _logger.LogError(ex, "Failed to initialize adapter: {AdapterType}", adapterType);
 
-            // Mark as failed if it supports readiness
             if (initializer is IAdapterReadiness readiness && readiness.ReadinessState != AdapterReadinessState.Failed)
             {
-                // Adapter should handle this internally, but we log the failure
-                _logger.LogWarning("Adapter {AdapterType} failed initialization but didn't update readiness state", adapterType);
+                _logger.LogWarning(
+                    "Adapter {AdapterType} failed initialization but didn't update readiness state",
+                    adapterType);
             }
-
-            // Don't rethrow - allow other adapters to initialize
-            // Applications can check readiness state to determine if critical adapters failed
         }
+    }
+
+    private IEnumerable<IReadOnlyCollection<IAsyncAdapterInitializer>> ApplyOrdering(
+        IReadOnlyCollection<IAsyncAdapterInitializer> initializers)
+    {
+        if (!_orderingPolicies.Any())
+            return new[] { initializers };
+
+        var waves = new List<IReadOnlyCollection<IAsyncAdapterInitializer>>();
+        var remaining = initializers;
+
+        foreach (var policy in _orderingPolicies.OrderBy(p => p.Priority))
+        {
+            var slice = policy.Apply(remaining).ToArray();
+            if (slice.Length > 0)
+            {
+                waves.Add(slice);
+                remaining = remaining.Except(slice).ToArray();
+            }
+        }
+
+        if (remaining.Any())
+            waves.Add(remaining);
+
+        return waves;
     }
 }
 ```
+
+### Observability & Monitoring
+
+* Surface readiness through the existing health endpoint as a distinct `readiness` contributor containing state, duration, and last transition information per adapter.
+* Emit structured logs on every `ReadinessStateManager.StateChanged` event so operators can correlate outages with deployment timelines.
+* Publish metrics such as readiness latency histograms, degraded/failed counters, and retry attempts using the framework telemetry pipeline.
+
+### Supporting Infrastructure Interfaces
+
+* `IAdapterInitializationOrder` – Allows adapters to express dependencies or priorities so the initialization service can run them in deterministic waves.
+* `IRetryPolicyProvider` – Supplies adapter-specific retry/backoff strategies (e.g., exponential, linear) that honor global startup budgets while tolerating transient failures.
 
 ## Implementation Plan
 
@@ -298,10 +451,11 @@ public class AdapterInitializationService : IHostedService
 
 **Core Infrastructure:**
 - [ ] Add capability interfaces to `Koan.Core.Adapters`
-- [ ] Implement `AdapterReadinessExtensions`
-- [ ] Create `AdapterInitializationService`
+- [ ] Implement `ReadinessStateManager` and `AdapterReadinessExtensions`
+- [ ] Create `AdapterInitializationService` with ordering and retry hooks
 - [ ] Add service registration in `Koan.Core` auto-registrar
 - [ ] Add configuration support in `Koan.Core`
+- [ ] Wire readiness signals into logging, metrics, and health endpoints
 
 **Couchbase Implementation:**
 - [ ] Implement `IAdapterReadiness` in `CouchbaseRepository<T,K>`
@@ -321,7 +475,7 @@ public class AdapterInitializationService : IHostedService
 - [ ] Implement readiness capabilities in `MongoRepository<T,K>`
 - [ ] Handle connection establishment and database/collection creation
 - [ ] Update operations to use readiness gating
-- [ ] Add Mongo-specific readiness configuration
+- [ ] Add Mongo-specific readiness configuration and degraded behavior guidance
 
 **Success Criteria for Phase 1:**
 - ✅ **Zero console errors during application startup**
@@ -361,9 +515,10 @@ public class AdapterInitializationService : IHostedService
 
 **Framework Integration & Documentation:**
 - [ ] Update framework documentation with readiness patterns
-- [ ] Create migration guide for custom adapters
-- [ ] Add readiness monitoring to health endpoints
+- [ ] Create migration guide for custom adapters, including `ReadinessStateManager`
+- [ ] Add readiness monitoring to health endpoints, logs, and metrics
 - [ ] Performance testing and optimization
+- [ ] Publish degraded-mode playbook for adapter authors
 
 **Success Criteria for Phase 2:**
 - ✅ **All framework adapters follow consistent readiness patterns**
@@ -411,6 +566,8 @@ public class AdapterInitializationService : IHostedService
   }
 }
 ```
+
+Configuration values follow the deterministic hierarchy: framework defaults → package defaults → application overrides → environment overrides. Conflicts resolve closest to the consumer, and readiness policies fail fast when both global and adapter-specific timeouts are exceeded. Documentation will include tables illustrating how defaults cascade for common environments (local dev, CI, production).
 
 ## Expected Behavior Changes
 
@@ -512,18 +669,25 @@ Application ready for requests
 2. **Adapter-Agnostic**: Works for Data, AI, Storage, Messaging adapters
 3. **Policy-Driven**: Configurable behavior for different scenarios
 4. **Extension Method Pattern**: Clean integration with existing operations
+5. **API Ergonomics**: Provide helper wrappers for static/entity-first APIs so readiness gating is applied automatically
 
 ### Implementation Priorities
 1. **Phase 1 Focus**: Couchbase (immediate console errors), Ollama (model loading), Mongo (connection issues)
-2. **Startup Sequence**: Initialization before operations
-3. **Use Existing Patterns**: Don't reinvent framework concepts
-4. **Maintain Compatibility**: Existing code works unchanged
+2. **Startup Sequence**: Initialization before operations with ordered waves when dependencies exist
+3. **Visibility First**: Emit readiness metrics/logs before enabling gating to aid rollout debugging
+4. **Maintain Compatibility**: Existing code works unchanged while adapters gradually adopt readiness
+
+### Degraded Mode Guidance
+* Adapters entering `Degraded` must populate a scoped context (e.g., `ReadinessDegradationContext`) describing impacted capabilities.
+* Entity and service operations should surface degradation metadata to callers through existing result envelopes or logging.
+* Document adapter-specific behaviors (read-only Couchbase, cached embeddings for Ollama, limited indexing for Mongo) to set clear expectations.
 
 ### Testing Strategy
-1. **Unit Tests**: Individual capability implementations
+1. **Unit Tests**: Individual capability implementations, including `ReadinessStateManager` transitions
 2. **Integration Tests**: Full startup sequence with Docker
 3. **Performance Tests**: Initialization timing and parallel startup
 4. **Compatibility Tests**: Existing applications continue working
+5. **Resilience Tests**: Failure-injection scenarios (delayed services, transient network faults) to validate retries, degraded transitions, and monitoring signals
 
 ## Reference Implementation Examples
 
@@ -534,13 +698,19 @@ public class CouchbaseRepository<T, K> : IDataRepository<T, K>,
     IAdapterReadiness, IAdapterReadinessConfiguration, IAsyncAdapterInitializer
     where T : class, IEntity<K> where K : notnull
 {
-    private AdapterReadinessState _readinessState = AdapterReadinessState.Initializing;
-    private readonly TaskCompletionSource _readinessSignal = new();
+    private readonly ReadinessStateManager _stateManager = new();
 
     // IAdapterReadiness Implementation
-    public AdapterReadinessState ReadinessState => _readinessState;
+    public AdapterReadinessState ReadinessState => _stateManager.State;
+    public bool IsReady => _stateManager.IsReady;
     public TimeSpan ReadinessTimeout => TimeSpan.FromSeconds(30);
+    public ReadinessStateManager StateManager => _stateManager;
     public event EventHandler<ReadinessStateChangedEventArgs>? ReadinessStateChanged;
+
+    public CouchbaseRepository(...)
+    {
+        _stateManager.StateChanged += (_, args) => ReadinessStateChanged?.Invoke(this, args);
+    }
 
     // Operations use readiness extensions
     public async Task<T?> GetAsync(K id, string? set = null, CancellationToken ct = default)
@@ -556,11 +726,11 @@ public class CouchbaseRepository<T, K> : IDataRepository<T, K>,
         try
         {
             await _clusterProvider.InitializeAsync(ct);
-            SetReadinessState(AdapterReadinessState.Ready);
+            _stateManager.TransitionTo(AdapterReadinessState.Ready);
         }
         catch (Exception)
         {
-            SetReadinessState(AdapterReadinessState.Failed);
+            _stateManager.TransitionTo(AdapterReadinessState.Failed);
             throw;
         }
     }
@@ -573,6 +743,18 @@ public class CouchbaseRepository<T, K> : IDataRepository<T, K>,
 public class OllamaAdapter : IAdapterReadiness, IAsyncAdapterInitializer
 {
     private readonly string[] _requiredModels;
+    private readonly ReadinessStateManager _stateManager = new();
+
+    public AdapterReadinessState ReadinessState => _stateManager.State;
+    public bool IsReady => _stateManager.IsReady;
+    public TimeSpan ReadinessTimeout => TimeSpan.FromMinutes(5);
+    public ReadinessStateManager StateManager => _stateManager;
+    public event EventHandler<ReadinessStateChangedEventArgs>? ReadinessStateChanged;
+
+    public OllamaAdapter(...)
+    {
+        _stateManager.StateChanged += (_, args) => ReadinessStateChanged?.Invoke(this, args);
+    }
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -583,7 +765,7 @@ public class OllamaAdapter : IAdapterReadiness, IAsyncAdapterInitializer
                 await PullModelAsync(model, ct);
             }
         }
-        SetReadinessState(AdapterReadinessState.Ready);
+        _stateManager.TransitionTo(AdapterReadinessState.Ready);
     }
 
     public async Task<EmbeddingResponse> GetEmbeddingsAsync(string text, CancellationToken ct = default)
@@ -624,4 +806,4 @@ cd samples/S5.Recs
 - **"Reference = Intent"**: Auto-registration continues unchanged
 - **Entity-First Development**: `Data<T>.All()` API remains the same
 - **Provider Transparency**: Same code works across all storage backends
-- **Capability-Based**: Use interfaces, not inheritance
+- **Capability-Based**: Use interfaces, not inheritance hierarchies
