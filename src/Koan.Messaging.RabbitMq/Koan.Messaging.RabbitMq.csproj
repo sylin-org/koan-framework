@@ -8,9 +8,9 @@
     <RootNamespace>Koan.Messaging.RabbitMq</RootNamespace>
     <Description>RabbitMQ transport for Koan Messaging: resilient connection management, config-first options, and inbox integration.</Description>
     <PackageTags>$(CommonPackageTags);messaging;rabbitmq;transport;queue;inbox</PackageTags>
-    <Version>0.6.1</Version>
-    <AssemblyVersion>0.6.1</AssemblyVersion>
-    <FileVersion>0.6.1</FileVersion>
+    <Version>0.6.2</Version>
+    <AssemblyVersion>0.6.2</AssemblyVersion>
+    <FileVersion>0.6.2</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />

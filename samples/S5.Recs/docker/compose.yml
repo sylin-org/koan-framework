@@ -11,8 +11,7 @@ services:
       ASPNETCORE_ENVIRONMENT: "Development"
       ASPNETCORE_URLS: "http://+:5084"
       Koan__Web__ExposeObservabilitySnapshot: "true"
-      Koan__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
-      Koan__Data__Mongo__Database: "Koan"
+      Koan__Data__Couchbase__Bucket: "Koan"
       Koan__Data__Weaviate__Endpoint: "http://weaviate:8080"
       Koan__Ai__AutoDiscoveryEnabled: "true"
       Koan__Ai__AllowDiscoveryInNonDev: "true"
@@ -33,14 +32,18 @@ services:
     volumes:
       - ../data:/app/data
     depends_on:
-      - mongo
+      - couchbase
       - weaviate
-  mongo:
-    image: mongo:latest
+  couchbase:
+    image: public.ecr.aws/docker/library/couchbase:latest
     volumes:
-      - ../data/mongo:/data/db
+      - ../data/couchbase:/opt/couchbase/var
     ports:
-      - "5081:27017"
+      - "5081:8091"  # Web UI
+      - "8092:8092"  # Views
+      - "8093:8093"  # Query
+      - "8094:8094"  # Search
+      - "11210:11210" # Data service
   weaviate:
     image: semitechnologies/weaviate:latest
     environment:

@@ -47,7 +47,7 @@ foreach (var t in providerTypes)
     builder.Services.AddSingleton(providerInterface, t);
 }
 
-// Mongo adapter is auto-registered by its module via Koan.Core discovery
+// Couchbase adapter is auto-registered by its module via Koan.Core discovery
 
 var app = builder.Build();
 

@@ -146,7 +146,7 @@ internal sealed class SeedService : ISeedService
                         _progress[jobId] = (totalFetched, totalFetched, totalEmbedded, totalImported, false, null);
 
                         // Process this batch immediately
-                        var batchImported = await ImportMongoAsync(batch, internalToken);
+                        var batchImported = await ImportDataAsync(batch, internalToken);
                         totalImported += batchImported;
 
                         var batchEmbedded = await EmbedAndIndexAsync(batch, internalToken);
@@ -173,7 +173,7 @@ internal sealed class SeedService : ISeedService
                 try { await CatalogGenresAsync(allData, internalToken); } catch (Exception ex) { _logger?.LogWarning(ex, "Genre cataloging failed: {Message}", ex.Message); }
 
                 _progress[jobId] = (totalFetched, totalFetched, totalEmbedded, totalImported, true, null);
-                _logger?.LogInformation("Seeding job {JobId}: imported {Imported} docs into Mongo", jobId, totalImported);
+                _logger?.LogInformation("Seeding job {JobId}: imported {Imported} docs into Couchbase", jobId, totalImported);
 
                 await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest.json"),
                     JsonConvert.SerializeObject(new { jobId, count = totalFetched, mediaType = mediaTypeName, at = DateTimeOffset.UtcNow }), internalToken);
@@ -396,7 +396,7 @@ internal sealed class SeedService : ISeedService
         }
     }
 
-    private async Task<int> ImportMongoAsync(List<Media> items, CancellationToken ct)
+    private async Task<int> ImportDataAsync(List<Media> items, CancellationToken ct)
     {
         try
         {

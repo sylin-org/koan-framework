@@ -6,7 +6,7 @@ using Koan.Data.Core.Relationships;
 namespace S5.Recs.Models;
 
 // User profile for personalization (genre weights + preference vector)
-[DataAdapter("mongo")]
+[DataAdapter("couchbase")]
 [Storage(Name = "UserProfiles")]
 public sealed class UserProfileDoc : Entity<UserProfileDoc>
 {

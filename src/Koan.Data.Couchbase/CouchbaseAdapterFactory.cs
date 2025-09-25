@@ -10,8 +10,8 @@ namespace Koan.Data.Couchbase;
 
 [ProviderPriority(30)]
 [KoanService(ServiceKind.Database, shortCode: "couchbase", name: "Couchbase",
-    ContainerImage = "couchbase/community",
-    DefaultTag = "7.2.2",
+    ContainerImage = "couchbase/server",
+    DefaultTag = "latest",
     DefaultPorts = new[] { 8091, 8092, 8093, 8094, 11210 },
     Capabilities = new[] { "protocol=couchbase" },
     Volumes = new[] { "./Data/couchbase:/opt/couchbase/var" },

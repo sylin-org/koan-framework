@@ -4,7 +4,7 @@ using Koan.Data.Core.Model;
 
 namespace S5.Recs.Models;
 
-[DataAdapter("mongo")]
+[DataAdapter("couchbase")]
 [Storage(Name = "RecsSettings")]
 public sealed class SettingsDoc : Entity<SettingsDoc>
 {

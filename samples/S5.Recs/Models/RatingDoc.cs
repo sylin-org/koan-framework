@@ -6,7 +6,7 @@ namespace S5.Recs.Models;
 
 // DEPRECATED: Use LibraryEntryDoc (Rating + status) instead. Kept temporarily to avoid breaking old data.
 // User rating keyed by composite id: "{userId}:{mediaId}"
-[DataAdapter("mongo")]
+[DataAdapter("couchbase")]
 [Storage(Name = "Ratings")]
 [System.Obsolete("Use LibraryEntryDoc; this doc remains only for backward compatibility.")]
 public sealed class RatingDoc : Entity<RatingDoc>

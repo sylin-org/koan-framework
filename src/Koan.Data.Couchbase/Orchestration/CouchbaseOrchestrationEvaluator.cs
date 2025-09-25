@@ -73,7 +73,7 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
             var username = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Username, "Koan:Data:Username");
             var password = Configuration.ReadFirst(configuration, "", Constants.Configuration.Keys.Password, "Koan:Data:Password");
             var connectionString = $"couchbase://{host}";
-            var options = new Couchbase.ClusterOptions();
+            var options = new global::Couchbase.ClusterOptions();
             if (!string.IsNullOrWhiteSpace(username))
             {
                 options.UserName = username;

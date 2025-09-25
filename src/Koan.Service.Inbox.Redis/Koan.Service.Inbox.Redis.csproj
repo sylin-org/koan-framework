@@ -7,9 +7,9 @@
     <RootNamespace>Koan.Service.Inbox.Redis</RootNamespace>
     <Description>Redis-backed inbox service for Koan: lightweight HTTP receiver storing messages in Redis.</Description>
     <PackageTags>$(CommonPackageTags);service;inbox;redis;messaging</PackageTags>
-    <Version>0.6.1</Version>
-    <AssemblyVersion>0.6.1</AssemblyVersion>
-    <FileVersion>0.6.1</FileVersion>
+    <Version>0.6.2</Version>
+    <AssemblyVersion>0.6.2</AssemblyVersion>
+    <FileVersion>0.6.2</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.1" />

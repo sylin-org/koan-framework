@@ -15,15 +15,15 @@ services:
       Koan__Ai__AutoDiscoveryEnabled: "true"
       Koan__Ai__AllowDiscoveryInNonDev: "true"
       Koan_AI_OLLAMA_URLS: "http://ollama:11434"
-      Koan__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
-      Koan__Data__Mongo__Database: "Koan"
+      Koan__Data__Couchbase__ConnectionString: "couchbase://couchbase"
+      Koan__Data__Couchbase__Bucket: "Koan"
       Koan__Data__Weaviate__Endpoint: "http://weaviate:8080"
     ports:
       - "40082:8080"
     depends_on:
       ollama:
         condition: service_healthy
-      mongo:
+      couchbase:
         condition: service_started
       weaviate:
         condition: service_healthy
@@ -41,10 +41,10 @@ services:
       retries: 12
     networks:
       - Koan_internal
-  mongo:
-    image: "mongo:7"
+  couchbase:
+    image: "public.ecr.aws/docker/library/couchbase:latest"
     volumes:
-      - ./Data/mongo:/data/db
+      - ./Data/couchbase:/opt/couchbase/var
     networks:
       - Koan_internal
   weaviate:
