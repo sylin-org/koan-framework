@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters;
+using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
@@ -32,16 +34,20 @@ public sealed class CouchbaseAutoRegistrar : IKoanAutoRegistrar
 
     public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        var configurator = new CouchbaseOptionsConfigurator(cfg, null);
-        var options = new CouchbaseOptions();
-        configurator.Configure(options);
-        report.AddSetting("Bucket", options.Bucket);
-        report.AddSetting("Scope", options.Scope ?? "_default");
-        report.AddSetting("Collection", options.Collection ?? "<convention>");
-        report.AddSetting("ConnectionString", Redaction.DeIdentify(options.ConnectionString), isSecret: true);
-        report.AddSetting(Constants.Bootstrap.DefaultPageSize, options.DefaultPageSize.ToString(CultureInfo.InvariantCulture));
-        report.AddSetting(Constants.Bootstrap.MaxPageSize, options.MaxPageSize.ToString(CultureInfo.InvariantCulture));
-        report.AddSetting(Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+        // Use centralized boot reporting with adapter-specific callback
+        var options = AdapterBootReporting.ConfigureForBootReportWithConfigurator<CouchbaseOptions, CouchbaseOptionsConfigurator>(
+            cfg,
+            (config, readiness) => new CouchbaseOptionsConfigurator(config, null, readiness),
+            () => new CouchbaseOptions());
+
+        report.ReportAdapterConfiguration(ModuleName, ModuleVersion, options,
+            (r, o) => {
+                // Couchbase-specific settings
+                r.ReportConnectionString(ModuleName, o.ConnectionString);
+                r.ReportStorageTargets(ModuleName, o.Bucket, o.Collection, o.Scope);
+                r.ReportPerformanceSettings(ModuleName, queryTimeout: o.QueryTimeout);
+                r.AddSetting($"{ModuleName}:DurabilityLevel", o.DurabilityLevel ?? "<default>");
+                r.AddSetting(Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+            });
     }
 }

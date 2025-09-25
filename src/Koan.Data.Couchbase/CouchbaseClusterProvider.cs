@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Couchbase;
 using Couchbase.KeyValue;
 using Koan.Core;
+using Koan.Core.Adapters;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -35,7 +36,7 @@ internal sealed class CouchbaseCollectionContext
     public string CollectionName { get; }
 }
 
-internal sealed class CouchbaseClusterProvider : IAsyncDisposable
+internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadiness, IAsyncAdapterInitializer
 {
     private readonly IOptionsMonitor<CouchbaseOptions> _options;
     private readonly ILogger<CouchbaseClusterProvider>? _logger;
@@ -46,12 +47,79 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable
     private string? _bucketName;
     private readonly ConcurrentDictionary<string, IScope> _scopes = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ICouchbaseCollection> _collections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ReadinessStateManager _stateManager = new();
 
     public CouchbaseClusterProvider(IOptionsMonitor<CouchbaseOptions> options, ILogger<CouchbaseClusterProvider>? logger = null)
     {
         _options = options;
         _logger = logger;
         _httpClient = new HttpClient();
+        _stateManager.StateChanged += (_, args) => ReadinessStateChanged?.Invoke(this, args);
+    }
+
+    public AdapterReadinessState ReadinessState => _stateManager.State;
+
+    public bool IsReady => _stateManager.IsReady;
+
+    public TimeSpan ReadinessTimeout
+    {
+        get
+        {
+            var timeout = _options.CurrentValue.Readiness.Timeout;
+            return timeout > TimeSpan.Zero ? timeout : TimeSpan.FromSeconds(30);
+        }
+    }
+
+    public event EventHandler<ReadinessStateChangedEventArgs>? ReadinessStateChanged;
+
+    public ReadinessStateManager StateManager => _stateManager;
+
+    public Task<bool> IsReadyAsync(CancellationToken ct = default)
+        => Task.FromResult(_stateManager.IsReady);
+
+    public async Task WaitForReadinessAsync(TimeSpan? timeout = null, CancellationToken ct = default)
+    {
+        if (_stateManager.IsReady)
+        {
+            return;
+        }
+
+        if (_stateManager.State == AdapterReadinessState.Failed)
+        {
+            throw new AdapterNotReadyException(GetType().Name, _stateManager.State, "Couchbase adapter failed to initialize.");
+        }
+
+        var effectiveTimeout = timeout ?? ReadinessTimeout;
+        if (effectiveTimeout <= TimeSpan.Zero)
+        {
+            throw new AdapterNotReadyException(GetType().Name, _stateManager.State,
+                "Couchbase readiness timeout is zero; gating cannot wait for readiness.");
+        }
+
+        try
+        {
+            await _stateManager.WaitAsync(effectiveTimeout, ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException ex)
+        {
+            throw new AdapterNotReadyException(GetType().Name, _stateManager.State,
+                $"Timed out waiting for Couchbase readiness after {effectiveTimeout}.", ex);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (_stateManager.State == AdapterReadinessState.Failed)
+        {
+            throw new AdapterNotReadyException(GetType().Name, _stateManager.State,
+                "Couchbase adapter failed while waiting for readiness.", ex);
+        }
+
+        if (!_stateManager.IsReady)
+        {
+            throw new AdapterNotReadyException(GetType().Name, _stateManager.State,
+                "Couchbase adapter is not ready after waiting for readiness.");
+        }
     }
 
     private static (string Username, string Password) GenerateDefaultCredentials()
@@ -179,6 +247,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable
         }
 
         _logger?.LogWarning("Couchbase was not ready after {MaxRetries} attempts. Proceeding without initialization.", maxRetries);
+        _stateManager.TransitionTo(AdapterReadinessState.Degraded);
         return false;
     }
 
@@ -249,6 +318,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable
         {
             _logger?.LogWarning(ex, "Error checking/creating bucket {BucketName}", bucketName);
             // Don't throw - continue with cluster connection
+            _stateManager.TransitionTo(AdapterReadinessState.Degraded);
         }
         finally
         {
@@ -267,6 +337,10 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable
             ? (!string.IsNullOrWhiteSpace(options.Collection) ? options.Collection! : "_default")
             : collectionName;
         var collection = await GetCollectionAsync(scope, scopeName, finalCollection).ConfigureAwait(false);
+        if (_stateManager.State == AdapterReadinessState.Initializing)
+        {
+            _stateManager.TransitionTo(AdapterReadinessState.Ready);
+        }
         return new CouchbaseCollectionContext(cluster, bucket, scope, collection, bucket.Name, scopeName, finalCollection);
     }
 
@@ -470,12 +544,40 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable
         {
             // Other creation failures - log but don't throw
             _logger?.LogWarning(ex, "Failed to create collection {ScopeName}.{CollectionName}: {Error}", scopeName, collectionName, ex.Message);
+            _stateManager.TransitionTo(AdapterReadinessState.Degraded);
         }
     }
 
     private static bool IsAlreadyExists(global::Couchbase.CouchbaseException ex)
     {
         return ex.Context?.Message?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    public async Task InitializeAsync(CancellationToken ct = default)
+    {
+        _stateManager.TransitionTo(AdapterReadinessState.Initializing);
+
+        try
+        {
+            var options = _options.CurrentValue;
+            var collectionName = options.Collection ?? string.Empty;
+            await GetCollectionContextAsync(collectionName, ct).ConfigureAwait(false);
+
+            if (_stateManager.State == AdapterReadinessState.Degraded)
+            {
+                _logger?.LogWarning("Couchbase adapter entering degraded readiness due to partial initialization.");
+            }
+            else
+            {
+                _stateManager.TransitionTo(AdapterReadinessState.Ready);
+            }
+        }
+        catch (Exception ex)
+        {
+            _stateManager.TransitionTo(AdapterReadinessState.Failed);
+            _logger?.LogError(ex, "Failed to initialize Couchbase adapter");
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()

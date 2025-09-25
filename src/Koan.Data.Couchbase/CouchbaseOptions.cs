@@ -1,13 +1,15 @@
 using System;
-using Koan.Data.Abstractions.Naming;
 using System.ComponentModel.DataAnnotations;
+using Koan.Core.Adapters;
+using Koan.Core.Adapters.Configuration;
+using Koan.Data.Abstractions.Naming;
 
 namespace Koan.Data.Couchbase;
 
 /// <summary>
 /// Couchbase adapter configuration options.
 /// </summary>
-public sealed class CouchbaseOptions
+public sealed class CouchbaseOptions : IAdapterOptions
 {
     /// <summary>
     /// Couchbase connection string. Supports "auto" orchestration discovery by default.
@@ -75,4 +77,9 @@ public sealed class CouchbaseOptions
     /// Optional durability level for mutations.
     /// </summary>
     public string? DurabilityLevel { get; set; }
+
+    /// <summary>
+    /// Readiness policy controlling adapter gating behaviour.
+    /// </summary>
+    public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }

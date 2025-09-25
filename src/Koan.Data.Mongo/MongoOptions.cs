@@ -1,3 +1,5 @@
+using Koan.Core.Adapters;
+using Koan.Core.Adapters.Configuration;
 using Koan.Data.Abstractions.Naming;
 using System.ComponentModel.DataAnnotations;
 
@@ -6,7 +8,7 @@ namespace Koan.Data.Mongo;
 /// <summary>
 /// MongoDB adapter options (connection string, database, and optional collection naming).
 /// </summary>
-public sealed class MongoOptions
+public sealed class MongoOptions : IAdapterOptions
 {
     [Required]
     public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
@@ -20,4 +22,6 @@ public sealed class MongoOptions
     // Paging guardrails (acceptance criteria 0044)
     public int DefaultPageSize { get; set; } = 50; // mirrors Koan.Web default
     public int MaxPageSize { get; set; } = 200;
+
+    public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }
