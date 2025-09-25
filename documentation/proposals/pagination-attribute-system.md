@@ -96,6 +96,52 @@ public class PaginationAttribute : Attribute
 }
 ```
 
+> **Important:** Attribute instances are cached and shared by the runtime. The framework MUST treat them as immutable configuration
+> hints and project them into per-request policy snapshots before applying any business rules.
+
+### Runtime Policy Snapshot
+
+```csharp
+public sealed record PaginationPolicy
+{
+    public required PaginationMode Mode { get; init; }
+    public required int DefaultSize { get; init; }
+    public required int MaxSize { get; init; }
+    public required bool IncludeCount { get; init; }
+    public required int AbsoluteMaxRecords { get; init; }
+    public string? DefaultSort { get; init; }
+
+    public static PaginationPolicy FromAttribute(PaginationAttribute attr, PaginationSafetyBounds safety)
+    {
+        // Defensive copy to avoid mutating attribute instances that are reused across requests.
+        var defaultSize = Math.Clamp(attr.DefaultSize, safety.MinPageSize, safety.MaxPageSize);
+        var maxSize = Math.Clamp(attr.MaxSize, safety.MinPageSize, safety.MaxPageSize);
+
+        if (maxSize < defaultSize)
+        {
+            maxSize = defaultSize;
+        }
+
+        return new PaginationPolicy
+        {
+            Mode = attr.Mode,
+            DefaultSize = defaultSize,
+            MaxSize = maxSize,
+            IncludeCount = attr.IncludeCount,
+            AbsoluteMaxRecords = safety.AbsoluteMaxRecords,
+            DefaultSort = attr.DefaultSort
+        };
+    }
+}
+
+public sealed record PaginationSafetyBounds
+{
+    public required int MinPageSize { get; init; }
+    public required int MaxPageSize { get; init; }
+    public required int AbsoluteMaxRecords { get; init; }
+}
+```
+
 ## Detailed Behavior Specification
 
 ### Mode Behavior Matrix
@@ -104,8 +150,12 @@ public class PaginationAttribute : Attribute
 |------|-----------------|---------------------|-----------|------------------|
 | **On** | Paginate (page=1, size=50) | Honor params (≤MaxSize) | Ignore, paginate | X-Total-Count, X-Page, X-PageSize |
 | **Required** | Paginate (page=1, size=50) | Honor params (≤MaxSize) | Ignore, paginate | X-Total-Count, X-Page, X-PageSize |
-| **Optional** | Return all records | Apply pagination | Return all | X-Total-Count only if paginated |
-| **Off** | Return all records | Ignore params | Return all | No pagination headers |
+| **Optional** | Return all records (subject to global cap) | Apply pagination | Return all (subject to global cap) | X-Total-Count only if paginated |
+| **Off** | Return all records (subject to global cap) | Ignore params | Return all (subject to global cap) | No pagination headers |
+
+> **Global cap**: Even when pagination is bypassed (Optional/Off), controllers must enforce `PaginationSafetyBounds.AbsoluteMaxRecords`
+> to prevent unbounded result sets. Responses that would exceed the cap should return `413 Payload Too Large` (or a configurable
+> error) instructing clients to use pagination instead.
 
 ### Query Parameter Handling
 
@@ -215,7 +265,8 @@ public static class Data<TEntity, TKey>
     public static async Task<QueryResult<TEntity>> QueryWithCount(
         object? query,
         DataQueryOptions? options,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        int? absoluteMaxRecords = null)
     {
         var page = options?.EffectivePage(1) ?? 1;
         var pageSize = options?.EffectivePageSize(50) ?? int.MaxValue;
@@ -232,19 +283,82 @@ public static class Data<TEntity, TKey>
             };
         }
 
-        // Fallback: rely on in-memory count when adapter cannot paginate natively
-        var items = await Repo.QueryAsync(query, options, ct);
-        var totalCount = options?.HasPagination == true
-            ? await Repo.CountAsync(query, ct)
-            : items.Count;
+        if (options?.HasPagination == true)
+        {
+            // Adapter lacks native paging; emulate with double query.
+            var items = await Repo.QueryAsync(query, options, ct);
+            var totalCount = await Repo.CountAsync(query, ct);
 
+            return new QueryResult<TEntity>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize
+            };
+        }
+
+        if (absoluteMaxRecords.HasValue)
+        {
+            var totalCount = await Repo.CountAsync(query, ct);
+            if (totalCount > absoluteMaxRecords.Value)
+            {
+                return new QueryResult<TEntity>
+                {
+                    Items = Array.Empty<TEntity>(),
+                    TotalCount = totalCount,
+                    Page = 1,
+                    PageSize = 0
+                };
+            }
+
+            var items = await Repo.QueryAsync(query, options, ct);
+            return new QueryResult<TEntity>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                Page = 1,
+                PageSize = items.Count
+            };
+        }
+
+        // Legacy fallback for non-paginated requests without explicit safety bounds
+        var legacyItems = await Repo.QueryAsync(query, options, ct);
         return new QueryResult<TEntity>
         {
-            Items = items,
-            TotalCount = totalCount,
-            Page = options?.HasPagination == true ? page : 1,
-            PageSize = options?.HasPagination == true ? pageSize : items.Count
+            Items = legacyItems,
+            TotalCount = legacyItems.Count,
+            Page = 1,
+            PageSize = legacyItems.Count
         };
+    }
+}
+```
+
+> When `absoluteMaxRecords` is provided, `QueryWithCount` will short-circuit and return an empty item set if the source contains
+> more records than allowed. Controllers can use the reported `TotalCount` to emit a `413` response without materializing the fu
+> ll dataset.
+
+#### 1.4 Global Safety Bounds
+
+```csharp
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddPaginationSafetyBounds(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<PaginationSafetyBounds>(configuration.GetSection("Pagination"));
+
+        // Sensible defaults if config is missing.
+        services.PostConfigure<PaginationSafetyBounds>(bounds =>
+        {
+            bounds.MinPageSize = Math.Max(bounds.MinPageSize, 1);
+            bounds.MaxPageSize = Math.Clamp(bounds.MaxPageSize, bounds.MinPageSize, 1_000);
+            bounds.AbsoluteMaxRecords = Math.Max(bounds.AbsoluteMaxRecords, bounds.MaxPageSize);
+        });
+
+        return services;
     }
 }
 ```
@@ -265,25 +379,38 @@ public abstract class EntityController<T, TKey> : ControllerBase
     where T : class, IEntity<TKey>
     where TKey : notnull
 {
-    protected virtual PaginationAttribute GetPaginationPolicy()
+    private static readonly PaginationAttribute FrameworkDefault = new()
     {
-        // Check method-level attribute first
-        var methodInfo = ControllerContext.ActionDescriptor.MethodInfo;
-        var methodAttr = methodInfo.GetCustomAttribute<PaginationAttribute>();
-        if (methodAttr != null) return methodAttr;
+        Mode = PaginationMode.On,
+        DefaultSize = 50,
+        MaxSize = 200,
+        IncludeCount = true
+    };
 
-        // Check controller-level attribute
-        var controllerAttr = GetType().GetCustomAttribute<PaginationAttribute>();
-        if (controllerAttr != null) return controllerAttr;
+    protected virtual PaginationPolicy GetPaginationPolicy()
+    {
+        var safety = HttpContext.RequestServices
+            .GetService<IOptions<PaginationSafetyBounds>>()?.Value
+            ?? new PaginationSafetyBounds
+            {
+                MinPageSize = 1,
+                MaxPageSize = 200,
+                AbsoluteMaxRecords = 10_000
+            };
 
-        // Framework default (overridable)
-        return new PaginationAttribute
+        PaginationAttribute? ResolveAttribute()
         {
-            Mode = PaginationMode.On,
-            DefaultSize = 50,
-            MaxSize = 200,
-            IncludeCount = true
-        };
+            var methodInfo = ControllerContext.ActionDescriptor.MethodInfo;
+            var methodAttr = methodInfo.GetCustomAttribute<PaginationAttribute>();
+            if (methodAttr != null) return methodAttr;
+
+            var controllerAttr = GetType().GetCustomAttribute<PaginationAttribute>();
+            if (controllerAttr != null) return controllerAttr;
+
+            return FrameworkDefault;
+        }
+
+        return PaginationPolicy.FromAttribute(ResolveAttribute()!, safety);
     }
 
     [HttpGet]
@@ -303,14 +430,14 @@ public abstract class EntityController<T, TKey> : ControllerBase
             PaginationMode.On => await HandleOnMode(options, policy, ct),
             PaginationMode.Required => await HandleRequiredMode(options, policy, ct),
             PaginationMode.Optional => await HandleOptionalMode(options, policy, all, ct),
-            PaginationMode.Off => await HandleOffMode(options, ct),
+            PaginationMode.Off => await HandleOffMode(options, policy, ct),
             _ => throw new InvalidOperationException($"Unknown pagination mode: {policy.Mode}")
         };
     }
 
     private async Task<IActionResult> HandleOnMode(
         DataQueryOptions options,
-        PaginationAttribute policy,
+        PaginationPolicy policy,
         CancellationToken ct)
     {
         // Always paginate, but allow user to customize within limits
@@ -318,7 +445,7 @@ public abstract class EntityController<T, TKey> : ControllerBase
         var pageSize = Math.Min(options.EffectivePageSize(policy.DefaultSize), policy.MaxSize);
 
         var paginatedOptions = options.WithPagination(page, pageSize);
-        var result = await Data<T, TKey>.QueryWithCount(null, paginatedOptions, ct);
+        var result = await Data<T, TKey>.QueryWithCount(null, paginatedOptions, ct, policy.AbsoluteMaxRecords);
 
         AddPaginationHeaders(result, policy);
         return Ok(result.Items);
@@ -326,7 +453,7 @@ public abstract class EntityController<T, TKey> : ControllerBase
 
     private async Task<IActionResult> HandleRequiredMode(
         DataQueryOptions options,
-        PaginationAttribute policy,
+        PaginationPolicy policy,
         CancellationToken ct)
     {
         // Force pagination regardless of query params
@@ -334,7 +461,7 @@ public abstract class EntityController<T, TKey> : ControllerBase
         var pageSize = Math.Min(options.EffectivePageSize(policy.DefaultSize), policy.MaxSize);
 
         var paginatedOptions = options.WithPagination(page, pageSize);
-        var result = await Data<T, TKey>.QueryWithCount(null, paginatedOptions, ct);
+        var result = await Data<T, TKey>.QueryWithCount(null, paginatedOptions, ct, policy.AbsoluteMaxRecords);
 
         AddPaginationHeaders(result, policy);
         return Ok(result.Items);
@@ -342,7 +469,7 @@ public abstract class EntityController<T, TKey> : ControllerBase
 
     private async Task<IActionResult> HandleOptionalMode(
         DataQueryOptions options,
-        PaginationAttribute policy,
+        PaginationPolicy policy,
         bool? all,
         CancellationToken ct)
     {
@@ -353,7 +480,7 @@ public abstract class EntityController<T, TKey> : ControllerBase
             var pageSize = Math.Min(options.EffectivePageSize(policy.DefaultSize), policy.MaxSize);
 
             var paginatedOptions = options.WithPagination(page, pageSize);
-            var result = await Data<T, TKey>.QueryWithCount(null, paginatedOptions, ct);
+            var result = await Data<T, TKey>.QueryWithCount(null, paginatedOptions, ct, policy.AbsoluteMaxRecords);
 
             AddPaginationHeaders(result, policy);
             return Ok(result.Items);
@@ -361,25 +488,44 @@ public abstract class EntityController<T, TKey> : ControllerBase
         else
         {
             // Return all records
-            var result = await Data<T, TKey>.QueryWithCount(null, null, ct);
+            var capped = await Data<T, TKey>.QueryWithCount(null, null, ct, policy.AbsoluteMaxRecords);
+
+            if (capped.TotalCount > policy.AbsoluteMaxRecords)
+            {
+                return StatusCode(StatusCodes.Status413PayloadTooLarge, new
+                {
+                    error = "Result too large",
+                    message = $"This endpoint allows at most {policy.AbsoluteMaxRecords} records without pagination."
+                });
+            }
 
             if (policy.IncludeCount)
             {
-                Response.Headers.Add("X-Total-Count", result.TotalCount.ToString());
+                Response.Headers.Add("X-Total-Count", capped.TotalCount.ToString());
             }
 
-            return Ok(result.Items);
+            return Ok(capped.Items);
         }
     }
 
-    private async Task<IActionResult> HandleOffMode(DataQueryOptions options, CancellationToken ct)
+    private async Task<IActionResult> HandleOffMode(DataQueryOptions options, PaginationPolicy policy, CancellationToken ct)
     {
         // Never paginate - always return all
-        var items = await Data<T, TKey>.All(ct);
-        return Ok(items);
+        var result = await Data<T, TKey>.QueryWithCount(null, null, ct, policy.AbsoluteMaxRecords);
+
+        if (result.TotalCount > policy.AbsoluteMaxRecords)
+        {
+            return StatusCode(StatusCodes.Status413PayloadTooLarge, new
+            {
+                error = "Result too large",
+                message = $"This endpoint must remain under the {policy.AbsoluteMaxRecords} record cap or enable pagination."
+            });
+        }
+
+        return Ok(result.Items);
     }
 
-    private void AddPaginationHeaders(QueryResult<T> result, PaginationAttribute policy)
+    private void AddPaginationHeaders(QueryResult<T> result, PaginationPolicy policy)
     {
         Response.Headers.Add("X-Page", result.Page.ToString());
         Response.Headers.Add("X-Page-Size", result.PageSize.ToString());
@@ -448,6 +594,18 @@ public class PaginationOperationFilter : IOperationFilter
 }
 ```
 
+## Feasibility & Risk Assessment
+
+| Area | Risk | Mitigation |
+|------|------|------------|
+| Repository adapters | `QueryWithCount` requires the new `IPagedRepository` path to avoid double-querying large datasets. Some adapters may lack efficient paging. | Provide a shared helper that emulates paging via SQL `OFFSET/FETCH` for relational providers, document the fallback cost, and gate GA on adapters implementing the optimized path. |
+| Attribute handling | ASP.NET caches attribute instances; mutating them at runtime would cause cross-request bleeding. | Introduce `PaginationPolicy` snapshots constructed per request (see "Runtime Policy Snapshot"), keeping attributes read-only. |
+| Optional/Off defaults | Returning unbounded datasets can exhaust memory and bandwidth. | Enforce `PaginationSafetyBounds.AbsoluteMaxRecords` and surface explicit 413 errors when callers bypass pagination. Provide environment-wide defaults via `IOptions<PaginationSafetyBounds>`. |
+| Complexity creep | Five modes + multiple knobs can confuse teams. | Deliver curated presets in documentation, add analyzers that warn on risky combinations, and keep Optional/Off opt-in with guardrails. |
+| Delivery scope | Proposal spans controllers, data layer, OpenAPI, tooling, and tests. Risk of overcommitting for a single release. | Stage work per phases, prioritize core runtime + repo support for v2.0, and mark OpenAPI/tooling as stretch if schedule slips. |
+
+> **Honest take:** The design is desirable and achievable, but only if we invest early in repository adapter support and keep Optional/Off firmly guarded. Without those pieces, we risk reintroducing unsafe defaults under a new banner.
+
 ## Usage Examples
 
 ### Example Controllers
@@ -479,7 +637,7 @@ public class CountriesController : EntityController<Country>
 [Pagination(Mode = Optional, DefaultSize = 50, MaxSize = 500)]
 public class UsersController : EntityController<User>
 {
-    // GET /api/users returns ALL users (dangerous but explicit)
+    // GET /api/users returns all users up to the global cap (explicit opt-out)
     // GET /api/users?page=1 returns paginated results
 
     // Method-level override for admin endpoint
