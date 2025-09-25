@@ -1,0 +1,33 @@
+networks:
+  Koan_internal:
+    internal: true
+  Koan_external: {}
+
+services:
+  mongo:
+    image: "mongo:7"
+    ports:
+      - "35500:27017"
+    volumes:
+      - ./Data/mongo:/data/db
+    networks:
+      - Koan_internal
+  weaviate:
+    image: "semitechnologies/weaviate:1.25.6"
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      CLUSTER_HOSTNAME: "node1"
+      RAFT_BOOTSTRAP_EXPECT: "1"
+    volumes:
+      - ./Data/weaviate:/var/lib/weaviate
+    networks:
+      - Koan_internal
+  ollama:
+    image: "ollama/ollama:latest"
+    volumes:
+      - ./Data/ollama:/root/.ollama
+    networks:
+      - Koan_internal

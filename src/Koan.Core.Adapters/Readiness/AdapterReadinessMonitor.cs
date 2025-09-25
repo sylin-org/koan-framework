@@ -1,6 +1,7 @@
 using Koan.Core.Observability.Health;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Core.Adapters;
 
@@ -16,12 +17,12 @@ internal sealed class AdapterReadinessMonitor : IHostedService
         IEnumerable<IAdapterReadiness> adapters,
         IHealthAggregator aggregator,
         ILogger<AdapterReadinessMonitor> logger,
-        AdaptersReadinessOptions options)
+        IOptions<AdaptersReadinessOptions> options)
     {
         _adapters = adapters;
         _aggregator = aggregator;
         _logger = logger;
-        _options = options;
+        _options = options.Value;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)

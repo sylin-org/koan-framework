@@ -22,8 +22,8 @@ public static class MongoRegistration
         // Ensure health contributor is available even outside Koan bootstrap
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
         services.AddSingleton<MongoClientProvider>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAsyncAdapterInitializer>(sp => sp.GetRequiredService<MongoClientProvider>()));
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAdapterReadiness>(sp => sp.GetRequiredService<MongoClientProvider>()));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAsyncAdapterInitializer, MongoClientProvider>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAdapterReadiness, MongoClientProvider>());
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
         return services;
     }

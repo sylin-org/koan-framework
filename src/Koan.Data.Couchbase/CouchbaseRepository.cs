@@ -105,7 +105,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     public bool EnableReadinessGating => _options.Readiness.EnableReadinessGating;
 
     private Task<TResult> ExecuteWithReadinessAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct)
-        => this.WithReadinessAsync(operation, ct);
+        => this.WithReadinessAsync<TResult, TEntity>(operation, ct);
 
     private Task ExecuteWithReadinessAsync(Func<Task> operation, CancellationToken ct)
         => this.WithReadinessAsync(operation, ct);

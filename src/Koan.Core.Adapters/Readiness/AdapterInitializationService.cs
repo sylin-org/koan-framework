@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Core.Adapters;
 
@@ -59,9 +60,9 @@ internal sealed class DefaultRetryPolicyProvider : IRetryPolicyProvider
     private readonly AdaptersReadinessOptions _options;
     private readonly ILoggerFactory _loggerFactory;
 
-    public DefaultRetryPolicyProvider(AdaptersReadinessOptions options, ILoggerFactory loggerFactory)
+    public DefaultRetryPolicyProvider(IOptions<AdaptersReadinessOptions> options, ILoggerFactory loggerFactory)
     {
-        _options = options;
+        _options = options.Value;
         _loggerFactory = loggerFactory;
     }
 

@@ -11,6 +11,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Core.Configuration;
+using Koan.Data.Core.Extensions;
 using Koan.Data.Core.Optimization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -92,7 +93,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     public bool EnableReadinessGating => _options.CurrentValue.Readiness.EnableReadinessGating;
 
     private Task<TResult> ExecuteWithReadinessAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct)
-        => this.WithReadinessAsync(operation, ct);
+        => this.WithReadinessAsync<TResult, TEntity>(operation, ct);
 
     private Task ExecuteWithReadinessAsync(Func<Task> operation, CancellationToken ct)
         => this.WithReadinessAsync(operation, ct);
@@ -170,13 +171,6 @@ internal sealed class MongoRepository<TEntity, TKey> :
         }
     }
 
-    private (int DefaultPageSize, int MaxPageSize) GetPagingGuardrails()
-    {
-        var snapshot = _options.CurrentValue;
-        var defaultPageSize = snapshot.DefaultPageSize > 0 ? snapshot.DefaultPageSize : 50;
-        var maxPageSize = snapshot.MaxPageSize > 0 ? snapshot.MaxPageSize : 200;
-        return (defaultPageSize, maxPageSize);
-    }
 
     public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
@@ -204,25 +198,13 @@ internal sealed class MongoRepository<TEntity, TKey> :
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            var (defaultPageSize, maxPageSize) = GetPagingGuardrails();
+            var (defaultPageSize, maxPageSize) = _options.CurrentValue.GetPagingGuardrails();
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            var cursor = collection.Find(Builders<TEntity>.Filter.Empty);
 
-            // Convert Page/PageSize to Skip/Take for MongoDB driver
-            if (options is { Page: > 0, PageSize: > 0 })
-            {
-                var skip = (options.Page.Value - 1) * options.PageSize.Value;
-                cursor = cursor.Skip(skip);
-                cursor = cursor.Limit((int)Math.Min(options.PageSize.Value, maxPageSize));
-            }
-            else if (options is { PageSize: > 0 })
-            {
-                cursor = cursor.Limit((int)Math.Min(options.PageSize.Value, maxPageSize));
-            }
-            else if (options is null)
-            {
-                cursor = cursor.Limit(defaultPageSize);
-            }
+            // Use centralized query extension for paging
+            var cursor = collection.Find(Builders<TEntity>.Filter.Empty)
+                .ApplyPaging(options, defaultPageSize, maxPageSize,
+                    (c, skip, take) => c.Skip(skip).Limit(take));
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
             return (IReadOnlyList<TEntity>)results;
@@ -237,25 +219,13 @@ internal sealed class MongoRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var (defaultPageSize, maxPageSize) = GetPagingGuardrails();
+            var (defaultPageSize, maxPageSize) = _options.CurrentValue.GetPagingGuardrails();
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            var cursor = collection.Find(predicate);
 
-            // Convert Page/PageSize to Skip/Take for MongoDB driver
-            if (options is { Page: > 0, PageSize: > 0 })
-            {
-                var skip = (options.Page.Value - 1) * options.PageSize.Value;
-                cursor = cursor.Skip(skip);
-                cursor = cursor.Limit((int)Math.Min(options.PageSize.Value, maxPageSize));
-            }
-            else if (options is { PageSize: > 0 })
-            {
-                cursor = cursor.Limit((int)Math.Min(options.PageSize.Value, maxPageSize));
-            }
-            else if (options is null)
-            {
-                cursor = cursor.Limit(defaultPageSize);
-            }
+            // Use centralized query extension for paging
+            var cursor = collection.Find(predicate)
+                .ApplyPaging(options, defaultPageSize, maxPageSize,
+                    (c, skip, take) => c.Skip(skip).Limit(take));
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
             return (IReadOnlyList<TEntity>)results;

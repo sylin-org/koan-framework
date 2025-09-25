@@ -9,45 +9,52 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Koan.Core;
 using Koan.Core.Adapters;
+using Koan.Core.Adapters.Configuration;
 using Koan.Core.Orchestration;
 
 namespace Koan.Data.Mongo;
 
 /// <summary>
 /// Orchestration-aware MongoDB configuration using centralized service discovery.
-/// Replaces custom auto-detection with unified Koan orchestration patterns.
+/// Inherits from AdapterOptionsConfigurator to eliminate configuration duplication.
 /// </summary>
-internal sealed class MongoOptionsConfigurator(
-    IConfiguration config,
-    ILogger<MongoOptionsConfigurator> logger,
-    IOptions<AdaptersReadinessOptions> readinessOptions) : IConfigureOptions<MongoOptions>
+internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<MongoOptions>
 {
-    private readonly AdaptersReadinessOptions _readinessDefaults = readinessOptions.Value;
+    protected override string ProviderName => "Mongo";
 
-    public void Configure(MongoOptions options)
+    public MongoOptionsConfigurator(
+        IConfiguration config,
+        ILogger<MongoOptionsConfigurator> logger,
+        IOptions<AdaptersReadinessOptions> readinessOptions)
+        : base(config, logger, readinessOptions)
     {
-        logger.LogInformation("MongoDB Orchestration-Aware Configuration Started");
-        logger.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
+    }
+
+    protected override void ConfigureProviderSpecific(MongoOptions options)
+    {
+        Logger?.LogInformation("MongoDB Orchestration-Aware Configuration Started");
+        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
             KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        logger.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Database: '{Database}'",
+        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Database: '{Database}'",
             options.ConnectionString, options.Database);
 
-        var databaseName = Configuration.ReadFirst(config, "KoanAspireDemo",
+        // MongoDB-specific configuration
+        var databaseName = ReadProviderConfiguration(options.Database,
             "Koan:Data:Mongo:Database",
             "Koan:Data:Database",
             "ConnectionStrings:Database");
 
-        var username = Configuration.ReadFirst(config, "",
+        var username = ReadProviderConfiguration("",
             "Koan:Data:Mongo:Username",
             "Koan:Data:Username");
 
-        var password = Configuration.ReadFirst(config, "",
+        var password = ReadProviderConfiguration("",
             "Koan:Data:Mongo:Password",
             "Koan:Data:Password");
 
-        var serviceDiscovery = new OrchestrationAwareServiceDiscovery(config, null);
+        var serviceDiscovery = new OrchestrationAwareServiceDiscovery(Configuration, null);
 
-        var explicitConnectionString = Configuration.ReadFirst(config, "",
+        var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
             Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
@@ -55,71 +62,30 @@ internal sealed class MongoOptionsConfigurator(
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            logger.LogInformation("Using explicit connection string from configuration");
+            Logger?.LogInformation("Using explicit connection string from configuration");
             options.ConnectionString = explicitConnectionString;
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            logger.LogInformation("Auto-detection mode - using orchestration-aware service discovery");
-            options.ConnectionString = ResolveOrchestrationAwareConnection(serviceDiscovery, databaseName, username, password, logger);
+            Logger?.LogInformation("Auto-detection mode - using orchestration-aware service discovery");
+            options.ConnectionString = ResolveOrchestrationAwareConnection(serviceDiscovery, databaseName, username, password, Logger);
         }
         else
         {
-            logger.LogInformation("Using pre-configured connection string");
+            Logger?.LogInformation("Using pre-configured connection string");
         }
 
-        options.Database = Configuration.ReadFirst(
-            config,
-            defaultValue: options.Database,
+        options.Database = ReadProviderConfiguration(options.Database,
             Infrastructure.Constants.Configuration.Keys.Database,
             Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
-        options.DefaultPageSize = Configuration.ReadFirst(
-            config,
-            defaultValue: options.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        options.MaxPageSize = Configuration.ReadFirst(
-            config,
-            defaultValue: options.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-
         options.ConnectionString = NormalizeConnectionString(options.ConnectionString);
 
-        var policyStr = Configuration.ReadFirst(config, options.Readiness.Policy.ToString(),
-            "Koan:Data:Mongo:Readiness:Policy");
-        if (Enum.TryParse<ReadinessPolicy>(policyStr, out var policy))
-        {
-            options.Readiness.Policy = policy;
-        }
-
-        var timeoutSecondsStr = Configuration.ReadFirst(config, ((int)options.Readiness.Timeout.TotalSeconds).ToString(),
-            "Koan:Data:Mongo:Readiness:Timeout");
-        if (int.TryParse(timeoutSecondsStr, out var timeoutSeconds) && timeoutSeconds > 0)
-        {
-            var readinessTimeout = TimeSpan.FromSeconds(timeoutSeconds);
-            options.Readiness.Timeout = readinessTimeout;
-        }
-        else if (options.Readiness.Timeout <= TimeSpan.Zero)
-        {
-            options.Readiness.Timeout = _readinessDefaults.DefaultTimeout;
-        }
-
-        options.Readiness.EnableReadinessGating = Configuration.Read(config,
-            "Koan:Data:Mongo:Readiness:EnableReadinessGating",
-            options.Readiness.EnableReadinessGating);
-
-        if (options.Readiness.Timeout <= TimeSpan.Zero)
-        {
-            options.Readiness.Timeout = _readinessDefaults.DefaultTimeout;
-        }
-
-        logger.LogInformation("Final MongoDB Configuration");
-        logger.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        logger.LogInformation("Database: {Database}", options.Database);
-        logger.LogInformation("MongoDB Orchestration-Aware Configuration Complete");
+        Logger?.LogInformation("Final MongoDB Configuration");
+        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
+        Logger?.LogInformation("Database: {Database}", options.Database);
+        Logger?.LogInformation("MongoDB Orchestration-Aware Configuration Complete");
     }
 
     private string ResolveOrchestrationAwareConnection(
@@ -127,13 +93,13 @@ internal sealed class MongoOptionsConfigurator(
         string? databaseName,
         string? username,
         string? password,
-        ILogger logger)
+        ILogger? logger)
     {
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger.LogInformation("Auto-detection disabled via configuration - using localhost");
+                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
                 return BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
             }
 
@@ -153,27 +119,27 @@ internal sealed class MongoOptionsConfigurator(
             var discoveryTask = serviceDiscovery.DiscoverServiceAsync("mongodb", discoveryOptions);
             var result = discoveryTask.GetAwaiter().GetResult();
 
-            logger.LogInformation("MongoDB discovered via {Method}: {ServiceUrl}",
+            logger?.LogInformation("MongoDB discovered via {Method}: {ServiceUrl}",
                 result.DiscoveryMethod, result.ServiceUrl);
 
             if (!result.IsHealthy && discoveryOptions.HealthCheck?.Required == true)
             {
-                logger.LogWarning("Discovered MongoDB service failed health check but proceeding anyway");
+                logger?.LogWarning("Discovered MongoDB service failed health check but proceeding anyway");
             }
 
             return result.ServiceUrl;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error in orchestration-aware MongoDB discovery, falling back to localhost");
+            logger?.LogError(ex, "Error in orchestration-aware MongoDB discovery, falling back to localhost");
             return BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
         }
     }
 
     private bool IsAutoDetectionDisabled()
     {
-        return Configuration.Read(config, "Koan:Data:Mongo:DisableAutoDetection", false)
-               || Configuration.Read(config, "Koan_DATA_MONGO_DISABLE_AUTO_DETECTION", false);
+        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Mongo:DisableAutoDetection", false)
+               || Koan.Core.Configuration.Read(Configuration, "Koan_DATA_MONGO_DISABLE_AUTO_DETECTION", false);
     }
 
     private string[] GetAdditionalCandidatesFromEnvironment()
@@ -226,6 +192,4 @@ internal sealed class MongoOptionsConfigurator(
             return false;
         }
     }
-
-    // Container detection uses KoanEnv static runtime snapshot per ADR-0039
 }
