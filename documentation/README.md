@@ -13,7 +13,7 @@ Welcome to the complete Koan Framework documentation. This restructured document
 ## Reference Documentation
 
 ### Core Framework Components
-- **[Core](reference/core/)** - Foundation, auto-registration, health checks
+- **[Core](reference/core/)** - Foundation, auto-registration, semantic streaming pipelines
 - **[Data](reference/data/)** - Entities, providers, queries, multi-storage
 - **[Web](reference/web/)** - Controllers, authentication, GraphQL, HTTP
 - **[AI](reference/ai/)** - Chat, embeddings, vector search, RAG patterns
@@ -30,6 +30,7 @@ Welcome to the complete Koan Framework documentation. This restructured document
 - **[Building APIs](guides/building-apis.md)** - REST and GraphQL API development
 - **[Authentication Setup](guides/authentication-setup.md)** - OIDC, SAML, multi-provider auth
 - **[Data Modeling](guides/data-modeling.md)** - Entity design, relationships, providers
+- **[Semantic Pipelines](guides/semantic-pipelines.md)** - Streaming data processing with AI integration
 - **[Performance Optimization](guides/performance.md)** - Query optimization, caching, scaling
 - **[Testing Patterns](guides/testing.md)** - Unit, integration, and end-to-end testing
 - **[Container Deployment](guides/deployment.md)** - Docker, Compose, orchestration
@@ -94,8 +95,9 @@ Welcome to the complete Koan Framework documentation. This restructured document
 
 ### **Adding AI Features?**
 1. [AI Integration Guide](guides/ai-integration.md)
-2. [AI Reference](reference/ai/)
-3. [Performance Optimization](guides/performance.md)
+2. [Semantic Pipelines](guides/semantic-pipelines.md)
+3. [AI Reference](reference/ai/)
+4. [Performance Optimization](guides/performance.md)
 
 ### **Going to Production?**
 1. [Container Deployment](guides/deployment.md)
