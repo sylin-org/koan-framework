@@ -10,8 +10,6 @@ namespace S13.DocMind.Models;
 /// Represents a processed fragment of a source document along with structured payloads and insight references.
 /// Supports multi-modal annotations, semantic tagging, and vector enrichment for retrieval workflows.
 /// </summary>
-[DataAdapter("mongodb")]
-[Table("document_chunks")]
 [McpEntity(Name = "document-chunks", Description = "Chunked text and diagram excerpts derived from source documents.")]
 public sealed class DocumentChunk : Entity<DocumentChunk>
 {

@@ -11,8 +11,6 @@ namespace S13.DocMind.Models;
 /// Represents an uploaded source document with rich processing metadata and storage references.
 /// Mirrors the blueprint entity with explicit adapter/table mappings for relational persistence.
 /// </summary>
-[DataAdapter("postgresql")]
-[Table("source_documents")]
 [McpEntity(Name = "source-documents", Description = "Uploaded documents pending or completing DocMind analysis.")]
 public sealed class SourceDocument : Entity<SourceDocument>
 {

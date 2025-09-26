@@ -1,5 +1,8 @@
 # S13.DocMind: AI-Native Document Intelligence Platform
 
+> **⚠️ IMPLEMENTATION STATUS NOTICE**
+> This README describes the **DESIRED STATE** and vision for S13.DocMind. The current implementation is **~30-40% complete** with many AI features existing as facades or placeholders. See [Honest Feature Assessment](docs/chunks/S13-DocMind/HONEST_FEATURE_ASSESSMENT.md) for detailed gap analysis.
+
 **S13.DocMind** is a guided sample showcasing how the Koan Framework integrates data, AI, and web capabilities to build an AI-native document intelligence experience. This sample demonstrates entity-first development, multi-provider architecture, and sophisticated AI-powered document analysis.
 
 ## 🌟 Key Features

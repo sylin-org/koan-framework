@@ -2,78 +2,77 @@
 
 ### 1. Guiding Principles
 
-- **Lightweight orchestration**: Retain the hosted worker + channel queue architecture introduced previously; avoid Flow dependencies while still modelling explicit stages and retries.
+- **Simple hosted services**: Use standard `BackgroundService` patterns for document processing; avoid channel queues and complex orchestration.
 - **Composable services**: Split the current monolithic analysis service into focused collaborators that map 1:1 with the new domain models.
-- **Provider-agnostic**: Rely on Koan AI abstractions (`AI.Prompt`, `AI.VisionPrompt`, `AI.Embed`) and storage helpers so switching between Ollama/OpenAI or different OCR providers is configuration-only.
+- **Single AI provider**: Rely on Ollama with multiple model support through Koan AI abstractions (`AI.Prompt`, `AI.VisionPrompt`, `AI.Embed`).
 - **Observable by default**: Emit `DocumentProcessingEvent` entries for every stage transition and surface them via API + MCP tools for debugging and UX timelines.
 
 ### 2. Proposed Processing Components
 
 | Component | Responsibility | Key Dependencies | Notes |
 |-----------|----------------|------------------|-------|
-| `DocumentIntakeService` | Streams uploads, hashes content, enqueues work items | Koan storage, `Channel<DocumentWorkItem>` | Returns `DocumentUploadReceipt` for UI immediate feedback. |
-| `DocumentAnalysisPipeline` (Hosted Service) | Background worker that drives staged processing | `System.Threading.Channels`, `ILogger`, Koan AI | Handles batching, retries, and concurrency throttle. |
+| `DocumentProcessor` | Main document processing orchestrator | Koan AI, storage providers | Single hosted service handling document lifecycle. |
 | `TextExtractionService` | Extracts textual content from PDFs, DOCX, text, images | PdfPig, OpenXML, OCR provider | Writes `DocumentChunk` records and updates `Summary`. |
-| `VisionInsightService` | Runs `AI.VisionPrompt` for diagrams/screenshots | Koan AI Vision, optional caching | Produces `DocumentInsight` entries flagged as `Vision`. |
+| `VisionInsightService` | Runs `AI.VisionPrompt` for diagrams/screenshots | Koan AI Vision | Produces `DocumentInsight` entries flagged as `Vision`. |
 | `InsightSynthesisService` | Generates structured facts from text chunks | Koan AI text models | Operates per chunk, merges into summary. |
 | `TemplateSuggestionService` | Suggests `SemanticTypeProfile` matches | Koan embeddings + Weaviate adapter | Falls back to lexical heuristics when embeddings disabled. |
-| `InsightAggregationService` | Builds multi-document `InsightCollection` | Koan AI prompt templates | Supports workspace-level intelligence scenarios. |
+| `DocumentProcessingWorker` (Hosted Service) | Background worker monitoring for new documents | `ILogger`, Koan AI | Simple polling-based processing without channels. |
 
-### 3. Pipeline Flow
+### 3. Processing Flow
 
-1. **Upload** – `DocumentsController.Upload` validates file size/type, streams to storage, creates `SourceDocument`, and posts a `DocumentWorkItem` containing the document ID and optional assigned profile.
-2. **Queue Intake** – `DocumentIntakeService` writes a `DocumentProcessingEvent` (`Stage = Upload`, `Status = Queued`) and places work on `Channel<DocumentWorkItem>`.
-3. **Extraction Stage**
-   - Pipeline fetches work; `TextExtractionService` resolves the storage object, extracts text, and creates ordered `DocumentChunk` entities.
-   - Updates `SourceDocument.Summary.TextExtracted = true` and records event `Stage = ExtractText` with metrics (duration, byte count).
-4. **Insight Stage**
-   - For each chunk, `InsightSynthesisService` executes a templated `AI.Prompt` deriving structured facts; persists `DocumentInsight` and updates chunk references.
-   - `VisionInsightService` runs for image files, using `AI.VisionPrompt` with diagram-specific instructions; stores insights tagged `Channel = Vision`.
-5. **Template Suggestion**
-   - `TemplateSuggestionService` computes embeddings for the document (averaged from chunks) and queries Weaviate. If disabled, fallback heuristics use TF-IDF and metadata.
-   - Suggestion stored in `SourceDocument.Summary.AutoClassificationConfidence` and appended to processing events.
-6. **Aggregation & Completion**
-   - `InsightAggregationService` optionally produces a consolidated summary (`PrimaryFindings`), ensures `SourceDocument.Status = Completed`, emits final event, and publishes a Koan domain notification for UI/webhooks.
+1. **Upload** – `DocumentsController.Upload` validates file size/type, streams to storage, creates `SourceDocument` with status `Uploaded`.
+2. **Background Detection** – `DocumentProcessingWorker` polls for documents with status `Uploaded` and triggers processing.
+3. **Processing Orchestration** – `DocumentProcessor` handles the complete workflow:
+   - **Text Extraction**: `TextExtractionService` extracts content and creates `DocumentChunk` entities
+   - **Vision Analysis**: `VisionInsightService` analyzes images using `AI.VisionPrompt`
+   - **Insight Generation**: `InsightSynthesisService` generates structured insights per chunk
+   - **Template Suggestion**: `TemplateSuggestionService` suggests matching semantic types
+   - **Status Updates**: Updates `SourceDocument.Status` and creates `DocumentProcessingEvent` entries
+4. **Completion** – Sets `SourceDocument.Status = Completed` and updates summary information.
 
 ### 4. Refactoring Steps
 
-1. **Establish Work Item Contract**
-   - Define `DocumentWorkItem` (`DocumentId`, `AssignedProfileId`, `RetryCount`, `TraceId`).
-   - Configure DI to register a singleton `Channel<DocumentWorkItem>` with bounded capacity derived from configuration (`Processing:QueueLimit`).
+1. **Background Worker Implementation**
+   - Implement `DocumentProcessingWorker : BackgroundService` that polls for documents with status `Uploaded`
+   - Use simple timer-based polling instead of complex channel orchestration
+   - Record `DocumentProcessingEvent` entries for each processing stage
 
-2. **Hosted Pipeline**
-   - Implement `DocumentAnalysisPipeline : BackgroundService`; pull items using `ReadAllAsync`, wrap each stage in try/catch with exponential backoff and max retries from configuration.
-   - Record `DocumentProcessingEvent` before and after each stage, capturing metrics and errors.
+2. **Document Processor Service**
+   - Create `DocumentProcessor` as the main orchestration service
+   - Handle complete document lifecycle from upload to completion
+   - Coordinate all extraction, analysis, and insight generation services
 
 3. **Service Composition**
-   - Move extraction helpers into dedicated classes. Each service exposes async methods returning strongly typed DTOs (`ExtractionResult`, `InsightBatch`, `TemplateSuggestion`).
-   - Register services via `S13DocMindRegistrar` so `Program.cs` simply calls `builder.Services.AddKoan().AddDocMind();`.
+   - Move extraction helpers into dedicated classes with clear responsibilities
+   - Each service exposes async methods returning strongly typed DTOs (`ExtractionResult`, `InsightBatch`, `TemplateSuggestion`)
+   - Register services via `KoanAutoRegistrar` for automatic discovery
 
-4. **AI Prompt Strategy**
-   - Store canonical prompt fragments in `SemanticTypeProfile.Prompt` and `TemplateExtractionSchema`.
-   - Provide default fallback prompts for unassigned documents in the registrar.
-   - Ensure all AI calls set model + temperature via configuration keys (`Ai:DefaultModel`, `Ai:VisionModel`).
+4. **AI Integration Strategy**
+   - Store canonical prompt fragments in `SemanticTypeProfile.Prompt` and `TemplateExtractionSchema`
+   - Use single Ollama provider with multiple model support via configuration
+   - Configure models via `DocMind:Ai:DefaultModel` and `DocMind:Ai:VisionModel`
 
 5. **Observability Enhancements**
-   - Emit structured logs with `LoggerMessage` source generators for each stage.
-   - Publish OpenTelemetry spans (`ActivitySource`) around long-running AI calls.
-   - Surface `DocumentProcessingEvent` query endpoints (`GET /api/documents/{id}/timeline`).
+   - Emit structured logs with `LoggerMessage` source generators for each stage
+   - Publish OpenTelemetry spans around long-running AI calls
+   - Surface `DocumentProcessingEvent` query endpoints for debugging
 
-6. **Error Handling & Retries**
-   - Distinguish between transient (`HttpRequestException`, `TaskCanceledException`) and terminal errors; push transient failures back onto the channel with incremented `RetryCount`.
-   - If retries exceed configured limit, set `SourceDocument.Status = Failed` and record the error payload for UI display.
+6. **Error Handling**
+   - Simple retry logic with configurable retry counts
+   - Set `SourceDocument.Status = Failed` for terminal errors
+   - Record error details in `DocumentProcessingEvent` entries
 
 7. **Performance Optimizations**
-   - Batch embedding generation by accumulating chunk texts and issuing a single `AI.Embed()` call per document.
-   - Cache OCR results for repeated images using storage object hash as key.
-   - Allow pipeline parallelism via configuration (`Processing:MaxDegreeOfParallelism`) controlling the number of concurrent document tasks.
+   - Batch embedding generation for efficient AI calls
+   - Cache OCR results using storage object hash as key
+   - Configure processing concurrency via `DocMind:Processing:MaxConcurrency`
 
 ### 5. Opportunities for Developer Experience Improvements
 
-- **Replay tooling**: Provide a CLI (`dotnet run -- project S13.DocMind replay --document <id>`) that pushes a historical document back onto the queue, simplifying demos.
+- **Replay tooling**: Provide a CLI (`dotnet run -- project S13.DocMind replay --document <id>`) that resets document status to trigger reprocessing.
 - **Simulation fixtures**: Ship sample PDF/DOCX/PNG fixtures plus an integration test harness that invokes the pipeline end-to-end using in-memory storage providers.
 - **Prompt playground**: Expose a protected `/api/templates/{id}/prompt-test` endpoint that executes a dry-run prompt against a chosen chunk, enabling quick iteration without rerunning the full pipeline.
-- **MCP automation**: Implement an MCP tool `docmind.process` that enqueues documents via the same work item contract, showcasing how Koan MCP integrates with background processing.
+- **MCP automation**: Implement MCP tools that trigger document processing and retrieve insights, showcasing how Koan MCP integrates with background services.
 
 ### 6. UI Alignment Notes
 
@@ -81,4 +80,4 @@
 - Provide chunk-level insight display with lazy loading (`GET /api/documents/{id}/chunks?includeInsights=true`).
 - Surface template suggestions in a dedicated side panel, supporting “accept suggestion” actions that call `POST /api/documents/{id}/assign-profile`.
 
-This plan keeps orchestration lightweight while showcasing Koan’s AI capabilities, resilience patterns, and observability in a way that aligns with the minimal stack requirement.
+This plan keeps orchestration simple using standard hosted services while showcasing Koan's AI capabilities and observability in a way that aligns with the minimal stack requirement.

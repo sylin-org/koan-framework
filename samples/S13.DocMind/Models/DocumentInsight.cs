@@ -10,8 +10,6 @@ namespace S13.DocMind.Models;
 /// Represents an extracted insight from a processed document or chunk.
 /// Carries schema-aware payloads, cross references, and vector annotations for retrieval.
 /// </summary>
-[DataAdapter("mongodb")]
-[Table("document_insights")]
 [McpEntity(Name = "document-insights", Description = "Structured findings, summaries, and risk highlights for DocMind documents.")]
 public sealed class DocumentInsight : Entity<DocumentInsight>
 {

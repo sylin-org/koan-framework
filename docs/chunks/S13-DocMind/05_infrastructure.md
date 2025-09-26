@@ -16,13 +16,12 @@
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services
-    .AddKoan(options =>
-    {
-        options.EnableMcp = true;
-        options.McpTransports = McpTransports.Stdio | McpTransports.HttpSse;
-    })
-    .AddDocMind(); // extension provided by the registrar below
+builder.Services.AddKoan(options =>
+{
+    options.EnableMcp = true;
+    options.McpTransports = McpTransports.Stdio | McpTransports.HttpSse;
+})
+.AddKoanMcp(); // Only framework modules get Add*() methods
 
 builder.Services.AddControllers();
 
@@ -30,45 +29,41 @@ var app = builder.Build();
 app.UseRouting();
 app.UseAuthorization();
 app.MapControllers();
-app.UseKoanMcp();
+app.MapKoanMcpEndpoints();
 app.Run();
 ```
 
-`AddDocMind()` is the new extension method that wires up all domain services, hosted workers, and options.
+All DocMind services are auto-discovered via `KoanAutoRegistrar` - no manual registration required. Data adapters and table mappings are resolved automatically by the Koan Framework based on available providers.
 
-### 3. Auto-Registrar Structure
+### 3. KoanAutoRegistrar Implementation
 
 ```csharp
-public static class DocMindServiceCollectionExtensions
-
+// /Initialization/KoanAutoRegistrar.cs
+public sealed class KoanAutoRegistrar : IKoanInitializer
 {
-    public static IServiceCollection AddDocMind(this IServiceCollection services)
+    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton(Channel.CreateBounded<DocumentWorkItem>(new BoundedChannelOptions(100)
-        {
-            FullMode = BoundedChannelFullMode.Wait
-        }));
-
-        services.AddScoped<DocumentIntakeService>();
+        // Core processing services
+        services.AddScoped<DocumentProcessor>();
+        services.AddScoped<DocumentAnalysisService>();
         services.AddScoped<TextExtractionService>();
         services.AddScoped<VisionInsightService>();
         services.AddScoped<InsightSynthesisService>();
         services.AddScoped<TemplateSuggestionService>();
-        services.AddScoped<InsightAggregationService>();
-        services.AddScoped<TemplateGeneratorService>();
 
-        services.AddHostedService<DocumentAnalysisPipeline>();
+        // Background workers
+        services.AddHostedService<DocumentProcessingWorker>();
 
-        services.AddOptions<DocumentProcessingOptions>()
-            .BindConfiguration("DocMind:Processing")
+        // Configuration binding
+        services.AddOptions<DocMindOptions>()
+            .BindConfiguration("DocMind")
             .ValidateDataAnnotations();
 
         services.AddOptions<StorageOptions>()
             .BindConfiguration("DocMind:Storage");
 
-        services.AddSingleton<IConfigureOptions<AiOptions>, ConfigureDocMindAiOptions>();
-
-        return services;
+        services.AddOptions<AiOptions>()
+            .BindConfiguration("DocMind:Ai");
     }
 }
 ```
@@ -82,7 +77,15 @@ public static class DocMindServiceCollectionExtensions
 | `DocMind:Vision` | Toggle vision processing | `Enabled`, `Model`, `MaxImagePixels` |
 | `DocMind:Embedding` | Embedding provider configuration | `Provider=Weaviate`, `Endpoint`, `ApiKey` |
 
-Use Koan’s capability detection to disable features when providers are unavailable (e.g., skip embeddings when Weaviate container is stopped).
+Use Koan's capability detection to disable features when providers are unavailable (e.g., skip embeddings when Weaviate container is stopped).
+
+### 4.1 Automatic Data Adapter Resolution
+The Koan Framework automatically resolves data adapters and table mappings without requiring explicit `[DataAdapter]` or `[Table]` attributes:
+
+- **Core Entities**: `SourceDocument`, `DocumentChunk`, `DocumentInsight`, etc. use automatic adapter selection based on available providers
+- **Vector Entities**: `SemanticTypeEmbedding`, `DocumentChunkEmbedding` explicitly use `[VectorAdapter("weaviate")]` for vector storage
+- **Provider Priority**: Framework detects available providers (MongoDB, PostgreSQL, etc.) and selects appropriate adapters
+- **Graceful Degradation**: Features automatically disable when required providers are unavailable
 
 ### 5. Observability & Telemetry
 

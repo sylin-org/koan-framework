@@ -10,8 +10,6 @@ namespace S13.DocMind.Models;
 /// Semantic profile metadata powering document auto-classification and structured extraction.
 /// Captures the canonical schema, tags, and vector annotations for downstream processing.
 /// </summary>
-[DataAdapter("postgresql")]
-[Table("semantic_type_profiles")]
 [McpEntity(Name = "semantic-type-profiles", Description = "Template definitions, prompts, and embeddings for DocMind document types.")]
 public sealed class SemanticTypeProfile : Entity<SemanticTypeProfile>
 {

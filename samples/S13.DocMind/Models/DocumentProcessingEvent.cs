@@ -10,8 +10,6 @@ namespace S13.DocMind.Models;
 /// Event stream entity capturing telemetry for each stage of document processing.
 /// Provides detailed instrumentation for diagnostics, retries, and workflow visualization.
 /// </summary>
-[DataAdapter("postgresql")]
-[Table("document_processing_events")]
 public sealed class DocumentProcessingEvent : FlowEntity<DocumentProcessingEvent>
 {
     [Required]
