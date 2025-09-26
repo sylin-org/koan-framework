@@ -24,9 +24,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Mongo.Initialization.KoanAutoRegistrar");
-        logger?.Log(LogLevel.Debug, "Koan.Data.Mongo KoanAutoRegistrar loaded.");
-
         // Configure MongoDB conventions globally at startup - disables _t discriminators
         var pack = new ConventionPack
         {

@@ -34,3 +34,7 @@ public class CensorTagsDocController : EntityController<CensorTagsDoc, string> {
 [ApiController]
 [Route("api/data/settings")]
 public class SettingsDocController : EntityController<SettingsDoc, string> { }
+
+[ApiController]
+[Route("api/data/media")]
+public class MediaDocController : EntityController<Media, string> { }

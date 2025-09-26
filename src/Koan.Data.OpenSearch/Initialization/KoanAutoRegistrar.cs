@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
@@ -19,9 +18,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        var loggerFactory = services.BuildServiceProvider().GetService<ILoggerFactory>();
-        loggerFactory?.CreateLogger("Koan.Data.OpenSearch.Initialization").LogDebug("OpenSearch adapter registrar loaded");
-
         services.AddKoanOptions<OpenSearchOptions>(Infrastructure.Constants.Section);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<OpenSearchOptions>, OpenSearchOptionsConfigurator>());
 

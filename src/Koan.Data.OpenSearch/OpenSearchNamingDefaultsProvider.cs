@@ -12,7 +12,7 @@ public sealed class OpenSearchNamingDefaultsProvider : INamingDefaultsProvider
     {
         var opts = services.GetService<IOptions<OpenSearchOptions>>()?.Value;
         var separator = opts?.IndexPrefix is not null ? "-" : "_";
-        return new StorageNameResolver.Convention(StorageNamingStyle.EntityType, separator, NameCasing.LowerCase);
+        return new StorageNameResolver.Convention(StorageNamingStyle.EntityType, separator, NameCasing.Lower);
     }
 
     public Func<Type, string?>? GetAdapterOverride(IServiceProvider services) => null;

@@ -432,7 +432,6 @@ public abstract class EntityController<T, TKey> : ControllerBase
             var methodInfo = ControllerContext.ActionDescriptor.MethodInfo;
             var methodAttr = methodInfo.GetCustomAttribute<PaginationAttribute>();
             if (methodAttr != null) return methodAttr;
-
             var controllerAttr = GetType().GetCustomAttribute<PaginationAttribute>();
             if (controllerAttr != null) return controllerAttr;
 

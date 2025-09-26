@@ -574,6 +574,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         if (request.ApplyPagination && options.Page > 0 && options.PageSize > 0)
         {
             queryOptions = queryOptions.WithPagination(options.Page, options.PageSize);
+
         }
 
         if (!string.IsNullOrWhiteSpace(request.Set))
@@ -597,6 +598,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         return string.Join(",", sorts.Select(s => s.Desc ? $"-{s.Field}" : s.Field));
+
     }
 
     private async Task<(IReadOnlyList<TEntity> Items, int Total)> QueryCollectionFromBodyAsync(

@@ -30,7 +30,7 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanMessaging();
     }
     
-    public void Describe(Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
 
