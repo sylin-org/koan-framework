@@ -29,16 +29,16 @@ public static class Data<TEntity, TKey>
 
     // Full scan - no pagination applied unless explicitly requested by user
     public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
-        => All(null, ct);
+        => All((DataQueryOptions?)null, ct);
 
     public static async Task<IReadOnlyList<TEntity>> All(DataQueryOptions? options, CancellationToken ct = default)
     {
-        var result = await QueryWithCount(null, options, ct).ConfigureAwait(false);
+        var result = await QueryWithCount((Expression<Func<TEntity, bool>>?)null, options, ct).ConfigureAwait(false);
         return result.Items;
     }
 
     public static Task<QueryResult<TEntity>> AllWithCount(DataQueryOptions? options = null, CancellationToken ct = default)
-        => QueryWithCount(null, options, ct);
+        => QueryWithCount((Expression<Func<TEntity, bool>>?)null, options, ct);
 
     public static Task<QueryResult<TEntity>> QueryWithCount(DataQueryOptions? options, CancellationToken ct = default, int? absoluteMaxRecords = null)
         => QueryWithCount((object?)null, options, ct, absoluteMaxRecords);
@@ -178,7 +178,7 @@ public static class Data<TEntity, TKey>
     }
 
     public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => Query(predicate, null, ct);
+        => Query(predicate, (DataQueryOptions?)null, ct);
 
     public static async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
@@ -188,7 +188,7 @@ public static class Data<TEntity, TKey>
     }
 
     public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
-        => Query(query, null, ct);
+        => Query(query, (DataQueryOptions?)null, ct);
 
     public static async Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
     {

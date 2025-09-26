@@ -75,12 +75,12 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 request.BasePath ?? context.HttpContext?.Request.Path.ToString() ?? "unknown",
                 queryResult.Total);
 
-            var payload = new
+            var errorPayload = new
             {
                 error = "Result too large",
                 message = $"This endpoint allows at most {request.Policy.AbsoluteMaxRecords} records without pagination."
             };
-            var tooLarge = new ObjectResult(payload) { StatusCode = StatusCodes.Status413PayloadTooLarge };
+            var tooLarge = new ObjectResult(errorPayload) { StatusCode = StatusCodes.Status413PayloadTooLarge };
             return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), queryResult.Total, null, tooLarge);
         }
 

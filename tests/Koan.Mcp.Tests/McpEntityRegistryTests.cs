@@ -82,7 +82,8 @@ public sealed class McpEntityRegistryTests
         var directResult = await entityService.GetCollectionAsync(new EntityCollectionRequest
         {
             Context = queryContext,
-            ForcePagination = false
+            ForcePagination = false,
+            Policy = Koan.Web.Attributes.PaginationPolicy.FromAttribute(new Koan.Web.Attributes.PaginationAttribute(), Koan.Web.Infrastructure.PaginationSafetyBounds.Default)
         });
 
         var toolName = registry.Registrations.Single(r => r.EntityType == typeof(TestEntity))

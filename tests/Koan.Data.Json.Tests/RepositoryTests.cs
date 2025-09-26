@@ -74,9 +74,9 @@ public class RepositoryTests
 
         var linqWithOpts = Assert.IsAssignableFrom<ILinqQueryRepositoryWithOptions<Todo, string>>(repo);
         // BuildServices() uses DefaultPageSize=2, MaxPageSize=3; request PageSize=3 capped by MaxPageSize
-        var p1 = await linqWithOpts.QueryAsync(x => x.Title == "page", new DataQueryOptions(Page: 1, PageSize: 3));
+        var p1 = await linqWithOpts.QueryAsync(x => x.Title == "page", new DataQueryOptions(page: 1, pageSize: 3));
         p1.Count.Should().Be(3);
-        var p2 = await linqWithOpts.QueryAsync(x => x.Title == "page", new DataQueryOptions(Page: 2, PageSize: 3));
+        var p2 = await linqWithOpts.QueryAsync(x => x.Title == "page", new DataQueryOptions(page: 2, pageSize: 3));
         p2.Count.Should().Be(3);
     }
 
@@ -271,9 +271,9 @@ public class RepositoryTests
 
         // Validate options-based paging using the decorated repository (facade implements IDataRepositoryWithOptions)
         var withOptsRepo = Assert.IsAssignableFrom<IDataRepositoryWithOptions<Todo, string>>(repo);
-        var withOpts = await withOptsRepo.QueryAsync(null, new DataQueryOptions(Page: 2, PageSize: 3));
+        var withOpts = await withOptsRepo.QueryAsync(null, new DataQueryOptions(page: 2, pageSize: 3));
         withOpts.Count.Should().Be(3);
-        var capped = await withOptsRepo.QueryAsync(null, new DataQueryOptions(Page: 1, PageSize: 999));
+        var capped = await withOptsRepo.QueryAsync(null, new DataQueryOptions(page: 1, pageSize: 999));
         capped.Count.Should().Be(3);
     }
 

@@ -56,10 +56,10 @@ public class SqlitePagingOptionsTests
         for (int i = 0; i < 20; i++) await repo.UpsertAsync(new Todo { Title = $"t-{i}" });
 
         var linqRepo = (ILinqQueryRepositoryWithOptions<Todo, string>)repo;
-        var page2 = await linqRepo.QueryAsync(x => x.Title.StartsWith("t-"), new DataQueryOptions(Page: 2, PageSize: 3));
+        var page2 = await linqRepo.QueryAsync(x => x.Title.StartsWith("t-"), new DataQueryOptions(page: 2, pageSize: 3));
         page2.Select(x => x.Title).Should().BeEquivalentTo(new[] { "t-3", "t-4", "t-5" }, opts => opts.WithoutStrictOrdering());
 
-        var capped = await linqRepo.QueryAsync(x => x.Title.StartsWith("t-"), new DataQueryOptions(Page: 1, PageSize: 50));
+        var capped = await linqRepo.QueryAsync(x => x.Title.StartsWith("t-"), new DataQueryOptions(page: 1, pageSize: 50));
         capped.Count.Should().Be(7); // capped by MaxPageSize
     }
 
@@ -78,10 +78,10 @@ public class SqlitePagingOptionsTests
         for (int i = 0; i < 15; i++) await repo.UpsertAsync(new Todo { Title = i % 2 == 0 ? "milk" : "bread" });
 
         var srepo = (IStringQueryRepositoryWithOptions<Todo, string>)repo;
-        var wherePage = await srepo.QueryAsync("Title = 'milk'", new DataQueryOptions(Page: 2, PageSize: 2));
+        var wherePage = await srepo.QueryAsync("Title = 'milk'", new DataQueryOptions(page: 2, pageSize: 2));
         wherePage.Count.Should().Be(2);
 
-        var withParamsCapped = await srepo.QueryAsync("Title = @p", new { p = "milk" }, new DataQueryOptions(Page: 1, PageSize: 100));
+        var withParamsCapped = await srepo.QueryAsync("Title = @p", new { p = "milk" }, new DataQueryOptions(page: 1, pageSize: 100));
         withParamsCapped.Count.Should().Be(6);
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -43,7 +44,7 @@ public class QueryWithCountTests
         using var scope = WithRepository(repo);
 
         var options = new DataQueryOptions().WithPagination(page: 2, pageSize: 3);
-        var result = await Data<StubEntity, string>.QueryWithCount(null, options, CancellationToken.None);
+        var result = await Data<StubEntity, string>.QueryWithCount((Expression<Func<StubEntity, bool>>?)null, options, CancellationToken.None);
 
         result.RepositoryHandledPagination.Should().BeTrue();
         result.Items.Should().HaveCount(3).And.Contain(e => e.Id == "4");
