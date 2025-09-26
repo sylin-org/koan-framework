@@ -11,6 +11,11 @@ Produce a cohesive refactoring plan that delivers the full S13.DocMind experienc
 
 ## Processing Phases
 
+### Phase 0 – Proposal Alignment
+1. **Chunk 10 – Proposal vs. Current Assessment**
+   Agent: *general-purpose*
+   Tasks: Evaluate proposal intent, summarize promised capabilities, contrast with current implementation, and confirm Compose-first baseline assumptions.
+
 ### Phase 1 – Foundation (Sequential)
 1. **Chunk 01 – Executive Overview**  
    Agent: *general-purpose*  
@@ -43,10 +48,14 @@ Produce a cohesive refactoring plan that delivers the full S13.DocMind experienc
    Agent: *Koan-orchestration-devops*  
    Tasks: Define test suites, CI pipeline, operational playbooks, observability dashboards, and release checklist.
 
-### Phase 5 – Adoption
+### Phase 5 – Adoption & Audit
 8. **Chunk 08 – Migration Guide**  
    Agent: *general-purpose*  
    Tasks: Provide incremental migration strategy, data/rollback checklists, and communication plan.
+
+9. **Chunk 09 – Gap Analysis & Rebuild Plan**  
+   Agent: *general-purpose*  
+   Tasks: Audit the current implementation, document rebuild roadmap, and surface critical blockers for the refactor team.
 
 ## Deliverables
 - Updated documentation in each chunk reflecting the refactoring plan and identified optimization opportunities.

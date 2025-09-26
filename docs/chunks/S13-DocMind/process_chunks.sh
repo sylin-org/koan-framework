@@ -43,7 +43,7 @@ init_processing() {
     log "🚀 Initializing S13-DocMind chunk processing..."
 
     # Create output directory structure
-    mkdir -p "$OUTPUT_DIR"/{phase1,phase2,phase3,phase4,phase5}
+    mkdir -p "$OUTPUT_DIR"/{phase0,phase1,phase2,phase3,phase4,phase5}
     mkdir -p "$OUTPUT_DIR"/coordination_checkpoints
     mkdir -p "$OUTPUT_DIR"/final_deliverables
 
@@ -56,7 +56,7 @@ init_processing() {
     done
 
     # Validate chunks exist
-    for i in {01..08}; do
+    for i in {01..10}; do
         chunk_file=$(ls ${i}_*.md 2>/dev/null | head -1)
         if [ ! -f "$chunk_file" ]; then
             error "Missing chunk file for ${i}"
@@ -203,6 +203,10 @@ main() {
 
     log "📋 Starting S13-DocMind chunk processing workflow..."
 
+    # Phase 0: Proposal Alignment
+    info "🧭 Phase 0: Proposal Alignment"
+    process_chunk "10" "general-purpose" "0" ""
+
     # Phase 1: Foundation Analysis (Sequential)
     info "🏁 Phase 1: Foundation Analysis"
 
@@ -249,12 +253,15 @@ main() {
     # Step 7: Migration Patterns (cross-reference throughout)
     process_chunk "08" "general-purpose" "5" "01,02,03,04,05,06,07"
 
+    # Step 8: Gap Assessment (requires full context)
+    process_chunk "09" "general-purpose" "5" "10,01,02,03,04,05,06,07,08"
+
     # Generate final integrated deliverables
     generate_final_deliverables
 
     success "🎉 S13-DocMind chunk processing completed successfully!"
     log "📊 Processing summary:"
-    log "   - Chunks processed: 8"
+    log "   - Chunks processed: 10"
     log "   - Coordination checkpoints: 3"
     log "   - Final deliverables: Generated"
     log "   - Output directory: $OUTPUT_DIR"
@@ -272,6 +279,12 @@ generate_final_deliverables() {
 ## Generated: $(date)
 
 This document consolidates all agent outputs into unified implementation specifications.
+
+## Proposal Alignment Summary
+[Consolidated from Chunk 10]
+
+## Gap Assessment
+[Consolidated from Chunk 09]
 
 ## Entity Specifications
 [Consolidated from Chunks 02, 03, 06]
@@ -367,11 +380,12 @@ case "${1:-}" in
         ;;
     --dry-run)
         info "🔍 Dry run mode - showing processing plan:"
+        echo "Phase 0: Chunk 10 (proposal alignment)"
         echo "Phase 1: Chunks 01, 02 (sequential)"
         echo "Phase 2: Chunks 03, 05 (parallel)"
         echo "Phase 3: Chunk 04"
         echo "Phase 4: Chunks 06, 07 (parallel)"
-        echo "Phase 5: Chunk 08"
+        echo "Phase 5: Chunks 08, 09"
         echo "Coordination checkpoints: 3"
         exit 0
         ;;

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains the S13-DocMind refactoring plan broken down into 9 semantically coherent chunks optimized for AI agent collaboration. Each chunk focuses on specific architectural concerns and can be processed by specialized Koan Framework agents.
+This directory contains the S13-DocMind refactoring plan broken down into 10 semantically coherent chunks optimized for AI agent collaboration. Each chunk focuses on specific architectural concerns and can be processed by specialized Koan Framework agents.
 
 ## 📁 Directory Structure
 
@@ -21,6 +21,8 @@ docs/chunks/S13-DocMind/
 ├── 06_implementation.md         # Technical specs and migration strategy
 ├── 07_testing_ops.md            # Testing, deployment, and operations
 ├── 08_migration_guide.md        # Code transformation and troubleshooting
+├── 09_gap_analysis_and_rebuild_plan.md # Current-state audit and rebuild roadmap
+├── 10_proposal_alignment_assessment.md # Proposal vs. implementation assessment
 └── processing_outputs/          # Generated during chunk processing
     ├── phase1/                  # Foundation analysis outputs
     ├── phase2/                  # Parallel specialization outputs
@@ -76,8 +78,12 @@ cat ai_agent_instructions.md
 | 07 | `07_testing_ops.md` | 86 | Koan-orchestration-devops | Test strategy, CI/CD, operational playbooks |
 | 08 | `08_migration_guide.md` | 49 | general-purpose | Adoption path, migration checklist, rollback plan |
 | 09 | `09_gap_analysis_and_rebuild_plan.md` | 130 | general-purpose | Current implementation audit and rebuild roadmap |
+| 10 | `10_proposal_alignment_assessment.md` | 123 | general-purpose | Proposal intent vs. current sample assessment |
 
 ## 🎯 Processing Workflow
+
+### Phase 0: Proposal Alignment
+- **Chunk 10** – Assess proposal intent vs. current implementation
 
 ### Phase 1: Foundation (Sequential)
 1. **Chunk 01** – Executive overview and guiding principles
@@ -94,8 +100,9 @@ cat ai_agent_instructions.md
 - **Chunk 06** – Implementation roadmap
 - **Chunk 07** – Testing & operations plan
 
-### Phase 5: Adoption
+### Phase 5: Adoption & Audit
 - **Chunk 08** – Migration & rollout guidance
+- **Chunk 09** – Current-state gap analysis and rebuild roadmap
 
 ## 🤖 AI Agent Specialization
 
@@ -125,9 +132,10 @@ cat ai_agent_instructions.md
 - Define test suites, CI workflow, and operational playbooks
 - Highlight observability dashboards and release checklist
 
-### General-Purpose Agents (Chunks 1 & 8)
+### General-Purpose Agents (Chunks 1, 8, 9 & 10)
 - Summarize vision, DX opportunities, and migration messaging
-- Coordinate adoption strategy, rollback, and communication
+- Evaluate proposal alignment, current-state gaps, and communication strategy
+- Coordinate adoption strategy, rollback, and stakeholder updates
 
 ## 📋 Expected Outputs
 
