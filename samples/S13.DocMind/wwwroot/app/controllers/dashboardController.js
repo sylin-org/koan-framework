@@ -1,46 +1,47 @@
-angular.module('s13DocMindApp').controller('DashboardController', ['$scope', 'FileService', 'DocumentTypeService', 'AnalysisService', 'ToastService', function($scope, FileService, DocumentTypeService, AnalysisService, ToastService) {
-    $scope.stats = {
-        totalFiles: 0,
-        processedFiles: 0,
-        processingFiles: 0,
-        documentTypes: 0
-    };
+angular.module('s13DocMindApp').controller('DashboardController', [
+    '$scope', '$q', 'InsightsService', 'ToastService',
+    function($scope, $q, InsightsService, ToastService) {
+        $scope.loading = true;
+        $scope.overview = null;
+        $scope.profileCollections = [];
+        $scope.activityFeed = [];
 
-    $scope.recentActivity = [];
+        function initialize() {
+            $scope.loading = true;
 
-    function loadStats() {
-        // Load file statistics
-        FileService.getAll()
-            .then(function(response) {
-                var files = response.data || [];
-                $scope.stats.totalFiles = files.length;
-                $scope.stats.processedFiles = files.filter(f => f.status === 'processed').length;
-                $scope.stats.processingFiles = files.filter(f => f.status === 'processing').length;
-
-                // Generate recent activity from files
-                $scope.recentActivity = files
-                    .filter(f => f.uploadDate)
-                    .sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate))
-                    .slice(0, 10)
-                    .map(f => ({
-                        description: `File "${f.name}" was uploaded`,
-                        timestamp: f.uploadDate
-                    }));
-            })
-            .catch(function(error) {
-                console.error('Error loading file stats:', error);
+            $q.all({
+                overview: InsightsService.getOverview(),
+                profiles: InsightsService.getProfileCollections('all'),
+                feed: InsightsService.getFeeds()
+            }).then(function(results) {
+                $scope.overview = results.overview;
+                $scope.profileCollections = results.profiles || [];
+                $scope.activityFeed = (results.feed || []).slice(0, 10);
+                $scope.loading = false;
+                $scope.$applyAsync();
+            }).catch(function(error) {
+                console.error('Failed to load dashboard insights', error);
+                ToastService.handleError(error, 'Failed to load insights');
+                $scope.loading = false;
+                $scope.$applyAsync();
             });
+        }
 
-        // Load document type count
-        DocumentTypeService.getAll()
-            .then(function(response) {
-                $scope.stats.documentTypes = (response.data || []).length;
-            })
-            .catch(function(error) {
-                console.error('Error loading document type stats:', error);
-            });
+        $scope.getCompletionRate = function() {
+            if (!$scope.overview || !$scope.overview.totalDocuments) {
+                return 0;
+            }
+            return Math.round(($scope.overview.completedDocuments / $scope.overview.totalDocuments) * 100);
+        };
+
+        $scope.getTopCollections = function() {
+            return ($scope.profileCollections || []).slice(0, 3);
+        };
+
+        $scope.formatTimestamp = function(timestamp) {
+            return timestamp ? new Date(timestamp) : null;
+        };
+
+        initialize();
     }
-
-    // Initialize dashboard
-    loadStats();
-}]);
+]);

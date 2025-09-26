@@ -15,59 +15,58 @@ namespace S13.DocMind.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public sealed class ProcessingController : ControllerBase
+public class ProcessingController : ControllerBase
 {
-    private readonly IDocumentIntakeService _intake;
-    private readonly DocMindProcessingOptions _processingOptions;
-    private readonly ILogger<ProcessingController> _logger;
+    private readonly IDocumentProcessingDiagnostics _diagnostics;
 
-    public ProcessingController(IDocumentIntakeService intake, IOptions<DocMindProcessingOptions> processingOptions, ILogger<ProcessingController> logger)
+    public ProcessingController(IDocumentProcessingDiagnostics diagnostics)
     {
-        _intake = intake;
-        _processingOptions = processingOptions.Value;
-        _logger = logger;
+        _diagnostics = diagnostics;
     }
 
-    [HttpPost("replay")]
-    public async Task<IActionResult> ReplayAsync([FromBody] ProcessingReplayRequest request, CancellationToken cancellationToken)
+    [HttpGet("queue")]
+    public async Task<ActionResult> GetQueue(CancellationToken cancellationToken)
     {
-        var document = await SourceDocument.Get(request.DocumentId, cancellationToken).ConfigureAwait(false);
-        if (document is null) return NotFound();
-
-        document.MarkStatus(DocumentProcessingStatus.Uploaded);
-        await document.Save(cancellationToken).ConfigureAwait(false);
-        await _intake.RequeueAsync(document.Id, DocumentProcessingStage.Upload, cancellationToken).ConfigureAwait(false);
-        _logger.LogInformation("Replayed document {DocumentId}", document.Id);
-        return Accepted(new { document.Id, document.Status });
+        var queue = await _diagnostics.GetQueueAsync(cancellationToken);
+        return Ok(queue);
     }
 
-    [HttpGet("config")]
-    public ActionResult<object> GetConfig()
-        => Ok(new
+    [HttpGet("timeline")]
+    public async Task<ActionResult> GetTimeline(
+        [FromQuery] string? documentTypeId,
+        [FromQuery] string? status,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new ProcessingTimelineQuery
         {
-            _processingOptions.QueueCapacity,
-            _processingOptions.MaxConcurrency,
-            _processingOptions.ChunkSizeTokens,
-            _processingOptions.EnableVisionExtraction
-        });
+            DocumentTypeId = documentTypeId,
+            Status = status,
+            FromDate = from,
+            ToDate = to
+        };
 
-    [HttpGet("events")]
-    public async Task<ActionResult<IEnumerable<TimelineEntryResponse>>> GetRecentEventsAsync([FromQuery] int take = 25, CancellationToken cancellationToken = default)
+        var timeline = await _diagnostics.GetTimelineAsync(query, cancellationToken);
+        return Ok(timeline);
+    }
+
+    [HttpPost("{fileId}/retry")]
+    public async Task<ActionResult> Retry(string fileId, [FromBody] ProcessingRetryRequest? request, CancellationToken cancellationToken)
     {
-        take = Math.Clamp(take, 1, 200);
-        var events = await DocumentProcessingEvent.All(cancellationToken).ConfigureAwait(false);
-        var response = events
-            .OrderByDescending(e => e.CreatedAt)
-            .Take(take)
-            .Select(e => new TimelineEntryResponse
-            {
-                Stage = e.Stage,
-                Status = e.Status,
-                Message = e.Message,
-                CreatedAt = e.CreatedAt,
-                Context = e.Context
-            })
-            .ToList();
-        return Ok(response);
+        var normalizedRequest = request ?? new ProcessingRetryRequest();
+        var result = await _diagnostics.RetryAsync(fileId, normalizedRequest, cancellationToken);
+        if (!result.Success)
+        {
+            return NotFound(new { message = result.Message });
+        }
+
+        return Ok(new
+        {
+            message = "Retry queued",
+            fileId = result.FileId,
+            fileStatus = result.FileStatus,
+            analysisStatus = result.AnalysisStatus
+        });
     }
 }

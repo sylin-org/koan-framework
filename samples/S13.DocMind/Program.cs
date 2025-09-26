@@ -7,6 +7,7 @@ using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
 using Koan.Web.Swagger;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddKoan()
@@ -14,20 +15,20 @@ builder.Services.AddKoan()
     .AsProxiedApi()
     .WithRateLimit();
 
-builder.Services.AddKoanObservability();
-builder.Services.AddKoanDataVector();
-builder.Services.AddKoanAiWeb();
-builder.Services.AddKoanSwagger(builder.Configuration);
-builder.Services.AddKoanMcp(builder.Configuration);
-builder.Services.AddMongoAdapter();
+// Note: Service implementations are handled by Koan auto-registration
+builder.Services.AddSingleton<IDocumentAggregationService, DocumentAggregationService>();
+builder.Services.AddSingleton<IDocumentInsightsService, DocumentInsightsService>();
+builder.Services.AddSingleton<IDocumentProcessingDiagnostics, DocumentProcessingDiagnostics>();
+builder.Services.AddSingleton<IModelCatalogService, InMemoryModelCatalogService>();
+builder.Services.AddSingleton<IModelInstallationQueue, InMemoryModelInstallationQueue>();
+builder.Services.AddHostedService<ModelInstallationBackgroundService>();
+
+// Ensure required directories exist
+Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "uploads"));
+Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "data"));
 
 var app = builder.Build();
 
 app.UseKoanSwagger();
 
 app.Run();
-
-namespace S13.DocMind
-{
-    public partial class Program;
-}

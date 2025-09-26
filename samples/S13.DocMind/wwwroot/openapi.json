@@ -1,0 +1,399 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "S13.DocMind API",
+    "version": "1.0.0",
+    "description": "API surface for document insights, processing diagnostics, and model management."
+  },
+  "paths": {
+    "/api/insights/overview": {
+      "get": {
+        "summary": "Retrieve high level document insights",
+        "operationId": "getInsightsOverview",
+        "responses": {
+          "200": {
+            "description": "Overview metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentInsightsOverview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/insights/profiles/{profileId}": {
+      "get": {
+        "summary": "Get profile collection summaries",
+        "operationId": "getInsightsProfile",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentCollectionSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/insights/feeds": {
+      "get": {
+        "summary": "Get aggregation feed items",
+        "operationId": "getInsightsFeeds",
+        "responses": {
+          "200": {
+            "description": "Feed entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AggregationFeedItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/processing/queue": {
+      "get": {
+        "summary": "Get processing queue diagnostics",
+        "operationId": "getProcessingQueue",
+        "responses": {
+          "200": {
+            "description": "Queue items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ProcessingQueueItem" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/processing/timeline": {
+      "get": {
+        "summary": "Get processing timelines",
+        "operationId": "getProcessingTimeline",
+        "parameters": [
+          { "name": "documentTypeId", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timeline entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ProcessingTimelineEntry" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/processing/{fileId}/retry": {
+      "post": {
+        "summary": "Retry a document in the processing pipeline",
+        "operationId": "postProcessingRetry",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProcessingRetryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Retry accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fileId": { "type": "string" },
+                    "fileStatus": { "type": "string" },
+                    "analysisStatus": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "File not found"
+          }
+        }
+      }
+    },
+    "/api/models/available": {
+      "get": {
+        "summary": "Get available models",
+        "operationId": "getModelsAvailable",
+        "responses": {
+          "200": {
+            "description": "Available models",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ModelDescriptor" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{modelName}/install": {
+      "post": {
+        "summary": "Queue model installation",
+        "operationId": "postModelInstall",
+        "parameters": [
+          { "name": "modelName", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InstallModelRequest" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Installation queued",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ModelInstallationStatus" }
+              }
+            }
+          },
+          "404": { "description": "Model not found" }
+        }
+      }
+    },
+    "/api/models/installations": {
+      "get": {
+        "summary": "List model installation statuses",
+        "operationId": "getModelInstallations",
+        "responses": {
+          "200": {
+            "description": "Installation statuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ModelInstallationStatus" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DocumentInsightsOverview": {
+        "type": "object",
+        "properties": {
+          "totalDocuments": { "type": "integer" },
+          "completedDocuments": { "type": "integer" },
+          "activeDocuments": { "type": "integer" },
+          "failedDocuments": { "type": "integer" },
+          "averageConfidence": { "type": "number" },
+          "averageProcessingTimeMs": { "type": "number" },
+          "highQualityDocumentCount": { "type": "integer" },
+          "reviewRequiredCount": { "type": "integer" },
+          "topDocumentTypes": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DocumentTypeUsage" }
+          },
+          "recentDocuments": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecentDocumentInsight" }
+          }
+        }
+      },
+      "DocumentTypeUsage": {
+        "type": "object",
+        "properties": {
+          "documentTypeId": { "type": "string" },
+          "documentTypeName": { "type": "string" },
+          "usageCount": { "type": "integer" },
+          "lastUsed": { "type": "string", "format": "date-time" }
+        }
+      },
+      "RecentDocumentInsight": {
+        "type": "object",
+        "properties": {
+          "fileId": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string" },
+          "documentTypeId": { "type": "string" },
+          "completedDate": { "type": "string", "format": "date-time" },
+          "confidence": { "type": "number" }
+        }
+      },
+      "DocumentCollectionSummary": {
+        "type": "object",
+        "properties": {
+          "documentTypeId": { "type": "string" },
+          "documentTypeName": { "type": "string" },
+          "category": { "type": "string" },
+          "documentCount": { "type": "integer" },
+          "averageConfidence": { "type": "number" },
+          "latestDocuments": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CollectionDocumentSummary" }
+          }
+        }
+      },
+      "CollectionDocumentSummary": {
+        "type": "object",
+        "properties": {
+          "fileId": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string" },
+          "uploadDate": { "type": "string", "format": "date-time" },
+          "assignedDate": { "type": "string", "format": "date-time" },
+          "completedDate": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AggregationFeedItem": {
+        "type": "object",
+        "properties": {
+          "fileId": { "type": "string" },
+          "fileName": { "type": "string" },
+          "status": { "type": "string" },
+          "documentTypeId": { "type": "string" },
+          "documentTypeName": { "type": "string" },
+          "confidence": { "type": "number" },
+          "summary": { "type": "string" },
+          "lastUpdated": { "type": "string", "format": "date-time" },
+          "highlights": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "ProcessingQueueItem": {
+        "type": "object",
+        "properties": {
+          "fileId": { "type": "string" },
+          "fileName": { "type": "string" },
+          "status": { "type": "string" },
+          "documentTypeId": { "type": "string" },
+          "uploadDate": { "type": "string", "format": "date-time" },
+          "assignedDate": { "type": "string", "format": "date-time" },
+          "completedDate": { "type": "string", "format": "date-time" },
+          "errorMessage": { "type": "string" },
+          "analysisStatus": { "type": "string" },
+          "confidence": { "type": "number" },
+          "progress": { "type": "integer" }
+        }
+      },
+      "ProcessingTimelineEntry": {
+        "type": "object",
+        "properties": {
+          "fileId": { "type": "string" },
+          "fileName": { "type": "string" },
+          "documentTypeId": { "type": "string" },
+          "currentStatus": { "type": "string" },
+          "confidence": { "type": "number" },
+          "errorMessage": { "type": "string" },
+          "steps": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProcessingTimelineStep" }
+          }
+        }
+      },
+      "ProcessingTimelineStep": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "state": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      },
+      "ProcessingRetryRequest": {
+        "type": "object",
+        "properties": {
+          "resetToStage": { "type": "string" },
+          "includeAnalysisReset": { "type": "boolean" }
+        }
+      },
+      "ModelDescriptor": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "provider": { "type": "string" },
+          "displayName": { "type": "string" },
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "size": { "type": "string" },
+          "isVisionCapable": { "type": "boolean" },
+          "isInstalled": { "type": "boolean" }
+        }
+      },
+      "InstallModelRequest": {
+        "type": "object",
+        "properties": {
+          "provider": { "type": "string" }
+        }
+      },
+      "ModelInstallationStatus": {
+        "type": "object",
+        "properties": {
+          "installationId": { "type": "string", "format": "uuid" },
+          "provider": { "type": "string" },
+          "modelName": { "type": "string" },
+          "state": { "type": "string" },
+          "progress": { "type": "integer" },
+          "currentStep": { "type": "string" },
+          "enqueuedAt": { "type": "string", "format": "date-time" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": "string", "format": "date-time" },
+          "lastUpdated": { "type": "string", "format": "date-time" },
+          "errorMessage": { "type": "string" }
+        }
+      }
+    }
+  }
+}
