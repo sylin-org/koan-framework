@@ -1,28 +1,85 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
+using Koan.Flow.Core.Model;
 
 namespace S13.DocMind.Models;
 
 /// <summary>
-/// Timeline entry capturing document pipeline progress.
+/// Event stream entity capturing telemetry for each stage of document processing.
+/// Provides detailed instrumentation for diagnostics, retries, and workflow visualization.
 /// </summary>
-public sealed class DocumentProcessingEvent : Entity<DocumentProcessingEvent>
+[DataAdapter("postgresql")]
+[Table("document_processing_events")]
+public sealed class DocumentProcessingEvent : FlowEntity<DocumentProcessingEvent>
 {
-    public string DocumentId { get; set; } = string.Empty;
-    public DocumentProcessingStage Stage { get; set; }
-    public string Message { get; set; } = string.Empty;
-    public Dictionary<string, string> Context { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public DocumentProcessingStatus Status { get; set; }
-}
+    [Required]
+    public Guid DocumentId { get; set; }
+        = Guid.Empty;
 
-public enum DocumentProcessingStage
-{
-    Upload = 0,
-    Deduplicate = 1,
-    Extraction = 2,
-    Chunking = 3,
-    Insight = 4,
-    Suggestion = 5,
-    Completion = 6,
-    Error = 7
+    public Guid? ChunkId { get; set; }
+        = null;
+
+    public Guid? InsightId { get; set; }
+        = null;
+
+    [Required]
+    public DocumentProcessingStage Stage { get; set; }
+        = DocumentProcessingStage.Uploaded;
+
+    [Required]
+    public DocumentProcessingStatus Status { get; set; }
+        = DocumentProcessingStatus.Queued;
+
+    public DateTimeOffset OccurredAt { get; set; }
+        = DateTimeOffset.UtcNow;
+
+    public TimeSpan? Duration { get; set; }
+        = null;
+
+    public int Attempt { get; set; }
+        = 1;
+
+    [MaxLength(100)]
+    public string? CorrelationId { get; set; }
+        = null;
+
+    [Column(TypeName = "jsonb")]
+    public object? EventData { get; set; }
+        = null;
+
+    [Column(TypeName = "jsonb")]
+    public Dictionary<string, double> Metrics { get; set; }
+        = new();
+
+    [Column(TypeName = "jsonb")]
+    public Dictionary<string, string> Tags { get; set; }
+        = new();
+
+    public long? InputTokens { get; set; }
+        = null;
+
+    public long? OutputTokens { get; set; }
+        = null;
+
+    public double? ConfidenceScore { get; set; }
+        = null;
+
+    public int? VisionFrameCount { get; set; }
+        = null;
+
+    public double? VisionConfidence { get; set; }
+        = null;
+
+    [MaxLength(2000)]
+    public string? ErrorMessage { get; set; }
+        = null;
+
+    [MaxLength(200)]
+    public string? ErrorCode { get; set; }
+        = null;
+
+    public bool IsTerminal { get; set; }
+        = false;
 }

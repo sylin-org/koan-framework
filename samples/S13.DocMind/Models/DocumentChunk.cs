@@ -1,26 +1,80 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 using Koan.Mcp;
 
 namespace S13.DocMind.Models;
 
 /// <summary>
-/// A chunk of extracted document content enriched with embeddings.
+/// Represents a processed fragment of a source document along with structured payloads and insight references.
+/// Supports multi-modal annotations, semantic tagging, and vector enrichment for retrieval workflows.
 /// </summary>
+[DataAdapter("mongodb")]
+[Table("document_chunks")]
 [McpEntity(Name = "document-chunks", Description = "Chunked text and diagram excerpts derived from source documents.")]
 public sealed class DocumentChunk : Entity<DocumentChunk>
 {
-    public string DocumentId { get; set; } = string.Empty;
-    public int Index { get; set; }
-    public string Channel { get; set; } = DocumentChannels.Text;
-    public string Content { get; set; } = string.Empty;
-    public string? Summary { get; set; }
-    public int TokenEstimate { get; set; }
-    public float[]? Embedding { get; set; }
-    public Dictionary<string, string> Metadata { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-}
+    [Parent(typeof(SourceDocument))]
+    public Guid DocumentId { get; set; }
+        = Guid.Empty;
 
-public static class DocumentChannels
-{
-    public const string Text = "text";
-    public const string Vision = "vision";
+    public int ChunkIndex { get; set; }
+        = 0;
+
+    [Required]
+    public string Content { get; set; } = string.Empty;
+
+    [MaxLength(50)]
+    public string ContentEncoding { get; set; } = "utf-8";
+
+    [MaxLength(150)]
+    public string ContentType { get; set; } = "text/plain";
+
+    public int StartOffset { get; set; }
+        = 0;
+
+    public int EndOffset { get; set; }
+        = 0;
+
+    public int TokenCount { get; set; }
+        = 0;
+
+    [MaxLength(100)]
+    public string? SemanticProfileCode { get; set; }
+        = null;
+
+    [Column(TypeName = "jsonb")]
+    public List<string> Tags { get; set; }
+        = new();
+
+    [Column(TypeName = "jsonb")]
+    public Dictionary<string, object> StructuredPayload { get; set; }
+        = new();
+
+    [Column(TypeName = "jsonb")]
+    public Dictionary<string, object> SchemaMetadata { get; set; }
+        = new();
+
+    [Column(TypeName = "jsonb")]
+    public List<Guid> InsightReferences { get; set; }
+        = new();
+
+    [Vector(Dimensions = 1536, IndexType = "HNSW")]
+    public double[]? Embedding { get; set; }
+        = null;
+
+    [Column(TypeName = "jsonb")]
+    public Dictionary<string, double> VectorAnnotations { get; set; }
+        = new();
+
+    [Column(TypeName = "jsonb")]
+    public Dictionary<string, double> ConfidenceByExtractor { get; set; }
+        = new();
+
+    public DateTimeOffset? ProcessedAt { get; set; }
+        = null;
+
+    public DocumentProcessingStage StageCaptured { get; set; }
+        = DocumentProcessingStage.Chunk;
 }
