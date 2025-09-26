@@ -12,7 +12,7 @@ The enhanced sample provides sophisticated document intelligence features includ
 
 | **Aspect** | **Original Solution** | **S13.DocMind (Enhanced)** |
 |------------|-------------------|---------------------------|
-| **Architecture** | Traditional .NET with manual DI | Entity-first with auto-registration |
+| **Architecture** | Traditional .NET with manual DI | Entity-first with DocMind registrar bootstrap |
 | **Data Layer** | MongoDB-only, repository pattern | Multi-provider patterns (MongoDB + optional Weaviate) |
 | **AI Integration** | Manual Ollama client | Built-in `AI.Prompt()`, `AI.Embed()`, and `AI.VisionPrompt()` |
 | **APIs** | Manual controller implementation | Auto-generated via `EntityController<T>` with rich enrichments |

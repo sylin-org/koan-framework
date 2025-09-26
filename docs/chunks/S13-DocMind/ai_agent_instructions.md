@@ -86,13 +86,13 @@ Focus: Auto-registration, provider configuration, bootstrap reporting
 ```
 
 **Agent Instructions:**
-- Design KoanAutoRegistrar implementation for S13.DocMind
+- Validate DocMindRegistrar wiring for S13.DocMind
 - Specify multi-provider configuration strategy
 - Define bootstrap reporting structure
 - Map provider election and capability detection logic
 
 **Expected Outputs:**
-- `auto_registrar.cs` - Complete KoanAutoRegistrar implementation
+- `docmind_registrar.cs` - Confirm DocMindRegistrar integration
 - `provider_config.md` - Multi-provider setup specifications
 - `boot_report.md` - Bootstrap reporting structure
 
@@ -260,7 +260,7 @@ Focus: Code transformation patterns, reusable components, troubleshooting
 - Specify authentication and authorization patterns
 
 **For Infrastructure Specifications:**
-- Must include complete KoanAutoRegistrar implementation
+- Must confirm DocMindRegistrar behavior and reporting
 - Define multi-provider configuration strategy
 - Include bootstrap reporting specifications
 - Specify health monitoring and readiness checks

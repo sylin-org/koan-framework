@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains the S13-DocMind proposal broken down into 8 semantically coherent chunks optimized for AI agent processing. Each chunk focuses on specific architectural concerns and can be processed by specialized Koan Framework agents.
+This directory contains the S13-DocMind proposal broken down into 10 semantically coherent chunks optimized for AI agent processing. Each chunk focuses on specific architectural concerns and can be processed by specialized Koan Framework agents.
 
 ## 📁 Directory Structure
 
@@ -21,6 +21,8 @@ docs/chunks/S13-DocMind/
 ├── 06_implementation.md         # Technical specs and migration strategy
 ├── 07_testing_ops.md            # Testing, deployment, and operations
 ├── 08_migration_guide.md        # Code transformation and troubleshooting
+├── 09_gap_analysis_and_rebuild_plan.md # Registrar-focused gap analysis
+├── 10_proposal_alignment_assessment.md # Alignment scorecard for registrar update
 └── processing_outputs/          # Generated during chunk processing
     ├── phase1/                  # Foundation analysis outputs
     ├── phase2/                  # Parallel specialization outputs
@@ -71,10 +73,12 @@ cat ai_agent_instructions.md
 | 02 | `02_entity_models.md` | 189 | 4,800 | Koan-data-architect | Entity<T> specifications & relationships |
 | 03 | `03_ai_processing.md` | 209 | 5,200 | Koan-flow-specialist | AI integration & Flow patterns |
 | 04 | `04_api_ui_design.md` | 723 | 18,000 | Koan-developer-experience-enhancer | EntityController & user workflows |
-| 05 | `05_infrastructure.md` | 130 | 3,200 | Koan-bootstrap-specialist | Multi-provider & auto-registration |
+| 05 | `05_infrastructure.md` | 130 | 3,200 | Koan-bootstrap-specialist | Multi-provider & DocMind registrar |
 | 06 | `06_implementation.md` | 538 | 13,500 | Koan-framework-specialist | Technical specs & migration strategy |
 | 07 | `07_testing_ops.md` | 828 | 20,500 | Koan-orchestration-devops | Testing, deployment & operations |
 | 08 | `08_migration_guide.md` | 612 | 15,000 | general-purpose | Code transformation & troubleshooting |
+| 09 | `09_gap_analysis_and_rebuild_plan.md` | 26 | 650 | general-purpose | Gap analysis & DX updates |
+| 10 | `10_proposal_alignment_assessment.md` | 19 | 480 | general-purpose | Proposal alignment review |
 
 ## 🎯 Processing Workflow
 
@@ -99,6 +103,10 @@ cat ai_agent_instructions.md
 ### Phase 5: Cross-Reference Integration
 - **Chunk 08** - Migration patterns and troubleshooting
 
+### Phase 6: Alignment & Governance
+- **Chunk 09** - Registrar gap analysis and DX follow-ups
+- **Chunk 10** - Proposal alignment assessment
+
 ## 🤖 AI Agent Specialization
 
 ### Koan Framework Specialist Agents
@@ -122,8 +130,8 @@ cat ai_agent_instructions.md
 - Frontend integration
 
 **Koan-bootstrap-specialist** (Chunk 5)
-- Auto-registration patterns
-- KoanAutoRegistrar implementation
+- Registrar bootstrap patterns
+- DocMindRegistrar integration
 - Bootstrap reporting
 - Service discovery
 
@@ -139,10 +147,11 @@ cat ai_agent_instructions.md
 - Health monitoring
 - Deployment procedures
 
-### General-Purpose Agents (Chunks 1, 8)
+### General-Purpose Agents (Chunks 1, 8-10)
 - Strategic analysis
 - Migration pattern extraction
 - Cross-reference material processing
+- Alignment and DX validation
 
 ## 📋 Expected Outputs
 
@@ -233,7 +242,7 @@ Task Koan-flow-specialist "Process S13-DocMind chunk 03 for AI processing patter
 - [ ] All chunks follow Koan Framework patterns
 - [ ] Entity specifications are consistent across chunks
 - [ ] API patterns align with EntityController<T> standards
-- [ ] Infrastructure follows auto-registration principles
+- [ ] Infrastructure follows DocMind registrar principles
 - [ ] Deployment configurations match S5/S8 sample patterns
 
 ### Cross-Chunk Consistency

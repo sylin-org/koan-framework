@@ -111,7 +111,7 @@ namespace S13.DocMind.Migration
 | `GDoc.Api.Services.LlmService` | Built-in Koan AI interface | Remove custom HTTP client code | Prompt building logic |
 | `GDoc.Api.Repositories.*Repository` | Automatic via Entity<T> patterns | Remove repository classes | Query logic for custom endpoints |
 | `GDoc.Api.Controllers.*Controller` | `EntityController<T>` inheritance | Replace manual CRUD with inheritance | Business logic endpoints |
-| `Program.cs` DI registration | `KoanAutoRegistrar` | Move to auto-registrar pattern | Service configuration logic |
+| `Program.cs` DI registration | `DocMindRegistrar` | Ensure shipped registrar is loaded | Service configuration logic |
 
 #### **Code Harvesting Guide for Agentic AI**
 
@@ -359,7 +359,7 @@ namespace S13.DocMind.Migration
 ##### **Service Registration Migration**
 ```csharp
 // Original: Manual DI registration in Program.cs (60+ lines)
-// Target: KoanAutoRegistrar pattern
+// Target: DocMindRegistrar pattern
 
 // MIGRATE FROM:
 // builder.Services.AddScoped<IDocumentTypeRepository, DocumentTypeRepository>();
@@ -368,7 +368,8 @@ namespace S13.DocMind.Migration
 // ... (58 more lines)
 
 // MIGRATE TO:
-public class KoanAutoRegistrar : IKoanAutoRegistrar
+// Provided by DocMind package; ensure assembly is referenced.
+public sealed class DocMindRegistrar : IKoanAutoRegistrar
 {
     public void Register(IServiceCollection services, IConfiguration configuration)
     {
@@ -517,7 +518,7 @@ Koan:
 
 ##### **Low Priority (30-50% Reusable - Patterns Only)**
 - [ ] **MongoDB repository patterns** (replace with Entity<T>)
-- [ ] **Manual DI registration** (convert to auto-registration)
+- [ ] **Manual DI registration** (confirm DocMindRegistrar wiring)
 - [ ] **Custom HTTP clients** (replace with Koan AI)
 - [ ] **Manual CRUD controllers** (replace with EntityController<T>)
 - [ ] **Custom event handling** (replace with Flow entities)
@@ -530,7 +531,7 @@ Koan:
 | **Phase 2: Data Access** | Repositories/* | Remove (auto-generated) | Extract custom query logic only |
 | **Phase 3: Business Logic** | Services/* | Koan-integrated services | Reuse algorithms, replace infrastructure |
 | **Phase 4: APIs** | Controllers/* | EntityController<T> | Keep business endpoints, remove CRUD |
-| **Phase 5: Infrastructure** | Program.cs, configs | KoanAutoRegistrar | Migrate service registrations |
+| **Phase 5: Infrastructure** | Program.cs, configs | DocMindRegistrar | Verify registrar wiring |
 
 This comprehensive mapping ensures agentic AI systems can systematically harvest and transform existing code while maximizing reuse and minimizing reimplementation effort.
 

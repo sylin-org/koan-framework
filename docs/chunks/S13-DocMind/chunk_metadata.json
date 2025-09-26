@@ -3,13 +3,13 @@
     "document_id": "S13-DocMind-Proposal",
     "source_file": "../../proposals/S13-DocMind-Proposal.md",
     "total_lines": 3274,
-    "total_chunks": 8,
+    "total_chunks": 10,
     "chunking_strategy": "semantic_coherence",
     "extraction_date": "2025-09-26",
     "framework": "Koan Framework"
   },
   "processing_strategy": {
-    "sequential_order": [1, 2, 3, 4, 5, 6, 7, 8],
+    "sequential_order": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     "parallel_groups": [
       {
         "group_id": "foundation",
@@ -38,7 +38,7 @@
       "koan_concepts": [
         "framework_transformation",
         "entity_first_development",
-        "auto_registration",
+        "registrar_bootstrap",
         "architecture_challenges"
       ],
       "key_sections": [
@@ -176,9 +176,9 @@
       "content_type": "configuration_setup",
       "koan_concepts": [
         "multi_provider_strategy",
-        "auto_registration",
+        "registrar_bootstrap",
         "bootstrap_reporting",
-        "KoanAutoRegistrar"
+        "DocMindRegistrar"
       ],
       "key_sections": [
         "Multi-Provider Data Strategy",
@@ -194,7 +194,7 @@
         "infrastructure_benefits"
       ],
       "recommended_agent": "Koan-bootstrap-specialist",
-      "processing_notes": "Infrastructure foundation. Extract provider election logic and auto-registration patterns."
+      "processing_notes": "Infrastructure foundation. Extract provider election logic and DocMind registrar patterns."
     },
     {
       "chunk_id": "06_implementation",
@@ -330,6 +330,63 @@
       "recommended_agent": "general-purpose",
       "cross_reference_role": true,
       "processing_notes": "Reference material for all other chunks. Extract code transformation patterns and migration procedures."
+    },
+    {
+      "chunk_id": "09_gap_analysis_and_rebuild_plan",
+      "file_name": "09_gap_analysis_and_rebuild_plan.md",
+      "lines": "n/a",
+      "actual_lines": 26,
+      "estimated_tokens": 650,
+      "content_type": "dx_gap_analysis",
+      "koan_concepts": [
+        "DocMindRegistrar",
+        "bootstrap_alignment",
+        "developer_experience"
+      ],
+      "key_sections": [
+        "Bootstrap & Infrastructure",
+        "Developer Experience Updates",
+        "Action Items",
+        "Risks & Mitigations",
+        "Next Steps"
+      ],
+      "complexity": "low",
+      "prerequisites": [],
+      "outputs": [
+        "registrar_task_list",
+        "dx_followups",
+        "risk_register"
+      ],
+      "recommended_agent": "general-purpose",
+      "processing_notes": "Focus on confirming the registrar-first narrative and cataloguing remaining DX follow-ups."
+    },
+    {
+      "chunk_id": "10_proposal_alignment_assessment",
+      "file_name": "10_proposal_alignment_assessment.md",
+      "lines": "n/a",
+      "actual_lines": 19,
+      "estimated_tokens": 480,
+      "content_type": "alignment_review",
+      "koan_concepts": [
+        "DocMindRegistrar",
+        "proposal_alignment",
+        "dx_validation"
+      ],
+      "key_sections": [
+        "Executive Summary",
+        "Alignment Checklist",
+        "Follow-Up Questions",
+        "Recommendation"
+      ],
+      "complexity": "low",
+      "prerequisites": [],
+      "outputs": [
+        "alignment_status",
+        "open_questions",
+        "next_steps"
+      ],
+      "recommended_agent": "general-purpose",
+      "processing_notes": "Validate that all collateral reflects the registrar-based startup guidance."
     }
   ],
   "agent_coordination": {
@@ -356,7 +413,7 @@
         "agent_type": "Koan-bootstrap-specialist",
         "assigned_chunks": [5],
         "coordination_role": "infrastructure_authority",
-        "output_dependencies": ["bootstrap_patterns", "auto_registration"]
+        "output_dependencies": ["bootstrap_patterns", "registrar_validation"]
       },
       {
         "agent_type": "Koan-framework-specialist",

@@ -1,21 +1,20 @@
 
-#### **Program.cs - Minimal Configuration with MCP Integration**
+#### **Program.cs – Minimal Bootstrap with the DocMind Registrar**
 ```csharp
 using DocMind;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Single line enables all Koan capabilities including MCP
-builder.Services.AddKoan(options =>
-{
-    // Enable MCP (Model Context Protocol) for AI agent orchestration
-    options.EnableMcp = true;
-    options.McpTransports = McpTransports.Stdio | McpTransports.HttpSse;
-});
+// Enable Koan with MCP and load the shipped DocMind registrar
+builder.Services
+    .AddKoan<DocMindRegistrar>(options =>
+    {
+        options.EnableMcp = true;
+        options.McpTransports = McpTransports.Stdio | McpTransports.HttpSse;
+    });
 
 var app = builder.Build();
 
-// Standard ASP.NET Core configuration
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -23,30 +22,29 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
+app.UseAuthorization();
 app.MapControllers();
-
-// Enable MCP endpoints for AI agent integration
 app.UseKoanMcp();
 
 app.Run();
 ```
 
-#### **Koan Auto-Registrar Implementation**
+#### **DocMind Registrar (Provided by the Package)**
 ```csharp
-// S13.DocMind/KoanAutoRegistrar.cs
-public class KoanAutoRegistrar : IKoanAutoRegistrar
+// S13.DocMind/DocMindRegistrar.cs
+public sealed class DocMindRegistrar : IKoanAutoRegistrar
 {
     public void Register(IServiceCollection services, IConfiguration configuration)
     {
-        // Business services auto-register
+        // Business services ship ready-to-wire
         services.AddScoped<DocumentIntelligenceService>();
         services.AddScoped<DocumentProcessingOrchestrator>();
         services.AddScoped<TemplateMatchingService>();
 
-        // AI services auto-configure
+        // AI configuration is hydrated from standard Koan sections
         services.Configure<AiOptions>(configuration.GetSection("Koan:AI"));
 
-        // Background services
+        // Background orchestration is enabled out of the box
         services.AddHostedService<DocumentProcessingBackgroundService>();
     }
 
@@ -54,19 +52,16 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         var report = new BootReport("S13.DocMind Document Intelligence Platform");
 
-        // Data provider capabilities
         report.AddSection("Data Providers", await GetProviderCapabilities(services));
-
-        // AI capabilities
         report.AddSection("AI Integration", await GetAiCapabilities(services));
-
-        // Processing pipeline status
         report.AddSection("Processing Pipeline", await GetPipelineStatus(services));
 
         return report;
     }
 }
 ```
+
+> ✅ **No custom extension required**: the registrar ships in the package, so the only Program.cs responsibility is invoking `AddKoan<DocMindRegistrar>()` and wiring the standard ASP.NET Core middleware.
 
 ---
 
@@ -138,7 +133,7 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
 - **Multi-provider transparency** enabling seamless scalability
 - **Built-in AI capabilities** eliminating infrastructure complexity
 - **Event sourcing** providing complete operational visibility
-- **Auto-registration** reducing configuration overhead
+- **DocMind registrar bootstrap** reducing configuration overhead
 - **Process-complete MCP integration** enabling full AI agent orchestration
 - **AI agent workflow support** through standardized tools, resources, and prompts
 

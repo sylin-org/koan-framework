@@ -43,7 +43,7 @@ init_processing() {
     log "🚀 Initializing S13-DocMind chunk processing..."
 
     # Create output directory structure
-    mkdir -p "$OUTPUT_DIR"/{phase1,phase2,phase3,phase4,phase5}
+    mkdir -p "$OUTPUT_DIR"/{phase1,phase2,phase3,phase4,phase5,phase6}
     mkdir -p "$OUTPUT_DIR"/coordination_checkpoints
     mkdir -p "$OUTPUT_DIR"/final_deliverables
 
@@ -56,7 +56,7 @@ init_processing() {
     done
 
     # Validate chunks exist
-    for i in {01..08}; do
+    for i in {01..10}; do
         chunk_file=$(ls ${i}_*.md 2>/dev/null | head -1)
         if [ ! -f "$chunk_file" ]; then
             error "Missing chunk file for ${i}"
@@ -249,12 +249,18 @@ main() {
     # Step 7: Migration Patterns (cross-reference throughout)
     process_chunk "08" "general-purpose" "5" "01,02,03,04,05,06,07"
 
+    # Phase 6: Alignment & Governance
+    info "🧭 Phase 6: Alignment & Governance"
+
+    process_chunk "09" "general-purpose" "6" "01,02,03,04,05,06,07,08"
+    process_chunk "10" "general-purpose" "6" "01,02,03,04,05,06,07,08,09"
+
     # Generate final integrated deliverables
     generate_final_deliverables
 
     success "🎉 S13-DocMind chunk processing completed successfully!"
     log "📊 Processing summary:"
-    log "   - Chunks processed: 8"
+    log "   - Chunks processed: 10"
     log "   - Coordination checkpoints: 3"
     log "   - Final deliverables: Generated"
     log "   - Output directory: $OUTPUT_DIR"
@@ -285,6 +291,9 @@ This document consolidates all agent outputs into unified implementation specifi
 ## Migration Procedures
 [Consolidated from Chunk 08]
 
+## Gap Analysis & DX Alignment
+[Consolidated from Chunks 09, 10]
+
 ## Implementation Roadmap
 [Consolidated from all chunks with coordination checkpoint outcomes]
 
@@ -312,7 +321,7 @@ EOF
 - [ ] Custom action implementations
 
 ## Phase 4: Infrastructure Implementation
-- [ ] KoanAutoRegistrar implementation
+- [ ] DocMindRegistrar integration verified
 - [ ] Multi-provider configuration
 - [ ] Bootstrap reporting
 
@@ -325,6 +334,11 @@ EOF
 - [ ] Code transformation procedures
 - [ ] Data migration scripts
 - [ ] Validation and testing
+
+## Phase 7: Alignment & Governance
+- [ ] DocMindRegistrar validation captured
+- [ ] DX collateral synchronized
+- [ ] Proposal alignment sign-off
 
 ---
 *Generated from consolidated agent specifications*
