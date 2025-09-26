@@ -287,7 +287,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         };
 
         var options = BuildOptions();
-        options.Page = applyPagination ? page : 1;
+        options.Page = applyPagination ? page : 0;
         options.PageSize = applyPagination ? pageSize : 0;
 
         if (!string.IsNullOrWhiteSpace(policy.DefaultSort) && options.Sort.Count == 0)

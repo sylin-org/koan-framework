@@ -29,7 +29,25 @@ public static class Data<TEntity, TKey>
 
     // Full scan - no pagination applied unless explicitly requested by user
     public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
-        => Repo.QueryAsync(null, ct);
+        => All(null, ct);
+
+    public static async Task<IReadOnlyList<TEntity>> All(DataQueryOptions? options, CancellationToken ct = default)
+    {
+        var result = await QueryWithCount(null, options, ct).ConfigureAwait(false);
+        return result.Items;
+    }
+
+    public static Task<QueryResult<TEntity>> AllWithCount(DataQueryOptions? options = null, CancellationToken ct = default)
+        => QueryWithCount(null, options, ct);
+
+    public static Task<QueryResult<TEntity>> QueryWithCount(DataQueryOptions? options, CancellationToken ct = default, int? absoluteMaxRecords = null)
+        => QueryWithCount((object?)null, options, ct, absoluteMaxRecords);
+
+    public static Task<QueryResult<TEntity>> QueryWithCount(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options = null, CancellationToken ct = default, int? absoluteMaxRecords = null)
+        => QueryWithCount((object?)predicate, options, ct, absoluteMaxRecords);
+
+    public static Task<QueryResult<TEntity>> QueryWithCount(string query, DataQueryOptions? options = null, CancellationToken ct = default, int? absoluteMaxRecords = null)
+        => QueryWithCount((object?)query, options, ct, absoluteMaxRecords);
 
     public static async Task<QueryResult<TEntity>> QueryWithCount(
         object? query,
@@ -38,156 +56,145 @@ public static class Data<TEntity, TKey>
         int? absoluteMaxRecords = null)
     {
         var repo = Repo;
-        var page = options?.EffectivePage(1) ?? 1;
-        var pageSize = options?.EffectivePageSize(int.MaxValue) ?? int.MaxValue;
+        var providedOptions = options ?? new DataQueryOptions();
+        var hasPagination = providedOptions.HasPagination;
+        var page = hasPagination ? providedOptions.EffectivePage(1) : 1;
+        var pageSize = hasPagination ? providedOptions.EffectivePageSize(Koan.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize) : int.MaxValue;
 
-        if (options?.HasPagination == true && repo is IPagedRepository<TEntity, TKey> pagedRepo)
+        var normalizedOptions = hasPagination
+            ? providedOptions.WithPagination(page, pageSize)
+            : providedOptions.WithoutPagination();
+
+        async Task<int?> TryCountAsync()
         {
-            var repoOptions = options.WithPagination(page, pageSize);
-            var repoResult = await pagedRepo.QueryPageAsync(query, repoOptions, ct).ConfigureAwait(false);
+            try
+            {
+                return await repo.CountAsync(query, ct).ConfigureAwait(false);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        int? preflightCount = null;
+        if (!hasPagination && absoluteMaxRecords.HasValue)
+        {
+            preflightCount = await TryCountAsync().ConfigureAwait(false);
+            if (preflightCount.HasValue && preflightCount.Value > absoluteMaxRecords.Value)
+            {
+                return new QueryResult<TEntity>
+                {
+                    Items = Array.Empty<TEntity>(),
+                    TotalCount = preflightCount.Value,
+                    Page = 1,
+                    PageSize = 0,
+                    RepositoryHandledPagination = false,
+                    ExceededSafetyLimit = true
+                };
+            }
+        }
+
+        if (hasPagination && repo is IPagedRepository<TEntity, TKey> pagedRepo)
+        {
+            var repoResult = await pagedRepo.QueryPageAsync(query, normalizedOptions, ct).ConfigureAwait(false);
             return new QueryResult<TEntity>
             {
                 Items = repoResult.Items,
                 TotalCount = repoResult.TotalCount,
                 Page = repoResult.Page,
-                PageSize = repoResult.PageSize
+                PageSize = repoResult.PageSize,
+                RepositoryHandledPagination = true,
+                ExceededSafetyLimit = false
             };
         }
 
-        int? totalCount = null;
-        if (options?.HasPagination == true || absoluteMaxRecords.HasValue)
-        {
-            try
-            {
-                totalCount = await repo.CountAsync(query, ct).ConfigureAwait(false);
-            }
-            catch
-            {
-                totalCount = null;
-            }
-
-            if (absoluteMaxRecords.HasValue && totalCount.HasValue && totalCount.Value > absoluteMaxRecords.Value)
-            {
-                return new QueryResult<TEntity>
-                {
-                    Items = Array.Empty<TEntity>(),
-                    TotalCount = totalCount.Value,
-                    Page = 1,
-                    PageSize = 0
-                };
-            }
-        }
-
         IReadOnlyList<TEntity> items;
-        var pagedInRepository = false;
+        var repositoryHandledPagination = false;
 
-        if (options?.HasPagination == true && repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions)
+        if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions)
         {
-            var repoOptions = options.WithPagination(page, pageSize);
-            items = await repoWithOptions.QueryAsync(query, repoOptions, ct).ConfigureAwait(false);
-            pagedInRepository = true;
+            items = await repoWithOptions.QueryAsync(query, normalizedOptions, ct).ConfigureAwait(false);
+            repositoryHandledPagination = hasPagination;
         }
         else
         {
             items = await repo.QueryAsync(query, ct).ConfigureAwait(false);
         }
 
+        int? totalCount = preflightCount;
+        if (!totalCount.HasValue && (hasPagination || absoluteMaxRecords.HasValue))
+        {
+            totalCount = await TryCountAsync().ConfigureAwait(false);
+        }
+
         if (!totalCount.HasValue)
         {
-            if (options?.HasPagination == true && pagedInRepository)
+            totalCount = items.Count;
+        }
+
+        if (!hasPagination)
+        {
+            if (absoluteMaxRecords.HasValue && totalCount.Value > absoluteMaxRecords.Value)
             {
-                try
+                return new QueryResult<TEntity>
                 {
-                    totalCount = await repo.CountAsync(query, ct).ConfigureAwait(false);
-                }
-                catch
-                {
-                    totalCount = items.Count;
-                }
+                    Items = Array.Empty<TEntity>(),
+                    TotalCount = totalCount.Value,
+                    Page = 1,
+                    PageSize = 0,
+                    RepositoryHandledPagination = repositoryHandledPagination,
+                    ExceededSafetyLimit = true
+                };
             }
-            else
+
+            return new QueryResult<TEntity>
             {
-                totalCount = items.Count;
-            }
+                Items = items,
+                TotalCount = totalCount.Value,
+                Page = 1,
+                PageSize = items.Count,
+                RepositoryHandledPagination = repositoryHandledPagination,
+                ExceededSafetyLimit = false
+            };
         }
 
         IReadOnlyList<TEntity> window = items;
-        if (options?.HasPagination == true && !pagedInRepository)
+        if (!repositoryHandledPagination)
         {
             var skip = Math.Max(page - 1, 0) * pageSize;
             window = items.Skip(skip).Take(pageSize).ToList();
         }
 
-        if (absoluteMaxRecords.HasValue && options?.HasPagination != true && totalCount.HasValue && totalCount.Value > absoluteMaxRecords.Value)
-        {
-            return new QueryResult<TEntity>
-            {
-                Items = Array.Empty<TEntity>(),
-                TotalCount = totalCount.Value,
-                Page = 1,
-                PageSize = 0
-            };
-        }
-
-        var finalTotal = totalCount ?? window.Count;
-        var finalPageSize = options?.HasPagination == true ? pageSize : window.Count;
-        var finalPage = options?.HasPagination == true ? page : 1;
-
         return new QueryResult<TEntity>
         {
             Items = window,
-            TotalCount = finalTotal,
-            Page = finalPage,
-            PageSize = finalPageSize
+            TotalCount = totalCount.Value,
+            Page = page,
+            PageSize = hasPagination ? pageSize : window.Count,
+            RepositoryHandledPagination = repositoryHandledPagination,
+            ExceededSafetyLimit = false
         };
     }
 
-    public static async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+        => Query(predicate, null, ct);
+
+    public static async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
-        if (Repo is ILinqQueryRepositoryWithOptions<TEntity, TKey> lrepoOpts)
-        {
-            var acc = new List<TEntity>(capacity: Koan.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
-            int page = 1;
-            int fetched;
-            do
-            {
-                ct.ThrowIfCancellationRequested();
-                var opts = new DataQueryOptions(page, Koan.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
-                var batch = await lrepoOpts.QueryAsync(predicate, opts, ct).ConfigureAwait(false);
-                fetched = batch.Count;
-                if (fetched == 0) break;
-                acc.AddRange(batch);
-                page++;
-            } while (fetched == Koan.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
-            return acc;
-        }
-        if (Repo is ILinqQueryRepository<TEntity, TKey> lrepo)
-            return await lrepo.QueryAsync(predicate, ct).ConfigureAwait(false);
-        throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
+        if (predicate is null) throw new ArgumentNullException(nameof(predicate));
+        var result = await QueryWithCount(predicate, options, ct).ConfigureAwait(false);
+        return result.Items;
     }
 
-    public static async Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
+    public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
+        => Query(query, null, ct);
+
+    public static async Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
     {
-        if (Repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
-        {
-            var acc = new List<TEntity>(capacity: Koan.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
-            int page = 1;
-            int fetched;
-            do
-            {
-                ct.ThrowIfCancellationRequested();
-                var opts = new DataQueryOptions(page, Koan.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
-                var batch = await srepoOpts.QueryAsync(query, opts, ct).ConfigureAwait(false);
-                fetched = batch.Count;
-                if (fetched == 0) break;
-                acc.AddRange(batch);
-                page++;
-            } while (fetched == Koan.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize);
-            return acc;
-        }
-        if (Repo is IStringQueryRepository<TEntity, TKey> srepo)
-            return await srepo.QueryAsync(query, ct).ConfigureAwait(false);
-        throw new System.NotSupportedException("String queries are not supported by this repository.");
+        if (query is null) throw new ArgumentNullException(nameof(query));
+        var result = await QueryWithCount(query, options, ct).ConfigureAwait(false);
+        return result.Items;
     }
     public static Task<int> CountAllAsync(CancellationToken ct = default)
         => Repo.CountAsync(null, ct);
@@ -200,6 +207,14 @@ public static class Data<TEntity, TKey>
     public static Task<bool> DeleteAsync(TKey id, CancellationToken ct = default) => Repo.DeleteAsync(id, ct);
     public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.DeleteManyAsync(ids, ct);
     public static Task<int> DeleteAllAsync(CancellationToken ct = default) => Repo.DeleteAllAsync(ct);
+    public static Task<bool> DeleteAsync(TKey id, DataQueryOptions? options, CancellationToken ct = default)
+        => string.IsNullOrWhiteSpace(options?.Set) ? Repo.DeleteAsync(id, ct) : DeleteAsync(id, options!.Set!, ct);
+
+    public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, DataQueryOptions? options, CancellationToken ct = default)
+        => string.IsNullOrWhiteSpace(options?.Set) ? Repo.DeleteManyAsync(ids, ct) : DeleteManyAsync(ids, options!.Set!, ct);
+
+    public static Task<int> DeleteAllAsync(DataQueryOptions? options, CancellationToken ct = default)
+        => string.IsNullOrWhiteSpace(options?.Set) ? Repo.DeleteAllAsync(ct) : DeleteAllAsync(options!.Set!, ct);
     public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default) => Repo.UpsertAsync(model, ct);
     public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertManyAsync(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
@@ -357,6 +372,9 @@ public static class Data<TEntity, TKey>
 
     public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, string set, CancellationToken ct = default)
     { using var _ = WithSet(set); return Repo.DeleteManyAsync(ids, ct); }
+
+    public static Task<int> DeleteAllAsync(string set, CancellationToken ct = default)
+    { using var _ = WithSet(set); return Repo.DeleteAllAsync(ct); }
 
     public static async Task<int> Delete(Expression<Func<TEntity, bool>> predicate, string set, CancellationToken ct = default)
     {

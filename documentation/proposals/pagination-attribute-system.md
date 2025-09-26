@@ -174,6 +174,35 @@ public sealed record PaginationSafetyBounds
 
 ## Implementation Plan
 
+### Guardrails for non-controller consumers
+
+Entity statics (e.g., `User.All()` or `User.Query(...)`) continue to behave exactly as they do today unless a caller explicitly
+supplies a `DataQueryOptions` instance. This ensures that the new default pagination only applies to `EntityController<>`
+endpoints—bulk data pulls from orchestration jobs, background workers, and CLI tools will keep issuing full table scans until
+they opt in to modifiers. The repository helpers already expose the hooks needed for those scenarios (`DataQueryOptions`
+flowing through `QueryWithCount`, `IDataRepositoryWithOptions`, etc.), so no runtime behavior changes are required to honor the
+DX contract.
+
+What remains is ergonomic surface area so callers can actually provide the modifier payloads when they want to. We will add an
+optional `DataQueryOptions? options = null` parameter (or builder overload) to the LINQ, string-query, and raw `QueryAsync`
+helpers on `Data<TEntity, TKey>` and on the generated model statics. The overloads will forward options verbatim to repositories
+that implement the `...WithOptions` contracts, falling back to today’s batched materialization loop otherwise. This keeps
+backward compatibility while making it trivial to supply set names, explicit sorts, composite filters, or pagination hints.
+
+To make this delightful, the plan includes:
+
+1. **API shape** – `Model.Query(predicate, options: DataQueryOptions?)`, `Model.All(options: DataQueryOptions?)`, and similar
+   overloads for raw query strings.
+2. **Builder helpers** – fluent helpers (`DataQueryOptionsBuilder`) or static factories so callers avoid manual `new
+   DataQueryOptions { ... }` when they only need to set one or two knobs.
+3. **Documentation & samples** – update CLI, GraphQL, and orchestration docs with examples that pass modifiers for pagination,
+   targeted sorts, and partition selection.
+4. **Safety rails** – reiterate that controller defaults remain paginated; opting out via statics requires an explicit choice so
+   high-risk code paths are easy to audit.
+
+These changes will ship alongside the controller work so developers can progressively adopt modifiers without breaking existing
+jobs that depend on unrestricted scans.
+
 ### Phase 1: Core Infrastructure
 
 #### 1.1 Enhanced DataQueryOptions
@@ -403,7 +432,6 @@ public abstract class EntityController<T, TKey> : ControllerBase
             var methodInfo = ControllerContext.ActionDescriptor.MethodInfo;
             var methodAttr = methodInfo.GetCustomAttribute<PaginationAttribute>();
             if (methodAttr != null) return methodAttr;
-
             var controllerAttr = GetType().GetCustomAttribute<PaginationAttribute>();
             if (controllerAttr != null) return controllerAttr;
 
@@ -546,53 +574,65 @@ public abstract class EntityController<T, TKey> : ControllerBase
 #### 3.1 OpenAPI Integration
 
 ```csharp
-public class PaginationOperationFilter : IOperationFilter
+public sealed class PaginationOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        var paginationAttr = context.MethodInfo.GetCustomAttribute<PaginationAttribute>()
-                           ?? context.MethodInfo.DeclaringType?.GetCustomAttribute<PaginationAttribute>();
+        if (!string.Equals(context.ApiDescription.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
 
-        if (paginationAttr == null) return;
+        var pagination = context.MethodInfo.GetCustomAttribute<PaginationAttribute>()
+                        ?? context.MethodInfo.DeclaringType?.GetCustomAttribute<PaginationAttribute>();
+        if (pagination is null)
+        {
+            return;
+        }
 
-        switch (paginationAttr.Mode)
+        operation.Parameters ??= new List<OpenApiParameter>();
+        EnsureResponses(operation);
+
+        switch (pagination.Mode)
         {
             case PaginationMode.On:
             case PaginationMode.Required:
-                AddPaginationParameters(operation, paginationAttr);
-                AddPaginationResponses(operation, paginationAttr);
+                AddPagingParameters(operation.Parameters, pagination);
+                AddPagingHeaders(operation.Responses, pagination.IncludeCount);
                 break;
-
             case PaginationMode.Optional:
-                AddOptionalPaginationParameters(operation, paginationAttr);
-                AddPaginationResponses(operation, paginationAttr);
+                AddPagingParameters(operation.Parameters, pagination);
+                AddAllParameter(operation.Parameters);
+                AddPagingHeaders(operation.Responses, pagination.IncludeCount);
                 break;
-
-
-            // Off mode needs no special handling
+            case PaginationMode.Off:
+                if (pagination.IncludeCount)
+                {
+                    AddCountHeader(operation.Responses);
+                }
+                break;
         }
     }
 
-    private void AddPaginationParameters(OpenApiOperation operation, PaginationAttribute attr)
+    private static void EnsureResponses(OpenApiOperation operation)
     {
-        operation.Parameters.Add(new OpenApiParameter
+        operation.Responses ??= new OpenApiResponses();
+        operation.Responses.TryAdd("200", new OpenApiResponse { Description = "OK" });
+        operation.Responses.TryAdd("413", new OpenApiResponse
         {
-            Name = "page",
-            In = ParameterLocation.Query,
-            Description = "Page number (1-based)",
-            Schema = new OpenApiSchema { Type = "integer", Minimum = 1, Default = new OpenApiInteger(1) }
-        });
-
-        operation.Parameters.Add(new OpenApiParameter
-        {
-            Name = "pageSize",
-            In = ParameterLocation.Query,
-            Description = $"Page size (max {attr.MaxSize})",
-            Schema = new OpenApiSchema { Type = "integer", Minimum = 1, Maximum = attr.MaxSize, Default = new OpenApiInteger(attr.DefaultSize) }
+            Description = "Payload too large – enable pagination or refine filters.",
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                ["application/json"] = new()
+            }
         });
     }
+
+    // Helper methods add query parameters and headers…
 }
 ```
+
+The concrete implementation (now shipping as `Koan.Web.Swagger.PaginationOperationFilter`) mirrors this pseudocode: it inspects `[Pagination]` metadata, adds `page`/`pageSize`/`all` query parameters as appropriate, documents the `X-Page`/`X-Page-Size`/`X-Total-Count` headers when totals are emitted, and registers a canonical `413 Payload Too Large` response for Optional/Off flows that exceed the absolute record cap.
 
 ## Feasibility & Risk Assessment
 
@@ -1000,6 +1040,11 @@ public class UsersController : EntityController<User>
 2. **Batch Processing**: Repositories that cannot paginate natively should still chunk large results to avoid spikes.
 3. **Connection Pooling**: Ensure long-running count queries or large result sets do not exhaust pooled connections.
 
+### Observability
+
+1. **Safety Cap Logging**: `EntityEndpointService` emits structured warnings whenever an unpaged request exceeds `AbsoluteMaxRecords`, exposing the effective path, cap, and observed total so operations teams can reach out to clients.
+2. **Swagger Documentation**: The pagination operation filter advertises both the protective `413` response and the headers emitted when pagination is active, making client expectations explicit.
+
 ### Caching Strategy
 
 ```csharp
@@ -1029,24 +1074,24 @@ public class ProductsController : EntityController<Product>
 ## Implementation Checklist
 
 ### Phase 1: Core (Required for MVP)
-- [ ] `PaginationAttribute` definition
-- [ ] Enhanced `DataQueryOptions`
-- [ ] `QueryResult<T>` type and repository paging contracts
-- [ ] Updated `Data<T,K>` methods
-- [ ] Basic mode support (On, Required, Optional, Off)
+- [x] `PaginationAttribute` definition
+- [x] Enhanced `DataQueryOptions`
+- [x] `QueryResult<T>` type and repository paging contracts
+- [x] Updated `Data<T,K>` methods
+- [x] Basic mode support (On, Required, Optional, Off)
 
 ### Phase 2: EntityController (Essential)
-- [ ] Base `EntityController<T>` updates
-- [ ] Mode-specific handlers
-- [ ] Header management
-- [ ] Query parameter validation
-- [ ] Error handling
+- [x] Base `EntityController<T>` updates
+- [x] Mode-specific handlers
+- [x] Header management
+- [x] Query parameter validation
+- [x] Error handling
 
 ### Phase 3: Framework Integration (Important)
-- [ ] OpenAPI integration
+- [x] OpenAPI integration
 - [ ] Validation filters
-- [ ] Default policy configuration
-- [ ] Migration documentation
+- [x] Default policy configuration
+- [x] Migration documentation
 
 ### Phase 4: Advanced (Nice to Have)
 - [ ] Performance optimizations

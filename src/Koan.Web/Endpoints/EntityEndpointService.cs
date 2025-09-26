@@ -57,7 +57,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         int total;
         try
         {
-            queryResult = await QueryCollectionAsync(repo, request, context.Options, context.CancellationToken);
+            queryResult = await QueryCollectionAsync(request, context.Options, context.CancellationToken);
             total = queryResult.Total;
         }
         catch (InvalidOperationException ex)
@@ -68,6 +68,13 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         if (queryResult.ExceededSafetyLimit)
         {
+            _logger?.LogWarning(
+                "EntityEndpointService<{Entity}> blocked unpaged response exceeding safety cap {Cap}. Path: {Path}. ReportedTotal: {Total}.",
+                typeof(TEntity).Name,
+                request.Policy.AbsoluteMaxRecords,
+                request.BasePath ?? context.HttpContext?.Request.Path.ToString() ?? "unknown",
+                queryResult.Total);
+
             var payload = new
             {
                 error = "Result too large",
@@ -531,136 +538,67 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     }
 
     private async Task<RepositoryQueryResult> QueryCollectionAsync(
-        IDataRepository<TEntity, TKey> repo,
         EntityCollectionRequest request,
         QueryOptions options,
         CancellationToken cancellationToken)
     {
         using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
-        async Task<int?> TryCountAsync(Func<CancellationToken, Task<int>> counter)
-        {
-            try
-            {
-                return await counter(cancellationToken).ConfigureAwait(false);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        async Task<int> ResolveTotalAsync(Func<CancellationToken, Task<int>> counter, int fallback, int? prefetched, bool needed)
-        {
-            if (prefetched.HasValue)
-            {
-                return prefetched.Value;
-            }
-
-            if (!needed)
-            {
-                return fallback;
-            }
-
-            var computed = await TryCountAsync(counter).ConfigureAwait(false);
-            return computed ?? fallback;
-        }
-
-        var absoluteMax = request.AbsoluteMaxRecords;
-
-        if (!string.IsNullOrWhiteSpace(request.FilterJson) && repo is ILinqQueryRepository<TEntity, TKey> lrepo)
+        object? queryPayload = null;
+        if (!string.IsNullOrWhiteSpace(request.FilterJson))
         {
             if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
             {
                 throw new InvalidOperationException(error ?? "Invalid filter");
             }
 
-            var counter = new Func<CancellationToken, Task<int>>(ct => lrepo.CountAsync(predicate!, ct));
-            int? prefetchedTotal = null;
-            if (!request.ApplyPagination && absoluteMax > 0)
-            {
-                prefetchedTotal = await TryCountAsync(counter).ConfigureAwait(false);
-                if (prefetchedTotal.HasValue && prefetchedTotal.Value > absoluteMax)
-                {
-                    return new RepositoryQueryResult(Array.Empty<TEntity>(), prefetchedTotal.Value, false, true);
-                }
-            }
-
-            IReadOnlyList<TEntity> items;
-            var handled = false;
-            if (request.ApplyPagination && repo is ILinqQueryRepositoryWithOptions<TEntity, TKey> lrepoOpts)
-            {
-                var dq = new DataQueryOptions(options.Page, options.PageSize);
-                items = await lrepoOpts.QueryAsync(predicate!, dq, cancellationToken).ConfigureAwait(false);
-                handled = true;
-            }
-            else
-            {
-                items = await lrepo.QueryAsync(predicate!, cancellationToken).ConfigureAwait(false);
-            }
-
-            var total = await ResolveTotalAsync(counter, items.Count, prefetchedTotal, request.IncludeTotalCount || request.ApplyPagination).ConfigureAwait(false);
-            return new RepositoryQueryResult(items, total, handled, false);
+            queryPayload = predicate!;
         }
-
-        if (!string.IsNullOrWhiteSpace(options.Q) && repo is IStringQueryRepository<TEntity, TKey> srepo)
+        else if (!string.IsNullOrWhiteSpace(options.Q))
         {
-            var counter = new Func<CancellationToken, Task<int>>(ct => srepo.CountAsync(options.Q!, ct));
-            int? prefetchedTotal = null;
-            if (!request.ApplyPagination && absoluteMax > 0)
-            {
-                prefetchedTotal = await TryCountAsync(counter).ConfigureAwait(false);
-                if (prefetchedTotal.HasValue && prefetchedTotal.Value > absoluteMax)
-                {
-                    return new RepositoryQueryResult(Array.Empty<TEntity>(), prefetchedTotal.Value, false, true);
-                }
-            }
-
-            IReadOnlyList<TEntity> items;
-            var handled = false;
-            if (request.ApplyPagination && repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
-            {
-                var dq = new DataQueryOptions(options.Page, options.PageSize);
-                items = await srepoOpts.QueryAsync(options.Q!, dq, cancellationToken).ConfigureAwait(false);
-                handled = true;
-            }
-            else
-            {
-                items = await srepo.QueryAsync(options.Q!, cancellationToken).ConfigureAwait(false);
-            }
-
-            var total = await ResolveTotalAsync(counter, items.Count, prefetchedTotal, request.IncludeTotalCount || request.ApplyPagination).ConfigureAwait(false);
-            return new RepositoryQueryResult(items, total, handled, false);
+            queryPayload = options.Q;
         }
 
+        var dataOptions = BuildDataQueryOptions(request, options);
+        var absoluteMax = request.AbsoluteMaxRecords > 0 ? request.AbsoluteMaxRecords : (int?)null;
+
+        var result = await Data<TEntity, TKey>.QueryWithCount(queryPayload, dataOptions, cancellationToken, absoluteMax).ConfigureAwait(false);
+
+        return new RepositoryQueryResult(result.Items, result.TotalCount, result.RepositoryHandledPagination, result.ExceededSafetyLimit);
+    }
+
+    private static DataQueryOptions BuildDataQueryOptions(EntityCollectionRequest request, QueryOptions options)
+    {
+        var queryOptions = new DataQueryOptions();
+
+        if (request.ApplyPagination && options.Page > 0 && options.PageSize > 0)
         {
-            var counter = new Func<CancellationToken, Task<int>>(ct => repo.CountAsync(null, ct));
-            int? prefetchedTotal = null;
-            if (!request.ApplyPagination && absoluteMax > 0)
-            {
-                prefetchedTotal = await TryCountAsync(counter).ConfigureAwait(false);
-                if (prefetchedTotal.HasValue && prefetchedTotal.Value > absoluteMax)
-                {
-                    return new RepositoryQueryResult(Array.Empty<TEntity>(), prefetchedTotal.Value, false, true);
-                }
-            }
+            queryOptions = queryOptions.WithPagination(options.Page, options.PageSize);
 
-            IReadOnlyList<TEntity> items;
-            var handled = false;
-            if (request.ApplyPagination && repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
-            {
-                var dq = new DataQueryOptions(options.Page, options.PageSize);
-                items = await repoOpts.QueryAsync(null, dq, cancellationToken).ConfigureAwait(false);
-                handled = true;
-            }
-            else
-            {
-                items = await repo.QueryAsync(null, cancellationToken).ConfigureAwait(false);
-            }
-
-            var total = await ResolveTotalAsync(counter, items.Count, prefetchedTotal, request.IncludeTotalCount || request.ApplyPagination).ConfigureAwait(false);
-            return new RepositoryQueryResult(items, total, handled, false);
         }
+
+        if (!string.IsNullOrWhiteSpace(request.Set))
+        {
+            queryOptions = queryOptions.ForSet(request.Set);
+        }
+
+        if (options.Sort.Count > 0)
+        {
+            queryOptions = queryOptions.WithSort(ToSortString(options.Sort));
+        }
+
+        return queryOptions;
+    }
+
+    private static string? ToSortString(IReadOnlyList<SortSpec> sorts)
+    {
+        if (sorts.Count == 0)
+        {
+            return null;
+        }
+
+        return string.Join(",", sorts.Select(s => s.Desc ? $"-{s.Field}" : s.Field));
+
     }
 
     private async Task<(IReadOnlyList<TEntity> Items, int Total)> QueryCollectionFromBodyAsync(

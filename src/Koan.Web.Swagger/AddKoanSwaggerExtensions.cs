@@ -40,6 +40,8 @@ public static class AddKoanSwaggerExtensions
                     try { c.IncludeXmlComments(xml, includeControllerXmlComments: true); } catch { }
                 }
             }
+            // Document pagination semantics for EntityController endpoints
+            c.OperationFilter<PaginationOperationFilter>();
             // Document common headers
             c.OperationFilter<KoanHeadersOperationFilter>();
             // If transformers assembly is present, include an operation filter to advertise alternate media types
