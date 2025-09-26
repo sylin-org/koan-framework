@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core Koan Framework -->
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data\Koan.Data.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+
+    <!-- Provider Projects - Auto-registered when referenced -->
+    <ProjectReference Include="..\..\src\Koan.Data.MongoDB\Koan.Data.MongoDB.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Weaviate\Koan.Data.Weaviate.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.PostgreSQL\Koan.Data.PostgreSQL.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Redis\Koan.Data.Redis.csproj" />
+
+    <!-- Document Processing -->
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.0.1" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
+
+    <!-- Additional utilities -->
+  </ItemGroup>
+</Project>

@@ -1,0 +1,52 @@
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">New Document Type</h1>
+                <div>
+                    <a href="#/document-types" class="btn btn-outline-secondary me-2">
+                        <i class="bi bi-arrow-left"></i> Back to List
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form ng-submit="save()" name="documentTypeForm">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Name *</label>
+                            <input type="text" class="form-control" id="name" ng-model="documentType.name" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" rows="3" ng-model="documentType.description"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="category" class="form-label">Category</label>
+                            <select class="form-select" id="category" ng-model="documentType.category">
+                                <option value="">Select Category</option>
+                                <option value="legal">Legal</option>
+                                <option value="financial">Financial</option>
+                                <option value="medical">Medical</option>
+                                <option value="academic">Academic</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button type="submit" class="btn btn-primary" ng-disabled="!documentTypeForm.$valid || saving">
+                                    <i class="bi bi-check-circle" ng-hide="saving"></i>
+                                    <span class="spinner-border spinner-border-sm" ng-show="saving"></span>
+                                    {{saving ? 'Creating...' : 'Create Document Type'}}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

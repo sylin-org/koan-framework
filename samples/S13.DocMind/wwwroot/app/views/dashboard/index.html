@@ -1,0 +1,108 @@
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">Dashboard</h1>
+
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">Total Files</h5>
+                                    <h2>{{stats.totalFiles || 0}}</h2>
+                                </div>
+                                <i class="bi bi-files" style="font-size: 2rem; opacity: 0.7;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">Processed</h5>
+                                    <h2>{{stats.processedFiles || 0}}</h2>
+                                </div>
+                                <i class="bi bi-check-circle" style="font-size: 2rem; opacity: 0.7;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">Processing</h5>
+                                    <h2>{{stats.processingFiles || 0}}</h2>
+                                </div>
+                                <i class="bi bi-hourglass-split" style="font-size: 2rem; opacity: 0.7;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h5 class="card-title">Document Types</h5>
+                                    <h2>{{stats.documentTypes || 0}}</h2>
+                                </div>
+                                <i class="bi bi-collection" style="font-size: 2rem; opacity: 0.7;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Recent Activity</h5>
+                        </div>
+                        <div class="card-body">
+                            <div ng-show="recentActivity.length === 0" class="text-center py-4">
+                                <i class="bi bi-activity" style="font-size: 3rem; opacity: 0.3;"></i>
+                                <p class="text-muted mt-2">No recent activity</p>
+                            </div>
+                            <div ng-repeat="activity in recentActivity" class="d-flex align-items-center mb-3">
+                                <i class="bi bi-circle-fill text-primary me-3" style="font-size: 0.5rem;"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-medium">{{activity.description}}</div>
+                                    <small class="text-muted">{{activity.timestamp | date:'medium'}}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="#/files/upload" class="btn btn-primary">
+                                    <i class="bi bi-upload"></i> Upload Files
+                                </a>
+                                <a href="#/document-types/new" class="btn btn-outline-primary">
+                                    <i class="bi bi-plus-circle"></i> New Document Type
+                                </a>
+                                <a href="#/analysis" class="btn btn-outline-secondary">
+                                    <i class="bi bi-graph-up"></i> View Analysis
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
