@@ -21,8 +21,8 @@ docs/chunks/S13-DocMind/
 ├── 06_implementation.md         # Technical specs and migration strategy
 ├── 07_testing_ops.md            # Testing, deployment, and operations
 ├── 08_migration_guide.md        # Code transformation and troubleshooting
-├── 09_gap_analysis_and_rebuild_plan.md # Current-state audit and rebuild roadmap
-├── 10_proposal_alignment_assessment.md # Proposal vs. implementation assessment
+├── 09_gap_analysis_and_rebuild_plan.md # Registrar-focused gap analysis
+├── 10_proposal_alignment_assessment.md # Alignment scorecard for registrar update
 └── processing_outputs/          # Generated during chunk processing
     ├── phase1/                  # Foundation analysis outputs
     ├── phase2/                  # Parallel specialization outputs
@@ -103,6 +103,10 @@ cat ai_agent_instructions.md
 ### Phase 5: Adoption & Audit
 - **Chunk 08** – Migration & rollout guidance
 - **Chunk 09** – Current-state gap analysis and rebuild roadmap
+
+### Phase 6: Alignment & Governance
+- **Chunk 09** - Registrar gap analysis and DX follow-ups
+- **Chunk 10** - Proposal alignment assessment
 
 ## 🤖 AI Agent Specialization
 
@@ -219,7 +223,7 @@ Task Koan-processing-specialist "Process S13-DocMind chunk 03 for AI processing 
 - [ ] All chunks follow Koan Framework patterns
 - [ ] Entity specifications are consistent across chunks
 - [ ] API patterns align with EntityController<T> standards
-- [ ] Infrastructure follows auto-registration principles
+- [ ] Infrastructure follows DocMind registrar principles
 - [ ] Deployment configurations match S5/S8 sample patterns
 
 ### Cross-Chunk Consistency

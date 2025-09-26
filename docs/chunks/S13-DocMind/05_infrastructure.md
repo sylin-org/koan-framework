@@ -28,6 +28,7 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 app.UseRouting();
+app.UseAuthorization();
 app.MapControllers();
 app.UseKoanMcp();
 app.Run();
@@ -39,6 +40,7 @@ app.Run();
 
 ```csharp
 public static class DocMindServiceCollectionExtensions
+
 {
     public static IServiceCollection AddDocMind(this IServiceCollection services)
     {

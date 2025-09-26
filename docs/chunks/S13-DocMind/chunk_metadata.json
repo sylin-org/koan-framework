@@ -84,6 +84,12 @@
       "chunk_id": "01_executive_overview",
       "file_name": "01_executive_overview.md",
       "content_type": "strategic_overview",
+      "koan_concepts": [
+        "framework_transformation",
+        "entity_first_development",
+        "registrar_bootstrap",
+        "architecture_challenges"
+      ],
       "key_sections": [
         "Executive Summary",
         "Refactoring Vision",
@@ -175,7 +181,16 @@
     {
       "chunk_id": "05_infrastructure",
       "file_name": "05_infrastructure.md",
-      "content_type": "bootstrap",
+      "lines": "1166-1295",
+      "actual_lines": 130,
+      "estimated_tokens": 3200,
+      "content_type": "configuration_setup",
+      "koan_concepts": [
+        "multi_provider_strategy",
+        "registrar_bootstrap",
+        "bootstrap_reporting",
+        "DocMindRegistrar"
+      ],
       "key_sections": [
         "Baseline Stack",
         "Auto-Registrar",
@@ -188,12 +203,8 @@
         "configuration_matrix",
         "infra_dx_enhancements"
       ],
-      "koan_concepts": [
-        "AddKoan",
-        "AddDocMind",
-        "OptionsBinding",
-        "HealthChecks"
-      ]
+      "recommended_agent": "Koan-bootstrap-specialist",
+      "processing_notes": "Infrastructure foundation. Extract provider election logic and DocMind registrar patterns."
     },
     {
       "chunk_id": "06_implementation",
@@ -295,19 +306,122 @@
         "Risks and Recommendations"
       ],
       "recommended_agent": "general-purpose",
-      "processing_notes": "Provide objective comparison between proposal goals and current sample implementation.",
-      "outputs": [
-        "proposal_summary",
-        "current_state_findings",
-        "gap_highlights",
-        "alignment_recommendations"
-      ],
+      "cross_reference_role": true,
+      "processing_notes": "Reference material for all other chunks. Extract code transformation patterns and migration procedures."
+    },
+    {
+      "chunk_id": "09_gap_analysis_and_rebuild_plan",
+      "file_name": "09_gap_analysis_and_rebuild_plan.md",
+      "lines": "n/a",
+      "actual_lines": 26,
+      "estimated_tokens": 650,
+      "content_type": "dx_gap_analysis",
       "koan_concepts": [
-        "AddKoan",
-        "AI.Abstractions",
-        "MCP",
-        "DockerCompose"
-      ]
+        "DocMindRegistrar",
+        "bootstrap_alignment",
+        "developer_experience"
+      ],
+      "key_sections": [
+        "Bootstrap & Infrastructure",
+        "Developer Experience Updates",
+        "Action Items",
+        "Risks & Mitigations",
+        "Next Steps"
+      ],
+      "complexity": "low",
+      "prerequisites": [],
+      "outputs": [
+        "registrar_task_list",
+        "dx_followups",
+        "risk_register"
+      ],
+      "recommended_agent": "general-purpose",
+      "processing_notes": "Focus on confirming the registrar-first narrative and cataloguing remaining DX follow-ups."
+    },
+    {
+      "chunk_id": "10_proposal_alignment_assessment",
+      "file_name": "10_proposal_alignment_assessment.md",
+      "lines": "n/a",
+      "actual_lines": 19,
+      "estimated_tokens": 480,
+      "content_type": "alignment_review",
+      "koan_concepts": [
+        "DocMindRegistrar",
+        "proposal_alignment",
+        "dx_validation"
+      ],
+      "key_sections": [
+        "Executive Summary",
+        "Alignment Checklist",
+        "Follow-Up Questions",
+        "Recommendation"
+      ],
+      "complexity": "low",
+      "prerequisites": [],
+      "outputs": [
+        "alignment_status",
+        "open_questions",
+        "next_steps"
+      ],
+      "recommended_agent": "general-purpose",
+      "processing_notes": "Validate that all collateral reflects the registrar-based startup guidance."
     }
-  ]
+  ],
+  "agent_coordination": {
+    "primary_agents": [
+      {
+        "agent_type": "Koan-data-architect",
+        "assigned_chunks": [2, 5],
+        "coordination_role": "entity_design_authority",
+        "output_dependencies": ["entity_schemas", "provider_strategies"]
+      },
+      {
+        "agent_type": "Koan-flow-specialist",
+        "assigned_chunks": [3],
+        "coordination_role": "ai_processing_authority",
+        "output_dependencies": ["flow_patterns", "event_sourcing_specs"]
+      },
+      {
+        "agent_type": "Koan-developer-experience-enhancer",
+        "assigned_chunks": [4],
+        "coordination_role": "api_design_authority",
+        "output_dependencies": ["api_specifications", "user_workflows"]
+      },
+      {
+        "agent_type": "Koan-bootstrap-specialist",
+        "assigned_chunks": [5],
+        "coordination_role": "infrastructure_authority",
+        "output_dependencies": ["bootstrap_patterns", "registrar_validation"]
+      },
+      {
+        "agent_type": "Koan-framework-specialist",
+        "assigned_chunks": [6],
+        "coordination_role": "compliance_authority",
+        "output_dependencies": ["implementation_specs", "framework_alignment"]
+      },
+      {
+        "agent_type": "Koan-orchestration-devops",
+        "assigned_chunks": [7],
+        "coordination_role": "deployment_authority",
+        "output_dependencies": ["deployment_configs", "operational_procedures"]
+      }
+    ],
+    "coordination_points": [
+      {
+        "checkpoint": "entity_design_review",
+        "participating_agents": ["Koan-data-architect", "Koan-flow-specialist"],
+        "deliverable": "validated_entity_specifications"
+      },
+      {
+        "checkpoint": "api_workflow_alignment",
+        "participating_agents": ["Koan-developer-experience-enhancer", "Koan-flow-specialist"],
+        "deliverable": "integrated_api_flow_specifications"
+      },
+      {
+        "checkpoint": "deployment_readiness",
+        "participating_agents": ["Koan-orchestration-devops", "Koan-framework-specialist"],
+        "deliverable": "production_deployment_plan"
+      }
+    ]
+  }
 }
