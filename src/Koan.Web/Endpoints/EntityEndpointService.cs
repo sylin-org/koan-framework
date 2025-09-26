@@ -68,6 +68,13 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         if (queryResult.ExceededSafetyLimit)
         {
+            _logger?.LogWarning(
+                "EntityEndpointService<{Entity}> blocked unpaged response exceeding safety cap {Cap}. Path: {Path}. ReportedTotal: {Total}.",
+                typeof(TEntity).Name,
+                request.Policy.AbsoluteMaxRecords,
+                request.BasePath ?? context.HttpContext?.Request.Path.ToString() ?? "unknown",
+                queryResult.Total);
+
             var payload = new
             {
                 error = "Result too large",

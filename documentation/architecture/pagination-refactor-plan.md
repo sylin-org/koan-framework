@@ -90,6 +90,8 @@ This plan integrates the discoveries captured during the pagination attribute pr
    - Update OpenAPI filters and docs to reflect new default `PaginationMode.On`, optional modifiers, and 413 behavior.
    - Provide migration notes for clients expecting streaming/full scans.
 
+**Status:** The OpenAPI layer now ships a dedicated `PaginationOperationFilter` that projects `[Pagination]` metadata into query parameters, safety headers, and a documented `413` response. Pagination headers are emitted only when the policy enables them, and client documentation now references the shared defaults instead of controller-specific logic.
+
 ### Phase 7 – Validation & Rollout
 
 1. **Cross-Cutting Tests**
@@ -99,6 +101,8 @@ This plan integrates the discoveries captured during the pagination attribute pr
    - Add structured logs or metrics when safety caps trigger to monitor real-world impact.
 3. **Release Notes & Adoption Guide**
    - Publish guidance summarizing new APIs, defaults, and upgrade steps for existing applications.
+
+**Status:** Pagination safety trips now emit structured warnings from `EntityEndpointService`, giving operations teams visibility when clients exceed absolute caps. New Swagger operation filter tests exercise mode-specific query parameters and headers, providing regression coverage until full end-to-end suites are added. Documentation updates summarize the new defaults and migration guidance for consumers.
 
 ## Risks & Mitigations
 

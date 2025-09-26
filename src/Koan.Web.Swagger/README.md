@@ -4,6 +4,7 @@ Swagger/OpenAPI integration for Koan Web: idempotent registration, config-driven
 
 - Target framework: net9.0
 - License: Apache-2.0
+- Ships pagination-aware Swagger metadata sourced from `[Pagination]` attributes, including query parameters, safety headers, and 413 responses.
 
 ## Install
 
