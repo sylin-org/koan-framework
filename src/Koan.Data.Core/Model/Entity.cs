@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Koan.Data.Core.Relationships;
 
 namespace Koan.Data.Core.Model
@@ -65,10 +66,22 @@ namespace Koan.Data.Core.Model
 
         public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
             => Data<TEntity, TKey>.All(ct);
+
+        public static Task<IReadOnlyList<TEntity>> All(DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.All(options, ct);
+
+        public static Task<QueryResult<TEntity>> AllWithCount(DataQueryOptions? options = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.AllWithCount(options, ct);
         public static Task<IReadOnlyList<TEntity>> All(string set, CancellationToken ct = default)
             => Data<TEntity, TKey>.All(set, ct);
         public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
             => Data<TEntity, TKey>.Query(query, ct);
+
+        public static Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(query, options, ct);
+
+        public static Task<QueryResult<TEntity>> QueryWithCount(string query, DataQueryOptions? options = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryWithCount(query, options, ct);
         public static Task<IReadOnlyList<TEntity>> Query(string query, string set, CancellationToken ct = default)
             => Data<TEntity, TKey>.Query(query, set, ct);
 
@@ -103,8 +116,14 @@ namespace Koan.Data.Core.Model
         public static Task<bool> Remove(TKey id, CancellationToken ct = default)
             => Data<TEntity, TKey>.DeleteAsync(id, ct);
 
+        public static Task<bool> Remove(TKey id, DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.DeleteAsync(id, options, ct);
+
         public static Task<int> Remove(IEnumerable<TKey> ids, CancellationToken ct = default)
             => Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
+
+        public static Task<int> Remove(IEnumerable<TKey> ids, DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.DeleteManyAsync(ids, options, ct);
 
         // Set-aware removal helpers
         public static Task<bool> Remove(TKey id, string set, CancellationToken ct = default)
@@ -129,6 +148,9 @@ namespace Koan.Data.Core.Model
 
         public static Task<int> RemoveAll(CancellationToken ct = default)
             => Data<TEntity, TKey>.DeleteAllAsync(ct);
+
+        public static Task<int> RemoveAll(DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.DeleteAllAsync(options, ct);
 
         // Instance self-remove
         public Task<bool> Remove(CancellationToken ct = default)

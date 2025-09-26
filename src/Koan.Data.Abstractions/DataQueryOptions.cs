@@ -42,7 +42,7 @@ public sealed class DataQueryOptions
     /// </summary>
     public string? Set { get; init; }
 
-    public bool HasPagination => (Page.HasValue && Page.Value > 0) || (PageSize.HasValue && PageSize.Value > 0);
+    public bool HasPagination => Page.HasValue && Page.Value > 0 && PageSize.HasValue && PageSize.Value > 0;
 
     public int EffectivePage(int defaultValue = 1)
         => Page.HasValue && Page.Value > 0 ? Page.Value : defaultValue;
@@ -64,6 +64,44 @@ public sealed class DataQueryOptions
             Set = Set
         };
     }
+
+    public DataQueryOptions WithoutPagination()
+        => new()
+        {
+            Filter = Filter,
+            Sort = Sort,
+            Set = Set
+        };
+
+    public DataQueryOptions WithFilter(string? filter)
+        => new()
+        {
+            Page = this.Page,
+            PageSize = this.PageSize,
+            Filter = filter,
+            Sort = this.Sort,
+            Set = this.Set
+        };
+
+    public DataQueryOptions WithSort(string? sort)
+        => new()
+        {
+            Page = this.Page,
+            PageSize = this.PageSize,
+            Filter = this.Filter,
+            Sort = sort,
+            Set = this.Set
+        };
+
+    public DataQueryOptions ForSet(string? set)
+        => new()
+        {
+            Page = this.Page,
+            PageSize = this.PageSize,
+            Filter = this.Filter,
+            Sort = this.Sort,
+            Set = set
+        };
 }
 
 // Optional: paging-aware base repository contract, enabling server-side pushdown
