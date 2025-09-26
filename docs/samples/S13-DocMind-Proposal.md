@@ -2,18 +2,20 @@
 
 ## **Executive Summary**
 
-**S13.DocMind** represents a complete architectural transformation of the reference document intelligence solution, leveraging the full capabilities of the Koan Framework to create an AI-native, enterprise-ready document processing platform.
+**S13.DocMind** is a guided sample that showcases how the Koan Framework stitches together data, flow, and AI capabilities to build an AI-native document intelligence experience. Rather than prescribing an enterprise migration, it walks readers through the architectural patterns and building blocks they can reuse when crafting their own solutions.
+
+This sample assumes lightweight evaluation datasets (dozens of documents, individual files ≤10 MB) and is optimized for interactive walkthroughs, scripted demos, and workshop labs. Larger workloads, multi-team governance, and production-grade SLAs are called out as optional explorations for teams who want to push the framework further.
 
 ### **Transformation Overview**
 
 | **Aspect** | **Original Solution** | **S13.DocMind (Koan-Native)** |
 |------------|-------------------|---------------------------|
 | **Architecture** | Traditional .NET with manual DI | Entity-first with auto-registration |
-| **Data Layer** | MongoDB-only, repository pattern | Multi-provider transparency (MongoDB + PostgreSQL + Weaviate + Redis) |
-| **AI Integration** | Manual Ollama client | Built-in `AI.Prompt()` and `AI.Embed()` |
+| **Data Layer** | MongoDB-only, repository pattern | Sample multi-provider patterns (MongoDB + Weaviate core, PostgreSQL/Redis optional) |
+| **AI Integration** | Manual Ollama client | Built-in `AI.Prompt()` and `AI.Embed()` with sample workflows |
 | **APIs** | Manual controller implementation | Auto-generated via `EntityController<T>` |
-| **Processing** | Synchronous with manual orchestration | Event-sourced with Flow entities |
-| **Scalability** | Single provider, container-aware | Multi-provider, orchestration-ready |
+| **Processing** | Synchronous with manual orchestration | Flow-driven background orchestration patterns |
+| **Scalability** | Single provider, container-aware | Sample scaling hooks and stretch guidance |
 | **Developer Experience** | Complex setup, manual patterns | "Reference = Intent", zero configuration |
 
 ---
@@ -56,7 +58,8 @@ public sealed class Document : Entity<Document>
 
     // Content storage - leverages provider capabilities
     public string ExtractedText { get; set; } = "";
-    public byte[]? OriginalContent { get; set; }
+    public string? BinaryObjectKey { get; set; }
+    public string? BinaryBucket { get; set; }
     public string Sha512Hash { get; set; } = "";
 
     // AI analysis results
@@ -76,6 +79,87 @@ public sealed class Document : Entity<Document>
     public double[]? Embedding { get; set; }
 }
 ```
+
+The upload endpoint demonstrates Koan's ability to combine streaming ingestion, storage adapters, and background orchestration:
+
+- **Streaming & hashing**: `HashingReadStream` wraps the incoming file stream, computing a SHA-512 digest as bytes flow to storage so large uploads never materialize fully in memory.
+- **Pluggable storage client**: `IObjectStorageClient` defaults to the lightweight filesystem provider that writes into `./data/storage` so the sample runs without external services, while still allowing teams to switch to S3, Azure Blob, or MinIO when exploring advanced scenarios.
+- **Durable orchestration**: `DocumentUploadedCommand` is queued on `IBackgroundCommandBus`, allowing Koan Flow workers to retry with exponential backoff, maintain idempotency, and absorb bursts without dropping work.
+- **Security hooks**: Virus scanning and content classification run as part of the storage upload pipeline (see governance section) before metadata is committed.
+
+```csharp
+public sealed class HashingReadStream : Stream
+{
+    private readonly Stream _inner;
+    private readonly HashAlgorithm _hash;
+
+    public HashingReadStream(Stream inner, HashAlgorithm hash)
+    {
+        _inner = inner;
+        _hash = hash;
+    }
+
+    private bool _finalized;
+
+    public string ComputeHashHex()
+    {
+        if (!_finalized)
+        {
+            _hash.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            _finalized = true;
+        }
+        return Convert.ToHexString(_hash.Hash ?? Array.Empty<byte>());
+    }
+
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        var bytesRead = await _inner.ReadAsync(buffer, cancellationToken);
+        if (bytesRead > 0)
+        {
+            _hash.TransformBlock(buffer.Span[..bytesRead], 0, bytesRead, null, 0);
+        }
+        return bytesRead;
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        var bytesRead = _inner.Read(buffer, offset, count);
+        if (bytesRead > 0)
+        {
+            _hash.TransformBlock(buffer, offset, bytesRead, null, 0);
+        }
+        return bytesRead;
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        if (!_finalized)
+        {
+            _hash.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            _finalized = true;
+        }
+        await base.DisposeAsync();
+    }
+
+    #region Stream forwarding members
+    public override bool CanRead => _inner.CanRead;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => _inner.Length;
+    public override long Position { get => _inner.Position; set => throw new NotSupportedException(); }
+    public override void Flush() => _inner.Flush();
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    #endregion
+}
+```
+
+Key design notes:
+
+- **Externalized binaries**: Only storage provider identifiers plus relative paths are persisted with the entity. Raw files live under the mounted filesystem root by default, keeping MongoDB lean and making it easy to clean or snapshot demo assets.
+- **Streaming-friendly metadata**: Hashes, embeddings, and template associations are calculated without loading the whole document into process memory.
+- **Vector fields remain optional**: When Weaviate is disabled, the Koan vector attribute is ignored, preserving compatibility with the minimal stack.
 
 #### **AI-Enhanced Template System**
 ```csharp
@@ -212,41 +296,72 @@ public enum ProcessingStage
     ProcessingCompleted,
     ProcessingFailed
 }
+
+public sealed record DocumentUploadedCommand : FlowCommand
+{
+    public Guid DocumentId { get; init; }
+    public string Bucket { get; init; } = string.Empty;
+    public string ObjectKey { get; init; } = string.Empty;
+}
 ```
 
 #### **Processing Orchestrator with Event Sourcing**
 ```csharp
-public class DocumentProcessingOrchestrator
+public class DocumentProcessingOrchestrator : FlowCommandHandler<DocumentUploadedCommand>
 {
-    public async Task ProcessDocumentAsync(Guid documentId)
+    private readonly DocumentIntelligenceService _intelligenceService;
+    private readonly IObjectStorageClient _storage;
+    private readonly ILogger<DocumentProcessingOrchestrator> _logger;
+
+    public DocumentProcessingOrchestrator(
+        DocumentIntelligenceService intelligenceService,
+        IObjectStorageClient storage,
+        ILogger<DocumentProcessingOrchestrator> logger)
     {
-        await RecordEvent(documentId, ProcessingStage.Uploaded, ProcessingState.Processing);
+        _intelligenceService = intelligenceService;
+        _storage = storage;
+        _logger = logger;
+    }
+
+    public override async Task HandleAsync(DocumentUploadedCommand command, CancellationToken cancellationToken)
+    {
+        await RecordEvent(command.DocumentId, ProcessingStage.Uploaded, ProcessingState.Processing);
 
         try
         {
-            var document = await Document.Get(documentId);
+            var document = await Document.Get(command.DocumentId, cancellationToken);
+
+            await using var contentStream = await _storage.OpenReadAsync(new ObjectReadRequest
+            {
+                Bucket = command.Bucket,
+                ObjectName = command.ObjectKey
+            }, cancellationToken);
 
             // Stage 1: Text Extraction
             if (string.IsNullOrEmpty(document.ExtractedText))
             {
-                document.ExtractedText = await ExtractTextAsync(document);
+                document.ExtractedText = await ExtractTextAsync(
+                    contentStream,
+                    document.DisplayName,
+                    document.ContentType,
+                    cancellationToken);
                 await document.Save();
-                await RecordEvent(documentId, ProcessingStage.TextExtracted, ProcessingState.Processing);
+                await RecordEvent(command.DocumentId, ProcessingStage.TextExtracted, ProcessingState.Processing);
             }
 
             // Stage 2: AI Analysis
-            await RecordEvent(documentId, ProcessingStage.AIAnalysisStarted, ProcessingState.Processing);
-            var analysis = await _intelligenceService.AnalyzeDocumentAsync(document);
+            await RecordEvent(command.DocumentId, ProcessingStage.AIAnalysisStarted, ProcessingState.Processing);
+            var analysis = await _intelligenceService.AnalyzeDocumentAsync(document, cancellationToken);
             await analysis.Save();
-            await RecordEvent(documentId, ProcessingStage.AIAnalysisCompleted, ProcessingState.Processing);
+            await RecordEvent(command.DocumentId, ProcessingStage.AIAnalysisCompleted, ProcessingState.Processing);
 
             // Stage 3: Template Matching
-            var templates = await _intelligenceService.FindSimilarTemplates(document);
+            var templates = await _intelligenceService.FindSimilarTemplates(document, cancellationToken: cancellationToken);
             if (templates.Any())
             {
                 document.TemplateId = templates.First().Id;
                 await document.Save();
-                await RecordEvent(documentId, ProcessingStage.TemplateMatched, ProcessingState.Processing);
+                await RecordEvent(command.DocumentId, ProcessingStage.TemplateMatched, ProcessingState.Processing);
             }
 
             // Stage 4: Vector Generation (if provider supports it)
@@ -254,20 +369,22 @@ public class DocumentProcessingOrchestrator
             {
                 if (document.Embedding == null)
                 {
-                    document.Embedding = await AI.Embed(document.ExtractedText);
-                    await document.Save();
+                    document.Embedding = await AI.Embed(document.ExtractedText, cancellationToken: cancellationToken);
+                    await document.Save(cancellationToken);
                 }
-                await RecordEvent(documentId, ProcessingStage.VectorGenerated, ProcessingState.Processing);
+                await RecordEvent(command.DocumentId, ProcessingStage.VectorGenerated, ProcessingState.Processing);
             }
 
             // Completion
             document.State = ProcessingState.Completed;
-            await document.Save();
-            await RecordEvent(documentId, ProcessingStage.ProcessingCompleted, ProcessingState.Completed);
+            await document.Save(cancellationToken);
+            await RecordEvent(command.DocumentId, ProcessingStage.ProcessingCompleted, ProcessingState.Completed);
         }
         catch (Exception ex)
         {
-            await RecordEvent(documentId, ProcessingStage.ProcessingFailed, ProcessingState.Failed,
+            _logger.LogError(ex, "Document processing failed for {DocumentId}", command.DocumentId);
+            await FlowContext.ScheduleRetryAsync(command, ex, cancellationToken);
+            await RecordEvent(command.DocumentId, ProcessingStage.ProcessingFailed, ProcessingState.Failed,
                               new { Error = ex.Message, StackTrace = ex.StackTrace });
         }
     }
@@ -295,12 +412,19 @@ public class DocumentController : EntityController<Document>
 {
     private readonly DocumentProcessingOrchestrator _orchestrator;
     private readonly DocumentIntelligenceService _intelligence;
+    private readonly IObjectStorageClient _storage;
+    private readonly IBackgroundCommandBus _commandBus;
 
-    public DocumentController(DocumentProcessingOrchestrator orchestrator,
-                             DocumentIntelligenceService intelligence)
+    public DocumentController(
+        DocumentProcessingOrchestrator orchestrator,
+        DocumentIntelligenceService intelligence,
+        IObjectStorageClient storage,
+        IBackgroundCommandBus commandBus)
     {
         _orchestrator = orchestrator;
         _intelligence = intelligence;
+        _storage = storage;
+        _commandBus = commandBus;
     }
 
     // Auto-generated endpoints from EntityController:
@@ -316,34 +440,52 @@ public class DocumentController : EntityController<Document>
     {
         foreach (var file in request.Files)
         {
-            var document = new Document
+            await using var sourceStream = file.OpenReadStream();
+            await using var hashingStream = new HashingReadStream(sourceStream, SHA512.Create());
+
+            var uploadResult = await _storage.UploadAsync(new ObjectUploadRequest
             {
-                FileName = file.FileName,
+                Bucket = "documents",
+                ObjectName = $"{Guid.NewGuid():N}/{file.FileName}",
                 ContentType = file.ContentType,
-                FileSize = file.Length
-            };
+                Content = hashingStream,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["original-file-name"] = file.FileName,
+                    ["content-type"] = file.ContentType
+                }
+            });
 
-            // Read content
-            using var stream = file.OpenReadStream();
-            var content = new byte[stream.Length];
-            await stream.ReadAsync(content);
-            document.OriginalContent = content;
+            var sha512 = hashingStream.ComputeHashHex();
+            var existing = await Document
+                .Where(d => d.Sha512Hash == sha512)
+                .FirstOrDefault();
 
-            // Compute hash for deduplication
-            document.Sha512Hash = ComputeHash(content);
-
-            // Check for existing document
-            var existing = await Document.Where(d => d.Sha512Hash == document.Sha512Hash).FirstOrDefault();
             if (existing != null)
             {
                 return Ok(existing); // Deduplication
             }
 
-            // Save and trigger processing
-            await document.Save(); // Auto GUID v7, provider-transparent
+            var document = new Document
+            {
+                FileName = uploadResult.ObjectName,
+                UserFileName = file.FileName,
+                ContentType = file.ContentType,
+                FileSize = file.Length,
+                Sha512Hash = sha512,
+                StorageBucket = uploadResult.Bucket,
+                StorageObjectKey = uploadResult.ObjectName,
+                StorageVersionId = uploadResult.VersionId
+            };
 
-            // Background processing with event sourcing
-            _ = Task.Run(() => _orchestrator.ProcessDocumentAsync(document.Id));
+            await document.Save();
+
+            await _commandBus.EnqueueAsync(new DocumentUploadedCommand
+            {
+                DocumentId = document.Id,
+                ObjectKey = uploadResult.ObjectName,
+                Bucket = uploadResult.Bucket
+            });
 
             return CreatedAtAction(nameof(GetById), new { id = document.Id }, document);
         }
@@ -531,7 +673,7 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
 - **"Reference = Intent"**: Adding package references enables capabilities automatically
 
 ### **2. Enterprise Scalability**
-- **Multi-Provider Architecture**: Start with JSON, scale to MongoDB + PostgreSQL + Weaviate
+- **Multi-Provider Architecture**: Start with MongoDB + Weaviate (core sample), add PostgreSQL/Redis via opt-in packages
 - **Provider Transparency**: Same code works across all storage backends
 - **Event Sourcing**: Complete audit trail with replay capabilities
 - **Container-Native**: Orchestration-aware with automatic environment detection
@@ -625,22 +767,16 @@ This architecture serves as a comprehensive reference implementation for buildin
 ```
 
 #### **Infrastructure Requirements**
+
+**Core sample stack (required to run the walkthrough end-to-end):**
+
 ```yaml
-# Required infrastructure components for full functionality
 services:
   mongodb:
     image: mongo:7.0
     ports: ["27017:27017"]
     environment:
       MONGO_INITDB_DATABASE: s13docmind
-
-  postgresql:
-    image: postgres:15
-    ports: ["5432:5432"]
-    environment:
-      POSTGRES_DB: s13docmind_audit
-      POSTGRES_USER: docmind
-      POSTGRES_PASSWORD: docmind123
 
   weaviate:
     image: semitechnologies/weaviate:1.22.4
@@ -650,18 +786,26 @@ services:
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
       PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
       DEFAULT_VECTORIZER_MODULE: 'none'
-      ENABLE_MODULES: 'backup-filesystem,offload-s3'
+      ENABLE_MODULES: 'backup-filesystem'
       CLUSTER_HOSTNAME: 'node1'
-
-  redis:
-    image: redis:7-alpine
-    ports: ["6379:6379"]
 
   ollama:
     image: ollama/ollama:latest
     ports: ["11434:11434"]
     volumes: ["ollama_models:/root/.ollama"]
 ```
+
+The API container mounts a host directory (for example `./data/storage`) and uses Koan’s filesystem storage provider, so no extra services are required to persist uploaded binaries during demos. This trio keeps the stack lightweight while still highlighting MongoDB, Weaviate, and Ollama working together.
+
+**Optional advanced scenarios:**
+
+- **PostgreSQL** for audit/event sourcing projections and reporting samples.
+- **Redis** for distributed caching, rate limiting, and background worker locks.
+- **NATS or Azure Service Bus** for durable orchestration (paired with Koan Flow workers).
+- **MinIO or cloud object storage** when demonstrating cross-environment replication or bucket lifecycle management.
+- **Weaviate replication & GPU inference** to explore high-throughput vector workloads.
+
+Each optional dependency is encapsulated behind Koan adapters so teams can enable them selectively. The sample scripts include compose overrides that wire these extras only when explicitly requested.
 
 ### **2. Core Entity Implementation Specifications**
 
@@ -690,8 +834,15 @@ namespace S13.DocMind.Models
         [MaxLength(10_000_000)] // 10MB text limit
         public string ExtractedText { get; set; } = "";
 
-        // Original content stored as binary
-        public byte[]? OriginalContent { get; set; }
+        // Original content persisted via the configured storage provider (filesystem by default)
+        [MaxLength(255)]
+        public string? StorageBucket { get; set; }
+
+        [MaxLength(1024)]
+        public string? StorageObjectKey { get; set; }
+
+        [MaxLength(100)]
+        public string? StorageVersionId { get; set; }
 
         // SHA-512 hash for deduplication (128 hex chars)
         [Required, Length(128, 128)]
@@ -909,6 +1060,12 @@ namespace S13.DocMind.Services
 }
 ```
 
+Operational guidance:
+
+- **Multi-provider routing**: Koan AI profiles map Ollama models for local/offline runs and OpenAI/Azure OpenAI for hosted inference. The sample configuration promotes Ollama by default but automatically fails over when health probes degrade, logging provider swaps.
+- **Quality baselines**: A curated benchmark set (10 reference documents + expected JSON outputs) runs nightly via GitHub Actions to detect drift. Failures trigger the human review queue and roll back to the last known-good model profile.
+- **Cost guardrails**: `AIUsageBudget` entities track cumulative token spend per environment with alert thresholds; when budgets are exceeded, non-critical template generation calls degrade to smaller models.
+
 ### **4. Performance & Scalability Specifications**
 
 #### **Performance Benchmarks**
@@ -917,25 +1074,29 @@ namespace S13.DocMind.Specifications
 {
     public static class PerformanceBenchmarks
     {
-        // Document processing targets
-        public const int MaxDocumentSizeMB = 50;
-        public const int MaxTextLengthChars = 10_000_000;
-        public const int ConcurrentProcessingLimit = 10;
+        // Sample-friendly document processing targets
+        public const int MaxDocumentSizeMb = 10;
+        public const int MaxTextLengthChars = 1_000_000;
+        public const int ConcurrentProcessingLimit = 3;
 
-        // API response time targets
-        public const int DocumentUploadTimeoutMs = 30_000;
-        public const int DocumentAnalysisTimeoutMs = 120_000;
-        public const int TemplateGenerationTimeoutMs = 60_000;
+        // API response time targets (interactive demos)
+        public const int DocumentUploadTimeoutMs = 15_000;
+        public const int DocumentAnalysisTimeoutMs = 45_000;
+        public const int TemplateGenerationTimeoutMs = 30_000;
 
         // Vector search performance
-        public const int VectorSearchTimeoutMs = 5_000;
-        public const int MaxVectorSearchResults = 50;
-        public const double MinSimilarityThreshold = 0.1;
+        public const int VectorSearchTimeoutMs = 2_000;
+        public const int MaxVectorSearchResults = 10;
+        public const double MinSimilarityThreshold = 0.4;
 
-        // Throughput targets
-        public const int DocumentsPerMinute = 30;
-        public const int ApiRequestsPerSecond = 100;
-        public const int ConcurrentUsers = 50;
+        // Throughput targets for guided walkthroughs
+        public const int DocumentsPerMinute = 4;
+        public const int ApiRequestsPerSecond = 5;
+        public const int ConcurrentUsers = 3;
+
+        // Stretch goals for optional load experiments
+        public const int StretchDocumentsPerMinute = 20;
+        public const int StretchConcurrentUsers = 15;
     }
 }
 ```
@@ -1094,6 +1255,18 @@ namespace S13.DocMind.Security
 }
 ```
 
+#### **Sensitive data governance & retention**
+
+- **Automated detection**: Every uploaded object is scanned with Koan's `ContentClassifier` pipeline to tag PII/PHI, contractual clauses, and regulated markers before downstream processing.
+- **Selective redaction**: Classified spans are redacted or masked prior to AI prompt submission. The original binary remains sealed in the storage provider (filesystem paths by default, S3-compatible buckets when enabled) with scoped, auditable access policies.
+- **Retention policies**: Sample automation applies lightweight file retention (cron job pruning the storage folder after 30 days) and, when an object store is configured, shows how to translate the same policy into bucket lifecycle rules. `RightToBeForgottenFlow` commands scrub embeddings, cached analyses, and audit logs linked to a subject.
+
+#### **Human-in-the-loop validation**
+
+- **Confidence gating**: Analyses with confidence <0.75 or containing high-risk entities are routed to a human review queue (implemented as a Koan Flow state machine) before templates or downstream systems consume them.
+- **Exception handling**: Reviewers can approve, request re-run with alternative models, or flag documents for legal escalation. Decisions are persisted on the `DocumentProcessingEvent` stream for full traceability.
+- **Operational runbooks**: The sample documentation ships with checklists for weekly access reviews, quarterly audit exports (JSON/CSV), and emergency kill-switch procedures when AI regressions are detected.
+
 ### **6. Testing Specifications**
 
 #### **Integration Test Requirements**
@@ -1140,10 +1313,10 @@ namespace S13.DocMind.Tests.Integration
         }
 
         [Fact]
-        public async Task ProcessDocument_WithLargeFile_ShouldHandleGracefully()
+        public async Task ProcessDocument_WithMediumFile_ShouldHandleGracefully()
         {
-            // Test with 45MB file (under 50MB limit)
-            var largeDocument = CreateLargeTestDocument(45 * 1024 * 1024);
+            // Test with 8MB file (aligned with sample guidance)
+            var largeDocument = CreateLargeTestDocument(8 * 1024 * 1024);
             // ... test implementation
         }
 
@@ -1175,10 +1348,10 @@ namespace S13.DocMind.Tests.Integration
 
     // Load testing specification
     [Fact]
-    public async Task LoadTest_ConcurrentDocumentProcessing()
+    public async Task LoadTest_ConcurrentDocumentProcessing_Optional()
     {
-        const int concurrentDocuments = 20;
-        const int maxProcessingTimeMinutes = 5;
+        const int concurrentDocuments = 6; // stretch scenario for workshops
+        const int maxProcessingTimeMinutes = 3;
 
         var tasks = Enumerable.Range(0, concurrentDocuments)
             .Select(i => ProcessTestDocument($"test-doc-{i}.txt"))
@@ -1196,6 +1369,12 @@ namespace S13.DocMind.Tests.Integration
     }
 }
 ```
+
+**Recommended test progression:**
+
+1. **Smoke walkthrough** – run `DocumentProcessingWorkflowTests.UploadDocument_ShouldTriggerCompleteProcessingWorkflow` with the default sample PDF.
+2. **Medium file resilience** – execute `ProcessDocument_WithMediumFile_ShouldHandleGracefully` using the bundled 8 MB fixture.
+3. **Optional stretch** – enable the `[Category("Load")]` collection to run `LoadTest_ConcurrentDocumentProcessing_Optional` once infrastructure resources are scaled.
 
 ### **7. Deployment & Operations Specifications**
 
@@ -1689,6 +1868,8 @@ echo "✅ S13.DocMind stopped"
 ```
 
 #### **Container Orchestration (Production)**
+
+The primary sample compose file (`docker-compose.yml`) boots the minimal stack—MongoDB, Weaviate, and Ollama—alongside the API container that mounts a local storage folder. The production variant below illustrates how to layer on optional dependencies (PostgreSQL for auditing, Redis for caching, externalized OpenAI access, object storage services, etc.) when demonstrating advanced scenarios.
 ```yaml
 # docker-compose.production.yml
 version: '3.8'
@@ -1794,21 +1975,51 @@ namespace S13.DocMind.Health
 {
     public class DocMindHealthCheck : IHealthCheck
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly KoanOptions _options;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IObjectStorageClient _storage;
+
+        public DocMindHealthCheck(
+            IOptions<KoanOptions> options,
+            IHttpClientFactory httpClientFactory,
+            IObjectStorageClient storage)
+        {
+            _options = options.Value;
+            _httpClientFactory = httpClientFactory;
+            _storage = storage;
+        }
 
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
         {
-            var checks = new List<(string name, Task<bool> check)>
+            var checks = new List<(string name, Func<Task<bool>> check)>
             {
-                ("MongoDB", CheckMongoHealthAsync()),
-                ("PostgreSQL", CheckPostgresHealthAsync()),
-                ("Weaviate", CheckWeaviateHealthAsync()),
-                ("Redis", CheckRedisHealthAsync()),
-                ("AI Services", CheckAiHealthAsync()),
-                ("Document Processing", CheckProcessingHealthAsync())
+                ("MongoDB", CheckMongoHealthAsync),
+                ("Weaviate", CheckWeaviateHealthAsync),
+                ("Ollama", CheckOllamaHealthAsync),
+                ("Storage Provider", CheckObjectStorageHealthAsync),
+                ("Document Processing", CheckProcessingHealthAsync)
             };
 
-            var results = await Task.WhenAll(checks.Select(async c => new { c.name, result = await c.check }));
+            if (IsProviderEnabled("postgresql"))
+            {
+                checks.Add(("PostgreSQL", CheckPostgresHealthAsync));
+            }
+
+            if (IsProviderEnabled("redis"))
+            {
+                checks.Add(("Redis", CheckRedisHealthAsync));
+            }
+
+            if (IsAiProviderEnabled("openai"))
+            {
+                checks.Add(("OpenAI", CheckOpenAiHealthAsync));
+            }
+
+            var results = await Task.WhenAll(checks.Select(async c => new
+            {
+                c.name,
+                result = await c.check()
+            }));
             var failures = results.Where(r => !r.result).ToList();
 
             if (failures.Any())
@@ -1841,6 +2052,46 @@ namespace S13.DocMind.Health
             }
             catch { return false; }
         }
+
+        private async Task<bool> CheckOllamaHealthAsync()
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient("ollama-health");
+                var response = await client.GetAsync("/api/tags");
+                return response.IsSuccessStatusCode;
+            }
+            catch { return false; }
+        }
+
+        private async Task<bool> CheckObjectStorageHealthAsync()
+        {
+            try
+            {
+                await _storage.EnsureBucketExistsAsync("documents");
+                return true;
+            }
+            catch { return false; }
+        }
+
+        private async Task<bool> CheckOpenAiHealthAsync()
+        {
+            try
+            {
+                var response = await AI.Prompt("ping")
+                    .WithProvider("openai")
+                    .WithTimeout(TimeSpan.FromSeconds(5))
+                    .ExecuteAsync();
+                return !string.IsNullOrEmpty(response.Content);
+            }
+            catch { return false; }
+        }
+
+        private bool IsProviderEnabled(string providerKey)
+            => _options.Data?.Providers?.ContainsKey(providerKey) == true;
+
+        private bool IsAiProviderEnabled(string providerKey)
+            => _options.AI?.ContainsKey(providerKey) == true;
     }
 }
 ```
@@ -1848,31 +2099,41 @@ namespace S13.DocMind.Health
 ### **8. Success Criteria & Acceptance Testing**
 
 #### **Functional Requirements Checklist**
-- [ ] **Document Upload**: Support .txt, .pdf, .docx, image formats up to 50MB
-- [ ] **Text Extraction**: 99%+ accuracy for standard document formats
-- [ ] **AI Analysis**: Generate structured summaries with >70% confidence
-- [ ] **Template System**: AI-generated templates with similarity matching
-- [ ] **Vector Search**: Sub-5-second similarity search across 10,000+ documents
-- [ ] **Event Sourcing**: Complete audit trail of all processing steps
-- [ ] **Multi-Provider**: Seamless operation across MongoDB, PostgreSQL, Weaviate, Redis
-- [ ] **Auto-Registration**: Zero-configuration startup with single `AddKoan()` call
-- [ ] **API Generation**: Full CRUD APIs with pagination, filtering, relationships
+- [ ] **Document Upload**: Support .txt, .pdf, .docx, and image formats up to 10 MB each (stretch: 25 MB with streaming enabled).
+- [ ] **Text Extraction**: Demonstrate ≥95 % accuracy on the curated sample pack; document gaps for edge formats.
+- [ ] **AI Analysis**: Produce structured summaries with confidence scoring and human-review routing.
+- [ ] **Template System**: Generate templates via AI and persist review decisions.
+- [ ] **Vector Search**: Return top-5 similar templates in <2 s across the 200-document demo corpus.
+- [ ] **Event Sourcing**: Persist a complete audit trail of upload → analysis Flow events.
+- [ ] **Multi-Provider (core)**: Operate across MongoDB, Weaviate, and Ollama; document toggles for optional Redis/PostgreSQL.
+- [ ] **Auto-Registration**: Boot sample with a single `AddKoan()` call plus provider packages.
+- [ ] **API Generation**: Expose CRUD APIs with pagination, filtering, and relationship expansion.
 
 #### **Performance Requirements Checklist**
-- [ ] **Throughput**: Process 30 documents per minute
-- [ ] **Concurrency**: Handle 50 concurrent users
-- [ ] **Response Time**: API responses under 2 seconds (excluding AI processing)
-- [ ] **AI Processing**: Document analysis within 2 minutes
-- [ ] **Memory Usage**: Under 4GB per instance under normal load
-- [ ] **Startup Time**: Application ready in under 30 seconds
+- [ ] **Throughput**: Process 4 documents per minute in sequential demo runs (stretch: 20 with optional load script).
+- [ ] **Concurrency**: Support 3 concurrent users in the base environment (stretch: 15 with scaled resources).
+- [ ] **Response Time**: CRUD API responses under 500 ms (excluding AI work); health endpoints under 200 ms.
+- [ ] **AI Processing**: Document analysis completes within 90 s for sample inputs.
+- [ ] **Memory Usage**: Keep API container below 1.5 GB RSS during demos.
+- [ ] **Startup Time**: Application ready in under 20 s on a developer laptop.
 
 #### **Security Requirements Checklist**
-- [ ] **Data Encryption**: All sensitive content encrypted at rest
-- [ ] **Audit Logging**: Complete audit trail for all user actions
-- [ ] **Input Validation**: Comprehensive validation preventing malicious uploads
-- [ ] **Rate Limiting**: API rate limiting to prevent abuse
-- [ ] **Authentication**: Support for OAuth 2.0 and JWT tokens
-- [ ] **Authorization**: Role-based access control for documents and templates
+- [ ] **Data Encryption**: All sensitive content encrypted at rest (filesystem volume encryption by default, object storage SSE when enabled) plus field-level encryption for secrets.
+- [ ] **Audit Logging**: Complete audit trail for all user actions with exportable lineage reports.
+- [ ] **Sensitive Data Classification**: Automated PII/PHI detection with redaction prior to AI prompts.
+- [ ] **Retention & Erasure**: Lifecycle policies enforced and `RightToBeForgottenFlow` validated end-to-end.
+- [ ] **Human Review Controls**: Low-confidence outputs held for manual approval before release.
+- [ ] **Input Validation**: Comprehensive validation and antivirus scanning preventing malicious uploads.
+- [ ] **Rate Limiting**: API rate limiting to prevent abuse.
+- [ ] **Authentication**: Support for OAuth 2.0 and JWT tokens.
+- [ ] **Authorization**: Role-based access control for documents and templates.
+
+#### **Observability & Cost Checklist**
+- [ ] **Tracing**: Distributed traces stitched across upload, Flow worker, and AI calls using OpenTelemetry.
+- [ ] **Metrics**: Dashboards covering queue depth, stage latency, embedding throughput, and AI token spend.
+- [ ] **Logging**: Structured logs with document IDs, review outcomes, and cost annotations.
+- [ ] **Budgets & Alerts**: `AIUsageBudget` thresholds enforced with alerting and automatic model downgrades when exceeded.
+- [ ] **SLO Reviews**: Weekly review ritual evaluating success metrics vs targets, with action items captured in runbook.
 
 ### **9. Migration & Rollback Procedures**
 
@@ -2161,9 +2422,15 @@ namespace S13.DocMind.Migration
                 // Transform processing state
                 State = MapProcessingState(originalDoc),
 
-                // Handle binary content
-                OriginalContent = originalDoc.Contains("originalContent")
-                    ? originalDoc["originalContent"].AsByteArray
+                // Handle binary content - lift into the configured storage provider during migration
+                StorageBucket = originalDoc.Contains("storageBucket")
+                    ? originalDoc["storageBucket"].AsString
+                    : "legacy-docs",
+                StorageObjectKey = originalDoc.Contains("storageObjectKey")
+                    ? originalDoc["storageObjectKey"].AsString
+                    : $"legacy/{originalDoc["_id"].AsObjectId}.bin",
+                StorageVersionId = originalDoc.Contains("storageVersionId")
+                    ? originalDoc["storageVersionId"].AsString
                     : null,
 
                 // Convert timestamps
@@ -2252,6 +2519,8 @@ public class DocumentController : EntityController<Document>
 {
     // All CRUD operations auto-generated
     // Only add custom business logic endpoints
+    private readonly IObjectStorageClient _storage;
+    private readonly IBackgroundCommandBus _commandBus;
 
     [HttpPost("upload")]
     public async Task<ActionResult<Document>> Upload([FromForm] DocumentUploadRequest request)
@@ -2259,28 +2528,40 @@ public class DocumentController : EntityController<Document>
         // Reuse original upload logic with Koan entities
         foreach (var file in request.Files)
         {
-            var document = new Document
+            await using var sourceStream = file.OpenReadStream();
+            await using var hashingStream = new HashingReadStream(sourceStream, SHA512.Create());
+
+            var uploadResult = await _storage.UploadAsync(new ObjectUploadRequest
             {
-                FileName = file.FileName,
+                Bucket = "documents",
+                ObjectName = $"{Guid.NewGuid():N}/{file.FileName}",
                 ContentType = file.ContentType,
-                FileSize = file.Length
-            };
+                Content = hashingStream
+            });
 
-            // Hash computation and deduplication logic (reuse from original)
-            using var stream = file.OpenReadStream();
-            var content = new byte[stream.Length];
-            await stream.ReadAsync(content);
-            document.OriginalContent = content;
-            document.Sha512Hash = ComputeSha512Hash(content); // Reuse original method
-
-            // Check for existing document (adapt original logic)
-            var existing = await Document.Where(d => d.Sha512Hash == document.Sha512Hash).FirstOrDefault();
+            var hash = hashingStream.ComputeHashHex();
+            var existing = await Document.Where(d => d.Sha512Hash == hash).FirstOrDefault();
             if (existing != null) return Ok(existing);
 
-            await document.Save(); // Koan entity persistence
+            var document = new Document
+            {
+                FileName = uploadResult.ObjectName,
+                UserFileName = file.FileName,
+                ContentType = file.ContentType,
+                FileSize = file.Length,
+                Sha512Hash = hash,
+                StorageBucket = uploadResult.Bucket,
+                StorageObjectKey = uploadResult.ObjectName,
+                StorageVersionId = uploadResult.VersionId
+            };
 
-            // Trigger processing (new event-driven approach)
-            _ = Task.Run(() => _orchestrator.ProcessDocumentAsync(document.Id));
+            await document.Save();
+            await _commandBus.EnqueueAsync(new DocumentUploadedCommand
+            {
+                DocumentId = document.Id,
+                Bucket = uploadResult.Bucket,
+                ObjectKey = uploadResult.ObjectName
+            });
 
             return CreatedAtAction(nameof(GetById), new { id = document.Id }, document);
         }
@@ -2402,16 +2683,16 @@ This comprehensive mapping ensures agentic AI systems can systematically harvest
 ## Performance Issues
 
 ### Slow Document Processing
-**Symptoms**: Processing takes longer than 2-minute target
+**Symptoms**: Processing takes longer than 90-second target
 **Solutions**:
 1. Check available memory and CPU resources
-2. Review document size (50MB limit)
+2. Review document size (10 MB baseline; stretch goal 25 MB)
 3. Validate AI model performance
-4. Consider enabling Redis caching
-5. Monitor concurrent processing limits
+4. Consider enabling Redis caching (optional component)
+5. Monitor concurrent processing limits and Flow queue depth
 
 ### High Memory Usage
-**Symptoms**: Application consuming >4GB RAM
+**Symptoms**: Application consuming >1.5 GB RAM during demos
 **Solutions**:
 1. Review large document handling
 2. Implement streaming for file processing
