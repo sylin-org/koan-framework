@@ -1,106 +1,134 @@
 <div class="container-fluid py-4">
-    <div class="row">
+    <div class="row" ng-if="loading">
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="text-muted mt-3">Loading insights...</p>
+        </div>
+    </div>
+
+    <div class="row" ng-if="!loading">
         <div class="col-12">
             <h1 class="h3 mb-4">Dashboard</h1>
 
-            <!-- Stats Cards -->
             <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="card bg-primary text-white">
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-primary text-white h-100">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h5 class="card-title">Total Files</h5>
-                                    <h2>{{stats.totalFiles || 0}}</h2>
+                            <h5 class="card-title">Total Documents</h5>
+                            <h2 class="mb-0">{{overview.totalDocuments || 0}}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-success text-white h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Completed</h5>
+                            <h2 class="mb-0">{{overview.completedDocuments || 0}}</h2>
+                            <small class="opacity-75">{{getCompletionRate()}}% completion</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-warning text-white h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">In Flight</h5>
+                            <h2 class="mb-0">{{overview.activeDocuments || 0}}</h2>
+                            <small class="opacity-75">{{overview.failedDocuments || 0}} failed</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card bg-info text-white h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Avg Confidence</h5>
+                            <h2 class="mb-0">{{(overview.averageConfidence * 100) | number:0}}%</h2>
+                            <small class="opacity-75">{{overview.highQualityDocumentCount || 0}} high quality</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-7 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Activity Feed</h5>
+                        </div>
+                        <div class="card-body">
+                            <div ng-if="activityFeed.length === 0" class="text-center py-4">
+                                <i class="bi bi-activity" style="font-size: 3rem; opacity: 0.3;"></i>
+                                <p class="text-muted mt-2">No recent activity available</p>
+                            </div>
+                            <div ng-repeat="item in activityFeed" class="mb-3">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{item.fileName}}</h6>
+                                        <p class="mb-1 text-muted">{{item.summary}}</p>
+                                        <div class="small text-muted">{{formatTimestamp(item.lastUpdated) | date:'medium'}}</div>
+                                    </div>
+                                    <span class="badge" ng-class="{'bg-success': item.status === 'completed', 'bg-warning': item.status !== 'completed'}">{{item.status | uppercase}}</span>
                                 </div>
-                                <i class="bi bi-files" style="font-size: 2rem; opacity: 0.7;"></i>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card bg-success text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h5 class="card-title">Processed</h5>
-                                    <h2>{{stats.processedFiles || 0}}</h2>
-                                </div>
-                                <i class="bi bi-check-circle" style="font-size: 2rem; opacity: 0.7;"></i>
-                            </div>
+
+                <div class="col-lg-5 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Top Collections</h5>
                         </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-warning text-white">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h5 class="card-title">Processing</h5>
-                                    <h2>{{stats.processingFiles || 0}}</h2>
-                                </div>
-                                <i class="bi bi-hourglass-split" style="font-size: 2rem; opacity: 0.7;"></i>
+                            <div ng-if="getTopCollections().length === 0" class="text-center py-4 text-muted">
+                                No profile collections available yet.
                             </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-info text-white">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h5 class="card-title">Document Types</h5>
-                                    <h2>{{stats.documentTypes || 0}}</h2>
+                            <div ng-repeat="collection in getTopCollections()" class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{collection.documentTypeName}}</h6>
+                                        <small class="text-muted">{{collection.documentCount}} documents • Avg confidence {{(collection.averageConfidence * 100) | number:0}}%</small>
+                                    </div>
+                                    <span class="badge bg-secondary">{{collection.category || 'general'}}</span>
                                 </div>
-                                <i class="bi bi-collection" style="font-size: 2rem; opacity: 0.7;"></i>
+                                <ul class="list-unstyled mt-2 mb-0">
+                                    <li ng-repeat="doc in collection.latestDocuments" class="small text-muted">
+                                        {{doc.name}} · {{formatTimestamp(doc.completedDate || doc.assignedDate || doc.uploadDate) | date:'short'}}
+                                    </li>
+                                </ul>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Recent Activity -->
-            <div class="row">
-                <div class="col-md-8">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Recent Activity</h5>
-                        </div>
-                        <div class="card-body">
-                            <div ng-show="recentActivity.length === 0" class="text-center py-4">
-                                <i class="bi bi-activity" style="font-size: 3rem; opacity: 0.3;"></i>
-                                <p class="text-muted mt-2">No recent activity</p>
-                            </div>
-                            <div ng-repeat="activity in recentActivity" class="d-flex align-items-center mb-3">
-                                <i class="bi bi-circle-fill text-primary me-3" style="font-size: 0.5rem;"></i>
-                                <div class="flex-grow-1">
-                                    <div class="fw-medium">{{activity.description}}</div>
-                                    <small class="text-muted">{{activity.timestamp | date:'medium'}}</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Recent Documents</h5>
                 </div>
-
-                <div class="col-md-4">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Quick Actions</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="d-grid gap-2">
-                                <a href="#/files/upload" class="btn btn-primary">
-                                    <i class="bi bi-upload"></i> Upload Files
-                                </a>
-                                <a href="#/document-types/new" class="btn btn-outline-primary">
-                                    <i class="bi bi-plus-circle"></i> New Document Type
-                                </a>
-                                <a href="#/analysis" class="btn btn-outline-secondary">
-                                    <i class="bi bi-graph-up"></i> View Analysis
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+                <div class="card-body table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Type</th>
+                                <th>Completed</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr ng-repeat="doc in (overview.recentDocuments || [])">
+                                <td>{{doc.name}}</td>
+                                <td>{{doc.status | uppercase}}</td>
+                                <td>{{doc.documentTypeId || 'Unassigned'}}</td>
+                                <td>{{doc.completedDate | date:'medium'}}</td>
+                                <td>{{(doc.confidence * 100) | number:0}}%</td>
+                            </tr>
+                            <tr ng-if="(overview.recentDocuments || []).length === 0">
+                                <td colspan="5" class="text-center text-muted">No recent documents</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

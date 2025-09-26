@@ -9,7 +9,7 @@
 - **Multi-Modal Support**: Both text and vision model integration for comprehensive analysis
 - **Template System**: User-defined document types with AI-generated analysis templates
 - **Vector Similarity Search**: Semantic document type matching and similar document discovery
-- **Multi-Provider Architecture**: MongoDB + Weaviate core, with PostgreSQL and Redis optional
+- **Minimal Multi-Provider Architecture**: MongoDB for persistence with Weaviate-powered vector search and Ollama-backed models
 - **Background Processing**: Async document analysis with real-time status tracking
 - **Auto-Generated APIs**: Full CRUD operations via Koan's `EntityController<T>`
 
@@ -23,8 +23,7 @@
 ### Multi-Provider Data Strategy
 - **MongoDB**: Primary document storage (metadata + extracted text)
 - **Weaviate**: Vector operations for similarity search
-- **PostgreSQL**: Optional audit trails and structured analytics
-- **Redis**: Optional caching layer
+- **Ollama**: Local AI provider for text, vision, and embedding workloads
 
 ### Processing Pipeline
 ```
@@ -41,12 +40,17 @@ Upload → Extract Text → User Assigns Type → Background AI Analysis → Com
 ### 1. Start Infrastructure & API
 
 ```powershell
-# Start everything
-./start.ps1
+# Start everything (Windows)
+./start.bat
+```
+
+```bash
+# Start everything (macOS/Linux)
+docker compose -f docker-compose.yml up -d
 ```
 
 This will:
-- Start MongoDB, Weaviate, Redis, PostgreSQL, and Ollama containers
+- Start MongoDB, Weaviate, and Ollama containers alongside the API
 - Initialize the S13.DocMind API (locally or containerized)
 - Create default document types
 
@@ -164,7 +168,7 @@ The platform supports local Ollama models for offline/private deployments:
 ### Koan Framework Benefits
 - **"Reference = Intent"**: Adding provider packages auto-enables capabilities
 - **Entity-First**: `File.Get(id)`, `file.Save()` patterns with GUID v7 auto-generation
-- **Provider Transparency**: Same entity code works across MongoDB, PostgreSQL, etc.
+- **Provider Transparency**: Same entity code works across MongoDB today with clear seams for future providers
 - **Auto-Registration**: Single `AddKoan()` call replaces 60+ lines of manual DI
 - **Self-Reporting**: Structured boot reports describe system capabilities
 

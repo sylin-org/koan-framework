@@ -41,6 +41,18 @@ angular.module('s13DocMindApp').service('FileService', ['ApiService', '$http', '
             return ApiService.get('/files/' + fileId + '/status');
         },
 
+        getProcessingQueue: function() {
+            return ApiService.get('/processing/queue');
+        },
+
+        getProcessingTimeline: function(params) {
+            return ApiService.get('/processing/timeline', params);
+        },
+
+        retryProcessing: function(fileId, options) {
+            return ApiService.post('/processing/' + fileId + '/retry', options || {});
+        },
+
         getAnalysis: function(fileId) {
             return ApiService.get('/files/' + fileId + '/analysis');
         },
