@@ -46,46 +46,61 @@ The reference document intelligence solution provides sophisticated features:
 
 ### **1. Entity-First Data Models**
 
-#### **Core Document Entity**
+#### **File Entity (Raw Content + Extracted Text)**
 ```csharp
-[DataAdapter("multi-provider")] // Demonstrates provider flexibility
-public sealed class Document : Entity<Document>
+[DataAdapter("mongodb")] // Document storage optimized for file metadata
+public sealed class File : Entity<File>
 {
+    // Raw file metadata
     public string FileName { get; set; } = "";
-    public string? UserFileName { get; set; }
     public string ContentType { get; set; } = "";
     public long FileSize { get; set; }
-
-    // Content storage - leverages provider capabilities
-    public string ExtractedText { get; set; } = "";
-    public string? BinaryObjectKey { get; set; }
-    public string? BinaryBucket { get; set; }
     public string Sha512Hash { get; set; } = "";
 
-    // AI analysis results
-    public ExtractedInformation? Analysis { get; set; }
-    public DateTime? LastAnalyzed { get; set; }
-    public ProcessingState State { get; set; } = ProcessingState.Uploaded;
+    // Storage references
+    public string? StorageBucket { get; set; }
+    public string? StorageKey { get; set; }
 
-    // Per-document notes for context override
-    public string Notes { get; set; } = "";
+    // Extracted content (ready for AI processing)
+    public string ExtractedText { get; set; } = "";
+    public ExtractionMethod ExtractionMethod { get; set; }
+    public DateTime? ExtractedAt { get; set; }
 
-    // Relationships - automatic navigation
-    [Parent(typeof(DocumentTemplate))]
-    public Guid? TemplateId { get; set; }
+    // User-assigned type (trigger for AI processing)
+    [Parent(typeof(Type))]
+    public Guid? TypeId { get; set; }
+    public DateTime? TypeAssignedAt { get; set; }
 
-    // Vector capabilities - when Weaviate provider available
-    [Vector(Dimensions = 1536)]
-    public double[]? Embedding { get; set; }
+    // Processing state
+    public FileState State { get; set; } = FileState.Uploaded;
+    public string? ProcessingError { get; set; }
+}
+
+public enum FileState
+{
+    Uploaded,           // File uploaded, content extracted, awaiting type assignment
+    TypeAssigned,       // User assigned type, analysis queued
+    Analyzing,          // AI analysis in progress
+    Analyzed,           // Analysis completed successfully
+    AnalysisFailed      // Analysis failed with error
+}
+
+public enum ExtractionMethod
+{
+    None,        // Text files - no extraction needed
+    PdfParser,   // PDF → text extraction
+    OcrEngine,   // Images → OCR text
+    DocxParser,  // DOCX → text extraction
+    Custom       // Extensible for other formats
 }
 ```
 
-The upload endpoint demonstrates Koan's ability to combine streaming ingestion, storage adapters, and background orchestration:
+The user-driven processing workflow demonstrates Koan's separation of concerns and background orchestration:
 
-- **Streaming & hashing**: `HashingReadStream` wraps the incoming file stream, computing a SHA-512 digest as bytes flow to storage so large uploads never materialize fully in memory.
-- **Pluggable storage client**: `IObjectStorageClient` defaults to the lightweight filesystem provider that writes into `./data/storage` so the sample runs without external services, while still allowing teams to switch to S3, Azure Blob, or MinIO when exploring advanced scenarios.
-- **Durable orchestration**: `DocumentUploadedCommand` is queued on `IBackgroundCommandBus`, allowing Koan Flow workers to retry with exponential backoff, maintain idempotency, and absorb bursts without dropping work.
-- **Security hooks**: Virus scanning and content classification run as part of the storage upload pipeline (see governance section) before metadata is committed.
+- **Upload & Extraction**: Files are uploaded with immediate content extraction (PDF→text, OCR for images, etc.) but remain in "Uploaded" state
+- **User-Driven Classification**: Users select document Type via UI, which assigns `File.TypeId` and triggers background AI processing
+- **Background Analysis**: `TypeAssignedCommand` is queued, allowing Koan Flow workers to process AI analysis asynchronously with retry logic
+- **State Tracking**: Clear progression from Uploaded → TypeAssigned → Analyzing → Analyzed with error handling
 
 ```csharp
 public sealed class HashingReadStream : Stream
@@ -161,242 +176,384 @@ Key design notes:
 - **Streaming-friendly metadata**: Hashes, embeddings, and template associations are calculated without loading the whole document into process memory.
 - **Vector fields remain optional**: When Weaviate is disabled, the Koan vector attribute is ignored, preserving compatibility with the minimal stack.
 
-#### **AI-Enhanced Template System**
+#### **Type Entity (Document Classification + AI Instructions)**
 ```csharp
-public sealed class DocumentTemplate : Entity<DocumentTemplate>
+public sealed class Type : Entity<Type>
 {
-    public string Name { get; set; } = "";
-    public string Code { get; set; } = "";
+    // Classification info
+    public string Name { get; set; } = "";           // "Meeting Transcript"
+    public string Code { get; set; } = "";           // "MEETING"
     public string Description { get; set; } = "";
-    public string Instructions { get; set; } = "";
-    public string Template { get; set; } = "";
     public List<string> Tags { get; set; } = new();
 
-    // AI generation metadata
-    public bool WasAiGenerated { get; set; }
-    public string? GenerationPrompt { get; set; }
-    public DateTime? LastRefined { get; set; }
+    // AI extraction instructions
+    public string ExtractionPrompt { get; set; } = "";     // How to analyze content
+    public string TemplateStructure { get; set; } = "";    // Output format template
+    public string Examples { get; set; } = "";             // Few-shot examples
 
-    // Template matching capabilities
+    // Auto-classification hints
+    public List<string> KeywordTriggers { get; set; } = new();
+    public double ConfidenceThreshold { get; set; } = 0.7;
+
+    // Vector matching for type classification
     [Vector(Dimensions = 1536)]
-    public double[]? TemplateEmbedding { get; set; }
+    public double[]? TypeEmbedding { get; set; }
 
-    // Child relationships - automatic via Koan
-    public async Task<List<Document>> GetDocuments() => await GetChildren<Document>();
+    // Child relationships - files assigned to this type
+    public async Task<List<File>> GetFiles() => await GetChildren<File>();
 }
 ```
 
-#### **Analysis Results**
+#### **Analysis Entity (AI-Generated Results)**
 ```csharp
-public sealed class DocumentAnalysis : Entity<DocumentAnalysis>
+public sealed class Analysis : Entity<Analysis>
 {
-    [Parent(typeof(Document))]
-    public Guid DocumentId { get; set; }
+    [Parent(typeof(File))]
+    public Guid FileId { get; set; }
 
-    public string Summary { get; set; } = "";
-    public Dictionary<string, List<string>> Entities { get; set; } = new();
-    public List<string> Topics { get; set; } = new();
-    public List<KeyFact> KeyFacts { get; set; } = new();
+    [Parent(typeof(Type))]
+    public Guid TypeId { get; set; }
+
+    // AI-generated content
+    public string ExtractedContext { get; set; } = "";          // Structured extraction
+    public string FilledTemplate { get; set; } = "";            // Template-formatted result
+    public Dictionary<string, object> StructuredData { get; set; } = new();
+
+    // Quality metrics
     public double ConfidenceScore { get; set; }
+    public string QualityFlags { get; set; } = "";              // "low-confidence", "partial-extraction"
 
     // Processing metadata
-    public string ProcessingVersion { get; set; } = "";
+    public string ModelUsed { get; set; } = "";
+    public long InputTokens { get; set; }
+    public long OutputTokens { get; set; }
     public TimeSpan ProcessingDuration { get; set; }
-    public string? ErrorMessage { get; set; }
 }
 ```
 
 ### **2. AI-First Processing Architecture**
 
-#### **Document Intelligence Service**
+#### **File Analysis Service**
 ```csharp
-public class DocumentIntelligenceService
+public class FileAnalysisService
 {
-    public async Task<DocumentAnalysis> AnalyzeDocumentAsync(Document document)
+    private readonly ILogger<FileAnalysisService> _logger;
+
+    public async Task<Analysis> GenerateAnalysisAsync(File file, Type type, CancellationToken ct)
     {
-        // Koan's unified AI interface - no HTTP client complexity
-        var analysisPrompt = BuildAnalysisPrompt(document.ExtractedText);
-        var result = await AI.Prompt(analysisPrompt);
+        var prompt = $"""
+            {type.ExtractionPrompt}
 
-        // Generate document embedding for similarity matching
-        var embedding = await AI.Embed(document.ExtractedText);
-        document.Embedding = embedding;
-        await document.Save(); // Provider-transparent persistence
+            Document content:
+            {file.ExtractedText}
 
-        return ParseAnalysisResult(result);
+            Instructions:
+            Extract information according to the template below and provide structured output.
+
+            Template:
+            {type.TemplateStructure}
+            """;
+
+        var response = await AI.Prompt(prompt)
+            .WithModel("gpt-4-turbo")
+            .WithMaxTokens(2000)
+            .WithTemperature(0.1)
+            .ExecuteAsync(ct);
+
+        return new Analysis
+        {
+            FileId = file.Id,
+            TypeId = type.Id,
+            ExtractedContext = response.Content,
+            FilledTemplate = await ApplyTemplateAsync(type.TemplateStructure, response.Content, ct),
+            ConfidenceScore = CalculateConfidence(response.Content, type),
+            ModelUsed = response.Model ?? "gpt-4-turbo",
+            InputTokens = response.Usage?.InputTokens ?? 0,
+            OutputTokens = response.Usage?.OutputTokens ?? 0,
+            ProcessingDuration = response.ProcessingTime ?? TimeSpan.Zero
+        };
     }
 
-    public async Task<List<DocumentTemplate>> FindSimilarTemplates(Document document)
+    public async Task<string> ExtractContentAsync(string storageKey, string contentType, CancellationToken ct)
     {
-        if (document.Embedding == null) return new();
-
-        // Koan's vector operations - automatic provider routing
-        return await DocumentTemplate.Vector.SimilaritySearch(
-            document.Embedding,
-            threshold: 0.8,
-            limit: 5
-        );
+        return contentType switch
+        {
+            "application/pdf" => await _pdfExtractor.ExtractTextAsync(storageKey, ct),
+            "image/jpeg" or "image/png" => await _ocrService.ExtractTextAsync(storageKey, ct),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" =>
+                await _docxExtractor.ExtractTextAsync(storageKey, ct),
+            "text/plain" => await _storage.ReadTextAsync(storageKey, ct),
+            _ => throw new NotSupportedException($"Content type {contentType} not supported")
+        };
     }
 
-    public async Task<DocumentTemplate> GenerateTemplateAsync(string prompt)
+    public async Task<Type> GenerateTypeAsync(string prompt, CancellationToken ct)
     {
         var generationPrompt = $"""
-            Create a document analysis template based on: {prompt}
+            Create a document type configuration based on: {prompt}
 
             Output JSON format:
             {{
-              "name": "Template Name",
-              "instructions": "Analysis instructions...",
-              "template": "# Template\n\n## Section\n{{PLACEHOLDER}}"
+              "name": "Document Type Name",
+              "code": "SHORT_CODE",
+              "description": "Brief description",
+              "extractionPrompt": "Instructions for AI analysis...",
+              "templateStructure": "Output format template with placeholders"
             }}
             """;
 
-        var response = await AI.Prompt(generationPrompt);
-        var templateData = JsonSerializer.Deserialize<TemplateData>(response);
+        var response = await AI.Prompt(generationPrompt).ExecuteAsync(ct);
+        var typeData = JsonSerializer.Deserialize<TypeGenerationData>(response.Content);
 
-        var template = new DocumentTemplate
+        var type = new Type
         {
-            Name = templateData.Name,
-            Instructions = templateData.Instructions,
-            Template = templateData.Template,
-            WasAiGenerated = true,
-            GenerationPrompt = prompt
+            Name = typeData.Name,
+            Code = typeData.Code,
+            Description = typeData.Description,
+            ExtractionPrompt = typeData.ExtractionPrompt,
+            TemplateStructure = typeData.TemplateStructure
         };
 
-        // Generate template embedding for future matching
-        template.TemplateEmbedding = await AI.Embed($"{template.Name} {template.Instructions}");
-
-        return await template.Save(); // Auto GUID v7, provider-transparent
+        return await type.Save(ct);
     }
 }
 ```
 
-### **3. Event-Sourced Processing Pipeline**
-
-#### **Document Processing Flow Entities**
+#### **AI Model Management Service (Following Original gdoc Patterns)**
 ```csharp
-public sealed class DocumentProcessingEvent : FlowEntity<DocumentProcessingEvent>
+public class ModelManagementService
 {
-    public Guid DocumentId { get; set; }
+    public async Task<List<AvailableModel>> GetAvailableModelsAsync()
+    {
+        // Koan AI abstraction layer for cross-provider model discovery
+        var ollamaModels = await AI.Models.GetAvailable("ollama");
+        var openaiModels = await AI.Models.GetAvailable("openai");
+
+        return ollamaModels.Concat(openaiModels)
+            .Select(m => new AvailableModel
+            {
+                Name = m.Name,
+                Provider = m.Provider,
+                IsVisionCapable = m.HasCapability("vision"),
+                IsInstalled = m.IsInstalled,
+                Size = m.Size,
+                Description = m.Description,
+                Tags = m.Tags
+            })
+            .OrderBy(m => m.Name)
+            .ToList();
+    }
+
+    public async Task<ModelConfiguration> GetCurrentConfigurationAsync()
+    {
+        return new ModelConfiguration
+        {
+            DefaultTextModel = await AI.Models.GetCurrent("text"),
+            DefaultVisionModel = await AI.Models.GetCurrent("vision"),
+            AvailableProviders = await AI.Providers.GetAvailable(),
+            ActiveProvider = await AI.Providers.GetActive(),
+            TextModelOptions = await GetTextModelOptionsAsync(),
+            VisionModelOptions = await GetVisionModelOptionsAsync()
+        };
+    }
+
+    public async Task<bool> SetCurrentTextModelAsync(string modelName, string? provider = null)
+    {
+        return await AI.Models.SetCurrent("text", modelName, provider);
+    }
+
+    public async Task<bool> SetCurrentVisionModelAsync(string modelName, string? provider = null)
+    {
+        return await AI.Models.SetCurrent("vision", modelName, provider);
+    }
+
+    public async Task<bool> InstallModelAsync(string modelName, string provider = "ollama")
+    {
+        // Dynamic model installation via provider-specific mechanisms
+        return await AI.Models.Install(modelName, provider);
+    }
+
+    public async Task<Analysis> AnalyzeWithSelectedModel(File file, Type type, string? modelOverride = null)
+    {
+        var modelName = modelOverride ?? await DetermineOptimalModel(file, type);
+
+        if (IsImageFile(file.ContentType))
+        {
+            return await AnalyzeImageContent(file, type, modelName);
+        }
+        else
+        {
+            return await AnalyzeTextContent(file, type, modelName);
+        }
+    }
+
+    private async Task<Analysis> AnalyzeImageContent(File file, Type type, string modelName)
+    {
+        var base64Image = await GetBase64ImageAsync(file.StorageKey);
+
+        var response = await AI.VisionPrompt($"""
+            {type.ExtractionPrompt}
+
+            Instructions: Analyze this image and extract structured information.
+            Template: {type.TemplateStructure}
+            """, base64Image)
+            .WithModel(modelName)
+            .WithMaxTokens(2000)
+            .ExecuteAsync();
+
+        return new Analysis
+        {
+            FileId = file.Id,
+            TypeId = type.Id,
+            ExtractedContext = response.Content,
+            ModelUsed = response.Model,
+            InputTokens = response.Usage?.InputTokens ?? 0,
+            OutputTokens = response.Usage?.OutputTokens ?? 0,
+            ProcessingDuration = response.ProcessingTime ?? TimeSpan.Zero
+        };
+    }
+
+    private bool IsImageFile(string contentType) =>
+        contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+}
+
+public class AvailableModel
+{
+    public string Name { get; set; } = "";
+    public string Provider { get; set; } = "";
+    public bool IsVisionCapable { get; set; }
+    public bool IsInstalled { get; set; }
+    public string Size { get; set; } = "";
+    public string Description { get; set; } = "";
+    public List<string> Tags { get; set; } = new();
+}
+
+public class ModelConfiguration
+{
+    public string DefaultTextModel { get; set; } = "";
+    public string DefaultVisionModel { get; set; } = "";
+    public List<string> AvailableProviders { get; set; } = new();
+    public string ActiveProvider { get; set; } = "";
+    public List<AvailableModel> TextModelOptions { get; set; } = new();
+    public List<AvailableModel> VisionModelOptions { get; set; } = new();
+}
+```
+
+### **3. User-Driven Processing Pipeline**
+
+#### **Background Processing Flow Commands**
+```csharp
+public sealed record TypeAssignedCommand : FlowCommand
+{
+    public Guid FileId { get; init; }
+    public Guid TypeId { get; init; }
+    public Guid UserId { get; init; } // Who assigned the type
+}
+
+public sealed class FileProcessingEvent : FlowEntity<FileProcessingEvent>
+{
+    public Guid FileId { get; set; }
     public ProcessingStage Stage { get; set; }
-    public ProcessingState State { get; set; }
+    public FileState State { get; set; }
     public object? EventData { get; set; }
     public string? ErrorMessage { get; set; }
     public TimeSpan? Duration { get; set; }
+    public Guid? UserId { get; set; } // User who triggered the processing
 }
 
 public enum ProcessingStage
 {
-    Uploaded,
-    TextExtracted,
-    AIAnalysisStarted,
-    AIAnalysisCompleted,
-    TemplateMatched,
-    VectorGenerated,
-    ProcessingCompleted,
-    ProcessingFailed
-}
-
-public sealed record DocumentUploadedCommand : FlowCommand
-{
-    public Guid DocumentId { get; init; }
-    public string Bucket { get; init; } = string.Empty;
-    public string ObjectKey { get; init; } = string.Empty;
+    TypeAssigned,        // User assigned document type
+    AnalysisStarted,     // AI analysis begun
+    AnalysisCompleted,   // Analysis successfully generated
+    AnalysisFailed       // Analysis failed with error
 }
 ```
 
-#### **Processing Orchestrator with Event Sourcing**
+#### **File Analysis Orchestrator (User-Triggered)**
 ```csharp
-public class DocumentProcessingOrchestrator : FlowCommandHandler<DocumentUploadedCommand>
+public class FileAnalysisOrchestrator : FlowCommandHandler<TypeAssignedCommand>
 {
-    private readonly DocumentIntelligenceService _intelligenceService;
-    private readonly IObjectStorageClient _storage;
-    private readonly ILogger<DocumentProcessingOrchestrator> _logger;
+    private readonly FileAnalysisService _analysisService;
+    private readonly ILogger<FileAnalysisOrchestrator> _logger;
 
-    public DocumentProcessingOrchestrator(
-        DocumentIntelligenceService intelligenceService,
-        IObjectStorageClient storage,
-        ILogger<DocumentProcessingOrchestrator> logger)
+    public FileAnalysisOrchestrator(
+        FileAnalysisService analysisService,
+        ILogger<FileAnalysisOrchestrator> logger)
     {
-        _intelligenceService = intelligenceService;
-        _storage = storage;
+        _analysisService = analysisService;
         _logger = logger;
     }
 
-    public override async Task HandleAsync(DocumentUploadedCommand command, CancellationToken cancellationToken)
+    public override async Task HandleAsync(TypeAssignedCommand command, CancellationToken ct)
     {
-        await RecordEvent(command.DocumentId, ProcessingStage.Uploaded, ProcessingState.Processing);
+        var file = await File.Get(command.FileId, ct);
+        var type = await Type.Get(command.TypeId, ct);
+
+        _logger.LogInformation("Starting analysis for file {FileId} with type {TypeName}",
+            command.FileId, type.Name);
+
+        await RecordEvent(command.FileId, ProcessingStage.TypeAssigned, FileState.TypeAssigned, command.UserId);
 
         try
         {
-            var document = await Document.Get(command.DocumentId, cancellationToken);
+            // Update file state
+            file.State = FileState.Analyzing;
+            await file.Save(ct);
 
-            await using var contentStream = await _storage.OpenReadAsync(new ObjectReadRequest
-            {
-                Bucket = command.Bucket,
-                ObjectName = command.ObjectKey
-            }, cancellationToken);
+            await RecordEvent(command.FileId, ProcessingStage.AnalysisStarted, FileState.Analyzing, command.UserId);
 
-            // Stage 1: Text Extraction
-            if (string.IsNullOrEmpty(document.ExtractedText))
+            // Check if analysis already exists (idempotency)
+            var existingAnalysis = await Analysis
+                .Where(a => a.FileId == command.FileId && a.TypeId == command.TypeId)
+                .FirstOrDefault();
+
+            if (existingAnalysis != null)
             {
-                document.ExtractedText = await ExtractTextAsync(
-                    contentStream,
-                    document.DisplayName,
-                    document.ContentType,
-                    cancellationToken);
-                await document.Save();
-                await RecordEvent(command.DocumentId, ProcessingStage.TextExtracted, ProcessingState.Processing);
+                _logger.LogInformation("Analysis already exists for file {FileId}", command.FileId);
+                file.State = FileState.Analyzed;
+                await file.Save(ct);
+                await RecordEvent(command.FileId, ProcessingStage.AnalysisCompleted, FileState.Analyzed, command.UserId);
+                return;
             }
 
-            // Stage 2: AI Analysis
-            await RecordEvent(command.DocumentId, ProcessingStage.AIAnalysisStarted, ProcessingState.Processing);
-            var analysis = await _intelligenceService.AnalyzeDocumentAsync(document, cancellationToken);
-            await analysis.Save();
-            await RecordEvent(command.DocumentId, ProcessingStage.AIAnalysisCompleted, ProcessingState.Processing);
+            // Generate AI analysis
+            var analysis = await _analysisService.GenerateAnalysisAsync(file, type, ct);
+            await analysis.Save(ct);
 
-            // Stage 3: Template Matching
-            var templates = await _intelligenceService.FindSimilarTemplates(document, cancellationToken: cancellationToken);
-            if (templates.Any())
-            {
-                document.TemplateId = templates.First().Id;
-                await document.Save();
-                await RecordEvent(command.DocumentId, ProcessingStage.TemplateMatched, ProcessingState.Processing);
-            }
+            // Mark file as analyzed
+            file.State = FileState.Analyzed;
+            await file.Save(ct);
 
-            // Stage 4: Vector Generation (if provider supports it)
-            if (Data<Document>.Vector.IsSupported)
-            {
-                if (document.Embedding == null)
-                {
-                    document.Embedding = await AI.Embed(document.ExtractedText, cancellationToken: cancellationToken);
-                    await document.Save(cancellationToken);
-                }
-                await RecordEvent(command.DocumentId, ProcessingStage.VectorGenerated, ProcessingState.Processing);
-            }
+            await RecordEvent(command.FileId, ProcessingStage.AnalysisCompleted, FileState.Analyzed, command.UserId);
 
-            // Completion
-            document.State = ProcessingState.Completed;
-            await document.Save(cancellationToken);
-            await RecordEvent(command.DocumentId, ProcessingStage.ProcessingCompleted, ProcessingState.Completed);
+            _logger.LogInformation("Analysis completed for file {FileId} with confidence {Confidence}",
+                command.FileId, analysis.ConfidenceScore);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Document processing failed for {DocumentId}", command.DocumentId);
-            await FlowContext.ScheduleRetryAsync(command, ex, cancellationToken);
-            await RecordEvent(command.DocumentId, ProcessingStage.ProcessingFailed, ProcessingState.Failed,
+            _logger.LogError(ex, "Analysis failed for file {FileId}", command.FileId);
+
+            file.State = FileState.AnalysisFailed;
+            file.ProcessingError = ex.Message;
+            await file.Save(ct);
+
+            await RecordEvent(command.FileId, ProcessingStage.AnalysisFailed, FileState.AnalysisFailed, command.UserId,
                               new { Error = ex.Message, StackTrace = ex.StackTrace });
+
+            throw; // Let Flow handle retry logic
         }
     }
 
-    private async Task RecordEvent(Guid documentId, ProcessingStage stage, ProcessingState state, object? data = null)
+    private async Task RecordEvent(Guid fileId, ProcessingStage stage, FileState state, Guid? userId, object? data = null)
     {
-        var evt = new DocumentProcessingEvent
+        var evt = new FileProcessingEvent
         {
-            DocumentId = documentId,
+            FileId = fileId,
             Stage = stage,
             State = state,
-            EventData = data
+            EventData = data,
+            UserId = userId
         };
         await evt.Save();
     }
@@ -405,152 +562,558 @@ public class DocumentProcessingOrchestrator : FlowCommandHandler<DocumentUploade
 
 ### **4. Auto-Generated APIs with Koan EntityController**
 
-#### **Document API Controller**
+#### **File API Controller (User-Driven Processing)**
 ```csharp
-[Route("api/documents")]
-public class DocumentController : EntityController<Document>
+[Route("api/files")]
+public class FileController : EntityController<File>
 {
-    private readonly DocumentProcessingOrchestrator _orchestrator;
-    private readonly DocumentIntelligenceService _intelligence;
-    private readonly IObjectStorageClient _storage;
     private readonly IBackgroundCommandBus _commandBus;
+    private readonly IObjectStorageClient _storage;
+    private readonly FileAnalysisService _analysisService;
 
-    public DocumentController(
-        DocumentProcessingOrchestrator orchestrator,
-        DocumentIntelligenceService intelligence,
+    public FileController(
+        IBackgroundCommandBus commandBus,
         IObjectStorageClient storage,
-        IBackgroundCommandBus commandBus)
+        FileAnalysisService analysisService)
     {
-        _orchestrator = orchestrator;
-        _intelligence = intelligence;
-        _storage = storage;
         _commandBus = commandBus;
+        _storage = storage;
+        _analysisService = analysisService;
     }
 
     // Auto-generated endpoints from EntityController:
-    // GET /api/documents - with pagination, filtering
-    // GET /api/documents/{id} - with relationship expansion
-    // POST /api/documents - create new
-    // PATCH /api/documents/{id} - update
-    // DELETE /api/documents/{id} - soft delete
+    // GET /api/files - with pagination, filtering
+    // GET /api/files/{id} - with relationship expansion
+    // POST /api/files - create new
+    // PATCH /api/files/{id} - update
+    // DELETE /api/files/{id} - soft delete
 
-    // Custom endpoints for business logic
     [HttpPost("upload")]
-    public async Task<ActionResult<Document>> Upload([FromForm] DocumentUploadRequest request)
+    public async Task<ActionResult<File>> Upload([FromForm] IFormFile uploadedFile)
     {
-        foreach (var file in request.Files)
+        // Upload and extract content immediately
+        await using var stream = uploadedFile.OpenReadStream();
+        await using var hashingStream = new HashingReadStream(stream, SHA512.Create());
+
+        var uploadResult = await _storage.UploadAsync(new ObjectUploadRequest
         {
-            await using var sourceStream = file.OpenReadStream();
-            await using var hashingStream = new HashingReadStream(sourceStream, SHA512.Create());
+            Bucket = "files",
+            ObjectName = $"{Guid.NewGuid():N}/{uploadedFile.FileName}",
+            ContentType = uploadedFile.ContentType,
+            Content = hashingStream
+        });
 
-            var uploadResult = await _storage.UploadAsync(new ObjectUploadRequest
-            {
-                Bucket = "documents",
-                ObjectName = $"{Guid.NewGuid():N}/{file.FileName}",
-                ContentType = file.ContentType,
-                Content = hashingStream,
-                Metadata = new Dictionary<string, string>
-                {
-                    ["original-file-name"] = file.FileName,
-                    ["content-type"] = file.ContentType
-                }
-            });
+        var sha512 = hashingStream.ComputeHashHex();
 
-            var sha512 = hashingStream.ComputeHashHex();
-            var existing = await Document
-                .Where(d => d.Sha512Hash == sha512)
-                .FirstOrDefault();
-
-            if (existing != null)
-            {
-                return Ok(existing); // Deduplication
-            }
-
-            var document = new Document
-            {
-                FileName = uploadResult.ObjectName,
-                UserFileName = file.FileName,
-                ContentType = file.ContentType,
-                FileSize = file.Length,
-                Sha512Hash = sha512,
-                StorageBucket = uploadResult.Bucket,
-                StorageObjectKey = uploadResult.ObjectName,
-                StorageVersionId = uploadResult.VersionId
-            };
-
-            await document.Save();
-
-            await _commandBus.EnqueueAsync(new DocumentUploadedCommand
-            {
-                DocumentId = document.Id,
-                ObjectKey = uploadResult.ObjectName,
-                Bucket = uploadResult.Bucket
-            });
-
-            return CreatedAtAction(nameof(GetById), new { id = document.Id }, document);
+        // Check for duplicates
+        var existing = await File.Where(f => f.Sha512Hash == sha512).FirstOrDefault();
+        if (existing != null)
+        {
+            return Ok(existing);
         }
 
-        return BadRequest();
+        // Extract content immediately (no type needed for extraction)
+        var extractedText = await _analysisService.ExtractContentAsync(
+            uploadResult.ObjectName, uploadedFile.ContentType, CancellationToken.None);
+
+        var file = new File
+        {
+            FileName = uploadResult.ObjectName,
+            ContentType = uploadedFile.ContentType,
+            FileSize = uploadedFile.Length,
+            Sha512Hash = sha512,
+            StorageBucket = uploadResult.Bucket,
+            StorageKey = uploadResult.ObjectName,
+            ExtractedText = extractedText,
+            ExtractionMethod = DetermineExtractionMethod(uploadedFile.ContentType),
+            ExtractedAt = DateTime.UtcNow,
+            State = FileState.Uploaded // Ready for type assignment
+        };
+
+        await file.Save();
+        return CreatedAtAction(nameof(GetById), new { id = file.Id }, file);
+    }
+
+    // Key endpoint: User assigns type via UI
+    [HttpPut("{id}/assign-type")]
+    public async Task<ActionResult> AssignType(Guid id, [FromBody] AssignTypeRequest request)
+    {
+        var file = await File.Get(id);
+        if (file == null) return NotFound();
+
+        if (file.State != FileState.Uploaded)
+        {
+            return BadRequest($"File must be in 'Uploaded' state to assign type. Current state: {file.State}");
+        }
+
+        // Validate type exists
+        var type = await Type.Get(request.TypeId);
+        if (type == null) return BadRequest("Invalid type ID");
+
+        // Assign type and trigger processing
+        file.TypeId = request.TypeId;
+        file.TypeAssignedAt = DateTime.UtcNow;
+        file.State = FileState.TypeAssigned;
+        await file.Save();
+
+        // Trigger background analysis
+        await _commandBus.EnqueueAsync(new TypeAssignedCommand
+        {
+            FileId = id,
+            TypeId = request.TypeId,
+            UserId = request.UserId // From current user context
+        });
+
+        return Ok(new { message = "Type assigned successfully. Analysis started.", fileState = file.State });
     }
 
     [HttpGet("{id}/analysis")]
-    public async Task<ActionResult<DocumentAnalysis>> GetAnalysis(Guid id)
+    public async Task<ActionResult<Analysis>> GetAnalysis(Guid id)
     {
-        var analysis = await DocumentAnalysis.Where(a => a.DocumentId == id).FirstOrDefault();
+        var analysis = await Analysis.Where(a => a.FileId == id).FirstOrDefault();
         return analysis != null ? Ok(analysis) : NotFound();
     }
 
-    [HttpGet("{id}/similar-templates")]
-    public async Task<ActionResult<List<DocumentTemplate>>> GetSimilarTemplates(Guid id)
+    [HttpGet("{id}/status")]
+    public async Task<ActionResult> GetProcessingStatus(Guid id)
     {
-        var document = await Document.Get(id);
-        if (document == null) return NotFound();
+        var file = await File.Get(id);
+        if (file == null) return NotFound();
 
-        var templates = await _intelligence.FindSimilarTemplates(document);
-        return Ok(templates);
+        return Ok(new
+        {
+            file.Id,
+            file.State,
+            file.TypeId,
+            file.TypeAssignedAt,
+            file.ProcessingError,
+            HasAnalysis = await Analysis.Where(a => a.FileId == id).Any()
+        });
     }
 
     [HttpGet("{id}/processing-history")]
-    public async Task<ActionResult<List<DocumentProcessingEvent>>> GetProcessingHistory(Guid id)
+    public async Task<ActionResult<List<FileProcessingEvent>>> GetProcessingHistory(Guid id)
     {
-        var events = await DocumentProcessingEvent
-            .Where(e => e.DocumentId == id)
+        var events = await FileProcessingEvent
+            .Where(e => e.FileId == id)
             .OrderBy(e => e.Timestamp)
             .All();
         return Ok(events);
     }
+
+    private ExtractionMethod DetermineExtractionMethod(string contentType)
+    {
+        return contentType switch
+        {
+            "text/plain" => ExtractionMethod.None,
+            "application/pdf" => ExtractionMethod.PdfParser,
+            "image/jpeg" or "image/png" => ExtractionMethod.OcrEngine,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => ExtractionMethod.DocxParser,
+            _ => ExtractionMethod.Custom
+        };
+    }
+}
+
+public class AssignTypeRequest
+{
+    public Guid TypeId { get; set; }
+    public Guid UserId { get; set; }
 }
 ```
 
-#### **Template API Controller**
+#### **Type API Controller**
 ```csharp
-[Route("api/templates")]
-public class DocumentTemplateController : EntityController<DocumentTemplate>
+[Route("api/types")]
+public class TypeController : EntityController<Type>
 {
-    private readonly DocumentIntelligenceService _intelligence;
+    private readonly FileAnalysisService _analysisService;
+
+    public TypeController(FileAnalysisService analysisService)
+    {
+        _analysisService = analysisService;
+    }
 
     // Auto-generated CRUD endpoints + custom business logic
 
     [HttpPost("generate")]
-    public async Task<ActionResult<DocumentTemplate>> GenerateTemplate([FromBody] TemplateGenerationRequest request)
+    public async Task<ActionResult<Type>> GenerateType([FromBody] TypeGenerationRequest request)
     {
-        var template = await _intelligence.GenerateTemplateAsync(request.Prompt);
-        return CreatedAtAction(nameof(GetById), new { id = template.Id }, template);
+        var type = await _analysisService.GenerateTypeAsync(request.Prompt, CancellationToken.None);
+        return CreatedAtAction(nameof(GetById), new { id = type.Id }, type);
     }
 
-    [HttpGet("{id}/documents")]
-    public async Task<ActionResult<List<Document>>> GetDocuments(Guid id)
+    [HttpGet("{id}/files")]
+    public async Task<ActionResult<List<File>>> GetFiles(Guid id)
     {
-        var template = await DocumentTemplate.Get(id);
-        if (template == null) return NotFound();
+        var type = await Type.Get(id);
+        if (type == null) return NotFound();
 
-        var documents = await template.GetChildren<Document>(); // Automatic relationship
-        return Ok(documents);
+        var files = await type.GetFiles(); // Automatic relationship
+        return Ok(files);
+    }
+
+    [HttpGet("{id}/analyses")]
+    public async Task<ActionResult<List<Analysis>>> GetAnalyses(Guid id)
+    {
+        var analyses = await Analysis.Where(a => a.TypeId == id).All();
+        return Ok(analyses);
+    }
+}
+
+public class TypeGenerationRequest
+{
+    public string Prompt { get; set; } = "";
+}
+```
+
+#### **Model Management API Controller (Matching Original gdoc)**
+```csharp
+[Route("api/models")]
+public class ModelManagementController : ControllerBase
+{
+    private readonly ModelManagementService _modelService;
+    private readonly ILogger<ModelManagementController> _logger;
+
+    public ModelManagementController(ModelManagementService modelService, ILogger<ModelManagementController> logger)
+    {
+        _modelService = modelService;
+        _logger = logger;
+    }
+
+    // Model Discovery & Installation (from original gdoc ConfigurationController)
+
+    [HttpGet("available")]
+    public async Task<ActionResult<List<AvailableModel>>> GetAvailableModels()
+    {
+        var models = await _modelService.GetAvailableModelsAsync();
+        return Ok(models.OrderBy(m => m.Name));
+    }
+
+    [HttpGet("installed")]
+    public async Task<ActionResult<List<AvailableModel>>> GetInstalledModels()
+    {
+        var models = await _modelService.GetAvailableModelsAsync();
+        return Ok(models.Where(m => m.IsInstalled).OrderBy(m => m.Name));
+    }
+
+    [HttpGet("search")]
+    public async Task<ActionResult<List<AvailableModel>>> SearchModels(
+        [FromQuery] string? name = null,
+        [FromQuery] bool onlyInstalled = false,
+        [FromQuery] bool onlyVision = false,
+        [FromQuery] string? provider = null)
+    {
+        var models = await _modelService.GetAvailableModelsAsync();
+
+        if (!string.IsNullOrEmpty(name))
+            models = models.Where(m => m.Name.Contains(name, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        if (onlyInstalled)
+            models = models.Where(m => m.IsInstalled).ToList();
+
+        if (onlyVision)
+            models = models.Where(m => m.IsVisionCapable).ToList();
+
+        if (!string.IsNullOrEmpty(provider))
+            models = models.Where(m => m.Provider.Equals(provider, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        return Ok(models.OrderBy(m => m.Name));
+    }
+
+    [HttpPost("{modelName}/install")]
+    public async Task<ActionResult> InstallModel(string modelName, [FromQuery] string provider = "ollama")
+    {
+        try
+        {
+            var success = await _modelService.InstallModelAsync(modelName, provider);
+            if (success)
+            {
+                return Ok(new { message = $"Model '{modelName}' installation started successfully" });
+            }
+            return BadRequest($"Failed to install model '{modelName}'");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error installing model: {ModelName}", modelName);
+            return StatusCode(500, $"Error installing model '{modelName}': {ex.Message}");
+        }
+    }
+
+    // Current Model Configuration
+
+    [HttpGet("config")]
+    public async Task<ActionResult<ModelConfiguration>> GetConfiguration()
+    {
+        var config = await _modelService.GetCurrentConfigurationAsync();
+        return Ok(config);
+    }
+
+    [HttpPut("text-model")]
+    public async Task<ActionResult> SetCurrentTextModel([FromBody] SetModelRequest request)
+    {
+        var success = await _modelService.SetCurrentTextModelAsync(request.ModelName, request.Provider);
+        if (success)
+        {
+            return Ok(new { message = $"Text model set to '{request.ModelName}'" });
+        }
+        return BadRequest($"Failed to set text model to '{request.ModelName}'");
+    }
+
+    [HttpPut("vision-model")]
+    public async Task<ActionResult> SetCurrentVisionModel([FromBody] SetModelRequest request)
+    {
+        var success = await _modelService.SetCurrentVisionModelAsync(request.ModelName, request.Provider);
+        if (success)
+        {
+            return Ok(new { message = $"Vision model set to '{request.ModelName}'" });
+        }
+        return BadRequest($"Failed to set vision model to '{request.ModelName}'");
+    }
+
+    // Analysis with Model Selection
+
+    [HttpPost("analyze")]
+    public async Task<ActionResult<Analysis>> AnalyzeWithModel([FromBody] AnalyzeWithModelRequest request)
+    {
+        var file = await File.Get(request.FileId);
+        if (file == null) return NotFound("File not found");
+
+        var type = await Type.Get(request.TypeId);
+        if (type == null) return NotFound("Type not found");
+
+        try
+        {
+            var analysis = await _modelService.AnalyzeWithSelectedModel(file, type, request.ModelOverride);
+            await analysis.Save();
+
+            // Update file state
+            file.State = FileState.Analyzed;
+            await file.Save();
+
+            return Ok(analysis);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Analysis failed for file {FileId} with model {Model}", request.FileId, request.ModelOverride);
+            return StatusCode(500, $"Analysis failed: {ex.Message}");
+        }
+    }
+}
+
+public class SetModelRequest
+{
+    public string ModelName { get; set; } = "";
+    public string? Provider { get; set; }
+}
+
+public class AnalyzeWithModelRequest
+{
+    public Guid FileId { get; set; }
+    public Guid TypeId { get; set; }
+    public string? ModelOverride { get; set; }
+}
+```
+
+#### **Analysis API Controller**
+```csharp
+[Route("api/analysis")]
+public class AnalysisController : EntityController<Analysis>
+{
+    // Auto-generated CRUD endpoints
+
+    [HttpGet("by-type/{typeId}")]
+    public async Task<ActionResult<List<Analysis>>> GetByType(Guid typeId)
+    {
+        var analyses = await Analysis.Where(a => a.TypeId == typeId).All();
+        return Ok(analyses);
+    }
+
+    [HttpGet("by-file/{fileId}")]
+    public async Task<ActionResult<Analysis>> GetByFile(Guid fileId)
+    {
+        var analysis = await Analysis.Where(a => a.FileId == fileId).FirstOrDefault();
+        return analysis != null ? Ok(analysis) : NotFound();
+    }
+
+    [HttpGet("high-confidence")]
+    public async Task<ActionResult<List<Analysis>>> GetHighConfidence([FromQuery] double threshold = 0.8)
+    {
+        var analyses = await Analysis.Where(a => a.ConfidenceScore >= threshold).All();
+        return Ok(analyses);
     }
 }
 ```
 
-### **5. Multi-Provider Data Strategy**
+### **5. AI Model Management & Image Processing (From Original gdoc)**
+
+The S13.DocMind sample incorporates the sophisticated model management capabilities from the original gdoc solution, enabling users to discover, install, and select AI models for both text and image analysis.
+
+#### **Key Features Replicated from Original gdoc**
+
+1. **Separate Text and Vision Model Selection**
+   - Independent model configuration for text processing and image analysis
+   - Vision model validation ensures only vision-capable models are used for images
+   - Automatic model selection based on content type
+
+2. **Dynamic Model Discovery**
+   - Browse available models from multiple providers (Ollama, OpenAI, etc.)
+   - Filter by installed status, vision capabilities, and provider
+   - Model search with name/description filtering
+
+3. **Model Installation Management**
+   - Install models directly from the UI (similar to `ollama pull`)
+   - Remove unused models to manage storage
+   - Installation progress tracking
+
+4. **Multi-Provider Support**
+   - Multiple Ollama instances support
+   - Cross-provider model comparison
+   - Provider health monitoring
+
+#### **User Workflow: Model Selection & File Processing**
+
+```mermaid
+graph TD
+    A[Upload File] --> B[Extract Content]
+    B --> C[User Assigns Type]
+    C --> D{Content Type?}
+    D -->|Image| E[Load Vision Models]
+    D -->|Text| F[Load Text Models]
+    E --> G[User Selects Vision Model]
+    F --> H[User Selects Text Model]
+    G --> I[Vision Analysis with Selected Model]
+    H --> J[Text Analysis with Selected Model]
+    I --> K[Generate Analysis Result]
+    J --> K
+```
+
+#### **Frontend Integration Examples**
+
+```typescript
+// Model selection dropdown population
+const loadAvailableModels = async (type: 'text' | 'vision') => {
+    const response = await fetch(`/api/models/search?onlyInstalled=true&onlyVision=${type === 'vision'}`);
+    const models = await response.json();
+    return models.map(m => ({ value: m.name, label: `${m.name} (${m.size})` }));
+};
+
+// File processing with model selection
+const processFileWithModel = async (fileId: string, typeId: string, selectedModel?: string) => {
+    const response = await fetch('/api/models/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fileId,
+            typeId,
+            modelOverride: selectedModel
+        })
+    });
+    return response.json();
+};
+
+// Model installation
+const installModel = async (modelName: string, provider: string = 'ollama') => {
+    const response = await fetch(`/api/models/${modelName}/install?provider=${provider}`, {
+        method: 'POST'
+    });
+    return response.json();
+};
+```
+
+#### **Image Processing Capabilities (Matching Original)**
+
+The original gdoc solution uses Ollama's vision models for image analysis. S13.DocMind replicates this with Koan's AI abstraction:
+
+**Original gdoc Image Processing:**
+```csharp
+// From LlmDiagramGraphExtractor.cs
+var resp = await _llm.AnalyzeImageAsync(preprocessed.Base64Image, system, user, ct);
+```
+
+**S13.DocMind Equivalent:**
+```csharp
+var response = await AI.VisionPrompt(prompt, base64Image)
+    .WithModel(selectedVisionModel)
+    .WithMaxTokens(2000)
+    .ExecuteAsync();
+```
+
+#### **Vision Model Detection (From Original gdoc)**
+
+The original gdoc uses "vision indicators" to detect which models support image analysis:
+
+```csharp
+// Original vision capability detection patterns
+public List<string> GetDefaultVisionIndicators() => new()
+{
+    "vision", "llava", "llava-phi3", "minicpm-v", "moondream", "bakllava"
+};
+```
+
+S13.DocMind integrates this through Koan's capability detection:
+```csharp
+var models = await AI.Models.GetAvailable("ollama");
+var visionModels = models.Where(m => m.HasCapability("vision")).ToList();
+```
+
+#### **Model Configuration UI Components**
+
+Based on the original gdoc's Angular frontend patterns:
+
+```html
+<!-- Text Model Selection -->
+<div class="model-selector">
+  <label>Text Analysis Model:</label>
+  <select [(ngModel)]="selectedTextModel" (change)="updateTextModel()">
+    <option *ngFor="let model of textModels" [value]="model.name">
+      {{model.name}} ({{model.size}}) - {{model.provider}}
+    </option>
+  </select>
+  <button (click)="browseModels('text')">Browse More Models</button>
+</div>
+
+<!-- Vision Model Selection -->
+<div class="model-selector">
+  <label>Image Analysis Model:</label>
+  <select [(ngModel)]="selectedVisionModel" (change)="updateVisionModel()">
+    <option *ngFor="let model of visionModels" [value]="model.name">
+      {{model.name}} ({{model.size}}) - Vision Capable
+    </option>
+  </select>
+  <button (click)="browseModels('vision')">Browse Vision Models</button>
+</div>
+
+<!-- Model Installation -->
+<div class="model-installation" *ngIf="showModelBrowser">
+  <h3>Available Models</h3>
+  <div *ngFor="let model of availableModels" class="model-card">
+    <div class="model-info">
+      <h4>{{model.name}}</h4>
+      <p>{{model.description}}</p>
+      <span class="model-size">Size: {{model.size}}</span>
+      <span class="model-tags">
+        <span *ngFor="let tag of model.tags" class="tag">{{tag}}</span>
+      </span>
+    </div>
+    <button *ngIf="!model.isInstalled"
+            (click)="installModel(model.name)"
+            class="install-btn">
+      Install Model
+    </button>
+    <span *ngIf="model.isInstalled" class="installed-badge">Installed</span>
+  </div>
+</div>
+```
+
+#### **Performance Considerations**
+
+Following the original gdoc's approach:
+- **Model caching**: Installed models are cached for quick selection
+- **Lazy loading**: Model lists loaded on-demand
+- **Provider health checks**: Regular connectivity tests to multiple Ollama instances
+- **Graceful fallbacks**: Default model selection when preferred models are unavailable
+
+### **6. Multi-Provider Data Strategy**
 
 #### **Provider Configuration**
 ```csharp
@@ -2202,10 +2765,10 @@ namespace S13.DocMind.Migration
 
 | **Original Component** | **S13.DocMind Target** | **Migration Strategy** | **Reusable Code** |
 |------------------------|------------------------|------------------------|-------------------|
-| `GDoc.Api.Models.UploadedDocument` | `S13.DocMind.Models.Document` | Convert to Entity<T>, add vector support | Property definitions, validation logic |
-| `GDoc.Api.Models.DocumentationRequest` | `S13.DocMind.Models.DocumentAnalysis` | Restructure as analysis result entity | Request processing logic |
-| `GDoc.Api.Models.DocumentTypeConfiguration` | `S13.DocMind.Models.DocumentTemplate` | Convert to Entity<T>, add AI generation | Template structure, validation rules |
-| `GDoc.Api.Services.DocumentProcessor` | `S13.DocMind.Services.DocumentIntelligenceService` | Replace custom clients with AI.Prompt() | Text extraction methods |
+| `GDoc.Api.Models.UploadedDocument` | `S13.DocMind.Models.File` | Convert to Entity<T>, add extraction state tracking | Property definitions, validation logic |
+| `GDoc.Api.Models.DocumentTypeConfiguration` | `S13.DocMind.Models.Type` | Convert to Entity<T>, add AI extraction prompts | Template structure, validation rules |
+| `GDoc.Api.Models.DocumentationRequest` | `S13.DocMind.Models.Analysis` | Restructure as AI analysis result entity | Context processing logic |
+| `GDoc.Api.Services.DocumentProcessingService` | `S13.DocMind.Services.FileAnalysisService` | Replace with user-driven type assignment | Text extraction methods |
 | `GDoc.Api.Services.LlmService` | Built-in Koan AI interface | Remove custom HTTP client code | Prompt building logic |
 | `GDoc.Api.Repositories.*Repository` | Automatic via Entity<T> patterns | Remove repository classes | Query logic for custom endpoints |
 | `GDoc.Api.Controllers.*Controller` | `EntityController<T>` inheritance | Replace manual CRUD with inheritance | Business logic endpoints |
