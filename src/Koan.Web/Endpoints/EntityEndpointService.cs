@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -52,12 +53,12 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return CollectionShortCircuit(context, hookContext);
         }
 
-        IReadOnlyList<TEntity> repositoryItems;
+        RepositoryQueryResult queryResult;
         int total;
-        bool repositoryHandledPagination;
         try
         {
-            (repositoryItems, total, repositoryHandledPagination) = await QueryCollectionAsync(repo, request, context.Options, context.CancellationToken);
+            queryResult = await QueryCollectionAsync(repo, request, context.Options, context.CancellationToken);
+            total = queryResult.Total;
         }
         catch (InvalidOperationException ex)
         {
@@ -65,20 +66,41 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), 0, null, bad);
         }
 
-        var list = repositoryItems.ToList();
+        if (queryResult.ExceededSafetyLimit)
+        {
+            var payload = new
+            {
+                error = "Result too large",
+                message = $"This endpoint allows at most {request.Policy.AbsoluteMaxRecords} records without pagination."
+            };
+            var tooLarge = new ObjectResult(payload) { StatusCode = StatusCodes.Status413PayloadTooLarge };
+            return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), queryResult.Total, null, tooLarge);
+        }
+
+        var list = queryResult.Items.ToList();
         if (context.Options.Sort.Count > 0)
         {
             list = ApplySort(list, context.Options.Sort);
         }
-        if (!repositoryHandledPagination && (request.ForcePagination || ShouldPaginate(context, request)))
+
+        var shouldPaginate = request.ApplyPagination;
+        if (shouldPaginate && !queryResult.RepositoryHandledPagination)
         {
             (list, total) = ApplyPagination(list, context.Options.Page, context.Options.PageSize, total);
             context.Headers["Koan-InMemory-Paging"] = "true";
+        }
+
+        if (shouldPaginate)
+        {
             context.Headers["X-Page"] = context.Options.Page.ToString();
             context.Headers["X-Page-Size"] = context.Options.PageSize.ToString();
-            context.Headers["X-Total-Count"] = total.ToString();
             var totalPages = context.Options.PageSize > 0 ? (int)Math.Ceiling((double)total / context.Options.PageSize) : 0;
             context.Headers["X-Total-Pages"] = totalPages.ToString();
+            if (request.IncludeTotalCount)
+            {
+                context.Headers["X-Total-Count"] = total.ToString();
+            }
+
             if (!string.IsNullOrWhiteSpace(request.BasePath) && request.QueryParameters.Count > 0 && totalPages > 0)
             {
                 var links = BuildLinkHeaders(request.BasePath!, request.QueryParameters, context.Options.Page, context.Options.PageSize, totalPages);
@@ -87,6 +109,10 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                     context.Headers["Link"] = string.Join(", ", links);
                 }
             }
+        }
+        else if (request.IncludeTotalCount)
+        {
+            context.Headers["X-Total-Count"] = total.ToString();
         }
 
         if (!await _hookPipeline.AfterCollectionAsync(hookContext, list))
@@ -409,28 +435,6 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
     }
 
-    private static bool ShouldPaginate(EntityRequestContext context, EntityCollectionRequest request)
-    {
-        if (request.ForcePagination)
-        {
-            return true;
-        }
-
-        if (context.Options.PageSize > 0 || context.Options.Page > 1)
-        {
-            return true;
-        }
-
-        var http = context.HttpContext;
-        if (http is null)
-        {
-            return false;
-        }
-
-        var query = http.Request.Query;
-        return query.ContainsKey("page") || query.ContainsKey("size");
-    }
-
     private static (List<TEntity> Items, int Total) ApplyPagination(List<TEntity> source, int page, int pageSize, int total)
     {
         if (pageSize <= 0)
@@ -510,13 +514,60 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     }
 
 
-    private async Task<(IReadOnlyList<TEntity> Items, int Total, bool RepositoryHandledPagination)> QueryCollectionAsync(
+    private sealed class RepositoryQueryResult
+    {
+        public RepositoryQueryResult(IReadOnlyList<TEntity> items, int total, bool handled, bool exceededLimit)
+        {
+            Items = items;
+            Total = total;
+            RepositoryHandledPagination = handled;
+            ExceededSafetyLimit = exceededLimit;
+        }
+
+        public IReadOnlyList<TEntity> Items { get; }
+        public int Total { get; }
+        public bool RepositoryHandledPagination { get; }
+        public bool ExceededSafetyLimit { get; }
+    }
+
+    private async Task<RepositoryQueryResult> QueryCollectionAsync(
         IDataRepository<TEntity, TKey> repo,
         EntityCollectionRequest request,
         QueryOptions options,
         CancellationToken cancellationToken)
     {
         using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+
+        async Task<int?> TryCountAsync(Func<CancellationToken, Task<int>> counter)
+        {
+            try
+            {
+                return await counter(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        async Task<int> ResolveTotalAsync(Func<CancellationToken, Task<int>> counter, int fallback, int? prefetched, bool needed)
+        {
+            if (prefetched.HasValue)
+            {
+                return prefetched.Value;
+            }
+
+            if (!needed)
+            {
+                return fallback;
+            }
+
+            var computed = await TryCountAsync(counter).ConfigureAwait(false);
+            return computed ?? fallback;
+        }
+
+        var absoluteMax = request.AbsoluteMaxRecords;
+
         if (!string.IsNullOrWhiteSpace(request.FilterJson) && repo is ILinqQueryRepository<TEntity, TKey> lrepo)
         {
             if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
@@ -524,57 +575,92 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 throw new InvalidOperationException(error ?? "Invalid filter");
             }
 
-            IReadOnlyList<TEntity> items;
-            bool paginationHandled = false;
-            if (repo is ILinqQueryRepositoryWithOptions<TEntity, TKey> lrepoOpts)
+            var counter = new Func<CancellationToken, Task<int>>(ct => lrepo.CountAsync(predicate!, ct));
+            int? prefetchedTotal = null;
+            if (!request.ApplyPagination && absoluteMax > 0)
             {
-                var dq = new Koan.Data.Abstractions.DataQueryOptions(options.Page, options.PageSize);
-                items = await lrepoOpts.QueryAsync(predicate!, dq, cancellationToken);
-                paginationHandled = true;
+                prefetchedTotal = await TryCountAsync(counter).ConfigureAwait(false);
+                if (prefetchedTotal.HasValue && prefetchedTotal.Value > absoluteMax)
+                {
+                    return new RepositoryQueryResult(Array.Empty<TEntity>(), prefetchedTotal.Value, false, true);
+                }
+            }
+
+            IReadOnlyList<TEntity> items;
+            var handled = false;
+            if (request.ApplyPagination && repo is ILinqQueryRepositoryWithOptions<TEntity, TKey> lrepoOpts)
+            {
+                var dq = new DataQueryOptions(options.Page, options.PageSize);
+                items = await lrepoOpts.QueryAsync(predicate!, dq, cancellationToken).ConfigureAwait(false);
+                handled = true;
             }
             else
             {
-                items = await lrepo.QueryAsync(predicate!, cancellationToken);
+                items = await lrepo.QueryAsync(predicate!, cancellationToken).ConfigureAwait(false);
             }
 
-            int total;
-            try { total = await lrepo.CountAsync(predicate!, cancellationToken); } catch { total = items.Count; }
-            return (items, total, paginationHandled);
+            var total = await ResolveTotalAsync(counter, items.Count, prefetchedTotal, request.IncludeTotalCount || request.ApplyPagination).ConfigureAwait(false);
+            return new RepositoryQueryResult(items, total, handled, false);
         }
 
         if (!string.IsNullOrWhiteSpace(options.Q) && repo is IStringQueryRepository<TEntity, TKey> srepo)
         {
-            IReadOnlyList<TEntity> items;
-            bool paginationHandled = false;
-            if (repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
+            var counter = new Func<CancellationToken, Task<int>>(ct => srepo.CountAsync(options.Q!, ct));
+            int? prefetchedTotal = null;
+            if (!request.ApplyPagination && absoluteMax > 0)
             {
-                var dq = new Koan.Data.Abstractions.DataQueryOptions(options.Page, options.PageSize);
-                items = await srepoOpts.QueryAsync(options.Q!, dq, cancellationToken);
-                paginationHandled = true;
+                prefetchedTotal = await TryCountAsync(counter).ConfigureAwait(false);
+                if (prefetchedTotal.HasValue && prefetchedTotal.Value > absoluteMax)
+                {
+                    return new RepositoryQueryResult(Array.Empty<TEntity>(), prefetchedTotal.Value, false, true);
+                }
+            }
+
+            IReadOnlyList<TEntity> items;
+            var handled = false;
+            if (request.ApplyPagination && repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
+            {
+                var dq = new DataQueryOptions(options.Page, options.PageSize);
+                items = await srepoOpts.QueryAsync(options.Q!, dq, cancellationToken).ConfigureAwait(false);
+                handled = true;
             }
             else
             {
-                items = await srepo.QueryAsync(options.Q!, cancellationToken);
+                items = await srepo.QueryAsync(options.Q!, cancellationToken).ConfigureAwait(false);
             }
 
-            int total;
-            try { total = await srepo.CountAsync(options.Q!, cancellationToken); } catch { total = items.Count; }
-            return (items, total, paginationHandled);
+            var total = await ResolveTotalAsync(counter, items.Count, prefetchedTotal, request.IncludeTotalCount || request.ApplyPagination).ConfigureAwait(false);
+            return new RepositoryQueryResult(items, total, handled, false);
         }
 
-        if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
         {
-            var dq = new Koan.Data.Abstractions.DataQueryOptions(options.Page, options.PageSize);
-            var items = await repoOpts.QueryAsync(null, dq, cancellationToken);
-            int total;
-            try { total = await repoOpts.CountAsync(null, cancellationToken); } catch { total = items.Count; }
-            return (items, total, true);
-        }
+            var counter = new Func<CancellationToken, Task<int>>(ct => repo.CountAsync(null, ct));
+            int? prefetchedTotal = null;
+            if (!request.ApplyPagination && absoluteMax > 0)
+            {
+                prefetchedTotal = await TryCountAsync(counter).ConfigureAwait(false);
+                if (prefetchedTotal.HasValue && prefetchedTotal.Value > absoluteMax)
+                {
+                    return new RepositoryQueryResult(Array.Empty<TEntity>(), prefetchedTotal.Value, false, true);
+                }
+            }
 
-        var fallback = await repo.QueryAsync(null, cancellationToken);
-        int fallbackTotal;
-        try { fallbackTotal = await repo.CountAsync(null, cancellationToken); } catch { fallbackTotal = fallback.Count; }
-        return (fallback, fallbackTotal, false);
+            IReadOnlyList<TEntity> items;
+            var handled = false;
+            if (request.ApplyPagination && repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
+            {
+                var dq = new DataQueryOptions(options.Page, options.PageSize);
+                items = await repoOpts.QueryAsync(null, dq, cancellationToken).ConfigureAwait(false);
+                handled = true;
+            }
+            else
+            {
+                items = await repo.QueryAsync(null, cancellationToken).ConfigureAwait(false);
+            }
+
+            var total = await ResolveTotalAsync(counter, items.Count, prefetchedTotal, request.IncludeTotalCount || request.ApplyPagination).ConfigureAwait(false);
+            return new RepositoryQueryResult(items, total, handled, false);
+        }
     }
 
     private async Task<(IReadOnlyList<TEntity> Items, int Total)> QueryCollectionFromBodyAsync(

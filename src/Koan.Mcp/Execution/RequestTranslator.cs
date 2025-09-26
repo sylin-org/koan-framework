@@ -7,8 +7,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Threading;
+using Koan.Web.Attributes;
 using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
+using Koan.Web.Infrastructure;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -91,6 +93,8 @@ public sealed class RequestTranslator
 
     private static EntityCollectionRequest BuildCollectionRequest(EntityRequestContext context, JsonObject args)
     {
+        var defaultPolicy = PaginationPolicy.FromAttribute(new PaginationAttribute(), PaginationSafetyBounds.Default);
+        var forcePagination = ReadBool(args, "forcePagination") ?? false;
         return new EntityCollectionRequest
         {
             Context = context,
@@ -99,7 +103,13 @@ public sealed class RequestTranslator
             IgnoreCase = ReadBool(args, "ignoreCase") ?? false,
             With = ReadString(args, "with"),
             Shape = ReadString(args, "shape"),
-            ForcePagination = ReadBool(args, "forcePagination") ?? false,
+            ForcePagination = forcePagination,
+            ApplyPagination = forcePagination,
+            PaginationRequested = forcePagination,
+            ClientRequestedAll = false,
+            Policy = defaultPolicy,
+            IncludeTotalCount = forcePagination && defaultPolicy.IncludeCount,
+            AbsoluteMaxRecords = defaultPolicy.AbsoluteMaxRecords,
             Accept = ReadString(args, "accept"),
             BasePath = ReadString(args, "basePath"),
             QueryParameters = BuildQueryParameters(args)
