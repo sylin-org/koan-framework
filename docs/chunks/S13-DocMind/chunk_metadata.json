@@ -1,6 +1,6 @@
 {
   "document_info": {
-    "document_id": "S13-DocMind-Proposal",
+    "document_id": "S13-DocMind-Refactor-Plan",
     "source_file": "../../proposals/S13-DocMind-Proposal.md",
     "total_lines": 3274,
     "total_chunks": 10,
@@ -9,31 +9,80 @@
     "framework": "Koan Framework"
   },
   "processing_strategy": {
-    "sequential_order": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "sequential_order": [
+      10,
+      1,
+      2,
+      3,
+      5,
+      4,
+      6,
+      7,
+      8,
+      9
+    ],
     "parallel_groups": [
       {
-        "group_id": "foundation",
-        "chunks": [2, 3],
-        "prerequisite_chunks": [1],
-        "description": "Entity models and AI processing can be analyzed in parallel after strategic overview"
+        "group_id": "alignment",
+        "chunks": [
+          10
+        ],
+        "prerequisite_chunks": [],
+        "description": "Validates proposal intent against current implementation before detailed planning."
       },
       {
-        "group_id": "implementation",
-        "chunks": [6, 7],
-        "prerequisite_chunks": [1, 2, 3, 4, 5],
-        "description": "Implementation and operations are independent concerns"
+        "group_id": "foundation",
+        "chunks": [
+          2,
+          3
+        ],
+        "prerequisite_chunks": [
+          1
+        ],
+        "description": "Establishes domain models and processing pipeline after executive framing."
+      },
+      {
+        "group_id": "infrastructure",
+        "chunks": [
+          3,
+          5
+        ],
+        "prerequisite_chunks": [
+          1,
+          2
+        ],
+        "description": "Pipeline and infrastructure guidance can proceed together once core models defined."
+      },
+      {
+        "group_id": "execution",
+        "chunks": [
+          6,
+          7
+        ],
+        "prerequisite_chunks": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "description": "Implementation roadmap and testing/ops solidify after API and infrastructure planning."
       }
     ],
     "cross_reference_chunk": 8,
-    "critical_path": [1, 2, 4, 6]
+    "critical_path": [
+      10,
+      1,
+      2,
+      3,
+      4,
+      6
+    ]
   },
   "chunks": [
     {
       "chunk_id": "01_executive_overview",
       "file_name": "01_executive_overview.md",
-      "lines": "1-44",
-      "actual_lines": 44,
-      "estimated_tokens": 1200,
       "content_type": "strategic_overview",
       "koan_concepts": [
         "framework_transformation",
@@ -43,129 +92,91 @@
       ],
       "key_sections": [
         "Executive Summary",
-        "Transformation Overview",
-        "Problem Domain Analysis",
-        "Architectural Challenges"
-      ],
-      "complexity": "low",
-      "prerequisites": [],
-      "outputs": [
-        "transformation_goals",
-        "problem_definition",
-        "success_criteria"
+        "Refactoring Vision",
+        "Opportunities to Streamline Developer Experience"
       ],
       "recommended_agent": "general-purpose",
-      "processing_notes": "Foundation for all subsequent analysis. Extract key transformation goals and architectural principles."
+      "processing_notes": "Capture guiding principles, naming conventions, and DX opportunities.",
+      "outputs": [
+        "transformation_goals",
+        "refactoring_vision",
+        "dx_opportunities"
+      ],
+      "koan_concepts": [
+        "reference_equals_intent",
+        "auto_registration",
+        "background_processing",
+        "mcp_integration"
+      ]
     },
     {
       "chunk_id": "02_entity_models",
       "file_name": "02_entity_models.md",
-      "lines": "45-233",
-      "actual_lines": 189,
-      "estimated_tokens": 4800,
       "content_type": "data_architecture",
+      "key_sections": [
+        "Domain Framing",
+        "Core Entities",
+        "Refactoring Plan"
+      ],
+      "recommended_agent": "Koan-data-architect",
+      "processing_notes": "Document SourceDocument, SemanticTypeProfile, DocumentChunk, DocumentInsight, and related value objects.",
+      "outputs": [
+        "entity_blueprint",
+        "relationship_map",
+        "data_refactor_steps"
+      ],
       "koan_concepts": [
         "Entity<T>",
         "DataAdapter",
-        "Parent relationships",
-        "auto_GUID_generation",
-        "multi_provider_patterns"
-      ],
-      "key_sections": [
-        "File Entity specification",
-        "Type Entity specification",
-        "Analysis Entity specification",
-        "Entity relationships"
-      ],
-      "complexity": "medium",
-      "prerequisites": ["koan_entity_patterns"],
-      "outputs": [
-        "entity_relationship_map",
-        "data_model_specifications",
-        "provider_assignment_strategy"
-      ],
-      "recommended_agent": "Koan-data-architect",
-      "processing_notes": "Critical foundation - all other chunks reference these entity designs. Extract entity schemas and relationship patterns."
+        "McpEntity",
+        "VectorAttributes"
+      ]
     },
     {
       "chunk_id": "03_ai_processing",
       "file_name": "03_ai_processing.md",
-      "lines": "234-442",
-      "actual_lines": 209,
-      "estimated_tokens": 5200,
-      "content_type": "service_architecture",
-      "koan_concepts": [
-        "AI.Prompt()",
-        "AI.Embed()",
-        "Flow_patterns",
-        "background_processing",
-        "event_sourcing"
-      ],
+      "content_type": "processing_pipeline",
       "key_sections": [
-        "File Analysis Service",
-        "AI Model Management",
-        "User-Driven Processing Pipeline",
-        "Background Flow Commands"
+        "Guiding Principles",
+        "Pipeline Flow",
+        "Refactoring Steps"
       ],
-      "complexity": "high",
-      "prerequisites": ["koan_ai_integration", "flow_patterns"],
+      "recommended_agent": "Koan-processing-specialist",
+      "processing_notes": "Detail DocumentAnalysisPipeline, queue contracts, AI service composition, observability hooks.",
       "outputs": [
-        "ai_service_specifications",
-        "processing_workflows",
-        "flow_command_definitions"
+        "pipeline_components",
+        "queue_contract",
+        "processing_refactor_plan"
       ],
-      "recommended_agent": "Koan-flow-specialist",
-      "processing_notes": "Complex AI integration patterns. Focus on Flow/Event Sourcing integration with Entity<T> patterns."
+      "koan_concepts": [
+        "BackgroundService",
+        "AI.Prompt",
+        "AI.VisionPrompt",
+        "ChannelQueue"
+      ]
     },
     {
       "chunk_id": "04_api_ui_design",
       "file_name": "04_api_ui_design.md",
-      "lines": "443-1165",
-      "actual_lines": 723,
-      "estimated_tokens": 18000,
-      "content_type": "interface_implementation",
-      "koan_concepts": [
-        "EntityController<T>",
-        "auto_generated_apis",
-        "user_workflows",
-        "frontend_integration"
-      ],
+      "content_type": "developer_experience",
       "key_sections": [
-        "Auto-Generated APIs",
-        "File/Type/Model/Analysis Controllers",
-        "AI Model Management UI",
-        "Frontend Integration Examples",
-        "Performance Considerations"
-      ],
-      "complexity": "high",
-      "prerequisites": ["koan_api_patterns", "frontend_integration"],
-      "outputs": [
-        "api_surface_specifications",
-        "ui_component_designs",
-        "user_workflow_maps"
+        "API Surface",
+        "Upload & Status Workflow",
+        "MCP Integration"
       ],
       "recommended_agent": "Koan-developer-experience-enhancer",
-      "sub_chunk_strategy": {
-        "enabled": true,
-        "sub_chunks": [
-          {
-            "name": "api_controllers",
-            "lines": "443-720",
-            "focus": "EntityController patterns"
-          },
-          {
-            "name": "ui_components",
-            "lines": "721-980",
-            "focus": "Frontend integration"
-          },
-          {
-            "name": "performance",
-            "lines": "981-1165",
-            "focus": "Performance considerations"
-          }
-        ]
-      },
-      "processing_notes": "Largest chunk - consider sub-chunking. Focus on EntityController<T> patterns and developer experience."
+      "processing_notes": "Define controller responsibilities, DTO strategies, UI alignment, and MCP tooling.",
+      "outputs": [
+        "controller_plan",
+        "ui_alignment",
+        "mcp_tooling"
+      ],
+      "koan_concepts": [
+        "EntityController",
+        "OpenAPI",
+        "DTOs",
+        "McpTools"
+      ]
     },
     {
       "chunk_id": "05_infrastructure",
@@ -181,17 +192,16 @@
         "DocMindRegistrar"
       ],
       "key_sections": [
-        "Multi-Provider Data Strategy",
-        "Bootstrap and Auto-Registration",
-        "Key Differentiators",
-        "Value Proposition"
+        "Baseline Stack",
+        "Auto-Registrar",
+        "Observability"
       ],
-      "complexity": "medium",
-      "prerequisites": ["koan_infrastructure_patterns"],
+      "recommended_agent": "Koan-bootstrap-specialist",
+      "processing_notes": "Capture AddDocMind registration, configuration sections, compose scenarios, and diagnostics.",
       "outputs": [
-        "provider_configuration_strategy",
-        "bootstrap_specifications",
-        "infrastructure_benefits"
+        "service_registration_plan",
+        "configuration_matrix",
+        "infra_dx_enhancements"
       ],
       "recommended_agent": "Koan-bootstrap-specialist",
       "processing_notes": "Infrastructure foundation. Extract provider election logic and DocMind registrar patterns."
@@ -199,133 +209,101 @@
     {
       "chunk_id": "06_implementation",
       "file_name": "06_implementation.md",
-      "lines": "1296-1833",
-      "actual_lines": 538,
-      "estimated_tokens": 13500,
-      "content_type": "technical_specifications",
-      "koan_concepts": [
-        "migration_strategy",
-        "performance_optimization",
-        "security_patterns",
-        "compliance_requirements"
-      ],
+      "content_type": "implementation_roadmap",
       "key_sections": [
-        "Migration Strategy & Roadmap",
-        "Technical Prerequisites",
-        "Core Implementation Specifications",
-        "AI Integration Specifications",
-        "Performance & Scalability",
-        "Security & Compliance"
-      ],
-      "complexity": "high",
-      "prerequisites": ["chunks_01-05"],
-      "outputs": [
-        "implementation_roadmap",
-        "technical_requirements",
-        "performance_benchmarks",
-        "security_specifications"
+        "Phased Delivery",
+        "Work Breakdown",
+        "Success Criteria"
       ],
       "recommended_agent": "Koan-framework-specialist",
-      "sub_chunk_strategy": {
-        "enabled": true,
-        "sub_chunks": [
-          {
-            "name": "migration_roadmap",
-            "lines": "1296-1400",
-            "focus": "Migration strategy"
-          },
-          {
-            "name": "technical_specs",
-            "lines": "1401-1650",
-            "focus": "Implementation specifications"
-          },
-          {
-            "name": "security_performance",
-            "lines": "1651-1833",
-            "focus": "Security and performance"
-          }
-        ]
-      },
-      "processing_notes": "Comprehensive implementation guide. Extract concrete specifications and acceptance criteria."
+      "processing_notes": "Provide phased plan, coding standards, quality gates, risks, and success metrics.",
+      "outputs": [
+        "implementation_roadmap",
+        "quality_gates",
+        "risk_register"
+      ],
+      "koan_concepts": [
+        "PhasedDelivery",
+        "KoanBestPractices",
+        "Telemetry"
+      ]
     },
     {
       "chunk_id": "07_testing_ops",
       "file_name": "07_testing_ops.md",
-      "lines": "1834-2661",
-      "actual_lines": 828,
-      "estimated_tokens": 20500,
-      "content_type": "operational_procedures",
-      "koan_concepts": [
-        "container_orchestration",
-        "health_monitoring",
-        "testing_strategies",
-        "deployment_patterns"
-      ],
+      "content_type": "testing_operations",
       "key_sections": [
-        "Testing Specifications",
-        "Docker Compose Setup",
-        "Container Orchestration",
-        "Health Monitoring",
-        "Environment Configurations"
-      ],
-      "complexity": "medium",
-      "prerequisites": ["docker_compose", "testing_patterns"],
-      "outputs": [
-        "testing_specifications",
-        "deployment_configurations",
-        "monitoring_strategies",
-        "operational_procedures"
+        "Test Strategy",
+        "CI Pipeline",
+        "Operational Playbooks"
       ],
       "recommended_agent": "Koan-orchestration-devops",
-      "sub_chunk_strategy": {
-        "enabled": true,
-        "sub_chunks": [
-          {
-            "name": "testing_specs",
-            "lines": "1834-2100",
-            "focus": "Testing strategies and specifications"
-          },
-          {
-            "name": "deployment_configs",
-            "lines": "2101-2500",
-            "focus": "Docker and deployment configurations"
-          },
-          {
-            "name": "monitoring_ops",
-            "lines": "2501-2661",
-            "focus": "Health monitoring and operations"
-          }
-        ]
-      },
-      "processing_notes": "Largest operational chunk. Focus on container orchestration and deployment patterns matching S5/S8 samples."
+      "processing_notes": "Outline test suites, CI workflow, operational scripts, and observability dashboards.",
+      "outputs": [
+        "test_plan",
+        "ci_pipeline",
+        "operations_playbook"
+      ],
+      "koan_concepts": [
+        "IntegrationTesting",
+        "OpenTelemetry",
+        "DockerCompose"
+      ]
     },
     {
       "chunk_id": "08_migration_guide",
       "file_name": "08_migration_guide.md",
-      "lines": "2662-3274",
-      "actual_lines": 612,
-      "estimated_tokens": 15000,
-      "content_type": "transformation_guide",
-      "koan_concepts": [
-        "code_migration_patterns",
-        "pattern_reuse",
-        "component_mapping",
-        "troubleshooting"
-      ],
+      "content_type": "migration",
       "key_sections": [
-        "Success Criteria",
-        "Migration & Rollback Procedures",
-        "Code Migration Mappings",
-        "Reusable Components",
-        "Troubleshooting Guide"
+        "Incremental Strategy",
+        "Data Checklist",
+        "Acceptance Criteria"
       ],
-      "complexity": "medium",
-      "prerequisites": ["original_codebase_knowledge"],
+      "recommended_agent": "general-purpose",
+      "processing_notes": "Define adoption path, rollback strategy, and communication plan.",
       "outputs": [
-        "migration_procedures",
-        "code_transformation_patterns",
-        "reusable_component_catalog",
-        "troubleshooting_procedures"
+        "migration_strategy",
+        "data_migration_checklist",
+        "adoption_criteria"
+      ],
+      "koan_concepts": [
+        "FeatureFlags",
+        "DualWrite",
+        "ComposeOperations"
+      ]
+    },
+    {
+      "chunk_id": "09_gap_analysis_and_rebuild_plan",
+      "file_name": "09_gap_analysis_and_rebuild_plan.md",
+      "content_type": "gap_analysis",
+      "key_sections": [
+        "Current Implementation Snapshot",
+        "Gap Summary",
+        "Break-and-Rebuild Strategy"
+      ],
+      "recommended_agent": "general-purpose",
+      "processing_notes": "Provide factual assessment of current code and greenfield rebuild roadmap starting from domain bedrock.",
+      "outputs": [
+        "implementation_assessment",
+        "gap_report",
+        "rebuild_strategy"
+      ],
+      "koan_concepts": [
+        "Entity<T>",
+        "AddKoan",
+        "BackgroundService",
+        "McpIntegration"
+      ]
+    },
+    {
+      "chunk_id": "10_proposal_alignment_assessment",
+      "file_name": "10_proposal_alignment_assessment.md",
+      "content_type": "assessment",
+      "key_sections": [
+        "Proposal Intent",
+        "Promised Capabilities",
+        "Current Implementation Snapshot",
+        "Risks and Recommendations"
       ],
       "recommended_agent": "general-purpose",
       "cross_reference_role": true,

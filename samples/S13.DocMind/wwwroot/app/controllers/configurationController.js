@@ -1,11 +1,13 @@
 angular.module('s13DocMindApp').controller('ConfigurationController', [
-    '$scope', '$location', 'ConfigurationService', 'ToastService',
-    function($scope, $location, ConfigurationService, ToastService) {
+    '$scope', '$location', '$interval', 'ConfigurationService', 'ToastService',
+    function($scope, $location, $interval, ConfigurationService, ToastService) {
 
         $scope.loading = true;
         $scope.saving = false;
         $scope.testing = {};
         $scope.activeTab = 'models';
+        $scope.installations = [];
+        var installationPoller = null;
 
         // Configuration sections
         $scope.config = {
@@ -84,6 +86,10 @@ angular.module('s13DocMindApp').controller('ConfigurationController', [
                     }
                 })
                 .then(function() {
+                    return refreshInstallations();
+                })
+                .then(function() {
+                    startInstallationPolling();
                     $scope.loading = false;
                     $scope.$apply();
                 })
@@ -126,6 +132,32 @@ angular.module('s13DocMindApp').controller('ConfigurationController', [
         $scope.setActiveTab = function(tabId) {
             $scope.activeTab = tabId;
         };
+
+        function refreshInstallations() {
+            return ConfigurationService.getInstallations()
+                .then(function(statuses) {
+                    $scope.installations = statuses || [];
+                    return statuses;
+                })
+                .catch(function(error) {
+                    console.warn('Failed to load model installations:', error);
+                });
+        }
+
+        function startInstallationPolling() {
+            if (installationPoller) return;
+            installationPoller = $interval(function() {
+                refreshInstallations();
+            }, 5000);
+        }
+
+        $scope.refreshInstallations = refreshInstallations;
+
+        $scope.$on('$destroy', function() {
+            if (installationPoller) {
+                $interval.cancel(installationPoller);
+            }
+        });
 
         $scope.isActiveTab = function(tabId) {
             return $scope.activeTab === tabId;

@@ -99,8 +99,8 @@ process_chunk() {
         "Koan-data-architect")
             info "🏗️  Running entity architecture analysis on $chunk_file"
             ;;
-        "Koan-flow-specialist")
-            info "🌊 Running Flow/Event Sourcing analysis on $chunk_file"
+        "Koan-processing-specialist")
+            info "🌊 Running background processing analysis on $chunk_file"
             ;;
         "Koan-developer-experience-enhancer")
             info "🎯 Running developer experience analysis on $chunk_file"
@@ -203,6 +203,10 @@ main() {
 
     log "📋 Starting S13-DocMind chunk processing workflow..."
 
+    # Phase 0: Proposal Alignment
+    info "🧭 Phase 0: Proposal Alignment"
+    process_chunk "10" "general-purpose" "0" ""
+
     # Phase 1: Foundation Analysis (Sequential)
     info "🏁 Phase 1: Foundation Analysis"
 
@@ -216,12 +220,12 @@ main() {
     info "🔄 Phase 2: Parallel Specialization"
 
     # Step 3A & 3B: Parallel processing
-    process_chunk "03" "Koan-flow-specialist" "2" "01,02" &
+    process_chunk "03" "Koan-processing-specialist" "2" "01,02" &
     process_chunk "05" "Koan-bootstrap-specialist" "2" "01,02" &
     wait # Wait for parallel processes
 
     # Coordination Checkpoint 1: Entity Design Review
-    coordination_checkpoint "entity_design_review" "Koan-data-architect,Koan-flow-specialist" "02,03"
+    coordination_checkpoint "entity_design_review" "Koan-data-architect,Koan-processing-specialist" "02,03"
 
     # Phase 3: Interface Design
     info "🎨 Phase 3: Interface Design"
@@ -230,7 +234,7 @@ main() {
     process_chunk "04" "Koan-developer-experience-enhancer" "3" "01,02,03"
 
     # Coordination Checkpoint 2: API Workflow Alignment
-    coordination_checkpoint "api_workflow_alignment" "Koan-developer-experience-enhancer,Koan-flow-specialist" "03,04"
+    coordination_checkpoint "api_workflow_alignment" "Koan-developer-experience-enhancer,Koan-processing-specialist" "03,04"
 
     # Phase 4: Implementation Specification (Parallel)
     info "🛠️  Phase 4: Implementation Specification"
@@ -249,13 +253,10 @@ main() {
     # Step 7: Migration Patterns (cross-reference throughout)
     process_chunk "08" "general-purpose" "5" "01,02,03,04,05,06,07"
 
-    # Phase 6: Alignment & Governance
-    info "🧭 Phase 6: Alignment & Governance"
+    # Step 8: Gap Assessment (requires full context)
+    process_chunk "09" "general-purpose" "5" "10,01,02,03,04,05,06,07,08"
 
-    process_chunk "09" "general-purpose" "6" "01,02,03,04,05,06,07,08"
-    process_chunk "10" "general-purpose" "6" "01,02,03,04,05,06,07,08,09"
-
-    # Generate final integrated deliverables
+# Generate final integrated deliverables
     generate_final_deliverables
 
     success "🎉 S13-DocMind chunk processing completed successfully!"
@@ -278,6 +279,12 @@ generate_final_deliverables() {
 ## Generated: $(date)
 
 This document consolidates all agent outputs into unified implementation specifications.
+
+## Proposal Alignment Summary
+[Consolidated from Chunk 10]
+
+## Gap Assessment
+[Consolidated from Chunk 09]
 
 ## Entity Specifications
 [Consolidated from Chunks 02, 03, 06]
@@ -312,7 +319,7 @@ EOF
 
 ## Phase 2: AI Processing Implementation
 - [ ] DocumentIntelligenceService implementation
-- [ ] Flow commands for background processing
+- [ ] Queue contracts for background processing
 - [ ] Event sourcing projections
 
 ## Phase 3: API Implementation
@@ -381,11 +388,12 @@ case "${1:-}" in
         ;;
     --dry-run)
         info "🔍 Dry run mode - showing processing plan:"
+        echo "Phase 0: Chunk 10 (proposal alignment)"
         echo "Phase 1: Chunks 01, 02 (sequential)"
         echo "Phase 2: Chunks 03, 05 (parallel)"
         echo "Phase 3: Chunk 04"
         echo "Phase 4: Chunks 06, 07 (parallel)"
-        echo "Phase 5: Chunk 08"
+        echo "Phase 5: Chunks 08, 09"
         echo "Coordination checkpoints: 3"
         exit 0
         ;;

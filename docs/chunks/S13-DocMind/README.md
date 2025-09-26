@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains the S13-DocMind proposal broken down into 10 semantically coherent chunks optimized for AI agent processing. Each chunk focuses on specific architectural concerns and can be processed by specialized Koan Framework agents.
+This directory contains the S13-DocMind refactoring plan broken down into 10 semantically coherent chunks optimized for AI agent collaboration. Each chunk focuses on specific architectural concerns and can be processed by specialized Koan Framework agents.
 
 ## 📁 Directory Structure
 
@@ -15,7 +15,7 @@ docs/chunks/S13-DocMind/
 ├── process_chunks.sh            # AI agent orchestration script
 ├── 01_executive_overview.md     # Strategic overview and problem analysis
 ├── 02_entity_models.md          # Entity<T> specifications and relationships
-├── 03_ai_processing.md          # AI integration and Flow patterns
+├── 03_ai_processing.md          # AI integration and processing patterns
 ├── 04_api_ui_design.md          # EntityController and user workflows
 ├── 05_infrastructure.md         # Multi-provider and bootstrap configuration
 ├── 06_implementation.md         # Technical specs and migration strategy
@@ -67,41 +67,42 @@ cat ai_agent_instructions.md
 
 ## 📊 Chunk Overview
 
-| Chunk | File | Lines | Tokens | Agent | Focus |
-|-------|------|-------|--------|-------|-------|
-| 01 | `01_executive_overview.md` | 44 | 1,200 | general-purpose | Strategic overview & transformation goals |
-| 02 | `02_entity_models.md` | 189 | 4,800 | Koan-data-architect | Entity<T> specifications & relationships |
-| 03 | `03_ai_processing.md` | 209 | 5,200 | Koan-flow-specialist | AI integration & Flow patterns |
-| 04 | `04_api_ui_design.md` | 723 | 18,000 | Koan-developer-experience-enhancer | EntityController & user workflows |
-| 05 | `05_infrastructure.md` | 130 | 3,200 | Koan-bootstrap-specialist | Multi-provider & DocMind registrar |
-| 06 | `06_implementation.md` | 538 | 13,500 | Koan-framework-specialist | Technical specs & migration strategy |
-| 07 | `07_testing_ops.md` | 828 | 20,500 | Koan-orchestration-devops | Testing, deployment & operations |
-| 08 | `08_migration_guide.md` | 612 | 15,000 | general-purpose | Code transformation & troubleshooting |
-| 09 | `09_gap_analysis_and_rebuild_plan.md` | 26 | 650 | general-purpose | Gap analysis & DX updates |
-| 10 | `10_proposal_alignment_assessment.md` | 19 | 480 | general-purpose | Proposal alignment review |
+| Chunk | File | Lines | Agent | Focus |
+|-------|------|-------|-------|-------|
+| 01 | `01_executive_overview.md` | 91 | general-purpose | Strategic framing, refactoring vision, DX opportunities |
+| 02 | `02_entity_models.md` | 168 | Koan-data-architect | Domain blueprint, entity/value objects, data refactor steps |
+| 03 | `03_ai_processing.md` | 84 | Koan-processing-specialist | Background pipeline, AI services, observability |
+| 04 | `04_api_ui_design.md` | 102 | Koan-developer-experience-enhancer | Scenario-driven APIs, UI alignment, MCP tooling |
+| 05 | `05_infrastructure.md` | 107 | Koan-bootstrap-specialist | Compose stack, registrar, configuration & diagnostics |
+| 06 | `06_implementation.md` | 72 | Koan-framework-specialist | Phased roadmap, coding standards, success criteria |
+| 07 | `07_testing_ops.md` | 86 | Koan-orchestration-devops | Test strategy, CI/CD, operational playbooks |
+| 08 | `08_migration_guide.md` | 49 | general-purpose | Adoption path, migration checklist, rollback plan |
+| 09 | `09_gap_analysis_and_rebuild_plan.md` | 130 | general-purpose | Current implementation audit and rebuild roadmap |
+| 10 | `10_proposal_alignment_assessment.md` | 123 | general-purpose | Proposal intent vs. current sample assessment |
 
 ## 🎯 Processing Workflow
 
-### Phase 1: Foundation Analysis (Sequential)
-1. **Chunk 01** - Strategic overview analysis
-2. **Chunk 02** - Entity design specifications
+### Phase 0: Proposal Alignment
+- **Chunk 10** – Assess proposal intent vs. current implementation
 
-### Phase 2: Parallel Specialization
-- **Chunk 03** - AI processing architecture (parallel)
-- **Chunk 05** - Infrastructure configuration (parallel)
-- **Coordination Checkpoint 1** - Entity design review
+### Phase 1: Foundation (Sequential)
+1. **Chunk 01** – Executive overview and guiding principles
+2. **Chunk 02** – Domain model blueprint
 
-### Phase 3: Interface Design
-- **Chunk 04** - API and user interface specifications
-- **Coordination Checkpoint 2** - API workflow alignment
+### Phase 2: Processing & Infrastructure (Parallel)
+- **Chunk 03** – AI pipeline refactor plan
+- **Chunk 05** – Infrastructure & bootstrap design
 
-### Phase 4: Implementation Specification (Parallel)
-- **Chunk 06** - Framework compliance & migration (parallel)
-- **Chunk 07** - Testing & deployment procedures (parallel)
-- **Coordination Checkpoint 3** - Deployment readiness
+### Phase 3: Interface & Experience
+- **Chunk 04** – API, UI, MCP alignment
 
-### Phase 5: Cross-Reference Integration
-- **Chunk 08** - Migration patterns and troubleshooting
+### Phase 4: Execution & Operations (Parallel)
+- **Chunk 06** – Implementation roadmap
+- **Chunk 07** – Testing & operations plan
+
+### Phase 5: Adoption & Audit
+- **Chunk 08** – Migration & rollout guidance
+- **Chunk 09** – Current-state gap analysis and rebuild roadmap
 
 ### Phase 6: Alignment & Governance
 - **Chunk 09** - Registrar gap analysis and DX follow-ups
@@ -111,47 +112,34 @@ cat ai_agent_instructions.md
 
 ### Koan Framework Specialist Agents
 
-**Koan-data-architect** (Chunks 2, 5)
-- Entity<T> design patterns
-- Multi-provider data strategy
-- Performance optimization
-- Provider capability detection
+**Koan-data-architect** (Chunk 2)
+- Define `SourceDocument`, `SemanticTypeProfile`, `DocumentChunk`, `DocumentInsight`
+- Map value objects, relationships, and migration steps
 
-**Koan-flow-specialist** (Chunk 3)
-- Flow/Event Sourcing integration
-- AI processing workflows
-- Background orchestration
-- Event projections
+**Koan-processing-specialist** (Chunk 3)
+- Architect the `DocumentAnalysisPipeline`
+- Specify AI service composition and observability hooks
 
 **Koan-developer-experience-enhancer** (Chunk 4)
-- EntityController<T> patterns
-- Auto-generated APIs
-- User workflow design
-- Frontend integration
+- Shape scenario-driven controllers and DTOs
+- Align Angular, API, and MCP tooling with shared contracts
 
 **Koan-bootstrap-specialist** (Chunk 5)
-- Registrar bootstrap patterns
-- DocMindRegistrar integration
-- Bootstrap reporting
-- Service discovery
+- Design `AddDocMind()` registrar and configuration model
+- Outline compose scenarios and diagnostics
 
 **Koan-framework-specialist** (Chunk 6)
-- Framework compliance validation
-- Migration strategy
-- Performance specifications
-- Security patterns
+- Produce phased implementation roadmap and quality gates
+- Capture coding standards and success criteria
 
 **Koan-orchestration-devops** (Chunk 7)
-- Container orchestration
-- Docker Compose patterns
-- Health monitoring
-- Deployment procedures
+- Define test suites, CI workflow, and operational playbooks
+- Highlight observability dashboards and release checklist
 
-### General-Purpose Agents (Chunks 1, 8-10)
-- Strategic analysis
-- Migration pattern extraction
-- Cross-reference material processing
-- Alignment and DX validation
+### General-Purpose Agents (Chunks 1, 8, 9 & 10)
+- Summarize vision, DX opportunities, and migration messaging
+- Evaluate proposal alignment, current-state gaps, and communication strategy
+- Coordinate adoption strategy, rollback, and stakeholder updates
 
 ## 📋 Expected Outputs
 
@@ -180,18 +168,11 @@ Each chunk processing generates:
 ## 🔧 Advanced Usage
 
 ### Processing Large Chunks
-For chunks exceeding context windows (04, 06, 07):
+Each chunk now fits within most agent context windows, but you can still split them if needed:
 
 ```bash
-# Chunk 4 sub-processing
-# 4A: API Controllers (lines 443-720)
-# 4B: UI Components (lines 721-980)
-# 4C: Performance (lines 981-1165)
-
-# Extract sub-chunks manually if needed:
-sed -n '443,720p' 04_api_ui_design.md > 04a_api_controllers.md
-sed -n '721,980p' 04_api_ui_design.md > 04b_ui_components.md
-sed -n '981,1165p' 04_api_ui_design.md > 04c_performance.md
+# Example: split chunk 04 into roughly equal parts
+csplit -f 04_api_ui_part 04_api_ui_design.md '/^###/' '{*}'
 ```
 
 ### Custom Agent Assignment
@@ -225,7 +206,7 @@ For Claude Code users with Task tool access:
 # Launch specialized agents for chunk processing
 Task general-purpose "Process S13-DocMind chunk 01 for strategic overview analysis"
 Task Koan-data-architect "Process S13-DocMind chunk 02 for entity specifications"
-Task Koan-flow-specialist "Process S13-DocMind chunk 03 for AI processing patterns"
+Task Koan-processing-specialist "Process S13-DocMind chunk 03 for AI processing patterns"
 # ... continue for all chunks
 ```
 
@@ -247,7 +228,7 @@ Task Koan-flow-specialist "Process S13-DocMind chunk 03 for AI processing patter
 
 ### Cross-Chunk Consistency
 - Entity definitions in Chunk 2 match usage in Chunks 3, 4, 6
-- Flow patterns in Chunk 3 align with API triggers in Chunk 4
+- Processing patterns in Chunk 3 align with API triggers in Chunk 4
 - Provider configurations in Chunk 5 match deployment specs in Chunk 7
 - Migration patterns in Chunk 8 support all technical implementations
 
@@ -274,9 +255,9 @@ wc -l *.md
 ```
 
 **Context Window Limitations**
-- Use sub-chunk processing for large chunks (4, 6, 7)
-- Focus on concept extraction over implementation details
-- Process in smaller batches with cross-references
+- Use `csplit` (see above) to divide any chunk that exceeds the active agent window
+- Focus on preserving section headings and summaries for cross-reference
+- Merge outputs using the coordination checkpoints described in `process_chunks.sh`
 
 ## 📈 Success Metrics
 

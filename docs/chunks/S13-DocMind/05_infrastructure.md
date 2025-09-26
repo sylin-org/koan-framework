@@ -1,143 +1,109 @@
+## **Infrastructure & Bootstrap Refactoring Plan**
 
-#### **Program.cs – Minimal Bootstrap with the DocMind Registrar**
+### 1. Baseline Stack (Docker Compose)
+
+- Reuse the existing `docker compose up` workflow that launches API, MongoDB, Weaviate, and Ollama containers.
+- Document environment variables in `.env.sample`:
+  - `DOCMIND__Storage__Bucket=local`
+  - `DOCMIND__Processing__MaxDegreeOfParallelism=2`
+  - `DOCMIND__Ai__DefaultModel=llama3`
+  - `DOCMIND__Ai__VisionModel=llava`
+  - `DOCMIND__Embedding__Provider=weaviate`
+- Provide optional override files (`compose.weaviate-disabled.yml`) for running without embeddings.
+
+### 2. Program.cs Layout
+
 ```csharp
-using DocMind;
-
 var builder = WebApplication.CreateBuilder(args);
 
-// Enable Koan with MCP and load the shipped DocMind registrar
 builder.Services
-    .AddKoan<DocMindRegistrar>(options =>
+    .AddKoan(options =>
     {
         options.EnableMcp = true;
         options.McpTransports = McpTransports.Stdio | McpTransports.HttpSse;
-    });
+    })
+    .AddDocMind(); // extension provided by the registrar below
+
+builder.Services.AddControllers();
 
 var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
 app.UseRouting();
 app.UseAuthorization();
 app.MapControllers();
 app.UseKoanMcp();
-
 app.Run();
 ```
 
-#### **DocMind Registrar (Provided by the Package)**
+`AddDocMind()` is the new extension method that wires up all domain services, hosted workers, and options.
+
+### 3. Auto-Registrar Structure
+
 ```csharp
-// S13.DocMind/DocMindRegistrar.cs
-public sealed class DocMindRegistrar : IKoanAutoRegistrar
+public static class DocMindServiceCollectionExtensions
+
 {
-    public void Register(IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddDocMind(this IServiceCollection services)
     {
-        // Business services ship ready-to-wire
-        services.AddScoped<DocumentIntelligenceService>();
-        services.AddScoped<DocumentProcessingOrchestrator>();
-        services.AddScoped<TemplateMatchingService>();
+        services.AddSingleton(Channel.CreateBounded<DocumentWorkItem>(new BoundedChannelOptions(100)
+        {
+            FullMode = BoundedChannelFullMode.Wait
+        }));
 
-        // AI configuration is hydrated from standard Koan sections
-        services.Configure<AiOptions>(configuration.GetSection("Koan:AI"));
+        services.AddScoped<DocumentIntakeService>();
+        services.AddScoped<TextExtractionService>();
+        services.AddScoped<VisionInsightService>();
+        services.AddScoped<InsightSynthesisService>();
+        services.AddScoped<TemplateSuggestionService>();
+        services.AddScoped<InsightAggregationService>();
+        services.AddScoped<TemplateGeneratorService>();
 
-        // Background orchestration is enabled out of the box
-        services.AddHostedService<DocumentProcessingBackgroundService>();
-    }
+        services.AddHostedService<DocumentAnalysisPipeline>();
 
-    public async Task<BootReport> GenerateBootReportAsync(IServiceProvider services)
-    {
-        var report = new BootReport("S13.DocMind Document Intelligence Platform");
+        services.AddOptions<DocumentProcessingOptions>()
+            .BindConfiguration("DocMind:Processing")
+            .ValidateDataAnnotations();
 
-        report.AddSection("Data Providers", await GetProviderCapabilities(services));
-        report.AddSection("AI Integration", await GetAiCapabilities(services));
-        report.AddSection("Processing Pipeline", await GetPipelineStatus(services));
+        services.AddOptions<StorageOptions>()
+            .BindConfiguration("DocMind:Storage");
 
-        return report;
+        services.AddSingleton<IConfigureOptions<AiOptions>, ConfigureDocMindAiOptions>();
+
+        return services;
     }
 }
 ```
 
-> ✅ **No custom extension required**: the registrar ships in the package, so the only Program.cs responsibility is invoking `AddKoan<DocMindRegistrar>()` and wiring the standard ASP.NET Core middleware.
+### 4. Configuration Model
 
----
+| Section | Purpose | Sample Keys |
+|---------|---------|-------------|
+| `DocMind:Processing` | Queue limits, retry policy, concurrency | `QueueLimit`, `MaxDegreeOfParallelism`, `MaxRetries`, `BackoffSeconds` |
+| `DocMind:Storage` | Storage provider selection | `Kind=FileSystem`, `Bucket`, `RootPath` |
+| `DocMind:Vision` | Toggle vision processing | `Enabled`, `Model`, `MaxImagePixels` |
+| `DocMind:Embedding` | Embedding provider configuration | `Provider=Weaviate`, `Endpoint`, `ApiKey` |
 
-## **Key Differentiators & Value Proposition**
+Use Koan’s capability detection to disable features when providers are unavailable (e.g., skip embeddings when Weaviate container is stopped).
 
-### **1. Development Velocity**
-- **80% Less Boilerplate**: Entity definitions replace repository patterns + manual DI
-- **Auto-Generated APIs**: Full CRUD with advanced features (pagination, filtering, relationships)
-- **Zero-Configuration AI**: `AI.Prompt()` and `AI.Embed()` replace custom HTTP clients
-- **"Reference = Intent"**: Adding package references enables capabilities automatically
+### 5. Observability & Telemetry
 
-### **2. Enterprise Scalability**
-- **Multi-Provider Architecture**: Simplified core stack (MongoDB + optional Weaviate for embeddings)
-- **Provider Transparency**: Same code works across all storage backends
-- **Event Sourcing**: Complete audit trail with replay capabilities
-- **Container-Native**: Orchestration-aware with automatic environment detection
+- Enable Koan boot report and extend it with DocMind-specific sections (documenting queue configuration, provider readiness, sample documents).
+- Add health checks:
+  - `/health/storage` – verifies storage root writable.
+  - `/health/embedding` – pings Weaviate when enabled.
+  - `/health/models` – checks required Ollama models installed.
+- Integrate OpenTelemetry exporters already supported by Koan; provide `otel-collector` compose override for workshops.
 
-### **3. AI-Native Capabilities**
-- **Built-in Vector Operations**: Semantic search without custom vector pipeline complexity
-- **LLM Integration**: Unified interface for multiple AI providers
-- **Template Intelligence**: AI-generated templates with similarity matching
-- **Multi-Modal Processing**: Text, images, and structured data processing patterns
+### 6. Deployment Profiles
 
-### **4. Operational Excellence**
-- **Capability Discovery**: Auto-generated API documentation with provider capabilities
-- **Health Monitoring**: Built-in health checks and performance monitoring
-- **Graceful Degradation**: Provider failover with capability-aware fallbacks
-- **Event-Driven Architecture**: Real-time processing with streaming capabilities
+- **Local (default)**: Compose stack with volume mounts for storage and Ollama models.
+- **Lightweight demo**: Compose override disabling Weaviate + Vision; pipeline automatically skips embedding stage.
+- **CI**: Use MongoDB memory server and stub AI providers (Koan AI test doubles) to run automated tests without external services.
+- **Cloud**: Document how to point to managed MongoDB/Weaviate/Ollama endpoints via environment variables, keeping the same code path.
 
----
+### 7. Developer Experience Enhancements
 
-## **Migration Strategy & Implementation Roadmap**
+- Provide `scripts/docmind-reset.sh` to purge Mongo collections, storage folder, and Weaviate classes for clean demos.
+- Include `launchSettings.json` profiles for API + Angular concurrently with pre-configured compose dependencies.
+- Add sample `appsettings.Development.json` showing minimal configuration required to run the stack.
 
-### **Phase 1: Core Entity Migration (Week 1-2)**
-- Convert MongoDB models to Koan entities
-- Implement `EntityController<T>` for auto-generated APIs
-- Set up multi-provider configuration with MongoDB primary
-
-### **Phase 2: AI Integration Enhancement (Week 3-4)**
-- Replace custom Ollama client with Koan's AI interface
-- Implement vector storage with Weaviate provider
-- Add template generation and similarity matching
-
-### **Phase 3: Event Sourcing Implementation (Week 5-6)**
-- Implement `FlowEntity` patterns for processing pipeline
-- Add event projections for real-time status tracking
-- Create processing orchestrator with error handling
-
-### **Phase 4: MCP Integration & AI Agent Orchestration (Week 7)**
-- Add Koan.Mcp package dependency
-- Configure MCP entities with appropriate attributes
-- Implement custom MCP tools for document intelligence workflows
-- Set up MCP resources for content access
-- Create AI-guided prompts for workflow orchestration
-
-### **Phase 5: Advanced Features & Optimization (Week 8)**
-- Add in-memory caching for performance optimization
-- Implement streaming responses for real-time updates
-- Add comprehensive monitoring and observability
-- Performance test MCP endpoints and AI agent workflows
-
----
-
-## **Conclusion**
-
-**S13.DocMind** demonstrates the transformative power of the Koan Framework, converting a complex document intelligence application from traditional patterns to a modern, AI-native architecture with complete AI agent orchestration capabilities. The solution showcases:
-
-- **Entity-first development** reducing complexity and increasing velocity
-- **Multi-provider transparency** enabling seamless scalability
-- **Built-in AI capabilities** eliminating infrastructure complexity
-- **Event sourcing** providing complete operational visibility
-- **DocMind registrar bootstrap** reducing configuration overhead
-- **Process-complete MCP integration** enabling full AI agent orchestration
-- **AI agent workflow support** through standardized tools, resources, and prompts
-
-This architecture serves as a comprehensive reference implementation for building AI-powered document intelligence platforms with enterprise-grade scalability, maintainability, operational excellence, and seamless AI agent integration through the Model Context Protocol.
-
----
-
+This infrastructure plan keeps the runtime stack approachable while exposing configuration hooks and diagnostics expected from a flagship Koan sample.
