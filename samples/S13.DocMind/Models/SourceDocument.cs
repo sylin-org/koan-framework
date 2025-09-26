@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions.Annotations;
+using Koan.AI.Contracts.Models;
 using Koan.Data.Core.Model;
+using Koan.Mcp;
 
 namespace S13.DocMind.Models;
 
@@ -11,6 +13,7 @@ namespace S13.DocMind.Models;
 /// </summary>
 [DataAdapter("postgresql")]
 [Table("source_documents")]
+[McpEntity(Name = "source-documents", Description = "Uploaded documents pending or completing DocMind analysis.")]
 public sealed class SourceDocument : Entity<SourceDocument>
 {
     private const int DefaultVectorDimensions = 1536;

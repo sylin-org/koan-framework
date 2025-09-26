@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
+using Koan.Mcp;
 
 namespace S13.DocMind.Models;
 
@@ -11,6 +12,7 @@ namespace S13.DocMind.Models;
 /// </summary>
 [DataAdapter("postgresql")]
 [Table("semantic_type_profiles")]
+[McpEntity(Name = "semantic-type-profiles", Description = "Template definitions, prompts, and embeddings for DocMind document types.")]
 public sealed class SemanticTypeProfile : Entity<SemanticTypeProfile>
 {
     [Required, MaxLength(100)]

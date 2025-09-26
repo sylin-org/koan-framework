@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
+using Koan.Mcp;
 
 namespace S13.DocMind.Models;
 
@@ -11,6 +12,7 @@ namespace S13.DocMind.Models;
 /// </summary>
 [DataAdapter("mongodb")]
 [Table("document_chunks")]
+[McpEntity(Name = "document-chunks", Description = "Chunked text and diagram excerpts derived from source documents.")]
 public sealed class DocumentChunk : Entity<DocumentChunk>
 {
     [Parent(typeof(SourceDocument))]

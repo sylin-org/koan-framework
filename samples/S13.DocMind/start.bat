@@ -68,7 +68,7 @@ if not errorlevel 1 (
   )
 
   echo Starting API container...
-  docker run -d --name s13-docmind-api --network s13_docmind_network -p 5000:5000 -e ASPNETCORE_ENVIRONMENT=Development -e "Koan__Data__Providers__mongodb__connectionString=mongodb://mongodb:27017" -e "Koan__Data__Providers__postgresql__connectionString=Host=postgresql;Database=s13docmind_audit;Username=docmind;Password=docmind123" -e "Koan__Data__Providers__weaviate__endpoint=http://weaviate:8080" -e "Koan__Data__Providers__redis__connectionString=redis:6379" -e "Koan__AI__Providers__ollama__baseUrl=http://ollama:11434" s13-docmind:latest || goto :error
+  docker run -d --name s13-docmind-api --network s13_docmind_network -p 5000:5000 -e ASPNETCORE_ENVIRONMENT=Development -e "Koan__Data__Providers__mongodb__connectionString=mongodb://mongodb:27017" -e "Koan__Data__Providers__weaviate__endpoint=http://weaviate:8080" -e "Koan__AI__Providers__ollama__baseUrl=http://ollama:11434" s13-docmind:latest || goto :error
 
   set API_URL=http://localhost:5000/health
   set OPEN_URL=http://localhost:5000/swagger
@@ -105,9 +105,9 @@ echo API Documentation: %OPEN_URL%
 echo Health Check: %API_URL%
 echo.
 echo Infrastructure Services:
-echo    MongoDB:    localhost:5120
+echo    MongoDB:    localhost:5121
 echo    Weaviate:   localhost:5122
-echo    Ollama:     localhost:5124
+echo    Ollama:     localhost:5123
 echo.
 echo To stop all services: docker compose -p %PROJECT_NAME% down
 popd

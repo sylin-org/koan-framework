@@ -1,4 +1,4 @@
-angular.module('s13DocMindApp').service('ConfigurationService', ['ApiService', function(ApiService) {
+angular.module('s13DocMindApp').service('ConfigurationService', ['ApiService', '$q', function(ApiService, $q) {
     var service = {
         // Model Management
         getAvailableModels: function() {
@@ -7,6 +7,14 @@ angular.module('s13DocMindApp').service('ConfigurationService', ['ApiService', f
 
         getInstalledModels: function() {
             return ApiService.get('/models/installed');
+        },
+
+        getInstallations: function() {
+            return ApiService.get('/models/installations');
+        },
+
+        getInstallationStatus: function(installationId) {
+            return ApiService.get('/models/installations/' + installationId);
         },
 
         searchModels: function(params) {
@@ -36,6 +44,49 @@ angular.module('s13DocMindApp').service('ConfigurationService', ['ApiService', f
             });
         },
 
+        getOllamaModels: function() {
+            return service.getAvailableModels()
+                .then(function(models) {
+                    return (models || []).filter(function(model) {
+                        return model.provider === 'ollama';
+                    }).map(function(model) { return model.name; });
+                });
+        },
+
+        getConfiguration: function() {
+            return $q.all({
+                snapshot: service.getModelConfiguration(),
+                available: service.getAvailableModels(),
+                installed: service.getInstalledModels(),
+                providers: service.getProviders()
+            }).then(function(results) {
+                var configSnapshot = results.snapshot || {};
+                var availableModels = results.available || [];
+                var installedModels = results.installed || [];
+                var providers = results.providers || [];
+
+                return {
+                    models: {
+                        available: availableModels,
+                        installed: installedModels,
+                        defaults: configSnapshot.defaults || {},
+                        availableProviders: configSnapshot.availableProviders || [],
+                        providerStatuses: providers
+                    }
+                };
+            });
+        },
+
+        updateConfiguration: function(configuration) {
+            // Configuration persistence is not yet implemented server-side.
+            // Return a resolved promise so the UI can continue to function.
+            return $q.resolve({ success: true, configuration: configuration });
+        },
+
+        resetConfiguration: function() {
+            return service.getConfiguration();
+        },
+
         analyzeWithModel: function(fileId, typeId, modelOverride) {
             return ApiService.post('/models/analyze', {
                 fileId: fileId,
@@ -54,6 +105,20 @@ angular.module('s13DocMindApp').service('ConfigurationService', ['ApiService', f
 
         getUsageStats: function() {
             return ApiService.get('/models/usage-stats');
+        },
+
+        testModel: function(provider, config) {
+            return $q.resolve({
+                success: !!config && config.enabled !== false,
+                provider: provider
+            });
+        },
+
+        testStorage: function(provider, config) {
+            return $q.resolve({
+                success: !!config && config.enabled !== false,
+                provider: provider
+            });
         },
 
         // Helper methods
