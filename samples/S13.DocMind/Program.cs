@@ -1,11 +1,19 @@
-using Koan.Core;
+using Koan.AI.Web;
+using Koan.Core.Observability;
+using Koan.Data.Core;
+using Koan.Data.Mongo;
+using Koan.Data.Vector;
+using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
-using S13.DocMind.Services;
+using Koan.Web.Swagger;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Koan Framework initialization
-builder.Services.AddKoan();
+builder.Services.AddKoan()
+    .AsWebApi()
+    .AsProxiedApi()
+    .WithRateLimit();
 
 // Note: Service implementations are handled by Koan auto-registration
 builder.Services.AddSingleton<IDocumentAggregationService, DocumentAggregationService>();
@@ -21,6 +29,6 @@ Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "dat
 
 var app = builder.Build();
 
-// Koan.Web startup filter auto-wires static files, controller routing, and Swagger
+app.UseKoanSwagger();
 
 app.Run();

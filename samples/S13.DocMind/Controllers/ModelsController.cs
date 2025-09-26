@@ -1,7 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.AI.Contracts.Adapters;
 using Microsoft.AspNetCore.Mvc;
-using S13.DocMind.Services;
+using Microsoft.Extensions.Logging;
+using S13.DocMind.Contracts;
 
 namespace S13.DocMind.Controllers;
 

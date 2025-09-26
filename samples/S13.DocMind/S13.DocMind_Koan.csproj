@@ -15,8 +15,6 @@
     <!-- Provider Projects - Auto-registered when referenced -->
     <ProjectReference Include="..\..\src\Koan.Data.MongoDB\Koan.Data.MongoDB.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Weaviate\Koan.Data.Weaviate.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.PostgreSQL\Koan.Data.PostgreSQL.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Redis\Koan.Data.Redis.csproj" />
 
     <!-- Document Processing -->
     <PackageReference Include="PdfPig" Version="0.1.9" />
