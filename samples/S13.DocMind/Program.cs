@@ -1,25 +1,33 @@
-using Koan.Core;
-using Koan.Core.Modules;
+using Koan.AI.Web;
 using Koan.Core.Observability;
 using Koan.Data.Core;
+using Koan.Data.Mongo;
+using Koan.Data.Vector;
+using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
+using Koan.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Koan Framework initialization
-builder.Services.AddKoan();
+builder.Services.AddKoan()
+    .AsWebApi()
+    .AsProxiedApi()
+    .WithRateLimit();
 
-// Add Koan observability for proper startup sequence logging
 builder.Services.AddKoanObservability();
-
-// Note: Service implementations are handled by Koan auto-registration
-
-// Ensure required directories exist
-Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "uploads"));
-Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "data"));
+builder.Services.AddKoanDataVector();
+builder.Services.AddKoanAiWeb();
+builder.Services.AddKoanSwagger(builder.Configuration);
+builder.Services.AddKoanMcp(builder.Configuration);
+builder.Services.AddMongoAdapter();
 
 var app = builder.Build();
 
-// Koan.Web startup filter auto-wires static files, controller routing, and Swagger
+app.UseKoanSwagger();
 
 app.Run();
+
+namespace S13.DocMind
+{
+    public partial class Program;
+}
