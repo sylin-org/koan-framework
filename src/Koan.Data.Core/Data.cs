@@ -1,8 +1,13 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
-using System.Linq.Expressions;
 
 namespace Koan.Data.Core;
 
@@ -25,6 +30,117 @@ public static class Data<TEntity, TKey>
     // Full scan - no pagination applied unless explicitly requested by user
     public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
         => Repo.QueryAsync(null, ct);
+
+    public static async Task<QueryResult<TEntity>> QueryWithCount(
+        object? query,
+        DataQueryOptions? options,
+        CancellationToken ct = default,
+        int? absoluteMaxRecords = null)
+    {
+        var repo = Repo;
+        var page = options?.EffectivePage(1) ?? 1;
+        var pageSize = options?.EffectivePageSize(int.MaxValue) ?? int.MaxValue;
+
+        if (options?.HasPagination == true && repo is IPagedRepository<TEntity, TKey> pagedRepo)
+        {
+            var repoOptions = options.WithPagination(page, pageSize);
+            var repoResult = await pagedRepo.QueryPageAsync(query, repoOptions, ct).ConfigureAwait(false);
+            return new QueryResult<TEntity>
+            {
+                Items = repoResult.Items,
+                TotalCount = repoResult.TotalCount,
+                Page = repoResult.Page,
+                PageSize = repoResult.PageSize
+            };
+        }
+
+        int? totalCount = null;
+        if (options?.HasPagination == true || absoluteMaxRecords.HasValue)
+        {
+            try
+            {
+                totalCount = await repo.CountAsync(query, ct).ConfigureAwait(false);
+            }
+            catch
+            {
+                totalCount = null;
+            }
+
+            if (absoluteMaxRecords.HasValue && totalCount.HasValue && totalCount.Value > absoluteMaxRecords.Value)
+            {
+                return new QueryResult<TEntity>
+                {
+                    Items = Array.Empty<TEntity>(),
+                    TotalCount = totalCount.Value,
+                    Page = 1,
+                    PageSize = 0
+                };
+            }
+        }
+
+        IReadOnlyList<TEntity> items;
+        var pagedInRepository = false;
+
+        if (options?.HasPagination == true && repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions)
+        {
+            var repoOptions = options.WithPagination(page, pageSize);
+            items = await repoWithOptions.QueryAsync(query, repoOptions, ct).ConfigureAwait(false);
+            pagedInRepository = true;
+        }
+        else
+        {
+            items = await repo.QueryAsync(query, ct).ConfigureAwait(false);
+        }
+
+        if (!totalCount.HasValue)
+        {
+            if (options?.HasPagination == true && pagedInRepository)
+            {
+                try
+                {
+                    totalCount = await repo.CountAsync(query, ct).ConfigureAwait(false);
+                }
+                catch
+                {
+                    totalCount = items.Count;
+                }
+            }
+            else
+            {
+                totalCount = items.Count;
+            }
+        }
+
+        IReadOnlyList<TEntity> window = items;
+        if (options?.HasPagination == true && !pagedInRepository)
+        {
+            var skip = Math.Max(page - 1, 0) * pageSize;
+            window = items.Skip(skip).Take(pageSize).ToList();
+        }
+
+        if (absoluteMaxRecords.HasValue && options?.HasPagination != true && totalCount.HasValue && totalCount.Value > absoluteMaxRecords.Value)
+        {
+            return new QueryResult<TEntity>
+            {
+                Items = Array.Empty<TEntity>(),
+                TotalCount = totalCount.Value,
+                Page = 1,
+                PageSize = 0
+            };
+        }
+
+        var finalTotal = totalCount ?? window.Count;
+        var finalPageSize = options?.HasPagination == true ? pageSize : window.Count;
+        var finalPage = options?.HasPagination == true ? page : 1;
+
+        return new QueryResult<TEntity>
+        {
+            Items = window,
+            TotalCount = finalTotal,
+            Page = finalPage,
+            PageSize = finalPageSize
+        };
+    }
 
     public static async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {

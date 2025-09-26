@@ -1,3 +1,6 @@
+using System;
+using System.Linq;
+using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
@@ -95,19 +98,58 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
                bool.TryParse(value.ToString(), out var result) && result;
     }
 
-    private KoanDataBehaviorAttribute? GetBehavior()
-        => GetType().GetCustomAttributes(typeof(KoanDataBehaviorAttribute), true).FirstOrDefault() as KoanDataBehaviorAttribute;
+    protected virtual PaginationPolicy GetPaginationPolicy()
+    {
+        if (HttpContext?.RequestServices is null)
+        {
+            throw new InvalidOperationException("RequestServices is not available.");
+        }
+
+        var services = HttpContext.RequestServices;
+        var methodInfo = ControllerContext?.ActionDescriptor?.MethodInfo;
+
+        PaginationAttribute? LocateAttribute()
+        {
+            var methodAttr = methodInfo?.GetCustomAttribute<PaginationAttribute>();
+            if (methodAttr is not null)
+            {
+                return methodAttr;
+            }
+
+            var controllerAttr = GetType().GetCustomAttribute<PaginationAttribute>();
+            if (controllerAttr is not null)
+            {
+                return controllerAttr;
+            }
+
+            var legacy = GetType().GetCustomAttribute<KoanDataBehaviorAttribute>();
+            if (legacy is not null)
+            {
+                return new PaginationAttribute
+                {
+                    Mode = legacy.MustPaginate ? PaginationMode.Required : PaginationMode.On,
+                    DefaultSize = legacy.DefaultPageSize,
+                    MaxSize = legacy.MaxPageSize,
+                    IncludeCount = true
+                };
+            }
+
+            return null;
+        }
+
+        var attr = LocateAttribute();
+        return PaginationPolicy.Resolve(services, attr);
+    }
 
     protected virtual QueryOptions BuildOptions()
     {
         var query = HttpContext.Request.Query;
-        var behavior = GetBehavior();
         var defaults = EndpointOptions;
 
         var opts = new QueryOptions
         {
             Page = 1,
-            PageSize = behavior?.DefaultPageSize ?? defaults.DefaultPageSize,
+            PageSize = defaults.DefaultPageSize,
             View = defaults.DefaultView
         };
 
@@ -121,8 +163,12 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             opts.Page = page;
         }
 
-        var maxSize = behavior?.MaxPageSize ?? defaults.MaxPageSize;
-        if (query.TryGetValue("size", out var vs) && int.TryParse(vs, out var size) && size > 0)
+        var maxSize = defaults.MaxPageSize;
+        if (query.TryGetValue("pageSize", out var vps) && int.TryParse(vps, out var requested) && requested > 0)
+        {
+            opts.PageSize = Math.Min(requested, maxSize);
+        }
+        else if (query.TryGetValue("size", out var vs) && int.TryParse(vs, out var size) && size > 0)
         {
             opts.PageSize = Math.Min(size, maxSize);
         }
@@ -198,18 +244,66 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     {
         if (!CanRead) return Forbid();
 
-        if (HttpContext.Request.Query.TryGetValue("page", out var _vp)
-            && int.TryParse(_vp, out var _p)
-            && _p < 0)
+        var query = HttpContext.Request.Query;
+        var policy = GetPaginationPolicy();
+        var paginationRequested = query.ContainsKey("page") || query.ContainsKey("pageSize") || query.ContainsKey("size");
+        var clientRequestedAll = GetBooleanQueryValue(query, "all");
+
+        int page = 1;
+        if (query.TryGetValue("page", out var vp) && int.TryParse(vp, out var parsedPage))
         {
-            return BadRequest(new { error = "page must be >= 0" });
+            if (parsedPage < 0)
+            {
+                return BadRequest(new { error = "page must be >= 0" });
+            }
+
+            page = parsedPage < 1 ? 1 : parsedPage;
         }
 
-        var options = BuildOptions();
-        var context = CreateRequestContext(options, ct);
-        var query = HttpContext.Request.Query;
-        var behavior = GetBehavior();
+        int requestedSize = policy.DefaultSize;
+        if (query.TryGetValue("pageSize", out var vps) && int.TryParse(vps, out var parsedSize))
+        {
+            requestedSize = parsedSize;
+        }
+        else if (query.TryGetValue("size", out var vs) && int.TryParse(vs, out var legacySize))
+        {
+            requestedSize = legacySize;
+        }
 
+        if (requestedSize < 1)
+        {
+            requestedSize = policy.DefaultSize;
+        }
+
+        var pageSize = Math.Min(requestedSize, policy.MaxSize);
+
+        var applyPagination = policy.Mode switch
+        {
+            PaginationMode.On => true,
+            PaginationMode.Required => true,
+            PaginationMode.Optional => paginationRequested && !clientRequestedAll,
+            PaginationMode.Off => false,
+            _ => true
+        };
+
+        var options = BuildOptions();
+        options.Page = applyPagination ? page : 1;
+        options.PageSize = applyPagination ? pageSize : 0;
+
+        if (!string.IsNullOrWhiteSpace(policy.DefaultSort) && options.Sort.Count == 0)
+        {
+            foreach (var spec in policy.DefaultSort.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var desc = spec.StartsWith('-');
+                var field = desc ? spec[1..] : spec;
+                if (!string.IsNullOrWhiteSpace(field))
+                {
+                    options.Sort.Add(new SortSpec(field, desc));
+                }
+            }
+        }
+
+        var context = CreateRequestContext(options, ct);
         var request = new EntityCollectionRequest
         {
             Context = context,
@@ -218,7 +312,13 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             IgnoreCase = GetBooleanQueryValue(query, "ignoreCase"),
             With = GetRelationshipParameter(query),
             Shape = GetShapeParameter(query) ?? options.Shape,
-            ForcePagination = behavior?.MustPaginate ?? false,
+            ForcePagination = applyPagination,
+            ApplyPagination = applyPagination,
+            PaginationRequested = paginationRequested,
+            ClientRequestedAll = clientRequestedAll,
+            Policy = policy,
+            IncludeTotalCount = applyPagination && policy.IncludeCount,
+            AbsoluteMaxRecords = policy.AbsoluteMaxRecords,
             Accept = HttpContext.Request.Headers["Accept"].ToString(),
             BasePath = HttpContext.Request.Path.HasValue ? HttpContext.Request.Path.Value : "/",
             QueryParameters = ToQueryDictionary(query)
