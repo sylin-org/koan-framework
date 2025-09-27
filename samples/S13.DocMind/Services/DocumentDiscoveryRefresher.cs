@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using S13.DocMind.Infrastructure;
-using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;
@@ -32,7 +31,7 @@ public sealed class DocumentDiscoveryRefresher : IDocumentDiscoveryRefresher
         var effective = request ?? new DocumentDiscoveryValidationRequest();
         var started = _clock.GetUtcNow();
 
-        var projection = await DocumentDiscoveryProjectionRepository.GetAsync(cancellationToken).ConfigureAwait(false);
+        var projection = await DocumentDiscoveryProjection.Get("global", cancellationToken).ConfigureAwait(false);
         var refreshed = false;
 
         var thresholdMinutes = effective.RefreshIfOlderThanMinutes ?? 10;

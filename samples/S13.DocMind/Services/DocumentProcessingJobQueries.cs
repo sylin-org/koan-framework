@@ -5,15 +5,47 @@ using System.Threading;
 using System.Threading.Tasks;
 using S13.DocMind.Models;
 
-namespace S13.DocMind.Infrastructure.Repositories;
+namespace S13.DocMind.Services;
 
-public static class DocumentProcessingJobRepository
+public sealed record DocumentProcessingJobSlice(IReadOnlyList<DocumentProcessingJob> Items, bool HasMore);
+
+public sealed class DocumentProcessingJobQuery
 {
-    public static async Task<DocumentProcessingJob?> GetAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var entity = await DocumentProcessingJob.Get(id.ToString(), cancellationToken).ConfigureAwait(false);
-        return entity;
-    }
+    public Guid? SourceDocumentId { get; set; }
+        = null;
+
+    public string? CorrelationId { get; set; }
+        = null;
+
+    public DocumentProcessingStatus[]? Statuses { get; set; }
+        = null;
+
+    public DocumentProcessingStage[]? Stages { get; set; }
+        = null;
+
+    public DateTimeOffset? DueBefore { get; set; }
+        = null;
+
+    public int Take { get; set; }
+        = 0;
+
+    public bool OrderByDue { get; set; }
+        = false;
+
+    public bool IncludeExtraForPaging { get; set; }
+        = true;
+}
+
+public static class DocumentProcessingJobQueries
+{
+    public static Task<DocumentProcessingJobSlice> GetPendingAsync(DateTimeOffset now, int batchSize, CancellationToken cancellationToken)
+        => QueryAsync(new DocumentProcessingJobQuery
+        {
+            Statuses = new[] { DocumentProcessingStatus.Queued },
+            DueBefore = now,
+            Take = Math.Max(1, batchSize),
+            OrderByDue = true
+        }, cancellationToken);
 
     public static async Task<DocumentProcessingJob?> FindByDocumentAsync(Guid documentId, CancellationToken cancellationToken)
     {
@@ -26,38 +58,9 @@ public static class DocumentProcessingJobRepository
         return slice.Items.FirstOrDefault();
     }
 
-    public static Task<DocumentProcessingJobSlice> GetPendingAsync(DateTimeOffset now, int batchSize, CancellationToken cancellationToken)
-        => QueryAsync(new DocumentProcessingJobQuery
-        {
-            Statuses = new[] { DocumentProcessingStatus.Queued },
-            DueBefore = now,
-            Take = Math.Max(1, batchSize),
-            OrderByDue = true
-        }, cancellationToken);
-
-    public static Task<DocumentProcessingJobSlice> QueryAsync(DocumentProcessingJobQuery query, CancellationToken cancellationToken)
+    public static async Task<DocumentProcessingJobSlice> QueryAsync(DocumentProcessingJobQuery query, CancellationToken cancellationToken)
     {
         var filter = BuildFilter(query);
-        return ExecuteQueryAsync(filter, query, cancellationToken);
-    }
-
-    public static async Task<IReadOnlyList<DocumentProcessingJob>> GetAllAsync(CancellationToken cancellationToken)
-    {
-        var results = await DocumentProcessingJob.All(cancellationToken).ConfigureAwait(false);
-        return results.ToList();
-    }
-
-    public static async Task<bool> HasChangesSinceAsync(DateTimeOffset since, CancellationToken cancellationToken)
-    {
-        var threshold = since.UtcDateTime.ToString("O");
-        var filter =
-            $"UpdatedAt > '{threshold}' || CreatedAt > '{threshold}'";
-        var results = await DocumentProcessingJob.Query(filter, cancellationToken).ConfigureAwait(false);
-        return results.Any();
-    }
-
-    public static async Task<DocumentProcessingJobSlice> ExecuteQueryAsync(string? filter, DocumentProcessingJobQuery query, CancellationToken cancellationToken)
-    {
         var result = filter is null
             ? await DocumentProcessingJob.All(cancellationToken).ConfigureAwait(false)
             : await DocumentProcessingJob.Query(filter, cancellationToken).ConfigureAwait(false);
@@ -78,6 +81,14 @@ public static class DocumentProcessingJobRepository
         }
 
         return new DocumentProcessingJobSlice(materialized, hasMore);
+    }
+
+    public static async Task<bool> HasChangesSinceAsync(DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        var threshold = since.UtcDateTime.ToString("O");
+        var filter = $"UpdatedAt > '{threshold}' || CreatedAt > '{threshold}'";
+        var results = await DocumentProcessingJob.Query(filter, cancellationToken).ConfigureAwait(false);
+        return results.Any();
     }
 
     private static string? BuildFilter(DocumentProcessingJobQuery query)
@@ -120,33 +131,4 @@ public static class DocumentProcessingJobRepository
 
         return filters.Count == 0 ? null : string.Join(" && ", filters);
     }
-}
-
-public sealed record DocumentProcessingJobSlice(IReadOnlyList<DocumentProcessingJob> Items, bool HasMore);
-
-public sealed class DocumentProcessingJobQuery
-{
-    public Guid? SourceDocumentId { get; set; }
-        = null;
-
-    public string? CorrelationId { get; set; }
-        = null;
-
-    public DocumentProcessingStatus[]? Statuses { get; set; }
-        = null;
-
-    public DocumentProcessingStage[]? Stages { get; set; }
-        = null;
-
-    public DateTimeOffset? DueBefore { get; set; }
-        = null;
-
-    public int Take { get; set; }
-        = 0;
-
-    public bool OrderByDue { get; set; }
-        = false;
-
-    public bool IncludeExtraForPaging { get; set; }
-        = true;
 }

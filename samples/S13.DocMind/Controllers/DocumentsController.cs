@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using S13.DocMind.Contracts;
-using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 using S13.DocMind.Services;
 using Koan.Web.Controllers;
@@ -56,7 +55,7 @@ public sealed class DocumentsController : EntityController<SourceDocument>
             return BadRequest();
         }
 
-        var events = await ProcessingEventRepository.GetTimelineAsync(documentGuid, null, null, null, cancellationToken).ConfigureAwait(false);
+        var events = await QueryProcessingEventsAsync(documentGuid, cancellationToken).ConfigureAwait(false);
         var response = events
             .OrderBy(e => e.CreatedAt)
             .Select(e => new TimelineEntryResponse
@@ -143,5 +142,14 @@ public sealed class DocumentsController : EntityController<SourceDocument>
             .ToList();
 
         return Ok(response);
+}
+
+    private static async Task<IReadOnlyList<DocumentProcessingEvent>> QueryProcessingEventsAsync(Guid documentId, CancellationToken cancellationToken)
+    {
+        var filter = $"SourceDocumentId == '{documentId}'";
+        var events = await DocumentProcessingEvent.Query(filter, cancellationToken).ConfigureAwait(false);
+        return events
+            .OrderBy(e => e.CreatedAt)
+            .ToList();
     }
 }

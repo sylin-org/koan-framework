@@ -6,7 +6,6 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using S13.DocMind.Contracts;
-using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 using S13.DocMind.Services;
 using Xunit;
@@ -59,7 +58,7 @@ public sealed class DocMindProcessingHarnessTests
         document.Summary.InsightRefs.Should().NotBeEmpty();
         document.AssignedBySystem.Should().BeTrue();
 
-        var job = await DocumentProcessingJobRepository.FindByDocumentAsync(Guid.Parse(documentId), CancellationToken.None).ConfigureAwait(false);
+        var job = await DocumentProcessingJobQueries.FindByDocumentAsync(Guid.Parse(documentId), CancellationToken.None).ConfigureAwait(false);
         job.Should().NotBeNull();
         job!.Status.Should().Be(DocumentProcessingStatus.Completed);
         job.Stage.Should().Be(DocumentProcessingStage.Complete);
