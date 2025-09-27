@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S13.DocMind.Contracts;
 using S13.DocMind.Infrastructure;
-using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 using Koan.Data.Core;
 
@@ -63,7 +62,12 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         await using var stream = request.File.OpenReadStream();
         var stored = await _storage.SaveAsync(request.File.FileName, stream, cancellationToken);
 
-        var duplicate = await SourceDocumentRepository.FindByHashAsync(stored.Hash ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        SourceDocument? duplicate = null;
+        if (!string.IsNullOrWhiteSpace(stored.Hash))
+        {
+            var matches = await SourceDocument.Query($"Sha512 == '{stored.Hash}'", cancellationToken).ConfigureAwait(false);
+            duplicate = matches.FirstOrDefault();
+        }
         if (duplicate is not null)
         {
             await _storage.TryDeleteAsync(stored.ToLocation(), cancellationToken).ConfigureAwait(false);
@@ -193,7 +197,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
     private async Task EnsureJobQueuedAsync(Guid documentId, DocumentProcessingStage stage, CancellationToken cancellationToken)
     {
         var now = _clock.GetUtcNow();
-        var job = await DocumentProcessingJobRepository.FindByDocumentAsync(documentId, cancellationToken).ConfigureAwait(false);
+        var job = await DocumentProcessingJobQueries.FindByDocumentAsync(documentId, cancellationToken).ConfigureAwait(false);
         if (job is null)
         {
             job = new DocumentProcessingJob

@@ -5,13 +5,13 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;
 
 public static class DocumentDiscoveryProjectionBuilder
 {
+    private const string ProjectionId = "global";
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = false
@@ -22,14 +22,14 @@ public static class DocumentDiscoveryProjectionBuilder
     public static async Task<DocumentDiscoveryProjection> RefreshAsync(TimeProvider clock, CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
-        var existing = await DocumentDiscoveryProjectionRepository.GetAsync(cancellationToken).ConfigureAwait(false);
+        var existing = await DocumentDiscoveryProjection.Get(ProjectionId, cancellationToken).ConfigureAwait(false);
 
         if (existing is not null)
         {
             var changeWindow = existing.RefreshedAt;
-            var documentChangesTask = SourceDocumentRepository.HasChangesSinceAsync(changeWindow, cancellationToken);
-            var insightChangesTask = DocumentInsightRepository.HasChangesSinceAsync(changeWindow, cancellationToken);
-            var queueChangesTask = DocumentProcessingJobRepository.HasChangesSinceAsync(changeWindow, cancellationToken);
+            var documentChangesTask = HasDocumentChangesSinceAsync(changeWindow, cancellationToken);
+            var insightChangesTask = HasInsightChangesSinceAsync(changeWindow, cancellationToken);
+            var queueChangesTask = DocumentProcessingJobQueries.HasChangesSinceAsync(changeWindow, cancellationToken);
 
             await Task.WhenAll(documentChangesTask, insightChangesTask, queueChangesTask).ConfigureAwait(false);
 
@@ -44,7 +44,7 @@ public static class DocumentDiscoveryProjectionBuilder
 
                 existing.RefreshedAt = now;
                 existing.RefreshDurationSeconds ??= 0d;
-                return await DocumentDiscoveryProjectionRepository.SaveAsync(existing, cancellationToken).ConfigureAwait(false);
+                return await SaveProjectionAsync(existing, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -64,7 +64,7 @@ public static class DocumentDiscoveryProjectionBuilder
             existing.RefreshedAt = now;
             existing.RefreshDurationSeconds = stopwatch.Elapsed.TotalSeconds;
             existing.Queue = queue;
-            return await DocumentDiscoveryProjectionRepository.SaveAsync(existing, cancellationToken).ConfigureAwait(false);
+            return await SaveProjectionAsync(existing, cancellationToken).ConfigureAwait(false);
         }
 
         var projection = existing ?? new DocumentDiscoveryProjection();
@@ -75,7 +75,7 @@ public static class DocumentDiscoveryProjectionBuilder
         projection.Feed = feed;
         projection.Queue = queue;
 
-        return await DocumentDiscoveryProjectionRepository.SaveAsync(projection, cancellationToken).ConfigureAwait(false);
+        return await SaveProjectionAsync(projection, cancellationToken).ConfigureAwait(false);
     }
 
     private static DocumentInsightsOverview BuildOverview(IReadOnlyCollection<SourceDocument> documents, IReadOnlyCollection<DocumentInsight> insights)
@@ -214,7 +214,7 @@ public static class DocumentDiscoveryProjectionBuilder
             DueBefore = asOf
         };
 
-        var slice = await DocumentProcessingJobRepository.QueryAsync(query, cancellationToken).ConfigureAwait(false);
+        var slice = await DocumentProcessingJobQueries.QueryAsync(query, cancellationToken).ConfigureAwait(false);
 
         if (slice.Items.Count == 0)
         {
@@ -230,9 +230,7 @@ public static class DocumentDiscoveryProjectionBuilder
             .ThenBy(job => job.CreatedAt)
             .ToList();
 
-        var documents = await SourceDocumentRepository
-            .GetManyAsync(ordered.Select(job => job.SourceDocumentId), cancellationToken)
-            .ConfigureAwait(false);
+        var documents = await GetDocumentsAsync(ordered.Select(job => job.SourceDocumentId), cancellationToken).ConfigureAwait(false);
 
         var seen = new HashSet<Guid>();
         var entries = new List<DocumentQueueEntry>(ordered.Count);
@@ -297,4 +295,51 @@ public static class DocumentDiscoveryProjectionBuilder
             Feed = feed,
             Queue = queue
         }, SerializerOptions);
+
+    private static async Task<DocumentDiscoveryProjection> SaveProjectionAsync(DocumentDiscoveryProjection projection, CancellationToken cancellationToken)
+    {
+        projection.Id = ProjectionId;
+        projection.Scope = ProjectionId;
+        projection.RefreshedAt = projection.RefreshedAt == default ? DateTimeOffset.UtcNow : projection.RefreshedAt;
+        return await projection.Save(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<bool> HasDocumentChangesSinceAsync(DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        var threshold = since.UtcDateTime.ToString("O");
+        var filter = $"UploadedAt > '{threshold}' || (LastProcessedAt != null && LastProcessedAt > '{threshold}')";
+        var results = await SourceDocument.Query(filter, cancellationToken).ConfigureAwait(false);
+        return results.Any();
+    }
+
+    private static async Task<bool> HasInsightChangesSinceAsync(DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        var threshold = since.UtcDateTime.ToString("O");
+        var filter = $"GeneratedAt > '{threshold}' || (UpdatedAt != null && UpdatedAt > '{threshold}')";
+        var results = await DocumentInsight.Query(filter, cancellationToken).ConfigureAwait(false);
+        return results.Any();
+    }
+
+    private static async Task<IDictionary<Guid, SourceDocument>> GetDocumentsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken)
+    {
+        var idArray = ids.Distinct().ToArray();
+        if (idArray.Length == 0)
+        {
+            return new Dictionary<Guid, SourceDocument>();
+        }
+
+        var filter = string.Join(" || ", idArray.Select(id => $"Id == '{id}'"));
+        var results = await SourceDocument.Query(filter, cancellationToken).ConfigureAwait(false);
+
+        var map = new Dictionary<Guid, SourceDocument>(idArray.Length);
+        foreach (var entity in results)
+        {
+            if (Guid.TryParse(entity.Id, out var parsed))
+            {
+                map[parsed] = entity;
+            }
+        }
+
+        return map;
+    }
 }

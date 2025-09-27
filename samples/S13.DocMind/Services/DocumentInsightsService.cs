@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using S13.DocMind.Infrastructure;
-using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;
@@ -18,6 +17,7 @@ public interface IDocumentInsightsService
 
 public sealed class DocumentInsightsService : IDocumentInsightsService
 {
+    private const string ProjectionId = "global";
     private readonly TimeProvider _clock;
     private readonly IDocumentDiscoveryRefreshScheduler _refreshScheduler;
 
@@ -70,11 +70,11 @@ public sealed class DocumentInsightsService : IDocumentInsightsService
 
     private async Task<DocumentDiscoveryProjection> EnsureProjectionAsync(CancellationToken cancellationToken)
     {
-        var projection = await DocumentDiscoveryProjectionRepository.GetAsync(cancellationToken).ConfigureAwait(false);
+        var projection = await DocumentDiscoveryProjection.Get(ProjectionId, cancellationToken).ConfigureAwait(false);
         if (projection is null)
         {
             await _refreshScheduler.EnsureRefreshAsync("cold-start", cancellationToken).ConfigureAwait(false);
-            projection = await DocumentDiscoveryProjectionRepository.GetAsync(cancellationToken).ConfigureAwait(false);
+            projection = await DocumentDiscoveryProjection.Get(ProjectionId, cancellationToken).ConfigureAwait(false);
         }
         else if ((_clock.GetUtcNow() - projection.RefreshedAt) > TimeSpan.FromMinutes(5))
         {

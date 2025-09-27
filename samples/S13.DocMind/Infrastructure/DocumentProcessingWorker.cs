@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 using S13.DocMind.Services;
 
@@ -57,7 +56,7 @@ public sealed class DocumentProcessingWorker : BackgroundService
     private async Task<bool> ProcessBatchAsync(CancellationToken cancellationToken)
     {
         var now = _clock.GetUtcNow();
-        var slice = await DocumentProcessingJobRepository
+        var slice = await DocumentProcessingJobQueries
             .GetPendingAsync(now, _options.Processing.WorkerBatchSize, cancellationToken)
             .ConfigureAwait(false);
 
@@ -98,9 +97,7 @@ public sealed class DocumentProcessingWorker : BackgroundService
         var refreshScheduler = services.GetRequiredService<IDocumentDiscoveryRefreshScheduler>();
         var vectorHealth = services.GetRequiredService<DocMindVectorHealth>();
 
-        var document = await SourceDocumentRepository
-            .GetAsync(job.SourceDocumentId, cancellationToken)
-            .ConfigureAwait(false);
+        var document = await SourceDocument.Get(job.SourceDocumentId.ToString(), cancellationToken).ConfigureAwait(false);
 
         if (document is null)
         {

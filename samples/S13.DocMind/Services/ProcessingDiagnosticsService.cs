@@ -7,7 +7,6 @@ using Koan.Data.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S13.DocMind.Infrastructure;
-using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;
@@ -88,7 +87,7 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
             IncludeExtraForPaging = false
         };
 
-        var slice = await DocumentProcessingJobRepository.QueryAsync(jobQuery, cancellationToken).ConfigureAwait(false);
+        var slice = await DocumentProcessingJobQueries.QueryAsync(jobQuery, cancellationToken).ConfigureAwait(false);
         var ordered = slice.Items
             .OrderBy(job => job.NextAttemptAt ?? job.CreatedAt)
             .ThenBy(job => job.CreatedAt)
@@ -114,9 +113,7 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
             };
         }
 
-        var documents = await SourceDocumentRepository
-            .GetManyAsync(pageItems.Select(job => job.SourceDocumentId), cancellationToken)
-            .ConfigureAwait(false);
+        var documents = await GetDocumentsAsync(pageItems.Select(job => job.SourceDocumentId), cancellationToken).ConfigureAwait(false);
 
         var now = _clock.GetUtcNow();
         var items = pageItems
@@ -229,7 +226,7 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
             .Select(doc => new { Document = doc, Parsed = Guid.TryParse(doc.Id, out var id) ? id : (Guid?)null })
             .Where(tuple => tuple.Parsed.HasValue)
             .ToDictionary(tuple => tuple.Parsed!.Value, tuple => tuple.Document);
-        var events = await ProcessingEventRepository.GetTimelineAsync(
+        var events = await QueryProcessingEventsAsync(
             TryParseGuid(query.DocumentId),
             query.Stage,
             query.From,
@@ -324,7 +321,7 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
                 CorrelationId: Guid.NewGuid().ToString("N")),
             cancellationToken).ConfigureAwait(false);
 
-        var job = await DocumentProcessingJobRepository.FindByDocumentAsync(parsedId, cancellationToken).ConfigureAwait(false)
+        var job = await DocumentProcessingJobQueries.FindByDocumentAsync(parsedId, cancellationToken).ConfigureAwait(false)
                   ?? new DocumentProcessingJob
                   {
                       SourceDocumentId = parsedId,
@@ -486,6 +483,68 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
             AverageDurationMs = status.AverageDuration?.TotalMilliseconds,
             MaxDurationMs = status.MaxDuration?.TotalMilliseconds
         };
+
+    private static async Task<IDictionary<Guid, SourceDocument>> GetDocumentsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken)
+    {
+        var idArray = ids.Distinct().ToArray();
+        if (idArray.Length == 0)
+        {
+            return new Dictionary<Guid, SourceDocument>();
+        }
+
+        var filter = string.Join(" || ", idArray.Select(id => $"Id == '{id}'"));
+        var results = await SourceDocument.Query(filter, cancellationToken).ConfigureAwait(false);
+
+        var map = new Dictionary<Guid, SourceDocument>(idArray.Length);
+        foreach (var entity in results)
+        {
+            if (Guid.TryParse(entity.Id, out var parsed))
+            {
+                map[parsed] = entity;
+            }
+        }
+
+        return map;
+    }
+
+    private static async Task<IReadOnlyList<DocumentProcessingEvent>> QueryProcessingEventsAsync(
+        Guid? documentId,
+        DocumentProcessingStage? stage,
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        CancellationToken cancellationToken)
+    {
+        var filters = new List<string>();
+        if (documentId.HasValue)
+        {
+            filters.Add($"SourceDocumentId == '{documentId.Value}'");
+        }
+
+        if (stage.HasValue)
+        {
+            filters.Add($"Stage == {(int)stage.Value}");
+        }
+
+        var filterExpression = filters.Count == 0 ? null : string.Join(" && ", filters);
+        var events = filterExpression is null
+            ? await DocumentProcessingEvent.All(cancellationToken).ConfigureAwait(false)
+            : await DocumentProcessingEvent.Query(filterExpression, cancellationToken).ConfigureAwait(false);
+
+        if (from.HasValue)
+        {
+            events = events.Where(evt => evt.CreatedAt >= from.Value).ToList();
+        }
+
+        if (to.HasValue)
+        {
+            events = events.Where(evt => evt.CreatedAt <= to.Value).ToList();
+        }
+
+        return events
+            .OrderBy(evt => evt.SourceDocumentId)
+            .ThenBy(evt => evt.CreatedAt)
+            .ToList();
+    }
 }
 
 public sealed class ProcessingTimelineQuery
