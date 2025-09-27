@@ -1,44 +1,45 @@
-# S13.DocMind Refactoring Plan (Post-Bedrock Implementation Review)
+# S13.DocMind Refactoring Plan (Comprehensive Delta Review)
 
-## 1. Delta Checkpoint
-- **Module wiring stalled** – `Program.cs` never loads Koan modules, so `DocMindRegistrar` (and the hosted pipeline/vector workers it registers) never activate. Options binding, validators, and boot report contributions remain inert even though the registrar exists. 【F:samples/S13.DocMind/Program.cs†L1-L19】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L17-L49】
-- **Pipeline stages drift from the proposal** – The channel-backed `DocumentPipelineQueue` is still the only orchestration mechanism even though the blueprint called for a simple polling worker. Several declared stages (`Deduplicate`, `GenerateEmbeddings`) are never emitted, retries always restart at `ExtractText`, and embeddings are generated opportunistically without stage telemetry. 【F:samples/S13.DocMind/Infrastructure/DocumentPipelineQueue.cs†L1-L214】【F:samples/S13.DocMind/Models/SourceDocument.cs†L176-L205】【F:samples/S13.DocMind/Services/DocumentIntakeService.cs†L120-L188】
-- **Data access remains brute-force** – Diagnostics and insight services hydrate whole collections via `Entity<T>.All()` and in-memory LINQ, contradicting the repo/aggregation strategy outlined in the proposal and threatening scalability once documents grow. 【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L22-L140】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L30-L137】
-- **AI & vector integration is only partially realized** – Vision/text synthesis now call AI providers, but the system still relies on cosine similarity over in-memory embeddings, skips semantic profile bootstrapping, and never records stage-specific embedding events for diagnostics. 【F:samples/S13.DocMind/Services/TemplateSuggestionService.cs†L82-L164】【F:samples/S13.DocMind/Infrastructure/DocumentVectorBootstrapper.cs†L1-L36】
-- **Operational surface incomplete** – Boot reports expose only three settings, no health checks validate storage/vector/model readiness, and there is no automated coverage to guard the rebuilt pipeline. Retry tooling always requeues stage `ExtractText`, ignoring targeted restarts requested by diagnostics. 【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L35-L49】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L105-L137】
+## 1. Current Delta Snapshot
+- **Bootstrap still bypasses Koan auto-registration** – `Program.cs` loads the DocMind assembly into the cache but never calls `AddKoanModules`, so `IKoanAutoRegistrar` implementations (including `DocMindRegistrar`) do not run and hosted workers/options validation stay dormant unless consumers wire them manually. 【F:samples/S13.DocMind/Program.cs†L1-L23】
+- **Pipeline orchestration collapses multiple stages into one worker pass** – `DocumentAnalysisPipeline` dequeues work with a bespoke channel, replays every stage in one shot, and only updates the work item at completion. Stage-specific retries, `Deduplicate`/`GenerateEmbeddings` transitions, and targeted resumptions described in the blueprint remain unimplemented. 【F:samples/S13.DocMind/Infrastructure/DocumentAnalysisPipeline.cs†L37-L345】【F:samples/S13.DocMind/Infrastructure/DocumentPipelineQueue.cs†L1-L216】
+- **Queue diagnostics lack persistence and state awareness** – Work items live solely in-memory, `ScheduleRetryAsync` reuses the same `DocumentWorkItem` without updating stage/status telemetry, and requeue helpers always restart at `ExtractText`, preventing diagnostics from requesting stage-specific resumes. 【F:samples/S13.DocMind/Infrastructure/DocumentPipelineQueue.cs†L12-L221】【F:samples/S13.DocMind/Services/DocumentIntakeService.cs†L134-L197】
+- **Repositories and discovery services still perform collection scans** – Timeline, insights, and aggregation services hydrate entire tables through `Entity<T>.All()` or ad-hoc filters, contradicting the proposal’s repository-driven, server-side projection strategy and limiting scalability. 【F:samples/S13.DocMind/Infrastructure/Repositories/ProcessingEventRepository.cs†L12-L45】【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L28-L149】
+- **Vector and semantic profile alignment remains partial** – Chunk embeddings persist to the adapter, but template suggestions still execute cosine similarity in-process after loading every embedding/profile, and no bootstrapper ensures semantic profile vectors exist. 【F:samples/S13.DocMind/Services/TemplateSuggestionService.cs†L94-L209】【F:samples/S13.DocMind/Infrastructure/DocumentVectorBootstrapper.cs†L1-L34】
+- **Operational hardening is unfinished** – Boot reports list configuration but omit health checks, AI/vector readiness probes, or telemetry hooks, and there is no automated coverage guarding the rebuilt pipeline. 【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L40-L86】
 
 ## 2. Layered Remediation Strategy
 
-### Layer A – Bootstrap & Configuration Activation
-1. **Load the module**: Update `Program.cs` to chain `.AddKoanModules(typeof(DocMindRegistrar).Assembly)` (or equivalent) so the registrar, hosted services, and options validation execute.
-2. **Unify options binding**: Replace ad-hoc option fetches with `AddKoanOptions<DocMindOptions>` or `AddOptions<DocMindOptions>().BindConfiguration("DocMind").ValidateOnStart()` so pipelines, storage, and AI services read consistent configuration across environments.
-3. **Enhance boot diagnostics**: Extend `DocMindRegistrar.Describe` to surface queue sizing, provider availability, AI model readiness, and feature flags to mirror the infrastructure blueprint.
+### Layer A – Reactivate Bootstrap & Configuration Enforcement
+1. **Adopt Koan module loading** – Replace the `AssemblyCache` call with `builder.Services.AddKoanModules(typeof(DocMindRegistrar).Assembly);` so the auto-registrar runs and hosted services/options validation activate on startup.
+2. **Centralize options validation** – Keep `AddKoanOptions<DocMindOptions>` but add `ValidateDataAnnotations()`/custom validators to fail fast on malformed storage/processing settings, mirroring the infrastructure guidance.
+3. **Expose boot readiness checks** – Extend `DocMindRegistrar.Describe` to run storage/vector/AI health probes and emit actionable warnings instead of static settings dumps.
 
-### Layer B – Domain & Stage Semantics
-1. **Honor full stage model**: Emit `DocumentProcessingEvent` entries (and update `SourceDocument.Summary`) for `Deduplicate`, `GenerateEmbeddings`, and profile aggregation stages. Ensure retry/resume logic respects the requested stage instead of always restarting at `ExtractText`.
-2. **Stage-aware work items**: Replace or wrap `DocumentPipelineQueue` with the blueprint’s polling worker so concurrency, retries, and stage progression are declarative and traceable. Persist work state when retries exhaust to support diagnostics.
-3. **Chunk ↔ insight linkage**: When insights reference chunks, update `DocumentChunk.InsightRefs` to keep summary references in sync and populate stage durations/metrics for downstream dashboards.
+### Layer B – Processing Topology & Stage Semantics
+1. **Introduce the proposal’s worker loop** – Swap the channel queue for the polling `DocumentProcessingWorker` pattern, persisting work status between iterations so retries and diagnostics have durable insight.
+2. **Model stage progression explicitly** – Teach the worker to persist `DocumentWorkItem` (or equivalent) state, emit `Deduplicate`/`GenerateEmbeddings` events, and update `SourceDocument.Summary` after each completed stage.
+3. **Targeted retry support** – Allow diagnostics uploads to requeue a specific stage by persisting last successful stage/status, honoring that when scheduling retries instead of always restarting at extraction.
 
 ### Layer C – Data Access & Aggregations
-1. **Repository-first queries**: Expand repository helpers (documents, chunks, insights, processing events) to expose targeted projections (pending queue items, per-document timelines, profile aggregations) using server-side filters instead of `All()` calls.
-2. **Insight collections**: Introduce the `InsightCollection`/`SimilarityProjection` aggregates from the proposal so discovery dashboards and MCP tools can query precomputed rollups instead of recomputing metrics on each request.
-3. **Semantic profile bootstrap**: Extend the vector bootstrapper (or add a dedicated initializer) to seed semantic type embeddings and ensure both chunk/profile classes exist before suggestions run.
+1. **Repository-first projections** – Build dedicated repository helpers (documents, chunks, insights, processing events) that generate server-side filters for timelines, queue views, and dashboards; remove `Entity<T>.All()` calls from services/controllers.
+2. **Insight collections & feeds** – Materialize the `InsightCollection`/`SimilarityProjection` aggregates from the blueprint with scheduled refreshes so the discovery layer queries precomputed rollups.
+3. **Timeline API alignment** – Move `/processing/timeline` to the new repository APIs, adding pagination/windowing so MCP tooling can stream events without loading the entire dataset.
 
 ### Layer D – AI & Vector Integration
-1. **Vector-backed suggestions**: Replace the in-memory cosine similarity loop with Koan vector adapter queries (`Vector<SemanticTypeEmbedding>.SearchAsync`) so template suggestions scale and align with the Weaviate-based design.
-2. **Embedding stage telemetry**: Record explicit `GenerateEmbeddings` events (metrics: vector count, adapter latency) and surface failures with retry semantics so diagnostics expose vector readiness.
-3. **Model capability checks**: On startup, verify configured AI models exist (or expose actionable boot warnings) and add graceful fallbacks when providers are absent, as called out in the proposal’s infrastructure guidance.
+1. **Adapter-backed similarity** – Replace manual cosine comparisons with `Vector<SemanticTypeEmbedding>.SearchAsync`, capturing adapter latency and emitting `GenerateEmbeddings` events when vectors are written.
+2. **Semantic profile bootstrapping** – Expand `DocumentVectorBootstrapper` (or add a new initializer) to ensure semantic profile embeddings exist and regenerate stale vectors during startup.
+3. **Model readiness telemetry** – Validate configured AI models and emit structured boot warnings/metrics when providers are absent; propagate model/latency data into processing events for diagnostics.
 
-### Layer E – Diagnostics, Experience & Ops
-1. **Retry targeting**: Allow diagnostics to requeue the specific stage that failed, capturing correlation IDs and audit events so operators can restart from insight synthesis without rerunning extraction unnecessarily.
-2. **Health checks & telemetry**: Add Koan health checks for storage path, vector adapter, and AI provider; emit OpenTelemetry spans around AI/vision calls and queue processing to match the observability commitments.
-3. **Automated coverage**: Introduce integration tests using Koan’s in-memory providers that cover upload → completion, retry exhaustion, and vision-disabled paths to protect the rebuilt pipeline.
+### Layer E – Diagnostics, Ops & Quality
+1. **Queue & pipeline health checks** – Register Koan health checks for storage paths, vector adapters, AI providers, and queue backlog thresholds, wiring them into MCP/UI status surfaces.
+2. **Structured telemetry & tracing** – Wrap pipeline stages with OpenTelemetry spans, enrich `DocumentProcessingEvent` records with duration/token metrics, and surface correlation IDs through the API.
+3. **Automated coverage** – Add integration tests covering upload→completion, targeted retries, and vector-disabled fallbacks using Koan in-memory adapters to guard the rebuilt flow.
 
-## 3. Execution Roadmap (Break & Rebuild Friendly)
-1. **Reactivate the module (Layer A)** – Wire up `Program.cs`, tighten options, and enrich boot diagnostics so hosted services and validators actually run.
-2. **Repair stage orchestration (Layer B)** – Swap in the polling worker, honor all processing stages, and align timeline/summaries with the blueprint’s expectations.
-3. **Stabilize data access (Layer C)** – Move diagnostics/insights onto repository-driven projections and seed vector/semantic data.
-4. **Complete AI/vector alignment (Layer D)** – Implement adapter-backed similarity, embed telemetry, and enforce model readiness checks.
-5. **Harden operations (Layer E)** – Deliver targeted retries, health checks, telemetry, and automated tests before refreshing docs/tooling.
+## 3. Execution Roadmap (Break-and-Rebuild Friendly)
+1. **Iteration 0 – Bootstrap Reactivation (Layer A)**: Activate module loading, tighten options validation, and extend boot diagnostics/health probes.
+2. **Iteration 1 – Stage-Oriented Worker (Layer B)**: Introduce the polling worker, persist work state, and emit full stage telemetry with targeted retries.
+3. **Iteration 2 – Repository-Driven Insights (Layer C)**: Deliver repository helpers, insight collections, and timeline alignment while retiring `All()` usages.
+4. **Iteration 3 – AI/Vector Completion (Layer D)**: Move suggestions to adapter-backed search, bootstrap semantic profiles, and add model readiness telemetry.
+5. **Iteration 4 – Operational Hardening (Layer E)**: Ship health checks, tracing, and integration tests before refreshing docs/tooling.
 
-Each milestone should leave the sample runnable (with temporary feature toggles if needed) while progressively restoring parity with the S13.DocMind proposal.
+Each milestone should leave the sample runnable (feature flags permitted) while progressively restoring parity with the S13.DocMind proposal.
