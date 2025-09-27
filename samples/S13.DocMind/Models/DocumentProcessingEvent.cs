@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Relationships;
 
 namespace S13.DocMind.Models;
 
@@ -9,10 +10,10 @@ namespace S13.DocMind.Models;
 /// Event stream entity capturing telemetry for each stage of document processing.
 /// Provides durable diagnostics powering the processing timeline and retry workflows.
 /// </summary>
-[Parent(typeof(SourceDocument))]
 public sealed class DocumentProcessingEvent : Entity<DocumentProcessingEvent>
 {
     [Required]
+    [Parent(typeof(SourceDocument))]
     public Guid SourceDocumentId { get; set; }
         = Guid.Empty;
 

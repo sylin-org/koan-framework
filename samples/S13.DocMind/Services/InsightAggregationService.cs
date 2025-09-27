@@ -22,7 +22,7 @@ public record AggregatedInsights(
 public interface IInsightAggregationService
 {
     Task<AggregatedInsights> AggregateAsync(
-        File file,
+        DocumentExtractionResult extractionResult,
         TemplateDefinition template,
         VisionInsightResult? visionResult,
         CancellationToken ct = default);
@@ -31,14 +31,14 @@ public interface IInsightAggregationService
 public sealed class InsightAggregationService : IInsightAggregationService
 {
     public Task<AggregatedInsights> AggregateAsync(
-        File file,
+        DocumentExtractionResult extractionResult,
         TemplateDefinition template,
         VisionInsightResult? visionResult,
         CancellationToken ct = default)
     {
-        if (file is null)
+        if (extractionResult is null)
         {
-            throw new ArgumentNullException(nameof(file));
+            throw new ArgumentNullException(nameof(extractionResult));
         }
 
         var summaryBuilder = new StringBuilder();
@@ -47,15 +47,15 @@ public sealed class InsightAggregationService : IInsightAggregationService
         var confidences = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         var diagnostics = new Dictionary<string, object>
         {
-            ["extractedTextLength"] = file.ExtractedText?.Length ?? 0,
+            ["extractedTextLength"] = extractionResult.Text?.Length ?? 0,
             ["templateName"] = template.Name,
             ["visionEnabled"] = visionResult is not null
         };
 
-        if (!string.IsNullOrWhiteSpace(file.ExtractedText))
+        if (!string.IsNullOrWhiteSpace(extractionResult.Text))
         {
-            summaryBuilder.AppendLine(file.ExtractedText!.Trim());
-            embeddingBuilder.AppendLine(file.ExtractedText.Trim());
+            summaryBuilder.AppendLine(extractionResult.Text!.Trim());
+            embeddingBuilder.AppendLine(extractionResult.Text.Trim());
         }
 
         if (visionResult is not null)

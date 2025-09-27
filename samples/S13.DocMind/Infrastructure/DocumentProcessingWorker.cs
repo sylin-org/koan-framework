@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using Koan.Data.Core;
 using Koan.Data.Vector;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -538,7 +539,7 @@ public sealed class DocumentProcessingWorker : BackgroundService
                 }
 
                 var visionContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                DocumentAnalysisDiagnostics.ApplyDiagnostics(visionMetrics, visionContext, visionResult.Diagnostics, "vision");
+                DocumentAnalysisDiagnostics.ApplyDiagnostics(visionMetrics, visionContext, (IReadOnlyDictionary<string, object?>)visionResult.Diagnostics, "vision");
                 if (visionResult.StructuredPayload.Count > 0)
                 {
                     visionContext["vision.structured"] = System.Text.Json.JsonSerializer.Serialize(visionResult.StructuredPayload);
@@ -758,7 +759,7 @@ public sealed class DocumentProcessingWorker : BackgroundService
                     Attempt: _job.Attempt,
                     CorrelationId: _job.CorrelationId,
                     Duration: duration,
-                    IsTerminal = true),
+                    IsTerminal: true),
                 cancellationToken).ConfigureAwait(false);
 
             await _refreshScheduler.EnsureRefreshAsync("processing-complete", cancellationToken).ConfigureAwait(false);

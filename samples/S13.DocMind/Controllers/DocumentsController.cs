@@ -127,7 +127,7 @@ public sealed class DocumentsController : EntityController<SourceDocument>
             : $"SourceDocumentId == '{documentGuid}' AND Channel == '{channel}'";
         var insights = await DocumentInsight.Query(query, cancellationToken).ConfigureAwait(false);
         var response = insights
-            .OrderByDescending(i => i.CreatedAt)
+            .OrderByDescending(i => i.GeneratedAt)
             .Select(i => new DocumentInsightResponse
             {
                 Id = i.Id,

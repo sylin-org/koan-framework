@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Data.Core;
 using Koan.Data.Vector;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

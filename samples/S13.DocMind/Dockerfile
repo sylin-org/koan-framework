@@ -6,11 +6,14 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-# Copy project file and restore dependencies
+# Copy all project files for proper dependency resolution
 COPY ["samples/S13.DocMind/S13.DocMind.csproj", "samples/S13.DocMind/"]
+COPY ["src/", "src/"]
+
+# Restore dependencies
 RUN dotnet restore "samples/S13.DocMind/S13.DocMind.csproj"
 
-# Copy source code
+# Copy remaining source code
 COPY . .
 WORKDIR "/src/samples/S13.DocMind"
 

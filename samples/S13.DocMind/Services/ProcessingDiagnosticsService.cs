@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Data.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S13.DocMind.Infrastructure;
@@ -354,7 +355,7 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
         await job.Save(cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Retry queued for document {DocumentId}", documentId);
-        return ProcessingRetryResult.Success(document.Id, document.Status);
+        return ProcessingRetryResult.Succeed(document.Id, document.Status);
     }
 
     public async Task<ProcessingReplayResult> ReplayAsync(ProcessingReplayRequest request, CancellationToken cancellationToken)
@@ -568,7 +569,7 @@ public sealed class ProcessingRetryResult
     public static ProcessingRetryResult NotFound(string documentId)
         => new(false, documentId, null, "Document not found");
 
-    public static ProcessingRetryResult Success(string documentId, DocumentProcessingStatus status)
+    public static ProcessingRetryResult Succeed(string documentId, DocumentProcessingStatus status)
         => new(true, documentId, status, null);
 }
 

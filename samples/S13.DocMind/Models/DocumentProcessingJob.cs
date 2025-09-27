@@ -5,6 +5,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Relationships;
+using Koan.Mcp;
 
 namespace S13.DocMind.Models;
 

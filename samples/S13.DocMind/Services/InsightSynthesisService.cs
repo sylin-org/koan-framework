@@ -314,7 +314,7 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
 
                     var metadata = BuildMetadata(response, "entity");
                     metadata["entityType"] = type;
-                    insights.Add(CreateInsight(documentId, name, entity.TryGetProperty("summary", out var summaryElement) ? summaryElement.GetString() ?? string.Empty : string.Empty, "entity", confidence, metadata, structured));
+                    insights.Add(CreateInsight(documentId, name, entity.TryGetProperty("summary", out var entitySummaryElement) ? entitySummaryElement.GetString() ?? string.Empty : string.Empty, "entity", confidence, metadata, structured));
                 }
             }
 

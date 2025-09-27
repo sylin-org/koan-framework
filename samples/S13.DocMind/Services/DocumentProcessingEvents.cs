@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Koan.Data.Core;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;

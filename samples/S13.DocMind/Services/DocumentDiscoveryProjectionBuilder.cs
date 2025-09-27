@@ -151,7 +151,7 @@ public static class DocumentDiscoveryProjectionBuilder
                     .ToArray();
 
                 var confidenceValues = documentIds
-                    .SelectMany(id => insightsByDocument.TryGetValue(id, out var list) ? list : Array.Empty<DocumentInsight>())
+                    .SelectMany<Guid, DocumentInsight>(id => insightsByDocument.TryGetValue(id, out var list) ? list : Array.Empty<DocumentInsight>())
                     .Where(insight => insight.Confidence.HasValue)
                     .Select(insight => insight.Confidence!.Value)
                     .ToList();

@@ -24,55 +24,30 @@ REM Use modern "docker compose" if available, else fallback to legacy "docker-co
 for /f "tokens=*" %%i in ('docker compose version 2^>nul') do set HAS_DOCKER_COMPOSE_CLI=1
 if defined HAS_DOCKER_COMPOSE_CLI (
   echo Using "docker compose" CLI
-  echo Building and starting infrastructure services...
+  echo Building and starting all services...
   docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build || goto :error
-  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
+  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d mongodb weaviate ollama || goto :error
 ) else (
   where docker-compose >nul 2>nul || goto :nolegacy
   echo Using legacy "docker-compose" CLI
-  echo Building and starting infrastructure services...
+  echo Building and starting all services...
   docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build || goto :error
-  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
+  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d mongodb weaviate ollama || goto :error
 )
 
-REM Wait for infrastructure services
+REM Wait for infrastructure services to be ready
 echo Waiting for infrastructure services to be ready...
-timeout /t 10 >nul
+timeout /t 15 >nul
 
-REM Check if dotnet is available for local development
-where dotnet >nul 2>nul
-if not errorlevel 1 (
-  echo .NET 8 SDK found. Starting S13.DocMind API locally...
-
-  set ASPNETCORE_ENVIRONMENT=Development
-  set ASPNETCORE_URLS=%DOTNET_URLS%
-
-  echo Restoring dependencies...
-  dotnet restore S13.DocMind.csproj || goto :error
-
-  echo Running application...
-  start /b dotnet run --project S13.DocMind.csproj --urls="%DOTNET_URLS%"
-
-  REM Wait a bit for the app to start
-  timeout /t 5 >nul
+echo Starting S13.DocMind API via Docker Compose...
+if defined HAS_DOCKER_COMPOSE_CLI (
+  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d app || goto :error
 ) else (
-  echo .NET 8 SDK not found. Using containerized deployment...
-
-  echo Building Docker image...
-  docker build -t s13-docmind:latest -f Dockerfile ../../.. || goto :error
-
-  REM Stop any existing API container
-  for /f "tokens=*" %%i in ('docker ps -q --filter name=s13-docmind-api 2^>nul') do (
-    docker stop s13-docmind-api >nul 2>&1
-    docker rm s13-docmind-api >nul 2>&1
-  )
-
-  echo Starting API container...
-  docker run -d --name s13-docmind-api --network s13_docmind_network -p 5000:5000 -e ASPNETCORE_ENVIRONMENT=Development -e "Koan__Data__Providers__mongodb__connectionString=mongodb://mongodb:27017" -e "Koan__Data__Providers__weaviate__endpoint=http://weaviate:8080" -e "Koan__AI__Providers__ollama__baseUrl=http://ollama:11434" s13-docmind:latest || goto :error
-
-  set API_URL=http://localhost:5000/health
-  set OPEN_URL=http://localhost:5000/swagger
+  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d app || goto :error
 )
+
+set API_URL=http://localhost:5120/health
+set OPEN_URL=http://localhost:5120/swagger
 
 echo Waiting for API to be ready at %API_URL% ...
 where curl >nul 2>nul && set HAS_CURL=1

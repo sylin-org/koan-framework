@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Data.Core;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Infrastructure.Repositories;

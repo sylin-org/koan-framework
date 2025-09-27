@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;
+using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
 using Microsoft.Extensions.Logging;

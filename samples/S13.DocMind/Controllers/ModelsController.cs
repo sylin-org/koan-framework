@@ -7,6 +7,7 @@ using Koan.AI.Contracts.Adapters;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using S13.DocMind.Contracts;
+using S13.DocMind.Services;
 
 namespace S13.DocMind.Controllers;
 

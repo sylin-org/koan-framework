@@ -10,6 +10,7 @@ using S13.DocMind.Contracts;
 using S13.DocMind.Infrastructure;
 using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
+using Koan.Data.Core;
 
 namespace S13.DocMind.Services;
 
@@ -157,7 +158,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
 
         document.AssignedProfileId = profileId;
         document.AssignedBySystem = acceptSuggestion;
-        document.UpdatedAt = _clock.GetUtcNow();
+        document.LastProcessedAt = _clock.GetUtcNow();
         await document.Save(cancellationToken).ConfigureAwait(false);
 
         var documentId = Guid.Parse(document.Id);

@@ -1,6 +1,8 @@
 using System;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Relationships;
+using Koan.Data.Vector.Abstractions;
 
 namespace S13.DocMind.Models;
 
@@ -18,7 +20,7 @@ public sealed class DocumentChunkEmbedding : Entity<DocumentChunkEmbedding>
     public Guid SourceDocumentId { get; set; }
         = Guid.Empty;
 
-    [Vector(Dimensions = 1536, IndexType = "HNSW")]
+    [VectorEmbedding]
     public float[] Embedding { get; set; }
         = Array.Empty<float>();
 
@@ -36,7 +38,7 @@ public sealed class SemanticTypeEmbedding : Entity<SemanticTypeEmbedding>
     public Guid SemanticTypeProfileId { get; set; }
         = Guid.Empty;
 
-    [Vector(Dimensions = 1536, IndexType = "HNSW")]
+    [VectorEmbedding]
     public float[] Embedding { get; set; }
         = Array.Empty<float>();
 

@@ -21,7 +21,7 @@ public record TemplateDefinition(
 
 public interface ITemplateGeneratorService
 {
-    Task<TemplateDefinition> ResolveTemplateAsync(DocumentType? type, CancellationToken ct = default);
+    Task<TemplateDefinition> ResolveTemplateAsync(SemanticTypeProfile? profile, CancellationToken ct = default);
 }
 
 public sealed class TemplateGeneratorService : ITemplateGeneratorService
@@ -33,47 +33,46 @@ public sealed class TemplateGeneratorService : ITemplateGeneratorService
         _logger = logger;
     }
 
-    public Task<TemplateDefinition> ResolveTemplateAsync(DocumentType? type, CancellationToken ct = default)
+    public Task<TemplateDefinition> ResolveTemplateAsync(SemanticTypeProfile? profile, CancellationToken ct = default)
     {
-        if (type is null)
+        if (profile is null)
         {
-            _logger.LogDebug("Falling back to default template definition because no document type was assigned.");
+            _logger.LogDebug("Falling back to default template definition because no semantic type profile was assigned.");
             return Task.FromResult(TemplateDefinition.Empty);
         }
 
-        var metadata = new Dictionary<string, object>(type.ModelSettings, StringComparer.OrdinalIgnoreCase)
+        var metadata = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        // Copy profile metadata
+        foreach (var kvp in profile.Metadata)
         {
-            ["prompt"] = type.AnalysisPrompt,
-            ["requiredFields"] = type.RequiredFields,
-            ["optionalFields"] = type.OptionalFields
-        };
+            metadata[kvp.Key] = kvp.Value;
+        }
+
+        // Add prompt information
+        metadata["systemPrompt"] = profile.Prompt.SystemPrompt;
+        metadata["userTemplate"] = profile.Prompt.UserTemplate;
+        metadata["variables"] = profile.Prompt.Variables;
 
         var fields = new List<TemplateField>();
-        foreach (var field in type.RequiredFields)
-        {
-            fields.Add(new TemplateField(field, "Required field identified in template", required: true));
-        }
 
-        foreach (var field in type.OptionalFields)
+        // Extract fields from the extraction schema
+        if (profile.ExtractionSchema?.Fields is { Count: > 0 })
         {
-            if (fields.All(f => !string.Equals(f.Name, field, StringComparison.OrdinalIgnoreCase)))
+            foreach (var kvp in profile.ExtractionSchema.Fields)
             {
-                fields.Add(new TemplateField(field, "Optional field identified in template", required: false));
-            }
-        }
-
-        if (type.ExtractionSchema is { Count: > 0 })
-        {
-            foreach (var kvp in type.ExtractionSchema)
-            {
-                var required = type.RequiredFields.Any(f => string.Equals(f, kvp.Key, StringComparison.OrdinalIgnoreCase));
-                fields.Add(new TemplateField(kvp.Key, "Schema defined field", required, kvp.Value?.ToString() ?? "string"));
+                var fieldDef = kvp.Value;
+                fields.Add(new TemplateField(
+                    kvp.Key,
+                    fieldDef.Description ?? "Schema defined field",
+                    fieldDef.Required,
+                    fieldDef.Type));
             }
         }
 
         var template = new TemplateDefinition(
-            Name: type.Name,
-            Description: type.Description,
+            Name: profile.Name,
+            Description: profile.Description,
             Fields: fields,
             Metadata: metadata);
 

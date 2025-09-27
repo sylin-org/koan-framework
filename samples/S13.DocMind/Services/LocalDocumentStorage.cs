@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S13.DocMind.Infrastructure;
+using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;
 
@@ -28,7 +29,7 @@ public sealed class LocalDocumentStorage : IDocumentStorage
 
         await using var fileStream = File.Create(destination);
         string hash;
-        await using (var hashAlgorithm = SHA512.Create())
+        using (var hashAlgorithm = SHA512.Create())
         {
             await using var cryptoStream = new CryptoStream(fileStream, hashAlgorithm, CryptoStreamMode.Write, leaveOpen: true);
             await content.CopyToAsync(cryptoStream, cancellationToken);
