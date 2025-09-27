@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
 using S13.DocMind.Models;
@@ -44,7 +46,8 @@ public sealed class TimelineEntryResponse
     public required DocumentProcessingStatus Status { get; init; }
     public required string Detail { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
-    public Dictionary<string, string> Context { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<string, string> Context { get; init; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<string, double> Metrics { get; init; } = new Dictionary<string, double>();
 }
 
 public sealed class DocumentChunkResponse
@@ -75,6 +78,8 @@ public sealed class DocumentInsightResponse
     public double? Confidence { get; init; }
     public string? Section { get; init; }
     public DateTimeOffset GeneratedAt { get; init; }
+    public IReadOnlyDictionary<string, object?> StructuredPayload { get; init; } = new Dictionary<string, object?>();
+    public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed class TemplateGenerationRequest

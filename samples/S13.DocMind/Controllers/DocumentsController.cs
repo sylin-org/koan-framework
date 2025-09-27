@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using S13.DocMind.Contracts;
+using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 using S13.DocMind.Services;
 using Koan.Web.Controllers;
@@ -55,7 +56,7 @@ public sealed class DocumentsController : EntityController<SourceDocument>
             return BadRequest();
         }
 
-        var events = await DocumentProcessingEvent.Query($"SourceDocumentId == '{documentGuid}'", cancellationToken).ConfigureAwait(false);
+        var events = await ProcessingEventRepository.GetTimelineAsync(documentGuid, null, null, null, cancellationToken).ConfigureAwait(false);
         var response = events
             .OrderBy(e => e.CreatedAt)
             .Select(e => new TimelineEntryResponse
@@ -64,7 +65,8 @@ public sealed class DocumentsController : EntityController<SourceDocument>
                 Status = e.Status,
                 Detail = e.Detail ?? string.Empty,
                 CreatedAt = e.CreatedAt,
-                Context = e.Context
+                Context = new Dictionary<string, string>(e.Context, StringComparer.OrdinalIgnoreCase),
+                Metrics = new Dictionary<string, double>(e.Metrics)
             })
             .ToList();
         return Ok(response);
@@ -134,7 +136,9 @@ public sealed class DocumentsController : EntityController<SourceDocument>
                 Confidence = i.Confidence,
                 Channel = i.Channel,
                 Section = i.Section,
-                GeneratedAt = i.GeneratedAt
+                GeneratedAt = i.GeneratedAt,
+                StructuredPayload = new Dictionary<string, object?>(i.StructuredPayload),
+                Metadata = new Dictionary<string, string>(i.Metadata, StringComparer.OrdinalIgnoreCase)
             })
             .ToList();
 

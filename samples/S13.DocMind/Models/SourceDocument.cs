@@ -30,15 +30,9 @@ public sealed class SourceDocument : Entity<SourceDocument>
     [Required, StringLength(128, MinimumLength = 128)]
     public string Sha512 { get; set; } = string.Empty;
 
-    [MaxLength(120)]
-    public string StorageBucket { get; set; } = "local";
-
-    [MaxLength(512)]
-    public string StorageObjectKey { get; set; } = string.Empty;
-
-    [MaxLength(120)]
-    public string? StorageVersionId { get; set; }
-        = null;
+    [Column(TypeName = "jsonb")]
+    public DocumentStorageLocation Storage { get; set; }
+        = DocumentStorageLocation.Empty;
 
     public DocumentProcessingStatus Status { get; set; }
         = DocumentProcessingStatus.Uploaded;
@@ -83,7 +77,19 @@ public sealed class DocumentProcessingSummary
     public bool VisionExtracted { get; set; }
         = false;
 
+    public bool ContainsImages { get; set; }
+        = false;
+
     public double? AutoClassificationConfidence { get; set; }
+        = null;
+
+    public DocumentProcessingStage? LastCompletedStage { get; set; }
+        = null;
+
+    public DocumentProcessingStatus? LastKnownStatus { get; set; }
+        = null;
+
+    public DateTimeOffset? LastStageCompletedAt { get; set; }
         = null;
 
     [MaxLength(2000)]
@@ -132,6 +138,46 @@ public sealed class ChunkReference
     [MaxLength(120)]
     public string? Section { get; set; }
         = null;
+}
+
+/// <summary>
+/// Immutable storage descriptor persisted with a document to locate the binary in the configured provider.
+/// </summary>
+public sealed class DocumentStorageLocation
+{
+    public static DocumentStorageLocation Empty { get; } = new();
+
+    [MaxLength(100)]
+    public string Provider { get; set; } = "local";
+
+    [MaxLength(120)]
+    public string Bucket { get; set; } = "local";
+
+    [MaxLength(512)]
+    public string ObjectKey { get; set; } = string.Empty;
+
+    [MaxLength(160)]
+    public string? VersionId { get; set; }
+        = null;
+
+    [MaxLength(1024)]
+    public string? ProviderPath { get; set; }
+        = null;
+
+    public bool IsEmpty()
+        => string.IsNullOrWhiteSpace(ObjectKey) && string.IsNullOrWhiteSpace(ProviderPath);
+
+    public bool TryResolvePhysicalPath(out string path)
+    {
+        if (!string.IsNullOrWhiteSpace(ProviderPath))
+        {
+            path = ProviderPath!;
+            return true;
+        }
+
+        path = string.Empty;
+        return false;
+    }
 }
 
 /// <summary>

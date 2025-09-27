@@ -4,6 +4,7 @@ using Koan.Data.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using S13.DocMind.Services;
 
 namespace S13.DocMind.Infrastructure;
@@ -17,12 +18,14 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         services.AddKoanOptions<DocMindOptions>(DocMindOptions.Section);
+        services.AddSingleton<IValidateOptions<DocMindOptions>, DocMindOptionsValidator>();
 
         services.AddSingleton<IDocumentPipelineQueue, DocumentPipelineQueue>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
         services.AddScoped<IDocumentProcessingEventSink, DocumentProcessingEventRepositorySink>();
         services.AddScoped<IDocumentIntakeService, DocumentIntakeService>();
         services.AddScoped<ITextExtractionService, TextExtractionService>();
+        services.AddScoped<IVisionInsightService, VisionInsightService>();
         services.AddScoped<IInsightSynthesisService, InsightSynthesisService>();
         services.AddScoped<ITemplateSuggestionService, TemplateSuggestionService>();
         services.AddScoped<IEmbeddingGenerator, EmbeddingGenerator>();

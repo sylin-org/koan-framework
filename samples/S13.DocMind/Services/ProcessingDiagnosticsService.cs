@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using S13.DocMind.Infrastructure;
+using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;
@@ -41,26 +42,9 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
             return Array.Empty<ProcessingQueueItem>();
         }
 
-        var fetchTasks = snapshot
-            .Select(item => SourceDocument.Get(item.DocumentId.ToString(), cancellationToken))
-            .ToArray();
-
-        await Task.WhenAll(fetchTasks).ConfigureAwait(false);
-
-        var documents = new Dictionary<Guid, SourceDocument>();
-        for (var i = 0; i < fetchTasks.Length; i++)
-        {
-            var entity = fetchTasks[i].Result;
-            if (entity is null)
-            {
-                continue;
-            }
-
-            if (Guid.TryParse(entity.Id, out var parsed))
-            {
-                documents[parsed] = entity;
-            }
-        }
+        var documents = await SourceDocumentRepository
+            .GetManyAsync(snapshot.Select(item => item.DocumentId), cancellationToken)
+            .ConfigureAwait(false);
 
         var now = _clock.GetUtcNow();
 
@@ -96,34 +80,22 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
     public async Task<IReadOnlyCollection<ProcessingTimelineEntry>> GetTimelineAsync(ProcessingTimelineQuery query, CancellationToken cancellationToken)
     {
         var documents = await SourceDocument.All(cancellationToken).ConfigureAwait(false);
-        var events = await DocumentProcessingEvent.All(cancellationToken).ConfigureAwait(false);
+        var documentMap = documents
+            .Select(doc => new { Document = doc, Parsed = Guid.TryParse(doc.Id, out var id) ? id : (Guid?)null })
+            .Where(tuple => tuple.Parsed.HasValue)
+            .ToDictionary(tuple => tuple.Parsed!.Value, tuple => tuple.Document);
+        var events = await ProcessingEventRepository.GetTimelineAsync(
+            TryParseGuid(query.DocumentId),
+            query.Stage,
+            query.From,
+            query.To,
+            cancellationToken).ConfigureAwait(false);
 
-        var filteredEvents = events.AsEnumerable();
-        if (!string.IsNullOrWhiteSpace(query.DocumentId) && Guid.TryParse(query.DocumentId, out var docId))
-        {
-            filteredEvents = filteredEvents.Where(evt => evt.SourceDocumentId == docId);
-        }
-
-        if (query.Stage.HasValue)
-        {
-            filteredEvents = filteredEvents.Where(evt => evt.Stage == query.Stage.Value);
-        }
-
-        if (query.From.HasValue)
-        {
-            filteredEvents = filteredEvents.Where(evt => evt.CreatedAt >= query.From.Value);
-        }
-
-        if (query.To.HasValue)
-        {
-            filteredEvents = filteredEvents.Where(evt => evt.CreatedAt <= query.To.Value);
-        }
-
-        var grouped = filteredEvents
+        var grouped = events
             .GroupBy(evt => evt.SourceDocumentId)
             .Select(group =>
             {
-                var document = documents.FirstOrDefault(d => Guid.TryParse(d.Id, out var id) && id == group.Key);
+                documentMap.TryGetValue(group.Key, out var document);
                 return new ProcessingTimelineEntry
                 {
                     DocumentId = document?.Id ?? group.Key.ToString(),
@@ -178,6 +150,9 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
         document.Status = DocumentProcessingStatus.Queued;
         document.LastError = null;
         document.LastProcessedAt = _clock.GetUtcNow();
+        document.Summary.LastKnownStatus = DocumentProcessingStatus.Queued;
+        document.Summary.LastCompletedStage = DocumentProcessingStage.Aggregate;
+        document.Summary.LastStageCompletedAt = _clock.GetUtcNow();
         await document.Save(cancellationToken).ConfigureAwait(false);
 
         await _eventSink.RecordAsync(
@@ -195,6 +170,9 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
         _logger.LogInformation("Retry queued for document {DocumentId}", documentId);
         return ProcessingRetryResult.Success(document.Id, document.Status);
     }
+
+    private static Guid? TryParseGuid(string? value)
+        => Guid.TryParse(value, out var parsed) ? parsed : null;
 }
 
 public sealed class ProcessingTimelineQuery

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S13.DocMind.Contracts;
 using S13.DocMind.Infrastructure;
+using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;
@@ -64,10 +65,10 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         await using var stream = request.File.OpenReadStream();
         var stored = await _storage.SaveAsync(request.File.FileName, stream, cancellationToken);
 
-        var duplicate = await FindDuplicateAsync(stored.Hash, cancellationToken);
+        var duplicate = await SourceDocumentRepository.FindByHashAsync(stored.Hash ?? string.Empty, cancellationToken).ConfigureAwait(false);
         if (duplicate is not null)
         {
-            TryDelete(stored.Path);
+            await _storage.TryDeleteAsync(stored.ToLocation(), cancellationToken).ConfigureAwait(false);
             _logger.LogInformation(
                 "Detected duplicate upload {File} -> {DocumentId}",
                 request.File.FileName,
@@ -87,15 +88,20 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         var now = _clock.GetUtcNow();
         var document = new SourceDocument
         {
-            FileName = Path.GetFileName(stored.Path),
+            FileName = Path.GetFileName(stored.ObjectKey),
             DisplayName = request.File.FileName,
             ContentType = request.File.ContentType,
             FileSizeBytes = stored.Length,
             Sha512 = stored.Hash ?? string.Empty,
-            StorageBucket = stored.Provider,
-            StorageObjectKey = stored.Path,
+            Storage = stored.ToLocation(),
             UploadedAt = now,
-            Description = request.Description
+            Description = request.Description,
+            Summary =
+            {
+                LastCompletedStage = DocumentProcessingStage.Upload,
+                LastKnownStatus = DocumentProcessingStatus.Uploaded,
+                LastStageCompletedAt = now
+            }
         };
 
         if (request.Tags is { Count: > 0 })
@@ -189,25 +195,4 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         return _queue.EnqueueAsync(work, cancellationToken).AsTask();
     }
 
-    private static async Task<SourceDocument?> FindDuplicateAsync(string? sha512, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(sha512)) return null;
-        var query = await SourceDocument.Query($"Sha512 == '{sha512}'", cancellationToken).ConfigureAwait(false);
-        return query.FirstOrDefault();
-    }
-
-    private void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Unable to delete duplicate file {Path}", path);
-        }
-    }
 }

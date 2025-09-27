@@ -16,7 +16,7 @@ public sealed class LocalDocumentStorage : IDocumentStorage
         _logger = logger;
     }
 
-    public async Task<StoredDocumentLocation> SaveAsync(string fileName, Stream content, CancellationToken cancellationToken)
+    public async Task<StoredDocumentDescriptor> SaveAsync(string fileName, Stream content, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(fileName)) throw new ArgumentException("File name required", nameof(fileName));
 
@@ -40,24 +40,62 @@ public sealed class LocalDocumentStorage : IDocumentStorage
         var fileInfo = new FileInfo(destination);
         _logger.LogInformation("Stored document {File} ({Length} bytes) at {Path}", fileName, fileInfo.Length, destination);
 
-        return new StoredDocumentLocation
+        return new StoredDocumentDescriptor
         {
             Provider = "local",
-            Path = destination,
+            Bucket = _options.Storage.Bucket,
+            ObjectKey = hashedName,
+            ProviderPath = destination,
             Length = fileInfo.Length,
             Hash = hash
         };
     }
 
-    public Task<Stream> OpenReadAsync(StoredDocumentLocation location, CancellationToken cancellationToken)
+    public Task<Stream> OpenReadAsync(DocumentStorageLocation location, CancellationToken cancellationToken)
     {
         if (location is null) throw new ArgumentNullException(nameof(location));
-        Stream stream = File.OpenRead(location.Path);
+        if (!location.TryResolvePhysicalPath(out var path))
+        {
+            throw new FileNotFoundException("Storage path unavailable for provider", location.ObjectKey);
+        }
+
+        Stream stream = File.OpenRead(path);
         return Task.FromResult(stream);
     }
 
-    public Task<bool> ExistsAsync(StoredDocumentLocation location, CancellationToken cancellationToken)
-        => Task.FromResult(File.Exists(location.Path));
+    public Task<bool> ExistsAsync(DocumentStorageLocation location, CancellationToken cancellationToken)
+    {
+        if (location is null)
+        {
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(location.TryResolvePhysicalPath(out var path) && File.Exists(path));
+    }
+
+    public Task<bool> TryDeleteAsync(DocumentStorageLocation location, CancellationToken cancellationToken)
+    {
+        if (location is null || !location.TryResolvePhysicalPath(out var path))
+        {
+            return Task.FromResult(false);
+        }
+
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return Task.FromResult(false);
+            }
+
+            File.Delete(path);
+            return Task.FromResult(true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Unable to delete stored document at {Path}", path);
+            return Task.FromResult(false);
+        }
+    }
 
     private string EnsureBasePath()
     {

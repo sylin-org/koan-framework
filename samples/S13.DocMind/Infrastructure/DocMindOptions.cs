@@ -21,6 +21,10 @@ public sealed class DocMindOptions
         [Required]
         public string BasePath { get; set; } = "uploads";
 
+        [Required]
+        [StringLength(120)]
+        public string Bucket { get; set; } = "local";
+
         [Range(1, long.MaxValue)]
         public long MaxFileSizeBytes { get; set; } = 20 * 1024 * 1024;
 
@@ -37,18 +41,18 @@ public sealed class DocMindOptions
 
     public sealed class ProcessingOptions
     {
-        [Range(1, int.MaxValue)]
-        public int QueueCapacity { get; set; } = 64;
+        [Range(4, 1024)]
+        public int QueueCapacity { get; set; } = 48;
 
-        [Range(1, int.MaxValue)]
-        public int MaxConcurrency { get; set; } = Environment.ProcessorCount;
+        [Range(1, 64)]
+        public int MaxConcurrency { get; set; } = Math.Clamp(Environment.ProcessorCount, 1, 16);
 
-        [Range(128, 4096)]
-        public int ChunkSizeTokens { get; set; } = 800;
+        [Range(200, 2000)]
+        public int ChunkSizeTokens { get; set; } = 600;
 
         public bool EnableVisionExtraction { get; set; } = true;
 
-        [Range(1, 256)]
+        [Range(1, 64)]
         public int WorkerBatchSize { get; set; } = 4;
 
         [Range(1, 20)]
@@ -64,6 +68,9 @@ public sealed class DocMindOptions
         public double RetryBackoffMultiplier { get; set; } = 2.0;
 
         public bool RetryUseJitter { get; set; } = true;
+
+        [Range(1, 120)]
+        public int PollIntervalSeconds { get; set; } = 5;
     }
 
     public sealed class AiOptions

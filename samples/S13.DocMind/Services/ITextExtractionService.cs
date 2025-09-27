@@ -12,6 +12,8 @@ public sealed record DocumentExtractionResult(
     IReadOnlyList<ExtractedChunk> Chunks,
     int WordCount,
     int PageCount,
-    bool ContainsImages);
+    bool ContainsImages,
+    IReadOnlyDictionary<string, object?> Diagnostics,
+    string? Language = null);
 
-public sealed record ExtractedChunk(int Index, string Content, string? Summary);
+public sealed record ExtractedChunk(int Index, string Content, string? Summary, IReadOnlyDictionary<string, object?> Metadata);
