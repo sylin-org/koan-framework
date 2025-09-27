@@ -11,15 +11,22 @@
 ### ✅ **ALWAYS USE Entity<T> Patterns**
 
 ```csharp
-// ✅ CORRECT: Use Entity<T> with static methods
+// ✅ CORRECT: Use Entity<T> with auto GUID v7
 public class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
     public bool Completed { get; set; }
+    // Id automatically generated as GUID v7 on first access
+}
+
+// ✅ For custom keys: Entity<T,K>
+public class NumericEntity : Entity<NumericEntity, int>
+{
+    // Manual key management for specific scenarios
 }
 
 // Usage - ALWAYS use static entity methods
-var todo = new Todo { Title = "Buy milk" };
+var todo = new Todo { Title = "Buy milk" }; // ID auto-generated
 await todo.Save(); // Instance method for saving
 
 var allTodos = await Todo.All(); // Static method for querying
@@ -265,15 +272,24 @@ public static class FileHelper // Check if framework already has this!
 // ✅ CORRECT: Same code works with any data provider
 var todos = await Todo.All(); // Works with SQL, MongoDB, JSON, etc.
 
-// ✅ Check capabilities when needed
-var caps = Data<Todo, string>.QueryCaps;
-if (caps.SupportsComplexQueries)
+// ✅ Check capabilities and implement graceful fallbacks
+var capabilities = Data<Todo, string>.QueryCaps;
+if (capabilities.Capabilities.HasFlag(QueryCapabilities.LinqQueries))
 {
+    // Query will be pushed down to provider
     var result = await Todo.Query("complex filter");
 }
 else
 {
-    // Fallback to simpler queries
+    // Query will fallback to in-memory filtering
+    var all = await Todo.All();
+    var filtered = all.Where(t => /* simple filter */).ToList();
+}
+
+// ✅ Performance: Use streaming for large datasets
+await foreach (var todo in Todo.AllStream(batchSize: 1000))
+{
+    // Process in batches to avoid memory issues
 }
 ```
 
@@ -463,6 +479,34 @@ find . -name "KoanAutoRegistrar.cs" -exec head -20 {} \;
 
 # Verify bootstrap simplicity
 find . -name "Program.cs" -exec cat {} \;
+
+# Debug auto-registration issues
+docker logs koan-app --tail 20 --follow | grep "Koan:"
+# Look for: [INFO] Koan:modules data→mongodb
+#          [INFO] Koan:modules web→controllers
+
+# Container development workflow
+./start.bat  # Always use project start scripts, handles port conflicts
+```
+
+### **Debug Auto-Registration Issues**
+
+```csharp
+// ✅ Check if KoanAutoRegistrar is properly implemented
+// Missing symptoms: Service not found in DI container
+// Solution: Verify /Initialization/KoanAutoRegistrar.cs exists
+
+// ✅ Enable detailed boot reporting in Development
+if (KoanEnv.IsDevelopment) {
+    KoanEnv.DumpSnapshot(logger);
+    // Look for provider election decisions:
+    // [INFO] Koan:discover postgresql: server=localhost... OK
+    // [INFO] Koan:modules storage→postgresql
+}
+
+// ✅ Debug provider capabilities
+Logger.LogInformation("Query capabilities: {Capabilities}",
+    Data<Todo, string>.QueryCaps.Capabilities);
 ```
 
 ---
