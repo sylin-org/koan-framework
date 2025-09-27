@@ -1,22 +1,18 @@
 # S13.DocMind Next Steps (Proposal Delta)
 
-## Discovery Validation & Scheduler Tuning
-1. **Replay captured datasets.** Use the validation endpoint/CLI to drive the scheduler with production-sized corpora, confirming incremental accuracy and measuring refresh duration/backlog growth.【F:samples/S13.DocMind/Infrastructure/DocumentDiscoveryRefreshService.cs†L1-L180】【F:samples/S13.DocMind/Services/DocumentDiscoveryRefresher.cs†L1-L160】
-2. **Publish scheduler metrics.** Extend diagnostics/dashboards with the tracked pending counts, totals, and durations so operators can spot refresh drift in real time.【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L20-L360】
+## Observability & Telemetry Instrumentation
+1. **Register OpenTelemetry exporters and spans.** Update the registrar/startup to add tracing/metrics exporters and wrap the processing stages with spans so the compose/collector profile in the proposal can surface queue depth and latency dashboards.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L74-L77】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L23-L52】
+2. **Publish per-stage metrics through diagnostics.** Extend `ProcessingDiagnosticsService` to expose counters (processed, failed, average latency, embedding throughput) that Grafana can consume alongside vector/discovery readiness snapshots.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L74-L77】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L186-L220】
 
-## Replay Automation & Operator Tooling
-1. **Ship CLI/MCP bindings.** Finalise documentation and MCP wiring around the new CLI so operators and agents can queue replays/validations without custom scripts.【F:samples/S13.DocMind.Tools/Program.cs†L1-L140】【F:docs/chunks/S13-DocMind/04_api_ui_design.md†L6-L101】
-2. **Add replay tests.** Enable the pending integration test (and add fake-host unit tests) to ensure the ledger resumes at the requested stage across upgrades.【tests/S13.DocMind.IntegrationTests/ReplayWorkflowTests.cs†L1-L26】【F:docs/chunks/S13-DocMind/07_testing_ops.md†L40-L67】
+## Automated Validation & CI Coverage
+1. **Build the fake-provider harness.** Create Mongo/AI test doubles so unit and integration projects can exercise upload→completion end to end without external services, replacing the skipped replay test with deterministic coverage.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L5-L59】【F:tests/S13.DocMind.IntegrationTests/ReplayWorkflowTests.cs†L8-L22】
+2. **Wire regression runs into CI.** Add workflows (or update existing ones) that run the DocMind unit/integration suites plus CLI smoke commands, aligning with the release checklist expectations.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L61-L82】
 
-## Vector Resilience Coverage
-1. **Test adapter/fallback paths.** Add fake adapter smoke tests that validate semantic bootstrap, vector search, and cosine fallback behavior in CI.【F:samples/S13.DocMind/Infrastructure/DocumentVectorBootstrapper.cs†L1-L180】【tests/S13.DocMind.UnitTests/DocMindVectorHealthTests.cs†L1-L34】
-2. **Surface health snapshots.** Visualise the new `DocMindVectorHealth` metrics inside diagnostics dashboards so operators can monitor missing profiles and latency trends.【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L1-L520】
-
-## Telemetry & Test Suites
-1. **Wire OpenTelemetry exporters.** Register tracing/metrics exporters per the infrastructure guide so DocMind telemetry flows into Koan observability pipelines.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L40-L112】
-2. **Activate DocMind unit/integration tests.** Flesh out the new projects with fake-provider coverage and hook them into CI to guard the refactored pipeline.【tests/S13.DocMind.UnitTests/DocumentDiscoveryRefreshServiceTests.cs†L1-L80】【tests/S13.DocMind.IntegrationTests/ReplayWorkflowTests.cs†L1-L26】
+## Discovery Projection Performance Guardrails
+1. **Replay representative corpora.** Use the validation CLI to drive large datasets through the refresher, measuring refresh duration/backlog so we can tune thresholds before scaling; today a refresh still scans every document/insight when change detection fires.【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L22-L78】
+2. **Surface projection accuracy diagnostics.** Add comparisons (document counts, insight totals, queue age) between the cached projection and live collections so operators can detect drift before trusting dashboards.【F:docs/chunks/S13-DocMind/01_executive_overview.md†L78-L83】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L186-L220】
 
 ## Immediate Spikes
-- **Scheduler load rehearsal:** Capture a representative dataset and replay it through the validation endpoint to benchmark duration/backlog thresholds before codifying alerts.【F:samples/S13.DocMind/Services/DocumentDiscoveryRefresher.cs†L1-L160】
-- **Replay DX design:** Document the CLI/MCP flows to ensure stage targeting, payload shape, and error messaging meet operator expectations.【F:samples/S13.DocMind.Tools/Program.cs†L1-L140】【F:docs/chunks/S13-DocMind/04_api_ui_design.md†L6-L101】
-- **Vector health dashboards:** Sketch UI/diagnostic payloads that visualise the new `DocMindVectorHealth` snapshot so operators immediately see degraded modes.【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L1-L520】
+- **Telemetry wiring blueprint:** Prototype the OpenTelemetry configuration locally to confirm which exporters/instrumentation packages we need before committing changes.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L74-L77】
+- **In-memory pipeline fixture:** Sketch the fake AI/storage fixtures required to un-skip the replay test and cover a full happy-path document.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L5-L59】【F:tests/S13.DocMind.IntegrationTests/ReplayWorkflowTests.cs†L8-L22】
+- **Projection drift dashboarding:** Draft the additional diagnostics payloads (counts, freshness deltas) needed for reliable discovery dashboards before implementing them in the service layer.【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L22-L78】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L186-L220】
