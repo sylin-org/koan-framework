@@ -26,17 +26,24 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<DocumentInsight>> GenerateAsync(SourceDocument document, DocumentExtractionResult extraction, IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
+    public async Task<InsightSynthesisResult> GenerateAsync(SourceDocument document, DocumentExtractionResult extraction, IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
     {
         var insights = new List<DocumentInsight>();
+        var metrics = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["chunks.total"] = chunks.Count
+        };
+        var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var documentId = Guid.Parse(document.Id);
+        AiChatResponse? response = null;
+        var usedAi = false;
 
         if (_ai is not null && !string.IsNullOrWhiteSpace(extraction.Text))
         {
             try
             {
                 var prompt = BuildPrompt(document, extraction);
-                var response = await _ai.PromptAsync(new AiChatRequest
+                response = await _ai.PromptAsync(new AiChatRequest
                 {
                     Model = _options.Ai.DefaultModel,
                     Messages =
@@ -49,13 +56,24 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
                 if (!string.IsNullOrWhiteSpace(response.Text))
                 {
                     var aiInsights = ParseAiInsights(documentId, chunks, response);
-                    insights.AddRange(aiInsights);
+                    if (aiInsights.Count > 0)
+                    {
+                        insights.AddRange(aiInsights);
+                        metrics["insights.ai"] = aiInsights.Count;
+                        usedAi = true;
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "AI insight synthesis failed for document {DocumentId}", document.Id);
+                context["aiError"] = ex.GetType().Name;
             }
+        }
+
+        if (!usedAi)
+        {
+            context["mode"] = "fallback";
         }
 
         if (insights.Count == 0)
@@ -72,7 +90,7 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
             var fallback = sb.Length == 0
                 ? extraction.Text[..Math.Min(320, extraction.Text.Length)]
                 : sb.ToString();
-            var metadata = BuildMetadata(null, "fallback");
+            var metadata = BuildMetadata(response, "fallback");
             insights.Add(new DocumentInsight
             {
                 SourceDocumentId = documentId,
@@ -84,16 +102,21 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
                 StructuredPayload = new Dictionary<string, object?>
                 {
                     ["type"] = "summary",
-                    ["source"] = "fallback"
+                    ["source"] = usedAi ? "ai" : "fallback"
                 },
                 Metadata = metadata
             });
+            metrics["insights.fallback"] = 1;
+        }
+        else
+        {
+            context["mode"] = usedAi ? "ai" : context.GetValueOrDefault("mode", "fallback");
         }
 
         foreach (var chunk in chunks)
         {
             var chunkId = Guid.Parse(chunk.Id);
-            var metadata = BuildMetadata(null, "chunk-highlight");
+            var metadata = BuildMetadata(response, "chunk-highlight");
             metadata["chunkOrder"] = chunk.Order.ToString(CultureInfo.InvariantCulture);
             insights.Add(new DocumentInsight
             {
@@ -114,7 +137,37 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
             });
         }
 
-        return insights;
+        if (chunks.Count > 0)
+        {
+            metrics["insights.chunkHighlights"] = chunks.Count;
+        }
+
+        metrics["insights.total"] = insights.Count;
+
+        if (response is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(response.Model))
+            {
+                context["model"] = response.Model!;
+            }
+
+            if (response.TokensIn.HasValue)
+            {
+                context["tokensIn"] = response.TokensIn.Value.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (response.TokensOut.HasValue)
+            {
+                context["tokensOut"] = response.TokensOut.Value.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        return new InsightSynthesisResult(
+            insights,
+            metrics,
+            context,
+            response?.TokensIn,
+            response?.TokensOut);
     }
 
     private IReadOnlyList<DocumentInsight> ParseAiInsights(Guid documentId, IReadOnlyList<DocumentChunk> chunks, AiChatResponse response)

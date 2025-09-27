@@ -16,7 +16,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentInsightsOverview"
+                  "$ref": "#/components/schemas/DocumentInsightsOverviewResponse"
                 }
               }
             }
@@ -42,10 +42,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DocumentCollectionSummary"
-                  }
+                  "$ref": "#/components/schemas/DocumentProfileCollectionsResponse"
                 }
               }
             }
@@ -63,11 +60,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AggregationFeedItem"
-                  }
+                  "$ref": "#/components/schemas/DocumentAggregationFeedResponse"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/processing/config": {
+      "get": {
+        "summary": "Get processing configuration and readiness",
+        "operationId": "getProcessingConfig",
+        "responses": {
+          "200": {
+            "description": "Processing configuration",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProcessingConfigResponse" }
               }
             }
           }
@@ -78,15 +88,40 @@
       "get": {
         "summary": "Get processing queue diagnostics",
         "operationId": "getProcessingQueue",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "stage",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "style": "form",
+            "explode": true
+          },
+          { "name": "correlationId", "in": "query", "schema": { "type": "string" } },
+          { "name": "documentId", "in": "query", "schema": { "type": "string" } },
+          { "name": "includeCompleted", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "includeFuture", "in": "query", "schema": { "type": "boolean" } }
+        ],
         "responses": {
           "200": {
-            "description": "Queue items",
+            "description": "Queue page",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/ProcessingQueueItem" }
-                }
+                "schema": { "$ref": "#/components/schemas/ProcessingQueueResult" }
               }
             }
           }
@@ -98,8 +133,8 @@
         "summary": "Get processing timelines",
         "operationId": "getProcessingTimeline",
         "parameters": [
-          { "name": "documentTypeId", "in": "query", "schema": { "type": "string" } },
-          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "documentId", "in": "query", "schema": { "type": "string" } },
+          { "name": "stage", "in": "query", "schema": { "type": "string" } },
           { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
           { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
         ],
@@ -112,6 +147,54 @@
                   "type": "array",
                   "items": { "$ref": "#/components/schemas/ProcessingTimelineEntry" }
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/processing/replay": {
+      "post": {
+        "summary": "Replay document processing",
+        "operationId": "postProcessingReplay",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProcessingReplayRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replay accepted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProcessingReplayResult" }
+              }
+            }
+          },
+          "400": { "description": "Replay rejected" }
+        }
+      }
+    },
+    "/api/processing/discovery/validate": {
+      "post": {
+        "summary": "Validate discovery projections",
+        "operationId": "postProcessingDiscoveryValidate",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DocumentDiscoveryValidationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation summary",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DocumentDiscoveryValidationResult" }
               }
             }
           }
@@ -227,6 +310,15 @@
   },
   "components": {
     "schemas": {
+      "DocumentInsightsOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": { "type": "string", "format": "date-time" },
+          "refreshDurationSeconds": { "type": "number" },
+          "overview": { "$ref": "#/components/schemas/DocumentInsightsOverview" },
+          "queue": { "$ref": "#/components/schemas/DocumentQueueProjection" }
+        }
+      },
       "DocumentInsightsOverview": {
         "type": "object",
         "properties": {
@@ -235,12 +327,9 @@
           "activeDocuments": { "type": "integer" },
           "failedDocuments": { "type": "integer" },
           "averageConfidence": { "type": "number" },
-          "averageProcessingTimeMs": { "type": "number" },
-          "highQualityDocumentCount": { "type": "integer" },
-          "reviewRequiredCount": { "type": "integer" },
-          "topDocumentTypes": {
+          "topProfiles": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/DocumentTypeUsage" }
+            "items": { "$ref": "#/components/schemas/DocumentProfileUsage" }
           },
           "recentDocuments": {
             "type": "array",
@@ -248,32 +337,39 @@
           }
         }
       },
-      "DocumentTypeUsage": {
+      "DocumentProfileUsage": {
         "type": "object",
         "properties": {
-          "documentTypeId": { "type": "string" },
-          "documentTypeName": { "type": "string" },
-          "usageCount": { "type": "integer" },
+          "profileId": { "type": "string" },
+          "documentCount": { "type": "integer" },
           "lastUsed": { "type": "string", "format": "date-time" }
         }
       },
       "RecentDocumentInsight": {
         "type": "object",
         "properties": {
-          "fileId": { "type": "string" },
-          "name": { "type": "string" },
+          "documentId": { "type": "string" },
+          "fileName": { "type": "string" },
           "status": { "type": "string" },
-          "documentTypeId": { "type": "string" },
-          "completedDate": { "type": "string", "format": "date-time" },
-          "confidence": { "type": "number" }
+          "lastProcessedAt": { "type": "string", "format": "date-time" },
+          "assignedProfileId": { "type": "string" }
+        }
+      },
+      "DocumentProfileCollectionsResponse": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": { "type": "string", "format": "date-time" },
+          "refreshDurationSeconds": { "type": "number" },
+          "collections": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DocumentCollectionSummary" }
+          }
         }
       },
       "DocumentCollectionSummary": {
         "type": "object",
         "properties": {
-          "documentTypeId": { "type": "string" },
-          "documentTypeName": { "type": "string" },
-          "category": { "type": "string" },
+          "profileId": { "type": "string" },
           "documentCount": { "type": "integer" },
           "averageConfidence": { "type": "number" },
           "latestDocuments": {
@@ -285,29 +381,124 @@
       "CollectionDocumentSummary": {
         "type": "object",
         "properties": {
-          "fileId": { "type": "string" },
-          "name": { "type": "string" },
+          "documentId": { "type": "string" },
+          "fileName": { "type": "string" },
           "status": { "type": "string" },
-          "uploadDate": { "type": "string", "format": "date-time" },
-          "assignedDate": { "type": "string", "format": "date-time" },
-          "completedDate": { "type": "string", "format": "date-time" }
+          "lastProcessedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DocumentAggregationFeedResponse": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": { "type": "string", "format": "date-time" },
+          "refreshDurationSeconds": { "type": "number" },
+          "feed": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AggregationFeedItem" }
+          },
+          "queue": { "$ref": "#/components/schemas/DocumentQueueProjection" }
         }
       },
       "AggregationFeedItem": {
         "type": "object",
         "properties": {
-          "fileId": { "type": "string" },
+          "documentId": { "type": "string" },
           "fileName": { "type": "string" },
           "status": { "type": "string" },
-          "documentTypeId": { "type": "string" },
-          "documentTypeName": { "type": "string" },
-          "confidence": { "type": "number" },
           "summary": { "type": "string" },
           "lastUpdated": { "type": "string", "format": "date-time" },
-          "highlights": {
+          "insightCount": { "type": "integer" }
+        }
+      },
+      "DocumentQueueProjection": {
+        "type": "object",
+        "properties": {
+          "pending": { "type": "integer" },
+          "failed": { "type": "integer" },
+          "oldestQueuedAt": { "type": "string", "format": "date-time" },
+          "asOf": { "type": "string", "format": "date-time" },
+          "hasMore": { "type": "boolean" },
+          "pageSize": { "type": "integer" },
+          "entries": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DocumentQueueEntry" }
+          }
+        }
+      },
+      "DocumentQueueEntry": {
+        "type": "object",
+        "properties": {
+          "documentId": { "type": "string" },
+          "fileName": { "type": "string" },
+          "stage": { "type": "string" },
+          "status": { "type": "string" },
+          "enqueuedAt": { "type": "string", "format": "date-time" },
+          "nextAttemptAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ProcessingQueueResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProcessingQueueItem" }
+          },
+          "hasMore": { "type": "boolean" },
+          "asOf": { "type": "string", "format": "date-time" },
+          "page": { "type": "integer", "format": "int32" },
+          "pageSize": { "type": "integer", "format": "int32" },
+          "diagnostics": { "$ref": "#/components/schemas/ProcessingDiagnosticsSummary" }
+        }
+      },
+      "ProcessingConfigResponse": {
+        "type": "object",
+        "properties": {
+          "maxConcurrency": { "type": "integer" },
+          "workerBatchSize": { "type": "integer" },
+          "pollIntervalSeconds": { "type": "integer" },
+          "vector": { "$ref": "#/components/schemas/VectorReadinessResponse" },
+          "discovery": { "$ref": "#/components/schemas/DiscoveryRefreshResponse" }
+        }
+      },
+      "ProcessingDiagnosticsSummary": {
+        "type": "object",
+        "properties": {
+          "vector": { "$ref": "#/components/schemas/VectorReadinessResponse" },
+          "discovery": { "$ref": "#/components/schemas/DiscoveryRefreshResponse" }
+        }
+      },
+      "VectorReadinessResponse": {
+        "type": "object",
+        "properties": {
+          "adapterAvailable": { "type": "boolean" },
+          "fallbackActive": { "type": "boolean" },
+          "lastAuditAt": { "type": "string", "format": "date-time" },
+          "lastAuditError": { "type": "string" },
+          "missingProfiles": {
             "type": "array",
             "items": { "type": "string" }
-          }
+          },
+          "lastSearchLatencyMs": { "type": "number" },
+          "lastGenerationDurationMs": { "type": "number" },
+          "lastSearchAt": { "type": "string", "format": "date-time" },
+          "lastGenerationAt": { "type": "string", "format": "date-time" },
+          "lastAdapterModel": { "type": "string" }
+        }
+      },
+      "DiscoveryRefreshResponse": {
+        "type": "object",
+        "properties": {
+          "pending": { "type": "integer" },
+          "lastCompletedAt": { "type": "string", "format": "date-time" },
+          "lastDurationMs": { "type": "number" },
+          "lastError": { "type": "string" },
+          "lastQueuedAt": { "type": "string", "format": "date-time" },
+          "lastReason": { "type": "string" },
+          "lastStartedAt": { "type": "string", "format": "date-time" },
+          "totalCompleted": { "type": "integer", "format": "int64" },
+          "totalFailed": { "type": "integer", "format": "int64" },
+          "averageDurationMs": { "type": "number" },
+          "maxDurationMs": { "type": "number" }
         }
       },
       "ProcessingQueueItem": {
@@ -329,7 +520,80 @@
           "uploadedAt": { "type": "string", "format": "date-time" },
           "lastProcessedAt": { "type": "string", "format": "date-time" },
           "assignedProfileId": { "type": "string" },
-          "lastError": { "type": "string" }
+          "lastError": { "type": "string" },
+          "nextAttemptAt": { "type": "string", "format": "date-time" },
+          "stageTelemetry": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProcessingStageSnapshot" }
+          }
+        }
+      },
+      "DocumentDiscoveryValidationRequest": {
+        "type": "object",
+        "properties": {
+          "forceRefresh": { "type": "boolean" },
+          "refreshIfOlderThanMinutes": { "type": "integer", "format": "int32" },
+          "includeOverview": { "type": "boolean" },
+          "includeCollections": { "type": "boolean" },
+          "includeQueueEntries": { "type": "boolean" }
+        }
+      },
+      "DocumentDiscoveryValidationResult": {
+        "type": "object",
+        "properties": {
+          "validatedAt": { "type": "string", "format": "date-time" },
+          "projectionRefreshed": { "type": "boolean" },
+          "durationMs": { "type": "number" },
+          "projectionDurationSeconds": { "type": "number" },
+          "documentCount": { "type": "integer" },
+          "insightCount": { "type": "integer" },
+          "queueCount": { "type": "integer" },
+          "warnings": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "snapshot": { "$ref": "#/components/schemas/DiscoveryRefreshResponse" },
+          "overview": { "$ref": "#/components/schemas/DocumentInsightsOverview" },
+          "collections": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DocumentCollectionSummary" }
+          },
+          "queue": { "$ref": "#/components/schemas/DocumentQueueProjection" }
+        }
+      },
+      "ProcessingStageSnapshot": {
+        "type": "object",
+        "properties": {
+          "stage": { "type": "string" },
+          "lastStatus": { "type": "string" },
+          "lastQueuedAt": { "type": "string", "format": "date-time" },
+          "lastStartedAt": { "type": "string", "format": "date-time" },
+          "lastCompletedAt": { "type": "string", "format": "date-time" },
+          "lastDuration": { "type": "string", "format": "duration" },
+          "lastError": { "type": "string" },
+          "lastInputTokens": { "type": "integer", "format": "int64" },
+          "lastOutputTokens": { "type": "integer", "format": "int64" },
+          "lastCorrelationId": { "type": "string" },
+          "attemptCount": { "type": "integer", "format": "int32" },
+          "successCount": { "type": "integer", "format": "int32" },
+          "failureCount": { "type": "integer", "format": "int32" },
+          "attempts": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProcessingStageAttemptSnapshot" }
+          }
+        }
+      },
+      "ProcessingStageAttemptSnapshot": {
+        "type": "object",
+        "properties": {
+          "attempt": { "type": "integer", "format": "int32" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": "string", "format": "date-time" },
+          "status": { "type": "string" },
+          "duration": { "type": "string", "format": "duration" },
+          "error": { "type": "string" },
+          "inputTokens": { "type": "integer", "format": "int64" },
+          "outputTokens": { "type": "integer", "format": "int64" }
         }
       },
       "ProcessingTimelineEntry": {
@@ -372,7 +636,25 @@
       "ProcessingRetryRequest": {
         "type": "object",
         "properties": {
-          "force": { "type": "boolean" }
+          "force": { "type": "boolean" },
+          "stage": { "type": "string", "nullable": true }
+        }
+      },
+      "ProcessingReplayRequest": {
+        "type": "object",
+        "properties": {
+          "documentId": { "type": "string" },
+          "stage": { "type": "string" },
+          "reset": { "type": "boolean" }
+        }
+      },
+      "ProcessingReplayResult": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "documentId": { "type": "string" },
+          "stage": { "type": "string" }
         }
       },
       "ModelDescriptor": {

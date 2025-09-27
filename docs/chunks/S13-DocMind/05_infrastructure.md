@@ -55,7 +55,7 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
         services.AddScoped<ITemplateSuggestionService, TemplateSuggestionService>();
 
         // Background workers
-        services.AddHostedService<DocumentAnalysisPipeline>();
+        services.AddHostedService<DocumentProcessingWorker>();
         services.AddHostedService<DocumentVectorBootstrapper>();
     }
 
@@ -72,7 +72,7 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
 
 | Section | Purpose | Sample Keys |
 |---------|---------|-------------|
-| `DocMind:Processing` | Queue limits, retry policy, concurrency | `QueueLimit`, `MaxDegreeOfParallelism`, `MaxRetries`, `BackoffSeconds` |
+| `DocMind:Processing` | Worker batch size, retry policy, concurrency | `WorkerBatchSize`, `MaxConcurrency`, `MaxRetryAttempts`, `PollIntervalSeconds` |
 | `DocMind:Storage` | Storage provider selection | `Kind=FileSystem`, `Bucket`, `RootPath` |
 | `DocMind:Vision` | Toggle vision processing | `Enabled`, `Model`, `MaxImagePixels` |
 | `DocMind:Embedding` | Embedding provider configuration | `Provider=Weaviate`, `Endpoint`, `ApiKey` |

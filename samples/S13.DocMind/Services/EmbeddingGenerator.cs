@@ -21,27 +21,29 @@ public sealed class EmbeddingGenerator : IEmbeddingGenerator
         _logger = logger;
     }
 
-    public async Task<float[]?> GenerateAsync(string text, CancellationToken cancellationToken)
+    public async Task<EmbeddingGenerationResult> GenerateAsync(string text, CancellationToken cancellationToken)
     {
         if (_ai is null || string.IsNullOrWhiteSpace(text))
         {
-            return null;
+            return EmbeddingGenerationResult.Empty;
         }
 
         try
         {
+            var started = DateTimeOffset.UtcNow;
             var response = await _ai.EmbedAsync(new AiEmbeddingsRequest
             {
                 Model = _options.Ai.EmbeddingModel,
                 Input = { text }
             }, cancellationToken).ConfigureAwait(false);
 
-            return response.Vectors.FirstOrDefault();
+            var duration = DateTimeOffset.UtcNow - started;
+            return new EmbeddingGenerationResult(response.Vectors.FirstOrDefault(), duration, response.Model);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Embedding generation failed");
-            return null;
+            return EmbeddingGenerationResult.Empty;
         }
     }
 }

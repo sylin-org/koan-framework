@@ -1,26 +1,22 @@
-# S13.DocMind Next Steps (Aligned to Updated Refactoring Plan)
+# S13.DocMind Next Steps (Proposal Delta)
 
-## Iteration 0 – Bootstrap Optimization & Health Probes
-1. Leverage minimal `AddKoan()` pattern in `Program.cs` which automatically discovers and initializes `DocMindRegistrar` without manual assembly loading or explicit service registration. 【F:samples/S13.DocMind/Program.cs†L1-L9】
-2. Move options configuration into `DocMindRegistrar.Initialize()` following "Reference = Intent" where modules manage their own dependencies. 【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L24-L25】
-3. Extend `DocMindRegistrar.Describe` to run storage/vector/AI readiness checks and surface them in the boot report alongside existing configuration.
+## Domain & Client Alignment
+1. **Stand up the domain assembly and migrations.** Create the `S13.DocMind.Domain` project, move entity/value-object definitions out of the web sample, and add bootstrap/migration routines that project legacy `files` data into the new schema outlined in the proposal.【F:docs/chunks/S13-DocMind/06_implementation.md†L22-L26】【F:samples/S13.DocMind/Models/SourceDocument.cs†L1-L142】
+2. **Regenerate contracts for UI and MCP clients.** Run `dotnet koan client` (and matching MCP tooling) once the domain DTOs stabilise so Angular/TypeScript consumers match the new API surface, documenting any breaking changes for workshop scripts.【F:docs/chunks/S13-DocMind/06_implementation.md†L34-L44】
 
-## Iteration 1 – Stage-Oriented Worker & Targeted Retries
-1. Replace the channel-backed queue with the polling worker pattern, persisting work state per document/stage and honoring concurrency from options. 【F:samples/S13.DocMind/Infrastructure/DocumentPipelineQueue.cs†L1-L221】
-2. Emit explicit `Deduplicate`, `GenerateEmbeddings`, and aggregation events from `DocumentAnalysisPipeline`, updating `SourceDocument.Summary` after each stage. 【F:samples/S13.DocMind/Infrastructure/DocumentAnalysisPipeline.cs†L37-L345】
-3. Update diagnostics APIs so requeue requests resume from the requested stage instead of always restarting at extraction. 【F:samples/S13.DocMind/Services/DocumentIntakeService.cs†L172-L197】
+## Discovery & Analytics Fidelity
+1. **Implement incremental projections.** Replace the full-scan `DocumentDiscoveryProjectionBuilder` with targeted aggregates (`InsightCollection`, queue snapshots) that track deltas and persist freshness metadata for validation endpoints.【F:docs/chunks/S13-DocMind/02_entity_models.md†L6-L45】【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L22-L89】
+2. **Add drift diagnostics and guardrails.** Extend diagnostics endpoints to compare cached projections with live counts/latency so operators can detect backlog or staleness before dashboards go stale.【F:docs/chunks/S13-DocMind/01_executive_overview.md†L78-L83】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L54-L133】
 
-## Iteration 2 – Repository-Driven Data Access
-1. Introduce repositories for documents, chunks, insights, and processing events that push filters/pagination server-side, removing `Entity<T>.All()` usage in discovery services. 【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L28-L149】
-2. Rebuild aggregation feeds on top of the new repositories and materialized insight collections to avoid recomputing metrics per request.
-3. Move the processing timeline endpoint to the repository API with windowing so MCP tooling can page through events. 【F:samples/S13.DocMind/Infrastructure/Repositories/ProcessingEventRepository.cs†L12-L45】
+## Observability & Operational Automation
+1. **Wire OpenTelemetry and compose instrumentation.** Add tracing/metrics exporters, wrap worker stages with spans, and document the otel-collector compose profile so dashboards from the infrastructure plan can light up.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L90-L109】【F:samples/S13.DocMind/Program.cs†L1-L9】
+2. **Publish operational scripts and profiles.** Deliver the reset script, compose overrides, and environment variable documentation promised in the infrastructure plan so teams can bootstrap, disable features, or reset data reliably.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L5-L13】
 
-## Iteration 3 – AI & Vector Completion
-1. Swap template suggestion scoring to `Vector<SemanticTypeEmbedding>.SearchAsync`, capturing adapter diagnostics and emitting `GenerateEmbeddings` timeline events. 【F:samples/S13.DocMind/Services/TemplateSuggestionService.cs†L94-L209】
-2. Expand vector bootstrapping to ensure semantic profile embeddings are created/refreshed alongside chunk indices. 【F:samples/S13.DocMind/Infrastructure/DocumentVectorBootstrapper.cs†L1-L34】
-3. Capture AI model readiness and latency metrics during boot and processing, wiring them into processing events for diagnostics.
+## Testing & Contract Coverage
+1. **Add HTTP-level integration and contract tests.** Introduce `WebApplicationFactory`-based tests that exercise upload→completion via HTTP, generate OpenAPI/MCP manifests in CI, and diff them against the committed baseline.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L1-L67】
+2. **Automate pipelines and smoke scripts.** Update CI to run unit/integration suites, CLI smoke commands, and artifact publication so the release checklist’s quality gates become repeatable automation instead of manual steps.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L61-L82】
 
-## Iteration 4 – Operational Hardening & Quality
-1. Add Koan health checks for storage, vector adapters, AI providers, and queue backlog thresholds; surface results through MCP/UI endpoints.
-2. Wrap pipeline stages with OpenTelemetry spans and persist duration/token metrics in `DocumentProcessingEvent` records.
-3. Author integration tests covering upload→completion, targeted retries, and vector-disabled fallbacks using in-memory providers to guard the rebuilt pipeline.
+## Immediate Spikes
+- **Domain migration design:** Prototype how existing Mongo collections migrate into the proposed `SourceDocument`/`DocumentProcessingJob` schema without downtime.【F:docs/chunks/S13-DocMind/06_implementation.md†L22-L26】
+- **Projection workload modelling:** Capture metrics from a representative dataset to size incremental discovery projections and validate refresh thresholds before implementation.【F:docs/chunks/S13-DocMind/02_entity_models.md†L6-L45】
+- **Telemetry exporter selection:** Experiment with Koan’s OpenTelemetry hooks locally to choose the exporter stack (OTLP, console, or Prometheus) that best matches the compose environment.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L90-L109】

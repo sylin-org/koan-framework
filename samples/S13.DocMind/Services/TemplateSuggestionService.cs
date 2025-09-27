@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;
+using Koan.Data.Vector;
+using Koan.Data.Vector.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S13.DocMind.Contracts;
@@ -18,13 +20,15 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
     private readonly IAi? _ai;
     private readonly DocMindOptions _options;
     private readonly IEmbeddingGenerator _embeddingGenerator;
+    private readonly DocMindVectorHealth _vectorHealth;
     private readonly ILogger<TemplateSuggestionService> _logger;
 
-    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, IEmbeddingGenerator embeddingGenerator, ILogger<TemplateSuggestionService> logger)
+    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, IEmbeddingGenerator embeddingGenerator, DocMindVectorHealth vectorHealth, ILogger<TemplateSuggestionService> logger)
     {
         _ai = serviceProvider.GetService<IAi>();
         _options = options.Value;
         _embeddingGenerator = embeddingGenerator;
+        _vectorHealth = vectorHealth;
         _logger = logger;
     }
 
@@ -123,77 +127,42 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
 
     public async Task<IReadOnlyList<DocumentProfileSuggestion>> SuggestAsync(SourceDocument document, IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
     {
-        var suggestions = new List<DocumentProfileSuggestion>();
+        var documentVector = await BuildDocumentVectorAsync(chunks, cancellationToken).ConfigureAwait(false);
+        if (!documentVector.HasEmbedding)
+        {
+            return Array.Empty<DocumentProfileSuggestion>();
+        }
 
         if (!Vector<SemanticTypeEmbedding>.IsAvailable)
         {
-            _logger.LogDebug("Vector adapter unavailable; skipping template suggestions.");
+            _logger.LogDebug("Vector adapter unavailable; using cosine fallback for suggestions.");
+            _vectorHealth.RecordSearch(TimeSpan.Zero, fallback: true);
+            return await SuggestWithCosineFallbackAsync(documentVector.Embedding!, cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            var searchStarted = DateTimeOffset.UtcNow;
+            var result = await Vector<SemanticTypeEmbedding>
+                .Search(new VectorQueryOptions(documentVector.Embedding!, TopK: 8), cancellationToken)
+                .ConfigureAwait(false);
+            var latencyMs = (DateTimeOffset.UtcNow - searchStarted).TotalMilliseconds;
+            _vectorHealth.RecordSearch(TimeSpan.FromMilliseconds(latencyMs), fallback: false);
+
+            if (result.Matches.Count == 0)
+            {
+                return Array.Empty<DocumentProfileSuggestion>();
+            }
+
+            var suggestions = await BuildVectorSuggestionsAsync(result, latencyMs, cancellationToken).ConfigureAwait(false);
             return suggestions;
         }
-
-        var documentVector = await BuildDocumentVectorAsync(chunks, cancellationToken).ConfigureAwait(false);
-        if (documentVector is null)
+        catch (Exception ex)
         {
-            return suggestions;
+            _logger.LogWarning(ex, "Vector suggestion search failed; using cosine fallback");
+            _vectorHealth.RecordSearch(TimeSpan.Zero, fallback: true);
+            return await SuggestWithCosineFallbackAsync(documentVector.Embedding!, cancellationToken).ConfigureAwait(false);
         }
-
-        var profiles = await SemanticTypeProfile.All(cancellationToken).ConfigureAwait(false);
-        var embeddings = await SemanticTypeEmbedding.All(cancellationToken).ConfigureAwait(false);
-        var embeddingByProfile = embeddings
-            .Where(e => e.Embedding is { Length: > 0 })
-            .ToDictionary(e => e.SemanticTypeProfileId, e => e.Embedding);
-
-        foreach (var profile in profiles)
-        {
-            if (profile.Archived)
-            {
-                continue;
-            }
-
-            if (!Guid.TryParse(profile.Id, out var profileId))
-            {
-                continue;
-            }
-
-            if (!embeddingByProfile.TryGetValue(profileId, out var embedding))
-            {
-                continue;
-            }
-
-            var similarity = CosineSimilarity(documentVector, embedding);
-            if (similarity <= 0)
-            {
-                continue;
-            }
-
-            var confidence = CalibrateConfidence(similarity);
-            var diagnostics = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["similarity"] = similarity.ToString("0.000", CultureInfo.InvariantCulture),
-                ["confidence"] = confidence.ToString("0.000", CultureInfo.InvariantCulture),
-                ["embeddingModel"] = _options.Ai.EmbeddingModel
-            };
-
-            if (!string.IsNullOrWhiteSpace(profile.Category))
-            {
-                diagnostics["category"] = profile.Category;
-            }
-
-            suggestions.Add(new DocumentProfileSuggestion
-            {
-                ProfileId = profile.Id,
-                Confidence = confidence,
-                Summary = profile.Description,
-                SuggestedAt = DateTimeOffset.UtcNow,
-                AutoAccepted = confidence >= 0.85,
-                Diagnostics = diagnostics
-            });
-        }
-
-        return suggestions
-            .OrderByDescending(s => s.Confidence)
-            .Take(5)
-            .ToList();
     }
 
     private static PromptTemplate BuildFallbackPrompt(TemplateGenerationRequest request)
@@ -252,15 +221,182 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         return builder.ToString();
     }
 
-    private async Task<float[]?> BuildDocumentVectorAsync(IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
+    private async Task<EmbeddingGenerationResult> BuildDocumentVectorAsync(IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
     {
         if (chunks is null || chunks.Count == 0)
         {
-            return null;
+            return EmbeddingGenerationResult.Empty;
         }
 
         var combined = string.Join(Environment.NewLine + Environment.NewLine, chunks.Select(c => c.Text));
-        return await _embeddingGenerator.GenerateAsync(combined, cancellationToken).ConfigureAwait(false);
+        var result = await _embeddingGenerator.GenerateAsync(combined, cancellationToken).ConfigureAwait(false);
+        _vectorHealth.RecordGeneration(result.Duration, result.Model, result.HasEmbedding);
+        return result;
+    }
+
+    private async Task<IReadOnlyList<DocumentProfileSuggestion>> SuggestWithCosineFallbackAsync(float[] documentVector, CancellationToken cancellationToken)
+    {
+        var suggestions = new List<DocumentProfileSuggestion>();
+
+        var profiles = await SemanticTypeProfile.All(cancellationToken).ConfigureAwait(false);
+        var embeddings = await SemanticTypeEmbedding.All(cancellationToken).ConfigureAwait(false);
+        var embeddingByProfile = embeddings
+            .Where(e => e.Embedding is { Length: > 0 })
+            .ToDictionary(e => e.SemanticTypeProfileId, e => e.Embedding);
+
+        foreach (var profile in profiles)
+        {
+            if (profile.Archived)
+            {
+                continue;
+            }
+
+            if (!Guid.TryParse(profile.Id, out var profileId))
+            {
+                continue;
+            }
+
+            if (!embeddingByProfile.TryGetValue(profileId, out var embedding))
+            {
+                continue;
+            }
+
+            var similarity = CosineSimilarity(documentVector, embedding);
+            if (similarity <= 0)
+            {
+                continue;
+            }
+
+            var confidence = CalibrateConfidence(similarity);
+            var diagnostics = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["mode"] = "fallback",
+                ["similarity"] = similarity.ToString("0.000", CultureInfo.InvariantCulture),
+                ["vectorLatencyMs"] = "n/a"
+            };
+
+            if (!string.IsNullOrWhiteSpace(profile.Category))
+            {
+                diagnostics["category"] = profile.Category;
+            }
+
+            suggestions.Add(new DocumentProfileSuggestion
+            {
+                ProfileId = profile.Id,
+                Confidence = confidence,
+                Summary = profile.Description,
+                SuggestedAt = DateTimeOffset.UtcNow,
+                AutoAccepted = confidence >= 0.85,
+                Diagnostics = diagnostics
+            });
+        }
+
+        return suggestions
+            .OrderByDescending(s => s.Confidence)
+            .Take(5)
+            .ToList();
+    }
+
+    private static async Task<Dictionary<string, SemanticTypeEmbedding>> LoadEmbeddingsAsync(IEnumerable<string> ids, CancellationToken cancellationToken)
+    {
+        var idList = ids.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (idList.Count == 0)
+        {
+            return new Dictionary<string, SemanticTypeEmbedding>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var filter = string.Join(" || ", idList.Select(id => $"Id == '{id}'"));
+        var results = await SemanticTypeEmbedding.Query(filter, cancellationToken).ConfigureAwait(false);
+
+        return results.ToDictionary(e => e.Id, e => e, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static async Task<IReadOnlyDictionary<Guid, SemanticTypeProfile>> LoadProfilesAsync(IEnumerable<SemanticTypeEmbedding> embeddings, CancellationToken cancellationToken)
+    {
+        var profileIds = embeddings
+            .Select(embedding => embedding.SemanticTypeProfileId)
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+
+        if (profileIds.Count == 0)
+        {
+            return new Dictionary<Guid, SemanticTypeProfile>();
+        }
+
+        var filter = string.Join(" || ", profileIds.Select(id => $"Id == '{id}'"));
+        var results = await SemanticTypeProfile.Query(filter, cancellationToken).ConfigureAwait(false);
+
+        var map = new Dictionary<Guid, SemanticTypeProfile>(profileIds.Count);
+        foreach (var profile in results)
+        {
+            if (Guid.TryParse(profile.Id, out var parsed))
+            {
+                map[parsed] = profile;
+            }
+        }
+
+        return map;
+    }
+
+    private async Task<IReadOnlyList<DocumentProfileSuggestion>> BuildVectorSuggestionsAsync(
+        VectorQueryResult<string> result,
+        double latencyMs,
+        CancellationToken cancellationToken)
+    {
+        var embeddings = await LoadEmbeddingsAsync(result.Matches.Select(match => match.Id), cancellationToken).ConfigureAwait(false);
+        if (embeddings.Count == 0)
+        {
+            return Array.Empty<DocumentProfileSuggestion>();
+        }
+
+        var profiles = await LoadProfilesAsync(embeddings.Values, cancellationToken).ConfigureAwait(false);
+        if (profiles.Count == 0)
+        {
+            return Array.Empty<DocumentProfileSuggestion>();
+        }
+
+        var suggestions = new List<DocumentProfileSuggestion>();
+        foreach (var match in result.Matches.OrderByDescending(m => m.Score))
+        {
+            if (!embeddings.TryGetValue(match.Id, out var embedding))
+            {
+                continue;
+            }
+
+            if (!profiles.TryGetValue(embedding.SemanticTypeProfileId, out var profile) || profile.Archived)
+            {
+                continue;
+            }
+
+            var confidence = CalibrateConfidence(match.Score);
+            var diagnostics = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["mode"] = "vector",
+                ["similarity"] = match.Score.ToString("0.000", CultureInfo.InvariantCulture),
+                ["vectorLatencyMs"] = latencyMs.ToString("0.0", CultureInfo.InvariantCulture)
+            };
+
+            if (!string.IsNullOrWhiteSpace(profile.Category))
+            {
+                diagnostics["category"] = profile.Category;
+            }
+
+            suggestions.Add(new DocumentProfileSuggestion
+            {
+                ProfileId = profile.Id,
+                Confidence = confidence,
+                Summary = profile.Description,
+                SuggestedAt = DateTimeOffset.UtcNow,
+                AutoAccepted = confidence >= 0.85,
+                Diagnostics = diagnostics
+            });
+        }
+
+        return suggestions
+            .OrderByDescending(s => s.Confidence)
+            .Take(5)
+            .ToList();
     }
 
     private async Task UpsertEmbeddingAsync(SemanticTypeProfile profile, string sampleText, CancellationToken cancellationToken)
@@ -270,8 +406,9 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
             return;
         }
 
-        var embedding = await _embeddingGenerator.GenerateAsync(sampleText, cancellationToken).ConfigureAwait(false);
-        if (embedding is null || embedding.Length == 0)
+        var embeddingResult = await _embeddingGenerator.GenerateAsync(sampleText, cancellationToken).ConfigureAwait(false);
+        _vectorHealth.RecordGeneration(embeddingResult.Duration, embeddingResult.Model, embeddingResult.HasEmbedding);
+        if (!embeddingResult.HasEmbedding)
         {
             return;
         }
@@ -284,7 +421,7 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         var entity = new SemanticTypeEmbedding
         {
             SemanticTypeProfileId = profileId,
-            Embedding = embedding,
+            Embedding = embeddingResult.Embedding!,
             GeneratedAt = DateTimeOffset.UtcNow
         };
 
