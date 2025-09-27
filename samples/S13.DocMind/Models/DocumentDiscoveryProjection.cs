@@ -14,6 +14,9 @@ public sealed class DocumentDiscoveryProjection : Entity<DocumentDiscoveryProjec
 
     public DateTimeOffset RefreshedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    public double? RefreshDurationSeconds { get; set; }
+        = null;
+
     [Column(TypeName = "jsonb")]
     public DocumentInsightsOverview Overview { get; set; } = new();
 
@@ -32,6 +35,11 @@ public sealed class DocumentQueueProjection
     public int Pending { get; set; }
     public int Failed { get; set; }
     public DateTimeOffset? OldestQueuedAt { get; set; }
+    public DateTimeOffset AsOf { get; set; } = DateTimeOffset.UtcNow;
+    public bool HasMore { get; set; }
+        = false;
+    public int PageSize { get; set; }
+        = 0;
     public IReadOnlyCollection<DocumentQueueEntry> Entries { get; set; } = Array.Empty<DocumentQueueEntry>();
 }
 

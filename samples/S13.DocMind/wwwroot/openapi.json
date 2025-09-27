@@ -16,7 +16,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentInsightsOverview"
+                  "$ref": "#/components/schemas/DocumentInsightsOverviewResponse"
                 }
               }
             }
@@ -42,10 +42,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DocumentCollectionSummary"
-                  }
+                  "$ref": "#/components/schemas/DocumentProfileCollectionsResponse"
                 }
               }
             }
@@ -63,10 +60,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AggregationFeedItem"
-                  }
+                  "$ref": "#/components/schemas/DocumentAggregationFeedResponse"
                 }
               }
             }
@@ -252,6 +246,15 @@
   },
   "components": {
     "schemas": {
+      "DocumentInsightsOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": { "type": "string", "format": "date-time" },
+          "refreshDurationSeconds": { "type": "number" },
+          "overview": { "$ref": "#/components/schemas/DocumentInsightsOverview" },
+          "queue": { "$ref": "#/components/schemas/DocumentQueueProjection" }
+        }
+      },
       "DocumentInsightsOverview": {
         "type": "object",
         "properties": {
@@ -260,12 +263,9 @@
           "activeDocuments": { "type": "integer" },
           "failedDocuments": { "type": "integer" },
           "averageConfidence": { "type": "number" },
-          "averageProcessingTimeMs": { "type": "number" },
-          "highQualityDocumentCount": { "type": "integer" },
-          "reviewRequiredCount": { "type": "integer" },
-          "topDocumentTypes": {
+          "topProfiles": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/DocumentTypeUsage" }
+            "items": { "$ref": "#/components/schemas/DocumentProfileUsage" }
           },
           "recentDocuments": {
             "type": "array",
@@ -273,32 +273,39 @@
           }
         }
       },
-      "DocumentTypeUsage": {
+      "DocumentProfileUsage": {
         "type": "object",
         "properties": {
-          "documentTypeId": { "type": "string" },
-          "documentTypeName": { "type": "string" },
-          "usageCount": { "type": "integer" },
+          "profileId": { "type": "string" },
+          "documentCount": { "type": "integer" },
           "lastUsed": { "type": "string", "format": "date-time" }
         }
       },
       "RecentDocumentInsight": {
         "type": "object",
         "properties": {
-          "fileId": { "type": "string" },
-          "name": { "type": "string" },
+          "documentId": { "type": "string" },
+          "fileName": { "type": "string" },
           "status": { "type": "string" },
-          "documentTypeId": { "type": "string" },
-          "completedDate": { "type": "string", "format": "date-time" },
-          "confidence": { "type": "number" }
+          "lastProcessedAt": { "type": "string", "format": "date-time" },
+          "assignedProfileId": { "type": "string" }
+        }
+      },
+      "DocumentProfileCollectionsResponse": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": { "type": "string", "format": "date-time" },
+          "refreshDurationSeconds": { "type": "number" },
+          "collections": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DocumentCollectionSummary" }
+          }
         }
       },
       "DocumentCollectionSummary": {
         "type": "object",
         "properties": {
-          "documentTypeId": { "type": "string" },
-          "documentTypeName": { "type": "string" },
-          "category": { "type": "string" },
+          "profileId": { "type": "string" },
           "documentCount": { "type": "integer" },
           "averageConfidence": { "type": "number" },
           "latestDocuments": {
@@ -310,29 +317,59 @@
       "CollectionDocumentSummary": {
         "type": "object",
         "properties": {
-          "fileId": { "type": "string" },
-          "name": { "type": "string" },
+          "documentId": { "type": "string" },
+          "fileName": { "type": "string" },
           "status": { "type": "string" },
-          "uploadDate": { "type": "string", "format": "date-time" },
-          "assignedDate": { "type": "string", "format": "date-time" },
-          "completedDate": { "type": "string", "format": "date-time" }
+          "lastProcessedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DocumentAggregationFeedResponse": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": { "type": "string", "format": "date-time" },
+          "refreshDurationSeconds": { "type": "number" },
+          "feed": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AggregationFeedItem" }
+          },
+          "queue": { "$ref": "#/components/schemas/DocumentQueueProjection" }
         }
       },
       "AggregationFeedItem": {
         "type": "object",
         "properties": {
-          "fileId": { "type": "string" },
+          "documentId": { "type": "string" },
           "fileName": { "type": "string" },
           "status": { "type": "string" },
-          "documentTypeId": { "type": "string" },
-          "documentTypeName": { "type": "string" },
-          "confidence": { "type": "number" },
           "summary": { "type": "string" },
           "lastUpdated": { "type": "string", "format": "date-time" },
-          "highlights": {
+          "insightCount": { "type": "integer" }
+        }
+      },
+      "DocumentQueueProjection": {
+        "type": "object",
+        "properties": {
+          "pending": { "type": "integer" },
+          "failed": { "type": "integer" },
+          "oldestQueuedAt": { "type": "string", "format": "date-time" },
+          "asOf": { "type": "string", "format": "date-time" },
+          "hasMore": { "type": "boolean" },
+          "pageSize": { "type": "integer" },
+          "entries": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": { "$ref": "#/components/schemas/DocumentQueueEntry" }
           }
+        }
+      },
+      "DocumentQueueEntry": {
+        "type": "object",
+        "properties": {
+          "documentId": { "type": "string" },
+          "fileName": { "type": "string" },
+          "stage": { "type": "string" },
+          "status": { "type": "string" },
+          "enqueuedAt": { "type": "string", "format": "date-time" },
+          "nextAttemptAt": { "type": "string", "format": "date-time" }
         }
       },
       "ProcessingQueueResult": {

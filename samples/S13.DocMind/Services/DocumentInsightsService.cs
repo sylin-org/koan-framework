@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 
@@ -8,9 +10,9 @@ namespace S13.DocMind.Services;
 
 public interface IDocumentInsightsService
 {
-    Task<DocumentInsightsOverview> GetOverviewAsync(CancellationToken cancellationToken);
-    Task<IReadOnlyCollection<DocumentCollectionSummary>> GetProfileCollectionsAsync(string profileId, CancellationToken cancellationToken);
-    Task<IReadOnlyCollection<AggregationFeedItem>> GetAggregationFeedAsync(CancellationToken cancellationToken);
+    Task<DocumentInsightsOverviewResponse> GetOverviewAsync(CancellationToken cancellationToken);
+    Task<DocumentProfileCollectionsResponse> GetProfileCollectionsAsync(string profileId, CancellationToken cancellationToken);
+    Task<DocumentAggregationFeedResponse> GetAggregationFeedAsync(CancellationToken cancellationToken);
 }
 
 public sealed class DocumentInsightsService : IDocumentInsightsService
@@ -22,29 +24,45 @@ public sealed class DocumentInsightsService : IDocumentInsightsService
         _clock = clock;
     }
 
-    public async Task<DocumentInsightsOverview> GetOverviewAsync(CancellationToken cancellationToken)
+    public async Task<DocumentInsightsOverviewResponse> GetOverviewAsync(CancellationToken cancellationToken)
     {
         var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
-        return projection.Overview;
-    }
-
-    public async Task<IReadOnlyCollection<DocumentCollectionSummary>> GetProfileCollectionsAsync(string profileId, CancellationToken cancellationToken)
-    {
-        var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(profileId))
+        return new DocumentInsightsOverviewResponse
         {
-            return projection.Collections;
-        }
-
-        return projection.Collections
-            .Where(summary => string.Equals(summary.ProfileId, profileId, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+            RefreshedAt = projection.RefreshedAt,
+            RefreshDurationSeconds = projection.RefreshDurationSeconds,
+            Overview = projection.Overview,
+            Queue = projection.Queue
+        };
     }
 
-    public async Task<IReadOnlyCollection<AggregationFeedItem>> GetAggregationFeedAsync(CancellationToken cancellationToken)
+    public async Task<DocumentProfileCollectionsResponse> GetProfileCollectionsAsync(string profileId, CancellationToken cancellationToken)
     {
         var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
-        return projection.Feed;
+        var collections = string.IsNullOrWhiteSpace(profileId)
+            ? projection.Collections
+            : projection.Collections
+                .Where(summary => string.Equals(summary.ProfileId, profileId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+        return new DocumentProfileCollectionsResponse
+        {
+            RefreshedAt = projection.RefreshedAt,
+            RefreshDurationSeconds = projection.RefreshDurationSeconds,
+            Collections = collections
+        };
+    }
+
+    public async Task<DocumentAggregationFeedResponse> GetAggregationFeedAsync(CancellationToken cancellationToken)
+    {
+        var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
+        return new DocumentAggregationFeedResponse
+        {
+            RefreshedAt = projection.RefreshedAt,
+            RefreshDurationSeconds = projection.RefreshDurationSeconds,
+            Feed = projection.Feed,
+            Queue = projection.Queue
+        };
     }
 
     private async Task<DocumentDiscoveryProjection> EnsureProjectionAsync(CancellationToken cancellationToken)
@@ -57,6 +75,31 @@ public sealed class DocumentInsightsService : IDocumentInsightsService
 
         return projection;
     }
+}
+
+public sealed class DocumentInsightsOverviewResponse
+{
+    public DateTimeOffset RefreshedAt { get; set; }
+    public double? RefreshDurationSeconds { get; set; }
+    public DocumentInsightsOverview Overview { get; set; } = new();
+    public DocumentQueueProjection Queue { get; set; } = new();
+}
+
+public sealed class DocumentProfileCollectionsResponse
+{
+    public DateTimeOffset RefreshedAt { get; set; }
+    public double? RefreshDurationSeconds { get; set; }
+    public IReadOnlyCollection<DocumentCollectionSummary> Collections { get; set; }
+        = Array.Empty<DocumentCollectionSummary>();
+}
+
+public sealed class DocumentAggregationFeedResponse
+{
+    public DateTimeOffset RefreshedAt { get; set; }
+    public double? RefreshDurationSeconds { get; set; }
+    public IReadOnlyCollection<AggregationFeedItem> Feed { get; set; }
+        = Array.Empty<AggregationFeedItem>();
+    public DocumentQueueProjection Queue { get; set; } = new();
 }
 
 public sealed class DocumentInsightsOverview

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Infrastructure.Repositories;
@@ -43,6 +45,15 @@ public static class DocumentProcessingJobRepository
     {
         var results = await DocumentProcessingJob.All(cancellationToken).ConfigureAwait(false);
         return results.ToList();
+    }
+
+    public static async Task<bool> HasChangesSinceAsync(DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        var threshold = since.UtcDateTime.ToString("O");
+        var filter =
+            $"UpdatedAt > '{threshold}' || CreatedAt > '{threshold}'";
+        var results = await DocumentProcessingJob.Query(filter, cancellationToken).ConfigureAwait(false);
+        return results.Any();
     }
 
     public static async Task<DocumentProcessingJobSlice> ExecuteQueryAsync(string? filter, DocumentProcessingJobQuery query, CancellationToken cancellationToken)

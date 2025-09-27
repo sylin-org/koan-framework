@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -21,31 +22,54 @@ public static class DocumentDiscoveryProjectionBuilder
     public static async Task<DocumentDiscoveryProjection> RefreshAsync(TimeProvider clock, CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
-        var documents = (await SourceDocument.All(cancellationToken).ConfigureAwait(false)).ToList();
-        var insights = (await DocumentInsight.All(cancellationToken).ConfigureAwait(false)).ToList();
-
-        var overview = BuildOverview(documents, insights);
-        var collections = BuildCollections(documents, insights);
-        var feed = BuildFeed(documents);
-        var queue = await BuildQueueAsync(clock, cancellationToken).ConfigureAwait(false);
-
         var existing = await DocumentDiscoveryProjectionRepository.GetAsync(cancellationToken).ConfigureAwait(false);
+
         if (existing is not null)
         {
-            if (IsProjectionUnchanged(existing, overview, collections, feed, queue))
+            var changeWindow = existing.RefreshedAt;
+            var documentChangesTask = SourceDocumentRepository.HasChangesSinceAsync(changeWindow, cancellationToken);
+            var insightChangesTask = DocumentInsightRepository.HasChangesSinceAsync(changeWindow, cancellationToken);
+            var queueChangesTask = DocumentProcessingJobRepository.HasChangesSinceAsync(changeWindow, cancellationToken);
+
+            await Task.WhenAll(documentChangesTask, insightChangesTask, queueChangesTask).ConfigureAwait(false);
+
+            var hasChanges = documentChangesTask.Result || insightChangesTask.Result || queueChangesTask.Result;
+            if (!hasChanges)
             {
+                existing.Queue.AsOf = now;
                 if ((now - existing.RefreshedAt) < MinimumRefreshWriteInterval)
                 {
                     return existing;
                 }
 
                 existing.RefreshedAt = now;
+                existing.RefreshDurationSeconds ??= 0d;
                 return await DocumentDiscoveryProjectionRepository.SaveAsync(existing, cancellationToken).ConfigureAwait(false);
             }
         }
 
+        var stopwatch = Stopwatch.StartNew();
+        var documents = (await SourceDocument.All(cancellationToken).ConfigureAwait(false)).ToList();
+        var insights = (await DocumentInsight.All(cancellationToken).ConfigureAwait(false)).ToList();
+
+        var overview = BuildOverview(documents, insights);
+        var collections = BuildCollections(documents, insights);
+        var feed = BuildFeed(documents);
+        var queue = await BuildQueueAsync(now, cancellationToken).ConfigureAwait(false);
+
+        stopwatch.Stop();
+
+        if (existing is not null && IsProjectionUnchanged(existing, overview, collections, feed, queue))
+        {
+            existing.RefreshedAt = now;
+            existing.RefreshDurationSeconds = stopwatch.Elapsed.TotalSeconds;
+            existing.Queue = queue;
+            return await DocumentDiscoveryProjectionRepository.SaveAsync(existing, cancellationToken).ConfigureAwait(false);
+        }
+
         var projection = existing ?? new DocumentDiscoveryProjection();
         projection.RefreshedAt = now;
+        projection.RefreshDurationSeconds = stopwatch.Elapsed.TotalSeconds;
         projection.Overview = overview;
         projection.Collections = collections;
         projection.Feed = feed;
@@ -171,9 +195,8 @@ public static class DocumentDiscoveryProjectionBuilder
             })
             .ToList();
 
-    private static async Task<DocumentQueueProjection> BuildQueueAsync(TimeProvider clock, CancellationToken cancellationToken)
+    private static async Task<DocumentQueueProjection> BuildQueueAsync(DateTimeOffset asOf, CancellationToken cancellationToken)
     {
-        var now = clock.GetUtcNow();
         var statuses = new[]
         {
             DocumentProcessingStatus.Queued,
@@ -182,18 +205,24 @@ public static class DocumentDiscoveryProjectionBuilder
             DocumentProcessingStatus.Failed
         };
 
-        var slice = await DocumentProcessingJobRepository.QueryAsync(new DocumentProcessingJobQuery
+        var query = new DocumentProcessingJobQuery
         {
             Statuses = statuses,
             OrderByDue = true,
             Take = 20,
-            IncludeExtraForPaging = false,
-            DueBefore = now
-        }, cancellationToken).ConfigureAwait(false);
+            IncludeExtraForPaging = true,
+            DueBefore = asOf
+        };
+
+        var slice = await DocumentProcessingJobRepository.QueryAsync(query, cancellationToken).ConfigureAwait(false);
 
         if (slice.Items.Count == 0)
         {
-            return new DocumentQueueProjection();
+            return new DocumentQueueProjection
+            {
+                AsOf = asOf,
+                PageSize = query.Take
+            };
         }
 
         var ordered = slice.Items
@@ -237,6 +266,9 @@ public static class DocumentDiscoveryProjectionBuilder
             Pending = slice.Items.Count(job => job.Status == DocumentProcessingStatus.Queued),
             Failed = slice.Items.Count(job => job.Status == DocumentProcessingStatus.Failed),
             OldestQueuedAt = oldest,
+            AsOf = asOf,
+            HasMore = slice.HasMore,
+            PageSize = query.Take,
             Entries = entries
         };
     }
