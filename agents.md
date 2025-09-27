@@ -24,7 +24,7 @@ await todo.Save(); // Instance method for saving
 
 var allTodos = await Todo.All(); // Static method for querying
 var todoById = await Todo.Get(id);
-var filtered = await Todo.Query("Completed == true");
+var filtered = await Todo.Where(i => i.Completed == true);
 ```
 
 ### ❌ **NEVER Create Manual Repository Pattern**
@@ -345,23 +345,28 @@ public async Task Todo_Save_ShouldPersist()
 ## 10. Common Anti-Patterns to AVOID
 
 ### ❌ **Repository Pattern Over Entity<T>**
+
 - Don't create `IRepository<T>` interfaces when `Entity<T>` exists
 - Don't inject repositories into services that can use Entity<T> directly
 
 ### ❌ **Manual Service Registration**
+
 - Don't manually register services in Program.cs
 - Use KoanAutoRegistrar for app-specific services
 
 ### ❌ **Custom ORM/Data Access**
+
 - Don't use Entity Framework directly
 - Don't create custom data access layers
 - Use Entity<T> patterns for all data operations
 
 ### ❌ **Environment-Specific Code**
+
 - Don't hard-code provider-specific logic
 - Use capability detection instead
 
 ### ❌ **Reinventing Framework Features**
+
 - Don't create custom validation when data annotations exist
 - Don't create custom controllers when EntityController<T> exists
 - Don't create custom configuration when KoanEnv/Configuration.Read exist
