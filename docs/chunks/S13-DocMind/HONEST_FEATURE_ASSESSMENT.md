@@ -23,7 +23,7 @@
 | **Model Management API** | ✅ Complete | `ModelsController` with installation, configuration, health checks |
 | **Document Timeline** | ✅ Complete | `DocumentProcessingEvent` tracking with query endpoints |
 | **Template Generation** | ✅ Complete | `TemplateSuggestionService.GenerateAsync()` with AI prompt generation |
-| **Background Processing Framework** | ✅ Complete | `DocumentAnalysisPipeline` hosted service with concurrency control |
+| **Background Processing Framework** | ✅ Complete | `DocumentProcessingWorker` hosted service with concurrency control |
 
 ### ⚠️ **PARTIALLY IMPLEMENTED** (10% of promises)
 

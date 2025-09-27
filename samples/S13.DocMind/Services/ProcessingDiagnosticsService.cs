@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using S13.DocMind.Infrastructure;
 using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
@@ -17,61 +18,69 @@ public interface IDocumentProcessingDiagnostics
 
 public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnostics
 {
-    private readonly IDocumentPipelineQueue _queue;
     private readonly IDocumentProcessingEventSink _eventSink;
+    private readonly DocMindOptions _options;
     private readonly TimeProvider _clock;
     private readonly ILogger<DocumentProcessingDiagnostics> _logger;
 
     public DocumentProcessingDiagnostics(
-        IDocumentPipelineQueue queue,
         IDocumentProcessingEventSink eventSink,
+        IOptions<DocMindOptions> options,
         TimeProvider clock,
         ILogger<DocumentProcessingDiagnostics> logger)
     {
-        _queue = queue;
         _eventSink = eventSink;
+        _options = options.Value;
         _clock = clock;
         _logger = logger;
     }
 
     public async Task<IReadOnlyCollection<ProcessingQueueItem>> GetQueueAsync(CancellationToken cancellationToken)
     {
-        var snapshot = _queue.GetSnapshot();
-        if (snapshot.Count == 0)
+        var jobs = await DocumentProcessingJobRepository
+            .GetAllAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var visible = jobs
+            .Where(job => job.Status != DocumentProcessingStatus.Completed && job.Status != DocumentProcessingStatus.Cancelled)
+            .ToList();
+
+        if (visible.Count == 0)
         {
             return Array.Empty<ProcessingQueueItem>();
         }
 
         var documents = await SourceDocumentRepository
-            .GetManyAsync(snapshot.Select(item => item.DocumentId), cancellationToken)
+            .GetManyAsync(visible.Select(job => job.SourceDocumentId), cancellationToken)
             .ConfigureAwait(false);
 
         var now = _clock.GetUtcNow();
 
-        return snapshot
-            .OrderBy(item => item.EnqueuedAt)
-            .Select(item =>
+        return visible
+            .OrderBy(job => job.NextAttemptAt ?? job.CreatedAt)
+            .Select(job =>
             {
-                documents.TryGetValue(item.DocumentId, out var document);
+                documents.TryGetValue(job.SourceDocumentId, out var document);
                 return new ProcessingQueueItem
                 {
-                    WorkId = item.WorkId,
-                    DocumentId = document?.Id ?? item.DocumentId.ToString(),
-                    FileName = document?.DisplayName ?? document?.FileName ?? item.DocumentId.ToString(),
-                    Stage = item.Stage,
-                    Status = item.Status,
-                    Attempt = item.Attempt,
-                    RetryCount = item.RetryCount,
-                    MaxAttempts = item.MaxAttempts,
-                    CorrelationId = item.CorrelationId,
-                    EnqueuedAt = item.EnqueuedAt,
-                    LastDequeuedAt = item.LastDequeuedAt,
-                    LastAttemptCompletedAt = item.LastAttemptCompletedAt,
-                    QueueAge = now - item.EnqueuedAt,
-                    UploadedAt = document?.UploadedAt ?? item.EnqueuedAt,
+                    WorkId = Guid.TryParse(job.Id, out var parsedId) ? parsedId : job.SourceDocumentId,
+                    DocumentId = document?.Id ?? job.SourceDocumentId.ToString(),
+                    FileName = document?.DisplayName ?? document?.FileName ?? job.SourceDocumentId.ToString(),
+                    Stage = job.Stage,
+                    Status = job.Status,
+                    Attempt = job.Attempt,
+                    RetryCount = job.RetryCount,
+                    MaxAttempts = job.MaxAttempts,
+                    CorrelationId = job.CorrelationId,
+                    EnqueuedAt = job.CreatedAt,
+                    LastDequeuedAt = job.StartedAt,
+                    LastAttemptCompletedAt = job.CompletedAt,
+                    QueueAge = now - job.CreatedAt,
+                    UploadedAt = document?.UploadedAt ?? job.CreatedAt,
                     LastProcessedAt = document?.LastProcessedAt,
                     AssignedProfileId = document?.AssignedProfileId,
-                    LastError = document?.LastError
+                    LastError = job.LastError ?? document?.LastError,
+                    NextAttemptAt = job.NextAttemptAt
                 };
             })
             .ToList();
@@ -147,12 +156,20 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
             return ProcessingRetryResult.NotFound(documentId);
         }
 
+        var now = _clock.GetUtcNow();
         document.Status = DocumentProcessingStatus.Queued;
         document.LastError = null;
-        document.LastProcessedAt = _clock.GetUtcNow();
+        document.LastProcessedAt = now;
         document.Summary.LastKnownStatus = DocumentProcessingStatus.Queued;
-        document.Summary.LastCompletedStage = DocumentProcessingStage.Aggregate;
-        document.Summary.LastStageCompletedAt = _clock.GetUtcNow();
+        document.Summary.LastCompletedStage = request.Stage switch
+        {
+            DocumentProcessingStage.Aggregate => DocumentProcessingStage.GenerateInsights,
+            DocumentProcessingStage.GenerateInsights => DocumentProcessingStage.GenerateChunks,
+            DocumentProcessingStage.ExtractVision => DocumentProcessingStage.GenerateChunks,
+            DocumentProcessingStage.ExtractText => DocumentProcessingStage.Upload,
+            _ => DocumentProcessingStage.Upload
+        };
+        document.Summary.LastStageCompletedAt = now;
         await document.Save(cancellationToken).ConfigureAwait(false);
 
         await _eventSink.RecordAsync(
@@ -161,11 +178,42 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
                 DocumentProcessingStage.Upload,
                 DocumentProcessingStatus.Queued,
                 Detail: "Retry requested",
+                Context: request.Stage is null
+                    ? null
+                    : new Dictionary<string, string>
+                    {
+                        ["stage"] = request.Stage.Value.ToString()
+                    },
                 CorrelationId: Guid.NewGuid().ToString("N")),
             cancellationToken).ConfigureAwait(false);
 
-        var work = new DocumentWorkItem(parsedId, DocumentProcessingStage.ExtractText, DocumentProcessingStatus.Queued);
-        await _queue.EnqueueAsync(work, cancellationToken).ConfigureAwait(false);
+        var job = await DocumentProcessingJobRepository.FindByDocumentAsync(parsedId, cancellationToken).ConfigureAwait(false)
+                  ?? new DocumentProcessingJob
+                  {
+                      SourceDocumentId = parsedId,
+                      CreatedAt = _clock.GetUtcNow(),
+                      UpdatedAt = _clock.GetUtcNow(),
+                      MaxAttempts = _options.Processing.MaxRetryAttempts,
+                      NextAttemptAt = _clock.GetUtcNow()
+                  };
+
+        job.Stage = request.Stage ?? job.Stage;
+        job.Status = DocumentProcessingStatus.Queued;
+        job.Attempt = 0;
+        job.RetryCount = 0;
+        job.NextAttemptAt = _clock.GetUtcNow();
+        job.UpdatedAt = _clock.GetUtcNow();
+        job.LastError = null;
+        if (job.MaxAttempts <= 0)
+        {
+            job.MaxAttempts = _options.Processing.MaxRetryAttempts;
+        }
+        if (string.IsNullOrWhiteSpace(job.CorrelationId))
+        {
+            job.CorrelationId = Guid.NewGuid().ToString("N");
+        }
+
+        await job.Save(cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Retry queued for document {DocumentId}", documentId);
         return ProcessingRetryResult.Success(document.Id, document.Status);
@@ -228,11 +276,13 @@ public sealed class ProcessingQueueItem
     public DateTimeOffset? LastProcessedAt { get; set; }
     public string? AssignedProfileId { get; set; }
     public string? LastError { get; set; }
+    public DateTimeOffset? NextAttemptAt { get; set; }
 }
 
 public sealed class ProcessingRetryRequest
 {
     public bool Force { get; set; }
+    public DocumentProcessingStage? Stage { get; set; }
 }
 
 public sealed class ProcessingRetryResult

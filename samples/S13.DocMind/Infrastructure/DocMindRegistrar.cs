@@ -25,7 +25,6 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
         services.AddKoanOptions<DocMindOptions>(DocMindOptions.Section).ValidateOnStart();
         services.AddSingleton<IValidateOptions<DocMindOptions>, DocMindOptionsValidator>();
 
-        services.AddSingleton<IDocumentPipelineQueue, DocumentPipelineQueue>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
         services.AddScoped<IDocumentProcessingEventSink, DocumentProcessingEventRepositorySink>();
         services.AddScoped<IDocumentIntakeService, DocumentIntakeService>();
@@ -39,7 +38,7 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
         services.AddScoped<IDocumentProcessingDiagnostics, DocumentProcessingDiagnostics>();
         services.AddSingleton(TimeProvider.System);
 
-        services.AddHostedService<DocumentAnalysisPipeline>();
+        services.AddHostedService<DocumentProcessingWorker>();
         services.AddHostedService<DocumentVectorBootstrapper>();
     }
 
@@ -62,8 +61,8 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
             report.AddNote($"Storage path missing: {physicalPath}");
         }
 
-        report.AddSetting("Processing.QueueCapacity", options.Processing.QueueCapacity.ToString(CultureInfo.InvariantCulture));
         report.AddSetting("Processing.MaxConcurrency", options.Processing.MaxConcurrency.ToString(CultureInfo.InvariantCulture));
+        report.AddSetting("Processing.WorkerBatchSize", options.Processing.WorkerBatchSize.ToString(CultureInfo.InvariantCulture));
         report.AddSetting("Processing.PollIntervalSeconds", options.Processing.PollIntervalSeconds.ToString(CultureInfo.InvariantCulture));
         report.AddSetting("Processing.MaxRetryAttempts", options.Processing.MaxRetryAttempts.ToString(CultureInfo.InvariantCulture));
 

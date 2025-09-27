@@ -329,7 +329,8 @@
           "uploadedAt": { "type": "string", "format": "date-time" },
           "lastProcessedAt": { "type": "string", "format": "date-time" },
           "assignedProfileId": { "type": "string" },
-          "lastError": { "type": "string" }
+          "lastError": { "type": "string" },
+          "nextAttemptAt": { "type": "string", "format": "date-time" }
         }
       },
       "ProcessingTimelineEntry": {
@@ -372,7 +373,8 @@
       "ProcessingRetryRequest": {
         "type": "object",
         "properties": {
-          "force": { "type": "boolean" }
+          "force": { "type": "boolean" },
+          "stage": { "type": "string", "nullable": true }
         }
       },
       "ModelDescriptor": {

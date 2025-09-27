@@ -16,7 +16,6 @@ namespace S13.DocMind.Services;
 public sealed class DocumentIntakeService : IDocumentIntakeService
 {
     private readonly IDocumentStorage _storage;
-    private readonly IDocumentPipelineQueue _queue;
     private readonly DocMindOptions _options;
     private readonly ILogger<DocumentIntakeService> _logger;
     private readonly TimeProvider _clock;
@@ -24,14 +23,12 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
 
     public DocumentIntakeService(
         IDocumentStorage storage,
-        IDocumentPipelineQueue queue,
         IOptions<DocMindOptions> options,
         ILogger<DocumentIntakeService> logger,
         TimeProvider clock,
         IDocumentProcessingEventSink eventSink)
     {
         _storage = storage;
-        _queue = queue;
         _options = options.Value;
         _logger = logger;
         _clock = clock;
@@ -140,8 +137,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         document.Status = DocumentProcessingStatus.Queued;
         await document.Save(cancellationToken).ConfigureAwait(false);
 
-        var work = new DocumentWorkItem(documentId, DocumentProcessingStage.ExtractText, DocumentProcessingStatus.Queued);
-        await _queue.EnqueueAsync(work, cancellationToken).ConfigureAwait(false);
+        await EnsureJobQueuedAsync(documentId, DocumentProcessingStage.ExtractText, cancellationToken).ConfigureAwait(false);
 
         return new DocumentUploadReceipt
         {
@@ -179,8 +175,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
                 }),
             cancellationToken).ConfigureAwait(false);
 
-        var work = new DocumentWorkItem(documentId, DocumentProcessingStage.ExtractText, DocumentProcessingStatus.Queued);
-        await _queue.EnqueueAsync(work, cancellationToken).ConfigureAwait(false);
+        await EnsureJobQueuedAsync(documentId, DocumentProcessingStage.Aggregate, cancellationToken).ConfigureAwait(false);
     }
 
     public Task RequeueAsync(string documentId, DocumentProcessingStage stage, CancellationToken cancellationToken)
@@ -191,8 +186,43 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
             throw new ValidationException("Document id must be a GUID");
         }
 
-        var work = new DocumentWorkItem(id, stage, DocumentProcessingStatus.Queued);
-        return _queue.EnqueueAsync(work, cancellationToken).AsTask();
+        return EnsureJobQueuedAsync(id, stage, cancellationToken);
     }
 
+    private async Task EnsureJobQueuedAsync(Guid documentId, DocumentProcessingStage stage, CancellationToken cancellationToken)
+    {
+        var now = _clock.GetUtcNow();
+        var job = await DocumentProcessingJobRepository.FindByDocumentAsync(documentId, cancellationToken).ConfigureAwait(false);
+        if (job is null)
+        {
+            job = new DocumentProcessingJob
+            {
+                SourceDocumentId = documentId,
+                Stage = stage,
+                Status = DocumentProcessingStatus.Queued,
+                CreatedAt = now,
+                UpdatedAt = now,
+                NextAttemptAt = now,
+                MaxAttempts = _options.Processing.MaxRetryAttempts
+            };
+
+            await job.Save(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        job.Stage = stage;
+        job.Status = DocumentProcessingStatus.Queued;
+        job.Attempt = 0;
+        job.RetryCount = 0;
+        job.NextAttemptAt = now;
+        job.UpdatedAt = now;
+        job.LastError = null;
+        job.MaxAttempts = _options.Processing.MaxRetryAttempts;
+        if (string.IsNullOrWhiteSpace(job.CorrelationId))
+        {
+            job.CorrelationId = Guid.NewGuid().ToString("N");
+        }
+
+        await job.Save(cancellationToken).ConfigureAwait(false);
+    }
 }
