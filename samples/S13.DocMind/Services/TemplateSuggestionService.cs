@@ -20,13 +20,15 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
     private readonly IAi? _ai;
     private readonly DocMindOptions _options;
     private readonly IEmbeddingGenerator _embeddingGenerator;
+    private readonly DocMindVectorHealth _vectorHealth;
     private readonly ILogger<TemplateSuggestionService> _logger;
 
-    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, IEmbeddingGenerator embeddingGenerator, ILogger<TemplateSuggestionService> logger)
+    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, IEmbeddingGenerator embeddingGenerator, DocMindVectorHealth vectorHealth, ILogger<TemplateSuggestionService> logger)
     {
         _ai = serviceProvider.GetService<IAi>();
         _options = options.Value;
         _embeddingGenerator = embeddingGenerator;
+        _vectorHealth = vectorHealth;
         _logger = logger;
     }
 
@@ -126,7 +128,7 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
     public async Task<IReadOnlyList<DocumentProfileSuggestion>> SuggestAsync(SourceDocument document, IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
     {
         var documentVector = await BuildDocumentVectorAsync(chunks, cancellationToken).ConfigureAwait(false);
-        if (documentVector is null || documentVector.Length == 0)
+        if (!documentVector.HasEmbedding)
         {
             return Array.Empty<DocumentProfileSuggestion>();
         }
@@ -134,16 +136,18 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         if (!Vector<SemanticTypeEmbedding>.IsAvailable)
         {
             _logger.LogDebug("Vector adapter unavailable; using cosine fallback for suggestions.");
-            return await SuggestWithCosineFallbackAsync(documentVector, cancellationToken).ConfigureAwait(false);
+            _vectorHealth.RecordSearch(TimeSpan.Zero, fallback: true);
+            return await SuggestWithCosineFallbackAsync(documentVector.Embedding!, cancellationToken).ConfigureAwait(false);
         }
 
         try
         {
             var searchStarted = DateTimeOffset.UtcNow;
             var result = await Vector<SemanticTypeEmbedding>
-                .Search(new VectorQueryOptions(documentVector, TopK: 8), cancellationToken)
+                .Search(new VectorQueryOptions(documentVector.Embedding!, TopK: 8), cancellationToken)
                 .ConfigureAwait(false);
             var latencyMs = (DateTimeOffset.UtcNow - searchStarted).TotalMilliseconds;
+            _vectorHealth.RecordSearch(TimeSpan.FromMilliseconds(latencyMs), fallback: false);
 
             if (result.Matches.Count == 0)
             {
@@ -156,7 +160,8 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Vector suggestion search failed; using cosine fallback");
-            return await SuggestWithCosineFallbackAsync(documentVector, cancellationToken).ConfigureAwait(false);
+            _vectorHealth.RecordSearch(TimeSpan.Zero, fallback: true);
+            return await SuggestWithCosineFallbackAsync(documentVector.Embedding!, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -216,15 +221,17 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         return builder.ToString();
     }
 
-    private async Task<float[]?> BuildDocumentVectorAsync(IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
+    private async Task<EmbeddingGenerationResult> BuildDocumentVectorAsync(IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
     {
         if (chunks is null || chunks.Count == 0)
         {
-            return null;
+            return EmbeddingGenerationResult.Empty;
         }
 
         var combined = string.Join(Environment.NewLine + Environment.NewLine, chunks.Select(c => c.Text));
-        return await _embeddingGenerator.GenerateAsync(combined, cancellationToken).ConfigureAwait(false);
+        var result = await _embeddingGenerator.GenerateAsync(combined, cancellationToken).ConfigureAwait(false);
+        _vectorHealth.RecordGeneration(result.Duration, result.Model, result.HasEmbedding);
+        return result;
     }
 
     private async Task<IReadOnlyList<DocumentProfileSuggestion>> SuggestWithCosineFallbackAsync(float[] documentVector, CancellationToken cancellationToken)
@@ -399,8 +406,9 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
             return;
         }
 
-        var embedding = await _embeddingGenerator.GenerateAsync(sampleText, cancellationToken).ConfigureAwait(false);
-        if (embedding is null || embedding.Length == 0)
+        var embeddingResult = await _embeddingGenerator.GenerateAsync(sampleText, cancellationToken).ConfigureAwait(false);
+        _vectorHealth.RecordGeneration(embeddingResult.Duration, embeddingResult.Model, embeddingResult.HasEmbedding);
+        if (!embeddingResult.HasEmbedding)
         {
             return;
         }
@@ -413,7 +421,7 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         var entity = new SemanticTypeEmbedding
         {
             SemanticTypeProfileId = profileId,
-            Embedding = embedding,
+            Embedding = embeddingResult.Embedding!,
             GeneratedAt = DateTimeOffset.UtcNow
         };
 

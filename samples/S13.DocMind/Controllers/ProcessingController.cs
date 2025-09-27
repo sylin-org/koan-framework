@@ -18,6 +18,13 @@ public class ProcessingController : ControllerBase
         _diagnostics = diagnostics;
     }
 
+    [HttpGet("config")]
+    public async Task<ActionResult> GetConfig(CancellationToken cancellationToken)
+    {
+        var config = await _diagnostics.GetConfigAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(config);
+    }
+
     [HttpGet("queue")]
     public async Task<ActionResult> GetQueue(
         [FromQuery] int page = 1,
@@ -64,6 +71,26 @@ public class ProcessingController : ControllerBase
 
         var timeline = await _diagnostics.GetTimelineAsync(query, cancellationToken);
         return Ok(timeline);
+    }
+
+    [HttpPost("replay")]
+    public async Task<ActionResult> Replay([FromBody] ProcessingReplayRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _diagnostics.ReplayAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    [HttpPost("discovery/validate")]
+    public async Task<ActionResult> ValidateDiscovery([FromBody] DocumentDiscoveryValidationRequest? request, CancellationToken cancellationToken)
+    {
+        var payload = request ?? new DocumentDiscoveryValidationRequest();
+        var result = await _diagnostics.ValidateDiscoveryAsync(payload, cancellationToken).ConfigureAwait(false);
+        return Ok(result);
     }
 
     [HttpPost("{fileId}/retry")]

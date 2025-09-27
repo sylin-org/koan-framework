@@ -94,6 +94,8 @@ public sealed class DocumentProcessingWorker : BackgroundService
         var vision = services.GetRequiredService<IVisionInsightService>();
         var insightSynthesis = services.GetRequiredService<IInsightSynthesisService>();
         var templateSuggestions = services.GetRequiredService<ITemplateSuggestionService>();
+        var refreshScheduler = services.GetRequiredService<IDocumentDiscoveryRefreshScheduler>();
+        var vectorHealth = services.GetRequiredService<DocMindVectorHealth>();
 
         var document = await SourceDocumentRepository
             .GetAsync(job.SourceDocumentId, cancellationToken)
@@ -114,6 +116,8 @@ public sealed class DocumentProcessingWorker : BackgroundService
             vision,
             insightSynthesis,
             templateSuggestions,
+            refreshScheduler,
+            vectorHealth,
             _clock,
             _options,
             _logger);
@@ -141,12 +145,15 @@ public sealed class DocumentProcessingWorker : BackgroundService
         private readonly IVisionInsightService _vision;
         private readonly IInsightSynthesisService _insightSynthesis;
         private readonly ITemplateSuggestionService _templateSuggestions;
+        private readonly IDocumentDiscoveryRefreshScheduler _refreshScheduler;
+        private readonly DocMindVectorHealth _vectorHealth;
         private readonly TimeProvider _clock;
         private readonly DocMindOptions _options;
         private readonly ILogger _outerLogger;
 
         private DocumentExtractionResult? _extractionResult;
         private IReadOnlyList<DocumentChunk> _persistedChunks = Array.Empty<DocumentChunk>();
+        private bool _requiresVision;
 
         public ProcessingSession(
             DocumentProcessingJob job,
@@ -157,6 +164,8 @@ public sealed class DocumentProcessingWorker : BackgroundService
             IVisionInsightService vision,
             IInsightSynthesisService insightSynthesis,
             ITemplateSuggestionService templateSuggestions,
+            IDocumentDiscoveryRefreshScheduler refreshScheduler,
+            DocMindVectorHealth vectorHealth,
             TimeProvider clock,
             DocMindOptions options,
             ILogger outerLogger)
@@ -169,6 +178,8 @@ public sealed class DocumentProcessingWorker : BackgroundService
             _vision = vision;
             _insightSynthesis = insightSynthesis;
             _templateSuggestions = templateSuggestions;
+            _refreshScheduler = refreshScheduler;
+            _vectorHealth = vectorHealth;
             _clock = clock;
             _options = options;
             _outerLogger = outerLogger;
@@ -186,6 +197,7 @@ public sealed class DocumentProcessingWorker : BackgroundService
                     currentStage = currentStage switch
                     {
                         DocumentProcessingStage.ExtractText => await ExecuteExtractionAsync(cancellationToken).ConfigureAwait(false),
+                        DocumentProcessingStage.GenerateEmbeddings => await ExecuteEmbeddingAsync(cancellationToken).ConfigureAwait(false),
                         DocumentProcessingStage.ExtractVision => await ExecuteVisionAsync(cancellationToken).ConfigureAwait(false),
                         DocumentProcessingStage.GenerateInsights => await ExecuteInsightsAsync(cancellationToken).ConfigureAwait(false),
                         DocumentProcessingStage.Aggregate => await ExecuteAggregationAsync(cancellationToken).ConfigureAwait(false),
@@ -248,14 +260,6 @@ public sealed class DocumentProcessingWorker : BackgroundService
                     Order = entity.Order
                 });
 
-                if (Vector<DocumentChunkEmbedding>.IsAvailable)
-                {
-                    var embedding = await _embeddingGenerator.GenerateAsync(entity.Text, cancellationToken).ConfigureAwait(false);
-                    if (embedding is not null && embedding.Length > 0)
-                    {
-                        await DocumentChunkEmbeddingWriter.UpsertAsync(Guid.Parse(entity.Id), _job.SourceDocumentId, embedding, cancellationToken).ConfigureAwait(false);
-                    }
-                }
             }
 
             _document.Summary.TextExtracted = true;
@@ -309,15 +313,138 @@ public sealed class DocumentProcessingWorker : BackgroundService
             _extractionResult = extractionResult;
             _persistedChunks = persistedChunks;
 
-            var nextStage = extractionResult.ContainsImages && _options.Processing.EnableVisionExtraction
-                ? DocumentProcessingStage.ExtractVision
-                : DocumentProcessingStage.GenerateInsights;
+            _requiresVision = extractionResult.ContainsImages && _options.Processing.EnableVisionExtraction;
+
+            var nextStage = DocumentProcessingStage.GenerateEmbeddings;
 
             await MarkStageCompletedAsync(
                 DocumentProcessingStage.ExtractText,
                 nextStage,
                 DocumentProcessingStatus.Extracted,
                 duration,
+                inputTokens: null,
+                outputTokens: null,
+                cancellationToken).ConfigureAwait(false);
+
+            return nextStage;
+        }
+
+        private async Task<DocumentProcessingStage> ExecuteEmbeddingAsync(CancellationToken cancellationToken)
+        {
+            var startedAt = await MarkStageRunningAsync(DocumentProcessingStage.GenerateEmbeddings, DocumentProcessingStatus.Analyzing, cancellationToken).ConfigureAwait(false);
+
+            var chunks = await EnsureChunksAsync(cancellationToken).ConfigureAwait(false);
+            _requiresVision = _requiresVision || (_document.Summary.ContainsImages && _options.Processing.EnableVisionExtraction);
+            var nextStage = _requiresVision
+                ? DocumentProcessingStage.ExtractVision
+                : DocumentProcessingStage.GenerateInsights;
+
+            if (!Vector<DocumentChunkEmbedding>.IsAvailable)
+            {
+                _vectorHealth.RecordGeneration(TimeSpan.Zero, null, succeeded: false);
+                var metrics = new Dictionary<string, double>
+                {
+                    ["chunks.total"] = chunks.Count,
+                    ["vector.available"] = 0
+                };
+
+                await _eventSink.RecordAsync(
+                    new DocumentProcessingEventEntry(
+                        Guid.Parse(_document.Id),
+                        DocumentProcessingStage.GenerateEmbeddings,
+                        DocumentProcessingStatus.Analyzing,
+                        Detail: "Vector adapter unavailable; skipping chunk embeddings",
+                        Metrics: metrics,
+                        Attempt: _job.Attempt,
+                        CorrelationId: _job.CorrelationId),
+                    cancellationToken).ConfigureAwait(false);
+
+                var duration = _clock.GetUtcNow() - startedAt;
+                await MarkStageCompletedAsync(
+                    DocumentProcessingStage.GenerateEmbeddings,
+                    nextStage,
+                    DocumentProcessingStatus.Analyzing,
+                    duration,
+                    inputTokens: null,
+                    outputTokens: null,
+                    cancellationToken).ConfigureAwait(false);
+
+                return nextStage;
+            }
+
+            var generated = 0;
+            var failures = 0;
+            double totalLatencyMs = 0d;
+            string? lastModel = null;
+
+            foreach (var chunk in chunks)
+            {
+                if (string.IsNullOrWhiteSpace(chunk.Id) || string.IsNullOrWhiteSpace(chunk.Text))
+                {
+                    continue;
+                }
+
+                var result = await _embeddingGenerator.GenerateAsync(chunk.Text, cancellationToken).ConfigureAwait(false);
+                _vectorHealth.RecordGeneration(result.Duration, result.Model, result.HasEmbedding);
+
+                if (!result.HasEmbedding)
+                {
+                    failures++;
+                    continue;
+                }
+
+                if (Guid.TryParse(chunk.Id, out var chunkId))
+                {
+                    var generatedAt = _clock.GetUtcNow();
+                    await DocumentChunkEmbeddingWriter.UpsertAsync(chunkId, _job.SourceDocumentId, result.Embedding!, generatedAt, cancellationToken).ConfigureAwait(false);
+                }
+
+                generated++;
+                totalLatencyMs += result.Duration.TotalMilliseconds;
+                lastModel = result.Model ?? lastModel;
+            }
+
+            _document.Summary.LastCompletedStage = DocumentProcessingStage.GenerateEmbeddings;
+            _document.Summary.LastKnownStatus = DocumentProcessingStatus.Analyzing;
+            _document.Summary.LastStageCompletedAt = _clock.GetUtcNow();
+            _document.LastProcessedAt = _clock.GetUtcNow();
+            await _document.Save(cancellationToken).ConfigureAwait(false);
+
+            var metricsWithAdapter = new Dictionary<string, double>
+            {
+                ["chunks.total"] = chunks.Count,
+                ["embeddings.generated"] = generated,
+                ["embeddings.failed"] = failures,
+                ["embedding.duration.ms.total"] = totalLatencyMs,
+                ["vector.available"] = 1
+            };
+
+            var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(lastModel))
+            {
+                context["embedding.model"] = lastModel!;
+            }
+
+            var durationOverall = _clock.GetUtcNow() - startedAt;
+
+            await _eventSink.RecordAsync(
+                new DocumentProcessingEventEntry(
+                    Guid.Parse(_document.Id),
+                    DocumentProcessingStage.GenerateEmbeddings,
+                    DocumentProcessingStatus.Analyzing,
+                    Detail: $"Generated {generated} chunk embeddings",
+                    Metrics: metricsWithAdapter,
+                    Context: context,
+                    Attempt: _job.Attempt,
+                    CorrelationId: _job.CorrelationId,
+                    Duration: durationOverall),
+                cancellationToken).ConfigureAwait(false);
+
+            await MarkStageCompletedAsync(
+                DocumentProcessingStage.GenerateEmbeddings,
+                nextStage,
+                DocumentProcessingStatus.Analyzing,
+                durationOverall,
                 inputTokens: null,
                 outputTokens: null,
                 cancellationToken).ConfigureAwait(false);
@@ -634,7 +761,7 @@ public sealed class DocumentProcessingWorker : BackgroundService
                     IsTerminal = true),
                 cancellationToken).ConfigureAwait(false);
 
-            await DocumentDiscoveryProjectionBuilder.RefreshAsync(_clock, cancellationToken).ConfigureAwait(false);
+            await _refreshScheduler.EnsureRefreshAsync("processing-complete", cancellationToken).ConfigureAwait(false);
 
             await MarkStageCompletedAsync(
                 DocumentProcessingStage.Aggregate,
@@ -924,7 +1051,7 @@ public sealed class DocumentProcessingWorker : BackgroundService
 
 internal static class DocumentChunkEmbeddingWriter
 {
-    public static async Task UpsertAsync(Guid chunkId, Guid documentId, float[] embedding, CancellationToken cancellationToken)
+    public static async Task UpsertAsync(Guid chunkId, Guid documentId, float[] embedding, DateTimeOffset generatedAt, CancellationToken cancellationToken)
     {
         if (!Vector<DocumentChunkEmbedding>.IsAvailable || embedding is null || embedding.Length == 0)
         {
@@ -936,7 +1063,7 @@ internal static class DocumentChunkEmbeddingWriter
             DocumentChunkId = chunkId,
             SourceDocumentId = documentId,
             Embedding = embedding,
-            GeneratedAt = DateTimeOffset.UtcNow
+            GeneratedAt = generatedAt
         };
 
         await entity.Save(cancellationToken).ConfigureAwait(false);

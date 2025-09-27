@@ -35,10 +35,20 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
         services.AddScoped<IEmbeddingGenerator, EmbeddingGenerator>();
         services.AddScoped<IDocumentInsightsService, DocumentInsightsService>();
         services.AddScoped<IDocumentProcessingDiagnostics, DocumentProcessingDiagnostics>();
+        services.AddSingleton<IDocumentDiscoveryRefresher, DocumentDiscoveryRefresher>();
+        services.AddSingleton<DocMindVectorHealth>();
+        services.AddSingleton<DocumentDiscoveryRefreshService>();
+        services.AddSingleton<IDocumentDiscoveryRefreshScheduler>(sp => sp.GetRequiredService<DocumentDiscoveryRefreshService>());
         services.AddSingleton(TimeProvider.System);
 
         services.AddHostedService<DocumentProcessingWorker>();
         services.AddHostedService<DocumentVectorBootstrapper>();
+        services.AddHostedService(sp => sp.GetRequiredService<DocumentDiscoveryRefreshService>());
+
+        services.AddHealthChecks()
+            .AddCheck<DocMindStorageHealthCheck>("docmind_storage")
+            .AddCheck<DocMindVectorHealthCheck>("docmind_vector")
+            .AddCheck<DocMindDiscoveryHealthCheck>("docmind_discovery");
     }
 
     public void Describe(BootReport report, IConfiguration configuration, IHostEnvironment environment)
@@ -74,6 +84,34 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
         if (!Vector<DocumentChunkEmbedding>.IsAvailable)
         {
             report.AddNote("Vector adapter not detected; semantic suggestions will fallback to lexical scoring.");
+        }
+
+        var vectorSnapshot = DocMindVectorHealth.LatestSnapshot;
+        report.AddSetting("Vector.FallbackActive", vectorSnapshot.FallbackActive.ToString());
+        if (vectorSnapshot.MissingProfiles.Count > 0)
+        {
+            report.AddNote("Missing semantic profile vectors: " + string.Join(", ", vectorSnapshot.MissingProfiles));
+        }
+        if (!string.IsNullOrWhiteSpace(vectorSnapshot.LastAuditError))
+        {
+            report.AddNote("Vector audit error: " + vectorSnapshot.LastAuditError);
+        }
+
+        var discoveryStatus = DocumentDiscoveryRefreshService.LatestStatus;
+        report.AddSetting("Discovery.Pending", discoveryStatus.PendingCount.ToString(CultureInfo.InvariantCulture));
+        report.AddSetting("Discovery.TotalCompleted", discoveryStatus.TotalCompleted.ToString(CultureInfo.InvariantCulture));
+        report.AddSetting("Discovery.TotalFailed", discoveryStatus.TotalFailed.ToString(CultureInfo.InvariantCulture));
+        if (discoveryStatus.AverageDuration is not null)
+        {
+            report.AddSetting("Discovery.AverageDurationMs", discoveryStatus.AverageDuration.Value.TotalMilliseconds.ToString(CultureInfo.InvariantCulture));
+        }
+        if (discoveryStatus.MaxDuration is not null)
+        {
+            report.AddSetting("Discovery.MaxDurationMs", discoveryStatus.MaxDuration.Value.TotalMilliseconds.ToString(CultureInfo.InvariantCulture));
+        }
+        if (!string.IsNullOrWhiteSpace(discoveryStatus.LastError))
+        {
+            report.AddNote("Discovery refresh error: " + discoveryStatus.LastError);
         }
     }
 }

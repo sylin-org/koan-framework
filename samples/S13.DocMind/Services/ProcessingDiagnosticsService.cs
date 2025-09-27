@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S13.DocMind.Infrastructure;
@@ -14,25 +16,56 @@ public interface IDocumentProcessingDiagnostics
     Task<ProcessingQueueResult> GetQueueAsync(ProcessingQueueQuery query, CancellationToken cancellationToken);
     Task<IReadOnlyCollection<ProcessingTimelineEntry>> GetTimelineAsync(ProcessingTimelineQuery query, CancellationToken cancellationToken);
     Task<ProcessingRetryResult> RetryAsync(string documentId, ProcessingRetryRequest request, CancellationToken cancellationToken);
+    Task<ProcessingConfigResponse> GetConfigAsync(CancellationToken cancellationToken);
+    Task<ProcessingReplayResult> ReplayAsync(ProcessingReplayRequest request, CancellationToken cancellationToken);
+    Task<DocumentDiscoveryValidationResult> ValidateDiscoveryAsync(DocumentDiscoveryValidationRequest request, CancellationToken cancellationToken);
 }
 
 public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnostics
 {
     private readonly IDocumentProcessingEventSink _eventSink;
+    private readonly IDocumentIntakeService _intakeService;
+    private readonly IDocumentDiscoveryRefreshScheduler _refreshScheduler;
+    private readonly IDocumentDiscoveryRefresher _discoveryRefresher;
+    private readonly DocMindVectorHealth _vectorHealth;
     private readonly DocMindOptions _options;
     private readonly TimeProvider _clock;
     private readonly ILogger<DocumentProcessingDiagnostics> _logger;
 
     public DocumentProcessingDiagnostics(
         IDocumentProcessingEventSink eventSink,
+        IDocumentIntakeService intakeService,
+        IDocumentDiscoveryRefreshScheduler refreshScheduler,
+        IDocumentDiscoveryRefresher discoveryRefresher,
+        DocMindVectorHealth vectorHealth,
         IOptions<DocMindOptions> options,
         TimeProvider clock,
         ILogger<DocumentProcessingDiagnostics> logger)
     {
         _eventSink = eventSink;
+        _intakeService = intakeService;
+        _refreshScheduler = refreshScheduler;
+        _discoveryRefresher = discoveryRefresher;
+        _vectorHealth = vectorHealth;
         _options = options.Value;
         _clock = clock;
         _logger = logger;
+    }
+
+    public Task<ProcessingConfigResponse> GetConfigAsync(CancellationToken cancellationToken)
+    {
+        var summary = CreateDiagnosticsSummary();
+
+        var response = new ProcessingConfigResponse
+        {
+            MaxConcurrency = _options.Processing.MaxConcurrency,
+            WorkerBatchSize = _options.Processing.WorkerBatchSize,
+            PollIntervalSeconds = _options.Processing.PollIntervalSeconds,
+            Vector = summary.Vector,
+            Discovery = summary.Discovery
+        };
+
+        return Task.FromResult(response);
     }
 
     public async Task<ProcessingQueueResult> GetQueueAsync(ProcessingQueueQuery query, CancellationToken cancellationToken)
@@ -65,9 +98,19 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
 
         var hasMore = ordered.Count > skip + pageItems.Count;
 
+        var summary = CreateDiagnosticsSummary();
+
         if (pageItems.Count == 0)
         {
-            return new ProcessingQueueResult(Array.Empty<ProcessingQueueItem>(), hasMore, _clock.GetUtcNow(), page, pageSize);
+            return new ProcessingQueueResult
+            {
+                Items = Array.Empty<ProcessingQueueItem>(),
+                HasMore = hasMore,
+                AsOf = _clock.GetUtcNow(),
+                Page = page,
+                PageSize = pageSize,
+                Diagnostics = summary
+            };
         }
 
         var documents = await SourceDocumentRepository
@@ -79,7 +122,15 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
             .Select(job => MapQueueItem(job, documents, now))
             .ToList();
 
-        return new ProcessingQueueResult(items, hasMore, now, page, pageSize);
+        return new ProcessingQueueResult
+        {
+            Items = items,
+            HasMore = hasMore,
+            AsOf = now,
+            Page = page,
+            PageSize = pageSize,
+            Diagnostics = summary
+        };
     }
 
     private ProcessingQueueItem MapQueueItem(DocumentProcessingJob job, IDictionary<Guid, SourceDocument> documents, DateTimeOffset now)
@@ -249,6 +300,7 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
         {
             DocumentProcessingStage.Aggregate => DocumentProcessingStage.GenerateInsights,
             DocumentProcessingStage.GenerateInsights => DocumentProcessingStage.GenerateChunks,
+            DocumentProcessingStage.GenerateEmbeddings => DocumentProcessingStage.GenerateChunks,
             DocumentProcessingStage.ExtractVision => DocumentProcessingStage.GenerateChunks,
             DocumentProcessingStage.ExtractText => DocumentProcessingStage.Upload,
             _ => DocumentProcessingStage.Upload
@@ -305,8 +357,134 @@ public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnosti
         return ProcessingRetryResult.Success(document.Id, document.Status);
     }
 
+    public async Task<ProcessingReplayResult> ReplayAsync(ProcessingReplayRequest request, CancellationToken cancellationToken)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.DocumentId))
+        {
+            return ProcessingReplayResult.Invalid("Document id required");
+        }
+
+        if (!Guid.TryParse(request.DocumentId, out var documentId))
+        {
+            return ProcessingReplayResult.Invalid("Document id must be a GUID");
+        }
+
+        var document = await SourceDocument.Get(request.DocumentId, cancellationToken).ConfigureAwait(false);
+        if (document is null)
+        {
+            return ProcessingReplayResult.NotFound(request.DocumentId);
+        }
+
+        if (request.Reset)
+        {
+            await PurgeDocumentStateAsync(document, cancellationToken).ConfigureAwait(false);
+        }
+
+        var stage = request.Stage;
+        await _intakeService.RequeueAsync(request.DocumentId, stage, cancellationToken).ConfigureAwait(false);
+
+        await _eventSink.RecordAsync(
+            new DocumentProcessingEventEntry(
+                documentId,
+                DocumentProcessingStage.Upload,
+                DocumentProcessingStatus.Queued,
+                Detail: "Replay requested",
+                Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["stage"] = stage.ToString(),
+                    ["reset"] = request.Reset.ToString()
+                },
+                CorrelationId: Guid.NewGuid().ToString("N")),
+            cancellationToken).ConfigureAwait(false);
+
+        _logger.LogInformation("Replay queued for document {DocumentId} at stage {Stage}", request.DocumentId, stage);
+        return ProcessingReplayResult.Queued(request.DocumentId, stage);
+    }
+
     private static Guid? TryParseGuid(string? value)
         => Guid.TryParse(value, out var parsed) ? parsed : null;
+
+    private static async Task PurgeDocumentStateAsync(SourceDocument document, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(document.Id, out var documentId))
+        {
+            return;
+        }
+
+        var chunkFilter = $"SourceDocumentId == '{documentId}'";
+        var chunks = await DocumentChunk.Query(chunkFilter, cancellationToken).ConfigureAwait(false);
+        foreach (var chunk in chunks)
+        {
+            await chunk.Delete(cancellationToken).ConfigureAwait(false);
+        }
+
+        var embeddings = await DocumentChunkEmbedding.Query(chunkFilter, cancellationToken).ConfigureAwait(false);
+        foreach (var embedding in embeddings)
+        {
+            await embedding.Delete(cancellationToken).ConfigureAwait(false);
+        }
+
+        var insights = await DocumentInsight.Query($"SourceDocumentId == '{documentId}'", cancellationToken).ConfigureAwait(false);
+        foreach (var insight in insights)
+        {
+            await insight.Delete(cancellationToken).ConfigureAwait(false);
+        }
+
+        document.Status = DocumentProcessingStatus.Queued;
+        document.LastProcessedAt = null;
+        document.LastError = null;
+        document.Summary = new DocumentProcessingSummary();
+        await document.Save(cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task<DocumentDiscoveryValidationResult> ValidateDiscoveryAsync(DocumentDiscoveryValidationRequest request, CancellationToken cancellationToken)
+    {
+        var effective = request ?? new DocumentDiscoveryValidationRequest();
+        return _discoveryRefresher.ValidateAsync(effective, cancellationToken);
+    }
+
+    private ProcessingDiagnosticsSummary CreateDiagnosticsSummary()
+    {
+        var vector = _vectorHealth.Snapshot();
+        var discovery = _refreshScheduler.Snapshot();
+
+        return new ProcessingDiagnosticsSummary
+        {
+            Vector = MapVector(vector),
+            Discovery = MapDiscovery(discovery)
+        };
+    }
+
+    private static VectorReadinessResponse MapVector(DocMindVectorReadinessSnapshot snapshot)
+        => new()
+        {
+            AdapterAvailable = snapshot.AdapterAvailable,
+            FallbackActive = snapshot.FallbackActive,
+            LastAuditAt = snapshot.LastAuditAt,
+            LastAuditError = snapshot.LastAuditError,
+            MissingProfiles = snapshot.MissingProfiles,
+            LastSearchLatencyMs = snapshot.LastSearchLatencyMs,
+            LastGenerationDurationMs = snapshot.LastGenerationDurationMs,
+            LastSearchAt = snapshot.LastSearchAt,
+            LastGenerationAt = snapshot.LastGenerationAt,
+            LastAdapterModel = snapshot.LastAdapterModel
+        };
+
+    private static DiscoveryRefreshResponse MapDiscovery(DocumentDiscoveryRefreshStatus status)
+        => new()
+        {
+            Pending = status.PendingCount,
+            LastCompletedAt = status.LastCompletedAt,
+            LastDurationMs = status.LastDuration?.TotalMilliseconds,
+            LastError = status.LastError,
+            LastQueuedAt = status.LastQueuedAt,
+            LastReason = status.LastReason,
+            LastStartedAt = status.LastStartedAt,
+            TotalCompleted = status.TotalCompleted,
+            TotalFailed = status.TotalFailed,
+            AverageDurationMs = status.AverageDuration?.TotalMilliseconds,
+            MaxDurationMs = status.MaxDuration?.TotalMilliseconds
+        };
 }
 
 public sealed class ProcessingTimelineQuery
@@ -394,12 +572,96 @@ public sealed class ProcessingRetryResult
         => new(true, documentId, status, null);
 }
 
-public sealed record ProcessingQueueResult(
-    IReadOnlyCollection<ProcessingQueueItem> Items,
-    bool HasMore,
-    DateTimeOffset AsOf,
-    int Page,
-    int PageSize);
+public sealed class ProcessingQueueResult
+{
+    public IReadOnlyCollection<ProcessingQueueItem> Items { get; set; } = Array.Empty<ProcessingQueueItem>();
+    public bool HasMore { get; set; }
+        = false;
+    public DateTimeOffset AsOf { get; set; }
+        = DateTimeOffset.UtcNow;
+    public int Page { get; set; }
+        = 1;
+    public int PageSize { get; set; }
+        = 20;
+    public ProcessingDiagnosticsSummary Diagnostics { get; set; }
+        = new();
+}
+
+public sealed class ProcessingConfigResponse
+{
+    public int MaxConcurrency { get; set; }
+    public int WorkerBatchSize { get; set; }
+    public int PollIntervalSeconds { get; set; }
+    public VectorReadinessResponse Vector { get; set; } = new();
+    public DiscoveryRefreshResponse Discovery { get; set; } = new();
+}
+
+public sealed class ProcessingDiagnosticsSummary
+{
+    public VectorReadinessResponse Vector { get; set; } = new();
+    public DiscoveryRefreshResponse Discovery { get; set; } = new();
+}
+
+public sealed class VectorReadinessResponse
+{
+    public bool AdapterAvailable { get; set; }
+    public bool FallbackActive { get; set; }
+    public DateTimeOffset? LastAuditAt { get; set; }
+    public string? LastAuditError { get; set; }
+    public IReadOnlyList<string> MissingProfiles { get; set; } = Array.Empty<string>();
+    public double? LastSearchLatencyMs { get; set; }
+    public double? LastGenerationDurationMs { get; set; }
+    public DateTimeOffset? LastSearchAt { get; set; }
+    public DateTimeOffset? LastGenerationAt { get; set; }
+    public string? LastAdapterModel { get; set; }
+}
+
+public sealed class DiscoveryRefreshResponse
+{
+    public int Pending { get; set; }
+    public DateTimeOffset? LastCompletedAt { get; set; }
+    public double? LastDurationMs { get; set; }
+    public string? LastError { get; set; }
+    public DateTimeOffset? LastQueuedAt { get; set; }
+    public string? LastReason { get; set; }
+    public DateTimeOffset? LastStartedAt { get; set; }
+    public long TotalCompleted { get; set; }
+    public long TotalFailed { get; set; }
+    public double? AverageDurationMs { get; set; }
+    public double? MaxDurationMs { get; set; }
+}
+
+public sealed class ProcessingReplayRequest
+{
+    public string DocumentId { get; set; } = string.Empty;
+    public DocumentProcessingStage Stage { get; set; } = DocumentProcessingStage.ExtractText;
+    public bool Reset { get; set; }
+}
+
+public sealed class ProcessingReplayResult
+{
+    private ProcessingReplayResult(bool success, string message, string? documentId, DocumentProcessingStage stage)
+    {
+        Success = success;
+        Message = message;
+        DocumentId = documentId;
+        Stage = stage;
+    }
+
+    public bool Success { get; }
+    public string Message { get; }
+    public string? DocumentId { get; }
+    public DocumentProcessingStage Stage { get; }
+
+    public static ProcessingReplayResult Queued(string documentId, DocumentProcessingStage stage)
+        => new(true, "Replay queued", documentId, stage);
+
+    public static ProcessingReplayResult NotFound(string documentId)
+        => new(false, "Document not found", documentId, DocumentProcessingStage.Upload);
+
+    public static ProcessingReplayResult Invalid(string message)
+        => new(false, message, null, DocumentProcessingStage.Upload);
+}
 
 public sealed class ProcessingQueueQuery
 {

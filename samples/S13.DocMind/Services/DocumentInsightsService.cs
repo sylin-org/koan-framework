@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using S13.DocMind.Infrastructure;
 using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 
@@ -18,10 +19,12 @@ public interface IDocumentInsightsService
 public sealed class DocumentInsightsService : IDocumentInsightsService
 {
     private readonly TimeProvider _clock;
+    private readonly IDocumentDiscoveryRefreshScheduler _refreshScheduler;
 
-    public DocumentInsightsService(TimeProvider clock)
+    public DocumentInsightsService(TimeProvider clock, IDocumentDiscoveryRefreshScheduler refreshScheduler)
     {
         _clock = clock;
+        _refreshScheduler = refreshScheduler;
     }
 
     public async Task<DocumentInsightsOverviewResponse> GetOverviewAsync(CancellationToken cancellationToken)
@@ -68,12 +71,21 @@ public sealed class DocumentInsightsService : IDocumentInsightsService
     private async Task<DocumentDiscoveryProjection> EnsureProjectionAsync(CancellationToken cancellationToken)
     {
         var projection = await DocumentDiscoveryProjectionRepository.GetAsync(cancellationToken).ConfigureAwait(false);
-        if (projection is null || (_clock.GetUtcNow() - projection.RefreshedAt) > TimeSpan.FromMinutes(5))
+        if (projection is null)
         {
-            projection = await DocumentDiscoveryProjectionBuilder.RefreshAsync(_clock, cancellationToken).ConfigureAwait(false);
+            await _refreshScheduler.EnsureRefreshAsync("cold-start", cancellationToken).ConfigureAwait(false);
+            projection = await DocumentDiscoveryProjectionRepository.GetAsync(cancellationToken).ConfigureAwait(false);
+        }
+        else if ((_clock.GetUtcNow() - projection.RefreshedAt) > TimeSpan.FromMinutes(5))
+        {
+            await _refreshScheduler.EnsureRefreshAsync("stale-read", cancellationToken).ConfigureAwait(false);
         }
 
-        return projection;
+        return projection ?? new DocumentDiscoveryProjection
+        {
+            RefreshedAt = _clock.GetUtcNow(),
+            Queue = new DocumentQueueProjection { AsOf = _clock.GetUtcNow() }
+        };
     }
 }
 
