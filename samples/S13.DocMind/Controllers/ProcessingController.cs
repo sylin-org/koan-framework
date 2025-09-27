@@ -19,9 +19,30 @@ public class ProcessingController : ControllerBase
     }
 
     [HttpGet("queue")]
-    public async Task<ActionResult> GetQueue(CancellationToken cancellationToken)
+    public async Task<ActionResult> GetQueue(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] DocumentProcessingStatus[]? status = null,
+        [FromQuery] DocumentProcessingStage[]? stage = null,
+        [FromQuery] string? correlationId = null,
+        [FromQuery] string? documentId = null,
+        [FromQuery] bool includeCompleted = false,
+        [FromQuery] bool includeFuture = false,
+        CancellationToken cancellationToken = default)
     {
-        var queue = await _diagnostics.GetQueueAsync(cancellationToken);
+        var query = new ProcessingQueueQuery
+        {
+            Page = page,
+            PageSize = pageSize,
+            Statuses = status,
+            Stages = stage,
+            CorrelationId = correlationId,
+            DocumentId = documentId,
+            IncludeCompleted = includeCompleted,
+            IncludeFuture = includeFuture
+        };
+
+        var queue = await _diagnostics.GetQueueAsync(query, cancellationToken);
         return Ok(queue);
     }
 

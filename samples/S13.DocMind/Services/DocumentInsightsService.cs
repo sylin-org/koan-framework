@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;
@@ -12,137 +13,49 @@ public interface IDocumentInsightsService
     Task<IReadOnlyCollection<AggregationFeedItem>> GetAggregationFeedAsync(CancellationToken cancellationToken);
 }
 
-public interface IDocumentAggregationService
-{
-    Task<IReadOnlyCollection<AggregationFeedItem>> GetFeedAsync(CancellationToken cancellationToken);
-}
-
 public sealed class DocumentInsightsService : IDocumentInsightsService
 {
-    private readonly IDocumentAggregationService _aggregationService;
+    private readonly TimeProvider _clock;
 
-    public DocumentInsightsService(IDocumentAggregationService aggregationService)
+    public DocumentInsightsService(TimeProvider clock)
     {
-        _aggregationService = aggregationService;
+        _clock = clock;
     }
 
     public async Task<DocumentInsightsOverview> GetOverviewAsync(CancellationToken cancellationToken)
     {
-        var documents = await SourceDocument.All(cancellationToken).ConfigureAwait(false);
-        var insights = await DocumentInsight.All(cancellationToken).ConfigureAwait(false);
-
-        var completed = documents.Where(d => d.Status == DocumentProcessingStatus.Completed).ToList();
-        var active = documents.Where(d => d.Status is DocumentProcessingStatus.Queued or DocumentProcessingStatus.Extracting or DocumentProcessingStatus.Analyzing).ToList();
-        var failed = documents.Where(d => d.Status == DocumentProcessingStatus.Failed).ToList();
-
-        var averageConfidence = insights
-            .Where(i => i.Confidence.HasValue)
-            .Select(i => i.Confidence!.Value)
-            .DefaultIfEmpty(0d)
-            .Average();
-
-        var topProfiles = documents
-            .Where(d => !string.IsNullOrWhiteSpace(d.AssignedProfileId))
-            .GroupBy(d => d.AssignedProfileId!)
-            .Select(group => new DocumentProfileUsage
-            {
-                ProfileId = group.Key,
-                DocumentCount = group.Count(),
-                LastUsed = group.Max(d => d.LastProcessedAt ?? d.UploadedAt)
-            })
-            .OrderByDescending(p => p.DocumentCount)
-            .Take(5)
-            .ToList();
-
-        var recentDocuments = documents
-            .OrderByDescending(d => d.LastProcessedAt ?? d.UploadedAt)
-            .Take(8)
-            .Select(d => new RecentDocumentInsight
-            {
-                DocumentId = d.Id,
-                FileName = d.DisplayName ?? d.FileName,
-                Status = d.Status,
-                LastProcessedAt = d.LastProcessedAt ?? d.UploadedAt,
-                AssignedProfileId = d.AssignedProfileId
-            })
-            .ToList();
-
-        return new DocumentInsightsOverview
-        {
-            TotalDocuments = documents.Count,
-            CompletedDocuments = completed.Count,
-            ActiveDocuments = active.Count,
-            FailedDocuments = failed.Count,
-            AverageConfidence = Math.Round(averageConfidence, 3),
-            TopProfiles = topProfiles,
-            RecentDocuments = recentDocuments
-        };
+        var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
+        return projection.Overview;
     }
 
     public async Task<IReadOnlyCollection<DocumentCollectionSummary>> GetProfileCollectionsAsync(string profileId, CancellationToken cancellationToken)
     {
-        var documents = await SourceDocument.All(cancellationToken).ConfigureAwait(false);
-        var insights = await DocumentInsight.All(cancellationToken).ConfigureAwait(false);
+        var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+            return projection.Collections;
+        }
 
-        IEnumerable<IGrouping<string?, SourceDocument>> grouped = string.IsNullOrWhiteSpace(profileId)
-            ? documents.GroupBy(d => d.AssignedProfileId)
-            : documents.Where(d => string.Equals(d.AssignedProfileId, profileId, StringComparison.OrdinalIgnoreCase)).GroupBy(d => d.AssignedProfileId);
-
-        return grouped
-            .Select(group => new DocumentCollectionSummary
-            {
-                ProfileId = group.Key ?? "unassigned",
-                DocumentCount = group.Count(),
-                AverageConfidence = insights
-                    .Where(i => group.Any(d => Guid.TryParse(d.Id, out var docId) && i.SourceDocumentId == docId) && i.Confidence.HasValue)
-                    .Select(i => i.Confidence!.Value)
-                    .DefaultIfEmpty(0d)
-                    .Average(),
-                LatestDocuments = group
-                    .OrderByDescending(d => d.LastProcessedAt ?? d.UploadedAt)
-                    .Take(5)
-                    .Select(d => new CollectionDocumentSummary
-                    {
-                        DocumentId = d.Id,
-                        FileName = d.DisplayName ?? d.FileName,
-                        Status = d.Status,
-                        LastProcessedAt = d.LastProcessedAt ?? d.UploadedAt
-                    })
-                    .ToList()
-            })
-            .OrderByDescending(summary => summary.DocumentCount)
+        return projection.Collections
+            .Where(summary => string.Equals(summary.ProfileId, profileId, StringComparison.OrdinalIgnoreCase))
             .ToList();
     }
 
-    public Task<IReadOnlyCollection<AggregationFeedItem>> GetAggregationFeedAsync(CancellationToken cancellationToken)
-        => _aggregationService.GetFeedAsync(cancellationToken);
-}
-
-public sealed class DocumentAggregationService : IDocumentAggregationService
-{
-    public async Task<IReadOnlyCollection<AggregationFeedItem>> GetFeedAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyCollection<AggregationFeedItem>> GetAggregationFeedAsync(CancellationToken cancellationToken)
     {
-        var documents = await SourceDocument.All(cancellationToken).ConfigureAwait(false);
-        var insights = await DocumentInsight.All(cancellationToken).ConfigureAwait(false);
+        var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
+        return projection.Feed;
+    }
 
-        return documents
-            .OrderByDescending(d => d.LastProcessedAt ?? d.UploadedAt)
-            .Take(20)
-            .Select(document =>
-            {
-                var documentId = Guid.TryParse(document.Id, out var parsed) ? parsed : Guid.Empty;
-                var relatedInsights = insights.Where(i => i.SourceDocumentId == documentId).ToList();
-                return new AggregationFeedItem
-                {
-                    DocumentId = document.Id,
-                    FileName = document.DisplayName ?? document.FileName,
-                    Status = document.Status,
-                    Summary = document.Summary.PrimaryFindings ?? string.Empty,
-                    LastUpdated = document.LastProcessedAt ?? document.UploadedAt,
-                    InsightCount = relatedInsights.Count
-                };
-            })
-            .ToList();
+    private async Task<DocumentDiscoveryProjection> EnsureProjectionAsync(CancellationToken cancellationToken)
+    {
+        var projection = await DocumentDiscoveryProjectionRepository.GetAsync(cancellationToken).ConfigureAwait(false);
+        if (projection is null || (_clock.GetUtcNow() - projection.RefreshedAt) > TimeSpan.FromMinutes(5))
+        {
+            projection = await DocumentDiscoveryProjectionBuilder.RefreshAsync(_clock, cancellationToken).ConfigureAwait(false);
+        }
+
+        return projection;
     }
 }
 

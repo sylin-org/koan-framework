@@ -78,15 +78,40 @@
       "get": {
         "summary": "Get processing queue diagnostics",
         "operationId": "getProcessingQueue",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "stage",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "style": "form",
+            "explode": true
+          },
+          { "name": "correlationId", "in": "query", "schema": { "type": "string" } },
+          { "name": "documentId", "in": "query", "schema": { "type": "string" } },
+          { "name": "includeCompleted", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "includeFuture", "in": "query", "schema": { "type": "boolean" } }
+        ],
         "responses": {
           "200": {
-            "description": "Queue items",
+            "description": "Queue page",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/ProcessingQueueItem" }
-                }
+                "schema": { "$ref": "#/components/schemas/ProcessingQueueResult" }
               }
             }
           }
@@ -98,8 +123,8 @@
         "summary": "Get processing timelines",
         "operationId": "getProcessingTimeline",
         "parameters": [
-          { "name": "documentTypeId", "in": "query", "schema": { "type": "string" } },
-          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "documentId", "in": "query", "schema": { "type": "string" } },
+          { "name": "stage", "in": "query", "schema": { "type": "string" } },
           { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
           { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
         ],
@@ -310,6 +335,19 @@
           }
         }
       },
+      "ProcessingQueueResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProcessingQueueItem" }
+          },
+          "hasMore": { "type": "boolean" },
+          "asOf": { "type": "string", "format": "date-time" },
+          "page": { "type": "integer", "format": "int32" },
+          "pageSize": { "type": "integer", "format": "int32" }
+        }
+      },
       "ProcessingQueueItem": {
         "type": "object",
         "properties": {
@@ -330,7 +368,46 @@
           "lastProcessedAt": { "type": "string", "format": "date-time" },
           "assignedProfileId": { "type": "string" },
           "lastError": { "type": "string" },
-          "nextAttemptAt": { "type": "string", "format": "date-time" }
+          "nextAttemptAt": { "type": "string", "format": "date-time" },
+          "stageTelemetry": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProcessingStageSnapshot" }
+          }
+        }
+      },
+      "ProcessingStageSnapshot": {
+        "type": "object",
+        "properties": {
+          "stage": { "type": "string" },
+          "lastStatus": { "type": "string" },
+          "lastQueuedAt": { "type": "string", "format": "date-time" },
+          "lastStartedAt": { "type": "string", "format": "date-time" },
+          "lastCompletedAt": { "type": "string", "format": "date-time" },
+          "lastDuration": { "type": "string", "format": "duration" },
+          "lastError": { "type": "string" },
+          "lastInputTokens": { "type": "integer", "format": "int64" },
+          "lastOutputTokens": { "type": "integer", "format": "int64" },
+          "lastCorrelationId": { "type": "string" },
+          "attemptCount": { "type": "integer", "format": "int32" },
+          "successCount": { "type": "integer", "format": "int32" },
+          "failureCount": { "type": "integer", "format": "int32" },
+          "attempts": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProcessingStageAttemptSnapshot" }
+          }
+        }
+      },
+      "ProcessingStageAttemptSnapshot": {
+        "type": "object",
+        "properties": {
+          "attempt": { "type": "integer", "format": "int32" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": "string", "format": "date-time" },
+          "status": { "type": "string" },
+          "duration": { "type": "string", "format": "duration" },
+          "error": { "type": "string" },
+          "inputTokens": { "type": "integer", "format": "int64" },
+          "outputTokens": { "type": "integer", "format": "int64" }
         }
       },
       "ProcessingTimelineEntry": {

@@ -206,6 +206,8 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
                 MaxAttempts = _options.Processing.MaxRetryAttempts
             };
 
+            job.MarkStageQueued(stage, now, job.CorrelationId);
+
             await job.Save(cancellationToken).ConfigureAwait(false);
             return;
         }
@@ -222,6 +224,8 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         {
             job.CorrelationId = Guid.NewGuid().ToString("N");
         }
+
+        job.MarkStageQueued(stage, now, job.CorrelationId);
 
         await job.Save(cancellationToken).ConfigureAwait(false);
     }

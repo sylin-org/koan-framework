@@ -56,16 +56,16 @@ public sealed class DocumentProcessingWorker : BackgroundService
     private async Task<bool> ProcessBatchAsync(CancellationToken cancellationToken)
     {
         var now = _clock.GetUtcNow();
-        var pending = await DocumentProcessingJobRepository
+        var slice = await DocumentProcessingJobRepository
             .GetPendingAsync(now, _options.Processing.WorkerBatchSize, cancellationToken)
             .ConfigureAwait(false);
 
-        if (pending.Count == 0)
+        if (slice.Items.Count == 0)
         {
             return false;
         }
 
-        foreach (var job in pending)
+        foreach (var job in slice.Items)
         {
             try
             {
@@ -176,13 +176,13 @@ public sealed class DocumentProcessingWorker : BackgroundService
 
         public async Task RunAsync(CancellationToken cancellationToken)
         {
-            try
+            var currentStage = _job.Stage;
+            while (currentStage != DocumentProcessingStage.Complete)
             {
-                var currentStage = _job.Stage;
-                while (currentStage != DocumentProcessingStage.Complete)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
 
+                try
+                {
                     currentStage = currentStage switch
                     {
                         DocumentProcessingStage.ExtractText => await ExecuteExtractionAsync(cancellationToken).ConfigureAwait(false),
@@ -192,20 +192,21 @@ public sealed class DocumentProcessingWorker : BackgroundService
                         _ => await CompleteAsync(cancellationToken).ConfigureAwait(false)
                     };
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                await HandleFailureAsync(ex, cancellationToken).ConfigureAwait(false);
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    await HandleFailureAsync(currentStage, ex, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
             }
         }
 
         private async Task<DocumentProcessingStage> ExecuteExtractionAsync(CancellationToken cancellationToken)
         {
-            await MarkStageRunningAsync(DocumentProcessingStage.ExtractText, DocumentProcessingStatus.Extracting, cancellationToken).ConfigureAwait(false);
+            var startedAt = await MarkStageRunningAsync(DocumentProcessingStage.ExtractText, DocumentProcessingStatus.Extracting, cancellationToken).ConfigureAwait(false);
 
             await _eventSink.RecordAsync(
                 new DocumentProcessingEventEntry(
@@ -272,14 +273,16 @@ public sealed class DocumentProcessingWorker : BackgroundService
 
             var extractionMetrics = new Dictionary<string, double>
             {
-                ["chunkCount"] = chunkRefs.Count,
-                ["wordCount"] = extractionResult.WordCount,
-                ["pageCount"] = extractionResult.PageCount,
-                ["containsImages"] = extractionResult.ContainsImages ? 1 : 0
+                ["chunk.count"] = chunkRefs.Count,
+                ["word.count"] = extractionResult.WordCount,
+                ["page.count"] = extractionResult.PageCount,
+                ["contains.images"] = extractionResult.ContainsImages ? 1 : 0
             };
 
             var extractionContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             DocumentAnalysisDiagnostics.ApplyDiagnostics(extractionMetrics, extractionContext, extractionResult.Diagnostics, "extract");
+
+            var duration = _clock.GetUtcNow() - startedAt;
 
             await _eventSink.RecordAsync(
                 new DocumentProcessingEventEntry(
@@ -290,7 +293,8 @@ public sealed class DocumentProcessingWorker : BackgroundService
                     Metrics: extractionMetrics,
                     Context: extractionContext,
                     Attempt: _job.Attempt,
-                    CorrelationId: _job.CorrelationId),
+                    CorrelationId: _job.CorrelationId,
+                    Duration: duration),
                 cancellationToken).ConfigureAwait(false);
 
             _job.Extraction = new DocumentExtractionSnapshot
@@ -309,10 +313,13 @@ public sealed class DocumentProcessingWorker : BackgroundService
                 ? DocumentProcessingStage.ExtractVision
                 : DocumentProcessingStage.GenerateInsights;
 
-            await MarkStageCompletedAsync(nextStage == DocumentProcessingStage.GenerateInsights
-                    ? DocumentProcessingStage.GenerateInsights
-                    : DocumentProcessingStage.ExtractVision,
+            await MarkStageCompletedAsync(
+                DocumentProcessingStage.ExtractText,
                 nextStage,
+                DocumentProcessingStatus.Extracted,
+                duration,
+                inputTokens: null,
+                outputTokens: null,
                 cancellationToken).ConfigureAwait(false);
 
             return nextStage;
@@ -320,7 +327,10 @@ public sealed class DocumentProcessingWorker : BackgroundService
 
         private async Task<DocumentProcessingStage> ExecuteVisionAsync(CancellationToken cancellationToken)
         {
-            await MarkStageRunningAsync(DocumentProcessingStage.ExtractVision, DocumentProcessingStatus.Analyzing, cancellationToken).ConfigureAwait(false);
+            var startedAt = await MarkStageRunningAsync(DocumentProcessingStage.ExtractVision, DocumentProcessingStatus.Analyzing, cancellationToken).ConfigureAwait(false);
+
+            long? tokensIn = null;
+            long? tokensOut = null;
 
             var visionResult = await _vision.TryExtractAsync(_document, cancellationToken).ConfigureAwait(false);
             if (visionResult is not null && !string.IsNullOrWhiteSpace(visionResult.Narrative))
@@ -413,6 +423,11 @@ public sealed class DocumentProcessingWorker : BackgroundService
                         : visionResult.ExtractedText;
                 }
 
+                tokensIn = TryReadDiagnosticToken(visionResult.Diagnostics, "tokensIn");
+                tokensOut = TryReadDiagnosticToken(visionResult.Diagnostics, "tokensOut");
+
+                var duration = _clock.GetUtcNow() - startedAt;
+
                 await _eventSink.RecordAsync(
                     new DocumentProcessingEventEntry(
                         documentId,
@@ -422,22 +437,36 @@ public sealed class DocumentProcessingWorker : BackgroundService
                         Metrics: visionMetrics,
                         Context: visionContext,
                         Attempt: _job.Attempt,
-                        CorrelationId: _job.CorrelationId),
+                        CorrelationId: _job.CorrelationId,
+                        InputTokens: tokensIn,
+                        OutputTokens: tokensOut,
+                        Duration: duration),
                     cancellationToken).ConfigureAwait(false);
             }
 
-            await MarkStageCompletedAsync(DocumentProcessingStage.GenerateInsights, DocumentProcessingStage.GenerateInsights, cancellationToken).ConfigureAwait(false);
+            var totalDuration = _clock.GetUtcNow() - startedAt;
+
+            await MarkStageCompletedAsync(
+                DocumentProcessingStage.ExtractVision,
+                DocumentProcessingStage.GenerateInsights,
+                DocumentProcessingStatus.Analyzing,
+                totalDuration,
+                tokensIn,
+                tokensOut,
+                cancellationToken).ConfigureAwait(false);
+
             return DocumentProcessingStage.GenerateInsights;
         }
 
         private async Task<DocumentProcessingStage> ExecuteInsightsAsync(CancellationToken cancellationToken)
         {
-            await MarkStageRunningAsync(DocumentProcessingStage.GenerateInsights, DocumentProcessingStatus.Analyzing, cancellationToken).ConfigureAwait(false);
+            var startedAt = await MarkStageRunningAsync(DocumentProcessingStage.GenerateInsights, DocumentProcessingStatus.Analyzing, cancellationToken).ConfigureAwait(false);
 
             var extraction = await EnsureExtractionAsync(cancellationToken).ConfigureAwait(false);
             var chunks = await EnsureChunksAsync(cancellationToken).ConfigureAwait(false);
 
-            var textInsights = await _insightSynthesis.GenerateAsync(_document, extraction, chunks, cancellationToken).ConfigureAwait(false);
+            var result = await _insightSynthesis.GenerateAsync(_document, extraction, chunks, cancellationToken).ConfigureAwait(false);
+            var textInsights = result.Insights;
 
             var insightRefs = new List<InsightReference>(_document.Summary.InsightRefs);
             string? summaryFromInsights = null;
@@ -474,6 +503,8 @@ public sealed class DocumentProcessingWorker : BackgroundService
             _document.LastProcessedAt = _clock.GetUtcNow();
             await _document.Save(cancellationToken).ConfigureAwait(false);
 
+            var duration = _clock.GetUtcNow() - startedAt;
+
             await _eventSink.RecordAsync(
                 new DocumentProcessingEventEntry(
                     Guid.Parse(_document.Id),
@@ -481,19 +512,54 @@ public sealed class DocumentProcessingWorker : BackgroundService
                     DocumentProcessingStatus.InsightsReady,
                     Detail: $"Persisted {insightRefs.Count} insights",
                     Attempt: _job.Attempt,
-                    CorrelationId: _job.CorrelationId),
+                    CorrelationId: _job.CorrelationId,
+                    Metrics: result.Metrics,
+                    Context: result.Context,
+                    InputTokens: result.InputTokens,
+                    OutputTokens: result.OutputTokens,
+                    Duration: duration),
                 cancellationToken).ConfigureAwait(false);
 
-            await MarkStageCompletedAsync(DocumentProcessingStage.Aggregate, DocumentProcessingStage.Aggregate, cancellationToken).ConfigureAwait(false);
+            await MarkStageCompletedAsync(
+                DocumentProcessingStage.GenerateInsights,
+                DocumentProcessingStage.Aggregate,
+                DocumentProcessingStatus.InsightsReady,
+                duration,
+                result.InputTokens,
+                result.OutputTokens,
+                cancellationToken).ConfigureAwait(false);
+
             return DocumentProcessingStage.Aggregate;
         }
 
         private async Task<DocumentProcessingStage> ExecuteAggregationAsync(CancellationToken cancellationToken)
         {
-            await MarkStageRunningAsync(DocumentProcessingStage.Aggregate, DocumentProcessingStatus.Analyzing, cancellationToken).ConfigureAwait(false);
+            var startedAt = await MarkStageRunningAsync(DocumentProcessingStage.Aggregate, DocumentProcessingStatus.Analyzing, cancellationToken).ConfigureAwait(false);
 
             var chunks = await EnsureChunksAsync(cancellationToken).ConfigureAwait(false);
             var suggestions = await _templateSuggestions.SuggestAsync(_document, chunks, cancellationToken).ConfigureAwait(false);
+
+            var suggestionMetrics = new Dictionary<string, double>
+            {
+                ["suggestion.count"] = suggestions.Count,
+                ["suggestion.autoAccepted"] = suggestions.Count(s => s.AutoAccepted)
+            };
+
+            var modeGroups = suggestions
+                .Select(s => s.Diagnostics.TryGetValue("mode", out var mode) ? mode : "unknown")
+                .GroupBy(mode => string.IsNullOrWhiteSpace(mode) ? "unknown" : mode, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var modeGroup in modeGroups)
+            {
+                var key = $"suggestion.mode.{modeGroup.Key.ToLowerInvariant()}";
+                suggestionMetrics[key] = modeGroup.Count();
+            }
+
+            if (suggestions.Count == 0)
+            {
+                suggestionMetrics["suggestion.mode.none"] = 1;
+            }
+
             if (suggestions.Count > 0)
             {
                 _document.Summary.AutoClassificationConfidence = suggestions.Max(s => s.Confidence);
@@ -504,16 +570,50 @@ public sealed class DocumentProcessingWorker : BackgroundService
                     _document.AssignedBySystem = true;
                 }
 
-                await _eventSink.RecordAsync(
-                    new DocumentProcessingEventEntry(
-                        Guid.Parse(_document.Id),
-                        DocumentProcessingStage.Aggregate,
-                        DocumentProcessingStatus.Analyzing,
-                        Detail: "Template suggestions evaluated",
-                        Attempt: _job.Attempt,
-                        CorrelationId: _job.CorrelationId),
-                    cancellationToken).ConfigureAwait(false);
+                suggestionMetrics["suggestion.top.confidence"] = topSuggestion.Confidence;
+                if (topSuggestion.Diagnostics.TryGetValue("vectorLatencyMs", out var latencyValue)
+                    && double.TryParse(latencyValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var latencyMs))
+                {
+                    suggestionMetrics["suggestion.vectorLatencyMs"] = latencyMs;
+                }
             }
+
+            var duration = _clock.GetUtcNow() - startedAt;
+
+            Dictionary<string, string>? suggestionContext = null;
+            if (suggestions.Count > 0)
+            {
+                var topSuggestion = suggestions[0];
+                suggestionContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["topProfileId"] = topSuggestion.ProfileId,
+                    ["topConfidence"] = topSuggestion.Confidence.ToString("0.000", CultureInfo.InvariantCulture),
+                    ["autoAccepted"] = topSuggestion.AutoAccepted ? "true" : "false"
+                };
+
+                if (topSuggestion.Diagnostics.TryGetValue("mode", out var modeValue) && !string.IsNullOrWhiteSpace(modeValue))
+                {
+                    suggestionContext["mode"] = modeValue;
+                }
+
+                if (topSuggestion.Diagnostics.TryGetValue("category", out var category) && !string.IsNullOrWhiteSpace(category))
+                {
+                    suggestionContext["category"] = category;
+                }
+            }
+
+            await _eventSink.RecordAsync(
+                new DocumentProcessingEventEntry(
+                    Guid.Parse(_document.Id),
+                    DocumentProcessingStage.Aggregate,
+                    DocumentProcessingStatus.Analyzing,
+                    Detail: "Template suggestions evaluated",
+                    Attempt: _job.Attempt,
+                    CorrelationId: _job.CorrelationId,
+                    Metrics: suggestionMetrics,
+                    Context: suggestionContext,
+                    Duration: duration),
+                cancellationToken).ConfigureAwait(false);
 
             _document.Status = DocumentProcessingStatus.Completed;
             _document.LastProcessedAt = _clock.GetUtcNow();
@@ -530,20 +630,39 @@ public sealed class DocumentProcessingWorker : BackgroundService
                     Detail: "Document processing completed",
                     Attempt: _job.Attempt,
                     CorrelationId: _job.CorrelationId,
+                    Duration: duration,
                     IsTerminal = true),
                 cancellationToken).ConfigureAwait(false);
 
-            await MarkStageCompletedAsync(DocumentProcessingStage.Complete, null, cancellationToken).ConfigureAwait(false);
+            await DocumentDiscoveryProjectionBuilder.RefreshAsync(_clock, cancellationToken).ConfigureAwait(false);
+
+            await MarkStageCompletedAsync(
+                DocumentProcessingStage.Aggregate,
+                DocumentProcessingStage.Complete,
+                DocumentProcessingStatus.Completed,
+                duration,
+                inputTokens: null,
+                outputTokens: null,
+                cancellationToken).ConfigureAwait(false);
+
             return DocumentProcessingStage.Complete;
         }
 
         private async Task<DocumentProcessingStage> CompleteAsync(CancellationToken cancellationToken)
         {
-            await MarkStageCompletedAsync(DocumentProcessingStage.Complete, null, cancellationToken).ConfigureAwait(false);
+            await MarkStageCompletedAsync(
+                DocumentProcessingStage.Complete,
+                nextStage: null,
+                finalStatus: DocumentProcessingStatus.Completed,
+                duration: null,
+                inputTokens: null,
+                outputTokens: null,
+                cancellationToken).ConfigureAwait(false);
+
             return DocumentProcessingStage.Complete;
         }
 
-        private async Task HandleFailureAsync(Exception exception, CancellationToken cancellationToken)
+        private async Task HandleFailureAsync(DocumentProcessingStage stage, Exception exception, CancellationToken cancellationToken)
         {
             _outerLogger.LogError(exception, "Pipeline failed for document {DocumentId}", _document.Id);
 
@@ -555,10 +674,27 @@ public sealed class DocumentProcessingWorker : BackgroundService
             _document.Summary.LastStageCompletedAt = now;
             await _document.Save(cancellationToken).ConfigureAwait(false);
 
+            var state = _job.GetStageState(stage);
+            state.LastError = exception.Message;
+            state.LastCompletedAt = now;
+            state.LastStatus = DocumentProcessingStatus.Failed;
+            state.FailureCount++;
+            state.LastDuration = state.LastStartedAt.HasValue ? now - state.LastStartedAt.Value : null;
+            var lastAttempt = state.Attempts.LastOrDefault();
+            if (lastAttempt is not null)
+            {
+                lastAttempt.CompletedAt = now;
+                lastAttempt.Status = DocumentProcessingStatus.Failed;
+                lastAttempt.Duration = state.LastDuration;
+                lastAttempt.Error = exception.Message;
+            }
+
             var backoff = CalculateBackoff(TimeSpan.FromSeconds(Math.Max(1, _options.Processing.RetryInitialDelaySeconds)), _job.RetryCount + 1, _options.Processing);
             var nextAttemptAt = now + backoff;
 
             _job.RetryCount++;
+            _job.Attempt = 0;
+            _job.Stage = stage;
             _job.Status = _job.RetryCount >= _job.MaxAttempts
                 ? DocumentProcessingStatus.Failed
                 : DocumentProcessingStatus.Queued;
@@ -566,7 +702,20 @@ public sealed class DocumentProcessingWorker : BackgroundService
             _job.NextAttemptAt = _job.RetryCount >= _job.MaxAttempts ? null : nextAttemptAt;
             _job.UpdatedAt = now;
             _job.CompletedAt = now;
+
+            if (_job.RetryCount < _job.MaxAttempts)
+            {
+                state.LastStatus = DocumentProcessingStatus.Queued;
+                state.LastQueuedAt = nextAttemptAt;
+            }
+
             await _job.Save(cancellationToken).ConfigureAwait(false);
+
+            var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["stage"] = stage.ToString(),
+                ["nextAttemptAt"] = _job.NextAttemptAt?.ToString("O") ?? string.Empty
+            };
 
             await _eventSink.RecordAsync(
                 new DocumentProcessingEventEntry(
@@ -575,37 +724,89 @@ public sealed class DocumentProcessingWorker : BackgroundService
                     DocumentProcessingStatus.Failed,
                     Detail: "Processing failed",
                     Error: exception.Message,
+                    Context: context,
                     Attempt: _job.Attempt,
                     CorrelationId: _job.CorrelationId,
+                    Duration: state.LastDuration,
                     IsTerminal: _job.RetryCount >= _job.MaxAttempts),
                 cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task MarkStageRunningAsync(DocumentProcessingStage stage, DocumentProcessingStatus status, CancellationToken cancellationToken)
+        private async Task<DateTimeOffset> MarkStageRunningAsync(DocumentProcessingStage stage, DocumentProcessingStatus status, CancellationToken cancellationToken)
         {
+            var now = _clock.GetUtcNow();
+            _job.Stage = stage;
             _job.Attempt++;
             _job.Status = status;
-            _job.StartedAt = _clock.GetUtcNow();
-            _job.UpdatedAt = _job.StartedAt.Value;
+            _job.StartedAt = now;
+            _job.UpdatedAt = now;
             if (string.IsNullOrWhiteSpace(_job.CorrelationId))
             {
                 _job.CorrelationId = Guid.NewGuid().ToString("N");
             }
 
+            var state = _job.GetStageState(stage);
+            state.Stage = stage;
+            state.LastStatus = status;
+            state.LastStartedAt = now;
+            state.LastCorrelationId = _job.CorrelationId;
+            state.LastError = null;
+            state.AttemptCount++;
+            state.AppendAttempt(new DocumentProcessingStageAttempt
+            {
+                Attempt = state.AttemptCount,
+                StartedAt = now,
+                Status = status
+            });
+
             await _job.Save(cancellationToken).ConfigureAwait(false);
+            return now;
         }
 
-        private async Task MarkStageCompletedAsync(DocumentProcessingStage? _, DocumentProcessingStage? nextStage, CancellationToken cancellationToken)
+        private async Task MarkStageCompletedAsync(
+            DocumentProcessingStage completedStage,
+            DocumentProcessingStage? nextStage,
+            DocumentProcessingStatus finalStatus,
+            TimeSpan? duration,
+            long? inputTokens,
+            long? outputTokens,
+            CancellationToken cancellationToken)
         {
             var now = _clock.GetUtcNow();
+            var state = _job.GetStageState(completedStage);
+            state.LastStatus = finalStatus;
+            state.LastCompletedAt = now;
+            state.LastDuration = duration;
+            state.LastError = null;
+            state.LastInputTokens = inputTokens;
+            state.LastOutputTokens = outputTokens;
+            state.LastCorrelationId = _job.CorrelationId;
+            state.SuccessCount++;
+            var attempt = state.Attempts.LastOrDefault();
+            if (attempt is not null)
+            {
+                attempt.CompletedAt = now;
+                attempt.Status = finalStatus;
+                attempt.Duration = duration;
+                attempt.Error = null;
+                attempt.InputTokens = inputTokens;
+                attempt.OutputTokens = outputTokens;
+            }
+
             _job.Attempt = 0;
             _job.RetryCount = 0;
             _job.Status = nextStage is null ? DocumentProcessingStatus.Completed : DocumentProcessingStatus.Queued;
             _job.CompletedAt = now;
             _job.UpdatedAt = now;
-            _job.NextAttemptAt = now;
-            _job.Stage = nextStage ?? DocumentProcessingStage.Complete;
             _job.LastError = null;
+            _job.NextAttemptAt = nextStage is null ? null : now;
+            _job.Stage = nextStage ?? DocumentProcessingStage.Complete;
+
+            if (nextStage.HasValue)
+            {
+                _job.MarkStageQueued(nextStage.Value, now, _job.CorrelationId);
+            }
+
             await _job.Save(cancellationToken).ConfigureAwait(false);
         }
 
@@ -694,6 +895,29 @@ public sealed class DocumentProcessingWorker : BackgroundService
             }
 
             return Math.Max(1, content.Length / 4);
+        }
+
+        private static long? TryReadDiagnosticToken(IDictionary<string, object?> diagnostics, string key)
+        {
+            if (diagnostics.TryGetValue(key, out var value) && value is not null)
+            {
+                if (value is long longValue)
+                {
+                    return longValue;
+                }
+
+                if (value is double doubleValue)
+                {
+                    return (long)Math.Round(doubleValue, MidpointRounding.AwayFromZero);
+                }
+
+                if (value is string stringValue && long.TryParse(stringValue, out var parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            return null;
         }
     }
 }

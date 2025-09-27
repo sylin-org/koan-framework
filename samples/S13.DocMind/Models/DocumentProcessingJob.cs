@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 
@@ -65,6 +66,34 @@ public sealed class DocumentProcessingJob : Entity<DocumentProcessingJob>
     [Column(TypeName = "jsonb")]
     public DocumentExtractionSnapshot? Extraction { get; set; }
         = null;
+
+    [Column(TypeName = "jsonb")]
+    public Dictionary<string, DocumentProcessingStageState> StageTelemetry { get; set; }
+        = new(StringComparer.OrdinalIgnoreCase);
+
+    public DocumentProcessingStageState GetStageState(DocumentProcessingStage stage)
+    {
+        var key = stage.ToString();
+        if (!StageTelemetry.TryGetValue(key, out var state))
+        {
+            state = new DocumentProcessingStageState
+            {
+                Stage = stage,
+                LastStatus = DocumentProcessingStatus.Queued
+            };
+            StageTelemetry[key] = state;
+        }
+
+        return state;
+    }
+
+    public void MarkStageQueued(DocumentProcessingStage stage, DateTimeOffset queuedAt, string? correlationId)
+    {
+        var state = GetStageState(stage);
+        state.LastStatus = DocumentProcessingStatus.Queued;
+        state.LastQueuedAt = queuedAt;
+        state.LastCorrelationId = correlationId;
+    }
 }
 
 /// <summary>
@@ -87,5 +116,91 @@ public sealed class DocumentExtractionSnapshot
 
     [MaxLength(32)]
     public string? Language { get; set; }
+        = null;
+}
+
+public sealed class DocumentProcessingStageState
+{
+    public const int MaxAttemptHistory = 10;
+
+    [Required]
+    public DocumentProcessingStage Stage { get; set; }
+        = DocumentProcessingStage.Upload;
+
+    [Required]
+    public DocumentProcessingStatus LastStatus { get; set; }
+        = DocumentProcessingStatus.Uploaded;
+
+    public DateTimeOffset? LastQueuedAt { get; set; }
+        = null;
+
+    public DateTimeOffset? LastStartedAt { get; set; }
+        = null;
+
+    public DateTimeOffset? LastCompletedAt { get; set; }
+        = null;
+
+    public TimeSpan? LastDuration { get; set; }
+        = null;
+
+    public int AttemptCount { get; set; }
+        = 0;
+
+    public int SuccessCount { get; set; }
+        = 0;
+
+    public int FailureCount { get; set; }
+        = 0;
+
+    public string? LastError { get; set; }
+        = null;
+
+    public long? LastInputTokens { get; set; }
+        = null;
+
+    public long? LastOutputTokens { get; set; }
+        = null;
+
+    public string? LastCorrelationId { get; set; }
+        = null;
+
+    public List<DocumentProcessingStageAttempt> Attempts { get; set; }
+        = new();
+
+    public void AppendAttempt(DocumentProcessingStageAttempt attempt)
+    {
+        Attempts.Add(attempt);
+        if (Attempts.Count > MaxAttemptHistory)
+        {
+            var skip = Attempts.Count - MaxAttemptHistory;
+            Attempts = Attempts.Skip(skip).ToList();
+        }
+    }
+}
+
+public sealed class DocumentProcessingStageAttempt
+{
+    public int Attempt { get; set; }
+        = 1;
+
+    public DateTimeOffset StartedAt { get; set; }
+        = DateTimeOffset.UtcNow;
+
+    public DateTimeOffset? CompletedAt { get; set; }
+        = null;
+
+    public DocumentProcessingStatus Status { get; set; }
+        = DocumentProcessingStatus.Queued;
+
+    public TimeSpan? Duration { get; set; }
+        = null;
+
+    public string? Error { get; set; }
+        = null;
+
+    public long? InputTokens { get; set; }
+        = null;
+
+    public long? OutputTokens { get; set; }
         = null;
 }

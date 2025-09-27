@@ -1,27 +1,21 @@
 # S13.DocMind Next Steps (Proposal Delta)
 
-## Ledger & Diagnostics
-1. **Design provider-backed job queries.** Prototype filtered `DocumentProcessingJob` lookups (status, stage, retry window, correlation) and reuse them in `/processing/queue` so the worker/diagnostics stop scanning the entire ledger.【F:samples/S13.DocMind/Infrastructure/Repositories/DocumentProcessingJobRepository.cs†L25-L41】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L38-L115】
-2. **Capture stage metrics on the ledger.** Persist started/completed timestamps, token counts, and retry notes for each stage, then surface them through queue/timeline responses to unlock the replay/observability flows promised in the proposal.【F:docs/chunks/S13-DocMind/03_ai_processing.md†L5-L39】【F:docs/chunks/S13-DocMind/02_entity_models.md†L169-L176】
-3. **Update replay surfaces.** Extend `ProcessingController`/CLI to target specific stages using the new queries, returning correlation IDs and guardrails that MCP tooling can consume.【F:docs/chunks/S13-DocMind/04_api_ui_design.md†L1-L40】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L140-L200】
+## Discovery Projection Hardening
+1. **Add change detection.** Introduce refresh throttling and save suppression so `DocumentDiscoveryProjectionBuilder` skips rewrites when content is unchanged and avoids whole-table scans for small deltas.【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L1-L220】
+2. **Validate at scale.** Build representative fixtures/tests that exercise large document/insight sets to confirm overview, collection, and queue projections stay accurate as data grows.【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L1-L150】
+3. **Surface freshness metadata.** Ensure discovery endpoints and docs highlight `RefreshedAt`, paging, and cache behavior so UI/MCP clients can reason about staleness without recomputing aggregates.【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L20-L80】
 
-## Discovery & Analytics
-1. **Implement projection repositories.** Build `InsightCollection`, queue, and timeline aggregates with refreshed-at metadata so dashboards avoid `SourceDocument.All()`/`DocumentInsight.All()` scans.【F:docs/chunks/S13-DocMind/02_entity_models.md†L169-L182】【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L29-L146】
-2. **Expose paged diagnostics endpoints.** Add pagination, filters, and projection timestamps to `/processing/queue` and `/processing/timeline`, wiring results to the new repositories for UI/MCP parity.【F:docs/chunks/S13-DocMind/04_api_ui_design.md†L1-L92】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L38-L136】
-3. **Retire ad-hoc insight math.** Swap the overview/collection calculations to consume the projections, ensuring freshness metadata and consistent filters.【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L29-L146】
+## Vector Readiness & Diagnostics
+1. **Bootstrap semantic profiles.** Extend `DocumentVectorBootstrapper` (or add a companion worker) to seed and refresh semantic profile embeddings alongside chunk vectors.【F:samples/S13.DocMind/Infrastructure/DocumentVectorBootstrapper.cs†L1-L60】
+2. **Expose adapter health.** Publish vector readiness/latency via the registrar and diagnostics queue so operators see when the system falls back to cosine mode.【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L30-L90】【F:samples/S13.DocMind/Infrastructure/DocumentProcessingWorker.cs†L500-L620】
+3. **Test vector modes.** Add unit/integration coverage for vector success, fallback, and degraded paths (including telemetry expectations) to keep suggestion behavior stable.【F:samples/S13.DocMind/Services/TemplateSuggestionService.cs†L120-L320】
 
-## Vector & Template
-1. **Use adapter-backed similarity.** Replace the manual cosine loop with `Vector<SemanticTypeEmbedding>.SearchAsync`, emitting latency/fallback diagnostics that match the S5.Recs approach.【F:samples/S13.DocMind/Services/TemplateSuggestionService.cs†L128-L196】【F:samples/S5.Recs/Services/RecsService.cs†L96-L155】
-2. **Bootstrap semantic profile embeddings.** Extend the bootstrapper to ensure profile vectors exist, rebuild stale ones, and flag degraded states when the adapter is offline.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L5-L12】【F:samples/S13.DocMind/Infrastructure/DocumentVectorBootstrapper.cs†L20-L37】
-3. **Surface vector health.** Publish adapter readiness and last-sync timestamps through the boot report and diagnostics responses so operators understand fallbacks.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L90-L112】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L45-L79】
-
-## Operations & Quality
-1. **Add health probes.** Implement storage/vector/model checks in `DocMindRegistrar` and expose `/health` endpoints per the infrastructure playbook.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L90-L112】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L45-L79】
-2. **Instrument pipeline telemetry.** Wrap AI stage calls with OpenTelemetry spans and persist token/duration metrics on processing events to satisfy the observability plan.【F:docs/chunks/S13-DocMind/03_ai_processing.md†L55-L59】【F:samples/S13.DocMind/Infrastructure/DocumentProcessingWorker.cs†L200-L360】
-3. **Stand up DocMind test suites.** Create the unit/integration projects with fake AI providers and ledger-focused smoke tests, then wire them into CI as the testing plan outlines.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L5-L67】
+## Replay & Operational Quality
+1. **Finish replay flows.** Deliver the stage-targeted retry CLI/APIs with concurrency guards and correlation IDs so MCP tooling can drive resumptions using the new ledger telemetry.【F:samples/S13.DocMind/Controllers/ProcessingController.cs†L1-L120】【F:docs/chunks/S13-DocMind/04_api_ui_design.md†L1-L52】
+2. **Register health & telemetry.** Wire storage/vector/model probes and OpenTelemetry exporters into `DocMindRegistrar` to match the infrastructure playbook.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L40-L112】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L30-L90】
+3. **Stand up DocMind tests.** Create the dedicated unit/integration suites with fake AI/vector providers and pipeline smoke tests, wiring them into CI as the testing plan outlines.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L5-L110】
 
 ## Immediate Spikes
-- **Query design spike:** Validate repository filters against sample data before refactoring the worker loop.【F:samples/S13.DocMind/Infrastructure/Repositories/DocumentProcessingJobRepository.cs†L25-L41】
-- **Projection schema sketch:** Draft aggregation schemas for insight/queue/timeline projections to confirm they meet dashboard needs.【F:docs/chunks/S13-DocMind/02_entity_models.md†L169-L182】【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L29-L146】
-- **Vector adapter capabilities check:** Exercise `Vector<T>.SearchAsync` and degraded-mode behavior to document fallbacks aligned with S5.Recs.【F:samples/S13.DocMind/Services/TemplateSuggestionService.cs†L128-L196】【F:samples/S5.Recs/Services/RecsService.cs†L96-L155】
-- **Ops rollout planning:** Decide which health probes, telemetry exporters, and test suites land with the first iteration so operational hardening tracks the refactor.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L90-L112】【F:docs/chunks/S13-DocMind/07_testing_ops.md†L5-L73】
+- **Projection load test:** Capture metrics from replaying sample data through `DocumentDiscoveryProjectionBuilder` to size incremental refresh work.【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L1-L220】
+- **Semantic profile audit:** Inventory existing profiles/embeddings to scope bootstrap coverage and fallback behavior.【F:samples/S13.DocMind/Infrastructure/DocumentVectorBootstrapper.cs†L1-L60】
+- **Replay tooling UX review:** Prototype the CLI/API surface for stage-targeted resumes before wiring into diagnostics to ensure operator workflows make sense.【F:samples/S13.DocMind/Controllers/ProcessingController.cs†L1-L120】
