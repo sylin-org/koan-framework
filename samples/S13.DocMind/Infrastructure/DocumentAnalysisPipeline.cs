@@ -17,12 +17,12 @@ namespace S13.DocMind.Infrastructure;
 
 public sealed class DocumentAnalysisPipeline : BackgroundService
 {
-    private readonly DocumentPipelineQueue _queue;
+    private readonly IDocumentPipelineQueue _queue;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly DocMindOptions _options;
     private readonly ILogger<DocumentAnalysisPipeline> _logger;
 
-    public DocumentAnalysisPipeline(DocumentPipelineQueue queue, IServiceScopeFactory scopeFactory, IOptions<DocMindOptions> options, ILogger<DocumentAnalysisPipeline> logger)
+    public DocumentAnalysisPipeline(IDocumentPipelineQueue queue, IServiceScopeFactory scopeFactory, IOptions<DocMindOptions> options, ILogger<DocumentAnalysisPipeline> logger)
     {
         _queue = queue;
         _scopeFactory = scopeFactory;

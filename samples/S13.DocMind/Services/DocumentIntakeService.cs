@@ -15,14 +15,14 @@ namespace S13.DocMind.Services;
 public sealed class DocumentIntakeService : IDocumentIntakeService
 {
     private readonly IDocumentStorage _storage;
-    private readonly DocumentPipelineQueue _queue;
+    private readonly IDocumentPipelineQueue _queue;
     private readonly DocMindOptions _options;
     private readonly ILogger<DocumentIntakeService> _logger;
     private readonly TimeProvider _clock;
 
     public DocumentIntakeService(
         IDocumentStorage storage,
-        DocumentPipelineQueue queue,
+        IDocumentPipelineQueue queue,
         IOptions<DocMindOptions> options,
         ILogger<DocumentIntakeService> logger,
         TimeProvider clock)

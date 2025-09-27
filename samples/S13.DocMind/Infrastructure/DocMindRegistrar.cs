@@ -18,7 +18,7 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
     {
         services.AddKoanOptions<DocMindOptions>(DocMindOptions.Section);
 
-        services.AddSingleton<DocumentPipelineQueue>();
+        services.AddSingleton<IDocumentPipelineQueue, DocumentPipelineQueue>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
         services.AddScoped<IDocumentIntakeService, DocumentIntakeService>();
         services.AddScoped<ITextExtractionService, TextExtractionService>();

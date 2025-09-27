@@ -47,6 +47,23 @@ public sealed class DocMindOptions
         public int ChunkSizeTokens { get; set; } = 800;
 
         public bool EnableVisionExtraction { get; set; } = true;
+
+        [Range(1, 256)]
+        public int WorkerBatchSize { get; set; } = 4;
+
+        [Range(1, 20)]
+        public int MaxRetryAttempts { get; set; } = 5;
+
+        [Range(1, 3600)]
+        public int RetryInitialDelaySeconds { get; set; } = 5;
+
+        [Range(1, 3600)]
+        public int RetryMaxDelaySeconds { get; set; } = 300;
+
+        [Range(1.0, 10.0)]
+        public double RetryBackoffMultiplier { get; set; } = 2.0;
+
+        public bool RetryUseJitter { get; set; } = true;
     }
 
     public sealed class AiOptions
