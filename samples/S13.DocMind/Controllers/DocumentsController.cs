@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using S13.DocMind.Contracts;
+using S13.DocMind.Infrastructure.Repositories;
 using S13.DocMind.Models;
 using S13.DocMind.Services;
 using Koan.Web.Controllers;
@@ -50,16 +51,22 @@ public sealed class DocumentsController : EntityController<SourceDocument>
         var document = await SourceDocument.Get(id, cancellationToken).ConfigureAwait(false);
         if (document is null) return NotFound();
 
-        var events = await DocumentProcessingEvent.Query($"DocumentId == '{id}'", cancellationToken).ConfigureAwait(false);
+        if (!Guid.TryParse(id, out var documentGuid))
+        {
+            return BadRequest();
+        }
+
+        var events = await ProcessingEventRepository.GetTimelineAsync(documentGuid, null, null, null, cancellationToken).ConfigureAwait(false);
         var response = events
             .OrderBy(e => e.CreatedAt)
             .Select(e => new TimelineEntryResponse
             {
                 Stage = e.Stage,
                 Status = e.Status,
-                Message = e.Message,
+                Detail = e.Detail ?? string.Empty,
                 CreatedAt = e.CreatedAt,
-                Context = e.Context
+                Context = new Dictionary<string, string>(e.Context, StringComparer.OrdinalIgnoreCase),
+                Metrics = new Dictionary<string, double>(e.Metrics)
             })
             .ToList();
         return Ok(response);
@@ -71,38 +78,33 @@ public sealed class DocumentsController : EntityController<SourceDocument>
         var document = await SourceDocument.Get(id, cancellationToken).ConfigureAwait(false);
         if (document is null) return NotFound();
 
-        var chunks = await DocumentChunk.Query($"DocumentId == '{id}'", cancellationToken).ConfigureAwait(false);
-        List<DocumentInsight>? insights = null;
-        Dictionary<string, List<DocumentInsightResponse>>? lookup = null;
-        if (includeInsights)
+        if (!Guid.TryParse(id, out var documentGuid))
         {
-            insights = await DocumentInsight.Query($"DocumentId == '{id}'", cancellationToken).ConfigureAwait(false);
-            lookup = insights
-                .GroupBy(i => i.ChunkId ?? string.Empty)
-                .ToDictionary(g => g.Key, g => g
-                    .Select(i => new DocumentInsightResponse
-                    {
-                        Id = i.Id,
-                        Title = i.Title,
-                        Content = i.Content,
-                        Confidence = i.Confidence,
-                        Channel = i.Channel,
-                        CreatedAt = i.CreatedAt
-                    })
-                    .ToList());
+            return BadRequest();
         }
 
+        var chunks = await DocumentChunk.Query($"SourceDocumentId == '{documentGuid}'", cancellationToken).ConfigureAwait(false);
+
         var response = chunks
-            .OrderBy(c => c.Index)
+            .OrderBy(c => c.Order)
             .Select(c => new DocumentChunkResponse
             {
                 Id = c.Id,
-                Index = c.Index,
-                Channel = c.Channel,
-                Content = c.Content,
-                Summary = c.Summary,
-                TokenEstimate = c.TokenEstimate,
-                Insights = lookup is null ? Array.Empty<DocumentInsightResponse>() : lookup.TryGetValue(c.Id, out var entries) ? entries : Array.Empty<DocumentInsightResponse>()
+                Order = c.Order,
+                Text = c.Text,
+                CharacterCount = c.CharacterCount,
+                TokenCount = c.TokenCount,
+                IsLastChunk = c.IsLastChunk,
+                InsightRefs = includeInsights
+                    ? c.InsightRefs.Select(refEntry => new InsightReferenceResponse
+                        {
+                            InsightId = refEntry.InsightId.ToString(),
+                            Channel = refEntry.Channel,
+                            Confidence = refEntry.Confidence,
+                            Heading = refEntry.Heading
+                        })
+                        .ToList()
+                    : Array.Empty<InsightReferenceResponse>()
             })
             .ToList();
 
@@ -115,20 +117,28 @@ public sealed class DocumentsController : EntityController<SourceDocument>
         var document = await SourceDocument.Get(id, cancellationToken).ConfigureAwait(false);
         if (document is null) return NotFound();
 
+        if (!Guid.TryParse(id, out var documentGuid))
+        {
+            return BadRequest();
+        }
+
         var query = string.IsNullOrWhiteSpace(channel)
-            ? $"DocumentId == '{id}'"
-            : $"DocumentId == '{id}' AND Channel == '{channel}'";
+            ? $"SourceDocumentId == '{documentGuid}'"
+            : $"SourceDocumentId == '{documentGuid}' AND Channel == '{channel}'";
         var insights = await DocumentInsight.Query(query, cancellationToken).ConfigureAwait(false);
         var response = insights
             .OrderByDescending(i => i.CreatedAt)
             .Select(i => new DocumentInsightResponse
             {
                 Id = i.Id,
-                Title = i.Title,
-                Content = i.Content,
+                Heading = i.Heading,
+                Body = i.Body,
                 Confidence = i.Confidence,
                 Channel = i.Channel,
-                CreatedAt = i.CreatedAt
+                Section = i.Section,
+                GeneratedAt = i.GeneratedAt,
+                StructuredPayload = new Dictionary<string, object?>(i.StructuredPayload),
+                Metadata = new Dictionary<string, string>(i.Metadata, StringComparer.OrdinalIgnoreCase)
             })
             .ToList();
 

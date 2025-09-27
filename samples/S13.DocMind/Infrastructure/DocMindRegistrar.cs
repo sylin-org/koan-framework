@@ -1,9 +1,14 @@
+using System.Globalization;
+using System.IO;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Core;
+using Koan.Data.Vector;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using S13.DocMind.Models;
 using S13.DocMind.Services;
 
 namespace S13.DocMind.Infrastructure;
@@ -16,17 +21,20 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddKoanOptions<DocMindStorageOptions>(DocMindStorageOptions.Section);
-        services.AddKoanOptions<DocMindProcessingOptions>(DocMindProcessingOptions.Section);
-        services.AddKoanOptions<DocMindAiOptions>(DocMindAiOptions.Section);
+        services.AddSingleton<IValidateOptions<DocMindOptions>, DocMindOptionsValidator>();
 
-        services.AddSingleton<DocumentPipelineQueue>();
+        services.AddSingleton<IDocumentPipelineQueue, DocumentPipelineQueue>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
+        services.AddScoped<IDocumentProcessingEventSink, DocumentProcessingEventRepositorySink>();
         services.AddScoped<IDocumentIntakeService, DocumentIntakeService>();
         services.AddScoped<ITextExtractionService, TextExtractionService>();
+        services.AddScoped<IVisionInsightService, VisionInsightService>();
         services.AddScoped<IInsightSynthesisService, InsightSynthesisService>();
         services.AddScoped<ITemplateSuggestionService, TemplateSuggestionService>();
         services.AddScoped<IEmbeddingGenerator, EmbeddingGenerator>();
+        services.AddScoped<IDocumentInsightsService, DocumentInsightsService>();
+        services.AddScoped<IDocumentAggregationService, DocumentAggregationService>();
+        services.AddScoped<IDocumentProcessingDiagnostics, DocumentProcessingDiagnostics>();
         services.AddSingleton(TimeProvider.System);
 
         services.AddHostedService<DocumentAnalysisPipeline>();
@@ -37,9 +45,35 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
     {
         report.AddModule(ModuleName, ModuleVersion);
 
-        var storageSection = configuration.GetSection(DocMindStorageOptions.Section);
-        report.AddSetting("Storage.BasePath", storageSection[nameof(DocMindStorageOptions.BasePath)] ?? "uploads");
-        report.AddSetting("Processing.MaxConcurrency", configuration[$"{DocMindProcessingOptions.Section}:{nameof(DocMindProcessingOptions.MaxConcurrency)}"] ?? "auto");
-        report.AddSetting("AI.DefaultModel", configuration[$"{DocMindAiOptions.Section}:{nameof(DocMindAiOptions.DefaultModel)}"] ?? "llama3");
+        var docMindSection = configuration.GetSection(DocMindOptions.Section);
+        var options = docMindSection.Get<DocMindOptions>() ?? new DocMindOptions();
+
+        report.AddSetting("Storage.BasePath", options.Storage.BasePath);
+        report.AddSetting("Storage.Bucket", options.Storage.Bucket);
+        report.AddSetting("Storage.AllowedContentTypes", string.Join(",", options.Storage.AllowedContentTypes));
+
+        var physicalPath = Path.IsPathRooted(options.Storage.BasePath)
+            ? options.Storage.BasePath
+            : Path.Combine(environment.ContentRootPath, options.Storage.BasePath);
+        if (!Directory.Exists(physicalPath))
+        {
+            report.AddNote($"Storage path missing: {physicalPath}");
+        }
+
+        report.AddSetting("Processing.QueueCapacity", options.Processing.QueueCapacity.ToString(CultureInfo.InvariantCulture));
+        report.AddSetting("Processing.MaxConcurrency", options.Processing.MaxConcurrency.ToString(CultureInfo.InvariantCulture));
+        report.AddSetting("Processing.PollIntervalSeconds", options.Processing.PollIntervalSeconds.ToString(CultureInfo.InvariantCulture));
+        report.AddSetting("Processing.MaxRetryAttempts", options.Processing.MaxRetryAttempts.ToString(CultureInfo.InvariantCulture));
+
+        report.AddSetting("AI.DefaultModel", options.Ai.DefaultModel);
+        report.AddSetting("AI.EmbeddingModel", options.Ai.EmbeddingModel);
+        report.AddSetting("AI.VisionModel", options.Ai.VisionModel ?? "(disabled)");
+
+        var vectorStatus = Vector<DocumentChunkEmbedding>.IsAvailable ? "available" : "unavailable";
+        report.AddSetting("Vector.Adapter", vectorStatus);
+        if (!Vector<DocumentChunkEmbedding>.IsAvailable)
+        {
+            report.AddNote("Vector adapter not detected; semantic suggestions will fallback to lexical scoring.");
+        }
     }
 }

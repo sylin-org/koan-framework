@@ -16,14 +16,14 @@ namespace S13.DocMind.Services;
 public sealed class TemplateSuggestionService : ITemplateSuggestionService
 {
     private readonly IAi? _ai;
-    private readonly DocMindAiOptions _aiOptions;
+    private readonly DocMindOptions _options;
     private readonly IEmbeddingGenerator _embeddingGenerator;
     private readonly ILogger<TemplateSuggestionService> _logger;
 
-    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindAiOptions> aiOptions, IEmbeddingGenerator embeddingGenerator, ILogger<TemplateSuggestionService> logger)
+    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, IEmbeddingGenerator embeddingGenerator, ILogger<TemplateSuggestionService> logger)
     {
         _ai = serviceProvider.GetService<IAi>();
-        _aiOptions = aiOptions.Value;
+        _options = options.Value;
         _embeddingGenerator = embeddingGenerator;
         _logger = logger;
     }
@@ -46,7 +46,7 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
                 var prompt = BuildTemplatePrompt(request);
                 var response = await _ai.PromptAsync(new AiChatRequest
                 {
-                    Model = _aiOptions.DefaultModel,
+                    Model = _options.Ai.DefaultModel,
                     Messages =
                     {
                         new AiMessage("system", "Design a JSON extraction template."),
@@ -67,12 +67,13 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
             profile.Prompt = BuildFallbackPrompt(request);
         }
 
+        profile = await profile.Save(cancellationToken).ConfigureAwait(false);
+
         if (!string.IsNullOrWhiteSpace(request.SampleText))
         {
-            profile.Embedding = await _embeddingGenerator.GenerateAsync(request.SampleText, cancellationToken).ConfigureAwait(false);
+            await UpsertEmbeddingAsync(profile, request.SampleText, cancellationToken).ConfigureAwait(false);
         }
 
-        profile = await profile.Save(cancellationToken);
         return profile;
     }
 
@@ -100,7 +101,7 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
 
         var response = await _ai.PromptAsync(new AiChatRequest
         {
-            Model = _aiOptions.DefaultModel,
+            Model = _options.Ai.DefaultModel,
             Messages =
             {
                 new AiMessage("system", profile.Prompt.SystemPrompt),
@@ -113,7 +114,7 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
             RawResponse = response.Text,
             Diagnostics = new Dictionary<string, string>
             {
-                ["model"] = response.Model ?? _aiOptions.DefaultModel,
+                ["model"] = response.Model ?? _options.Ai.DefaultModel,
                 ["tokensIn"] = response.TokensIn?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 ["tokensOut"] = response.TokensOut?.ToString(CultureInfo.InvariantCulture) ?? string.Empty
             }
@@ -122,26 +123,70 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
 
     public async Task<IReadOnlyList<DocumentProfileSuggestion>> SuggestAsync(SourceDocument document, IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
     {
-        var profiles = await SemanticTypeProfile.All(cancellationToken).ConfigureAwait(false);
         var suggestions = new List<DocumentProfileSuggestion>();
-        var docVector = AverageEmbedding(chunks);
-        if (docVector is null)
+
+        if (!Vector<SemanticTypeEmbedding>.IsAvailable)
+        {
+            _logger.LogDebug("Vector adapter unavailable; skipping template suggestions.");
+            return suggestions;
+        }
+
+        var documentVector = await BuildDocumentVectorAsync(chunks, cancellationToken).ConfigureAwait(false);
+        if (documentVector is null)
         {
             return suggestions;
         }
 
+        var profiles = await SemanticTypeProfile.All(cancellationToken).ConfigureAwait(false);
+        var embeddings = await SemanticTypeEmbedding.All(cancellationToken).ConfigureAwait(false);
+        var embeddingByProfile = embeddings
+            .Where(e => e.Embedding is { Length: > 0 })
+            .ToDictionary(e => e.SemanticTypeProfileId, e => e.Embedding);
+
         foreach (var profile in profiles)
         {
-            if (profile.Archived || profile.Embedding is null) continue;
-            var similarity = CosineSimilarity(docVector, profile.Embedding);
-            if (similarity <= 0) continue;
+            if (profile.Archived)
+            {
+                continue;
+            }
+
+            if (!Guid.TryParse(profile.Id, out var profileId))
+            {
+                continue;
+            }
+
+            if (!embeddingByProfile.TryGetValue(profileId, out var embedding))
+            {
+                continue;
+            }
+
+            var similarity = CosineSimilarity(documentVector, embedding);
+            if (similarity <= 0)
+            {
+                continue;
+            }
+
+            var confidence = CalibrateConfidence(similarity);
+            var diagnostics = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["similarity"] = similarity.ToString("0.000", CultureInfo.InvariantCulture),
+                ["confidence"] = confidence.ToString("0.000", CultureInfo.InvariantCulture),
+                ["embeddingModel"] = _options.Ai.EmbeddingModel
+            };
+
+            if (!string.IsNullOrWhiteSpace(profile.Category))
+            {
+                diagnostics["category"] = profile.Category;
+            }
+
             suggestions.Add(new DocumentProfileSuggestion
             {
                 ProfileId = profile.Id,
-                Confidence = similarity,
+                Confidence = confidence,
                 Summary = profile.Description,
                 SuggestedAt = DateTimeOffset.UtcNow,
-                AutoAccepted = false
+                AutoAccepted = confidence >= 0.85,
+                Diagnostics = diagnostics
             });
         }
 
@@ -207,32 +252,82 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         return builder.ToString();
     }
 
-    private static float[]? AverageEmbedding(IReadOnlyList<DocumentChunk> chunks)
+    private async Task<float[]?> BuildDocumentVectorAsync(IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
     {
-        var vectors = chunks
-            .Select(c => c.Embedding)
-            .Where(e => e is not null)
-            .Cast<float[]>()
-            .ToList();
-
-        if (vectors.Count == 0) return null;
-
-        var dimension = vectors[0].Length;
-        var accumulator = new double[dimension];
-        foreach (var vector in vectors)
+        if (chunks is null || chunks.Count == 0)
         {
-            for (var i = 0; i < dimension; i++)
+            return null;
+        }
+
+        var combined = string.Join(Environment.NewLine + Environment.NewLine, chunks.Select(c => c.Text));
+        return await _embeddingGenerator.GenerateAsync(combined, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task UpsertEmbeddingAsync(SemanticTypeProfile profile, string sampleText, CancellationToken cancellationToken)
+    {
+        if (!Vector<SemanticTypeEmbedding>.IsAvailable)
+        {
+            return;
+        }
+
+        var embedding = await _embeddingGenerator.GenerateAsync(sampleText, cancellationToken).ConfigureAwait(false);
+        if (embedding is null || embedding.Length == 0)
+        {
+            return;
+        }
+
+        if (!Guid.TryParse(profile.Id, out var profileId))
+        {
+            return;
+        }
+
+        var entity = new SemanticTypeEmbedding
+        {
+            SemanticTypeProfileId = profileId,
+            Embedding = embedding,
+            GeneratedAt = DateTimeOffset.UtcNow
+        };
+
+        await entity.Save(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static string GenerateCode(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return $"profile-{Guid.NewGuid():N}";
+        }
+
+        var span = name.Trim().ToLowerInvariant().AsSpan();
+        Span<char> buffer = stackalloc char[Math.Min(span.Length, 60)];
+        var index = 0;
+        foreach (var ch in span)
+        {
+            if (char.IsLetterOrDigit(ch))
             {
-                accumulator[i] += vector[i];
+                buffer[index++] = ch;
+            }
+            else if (char.IsWhiteSpace(ch) || ch is '-' or '_')
+            {
+                if (index > 0 && buffer[index - 1] != '-')
+                {
+                    buffer[index++] = '-';
+                }
+            }
+
+            if (index >= buffer.Length)
+            {
+                break;
             }
         }
 
-        var avg = new float[dimension];
-        for (var i = 0; i < dimension; i++)
+        if (index == 0)
         {
-            avg[i] = (float)(accumulator[i] / vectors.Count);
+            return $"profile-{Guid.NewGuid():N}";
         }
-        return avg;
+
+        var code = new string(buffer[..index]).Trim('-');
+        return string.IsNullOrWhiteSpace(code) ? $"profile-{Guid.NewGuid():N}" : code;
     }
 
     private static double CosineSimilarity(float[] a, float[] b)
@@ -248,4 +343,21 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         if (normA == 0 || normB == 0) return 0;
         return dot / (Math.Sqrt(normA) * Math.Sqrt(normB));
     }
+
+    private static double CalibrateConfidence(double similarity)
+    {
+        var normalized = (similarity + 1) / 2; // map -1..1 -> 0..1
+        var adjusted = Math.Pow(Math.Clamp(normalized, 0, 1), 1.2); // emphasize higher matches
+        return Math.Round(adjusted, 3, MidpointRounding.AwayFromZero);
+    }
+}
+
+public sealed class DocumentProfileSuggestion
+{
+    public string ProfileId { get; set; } = string.Empty;
+    public double Confidence { get; set; }
+    public string? Summary { get; set; }
+    public DateTimeOffset SuggestedAt { get; set; }
+    public bool AutoAccepted { get; set; }
+    public Dictionary<string, string> Diagnostics { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }

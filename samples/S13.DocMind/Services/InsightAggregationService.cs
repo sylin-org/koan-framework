@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using S13.DocMind.Models;
 
@@ -79,6 +80,19 @@ public sealed class InsightAggregationService : IInsightAggregationService
             {
                 diagnostics[$"vision.{kvp.Key}"] = kvp.Value;
             }
+
+            if (visionResult.StructuredPayload.Count > 0)
+            {
+                diagnostics["vision.structured"] = visionResult.StructuredPayload;
+            }
+            if (!string.IsNullOrWhiteSpace(visionResult.ExtractedText))
+            {
+                diagnostics["vision.ocrText"] = visionResult.ExtractedText;
+            }
+            if (visionResult.Confidence.HasValue)
+            {
+                confidences["vision.overall"] = visionResult.Confidence.Value;
+            }
         }
 
         foreach (var field in template.Fields)
@@ -95,7 +109,7 @@ public sealed class InsightAggregationService : IInsightAggregationService
             foreach (var obs in visionResult.Observations)
             {
                 var key = $"vision.{obs.Label}";
-                structured[key] = obs.Metadata ?? new Dictionary<string, object>();
+                structured[key] = new Dictionary<string, object?>(obs.Metadata);
                 confidences[key] = obs.Confidence;
             }
         }

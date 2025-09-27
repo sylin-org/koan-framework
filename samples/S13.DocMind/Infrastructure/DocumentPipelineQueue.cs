@@ -1,56 +1,83 @@
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using S13.DocMind.Models;
 
 namespace S13.DocMind.Infrastructure;
-
-public record ProcessingProfile(string Name, string? TextModel = null, string? VisionModel = null, string? EmbeddingModel = null)
-{
-    public static ProcessingProfile Default(string? embeddingModel = null) => new("default", embeddingModel: embeddingModel);
-}
 
 public sealed class DocumentWorkItem
 {
     private readonly object _lock = new();
 
     public DocumentWorkItem(
-        string fileId,
-        string? documentTypeId,
-        ProcessingProfile profile,
-        string? correlationId = null,
-        string? traceId = null,
-        string? spanId = null)
+        Guid documentId,
+        DocumentProcessingStage stage,
+        DocumentProcessingStatus status = DocumentProcessingStatus.Queued,
+        string? correlationId = null)
     {
-        FileId = fileId;
-        DocumentTypeId = documentTypeId;
-        Profile = profile;
-        CorrelationId = correlationId ?? Guid.NewGuid().ToString("N");
-        TraceId = traceId ?? Guid.NewGuid().ToString("N");
-        SpanId = spanId ?? Guid.NewGuid().ToString("N");
+        if (documentId == Guid.Empty)
+        {
+            throw new ArgumentException("Document id is required", nameof(documentId));
+        }
+
+        DocumentId = documentId;
+        Stage = stage;
+        Status = status;
+        WorkId = Guid.NewGuid();
+        CorrelationId = string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString("N") : correlationId!;
         EnqueuedAt = DateTimeOffset.UtcNow;
         MaxAttempts = 3;
     }
 
-    public string FileId { get; }
-    public string? DocumentTypeId { get; }
-    public ProcessingProfile Profile { get; }
+    public Guid WorkId { get; }
+
+    public Guid DocumentId { get; }
+
+    public DocumentProcessingStage Stage { get; private set; }
+
+    public DocumentProcessingStatus Status { get; private set; }
 
     public string CorrelationId { get; }
-    public string TraceId { get; }
-    public string SpanId { get; }
 
     public int Attempt { get; private set; }
+
     public int RetryCount { get; private set; }
-    public int ConsecutiveFailures { get; private set; }
-    public int MaxAttempts { get; internal set; }
+
+    public int MaxAttempts { get; private set; }
 
     public DateTimeOffset EnqueuedAt { get; }
+
     public DateTimeOffset? LastDequeuedAt { get; private set; }
+
     public DateTimeOffset? LastAttemptCompletedAt { get; private set; }
 
-    public Dictionary<string, string> Tags { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> Metadata { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public bool CanRetry => RetryCount < MaxAttempts;
+
+    public void ConfigureMaxAttempts(int maxAttempts)
+    {
+        if (maxAttempts <= 0)
+        {
+            maxAttempts = 1;
+        }
+
+        lock (_lock)
+        {
+            MaxAttempts = maxAttempts;
+        }
+    }
+
+    public void UpdateStage(DocumentProcessingStage stage, DocumentProcessingStatus status)
+    {
+        lock (_lock)
+        {
+            Stage = stage;
+            Status = status;
+        }
+    }
 
     public void MarkDequeued()
     {
@@ -61,19 +88,12 @@ public sealed class DocumentWorkItem
         }
     }
 
-    public void MarkAttemptCompleted(bool success)
+    public void MarkCompleted(DocumentProcessingStatus status)
     {
         lock (_lock)
         {
+            Status = status;
             LastAttemptCompletedAt = DateTimeOffset.UtcNow;
-            if (success)
-            {
-                ConsecutiveFailures = 0;
-            }
-            else
-            {
-                ConsecutiveFailures++;
-            }
         }
     }
 
@@ -87,40 +107,39 @@ public sealed class DocumentWorkItem
     }
 
     public override string ToString()
-        => $"DocumentWorkItem {{ FileId = {FileId}, Attempt = {Attempt}, RetryCount = {RetryCount}, TraceId = {TraceId} }}";
-}
-
-public sealed class DocumentPipelineQueueOptions
-{
-    public int WorkerBatchSize { get; set; } = 4;
-    public int MaxRetryCount { get; set; } = 5;
-    public double BackoffMultiplier { get; set; } = 2.0;
-    public TimeSpan InitialRetryDelay { get; set; } = TimeSpan.FromSeconds(5);
-    public TimeSpan MaxRetryDelay { get; set; } = TimeSpan.FromMinutes(5);
-    public bool UseJitter { get; set; } = true;
+        => $"DocumentWorkItem {{ DocumentId = {DocumentId}, Stage = {Stage}, Attempt = {Attempt}, RetryCount = {RetryCount}, CorrelationId = {CorrelationId} }}";
 }
 
 public interface IDocumentPipelineQueue
 {
     ValueTask EnqueueAsync(DocumentWorkItem workItem, CancellationToken ct = default);
-    ValueTask<IReadOnlyList<DocumentWorkItem>> DequeueBatchAsync(int maxItems, CancellationToken ct = default);
+
+    IAsyncEnumerable<DocumentWorkItem> DequeueAsync(CancellationToken ct = default);
+
     ValueTask<bool> ScheduleRetryAsync(DocumentWorkItem workItem, Exception reason, CancellationToken ct = default);
+
+    ValueTask CompleteAsync(DocumentWorkItem workItem, CancellationToken ct = default);
+
+    IReadOnlyCollection<DocumentQueueSnapshotItem> GetSnapshot();
 }
 
 public sealed class DocumentPipelineQueue : IDocumentPipelineQueue
 {
     private readonly Channel<DocumentWorkItem> _channel;
     private readonly ILogger<DocumentPipelineQueue> _logger;
-    private readonly IOptionsMonitor<DocumentPipelineQueueOptions> _options;
+    private readonly IOptionsMonitor<DocMindOptions> _options;
+    private readonly ConcurrentDictionary<Guid, DocumentWorkItem> _workItems = new();
     private readonly Random _random = new();
 
     public DocumentPipelineQueue(
         ILogger<DocumentPipelineQueue> logger,
-        IOptionsMonitor<DocumentPipelineQueueOptions> options)
+        IOptionsMonitor<DocMindOptions> options)
     {
         _logger = logger;
         _options = options;
-        var channelOptions = new BoundedChannelOptions(capacity: 500)
+        var processing = options.CurrentValue.Processing;
+        var capacity = Math.Max(1, processing.QueueCapacity);
+        var channelOptions = new BoundedChannelOptions(capacity)
         {
             AllowSynchronousContinuations = false,
             FullMode = BoundedChannelFullMode.Wait,
@@ -132,83 +151,62 @@ public sealed class DocumentPipelineQueue : IDocumentPipelineQueue
 
     public async ValueTask EnqueueAsync(DocumentWorkItem workItem, CancellationToken ct = default)
     {
-        var opts = _options.CurrentValue;
-        workItem.MaxAttempts = Math.Max(opts.MaxRetryCount, workItem.MaxAttempts);
-        _logger.LogDebug("Queueing document {DocumentId} for processing (trace: {TraceId})", workItem.FileId, workItem.TraceId);
+        var processing = _options.CurrentValue.Processing;
+        workItem.ConfigureMaxAttempts(processing.MaxRetryAttempts);
+        workItem.UpdateStage(workItem.Stage, DocumentProcessingStatus.Queued);
+        _workItems[workItem.WorkId] = workItem;
+        _logger.LogDebug(
+            "Queueing document {DocumentId} for stage {Stage} (correlation: {CorrelationId})",
+            workItem.DocumentId,
+            workItem.Stage,
+            workItem.CorrelationId);
         await _channel.Writer.WriteAsync(workItem, ct);
     }
 
-    public async ValueTask<IReadOnlyList<DocumentWorkItem>> DequeueBatchAsync(int maxItems, CancellationToken ct = default)
+    public async IAsyncEnumerable<DocumentWorkItem> DequeueAsync([EnumeratorCancellation] CancellationToken ct = default)
     {
-        if (maxItems <= 0)
+        while (await _channel.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
         {
-            throw new ArgumentOutOfRangeException(nameof(maxItems), "Batch size must be greater than zero.");
+            while (_channel.Reader.TryRead(out var item))
+            {
+                item.MarkDequeued();
+                yield return item;
+            }
         }
-
-        var items = new List<DocumentWorkItem>(maxItems);
-
-        while (!ct.IsCancellationRequested && items.Count < maxItems)
-        {
-            DocumentWorkItem? item = null;
-            if (items.Count == 0)
-            {
-                try
-                {
-                    item = await _channel.Reader.ReadAsync(ct);
-                }
-                catch (ChannelClosedException)
-                {
-                    break;
-                }
-            }
-            else if (_channel.Reader.TryRead(out item))
-            {
-                // already populated
-            }
-
-            if (item == null)
-            {
-                break;
-            }
-
-            item.MarkDequeued();
-            items.Add(item);
-        }
-
-        return items;
     }
 
     public async ValueTask<bool> ScheduleRetryAsync(DocumentWorkItem workItem, Exception reason, CancellationToken ct = default)
     {
         var attempt = workItem.RegisterRetry();
-        var opts = _options.CurrentValue;
-        if (attempt > opts.MaxRetryCount)
+        var processing = _options.CurrentValue.Processing;
+        if (attempt > processing.MaxRetryAttempts)
         {
             _logger.LogWarning(
                 reason,
-                "Dropping document {DocumentId} after exhausting {RetryCount} retries (trace: {TraceId})",
-                workItem.FileId,
-                opts.MaxRetryCount,
-                workItem.TraceId);
+                "Dropping document {DocumentId} after exhausting {RetryCount} retries (correlation: {CorrelationId})",
+                workItem.DocumentId,
+                processing.MaxRetryAttempts,
+                workItem.CorrelationId);
+            _workItems.TryRemove(workItem.WorkId, out _);
             return false;
         }
 
-        var delay = CalculateBackoffDelay(attempt - 1, opts);
+        var delay = CalculateBackoffDelay(attempt - 1, processing);
         _logger.LogInformation(
             reason,
-            "Scheduling retry {RetryCount}/{MaxRetry} for document {DocumentId} in {Delay} (trace: {TraceId})",
+            "Scheduling retry {Retry}/{MaxRetry} for document {DocumentId} in {Delay} (correlation: {CorrelationId})",
             attempt,
-            opts.MaxRetryCount,
-            workItem.FileId,
+            processing.MaxRetryAttempts,
+            workItem.DocumentId,
             delay,
-            workItem.TraceId);
+            workItem.CorrelationId);
 
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(delay, ct);
-                await EnqueueAsync(workItem, ct);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
+                await EnqueueAsync(workItem, ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -219,27 +217,47 @@ public sealed class DocumentPipelineQueue : IDocumentPipelineQueue
         return true;
     }
 
-    private TimeSpan CalculateBackoffDelay(int retryNumber, DocumentPipelineQueueOptions opts)
+    public ValueTask CompleteAsync(DocumentWorkItem workItem, CancellationToken ct = default)
     {
-        var baseDelay = opts.InitialRetryDelay;
-        if (retryNumber <= 0)
-        {
-            return ApplyJitter(baseDelay, opts);
-        }
-
-        var multiplier = Math.Pow(opts.BackoffMultiplier, retryNumber);
-        var delay = TimeSpan.FromMilliseconds(baseDelay.TotalMilliseconds * multiplier);
-        if (delay > opts.MaxRetryDelay)
-        {
-            delay = opts.MaxRetryDelay;
-        }
-
-        return ApplyJitter(delay, opts);
+        _workItems.TryRemove(workItem.WorkId, out _);
+        return ValueTask.CompletedTask;
     }
 
-    private TimeSpan ApplyJitter(TimeSpan delay, DocumentPipelineQueueOptions opts)
+    public IReadOnlyCollection<DocumentQueueSnapshotItem> GetSnapshot()
     {
-        if (!opts.UseJitter || delay <= TimeSpan.Zero)
+        if (_workItems.IsEmpty)
+        {
+            return Array.Empty<DocumentQueueSnapshotItem>();
+        }
+
+        var snapshot = new List<DocumentQueueSnapshotItem>(_workItems.Count);
+        foreach (var item in _workItems.Values)
+        {
+            snapshot.Add(DocumentQueueSnapshotItem.FromWorkItem(item));
+        }
+
+        return snapshot;
+    }
+
+    private TimeSpan CalculateBackoffDelay(int retryNumber, DocMindOptions.ProcessingOptions options)
+    {
+        var initialSeconds = Math.Max(1, options.RetryInitialDelaySeconds);
+        var maxSeconds = Math.Max(initialSeconds, options.RetryMaxDelaySeconds);
+        var multiplier = options.RetryBackoffMultiplier <= 1 ? 1d : options.RetryBackoffMultiplier;
+        var baseDelayMs = initialSeconds * 1000d;
+        if (retryNumber > 0)
+        {
+            baseDelayMs *= Math.Pow(multiplier, retryNumber);
+        }
+
+        var clampedMs = Math.Min(baseDelayMs, maxSeconds * 1000d);
+        var delay = TimeSpan.FromMilliseconds(clampedMs);
+        return ApplyJitter(delay, options);
+    }
+
+    private TimeSpan ApplyJitter(TimeSpan delay, DocMindOptions.ProcessingOptions options)
+    {
+        if (!options.RetryUseJitter || delay <= TimeSpan.Zero)
         {
             return delay;
         }
@@ -248,7 +266,36 @@ public sealed class DocumentPipelineQueue : IDocumentPipelineQueue
         {
             var jitterFactor = _random.NextDouble() * 0.3 + 0.85; // +/-15%
             var jittered = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * jitterFactor);
-            return jittered <= opts.MaxRetryDelay ? jittered : opts.MaxRetryDelay;
+            var maxDelay = TimeSpan.FromSeconds(Math.Max(1, options.RetryMaxDelaySeconds));
+            return jittered <= maxDelay ? jittered : maxDelay;
         }
     }
+}
+
+public sealed record DocumentQueueSnapshotItem(
+    Guid WorkId,
+    Guid DocumentId,
+    DocumentProcessingStage Stage,
+    DocumentProcessingStatus Status,
+    int Attempt,
+    int RetryCount,
+    int MaxAttempts,
+    DateTimeOffset EnqueuedAt,
+    DateTimeOffset? LastDequeuedAt,
+    DateTimeOffset? LastAttemptCompletedAt,
+    string CorrelationId)
+{
+    public static DocumentQueueSnapshotItem FromWorkItem(DocumentWorkItem workItem)
+        => new(
+            workItem.WorkId,
+            workItem.DocumentId,
+            workItem.Stage,
+            workItem.Status,
+            workItem.Attempt,
+            workItem.RetryCount,
+            workItem.MaxAttempts,
+            workItem.EnqueuedAt,
+            workItem.LastDequeuedAt,
+            workItem.LastAttemptCompletedAt,
+            workItem.CorrelationId);
 }
