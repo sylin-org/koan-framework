@@ -1,29 +1,58 @@
-# S13.DocMind Refactoring Plan (Proposal Delta)
+# S13.DocMind Refactoring Plan (Updated)
 
-## Completion Snapshot
-- **Estimated completion:** ~60% of the proposal scope. The stage-aware `DocumentProcessingWorker` now advances durable `DocumentProcessingJob` records through each processing phase while emitting events and resuming retries after restarts, giving DocMind the resilient workflow backbone described in the blueprint.【F:samples/S13.DocMind/Infrastructure/DocumentProcessingWorker.cs†L17-L200】【F:samples/S13.DocMind/Infrastructure/DocumentProcessingJobRepository.cs†L12-L103】
-- **Delivered capabilities:** Discovery refresh scheduling, vector bootstrap checks, and diagnostics endpoints expose queue snapshots, vector readiness, and replay flows so operators can observe the current pipeline even before the remaining proposal features land.【F:samples/S13.DocMind/Infrastructure/DocumentDiscoveryRefreshService.cs†L12-L173】【F:samples/S13.DocMind/Infrastructure/DocMindVectorHealth.cs†L8-L109】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L15-L210】
+## Current Coverage Snapshot
+- **Durable pipeline core in place.** The hosted `DocumentProcessingWorker` advances `DocumentProcessingJob` ledgers through extraction, embeddings, vision, insights, and aggregation while emitting persisted telemetry, delivering the resilient orchestration envisioned in the proposal’s AI processing plan.【F:docs/chunks/S13-DocMind/03_ai_processing.md†L35-L66】【F:samples/S13.DocMind/Infrastructure/DocumentProcessingWorker.cs†L17-L418】【F:samples/S13.DocMind/Models/DocumentProcessingJob.cs†L15-L170】
+- **Operator visibility partially delivered.** Discovery refresh scheduling, vector bootstrap checks, and diagnostics endpoints expose queue slices, vector readiness, and replay scaffolding, giving operators insight into the live system but without the incremental and contract guardrails the proposal targets.【F:samples/S13.DocMind/Infrastructure/DocumentDiscoveryRefreshService.cs†L12-L173】【F:samples/S13.DocMind/Infrastructure/DocMindVectorHealth.cs†L8-L109】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L15-L210】
 
-## Remaining Delta
+## Delta Analysis
 
-### 1. Domain & client alignment
-- The proposal calls for a dedicated `S13.DocMind.Domain` project plus migrations and seed scripts, yet all entities still live inside the web sample with no separate domain assembly or migration workflow, leaving storage shape and schema evolution out of sync with the blueprint expectations.【F:docs/chunks/S13-DocMind/06_implementation.md†L22-L26】【a7d3a3†L1-L6】【F:samples/S13.DocMind/Models/SourceDocument.cs†L1-L142】
-- TypeScript/Angular client regeneration and DTO harmonisation have not happened, so API contracts remain backend-only and diverge from the cross-channel alignment the proposal requires for UI/MCP parity.【F:docs/chunks/S13-DocMind/06_implementation.md†L34-L44】
+### 1. Domain, storage, and client alignment
+- Entities, value objects, and projections still live inside the sample web project with no dedicated domain assembly, migration scripts, or seed routines, leaving schema evolution disconnected from the blueprint’s phase-one expectations.【F:docs/chunks/S13-DocMind/06_implementation.md†L22-L44】【F:samples/S13.DocMind/Models/SourceDocument.cs†L1-L189】【F:samples/S13.DocMind/Models/DocumentProcessingJob.cs†L15-L206】
+- DTOs and API contracts have not been regenerated for Angular or MCP consumers, so cross-channel alignment (UI, CLI, MCP) remains incomplete compared to the proposal’s contract synchronisation goals.【F:docs/chunks/S13-DocMind/06_implementation.md†L34-L44】【F:samples/S13.DocMind/Controllers/DocumentsController.cs†L1-L138】
 
-### 2. Discovery & analytics fidelity
-- The discovery projection still performs full collection scans whenever a refresh runs and materialises ad-hoc aggregates instead of the planned `InsightCollection`/timeline projections, so analytics endpoints cannot scale or meet the dashboard guardrails defined in the data blueprint.【F:docs/chunks/S13-DocMind/02_entity_models.md†L6-L45】【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L22-L89】
-- Queue/timeline diagnostics query live collections on every request, lacking the cached projections and lateness comparisons the proposal expects for reliable operator workflows.【F:docs/chunks/S13-DocMind/01_executive_overview.md†L78-L83】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L54-L133】
+### 2. AI prompting and semantic tooling
+- Template generation and insight synthesis currently rely on ad-hoc prompts and JSON parsing instead of the delimiter-driven, schema-safe patterns captured from the GDoc reference (e.g., strict delimiter JSON for document type creation, consolidated analysis scaffolds), increasing the risk of brittle outputs.【F:docs/chunks/S13-DocMind/AI_Prompting_Patterns_from_GDoc.md†L10-L118】【F:samples/S13.DocMind/Services/TemplateSuggestionService.cs†L18-L208】【F:samples/S13.DocMind/Services/InsightSynthesisService.cs†L18-L220】
+- Prompt variables and extraction schemas on `SemanticTypeProfile` are not yet wired into a reusable prompt-builder abstraction, so downstream services duplicate string manipulation instead of following the lean prompt architecture described in the proposal package.【F:docs/chunks/S13-DocMind/AI_Prompting_Patterns_from_GDoc.md†L120-L209】【F:samples/S13.DocMind/Models/SemanticTypeProfile.cs†L1-L82】【F:samples/S13.DocMind/Services/TemplateGeneratorService.cs†L1-L78】
 
-### 3. Observability & operational automation
-- OpenTelemetry exporters, structured spans, and the compose-friendly instrumentation described in the infrastructure plan are missing; the current Program/registrar only wires Koan defaults and health checks, so no traces or metrics flow to the promised dashboards or otel-collector profile.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L90-L109】【F:samples/S13.DocMind/Program.cs†L1-L9】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L23-L115】
-- Operational scripts and environment profiles such as the reset tooling, compose overrides, and documented environment variables have not been produced, leaving the delivery order’s operational hardening unaddressed.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L5-L13】【7c37f0†L1-L5】
+### 3. Discovery projections and diagnostics
+- `DocumentDiscoveryProjectionBuilder` still performs full collection scans and emits coarse aggregates, missing the incremental `InsightCollection` projections, freshness windows, and lateness comparisons outlined in the data model blueprint.【F:docs/chunks/S13-DocMind/02_entity_models.md†L3-L122】【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L18-L212】
+- Diagnostics endpoints query live collections each time and lack cached queue/timeline comparisons, so operator experiences do not yet meet the proposal’s dashboard guardrails for latency and backlog tracking.【F:docs/chunks/S13-DocMind/01_executive_overview.md†L72-L95】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L54-L236】
 
-### 4. Testing & contract coverage
-- The testing plan mandates HTTP-level integration tests, contract diffing, and CI automation, but the current coverage stops at in-memory harness tests with no WebApplicationFactory or contract verification, so regression and compatibility guarantees remain unmet.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L1-L67】【F:tests/S13.DocMind.IntegrationTests/DocMindProcessingHarnessTests.cs†L1-L63】
-- Release pipelines still lack the proposal’s OpenAPI/MCP diff checks and automated smoke scripts, leaving the sample without the repeatable quality gates required for go-live readiness.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L61-L82】
+### 4. Observability and operational automation
+- Telemetry exporters, OpenTelemetry spans, and compose-ready instrumentation from the infrastructure plan remain unimplemented; `Program.cs` and the registrar only register Koan defaults and health checks, leaving traces/metrics absent from the promised dashboards.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L60-L109】【F:samples/S13.DocMind/Program.cs†L1-L9】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L19-L115】
+- Operational scripts (reset tooling, compose overrides, env-var matrices) have not been produced, so bootstrapping and failover steps described in the proposal are still manual exercises.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L5-L32】【F:samples/S13.DocMind/docker-compose.yml†L1-L120】
+
+### 5. Testing, contracts, and CI guardrails
+- HTTP-level integration tests, OpenAPI/MCP diffing, and CI automation have not been wired; existing tests stop at harness-level checks and leave the full upload→completion path unverified over HTTP or MCP contracts.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L1-L82】【F:tests/S13.DocMind.IntegrationTests/DocMindProcessingHarnessTests.cs†L1-L88】
+- CLI smoke scripts and replay automation are scaffolded but not executed in CI, so the operational guarantees in the testing plan remain aspirational.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L61-L110】【F:samples/S13.DocMind.Tools/Program.cs†L1-L142】
+
+## Refactoring Plan
+
+1. **Domain packaging & migrations**
+   - Create `S13.DocMind.Domain` (entities, value objects, configuration) and move models out of the sample project.
+   - Introduce migration/seed routines for `SourceDocument`, `DocumentProcessingJob`, and related projections plus scripts to project legacy data into the new schema.
+   - Regenerate API/TypeScript/MCP clients once contracts stabilise and document breaking changes for workshops.
+
+2. **Prompting framework & semantic tooling alignment**
+   - Implement a dedicated prompt builder that encapsulates the GDoc delimiter patterns (document type generation, consolidated analysis, lean prompts) and expose it through `TemplateGeneratorService`, `InsightSynthesisService`, and future multi-document flows.
+   - Store canonical system/user prompts and extraction schemas in `SemanticTypeProfile`, wire variable substitution, and persist prompt revisions for auditing.
+   - Update AI responses to emit the delimited payloads, add strict extractors, and expand testing with captured transcripts.
+
+3. **Discovery projections & diagnostics**
+   - Replace full scans with incremental `InsightCollection` projections, freshness metadata, and cached queue/timeline snapshots.
+   - Extend diagnostics APIs to surface projection freshness, backlog drift, and retry pacing with thresholds matching the executive dashboard requirements.
+
+4. **Observability & operations**
+   - Wire OpenTelemetry tracing/metrics around worker stages, AI calls, and vector interactions; document compose overrides for the otel collector and sampling knobs.
+   - Ship operational scripts (reset, smoke, profile toggles) and enrich the boot report with telemetry/exporter configuration per the infrastructure chapter.
+
+5. **Testing & CI guardrails**
+   - Add `WebApplicationFactory`-based integration tests covering upload→completion, template suggestions, and diagnostics endpoints; include vector fallback cases.
+   - Automate OpenAPI/MCP diffing, CLI smoke runs, and replay workflows in CI so pipeline regressions surface immediately.
 
 ## Delivery Order
-1. Domain & client alignment.
-2. Discovery & analytics fidelity.
-3. Observability & operational automation.
-4. Testing & contract coverage.
+1. Domain packaging & migrations.
+2. Prompting framework & semantic tooling alignment.
+3. Discovery projections & diagnostics.
+4. Observability & operations.
+5. Testing & CI guardrails.
