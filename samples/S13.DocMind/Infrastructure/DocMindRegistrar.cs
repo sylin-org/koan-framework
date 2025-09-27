@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Core;
@@ -21,6 +22,7 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        services.AddKoanOptions<DocMindOptions>(DocMindOptions.Section).ValidateOnStart();
         services.AddSingleton<IValidateOptions<DocMindOptions>, DocMindOptionsValidator>();
 
         services.AddSingleton<IDocumentPipelineQueue, DocumentPipelineQueue>();

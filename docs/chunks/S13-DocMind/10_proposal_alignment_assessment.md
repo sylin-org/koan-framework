@@ -14,7 +14,7 @@
 6. **Operations & DX** – Docker Compose bootstrap, Koan auto-registrars, boot diagnostics, model management endpoints, and workshop-ready test scripts.
 
 ## 3. Koan Capability Demonstrations
-- **Auto-Registration Simplicity**: Single `AddKoan().AddKoanMcp()` call plus `KoanAutoRegistrar` auto-discovers all DocMind services without manual registration.
+- **Auto-Registration Simplicity**: Single `AddKoan()` call auto-discovers all DocMind services, MCP endpoints, web controllers, and configuration through framework auto-registrars without any manual registration.
 - **Entity-First Design**: Rich `SourceDocument`, `SemanticTypeProfile`, `DocumentChunk`, `DocumentInsight`, and `DocumentProcessingEvent` entities unlock CRUD + workflow endpoints with minimal boilerplate.
 - **Provider Transparency**: Core entities use automatic adapter resolution while vector embeddings use separate `[VectorAdapter("weaviate")]` entities, ensuring provider transparency without manual coupling.
 - **AI Integration**: Single Ollama provider with multiple model support through Koan AI abstractions (`AI.Prompt`, `AI.VisionPrompt`, `AI.Embed`).

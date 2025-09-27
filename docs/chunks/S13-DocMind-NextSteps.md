@@ -1,9 +1,9 @@
 # S13.DocMind Next Steps (Aligned to Updated Refactoring Plan)
 
-## Iteration 0 – Bootstrap Reactivation & Health Probes
-1. Call `AddKoanModules(typeof(DocMindRegistrar).Assembly)` in `Program.cs`, keeping options binding/validation so the registrar and hosted services activate. 【F:samples/S13.DocMind/Program.cs†L1-L23】
-2. Extend `DocMindRegistrar` to run storage/vector/AI readiness checks and surface them in the boot report alongside existing configuration. 【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L40-L86】
-3. Harden `DocMindOptions` validation (data annotations + custom validator) and ensure failures bubble during startup.
+## Iteration 0 – Bootstrap Optimization & Health Probes
+1. Leverage minimal `AddKoan()` pattern in `Program.cs` which automatically discovers and initializes `DocMindRegistrar` without manual assembly loading or explicit service registration. 【F:samples/S13.DocMind/Program.cs†L1-L9】
+2. Move options configuration into `DocMindRegistrar.Initialize()` following "Reference = Intent" where modules manage their own dependencies. 【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L24-L25】
+3. Extend `DocMindRegistrar.Describe` to run storage/vector/AI readiness checks and surface them in the boot report alongside existing configuration.
 
 ## Iteration 1 – Stage-Oriented Worker & Targeted Retries
 1. Replace the channel-backed queue with the polling worker pattern, persisting work state per document/stage and honoring concurrency from options. 【F:samples/S13.DocMind/Infrastructure/DocumentPipelineQueue.cs†L1-L221】

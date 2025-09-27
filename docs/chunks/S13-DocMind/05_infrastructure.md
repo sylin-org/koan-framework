@@ -14,56 +14,56 @@
 ### 2. Program.cs Layout
 
 ```csharp
+using Koan.Data.Core;
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddKoan(options =>
-{
-    options.EnableMcp = true;
-    options.McpTransports = McpTransports.Stdio | McpTransports.HttpSse;
-})
-.AddKoanMcp(); // Only framework modules get Add*() methods
-
-builder.Services.AddControllers();
+builder.Services.AddKoan();
 
 var app = builder.Build();
-app.UseRouting();
-app.UseAuthorization();
-app.MapControllers();
-app.MapKoanMcpEndpoints();
+
 app.Run();
 ```
 
-All DocMind services are auto-discovered via `KoanAutoRegistrar` - no manual registration required. Data adapters and table mappings are resolved automatically by the Koan Framework based on available providers.
+All DocMind services, controllers, MCP endpoints, and configuration are auto-discovered via `DocMindRegistrar` - no manual registration required. The framework automatically:
 
-### 3. KoanAutoRegistrar Implementation
+- **Discovers DocMindRegistrar**: `AddKoan()` scans assemblies and finds `DocMindRegistrar : IKoanAutoRegistrar`
+- **Registers Services**: Background workers, AI services, storage providers, and options validation
+- **Configures Web Pipeline**: Controllers, routing, authentication, and MCP endpoints via `KoanWebStartupFilter`
+- **Handles Data Adapters**: MongoDB, Weaviate, and vector capabilities based on available providers
+
+### 3. DocMindRegistrar Implementation
 
 ```csharp
-// /Initialization/KoanAutoRegistrar.cs
-public sealed class KoanAutoRegistrar : IKoanInitializer
+// /Infrastructure/DocMindRegistrar.cs
+public sealed class DocMindRegistrar : IKoanAutoRegistrar
 {
-    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+    public string ModuleName => "S13.DocMind";
+    public string? ModuleVersion => typeof(DocMindRegistrar).Assembly.GetName().Version?.ToString();
+
+    public void Initialize(IServiceCollection services)
     {
+        // Configuration with validation
+        services.AddKoanOptions<DocMindOptions>(DocMindOptions.Section).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<DocMindOptions>, DocMindOptionsValidator>();
+
         // Core processing services
-        services.AddScoped<DocumentProcessor>();
-        services.AddScoped<DocumentAnalysisService>();
-        services.AddScoped<TextExtractionService>();
-        services.AddScoped<VisionInsightService>();
-        services.AddScoped<InsightSynthesisService>();
-        services.AddScoped<TemplateSuggestionService>();
+        services.AddScoped<IDocumentIntakeService, DocumentIntakeService>();
+        services.AddScoped<ITextExtractionService, TextExtractionService>();
+        services.AddScoped<IVisionInsightService, VisionInsightService>();
+        services.AddScoped<IInsightSynthesisService, InsightSynthesisService>();
+        services.AddScoped<ITemplateSuggestionService, TemplateSuggestionService>();
 
         // Background workers
-        services.AddHostedService<DocumentProcessingWorker>();
+        services.AddHostedService<DocumentAnalysisPipeline>();
+        services.AddHostedService<DocumentVectorBootstrapper>();
+    }
 
-        // Configuration binding
-        services.AddOptions<DocMindOptions>()
-            .BindConfiguration("DocMind")
-            .ValidateDataAnnotations();
-
-        services.AddOptions<StorageOptions>()
-            .BindConfiguration("DocMind:Storage");
-
-        services.AddOptions<AiOptions>()
-            .BindConfiguration("DocMind:Ai");
+    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    {
+        // Boot report with configuration summary
+        report.AddModule(ModuleName, ModuleVersion);
+        // ... configuration reporting
     }
 }
 ```

@@ -1,7 +1,7 @@
 # S13.DocMind Refactoring Plan (Comprehensive Delta Review)
 
 ## 1. Current Delta Snapshot
-- **Bootstrap still bypasses Koan auto-registration** – `Program.cs` loads the DocMind assembly into the cache but never calls `AddKoanModules`, so `IKoanAutoRegistrar` implementations (including `DocMindRegistrar`) do not run and hosted workers/options validation stay dormant unless consumers wire them manually. 【F:samples/S13.DocMind/Program.cs†L1-L23】
+- **Bootstrap uses minimal Koan pattern** – `Program.cs` calls only `AddKoan()` which automatically discovers `DocMindRegistrar : IKoanAutoRegistrar` and registers all services, hosted workers, and options validation without manual intervention. 【F:samples/S13.DocMind/Program.cs†L1-L9】
 - **Pipeline orchestration collapses multiple stages into one worker pass** – `DocumentAnalysisPipeline` dequeues work with a bespoke channel, replays every stage in one shot, and only updates the work item at completion. Stage-specific retries, `Deduplicate`/`GenerateEmbeddings` transitions, and targeted resumptions described in the blueprint remain unimplemented. 【F:samples/S13.DocMind/Infrastructure/DocumentAnalysisPipeline.cs†L37-L345】【F:samples/S13.DocMind/Infrastructure/DocumentPipelineQueue.cs†L1-L216】
 - **Queue diagnostics lack persistence and state awareness** – Work items live solely in-memory, `ScheduleRetryAsync` reuses the same `DocumentWorkItem` without updating stage/status telemetry, and requeue helpers always restart at `ExtractText`, preventing diagnostics from requesting stage-specific resumes. 【F:samples/S13.DocMind/Infrastructure/DocumentPipelineQueue.cs†L12-L221】【F:samples/S13.DocMind/Services/DocumentIntakeService.cs†L134-L197】
 - **Repositories and discovery services still perform collection scans** – Timeline, insights, and aggregation services hydrate entire tables through `Entity<T>.All()` or ad-hoc filters, contradicting the proposal’s repository-driven, server-side projection strategy and limiting scalability. 【F:samples/S13.DocMind/Infrastructure/Repositories/ProcessingEventRepository.cs†L12-L45】【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L28-L149】
@@ -10,10 +10,10 @@
 
 ## 2. Layered Remediation Strategy
 
-### Layer A – Reactivate Bootstrap & Configuration Enforcement
-1. **Adopt Koan module loading** – Replace the `AssemblyCache` call with `builder.Services.AddKoanModules(typeof(DocMindRegistrar).Assembly);` so the auto-registrar runs and hosted services/options validation activate on startup.
-2. **Centralize options validation** – Keep `AddKoanOptions<DocMindOptions>` but add `ValidateDataAnnotations()`/custom validators to fail fast on malformed storage/processing settings, mirroring the infrastructure guidance.
-3. **Expose boot readiness checks** – Extend `DocMindRegistrar.Describe` to run storage/vector/AI health probes and emit actionable warnings instead of static settings dumps.
+### Layer A – Bootstrap & Configuration Optimization
+1. **Leverage pure auto-registration** – Current `AddKoan()` already discovers `DocMindRegistrar` automatically; no additional assembly loading needed as the framework handles application assembly discovery.
+2. **Move options to registrar** – Configuration and validation now handled within `DocMindRegistrar.Initialize()` following the "Reference = Intent" principle where modules manage their own dependencies.
+3. **Enhance boot readiness checks** – Extend `DocMindRegistrar.Describe` to run storage/vector/AI health probes and emit actionable warnings instead of static settings dumps.
 
 ### Layer B – Processing Topology & Stage Semantics
 1. **Introduce the proposal’s worker loop** – Swap the channel queue for the polling `DocumentProcessingWorker` pattern, persisting work status between iterations so retries and diagnostics have durable insight.
