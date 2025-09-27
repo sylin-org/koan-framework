@@ -1,89 +1,78 @@
-# S13.DocMind Refactoring Plan
+# S13.DocMind Refactoring Plan (Updated)
 
-## Overview
-This plan rebuilds the S13.DocMind sample from its foundational data contracts up through orchestration, AI enrichment, and API exposure. It addresses the gaps identified between the proposal and the current implementation by iterating through dependency layers—establishing bedrock entities and storage rules, then layering in infrastructure, services, and UX-facing processes.
+## Context & Delta Synthesis
+- **Entities vs. services mismatch** – The new `SourceDocument`, `DocumentChunk`, and `DocumentInsight` entities expose properties such as `ProcessingSummary`, `ChunkIds`, and vector adapters, yet `DocumentIntakeService` and the legacy `Services/DocumentAnalysisPipeline` still target removed members (`OriginalFileName`, `Summary`, `Suggestions`, `AssignedProfileId`) and legacy models (`File`, `Analysis`, `DocumentType`).
+- **Competing infrastructure stacks** – `Program.cs` wires `AddDocMindProcessing` (legacy queue + hosted service) while `Infrastructure/DocMindRegistrar` attempts Koan auto-registration, leading to duplicate background workers (`DocumentProcessingHostedService` vs. `Infrastructure/DocumentAnalysisPipeline`) and inconsistent options (`DocumentPipelineQueueOptions` vs. `DocMindOptions`).
+- **Queue contract drift** – `Infrastructure/DocumentPipelineQueue` (newer) expects `DocumentWorkItem` with `DocumentId` + stage metadata, while `Services/DocumentPipelineQueue` and its consumers still use string-based `FileId`, retry counters, and `ProcessingProfile`. Both versions coexist and block compilation.
+- **Vector strategy inconsistency** – Vector adapter entities (`DocumentChunkEmbedding`, `SemanticTypeEmbedding`) live beside `[Vector]` fields on core entities and service code that continues saving embeddings through `Vector<T>.Save`, contradicting the Weaviate-based design.
+- **Event persistence gap** – `DocumentProcessingEvent` now includes message/context metadata, but ingestion and pipeline code either log events only (`DocumentProcessingEventLogger`) or never sets correlation/timing fields required by diagnostics.
+- **API & contracts drift** – Controllers and contracts assume timelines, chunk responses, and profile suggestions built atop the old pipeline; the new domain structure has no working projection layer to populate these responses.
 
-## 1. Bedrock Layer – Domain & Persistence Contracts
-1. **Entity reconciliation**
-   - Replace legacy `File`, `Analysis`, and `DocumentType` usage with the proposal's `SourceDocument`, `DocumentChunk`, `DocumentInsight`, and `DocumentProcessingEvent` entities.
-   - Introduce supporting value objects (`DocumentProcessingSummary`, insight payload models) and enums (`ProcessingStage`, `ProcessingStatus`).
-2. **Event schema completion**
-   - Extend `DocumentProcessingEvent` with `Message`, `Context`, `CreatedAt`, and correlation identifiers.
-   - Define repository abstractions and Koan adapters for persisting these events.
-3. **Vector adapter alignment**
-   - Add `[VectorAdapter("weaviate")]` entities (`DocumentChunkEmbedding`, `SemanticTypeEmbedding`).
-   - Remove inline `[Vector]` fields from core entities and introduce relationships to vector records.
-4. **Configuration & options baseline**
-   - Create `DocMindOptions` with sections for storage, AI models, and processing thresholds.
-   - Ensure configuration is loaded via `AddOptions().BindConfiguration("DocMind")`.
+## Layered Refactoring Strategy
+The rebuild follows dependency layers—stabilize domain contracts, refit infrastructure, then reconstitute services, AI enrichment, and API surfaces. Each layer calls out explicit source modules to modify or remove.
 
-## 2. Infrastructure Layer – Initialization & Cross-Cutting Services
-1. **Koan auto-registration**
-   - Replace manual DI registration in `Program.cs` with `AddKoan().AddKoanMcp()` and invoke a new `KoanAutoRegistrar`.
-   - Move pipeline registrations, hosted workers, and options wiring into the registrar.
-2. **Storage and adapters**
-   - Configure MongoDB (documents), Weaviate (vectors), and optional cache providers via Koan adapters.
-   - Implement blob/file storage abstractions consistent with the proposal.
-3. **Queue & background orchestration plumbing**
-   - Define `DocumentPipelineQueue` compatible with the new `DocumentWorkItem` schema (stage, status, entity IDs).
-   - Register hosted worker(s) for intake and processing stages.
-4. **Observability foundations**
-   - Implement persistence-backed `DocumentProcessingEventLogger` that emits diagnostics hooks and integrates with Koan tracing/metrics.
+### 1. Bedrock Entities & Persistence
+1. **Converge entity schemas**
+   - Normalize `SourceDocument`, `DocumentChunk`, `DocumentInsight`, and `DocumentProcessingEvent` to match the proposal (remove stray `[Vector]` arrays, finalize `ProcessingSummary`, ensure storage metadata lives under `StorageLocation`).
+   - Reconcile enums and value objects so service code can reference a single set (`DocumentProcessingStage`, `DocumentProcessingStatus`, `DocumentProcessingSummary`).
+2. **Finalize vector adapters**
+   - Keep embeddings exclusively in `DocumentChunkEmbedding`/`SemanticTypeEmbedding`; migrate any required annotations into those records.
+   - Provide helper methods for querying embeddings via Koan vector adapters instead of direct `[Vector]` usage.
+3. **Persistence utilities**
+   - Introduce repository/query helpers for the rebuilt entities (e.g., `SourceDocumentQueries`, `DocumentProcessingEventLog`) to centralize common lookups used by controllers and pipelines.
 
-## 3. Data Access & Aggregation Layer
-1. **Repositories and query surfaces**
-   - Provide query helpers for `SourceDocument`, `DocumentChunk`, `DocumentInsight`, and embedding entities using Koan's `Entity\<T>` APIs.
-   - Build aggregation utilities for timeline views and insight summaries.
-2. **Insight collections**
-   - Materialize `InsightCollection` and `SimilarityProjection` aggregates per proposal for analytics scenarios.
-   - Schedule background refresh jobs if needed, leveraging Koan data flows.
-3. **Testing & fixtures**
-   - Author unit tests that validate entity mappings, vector adapter interactions, and query helpers with in-memory providers.
+### 2. Infrastructure & Bootstrapping
+1. **Program bootstrap alignment**
+   - Replace the manual `AddDocMindProcessing` wiring in `Program.cs` with the Koan pattern: `.AddKoan().AddKoanMcp()` + module registrar discovery.
+   - Remove `Services/DocMindRegistrar.cs` extension and rely solely on `Infrastructure/DocMindRegistrar` to register options, storage, queue, and hosted services.
+2. **Options unification**
+   - Bind `DocMindOptions` from configuration and retire `DocumentPipelineQueueOptions`/`DocumentAnalysisOptions` in favor of the consolidated processing settings.
+3. **Queue consolidation**
+   - Promote `Infrastructure/DocumentPipelineQueue` as the single implementation; rewrite `DocumentWorkItem` to track `Guid DocumentId`, requested stage, attempt counters, and correlation IDs per the blueprint.
+   - Delete the legacy channel queue and hosted service once the new background service owns orchestration.
+4. **File storage baseline**
+   - Ensure `LocalDocumentStorage` (or alternative provider) persists files under the new storage metadata contract and surfaces dedupe hashes for intake.
 
-## 4. Application Services Layer
-1. **Document intake service**
-   - Refactor to create `SourceDocument` records, enqueue `DocumentWorkItem`s, and log persisted intake events.
-   - Normalize file validation, storage upload, and metadata extraction.
-2. **Analysis pipeline**
-   - Rewrite pipeline stages to hydrate `DocumentChunk`s, generate `DocumentInsight`s, and update `DocumentProcessingSummary`.
-   - Remove references to deprecated properties (e.g., `Summary`, `Suggestions`), using the new value objects.
-3. **Event publishing**
-   - Emit `DocumentProcessingEvent`s at each stage with contextual payloads for timeline experiences.
-4. **Insight synthesis**
-   - Implement structured prompt flows for summarization, template extraction, and classification aligned with the `DocumentInsight.StructuredPayload` contract.
+### 3. Processing Pipeline & Background Services
+1. **Rebuild pipeline orchestration**
+   - Update `Infrastructure/DocumentAnalysisPipeline` to orchestrate stages: hydrate document, extract text/vision, persist chunks (`DocumentChunk`), generate insights (`DocumentInsight`), update `ProcessingSummary`, and enqueue follow-on tasks when needed.
+   - Inject persistence-backed logging to create `DocumentProcessingEvent` entries for each significant step (with stage, status, message, context, duration, attempts).
+2. **Queue-driven execution**
+   - Implement a hosted worker that dequeues `DocumentWorkItem`s from the consolidated queue, handles concurrency via `DocMindOptions.Processing`, and requeues transient failures with backoff semantics.
+3. **Retry & diagnostics**
+   - Persist attempt counts, last error, and durations onto `SourceDocument.ProcessingSummary` and `DocumentProcessingEvent` to support timeline + operations dashboards.
 
-## 5. AI & Intelligence Layer
-1. **Text extraction & OCR**
-   - Integrate `IAi.VisionPrompt` for image/PDF extraction, storing results within `DocumentChunk`s and capturing extraction metadata.
-2. **Vision analysis**
-   - Build `VisionInsightService` atop Koan AI prompts with configurable models, capturing confidence scores and tagging with the `Vision` channel.
+### 4. AI, Extraction, and Intelligence Services
+1. **Text & vision extraction**
+   - Refactor `TextExtractionService` to use Koan `IAi` abstractions for OCR/vision when `ProcessingOptions.EnableVisionExtraction` is true; emit multi-channel chunks (text, vision frames).
+   - Capture extraction metadata (tokens, frames, confidences) into chunk records and processing events.
+2. **Insight synthesis pipeline**
+   - Update `InsightSynthesisService`, `TemplateSuggestionService`, and related collaborators to operate on the new entities/embedding stores, producing structured payloads aligned with `DocumentInsight.StructuredPayload`.
+   - Remove placeholder implementations (`VisionInsightService`, `TemplateGeneratorService`, etc.) that still target legacy models.
 3. **Embedding workflow**
-   - Use Koan vector adapters to create embeddings for chunks and semantic types; ensure retry/backoff and adapter health checks.
-4. **Template suggestion & classification**
-   - Refactor to query Weaviate via adapters; provide lexical fallbacks and unify scoring logic for insight recommendation.
+   - Route chunk/type embeddings through the vector adapter entities, provide fallbacks when the adapter is unavailable, and synchronize vector IDs with source entities.
 
-## 6. Interface & Experience Layer
-1. **API controllers**
-   - Update controllers to consume the new entities, vector-backed services, and persisted processing events (timeline endpoints).
-   - Ensure response DTOs align with MCP and Angular contracts while sourcing data from new aggregates.
-2. **Diagnostics & timeline UX**
-   - Back controllers and UI components with the persisted event store; expose filters for stage/status/context.
-3. **Documentation & samples**
-   - Refresh docs and samples to reflect the new bootstrap pattern, configuration hierarchy, and data flow diagrams.
+### 5. API, Projections, and Experience Layer
+1. **Controller refactor**
+   - Update `DocumentsController`, `InsightsController`, and related endpoints to query the rebuilt entities/aggregations, returning responses expected by the Angular app and MCP tools.
+   - Implement timeline endpoints backed by persisted `DocumentProcessingEvent`s instead of in-memory logs.
+2. **Projection services**
+   - Rebuild `DocumentInsightsService`, `DocumentAggregationService`, and diagnostics helpers to materialize summary DTOs (chunks, insights, suggestions, processing summaries) from the new data model.
+3. **MCP tooling alignment**
+   - Ensure MCP tool registrations and responses reference the updated contracts, especially for document upload, reprocessing, and insight retrieval workflows.
 
-## 7. Process & Quality Layer
-1. **Migration strategy**
-   - Provide scripts or notes for clearing legacy collections and initializing new adapters (Mongo/Weaviate indices).
-   - Document environment variables/secrets required for AI and vector adapters.
-2. **Testing matrix**
-   - Define automated test suites: unit (services), integration (pipeline & adapters), functional (end-to-end document run).
-3. **Operational runbook**
-   - Capture monitoring hooks, alert thresholds, and troubleshooting steps tied to the new event logging and vector dependencies.
-4. **Release checklist**
-   - Ensure registrar wiring, configuration, migrations, and smoke tests are validated before shipping the updated sample.
+### 6. Observability, Ops, and Quality
+1. **Diagnostics plumbing**
+   - Implement `IDocumentProcessingEventSink` atop entity persistence, integrate with Koan tracing, and expose boot report metadata via the registrar.
+   - Capture model usage, token counts, and error codes in events to support analytics.
+2. **Testing strategy**
+   - Establish unit/integration tests around intake validation, pipeline stage progression, embedding persistence, and controller projections using Koan’s in-memory providers where possible.
+3. **Operational scripts & docs**
+   - Provide setup scripts for MongoDB/Weaviate indices, sample configuration for AI providers, and troubleshooting guides reflecting the new architecture.
 
-## Execution Ordering
-1. Complete **Bedrock** and **Infrastructure** layers to stabilize entity contracts and runtime wiring.
-2. Proceed with **Data Access** and **Application Services** refactors to rebuild the pipeline on the new foundation.
-3. Layer on **AI & Intelligence** enhancements, followed by **Interface** updates to surface the richer capabilities.
-4. Close with **Process & Quality** deliverables to support operations, documentation, and sustainable maintenance.
+## Execution Roadmap
+1. **Stabilize bedrock** – finalize entities, options, and vector adapters; remove conflicting legacy types.
+2. **Rewire infrastructure** – adopt the Koan registrar bootstrap, consolidate the queue, and stand up the new hosted pipeline service.
+3. **Rebuild pipeline services** – refactor intake, extraction, insight synthesis, and embedding flow on top of the new contracts.
+4. **Restore projections & APIs** – update controllers and projection services to surface the enriched data and persisted events.
+5. **Harden AI & ops** – wire production-ready AI calls, diagnostics, tests, and documentation to complete the rebuild.
