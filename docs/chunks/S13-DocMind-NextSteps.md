@@ -1,22 +1,26 @@
-# S13.DocMind Next Steps (Proposal Delta)
+# S13.DocMind Next Steps (Updated)
 
-## Domain & Client Alignment
-1. **Stand up the domain assembly and migrations.** Create the `S13.DocMind.Domain` project, move entity/value-object definitions out of the web sample, and add bootstrap/migration routines that project legacy `files` data into the new schema outlined in the proposal.【F:docs/chunks/S13-DocMind/06_implementation.md†L22-L26】【F:samples/S13.DocMind/Models/SourceDocument.cs†L1-L142】
-2. **Regenerate contracts for UI and MCP clients.** Run `dotnet koan client` (and matching MCP tooling) once the domain DTOs stabilise so Angular/TypeScript consumers match the new API surface, documenting any breaking changes for workshop scripts.【F:docs/chunks/S13-DocMind/06_implementation.md†L34-L44】
+## Domain & Contract Alignment
+1. **Carve out the domain assembly.** Create `S13.DocMind.Domain`, move entities/value objects from the sample project, and add bootstrap/migration routines that hydrate the new schema from existing `files` data per the proposal’s phase-one guidance.【F:docs/chunks/S13-DocMind/06_implementation.md†L22-L44】【F:samples/S13.DocMind/Models/SourceDocument.cs†L1-L189】
+2. **Regenerate clients and MCP contracts.** Once DTOs stabilise, run `dotnet koan client` and regenerate MCP manifests so Angular, CLI, and MCP integrations share the new contracts, documenting breaking changes for workshop collateral.【F:docs/chunks/S13-DocMind/06_implementation.md†L34-L44】【F:samples/S13.DocMind/Controllers/DocumentsController.cs†L1-L138】
 
-## Discovery & Analytics Fidelity
-1. **Implement incremental projections.** Replace the full-scan `DocumentDiscoveryProjectionBuilder` with targeted aggregates (`InsightCollection`, queue snapshots) that track deltas and persist freshness metadata for validation endpoints.【F:docs/chunks/S13-DocMind/02_entity_models.md†L6-L45】【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L22-L89】
-2. **Add drift diagnostics and guardrails.** Extend diagnostics endpoints to compare cached projections with live counts/latency so operators can detect backlog or staleness before dashboards go stale.【F:docs/chunks/S13-DocMind/01_executive_overview.md†L78-L83】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L54-L133】
+## Prompting Framework & Semantic Tooling
+1. **Implement the GDoc-derived prompt builder.** Build a reusable prompt builder that encapsulates the delimiter patterns for document type generation and multi-document analysis outlined in the AI prompting guide, and apply it across template generation, insight synthesis, and future replay flows.【F:docs/chunks/S13-DocMind/AI_Prompting_Patterns_from_GDoc.md†L10-L173】【F:samples/S13.DocMind/Services/InsightSynthesisService.cs†L18-L340】
+2. **Wire profiles to structured prompts.** Persist canonical prompts/extraction schemas on `SemanticTypeProfile`, surface prompt revisions, and refactor services to consume the builder instead of ad-hoc string concatenation so outputs remain schema-safe.【F:docs/chunks/S13-DocMind/AI_Prompting_Patterns_from_GDoc.md†L174-L209】【F:samples/S13.DocMind/Services/TemplateGeneratorService.cs†L1-L78】【F:samples/S13.DocMind/Models/SemanticTypeProfile.cs†L1-L82】
+
+## Discovery Projections & Diagnostics
+1. **Adopt incremental projections.** Replace full scans in `DocumentDiscoveryProjectionBuilder` with incremental `InsightCollection` aggregates, freshness windows, and cache invalidation aligned with the data blueprint.【F:docs/chunks/S13-DocMind/02_entity_models.md†L3-L122】【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L18-L212】
+2. **Expose drift telemetry.** Extend diagnostics endpoints to compare cached projections with live counts/queue age so operators can spot backlog or staleness before dashboards degrade.【F:docs/chunks/S13-DocMind/01_executive_overview.md†L72-L95】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L54-L236】
 
 ## Observability & Operational Automation
-1. **Wire OpenTelemetry and compose instrumentation.** Add tracing/metrics exporters, wrap worker stages with spans, and document the otel-collector compose profile so dashboards from the infrastructure plan can light up.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L90-L109】【F:samples/S13.DocMind/Program.cs†L1-L9】
-2. **Publish operational scripts and profiles.** Deliver the reset script, compose overrides, and environment variable documentation promised in the infrastructure plan so teams can bootstrap, disable features, or reset data reliably.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L5-L13】
+1. **Enable OpenTelemetry traces/metrics.** Wrap worker stages, AI calls, and vector operations with spans/counters, wire exporters in the registrar, and document compose overrides for the otel collector per the infrastructure plan.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L60-L109】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L19-L115】
+2. **Ship operational tooling.** Publish reset scripts, compose profiles, and environment variable matrices so teams can bootstrap, toggle features, or recover systems following the plan’s operational checklist.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L5-L32】【F:samples/S13.DocMind/docker-compose.yml†L1-L120】
 
-## Testing & Contract Coverage
-1. **Add HTTP-level integration and contract tests.** Introduce `WebApplicationFactory`-based tests that exercise upload→completion via HTTP, generate OpenAPI/MCP manifests in CI, and diff them against the committed baseline.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L1-L67】
-2. **Automate pipelines and smoke scripts.** Update CI to run unit/integration suites, CLI smoke commands, and artifact publication so the release checklist’s quality gates become repeatable automation instead of manual steps.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L61-L82】
+## Testing & CI Guardrails
+1. **Add end-to-end HTTP tests.** Use `WebApplicationFactory` to cover upload→completion flows, template suggestions, and diagnostics, including vector fallback scenarios, then run them in CI.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L1-L82】【F:tests/S13.DocMind.IntegrationTests/DocMindProcessingHarnessTests.cs†L1-L88】
+2. **Automate contract and smoke checks.** Generate/diff OpenAPI & MCP manifests, execute CLI replay smoke scripts, and gate PRs on these checks to satisfy the testing plan’s release guardrails.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L61-L110】【F:samples/S13.DocMind.Tools/Program.cs†L1-L142】
 
 ## Immediate Spikes
-- **Domain migration design:** Prototype how existing Mongo collections migrate into the proposed `SourceDocument`/`DocumentProcessingJob` schema without downtime.【F:docs/chunks/S13-DocMind/06_implementation.md†L22-L26】
-- **Projection workload modelling:** Capture metrics from a representative dataset to size incremental discovery projections and validate refresh thresholds before implementation.【F:docs/chunks/S13-DocMind/02_entity_models.md†L6-L45】
-- **Telemetry exporter selection:** Experiment with Koan’s OpenTelemetry hooks locally to choose the exporter stack (OTLP, console, or Prometheus) that best matches the compose environment.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L90-L109】
+- **Migration blueprint:** Prototype the migration of existing Mongo collections into `SourceDocument`/`DocumentProcessingJob` without downtime, validating rollback steps.【F:docs/chunks/S13-DocMind/06_implementation.md†L22-L44】
+- **Prompt verification harness:** Capture representative transcripts to validate the new prompt builder against the GDoc patterns before wiring it into the pipeline.【F:docs/chunks/S13-DocMind/AI_Prompting_Patterns_from_GDoc.md†L10-L209】
+- **Telemetry exporter selection:** Experiment with Koan’s OpenTelemetry hooks to pick the OTLP/Prometheus exporters that align with the compose stack before documenting the setup.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L90-L109】
