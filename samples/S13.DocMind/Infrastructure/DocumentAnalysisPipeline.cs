@@ -1,15 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Koan.Data.Vector;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using S13.DocMind.Infrastructure;
 using S13.DocMind.Models;
 using S13.DocMind.Services;
 
@@ -22,7 +18,11 @@ public sealed class DocumentAnalysisPipeline : BackgroundService
     private readonly DocMindOptions _options;
     private readonly ILogger<DocumentAnalysisPipeline> _logger;
 
-    public DocumentAnalysisPipeline(IDocumentPipelineQueue queue, IServiceScopeFactory scopeFactory, IOptions<DocMindOptions> options, ILogger<DocumentAnalysisPipeline> logger)
+    public DocumentAnalysisPipeline(
+        IDocumentPipelineQueue queue,
+        IServiceScopeFactory scopeFactory,
+        IOptions<DocMindOptions> options,
+        ILogger<DocumentAnalysisPipeline> logger)
     {
         _queue = queue;
         _scopeFactory = scopeFactory;
@@ -39,147 +39,224 @@ public sealed class DocumentAnalysisPipeline : BackgroundService
         await foreach (var work in _queue.DequeueAsync(stoppingToken))
         {
             await semaphore.WaitAsync(stoppingToken).ConfigureAwait(false);
-            var task = Task.Run(async () =>
-            {
-                try
-                {
-                    using var scope = _scopeFactory.CreateScope();
-                    await ProcessDocumentAsync(scope.ServiceProvider, work, stoppingToken).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Pipeline failed for document {DocumentId}", work.DocumentId);
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-            }, stoppingToken);
+            var task = ProcessWorkAsync(work, semaphore, stoppingToken);
             running.Add(task);
         }
 
-        await Task.WhenAll(running); // Drain outstanding work before shutdown
+        await Task.WhenAll(running).ConfigureAwait(false);
     }
 
-    private static async Task ProcessDocumentAsync(IServiceProvider services, DocumentWorkItem workItem, CancellationToken cancellationToken)
-    {
-        var logger = services.GetRequiredService<ILogger<DocumentAnalysisPipeline>>();
-        var extraction = services.GetRequiredService<ITextExtractionService>();
-        var insights = services.GetRequiredService<IInsightSynthesisService>();
-        var templates = services.GetRequiredService<ITemplateSuggestionService>();
-        var embeddingGenerator = services.GetRequiredService<IEmbeddingGenerator>();
-        var clock = services.GetRequiredService<TimeProvider>();
-
-        var document = await SourceDocument.Get(workItem.DocumentId, cancellationToken).ConfigureAwait(false);
-        if (document is null)
+    private Task ProcessWorkAsync(DocumentWorkItem workItem, SemaphoreSlim semaphore, CancellationToken cancellationToken)
+        => Task.Run(async () =>
         {
-            logger.LogWarning("Document {DocumentId} missing from storage", workItem.DocumentId);
-            return;
-        }
-
-        try
-        {
-            await RecordEventAsync(document, DocumentProcessingStage.Extraction, DocumentProcessingStatus.Extracting, "Extraction started", cancellationToken).ConfigureAwait(false);
-            document.MarkStatus(DocumentProcessingStatus.Extracting);
-            await document.Save(cancellationToken).ConfigureAwait(false);
-
-            var extractionResult = await extraction.ExtractAsync(document, cancellationToken).ConfigureAwait(false);
-            document.Summary.TextExtracted = true;
-            document.Summary.WordCount = extractionResult.WordCount;
-            document.Summary.PageCount = extractionResult.PageCount;
-            document.Summary.ChunkCount = extractionResult.Chunks.Count;
-            document.Summary.Excerpt = extractionResult.Text.Length > 320 ? extractionResult.Text[..320] : extractionResult.Text;
-            document.MarkStatus(DocumentProcessingStatus.Extracted);
-            await document.Save(cancellationToken).ConfigureAwait(false);
-
-            await RecordEventAsync(document, DocumentProcessingStage.Chunking, DocumentProcessingStatus.Extracted, "Chunking document", cancellationToken).ConfigureAwait(false);
-
-            var savedChunks = new List<DocumentChunk>();
-            foreach (var chunk in extractionResult.Chunks)
+            try
             {
-                var chunkEntity = new DocumentChunk
-                {
-                    DocumentId = document.Id,
-                    Index = chunk.Index,
-                    Channel = chunk.Channel,
-                    Content = chunk.Content,
-                    Summary = chunk.Summary,
-                    TokenEstimate = EstimateTokens(chunk.Content)
-                };
+                using var scope = _scopeFactory.CreateScope();
+                var services = scope.ServiceProvider;
+                var eventSink = services.GetRequiredService<IDocumentProcessingEventSink>();
+                var extraction = services.GetRequiredService<ITextExtractionService>();
+                var embeddingGenerator = services.GetRequiredService<IEmbeddingGenerator>();
+                var clock = services.GetRequiredService<TimeProvider>();
+                var logger = services.GetRequiredService<ILogger<DocumentAnalysisPipeline>>();
 
-                var embedding = await embeddingGenerator.GenerateAsync(chunk.Content, cancellationToken).ConfigureAwait(false);
-                chunkEntity.Embedding = embedding;
-                chunkEntity = await chunkEntity.Save(cancellationToken).ConfigureAwait(false);
-                savedChunks.Add(chunkEntity);
-
-                if (embedding is not null && Vector<DocumentChunk>.IsAvailable)
+                var document = await SourceDocument.Get(workItem.DocumentId.ToString(), cancellationToken).ConfigureAwait(false);
+                if (document is null)
                 {
-                    await Vector<DocumentChunk>.Save(chunkEntity.Id, embedding, cancellationToken).ConfigureAwait(false);
+                    _logger.LogWarning("Work item {WorkId} references missing document {DocumentId}", workItem.WorkId, workItem.DocumentId);
+                    await _queue.CompleteAsync(workItem, cancellationToken).ConfigureAwait(false);
+                    return;
                 }
+
+                var documentId = Guid.Parse(document.Id);
+
+                await eventSink.RecordAsync(
+                    new DocumentProcessingEventEntry(
+                        documentId,
+                        workItem.Stage,
+                        DocumentProcessingStatus.Extracting,
+                        Detail: "Starting text extraction",
+                        Attempt: workItem.Attempt,
+                        CorrelationId: workItem.CorrelationId),
+                    cancellationToken).ConfigureAwait(false);
+
+                document.Status = DocumentProcessingStatus.Extracting;
+                await document.Save(cancellationToken).ConfigureAwait(false);
+
+                var extractionResult = await extraction.ExtractAsync(document, cancellationToken).ConfigureAwait(false);
+
+                var chunkRefs = new List<ChunkReference>();
+                var chunkIndex = 0;
+                foreach (var chunk in extractionResult.Chunks)
+                {
+                    var entity = new DocumentChunk
+                    {
+                        SourceDocumentId = documentId,
+                        Order = chunk.Index,
+                        Text = chunk.Content.Trim(),
+                        CharacterCount = chunk.Content.Length,
+                        TokenCount = EstimateTokens(chunk.Content),
+                        IsLastChunk = chunkIndex == extractionResult.Chunks.Count - 1
+                    };
+
+                    entity = await entity.Save(cancellationToken).ConfigureAwait(false);
+                    chunkRefs.Add(new ChunkReference
+                    {
+                        ChunkId = Guid.Parse(entity.Id),
+                        Order = entity.Order
+                    });
+
+                    if (Vector<DocumentChunkEmbedding>.IsAvailable)
+                    {
+                        var embedding = await embeddingGenerator.GenerateAsync(entity.Text, cancellationToken).ConfigureAwait(false);
+                        if (embedding is not null && embedding.Length > 0)
+                        {
+                            await DocumentChunkEmbeddingWriter.UpsertAsync(Guid.Parse(entity.Id), documentId, embedding, cancellationToken).ConfigureAwait(false);
+                        }
+                    }
+
+                    chunkIndex++;
+                }
+
+                document.Summary.TextExtracted = true;
+                document.Summary.ChunkRefs = chunkRefs;
+                document.LastProcessedAt = clock.GetUtcNow();
+                document.Status = DocumentProcessingStatus.Extracted;
+                document.Summary.PrimaryFindings = extractionResult.Text.Length > 320
+                    ? extractionResult.Text[..320]
+                    : extractionResult.Text;
+                await document.Save(cancellationToken).ConfigureAwait(false);
+
+                await eventSink.RecordAsync(
+                    new DocumentProcessingEventEntry(
+                        documentId,
+                        DocumentProcessingStage.GenerateChunks,
+                        DocumentProcessingStatus.Extracted,
+                        Detail: $"Generated {chunkRefs.Count} chunks",
+                        Metrics: new Dictionary<string, double>
+                        {
+                            ["chunkCount"] = chunkRefs.Count,
+                            ["wordCount"] = extractionResult.WordCount,
+                            ["pageCount"] = extractionResult.PageCount
+                        },
+                        Attempt: workItem.Attempt,
+                        CorrelationId: workItem.CorrelationId),
+                    cancellationToken).ConfigureAwait(false);
+
+                document.Status = DocumentProcessingStatus.Completed;
+                document.LastProcessedAt = clock.GetUtcNow();
+                await document.Save(cancellationToken).ConfigureAwait(false);
+
+                await eventSink.RecordAsync(
+                    new DocumentProcessingEventEntry(
+                        documentId,
+                        DocumentProcessingStage.Complete,
+                        DocumentProcessingStatus.Completed,
+                        Detail: "Document processing completed",
+                        Attempt: workItem.Attempt,
+                        CorrelationId: workItem.CorrelationId,
+                        IsTerminal = true),
+                    cancellationToken).ConfigureAwait(false);
+
+                workItem.UpdateStage(DocumentProcessingStage.Complete, DocumentProcessingStatus.Completed);
+                workItem.MarkCompleted(DocumentProcessingStatus.Completed);
+                await _queue.CompleteAsync(workItem, cancellationToken).ConfigureAwait(false);
             }
-
-            document.ChunkIds = savedChunks.Select(c => c.Id).ToList();
-            document.MarkStatus(DocumentProcessingStatus.Analyzing);
-            await document.Save(cancellationToken).ConfigureAwait(false);
-
-            await RecordEventAsync(document, DocumentProcessingStage.Insight, DocumentProcessingStatus.Analyzing, "Synthesising insights", cancellationToken).ConfigureAwait(false);
-            var insightEntities = await insights.GenerateAsync(document, extractionResult, savedChunks, cancellationToken).ConfigureAwait(false);
-
-            foreach (var insight in insightEntities)
+            catch (Exception ex)
             {
-                await insight.Save(cancellationToken).ConfigureAwait(false);
+                _logger.LogError(ex, "Pipeline failed for document {DocumentId}", workItem.DocumentId);
+                await HandleFailureAsync(workItem, ex, cancellationToken).ConfigureAwait(false);
             }
-
-            if (insightEntities.Count > 0)
+            finally
             {
-                document.Summary.PrimaryFindings = insightEntities[0].Content.Length > 240
-                    ? insightEntities[0].Content[..240]
-                    : insightEntities[0].Content;
+                semaphore.Release();
             }
+        }, cancellationToken);
 
-            await RecordEventAsync(document, DocumentProcessingStage.Suggestion, DocumentProcessingStatus.Analyzing, "Computing profile suggestions", cancellationToken).ConfigureAwait(false);
-            var suggestions = await templates.SuggestAsync(document, savedChunks, cancellationToken).ConfigureAwait(false);
-            document.Suggestions = suggestions.ToList();
-            if (string.IsNullOrWhiteSpace(document.AssignedProfileId) && suggestions.Count > 0)
-            {
-                var top = suggestions[0];
-                document.AssignedProfileId = top.ProfileId;
-                document.AssignedBySystem = true;
-                document.Suggestions[0].AutoAccepted = true;
-                await RecordEventAsync(document, DocumentProcessingStage.Suggestion, DocumentProcessingStatus.Analyzing,
-                    $"Auto-assigned profile {top.ProfileId}", cancellationToken).ConfigureAwait(false);
-            }
-
-            document.MarkStatus(DocumentProcessingStatus.Completed);
-            document.CompletedAt = clock.GetUtcNow();
-            await document.Save(cancellationToken).ConfigureAwait(false);
-            await RecordEventAsync(document, DocumentProcessingStage.Completion, DocumentProcessingStatus.Completed, "Document analysis completed", cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Processing failed for document {DocumentId}", document.Id);
-            document.MarkStatus(DocumentProcessingStatus.Failed, ex.Message);
-            await document.Save(cancellationToken).ConfigureAwait(false);
-            await RecordEventAsync(document, DocumentProcessingStage.Error, DocumentProcessingStatus.Failed, ex.Message, cancellationToken).ConfigureAwait(false);
-        }
-    }
-
-    private static Task RecordEventAsync(SourceDocument document, DocumentProcessingStage stage, DocumentProcessingStatus status, string message, CancellationToken cancellationToken)
+    private async Task HandleFailureAsync(DocumentWorkItem workItem, Exception exception, CancellationToken cancellationToken)
     {
-        var evt = new DocumentProcessingEvent
+        using var scope = _scopeFactory.CreateScope();
+        var eventSink = scope.ServiceProvider.GetRequiredService<IDocumentProcessingEventSink>();
+        var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
+
+        var document = await SourceDocument.Get(workItem.DocumentId.ToString(), cancellationToken).ConfigureAwait(false);
+        if (document is not null)
         {
-            DocumentId = document.Id,
-            Stage = stage,
-            Status = status,
-            Message = message,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-        return evt.Save(cancellationToken);
+            var documentId = Guid.Parse(document.Id);
+            document.Status = DocumentProcessingStatus.Failed;
+            document.LastError = exception.Message;
+            document.LastProcessedAt = clock.GetUtcNow();
+            await document.Save(cancellationToken).ConfigureAwait(false);
+
+            await eventSink.RecordAsync(
+                new DocumentProcessingEventEntry(
+                    documentId,
+                    DocumentProcessingStage.Failed,
+                    DocumentProcessingStatus.Failed,
+                    Detail: "Processing failed",
+                    Error: exception.Message,
+                    Attempt: workItem.Attempt,
+                    CorrelationId: workItem.CorrelationId),
+                cancellationToken).ConfigureAwait(false);
+
+            workItem.UpdateStage(workItem.Stage, DocumentProcessingStatus.Failed);
+            workItem.MarkCompleted(DocumentProcessingStatus.Failed);
+            var scheduled = await _queue.ScheduleRetryAsync(workItem, exception, cancellationToken).ConfigureAwait(false);
+            if (!scheduled)
+            {
+                await eventSink.RecordAsync(
+                    new DocumentProcessingEventEntry(
+                        documentId,
+                        DocumentProcessingStage.Failed,
+                        DocumentProcessingStatus.Failed,
+                        Detail: "Retry limit reached",
+                        Error: exception.Message,
+                        Attempt: workItem.Attempt,
+                        CorrelationId: workItem.CorrelationId,
+                        IsTerminal = true),
+                    cancellationToken).ConfigureAwait(false);
+                await _queue.CompleteAsync(workItem, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        else
+        {
+            workItem.UpdateStage(workItem.Stage, DocumentProcessingStatus.Failed);
+            workItem.MarkCompleted(DocumentProcessingStatus.Failed);
+            var scheduled = await _queue.ScheduleRetryAsync(workItem, exception, cancellationToken).ConfigureAwait(false);
+            if (!scheduled)
+            {
+                await _queue.CompleteAsync(workItem, cancellationToken).ConfigureAwait(false);
+            }
+        }
     }
 
     private static int EstimateTokens(string content)
     {
-        if (string.IsNullOrWhiteSpace(content)) return 0;
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return 0;
+        }
+
         return Math.Max(1, content.Length / 4);
+    }
+}
+
+internal static class DocumentChunkEmbeddingWriter
+{
+    public static async Task UpsertAsync(Guid chunkId, Guid documentId, float[] embedding, CancellationToken cancellationToken)
+    {
+        if (!Vector<DocumentChunkEmbedding>.IsAvailable || embedding is null || embedding.Length == 0)
+        {
+            return;
+        }
+
+        var entity = new DocumentChunkEmbedding
+        {
+            DocumentChunkId = chunkId,
+            SourceDocumentId = documentId,
+            Embedding = embedding,
+            GeneratedAt = DateTimeOffset.UtcNow
+        };
+
+        await entity.Save(cancellationToken).ConfigureAwait(false);
     }
 }

@@ -29,6 +29,8 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
     {
         var insights = new List<DocumentInsight>();
 
+        var documentId = Guid.Parse(document.Id);
+
         if (_ai is not null && !string.IsNullOrWhiteSpace(extraction.Text))
         {
             try
@@ -48,11 +50,11 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
                 {
                     insights.Add(new DocumentInsight
                     {
-                        DocumentId = document.Id,
-                        Title = "Executive summary",
-                        Content = response.Text.Trim(),
+                        SourceDocumentId = documentId,
+                        Channel = InsightChannel.Text,
+                        Heading = "Executive summary",
+                        Body = response.Text.Trim(),
                         Confidence = 0.7,
-                        Channel = DocumentChannels.Text,
                         Metadata = new Dictionary<string, string>
                         {
                             ["model"] = response.Model ?? _options.Ai.DefaultModel,
@@ -80,31 +82,26 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
             var fallback = sb.Length == 0 ? extraction.Text[..Math.Min(extraction.Text.Length, 320)] : sb.ToString();
             insights.Add(new DocumentInsight
             {
-                DocumentId = document.Id,
-                Title = "Auto-generated overview",
-                Content = fallback.Trim(),
-                Confidence = 0.4,
-                Channel = DocumentChannels.Text
+                SourceDocumentId = documentId,
+                Channel = InsightChannel.Text,
+                Heading = "Auto-generated overview",
+                Body = fallback.Trim(),
+                Confidence = 0.4
             });
         }
 
-        var index = 0;
         foreach (var chunk in chunks)
         {
+            var chunkId = Guid.Parse(chunk.Id);
             insights.Add(new DocumentInsight
             {
-                DocumentId = document.Id,
-                ChunkId = chunk.Id,
-                Channel = chunk.Channel,
-                Title = $"Chunk {chunk.Index + 1} highlight",
-                Content = chunk.Summary ?? chunk.Content,
-                Confidence = 0.3,
-                Metadata = new Dictionary<string, string>
-                {
-                    ["chunkIndex"] = chunk.Index.ToString(CultureInfo.InvariantCulture)
-                }
+                SourceDocumentId = documentId,
+                ChunkId = chunkId,
+                Channel = InsightChannel.Text,
+                Heading = $"Chunk {chunk.Order + 1} highlight",
+                Body = chunk.Text.Length > 200 ? chunk.Text[..200] + "…" : chunk.Text,
+                Confidence = 0.3
             });
-            index++;
         }
 
         return insights;
@@ -113,7 +110,7 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
     private static string BuildPrompt(SourceDocument document, DocumentExtractionResult extraction)
     {
         var builder = new StringBuilder();
-        builder.AppendLine($"Document: {document.OriginalFileName}");
+        builder.AppendLine($"Document: {document.DisplayName ?? document.FileName}");
         if (!string.IsNullOrWhiteSpace(document.AssignedProfileId))
         {
             builder.AppendLine($"Assigned profile: {document.AssignedProfileId}");

@@ -136,6 +136,6 @@ public sealed class TextExtractionService : ITextExtractionService
     private static ExtractedChunk CreateChunk(int index, string content)
     {
         var summary = content.Length <= 160 ? content.Trim() : content[..160].Trim() + "…";
-        return new ExtractedChunk(index, DocumentChannels.Text, content.Trim(), summary);
+        return new ExtractedChunk(index, content.Trim(), summary);
     }
 }

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using S13.DocMind.Infrastructure;
 using S13.DocMind.Models;
 
 namespace S13.DocMind.Services;
@@ -9,250 +11,270 @@ public interface IDocumentProcessingDiagnostics
 {
     Task<IReadOnlyCollection<ProcessingQueueItem>> GetQueueAsync(CancellationToken cancellationToken);
     Task<IReadOnlyCollection<ProcessingTimelineEntry>> GetTimelineAsync(ProcessingTimelineQuery query, CancellationToken cancellationToken);
-    Task<ProcessingRetryResult> RetryAsync(string fileId, ProcessingRetryRequest request, CancellationToken cancellationToken);
+    Task<ProcessingRetryResult> RetryAsync(string documentId, ProcessingRetryRequest request, CancellationToken cancellationToken);
 }
 
-public class DocumentProcessingDiagnostics : IDocumentProcessingDiagnostics
+public sealed class DocumentProcessingDiagnostics : IDocumentProcessingDiagnostics
 {
+    private readonly IDocumentPipelineQueue _queue;
+    private readonly IDocumentProcessingEventSink _eventSink;
+    private readonly TimeProvider _clock;
+    private readonly ILogger<DocumentProcessingDiagnostics> _logger;
+
+    public DocumentProcessingDiagnostics(
+        IDocumentPipelineQueue queue,
+        IDocumentProcessingEventSink eventSink,
+        TimeProvider clock,
+        ILogger<DocumentProcessingDiagnostics> logger)
+    {
+        _queue = queue;
+        _eventSink = eventSink;
+        _clock = clock;
+        _logger = logger;
+    }
+
     public async Task<IReadOnlyCollection<ProcessingQueueItem>> GetQueueAsync(CancellationToken cancellationToken)
     {
-        var files = await Models.File.All();
-        var analyses = await Analysis.All();
+        var snapshot = _queue.GetSnapshot();
+        if (snapshot.Count == 0)
+        {
+            return Array.Empty<ProcessingQueueItem>();
+        }
 
-        var queueItems = files
-            .Where(file => file.Status is "uploaded" or "extracting" or "extracted" or "assigned" or "processing" or "analyzing")
-            .Select(file =>
+        var fetchTasks = snapshot
+            .Select(item => SourceDocument.Get(item.DocumentId.ToString(), cancellationToken))
+            .ToArray();
+
+        await Task.WhenAll(fetchTasks).ConfigureAwait(false);
+
+        var documents = new Dictionary<Guid, SourceDocument>();
+        for (var i = 0; i < fetchTasks.Length; i++)
+        {
+            var entity = fetchTasks[i].Result;
+            if (entity is null)
             {
-                var analysis = analyses.FirstOrDefault(a => a.Id == file.AnalysisId);
+                continue;
+            }
 
+            if (Guid.TryParse(entity.Id, out var parsed))
+            {
+                documents[parsed] = entity;
+            }
+        }
+
+        var now = _clock.GetUtcNow();
+
+        return snapshot
+            .OrderBy(item => item.EnqueuedAt)
+            .Select(item =>
+            {
+                documents.TryGetValue(item.DocumentId, out var document);
                 return new ProcessingQueueItem
                 {
-                    FileId = file.Id!,
-                    FileName = file.Name,
-                    Status = file.Status,
-                    DocumentTypeId = file.DocumentTypeId,
-                    AssignedDate = file.AssignedDate,
-                    UploadDate = file.UploadDate,
-                    CompletedDate = file.CompletedDate,
-                    ErrorMessage = file.ErrorMessage,
-                    AnalysisStatus = analysis?.Status,
-                    Confidence = analysis?.OverallConfidence,
-                    Progress = CalculateProgress(file.Status)
+                    WorkId = item.WorkId,
+                    DocumentId = document?.Id ?? item.DocumentId.ToString(),
+                    FileName = document?.DisplayName ?? document?.FileName ?? item.DocumentId.ToString(),
+                    Stage = item.Stage,
+                    Status = item.Status,
+                    Attempt = item.Attempt,
+                    RetryCount = item.RetryCount,
+                    MaxAttempts = item.MaxAttempts,
+                    CorrelationId = item.CorrelationId,
+                    EnqueuedAt = item.EnqueuedAt,
+                    LastDequeuedAt = item.LastDequeuedAt,
+                    LastAttemptCompletedAt = item.LastAttemptCompletedAt,
+                    QueueAge = now - item.EnqueuedAt,
+                    UploadedAt = document?.UploadedAt ?? item.EnqueuedAt,
+                    LastProcessedAt = document?.LastProcessedAt,
+                    AssignedProfileId = document?.AssignedProfileId,
+                    LastError = document?.LastError
                 };
             })
-            .OrderByDescending(item => item.UploadDate)
             .ToList();
-
-        return queueItems;
     }
 
     public async Task<IReadOnlyCollection<ProcessingTimelineEntry>> GetTimelineAsync(ProcessingTimelineQuery query, CancellationToken cancellationToken)
     {
-        var files = await Models.File.All();
-        var analyses = await Analysis.All();
+        var documents = await SourceDocument.All(cancellationToken).ConfigureAwait(false);
+        var events = await DocumentProcessingEvent.All(cancellationToken).ConfigureAwait(false);
 
-        var timeline = new List<ProcessingTimelineEntry>();
-
-        foreach (var file in files)
+        var filteredEvents = events.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(query.DocumentId) && Guid.TryParse(query.DocumentId, out var docId))
         {
-            if (!string.IsNullOrEmpty(query.DocumentTypeId) && !string.Equals(file.DocumentTypeId, query.DocumentTypeId, StringComparison.OrdinalIgnoreCase))
+            filteredEvents = filteredEvents.Where(evt => evt.SourceDocumentId == docId);
+        }
+
+        if (query.Stage.HasValue)
+        {
+            filteredEvents = filteredEvents.Where(evt => evt.Stage == query.Stage.Value);
+        }
+
+        if (query.From.HasValue)
+        {
+            filteredEvents = filteredEvents.Where(evt => evt.CreatedAt >= query.From.Value);
+        }
+
+        if (query.To.HasValue)
+        {
+            filteredEvents = filteredEvents.Where(evt => evt.CreatedAt <= query.To.Value);
+        }
+
+        var grouped = filteredEvents
+            .GroupBy(evt => evt.SourceDocumentId)
+            .Select(group =>
             {
-                continue;
-            }
-
-            if (query.FromDate.HasValue && file.UploadDate < query.FromDate.Value)
-            {
-                continue;
-            }
-
-            if (query.ToDate.HasValue && file.UploadDate > query.ToDate.Value)
-            {
-                continue;
-            }
-
-            var analysis = analyses.FirstOrDefault(a => a.Id == file.AnalysisId);
-
-            var steps = new List<ProcessingTimelineStep>
-            {
-                new("Uploaded", file.UploadDate, file.Status is "uploaded" ? ProcessingStepState.Current : ProcessingStepState.Completed)
-            };
-
-            if (file.ExtractedDate.HasValue)
-            {
-                steps.Add(new ProcessingTimelineStep("Extracted", file.ExtractedDate.Value, file.Status is "extracting" or "extracted" ? ProcessingStepState.Current : ProcessingStepState.Completed));
-            }
-
-            if (file.AssignedDate.HasValue)
-            {
-                steps.Add(new ProcessingTimelineStep("Type Assigned", file.AssignedDate.Value, file.Status is "assigned" ? ProcessingStepState.Current : ProcessingStepState.Completed));
-            }
-
-            if (analysis != null)
-            {
-                steps.Add(new ProcessingTimelineStep("Analysis Started", analysis.StartedDate, analysis.Status == "processing" ? ProcessingStepState.Current : ProcessingStepState.Completed));
-
-                if (analysis.CompletedDate.HasValue)
+                var document = documents.FirstOrDefault(d => Guid.TryParse(d.Id, out var id) && id == group.Key);
+                return new ProcessingTimelineEntry
                 {
-                    steps.Add(new ProcessingTimelineStep("Analysis Completed", analysis.CompletedDate.Value, analysis.Status == "completed" ? ProcessingStepState.Completed : ProcessingStepState.Current));
-                }
-            }
-
-            if (file.CompletedDate.HasValue)
-            {
-                steps.Add(new ProcessingTimelineStep("Document Completed", file.CompletedDate.Value, file.Status == "completed" ? ProcessingStepState.Completed : ProcessingStepState.Current));
-            }
-
-            if (file.Status == "failed")
-            {
-                steps.Add(new ProcessingTimelineStep("Failed", file.LastErrorDate ?? file.CompletedDate ?? file.UploadDate, ProcessingStepState.Failed, file.ErrorMessage));
-            }
-
-            if (!string.IsNullOrEmpty(query.Status) && steps.All(step => !string.Equals(step.Name, query.Status, StringComparison.OrdinalIgnoreCase)))
-            {
-                continue;
-            }
-
-            timeline.Add(new ProcessingTimelineEntry
-            {
-                FileId = file.Id!,
-                FileName = file.Name,
-                DocumentTypeId = file.DocumentTypeId,
-                Steps = steps.OrderBy(step => step.Timestamp).ToList(),
-                CurrentStatus = file.Status,
-                Confidence = analysis?.OverallConfidence,
-                ErrorMessage = file.ErrorMessage
-            });
-        }
-
-        return timeline
-            .OrderByDescending(entry => entry.Steps.Max(step => step.Timestamp))
+                    DocumentId = document?.Id ?? group.Key.ToString(),
+                    FileName = document?.DisplayName ?? document?.FileName ?? group.Key.ToString(),
+                    Events = group
+                        .OrderBy(evt => evt.CreatedAt)
+                        .Select(evt => new ProcessingTimelineEvent
+                        {
+                            Stage = evt.Stage,
+                            Status = evt.Status,
+                            Detail = evt.Detail ?? string.Empty,
+                            Error = evt.Error,
+                            CreatedAt = evt.CreatedAt,
+                            Attempt = evt.Attempt,
+                            CorrelationId = evt.CorrelationId,
+                            Duration = evt.Duration,
+                            ChunkId = evt.ChunkId,
+                            InsightId = evt.InsightId,
+                            Metrics = new Dictionary<string, double>(evt.Metrics),
+                            Context = new Dictionary<string, string>(evt.Context, StringComparer.OrdinalIgnoreCase),
+                            InputTokens = evt.InputTokens,
+                            OutputTokens = evt.OutputTokens,
+                            IsTerminal = evt.IsTerminal
+                        })
+                        .ToList()
+                };
+            })
+            .OrderBy(entry => entry.Events.FirstOrDefault()?.CreatedAt ?? DateTimeOffset.MinValue)
             .ToList();
+
+        return grouped;
     }
 
-    public async Task<ProcessingRetryResult> RetryAsync(string fileId, ProcessingRetryRequest request, CancellationToken cancellationToken)
+    public async Task<ProcessingRetryResult> RetryAsync(string documentId, ProcessingRetryRequest request, CancellationToken cancellationToken)
     {
-        var file = await Models.File.Get(fileId);
-        if (file is null)
+        if (string.IsNullOrWhiteSpace(documentId))
         {
-            return ProcessingRetryResult.NotFound(fileId);
+            return ProcessingRetryResult.NotFound(documentId);
         }
 
-        var analysis = !string.IsNullOrEmpty(file.AnalysisId)
-            ? await Analysis.Get(file.AnalysisId)
-            : null;
-
-        if (request.ResetToStage is not null)
+        if (!Guid.TryParse(documentId, out var parsedId))
         {
-            file.Status = request.ResetToStage;
-        }
-        else
-        {
-            file.Status = "uploaded";
+            return ProcessingRetryResult.NotFound(documentId);
         }
 
-        file.ErrorMessage = null;
-        file.LastErrorDate = null;
-        file.CompletedDate = null;
-        file.AssignedDate = null;
-        file.ExtractedDate = null;
-
-        await file.Save(cancellationToken);
-
-        if (analysis != null && request.IncludeAnalysisReset)
+        var document = await SourceDocument.Get(documentId, cancellationToken).ConfigureAwait(false);
+        if (document is null)
         {
-            analysis.Status = "processing";
-            analysis.CompletedDate = null;
-            analysis.ErrorMessage = null;
-            analysis.RetryCount++;
-            await analysis.Save(cancellationToken);
+            return ProcessingRetryResult.NotFound(documentId);
         }
 
-        return ProcessingRetryResult.Success(file.Id!, file.Status, analysis?.Status);
+        document.Status = DocumentProcessingStatus.Queued;
+        document.LastError = null;
+        document.LastProcessedAt = _clock.GetUtcNow();
+        await document.Save(cancellationToken).ConfigureAwait(false);
+
+        await _eventSink.RecordAsync(
+            new DocumentProcessingEventEntry(
+                parsedId,
+                DocumentProcessingStage.Upload,
+                DocumentProcessingStatus.Queued,
+                Detail: "Retry requested",
+                CorrelationId: Guid.NewGuid().ToString("N")),
+            cancellationToken).ConfigureAwait(false);
+
+        var work = new DocumentWorkItem(parsedId, DocumentProcessingStage.ExtractText, DocumentProcessingStatus.Queued);
+        await _queue.EnqueueAsync(work, cancellationToken).ConfigureAwait(false);
+
+        _logger.LogInformation("Retry queued for document {DocumentId}", documentId);
+        return ProcessingRetryResult.Success(document.Id, document.Status);
     }
-
-    private static int CalculateProgress(string status) => status switch
-    {
-        "uploaded" => 10,
-        "extracting" => 25,
-        "extracted" => 45,
-        "assigned" => 60,
-        "processing" => 75,
-        "analyzing" => 90,
-        "completed" => 100,
-        _ => 0
-    };
 }
 
-public record ProcessingTimelineQuery
+public sealed class ProcessingTimelineQuery
 {
-    public string? DocumentTypeId { get; init; }
-    public string? Status { get; init; }
-    public DateTime? FromDate { get; init; }
-    public DateTime? ToDate { get; init; }
+    public string? DocumentId { get; set; }
+    public DocumentProcessingStage? Stage { get; set; }
+    public DateTimeOffset? From { get; set; }
+    public DateTimeOffset? To { get; set; }
 }
 
-public class ProcessingTimelineEntry
+public sealed class ProcessingTimelineEntry
 {
-    public string FileId { get; set; } = string.Empty;
+    public string DocumentId { get; set; } = string.Empty;
     public string FileName { get; set; } = string.Empty;
-    public string? DocumentTypeId { get; set; }
-    public string CurrentStatus { get; set; } = string.Empty;
-    public double? Confidence { get; set; }
-    public string? ErrorMessage { get; set; }
-    public IReadOnlyCollection<ProcessingTimelineStep> Steps { get; set; } = Array.Empty<ProcessingTimelineStep>();
+    public IReadOnlyCollection<ProcessingTimelineEvent> Events { get; set; } = Array.Empty<ProcessingTimelineEvent>();
 }
 
-public record ProcessingTimelineStep(string Name, DateTime Timestamp, ProcessingStepState State, string? Notes = null);
-
-public enum ProcessingStepState
+public sealed class ProcessingTimelineEvent
 {
-    Pending,
-    Current,
-    Completed,
-    Failed
+    public DocumentProcessingStage Stage { get; set; }
+    public DocumentProcessingStatus Status { get; set; }
+    public string Detail { get; set; } = string.Empty;
+    public string? Error { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public int Attempt { get; set; }
+    public string? CorrelationId { get; set; }
+    public TimeSpan? Duration { get; set; }
+    public Guid? ChunkId { get; set; }
+    public Guid? InsightId { get; set; }
+    public Dictionary<string, double> Metrics { get; set; } = new();
+    public Dictionary<string, string> Context { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public long? InputTokens { get; set; }
+    public long? OutputTokens { get; set; }
+    public bool IsTerminal { get; set; }
 }
 
-public class ProcessingQueueItem
+public sealed class ProcessingQueueItem
 {
-    public string FileId { get; set; } = string.Empty;
+    public Guid WorkId { get; set; }
+    public string DocumentId { get; set; } = string.Empty;
     public string FileName { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-    public string? DocumentTypeId { get; set; }
-    public DateTime UploadDate { get; set; }
-    public DateTime? AssignedDate { get; set; }
-    public DateTime? CompletedDate { get; set; }
-    public string? ErrorMessage { get; set; }
-    public string? AnalysisStatus { get; set; }
-    public double? Confidence { get; set; }
-    public int Progress { get; set; }
+    public DocumentProcessingStage Stage { get; set; }
+    public DocumentProcessingStatus Status { get; set; }
+    public int Attempt { get; set; }
+    public int RetryCount { get; set; }
+    public int MaxAttempts { get; set; }
+    public string? CorrelationId { get; set; }
+    public DateTimeOffset EnqueuedAt { get; set; }
+    public DateTimeOffset? LastDequeuedAt { get; set; }
+    public DateTimeOffset? LastAttemptCompletedAt { get; set; }
+    public TimeSpan QueueAge { get; set; }
+    public DateTimeOffset UploadedAt { get; set; }
+    public DateTimeOffset? LastProcessedAt { get; set; }
+    public string? AssignedProfileId { get; set; }
+    public string? LastError { get; set; }
 }
 
-public class ProcessingRetryRequest
+public sealed class ProcessingRetryRequest
 {
-    public string? ResetToStage { get; set; }
-    public bool IncludeAnalysisReset { get; set; } = true;
+    public bool Force { get; set; }
 }
 
-public class ProcessingRetryResult
+public sealed class ProcessingRetryResult
 {
-    private ProcessingRetryResult(bool success, string fileId, string? fileStatus, string? analysisStatus, string? message)
+    private ProcessingRetryResult(bool success, string documentId, DocumentProcessingStatus? status, string? message)
     {
         Success = success;
-        FileId = fileId;
-        FileStatus = fileStatus;
-        AnalysisStatus = analysisStatus;
+        DocumentId = documentId;
+        Status = status;
         Message = message;
     }
 
     public bool Success { get; }
-    public string FileId { get; }
-    public string? FileStatus { get; }
-    public string? AnalysisStatus { get; }
+    public string DocumentId { get; }
+    public DocumentProcessingStatus? Status { get; }
     public string? Message { get; }
 
-    public static ProcessingRetryResult NotFound(string fileId)
-        => new(false, fileId, null, null, "File not found");
+    public static ProcessingRetryResult NotFound(string documentId)
+        => new(false, documentId, null, "Document not found");
 
-    public static ProcessingRetryResult Success(string fileId, string? fileStatus, string? analysisStatus)
-        => new(true, fileId, fileStatus, analysisStatus, null);
+    public static ProcessingRetryResult Success(string documentId, DocumentProcessingStatus status)
+        => new(true, documentId, status, null);
 }

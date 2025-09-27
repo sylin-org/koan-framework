@@ -20,11 +20,15 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
 
         services.AddSingleton<IDocumentPipelineQueue, DocumentPipelineQueue>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
+        services.AddScoped<IDocumentProcessingEventSink, DocumentProcessingEventRepositorySink>();
         services.AddScoped<IDocumentIntakeService, DocumentIntakeService>();
         services.AddScoped<ITextExtractionService, TextExtractionService>();
         services.AddScoped<IInsightSynthesisService, InsightSynthesisService>();
         services.AddScoped<ITemplateSuggestionService, TemplateSuggestionService>();
         services.AddScoped<IEmbeddingGenerator, EmbeddingGenerator>();
+        services.AddScoped<IDocumentInsightsService, DocumentInsightsService>();
+        services.AddScoped<IDocumentAggregationService, DocumentAggregationService>();
+        services.AddScoped<IDocumentProcessingDiagnostics, DocumentProcessingDiagnostics>();
         services.AddSingleton(TimeProvider.System);
 
         services.AddHostedService<DocumentAnalysisPipeline>();

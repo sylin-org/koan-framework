@@ -313,48 +313,66 @@
       "ProcessingQueueItem": {
         "type": "object",
         "properties": {
-          "fileId": { "type": "string" },
+          "workId": { "type": "string", "format": "uuid" },
+          "documentId": { "type": "string" },
           "fileName": { "type": "string" },
+          "stage": { "type": "string" },
           "status": { "type": "string" },
-          "documentTypeId": { "type": "string" },
-          "uploadDate": { "type": "string", "format": "date-time" },
-          "assignedDate": { "type": "string", "format": "date-time" },
-          "completedDate": { "type": "string", "format": "date-time" },
-          "errorMessage": { "type": "string" },
-          "analysisStatus": { "type": "string" },
-          "confidence": { "type": "number" },
-          "progress": { "type": "integer" }
+          "attempt": { "type": "integer", "format": "int32" },
+          "retryCount": { "type": "integer", "format": "int32" },
+          "maxAttempts": { "type": "integer", "format": "int32" },
+          "correlationId": { "type": "string" },
+          "enqueuedAt": { "type": "string", "format": "date-time" },
+          "lastDequeuedAt": { "type": "string", "format": "date-time" },
+          "lastAttemptCompletedAt": { "type": "string", "format": "date-time" },
+          "queueAge": { "type": "string", "format": "duration" },
+          "uploadedAt": { "type": "string", "format": "date-time" },
+          "lastProcessedAt": { "type": "string", "format": "date-time" },
+          "assignedProfileId": { "type": "string" },
+          "lastError": { "type": "string" }
         }
       },
       "ProcessingTimelineEntry": {
         "type": "object",
         "properties": {
-          "fileId": { "type": "string" },
+          "documentId": { "type": "string" },
           "fileName": { "type": "string" },
-          "documentTypeId": { "type": "string" },
-          "currentStatus": { "type": "string" },
-          "confidence": { "type": "number" },
-          "errorMessage": { "type": "string" },
-          "steps": {
+          "events": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/ProcessingTimelineStep" }
+            "items": { "$ref": "#/components/schemas/ProcessingTimelineEvent" }
           }
         }
       },
-      "ProcessingTimelineStep": {
+      "ProcessingTimelineEvent": {
         "type": "object",
         "properties": {
-          "name": { "type": "string" },
-          "timestamp": { "type": "string", "format": "date-time" },
-          "state": { "type": "string" },
-          "notes": { "type": "string" }
+          "stage": { "type": "string" },
+          "status": { "type": "string" },
+          "detail": { "type": "string" },
+          "error": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "attempt": { "type": "integer", "format": "int32" },
+          "correlationId": { "type": "string" },
+          "duration": { "type": "string", "format": "duration" },
+          "chunkId": { "type": "string", "format": "uuid" },
+          "insightId": { "type": "string", "format": "uuid" },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": { "type": "number", "format": "double" }
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "inputTokens": { "type": "integer", "format": "int64" },
+          "outputTokens": { "type": "integer", "format": "int64" },
+          "isTerminal": { "type": "boolean" }
         }
       },
       "ProcessingRetryRequest": {
         "type": "object",
         "properties": {
-          "resetToStage": { "type": "string" },
-          "includeAnalysisReset": { "type": "boolean" }
+          "force": { "type": "boolean" }
         }
       },
       "ModelDescriptor": {

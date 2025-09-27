@@ -1,21 +1,19 @@
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
-using Koan.Flow.Core.Model;
 
 namespace S13.DocMind.Models;
 
 /// <summary>
 /// Event stream entity capturing telemetry for each stage of document processing.
-/// Provides detailed instrumentation for diagnostics, retries, and workflow visualization.
+/// Provides durable diagnostics powering the processing timeline and retry workflows.
 /// </summary>
-public sealed class DocumentProcessingEvent : FlowEntity<DocumentProcessingEvent>
+[Parent(typeof(SourceDocument))]
+public sealed class DocumentProcessingEvent : Entity<DocumentProcessingEvent>
 {
     [Required]
-    public Guid DocumentId { get; set; }
+    public Guid SourceDocumentId { get; set; }
         = Guid.Empty;
 
     public Guid? ChunkId { get; set; }
@@ -26,15 +24,19 @@ public sealed class DocumentProcessingEvent : FlowEntity<DocumentProcessingEvent
 
     [Required]
     public DocumentProcessingStage Stage { get; set; }
-        = DocumentProcessingStage.Uploaded;
+        = DocumentProcessingStage.Upload;
 
     [Required]
     public DocumentProcessingStatus Status { get; set; }
-        = DocumentProcessingStatus.Queued;
+        = DocumentProcessingStatus.Uploaded;
 
     [MaxLength(300)]
-    public string Message { get; set; }
-        = string.Empty;
+    public string? Detail { get; set; }
+        = null;
+
+    [MaxLength(2000)]
+    public string? Error { get; set; }
+        = null;
 
     public DateTimeOffset CreatedAt { get; set; }
         = DateTimeOffset.UtcNow;
@@ -57,31 +59,10 @@ public sealed class DocumentProcessingEvent : FlowEntity<DocumentProcessingEvent
     public Dictionary<string, double> Metrics { get; set; }
         = new();
 
-    [Column(TypeName = "jsonb")]
-    public Dictionary<string, string> Tags { get; set; }
-        = new();
-
     public long? InputTokens { get; set; }
         = null;
 
     public long? OutputTokens { get; set; }
-        = null;
-
-    public double? ConfidenceScore { get; set; }
-        = null;
-
-    public int? VisionFrameCount { get; set; }
-        = null;
-
-    public double? VisionConfidence { get; set; }
-        = null;
-
-    [MaxLength(2000)]
-    public string? ErrorMessage { get; set; }
-        = null;
-
-    [MaxLength(200)]
-    public string? ErrorCode { get; set; }
         = null;
 
     public bool IsTerminal { get; set; }

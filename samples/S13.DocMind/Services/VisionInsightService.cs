@@ -20,7 +20,7 @@ public record VisionInsightResult(
 
 public interface IVisionInsightService
 {
-    Task<VisionInsightResult?> TryExtractAsync(File file, CancellationToken ct = default);
+    Task<VisionInsightResult?> TryExtractAsync(SourceDocument document, CancellationToken ct = default);
 }
 
 public sealed class VisionInsightService : IVisionInsightService
@@ -41,16 +41,21 @@ public sealed class VisionInsightService : IVisionInsightService
         _logger = logger;
     }
 
-    public async Task<VisionInsightResult?> TryExtractAsync(File file, CancellationToken ct = default)
+    public async Task<VisionInsightResult?> TryExtractAsync(SourceDocument document, CancellationToken ct = default)
     {
-        if (!ShouldProcess(file))
+        if (!ShouldProcess(document))
         {
             return null;
         }
 
         try
         {
-            await using var stream = System.IO.File.OpenRead(file.FilePath);
+            if (string.IsNullOrWhiteSpace(document.StorageObjectKey) || !System.IO.File.Exists(document.StorageObjectKey))
+            {
+                return null;
+            }
+
+            await using var stream = System.IO.File.OpenRead(document.StorageObjectKey);
             using var image = await SixLabors.ImageSharp.Image.LoadAsync(stream, ct);
 
             var diagnostics = new Dictionary<string, object>
@@ -58,7 +63,7 @@ public sealed class VisionInsightService : IVisionInsightService
                 ["width"] = image.Width,
                 ["height"] = image.Height,
                 ["pixelFormat"] = image.PixelType.BitsPerPixel,
-                ["sizeBytes"] = file.Size
+                ["sizeBytes"] = document.FileSizeBytes
             };
 
             var observations = new List<VisionObservation>
@@ -75,31 +80,32 @@ public sealed class VisionInsightService : IVisionInsightService
             };
 
             return new VisionInsightResult(
-                Narrative: $"Vision scan completed for {file.Name} ({image.Width}x{image.Height}).",
+                Narrative: $"Vision scan completed for {document.DisplayName ?? document.FileName} ({image.Width}x{image.Height}).",
                 Observations: observations,
                 FieldHints: fieldHints,
                 Diagnostics: diagnostics);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Unable to run lightweight vision insight extraction for {FileId}", file.Id);
+            _logger.LogWarning(ex, "Unable to run lightweight vision insight extraction for {DocumentId}", document.Id);
             return VisionInsightResult.Empty;
         }
     }
 
-    private static bool ShouldProcess(File file)
+    private static bool ShouldProcess(SourceDocument document)
     {
-        if (string.IsNullOrEmpty(file.ContentType))
+        if (string.IsNullOrEmpty(document.ContentType))
         {
             return false;
         }
 
-        if (VisionContentTypes.Contains(file.ContentType))
+        if (VisionContentTypes.Contains(document.ContentType))
         {
             return true;
         }
 
-        var extension = System.IO.Path.GetExtension(file.FilePath);
+        var fileName = document.StorageObjectKey ?? document.FileName;
+        var extension = System.IO.Path.GetExtension(fileName);
         return extension is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp";
     }
 }

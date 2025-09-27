@@ -7,70 +7,44 @@ using Koan.Mcp;
 namespace S13.DocMind.Models;
 
 /// <summary>
-/// Represents an extracted insight from a processed document or chunk.
-/// Carries schema-aware payloads, cross references, and vector annotations for retrieval.
+/// Represents a structured insight generated during processing. Multiple channels can add insights over time.
+/// Vector data is stored in SemanticTypeEmbedding/DocumentChunkEmbedding entities.
 /// </summary>
 [McpEntity(Name = "document-insights", Description = "Structured findings, summaries, and risk highlights for DocMind documents.")]
 public sealed class DocumentInsight : Entity<DocumentInsight>
 {
     [Parent(typeof(SourceDocument))]
-    public Guid DocumentId { get; set; }
+    public Guid SourceDocumentId { get; set; }
         = Guid.Empty;
 
     public Guid? ChunkId { get; set; }
         = null;
 
-    [MaxLength(100)]
-    public string InsightType { get; set; } = string.Empty;
+    public InsightChannel Channel { get; set; }
+        = InsightChannel.Text;
 
-    [MaxLength(200)]
-    public string Title { get; set; } = string.Empty;
-
-    [MaxLength(2000)]
-    public string Summary { get; set; } = string.Empty;
-
-    public double? ConfidenceScore { get; set; }
+    [MaxLength(120)]
+    public string? Section { get; set; }
         = null;
 
-    [MaxLength(100)]
-    public string? SemanticProfileCode { get; set; }
-        = null;
+    [Required, MaxLength(200)]
+    public string Heading { get; set; } = string.Empty;
 
-    [Column(TypeName = "jsonb")]
-    public List<string> Tags { get; set; }
-        = new();
+    [Required, MaxLength(4000)]
+    public string Body { get; set; } = string.Empty;
 
-    [Column(TypeName = "jsonb")]
-    public Dictionary<string, object> StructuredPayload { get; set; }
-        = new();
-
-    [Column(TypeName = "jsonb")]
-    public Dictionary<string, object> SchemaMetadata { get; set; }
-        = new();
-
-    [Column(TypeName = "jsonb")]
-    public List<Guid> RelatedInsightIds { get; set; }
-        = new();
-
-    [Column(TypeName = "jsonb")]
-    public List<Guid> SupportingChunkIds { get; set; }
-        = new();
-
-    public int? StartOffset { get; set; }
-        = null;
-
-    public int? EndOffset { get; set; }
-        = null;
-
-    [Vector(Dimensions = 1536, IndexType = "HNSW")]
-    public double[]? Embedding { get; set; }
+    public double? Confidence { get; set; }
         = null;
 
     [Column(TypeName = "jsonb")]
-    public Dictionary<string, double> VectorAnnotations { get; set; }
+    public Dictionary<string, object?> StructuredPayload { get; set; }
         = new();
 
-    public DateTimeOffset CreatedAt { get; set; }
+    [Column(TypeName = "jsonb")]
+    public Dictionary<string, string> Metadata { get; set; }
+        = new();
+
+    public DateTimeOffset GeneratedAt { get; set; }
         = DateTimeOffset.UtcNow;
 
     public DateTimeOffset? UpdatedAt { get; set; }

@@ -10,10 +10,13 @@ public sealed class UploadDocumentRequest
     public IFormFile File { get; set; } = default!;
 
     public string? ProfileId { get; set; }
+        = null;
 
     public string? Description { get; set; }
+        = null;
 
     public Dictionary<string, string>? Tags { get; set; }
+        = null;
 }
 
 public sealed class DocumentUploadReceipt
@@ -22,7 +25,7 @@ public sealed class DocumentUploadReceipt
     public required string FileName { get; init; }
     public required DocumentProcessingStatus Status { get; init; }
     public bool Duplicate { get; init; }
-    public string? Hash { get; init; }
+    public string? Sha512 { get; init; }
     public Dictionary<string, string> Tags { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
@@ -32,13 +35,14 @@ public sealed class AssignProfileRequest
     public string ProfileId { get; set; } = string.Empty;
 
     public bool AcceptSuggestion { get; set; }
+        = false;
 }
 
 public sealed class TimelineEntryResponse
 {
     public required DocumentProcessingStage Stage { get; init; }
     public required DocumentProcessingStatus Status { get; init; }
-    public required string Message { get; init; }
+    public required string Detail { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public Dictionary<string, string> Context { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 }
@@ -46,22 +50,31 @@ public sealed class TimelineEntryResponse
 public sealed class DocumentChunkResponse
 {
     public required string Id { get; init; }
-    public required int Index { get; init; }
-    public required string Channel { get; init; }
-    public required string Content { get; init; }
-    public string? Summary { get; init; }
-    public int TokenEstimate { get; init; }
-    public IReadOnlyList<DocumentInsightResponse> Insights { get; init; } = Array.Empty<DocumentInsightResponse>();
+    public required int Order { get; init; }
+    public required string Text { get; init; }
+    public int CharacterCount { get; init; }
+    public int TokenCount { get; init; }
+    public bool IsLastChunk { get; init; }
+    public IReadOnlyList<InsightReferenceResponse> InsightRefs { get; init; } = Array.Empty<InsightReferenceResponse>();
+}
+
+public sealed class InsightReferenceResponse
+{
+    public required string InsightId { get; init; }
+    public InsightChannel Channel { get; init; } = InsightChannel.Text;
+    public double? Confidence { get; init; }
+    public string? Heading { get; init; }
 }
 
 public sealed class DocumentInsightResponse
 {
     public required string Id { get; init; }
-    public required string Title { get; init; }
-    public required string Content { get; init; }
-    public double Confidence { get; init; }
-    public string Channel { get; init; } = DocumentChannels.Text;
-    public DateTimeOffset CreatedAt { get; init; }
+    public required string Heading { get; init; }
+    public required string Body { get; init; }
+    public InsightChannel Channel { get; init; } = InsightChannel.Text;
+    public double? Confidence { get; init; }
+    public string? Section { get; init; }
+    public DateTimeOffset GeneratedAt { get; init; }
 }
 
 public sealed class TemplateGenerationRequest
@@ -78,8 +91,10 @@ public sealed class TemplateGenerationRequest
     /// Sample body of text used to prime the template generation.
     /// </summary>
     public string? SampleText { get; set; }
+        = null;
 
     public Dictionary<string, string>? Metadata { get; set; }
+        = null;
 }
 
 public sealed class TemplatePromptTestRequest
@@ -88,6 +103,7 @@ public sealed class TemplatePromptTestRequest
     public string Text { get; set; } = string.Empty;
 
     public Dictionary<string, string>? Variables { get; set; }
+        = null;
 }
 
 public sealed class SemanticTypeProfileResponse
@@ -108,6 +124,7 @@ public sealed class ProcessingReplayRequest
     public string DocumentId { get; set; } = string.Empty;
 
     public bool Force { get; set; }
+        = false;
 }
 
 public sealed class ModelInstallRequest

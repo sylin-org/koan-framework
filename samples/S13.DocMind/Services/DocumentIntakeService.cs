@@ -19,19 +19,22 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
     private readonly DocMindOptions _options;
     private readonly ILogger<DocumentIntakeService> _logger;
     private readonly TimeProvider _clock;
+    private readonly IDocumentProcessingEventSink _eventSink;
 
     public DocumentIntakeService(
         IDocumentStorage storage,
         IDocumentPipelineQueue queue,
         IOptions<DocMindOptions> options,
         ILogger<DocumentIntakeService> logger,
-        TimeProvider clock)
+        TimeProvider clock,
+        IDocumentProcessingEventSink eventSink)
     {
         _storage = storage;
         _queue = queue;
         _options = options.Value;
         _logger = logger;
         _clock = clock;
+        _eventSink = eventSink;
     }
 
     public async Task<DocumentUploadReceipt> UploadAsync(UploadDocumentRequest request, CancellationToken cancellationToken)
@@ -52,7 +55,10 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         if (_options.Storage.AllowedContentTypes.Length > 0 &&
             !_options.Storage.AllowedContentTypes.Contains(request.File.ContentType, StringComparer.OrdinalIgnoreCase))
         {
-            _logger.LogWarning("File {File} uploaded with unsupported content type {ContentType}", request.File.FileName, request.File.ContentType);
+            _logger.LogWarning(
+                "File {File} uploaded with unsupported content type {ContentType}",
+                request.File.FileName,
+                request.File.ContentType);
         }
 
         await using var stream = request.File.OpenReadStream();
@@ -61,25 +67,19 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         var duplicate = await FindDuplicateAsync(stored.Hash, cancellationToken);
         if (duplicate is not null)
         {
-            try
-            {
-                if (File.Exists(stored.Path))
-                {
-                    File.Delete(stored.Path);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Unable to delete duplicate file {Path}", stored.Path);
-            }
-            _logger.LogInformation("Detected duplicate upload {File} -> {DocumentId}", request.File.FileName, duplicate.Id);
+            TryDelete(stored.Path);
+            _logger.LogInformation(
+                "Detected duplicate upload {File} -> {DocumentId}",
+                request.File.FileName,
+                duplicate.Id);
+
             return new DocumentUploadReceipt
             {
                 DocumentId = duplicate.Id,
-                FileName = duplicate.OriginalFileName,
+                FileName = duplicate.DisplayName ?? duplicate.FileName,
                 Status = duplicate.Status,
                 Duplicate = true,
-                Hash = duplicate.Hash,
+                Sha512 = duplicate.Sha512,
                 Tags = new Dictionary<string, string>(duplicate.Tags, StringComparer.OrdinalIgnoreCase)
             };
         }
@@ -88,25 +88,14 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         var document = new SourceDocument
         {
             FileName = Path.GetFileName(stored.Path),
-            OriginalFileName = request.File.FileName,
+            DisplayName = request.File.FileName,
             ContentType = request.File.ContentType,
-            Length = stored.Length,
-            Hash = stored.Hash,
+            FileSizeBytes = stored.Length,
+            Sha512 = stored.Hash ?? string.Empty,
+            StorageBucket = stored.Provider,
+            StorageObjectKey = stored.Path,
             UploadedAt = now,
-            Summary = new DocumentSummary
-            {
-                TextExtracted = false,
-                WordCount = 0,
-                PageCount = 0,
-                ChunkCount = 0
-            },
-            Storage = new Models.StorageLocation
-            {
-                Provider = stored.Provider,
-                Path = stored.Path,
-                Hash = stored.Hash,
-                Size = stored.Length
-            }
+            Description = request.Description
         };
 
         if (request.Tags is { Count: > 0 })
@@ -124,26 +113,37 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
             document.AssignedBySystem = false;
         }
 
-        await document.Save(cancellationToken);
+        await document.Save(cancellationToken).ConfigureAwait(false);
 
-        await RecordEventAsync(document, DocumentProcessingStage.Upload, DocumentProcessingStatus.Uploaded,
-            "Document uploaded",
-            new Dictionary<string, string>
-            {
-                ["fileName"] = document.OriginalFileName,
-                ["contentType"] = document.ContentType,
-                ["length"] = stored.Length.ToString(CultureInfo.InvariantCulture)
-            }, cancellationToken);
+        var documentId = Guid.Parse(document.Id);
 
-        await _queue.EnqueueAsync(new DocumentWorkItem(document.Id, DocumentProcessingStage.Upload), cancellationToken);
+        await _eventSink.RecordAsync(
+            new DocumentProcessingEventEntry(
+                documentId,
+                DocumentProcessingStage.Upload,
+                DocumentProcessingStatus.Uploaded,
+                Detail: "Document uploaded",
+                Context: new Dictionary<string, string>
+                {
+                    ["fileName"] = document.DisplayName ?? document.FileName,
+                    ["contentType"] = document.ContentType,
+                    ["length"] = stored.Length.ToString(CultureInfo.InvariantCulture)
+                }),
+            cancellationToken).ConfigureAwait(false);
+
+        document.Status = DocumentProcessingStatus.Queued;
+        await document.Save(cancellationToken).ConfigureAwait(false);
+
+        var work = new DocumentWorkItem(documentId, DocumentProcessingStage.ExtractText, DocumentProcessingStatus.Queued);
+        await _queue.EnqueueAsync(work, cancellationToken).ConfigureAwait(false);
 
         return new DocumentUploadReceipt
         {
             DocumentId = document.Id,
-            FileName = document.OriginalFileName,
+            FileName = document.DisplayName ?? document.FileName,
             Status = document.Status,
             Duplicate = false,
-            Hash = document.Hash,
+            Sha512 = document.Sha512,
             Tags = new Dictionary<string, string>(document.Tags, StringComparer.OrdinalIgnoreCase)
         };
     }
@@ -156,43 +156,58 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         document.AssignedProfileId = profileId;
         document.AssignedBySystem = acceptSuggestion;
         document.UpdatedAt = _clock.GetUtcNow();
-        await document.Save(cancellationToken);
+        await document.Save(cancellationToken).ConfigureAwait(false);
 
-        await RecordEventAsync(document, DocumentProcessingStage.Suggestion, DocumentProcessingStatus.Deduplicated,
-            acceptSuggestion ? "Profile auto-accepted" : "Profile assignment queued",
-            new Dictionary<string, string>
-            {
-                ["profileId"] = profileId,
-                ["auto"] = acceptSuggestion.ToString()
-            }, cancellationToken);
+        var documentId = Guid.Parse(document.Id);
 
-        await _queue.EnqueueAsync(new DocumentWorkItem(document.Id, DocumentProcessingStage.Deduplicate), cancellationToken);
+        await _eventSink.RecordAsync(
+            new DocumentProcessingEventEntry(
+                documentId,
+                DocumentProcessingStage.Aggregate,
+                DocumentProcessingStatus.Queued,
+                Detail: acceptSuggestion ? "Profile auto-accepted" : "Profile assignment queued",
+                Context: new Dictionary<string, string>
+                {
+                    ["profileId"] = profileId,
+                    ["auto"] = acceptSuggestion.ToString()
+                }),
+            cancellationToken).ConfigureAwait(false);
+
+        var work = new DocumentWorkItem(documentId, DocumentProcessingStage.ExtractText, DocumentProcessingStatus.Queued);
+        await _queue.EnqueueAsync(work, cancellationToken).ConfigureAwait(false);
     }
 
     public Task RequeueAsync(string documentId, DocumentProcessingStage stage, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(documentId)) throw new ArgumentException("Document id required", nameof(documentId));
-        return _queue.EnqueueAsync(new DocumentWorkItem(documentId, stage), cancellationToken).AsTask();
+        if (!Guid.TryParse(documentId, out var id))
+        {
+            throw new ValidationException("Document id must be a GUID");
+        }
+
+        var work = new DocumentWorkItem(id, stage, DocumentProcessingStatus.Queued);
+        return _queue.EnqueueAsync(work, cancellationToken).AsTask();
     }
 
-    private static async Task<SourceDocument?> FindDuplicateAsync(string? hash, CancellationToken cancellationToken)
+    private static async Task<SourceDocument?> FindDuplicateAsync(string? sha512, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(hash)) return null;
-        var query = await SourceDocument.Query($"Hash == '{hash}'", cancellationToken);
+        if (string.IsNullOrWhiteSpace(sha512)) return null;
+        var query = await SourceDocument.Query($"Sha512 == '{sha512}'", cancellationToken).ConfigureAwait(false);
         return query.FirstOrDefault();
     }
 
-    private static Task RecordEventAsync(SourceDocument document, DocumentProcessingStage stage, DocumentProcessingStatus status, string message, Dictionary<string, string> context, CancellationToken cancellationToken)
+    private void TryDelete(string path)
     {
-        var evt = new DocumentProcessingEvent
+        try
         {
-            DocumentId = document.Id,
-            Stage = stage,
-            Status = status,
-            Message = message,
-            Context = context,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-        return evt.Save(cancellationToken);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Unable to delete duplicate file {Path}", path);
+        }
     }
 }

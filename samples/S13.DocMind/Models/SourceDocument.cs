@@ -1,22 +1,18 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions.Annotations;
-using Koan.AI.Contracts.Models;
 using Koan.Data.Core.Model;
 using Koan.Mcp;
 
 namespace S13.DocMind.Models;
 
 /// <summary>
-/// Represents an uploaded source document with rich processing metadata and storage references.
-/// Mirrors the blueprint entity with explicit adapter/table mappings for relational persistence.
+/// Represents an uploaded source document with immutable storage metadata and the latest processing summary.
+/// Mirrors the refactoring blueprint entity so downstream services and controllers share a stable contract.
 /// </summary>
 [McpEntity(Name = "source-documents", Description = "Uploaded documents pending or completing DocMind analysis.")]
 public sealed class SourceDocument : Entity<SourceDocument>
 {
-    private const int DefaultVectorDimensions = 1536;
-
-    // Core document metadata
     [Required, MaxLength(255)]
     public string FileName { get; set; } = string.Empty;
 
@@ -24,44 +20,28 @@ public sealed class SourceDocument : Entity<SourceDocument>
     public string? DisplayName { get; set; }
         = null;
 
-    [Required, MaxLength(150)]
+    [Required, MaxLength(120)]
     public string ContentType { get; set; } = string.Empty;
 
-    public long FileSize { get; set; }
+    [Range(1, long.MaxValue)]
+    public long FileSizeBytes { get; set; }
         = 0L;
 
-    [MaxLength(50)]
-    public string? Extension { get; set; }
-        = null;
+    [Required, StringLength(128, MinimumLength = 128)]
+    public string Sha512 { get; set; } = string.Empty;
 
-    // Storage pointers
-    [MaxLength(255)]
-    public string? StorageBucket { get; set; }
-        = null;
+    [MaxLength(120)]
+    public string StorageBucket { get; set; } = "local";
 
-    [MaxLength(1024)]
-    public string? StorageObjectKey { get; set; }
-        = null;
+    [MaxLength(512)]
+    public string StorageObjectKey { get; set; } = string.Empty;
 
-    [MaxLength(100)]
+    [MaxLength(120)]
     public string? StorageVersionId { get; set; }
         = null;
 
-    // Hashing / deduplication
-    [Required, StringLength(128, MinimumLength = 128)]
-    public string Sha512Hash { get; set; } = string.Empty;
-
-    [MaxLength(128)]
-    public string? ContentSignature { get; set; }
-        = null;
-
-    // User authored context
-    [MaxLength(5000)]
-    public string Notes { get; set; } = string.Empty;
-
-    // Processing state
     public DocumentProcessingStatus Status { get; set; }
-        = DocumentProcessingStatus.Queued;
+        = DocumentProcessingStatus.Uploaded;
 
     public DateTimeOffset UploadedAt { get; set; }
         = DateTimeOffset.UtcNow;
@@ -69,148 +49,131 @@ public sealed class SourceDocument : Entity<SourceDocument>
     public DateTimeOffset? LastProcessedAt { get; set; }
         = null;
 
-    [MaxLength(2000)]
-    public string? LastProcessingError { get; set; }
+    [MaxLength(1024)]
+    public string? LastError { get; set; }
         = null;
 
-    public int ProcessingAttempt { get; set; }
-        = 0;
-
-    // Classification metadata
-    [MaxLength(100)]
-    public string? AssignedTypeCode { get; set; }
+    [MaxLength(200)]
+    public string? AssignedProfileId { get; set; }
         = null;
 
-    public double? AutoClassificationConfidence { get; set; }
-        = null;
-
-    // Vector annotations when vector adapters configured
-    [Vector(Dimensions = DefaultVectorDimensions, IndexType = "HNSW")]
-    public double[]? Embedding { get; set; }
-        = null;
+    public bool AssignedBySystem { get; set; }
+        = false;
 
     [Column(TypeName = "jsonb")]
-    public Dictionary<string, double> EmbeddingAnnotations { get; set; }
-        = new();
+    public Dictionary<string, string> Tags { get; set; }
+        = new(StringComparer.OrdinalIgnoreCase);
 
-    // Processing summary (replaces legacy DocumentSummary)
-    public DocumentProcessingSummary ProcessingSummary { get; set; }
+    [MaxLength(2000)]
+    public string? Description { get; set; }
+        = null;
+
+    public DocumentProcessingSummary Summary { get; set; }
         = new();
 }
 
 /// <summary>
-/// Aggregated processing summary with detailed telemetry for the document lifecycle.
+/// Aggregated processing summary with chunk and insight references for quick projections.
 /// </summary>
 public sealed class DocumentProcessingSummary
 {
-    // Stage tracking
-    public DocumentProcessingStage CurrentStage { get; set; }
-        = DocumentProcessingStage.Uploaded;
+    public bool TextExtracted { get; set; }
+        = false;
 
-    public DocumentProcessingStatus CurrentStatus { get; set; }
-        = DocumentProcessingStatus.Queued;
-
-    public DateTimeOffset? StageStartedAt { get; set; }
-        = null;
-
-    public DateTimeOffset? StageCompletedAt { get; set; }
-        = null;
-
-    public Dictionary<DocumentProcessingStage, DateTimeOffset> StageHistory { get; set; }
-        = new();
-
-    // Vision processing flags
-    public DocumentVisionProcessingSummary Vision { get; set; }
-        = new();
-
-    // Auto classification telemetry
-    public bool AutoClassificationApplied { get; set; }
+    public bool VisionExtracted { get; set; }
         = false;
 
     public double? AutoClassificationConfidence { get; set; }
         = null;
 
-    public string? AutoClassificationProfile { get; set; }
-        = null;
-
-    // Chunking / insights relationships
-    public List<Guid> ChunkIds { get; set; }
-        = new();
-
-    public List<Guid> InsightIds { get; set; }
-        = new();
-
-    // Structured processing metrics
-    public Dictionary<string, double> MetricCounters { get; set; }
-        = new();
-
-    public Dictionary<string, string> Metadata { get; set; }
-        = new();
-
     [MaxLength(2000)]
-    public string? LastError { get; set; }
+    public string? PrimaryFindings { get; set; }
         = null;
+
+    [Column(TypeName = "jsonb")]
+    public List<InsightReference> InsightRefs { get; set; }
+        = new();
+
+    [Column(TypeName = "jsonb")]
+    public List<ChunkReference> ChunkRefs { get; set; }
+        = new();
 }
 
 /// <summary>
-/// Vision-centric processing insights captured during extraction.
+/// Lightweight pointer to an insight for dashboards and summary widgets.
 /// </summary>
-public sealed class DocumentVisionProcessingSummary
+public sealed class InsightReference
 {
-    public bool VisionRequested { get; set; }
-        = false;
+    public Guid InsightId { get; set; }
+        = Guid.Empty;
 
-    public bool VisionCompleted { get; set; }
-        = false;
+    public InsightChannel Channel { get; set; }
+        = InsightChannel.Text;
 
-    public bool ContainsTables { get; set; }
-        = false;
-
-    public bool ContainsCharts { get; set; }
-        = false;
-
-    public bool ContainsHandwriting { get; set; }
-        = false;
-
-    public bool ContainsSignatures { get; set; }
-        = false;
-
-    public int? ExtractedFrameCount { get; set; }
+    public double? Confidence { get; set; }
         = null;
 
-    public double? AverageVisionConfidence { get; set; }
+    [MaxLength(200)]
+    public string? Heading { get; set; }
         = null;
 }
 
 /// <summary>
-/// Stage definitions for document processing pipeline.
+/// Lightweight pointer to a chunk for quick navigation without additional queries.
+/// </summary>
+public sealed class ChunkReference
+{
+    public Guid ChunkId { get; set; }
+        = Guid.Empty;
+
+    public int Order { get; set; }
+        = 0;
+
+    [MaxLength(120)]
+    public string? Section { get; set; }
+        = null;
+}
+
+/// <summary>
+/// Pipeline stages exposed through diagnostics and timeline projections.
 /// </summary>
 public enum DocumentProcessingStage
 {
-    Uploaded = 0,
-    Queued,
+    Upload = 0,
+    Deduplicate,
     ExtractText,
     ExtractVision,
-    Chunk,
-    Classify,
-    Enrich,
-    Analyze,
+    GenerateChunks,
+    GenerateInsights,
+    GenerateEmbeddings,
     Aggregate,
-    Insights,
     Complete,
     Failed
 }
 
 /// <summary>
-/// Status definitions for document processing telemetry.
+/// Document lifecycle status reflected on the SourceDocument record.
 /// </summary>
 public enum DocumentProcessingStatus
 {
-    Queued = 0,
-    Running,
-    Waiting,
+    Uploaded = 0,
+    Queued,
+    Extracting,
+    Extracted,
+    Analyzing,
     InsightsReady,
     Completed,
     Failed,
     Cancelled
+}
+
+/// <summary>
+/// Channels used when classifying insights and diagnostic events.
+/// </summary>
+public enum InsightChannel
+{
+    Text = 0,
+    Vision,
+    Aggregation,
+    UserFeedback
 }

@@ -209,30 +209,9 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
 
     private static float[]? AverageEmbedding(IReadOnlyList<DocumentChunk> chunks)
     {
-        var vectors = chunks
-            .Select(c => c.Embedding)
-            .Where(e => e is not null)
-            .Cast<float[]>()
-            .ToList();
-
-        if (vectors.Count == 0) return null;
-
-        var dimension = vectors[0].Length;
-        var accumulator = new double[dimension];
-        foreach (var vector in vectors)
-        {
-            for (var i = 0; i < dimension; i++)
-            {
-                accumulator[i] += vector[i];
-            }
-        }
-
-        var avg = new float[dimension];
-        for (var i = 0; i < dimension; i++)
-        {
-            avg[i] = (float)(accumulator[i] / vectors.Count);
-        }
-        return avg;
+        // Embeddings are now persisted via DocumentChunkEmbedding entities. Without a vector adapter
+        // available at runtime, fall back to null so the caller can skip similarity suggestions.
+        return null;
     }
 
     private static double CosineSimilarity(float[] a, float[] b)

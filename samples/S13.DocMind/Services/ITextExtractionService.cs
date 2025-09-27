@@ -14,4 +14,4 @@ public sealed record DocumentExtractionResult(
     int PageCount,
     bool ContainsImages);
 
-public sealed record ExtractedChunk(int Index, string Channel, string Content, string? Summary);
+public sealed record ExtractedChunk(int Index, string Content, string? Summary);

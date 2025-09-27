@@ -28,7 +28,7 @@ public sealed class LocalDocumentStorage : IDocumentStorage
 
         await using var fileStream = File.Create(destination);
         string hash;
-        await using (var hashAlgorithm = SHA256.Create())
+        await using (var hashAlgorithm = SHA512.Create())
         {
             await using var cryptoStream = new CryptoStream(fileStream, hashAlgorithm, CryptoStreamMode.Write, leaveOpen: true);
             await content.CopyToAsync(cryptoStream, cancellationToken);

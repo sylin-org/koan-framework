@@ -1,13 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using S13.DocMind.Contracts;
-using S13.DocMind.Infrastructure;
 using S13.DocMind.Models;
 using S13.DocMind.Services;
 
@@ -33,18 +27,18 @@ public class ProcessingController : ControllerBase
 
     [HttpGet("timeline")]
     public async Task<ActionResult> GetTimeline(
-        [FromQuery] string? documentTypeId,
-        [FromQuery] string? status,
-        [FromQuery] DateTime? from,
-        [FromQuery] DateTime? to,
+        [FromQuery] string? documentId,
+        [FromQuery] DocumentProcessingStage? stage,
+        [FromQuery] DateTimeOffset? from,
+        [FromQuery] DateTimeOffset? to,
         CancellationToken cancellationToken = default)
     {
         var query = new ProcessingTimelineQuery
         {
-            DocumentTypeId = documentTypeId,
-            Status = status,
-            FromDate = from,
-            ToDate = to
+            DocumentId = documentId,
+            Stage = stage,
+            From = from,
+            To = to
         };
 
         var timeline = await _diagnostics.GetTimelineAsync(query, cancellationToken);
@@ -64,9 +58,8 @@ public class ProcessingController : ControllerBase
         return Ok(new
         {
             message = "Retry queued",
-            fileId = result.FileId,
-            fileStatus = result.FileStatus,
-            analysisStatus = result.AnalysisStatus
+            documentId = result.DocumentId,
+            status = result.Status
         });
     }
 }
