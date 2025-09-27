@@ -1,6 +1,6 @@
 angular.module('s13DocMindApp').controller('DocumentTypesController', [
-    '$scope', '$location', 'DocumentTypeService', 'ToastService',
-    function($scope, $location, DocumentTypeService, ToastService) {
+    '$scope', '$location', 'TemplateService', 'ToastService',
+    function($scope, $location, TemplateService, ToastService) {
 
         $scope.loading = true;
         $scope.documentTypes = [];
@@ -29,7 +29,7 @@ angular.module('s13DocMindApp').controller('DocumentTypesController', [
         }
 
         function loadDocumentTypes() {
-            return DocumentTypeService.getAllTypes()
+            return TemplateService.getAll()
                 .then(function(types) {
                     $scope.documentTypes = types;
                     return types;
@@ -98,7 +98,7 @@ angular.module('s13DocMindApp').controller('DocumentTypesController', [
                 return;
             }
 
-            DocumentTypeService.deleteType(type.id)
+            TemplateService.delete(type.id)
                 .then(function() {
                     ToastService.success('Document type deleted successfully');
                     return loadDocumentTypes();
@@ -121,7 +121,7 @@ angular.module('s13DocMindApp').controller('DocumentTypesController', [
                 isActive: false
             };
 
-            DocumentTypeService.createType(duplicatedType)
+            TemplateService.create(duplicatedType)
                 .then(function(result) {
                     ToastService.success('Document type duplicated successfully');
                     return loadDocumentTypes();
@@ -170,7 +170,7 @@ angular.module('s13DocMindApp').controller('DocumentTypesController', [
             }
 
             var promises = $scope.selectedTypes.map(function(typeId) {
-                return DocumentTypeService.deleteType(typeId);
+                return TemplateService.delete(typeId);
             });
 
             Promise.all(promises)
@@ -197,7 +197,7 @@ angular.module('s13DocMindApp').controller('DocumentTypesController', [
             }
 
             var promises = $scope.selectedTypes.map(function(typeId) {
-                return DocumentTypeService.updateType(typeId, { isActive: true });
+                return TemplateService.update(typeId, { isActive: true });
             });
 
             Promise.all(promises)
@@ -221,7 +221,7 @@ angular.module('s13DocMindApp').controller('DocumentTypesController', [
             }
 
             var promises = $scope.selectedTypes.map(function(typeId) {
-                return DocumentTypeService.updateType(typeId, { isActive: false });
+                return TemplateService.update(typeId, { isActive: false });
             });
 
             Promise.all(promises)
@@ -244,7 +244,7 @@ angular.module('s13DocMindApp').controller('DocumentTypesController', [
         };
 
         // Helper methods
-        $scope.getTypeIcon = DocumentTypeService.getTypeIcon;
+        $scope.getTypeIcon = TemplateService.getTypeIcon;
 
         $scope.formatDate = function(dateString) {
             if (!dateString) return 'Unknown';

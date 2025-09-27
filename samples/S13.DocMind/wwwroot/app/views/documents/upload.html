@@ -1,0 +1,254 @@
+<div class="container-fluid py-4" ng-controller="DocumentUploadController">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h2 mb-1">Upload Documents</h1>
+            <p class="text-muted">Upload documents for document intelligence processing</p>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-outline-secondary" ng-click="goToDocuments()">
+                <i class="bi bi-arrow-left"></i> Back to Documents
+            </button>
+        </div>
+    </div>
+
+    <!-- Upload Instructions -->
+    <div class="row mb-4" ng-if="!uploading && !isUploadComplete()">
+        <div class="col">
+            <div class="alert alert-info">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h6 class="alert-heading mb-2">
+                            <i class="bi bi-info-circle me-2"></i>Upload Guidelines
+                        </h6>
+                        <ul class="mb-0">
+                            <li><strong>Supported formats:</strong> {{getSupportedTypesText()}}</li>
+                            <li><strong>Maximum file size:</strong> {{getMaxFileSizeText()}}</li>
+                            <li><strong>Multiple files:</strong> You can upload multiple files at once</li>
+                        </ul>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-upload display-4 text-info opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Drop Zone -->
+    <div class="row mb-4" ng-if="!uploading && !isUploadComplete()">
+        <div class="col">
+            <div class="card">
+                <div class="card-body">
+                    <div id="dropZone" class="border border-2 border-dashed rounded p-5 text-center position-relative"
+                         ng-class="{'border-primary bg-primary bg-opacity-10': dragOver, 'border-secondary': !dragOver}"
+                         style="min-height: 200px; cursor: pointer;"
+                         onclick="document.getElementById('fileInput').click();">
+
+                        <div class="drop-zone-content">
+                            <i class="bi bi-cloud-upload display-1 text-muted mb-3"></i>
+                            <h4 class="text-muted mb-2">Drag & Drop Documents Here</h4>
+                            <p class="text-muted mb-3">or click to select documents from your computer</p>
+                            <button type="button" class="btn btn-primary">
+                                <i class="bi bi-folder2-open me-2"></i>Choose Documents
+                            </button>
+                        </div>
+
+                        <!-- Hidden file input -->
+                        <input type="file" id="fileInput" class="d-none" multiple
+                               accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.gif,.bmp"
+                               onchange="angular.element(this).scope().handleFileSelect(event)">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Progress -->
+    <div class="row mb-4" ng-if="uploading">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-upload me-2"></i>Uploading Files...
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Overall Progress -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Overall Progress</span>
+                            <span class="text-muted">{{getOverallProgress()}}%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar"
+                                 ng-style="{'width': getOverallProgress() + '%'}"
+                                 aria-valuenow="{{getOverallProgress()}}" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Individual File Progress -->
+                    <div ng-repeat="(index, progress) in uploadProgress" class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-file-text me-2 text-muted"></i>
+                                <span class="text-truncate" style="max-width: 250px;">{{progress.fileName}}</span>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted">
+                                    {{formatFileSize(progress.loaded)}} / {{formatFileSize(progress.total)}}
+                                </small>
+                                <span class="ms-2 fw-medium">{{progress.progress}}%</span>
+                            </div>
+                        </div>
+                        <div class="progress progress-sm">
+                            <div class="progress-bar" role="progressbar"
+                                 ng-style="{'width': progress.progress + '%'}"
+                                 aria-valuenow="{{progress.progress}}" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Results -->
+    <div class="row mb-4" ng-if="isUploadComplete()">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>Upload Complete
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Summary -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="text-success mb-0">{{getSuccessCount()}}</h3>
+                                <small class="text-muted">Successful</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="text-danger mb-0">{{getFailCount()}}</h3>
+                                <small class="text-muted">Failed</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="text-primary mb-0">{{uploadedFiles.length}}</h3>
+                                <small class="text-muted">Total</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Results -->
+                    <div ng-if="uploadedFiles.length > 0">
+                        <h6 class="mb-3">Upload Results:</h6>
+                        <div class="list-group">
+                            <div ng-repeat="result in uploadedFiles"
+                                 class="list-group-item d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <i ng-if="result.success" class="bi bi-check-circle-fill text-success me-3"></i>
+                                    <i ng-if="!result.success" class="bi bi-x-circle-fill text-danger me-3"></i>
+                                    <div>
+                                        <div class="fw-medium">
+                                            {{result.file.displayName || result.fileName}}
+                                        </div>
+                                        <small class="text-muted" ng-if="result.success">
+                                            {{formatFileSize(result.file.fileSize)}} • Uploaded successfully
+                                        </small>
+                                        <small class="text-danger" ng-if="!result.success">
+                                            {{result.error}}
+                                        </small>
+                                    </div>
+                                </div>
+                                <div ng-if="result.success">
+                                    <button class="btn btn-sm btn-outline-primary"
+                                            ng-click="viewUploadedFile(result.file)">
+                                        <i class="bi bi-eye"></i> View
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-flex gap-2 mt-4">
+                        <button class="btn btn-primary" ng-click="uploadMore()">
+                            <i class="bi bi-upload me-2"></i>Upload More Files
+                        </button>
+                        <button class="btn btn-outline-primary" ng-click="goToFiles()">
+                            <i class="bi bi-list me-2"></i>View All Files
+                        </button>
+                        <button class="btn btn-outline-secondary" ng-click="clearUploaded()">
+                            <i class="bi bi-x me-2"></i>Clear Results
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Tips -->
+    <div class="row" ng-if="!uploading && !isUploadComplete()">
+        <div class="col">
+            <div class="card bg-light border-0">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="bi bi-lightbulb text-warning me-2"></i>Pro Tips
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <small class="text-muted">
+                                <strong>Better Processing:</strong> Use clear, high-quality scans for better text extraction and analysis.
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <small class="text-muted">
+                                <strong>File Names:</strong> Use descriptive file names to help identify documents later.
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <small class="text-muted">
+                                <strong>Document Types:</strong> Assign document types after upload for automated analysis.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.progress-sm {
+    height: 0.5rem;
+}
+
+.drop-zone-content {
+    pointer-events: none;
+}
+
+#dropZone:hover {
+    border-color: var(--bs-primary) !important;
+    background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+}
+
+.list-group-item {
+    border-left: none;
+    border-right: none;
+}
+
+.list-group-item:first-child {
+    border-top: none;
+}
+
+.list-group-item:last-child {
+    border-bottom: none;
+}
+</style>

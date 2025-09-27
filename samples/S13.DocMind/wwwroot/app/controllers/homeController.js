@@ -1,6 +1,6 @@
 angular.module('s13DocMindApp').controller('HomeController', [
-    '$scope', 'FileService', 'DocumentTypeService', 'AnalysisService', 'ToastService',
-    function($scope, FileService, DocumentTypeService, AnalysisService, ToastService) {
+    '$scope', 'DocumentService', 'TemplateService', 'AnalysisService', 'ToastService',
+    function($scope, DocumentService, TemplateService, AnalysisService, ToastService) {
 
         $scope.loading = true;
         $scope.stats = {};
@@ -33,13 +33,13 @@ angular.module('s13DocMindApp').controller('HomeController', [
         }
 
         function loadFileStats() {
-            return FileService.getFileStats()
+            return DocumentService.getStats()
                 .then(function(stats) {
                     $scope.stats.files = stats;
                     return stats;
                 })
                 .catch(function(error) {
-                    console.error('Failed to load file stats:', error);
+                    console.error('Failed to load document stats:', error);
                     $scope.stats.files = {
                         totalFiles: 0,
                         totalFileSize: 0,
@@ -50,24 +50,19 @@ angular.module('s13DocMindApp').controller('HomeController', [
         }
 
         function loadRecentFiles() {
-            return FileService.getAllFiles()
-                .then(function(files) {
-                    // Sort by creation date and take last 5
-                    $scope.recentFiles = files
-                        .sort(function(a, b) {
-                            return new Date(b.createdAt || b.uploadDate || 0) - new Date(a.createdAt || a.uploadDate || 0);
-                        })
-                        .slice(0, 5);
+            return DocumentService.getRecent(5)
+                .then(function(documents) {
+                    $scope.recentFiles = documents;
                     return $scope.recentFiles;
                 })
                 .catch(function(error) {
-                    console.error('Failed to load recent files:', error);
+                    console.error('Failed to load recent documents:', error);
                     $scope.recentFiles = [];
                 });
         }
 
         function loadRecentAnalyses() {
-            return AnalysisService.getRecentAnalyses(5)
+            return AnalysisService.getRecent(5)
                 .then(function(analyses) {
                     $scope.recentAnalyses = analyses;
                     return analyses;
@@ -79,10 +74,10 @@ angular.module('s13DocMindApp').controller('HomeController', [
         }
 
         function loadDocumentTypes() {
-            return DocumentTypeService.getAllTypes()
-                .then(function(types) {
-                    $scope.documentTypes = types.slice(0, 6); // Show first 6 types
-                    return types;
+            return TemplateService.getAll()
+                .then(function(templates) {
+                    $scope.documentTypes = templates.slice(0, 6); // Show first 6 templates
+                    return templates;
                 })
                 .catch(function(error) {
                     console.error('Failed to load document types:', error);
@@ -91,18 +86,19 @@ angular.module('s13DocMindApp').controller('HomeController', [
         }
 
         // Helper methods
-        $scope.formatFileSize = FileService.formatFileSize;
-        $scope.getFileIcon = FileService.getFileIcon;
-        $scope.getStateLabel = FileService.getStateLabel;
-        $scope.getStateClass = FileService.getStateClass;
+        $scope.formatFileSize = DocumentService.formatFileSize;
+        $scope.getFileIcon = DocumentService.getFileIcon;
+        $scope.getStateLabel = DocumentService.getStateLabel;
+        $scope.getStateClass = DocumentService.getStateClass;
         $scope.getConfidenceLabel = AnalysisService.getConfidenceLabel;
         $scope.getConfidenceClass = AnalysisService.getConfidenceClass;
         $scope.formatConfidenceScore = AnalysisService.formatConfidenceScore;
-        $scope.getTypeIcon = DocumentTypeService.getTypeIcon;
+        $scope.getTypeIcon = TemplateService.getTypeIcon;
+        $scope.formatDate = DocumentService.formatDate;
 
         $scope.getTotalFileSize = function() {
             if (!$scope.stats.files) return '0 B';
-            return FileService.formatFileSize($scope.stats.files.totalFileSize);
+            return DocumentService.formatFileSize($scope.stats.files.totalFileSize);
         };
 
         $scope.getProcessingRate = function() {

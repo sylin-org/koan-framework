@@ -1,4 +1,4 @@
-angular.module('s13DocMindApp').controller('DocumentTypeNewController', ['$scope', '$location', 'DocumentTypeService', 'ToastService', function($scope, $location, DocumentTypeService, ToastService) {
+angular.module('s13DocMindApp').controller('DocumentTypeNewController', ['$scope', '$location', 'TemplateService', 'ToastService', function($scope, $location, TemplateService, ToastService) {
     $scope.documentType = {
         name: '',
         description: '',
@@ -15,7 +15,7 @@ angular.module('s13DocMindApp').controller('DocumentTypeNewController', ['$scope
 
         $scope.saving = true;
 
-        DocumentTypeService.create($scope.documentType)
+        TemplateService.create($scope.documentType)
             .then(function(response) {
                 ToastService.success('Document type created successfully!');
                 $location.path('/document-types');

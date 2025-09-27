@@ -1,9 +1,9 @@
-angular.module('s13DocMindApp').controller('DocumentTypeDetailController', ['$scope', '$routeParams', '$location', 'DocumentTypeService', 'ToastService', function($scope, $routeParams, $location, DocumentTypeService, ToastService) {
+angular.module('s13DocMindApp').controller('DocumentTypeDetailController', ['$scope', '$routeParams', '$location', 'TemplateService', 'ToastService', function($scope, $routeParams, $location, TemplateService, ToastService) {
     $scope.loading = true;
     $scope.documentType = null;
 
     function loadDocumentType() {
-        DocumentTypeService.get($routeParams.id)
+        TemplateService.getById($routeParams.id)
             .then(function(response) {
                 $scope.documentType = response.data;
             })

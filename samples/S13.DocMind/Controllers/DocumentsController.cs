@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -22,6 +24,37 @@ public sealed class DocumentsController : EntityController<SourceDocument>
     {
         _intake = intake;
         _logger = logger;
+    }
+
+    [HttpGet("stats")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult> GetStatsAsync(CancellationToken cancellationToken)
+    {
+        var documents = await SourceDocument.All(cancellationToken).ConfigureAwait(false);
+        var documentList = documents.ToList();
+
+        var stats = new
+        {
+            totalFiles = documentList.Count,
+            totalFileSize = documentList.Sum(d => d.FileSizeBytes),
+            processedFiles = documentList.Count(d => !string.IsNullOrEmpty(d.AssignedProfileId)),
+            pendingFiles = documentList.Count(d => string.IsNullOrEmpty(d.AssignedProfileId))
+        };
+
+        return Ok(stats);
+    }
+
+    [HttpGet("recent")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult> GetRecentAsync(CancellationToken cancellationToken, [FromQuery] int limit = 10)
+    {
+        var documents = await SourceDocument.All(cancellationToken).ConfigureAwait(false);
+        var recent = documents
+            .OrderByDescending(d => d.UploadedAt)
+            .Take(limit)
+            .ToList();
+
+        return Ok(recent);
     }
 
     [HttpPost("upload")]

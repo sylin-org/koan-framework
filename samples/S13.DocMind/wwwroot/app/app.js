@@ -9,17 +9,17 @@ angular.module('s13DocMindApp', [
             templateUrl: 'app/views/home/index.html',
             controller: 'HomeController'
         })
-        .when('/files', {
-            templateUrl: 'app/views/files/list.html',
-            controller: 'FilesController'
+        .when('/documents', {
+            templateUrl: 'app/views/documents/list.html',
+            controller: 'DocumentsController'
         })
-        .when('/files/upload', {
-            templateUrl: 'app/views/files/upload.html',
-            controller: 'FileUploadController'
+        .when('/documents/upload', {
+            templateUrl: 'app/views/documents/upload.html',
+            controller: 'DocumentUploadController'
         })
-        .when('/files/:id', {
-            templateUrl: 'app/views/files/detail.html',
-            controller: 'FileDetailController'
+        .when('/documents/:id', {
+            templateUrl: 'app/views/documents/detail.html',
+            controller: 'DocumentDetailController'
         })
         .when('/document-types', {
             templateUrl: 'app/views/document-types/list.html',

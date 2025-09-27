@@ -1,6 +1,6 @@
-angular.module('s13DocMindApp').controller('FileDetailController', [
-    '$scope', '$routeParams', '$location', 'FileService', 'DocumentTypeService', 'AnalysisService', 'ToastService',
-    function($scope, $routeParams, $location, FileService, DocumentTypeService, AnalysisService, ToastService) {
+angular.module('s13DocMindApp').controller('DocumentDetailController', [
+    '$scope', '$routeParams', '$location', 'DocumentService', 'TemplateService', 'AnalysisService', 'ToastService',
+    function($scope, $routeParams, $location, DocumentService, TemplateService, AnalysisService, ToastService) {
 
         $scope.loading = true;
         $scope.file = null;
@@ -15,7 +15,7 @@ angular.module('s13DocMindApp').controller('FileDetailController', [
         function initialize() {
             if (!fileId) {
                 ToastService.error('Invalid file ID');
-                $location.path('/files');
+                $location.path('/documents');
                 return;
             }
 
@@ -37,7 +37,7 @@ angular.module('s13DocMindApp').controller('FileDetailController', [
         }
 
         function loadFile() {
-            return FileService.getFile(fileId)
+            return DocumentService.getById(fileId)
                 .then(function(file) {
                     $scope.file = file;
                     $scope.selectedTypeId = file.typeId || '';
@@ -46,14 +46,14 @@ angular.module('s13DocMindApp').controller('FileDetailController', [
                 .catch(function(error) {
                     if (error.status === 404) {
                         ToastService.error('File not found');
-                        $location.path('/files');
+                        $location.path('/documents');
                     }
                     throw error;
                 });
         }
 
         function loadDocumentTypes() {
-            return DocumentTypeService.getAllTypes()
+            return TemplateService.getAll()
                 .then(function(types) {
                     $scope.documentTypes = types;
                     return types;
@@ -61,7 +61,7 @@ angular.module('s13DocMindApp').controller('FileDetailController', [
         }
 
         function loadAnalyses() {
-            return AnalysisService.getAnalysesByFileId(fileId)
+            return AnalysisService.getByDocument(fileId)
                 .then(function(analyses) {
                     $scope.analyses = analyses.sort(function(a, b) {
                         return new Date(b.createdAt) - new Date(a.createdAt);
@@ -73,7 +73,7 @@ angular.module('s13DocMindApp').controller('FileDetailController', [
         // File operations
         $scope.downloadFile = function() {
             if (!$scope.file) return;
-            window.open(FileService.downloadFile($scope.file.id), '_blank');
+            window.open(DocumentService.downloadFile($scope.file.id), '_blank');
         };
 
         $scope.deleteFile = function() {
@@ -83,10 +83,10 @@ angular.module('s13DocMindApp').controller('FileDetailController', [
                 return;
             }
 
-            FileService.deleteFile($scope.file.id)
+            DocumentService.deleteFile($scope.file.id)
                 .then(function() {
                     ToastService.success('File deleted successfully');
-                    $location.path('/files');
+                    $location.path('/documents');
                 })
                 .catch(function(error) {
                     ToastService.handleError(error, 'Failed to delete file');
@@ -104,7 +104,7 @@ angular.module('s13DocMindApp').controller('FileDetailController', [
 
             $scope.assigningType = true;
 
-            FileService.assignType($scope.file.id, $scope.selectedTypeId, null)
+            DocumentService.assignType($scope.file.id, $scope.selectedTypeId, null)
                 .then(function() {
                     ToastService.success('Document type assigned successfully');
                     return loadFile();
@@ -162,7 +162,7 @@ angular.module('s13DocMindApp').controller('FileDetailController', [
                 return;
             }
 
-            AnalysisService.deleteAnalysis(analysis.id)
+            AnalysisService.delete(analysis.id)
                 .then(function() {
                     ToastService.success('Analysis deleted successfully');
                     return loadAnalyses();
@@ -177,14 +177,14 @@ angular.module('s13DocMindApp').controller('FileDetailController', [
 
         // Navigation
         $scope.goBack = function() {
-            $location.path('/files');
+            $location.path('/documents');
         };
 
         // Helper methods
-        $scope.formatFileSize = FileService.formatFileSize;
-        $scope.getFileIcon = FileService.getFileIcon;
-        $scope.getStateLabel = FileService.getStateLabel;
-        $scope.getStateClass = FileService.getStateClass;
+        $scope.formatFileSize = DocumentService.formatFileSize;
+        $scope.getFileIcon = DocumentService.getFileIcon;
+        $scope.getStateLabel = DocumentService.getStateLabel;
+        $scope.getStateClass = DocumentService.getStateClass;
         $scope.getConfidenceLabel = AnalysisService.getConfidenceLabel;
         $scope.getConfidenceClass = AnalysisService.getConfidenceClass;
         $scope.formatConfidenceScore = AnalysisService.formatConfidenceScore;

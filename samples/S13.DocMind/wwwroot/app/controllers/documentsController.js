@@ -1,6 +1,6 @@
-angular.module('s13DocMindApp').controller('FilesController', [
-    '$scope', '$location', 'FileService', 'DocumentTypeService', 'ToastService',
-    function($scope, $location, FileService, DocumentTypeService, ToastService) {
+angular.module('s13DocMindApp').controller('DocumentsController', [
+    '$scope', '$location', 'DocumentService', 'TemplateService', 'ToastService',
+    function($scope, $location, DocumentService, TemplateService, ToastService) {
 
         $scope.loading = true;
         $scope.files = [];
@@ -47,7 +47,7 @@ angular.module('s13DocMindApp').controller('FilesController', [
         }
 
         function loadFiles() {
-            return FileService.getAllFiles()
+            return DocumentService.getAll()
                 .then(function(files) {
                     $scope.files = files;
                     return files;
@@ -55,7 +55,7 @@ angular.module('s13DocMindApp').controller('FilesController', [
         }
 
         function loadDocumentTypes() {
-            return DocumentTypeService.getAllTypes()
+            return TemplateService.getAll()
                 .then(function(types) {
                     $scope.documentTypes = [{ id: '', name: 'All Types' }].concat(types);
                     return types;
@@ -121,11 +121,11 @@ angular.module('s13DocMindApp').controller('FilesController', [
 
         // File operations
         $scope.viewFile = function(file) {
-            $location.path('/files/' + file.id);
+            $location.path('/documents/' + file.id);
         };
 
         $scope.downloadFile = function(file) {
-            window.open(FileService.downloadFile(file.id), '_blank');
+            window.open(DocumentService.downloadFile(file.id), '_blank');
         };
 
         $scope.deleteFile = function(file) {
@@ -133,7 +133,7 @@ angular.module('s13DocMindApp').controller('FilesController', [
                 return;
             }
 
-            FileService.deleteFile(file.id)
+            DocumentService.deleteFile(file.id)
                 .then(function() {
                     ToastService.success('File deleted successfully');
                     loadFiles().then(function() {
@@ -151,7 +151,7 @@ angular.module('s13DocMindApp').controller('FilesController', [
                 return;
             }
 
-            FileService.assignType(file.id, typeId, null)
+            DocumentService.assignType(file.id, typeId, null)
                 .then(function(response) {
                     ToastService.success('Document type assigned successfully');
                     loadFiles().then(function() {
@@ -199,7 +199,7 @@ angular.module('s13DocMindApp').controller('FilesController', [
             }
 
             var promises = $scope.selectedFiles.map(function(fileId) {
-                return FileService.deleteFile(fileId);
+                return DocumentService.deleteFile(fileId);
             });
 
             Promise.all(promises)
@@ -221,14 +221,14 @@ angular.module('s13DocMindApp').controller('FilesController', [
 
         // Navigation
         $scope.uploadFiles = function() {
-            $location.path('/files/upload');
+            $location.path('/documents/upload');
         };
 
         // Helper methods
-        $scope.formatFileSize = FileService.formatFileSize;
-        $scope.getFileIcon = FileService.getFileIcon;
-        $scope.getStateLabel = FileService.getStateLabel;
-        $scope.getStateClass = FileService.getStateClass;
+        $scope.formatFileSize = DocumentService.formatFileSize;
+        $scope.getFileIcon = DocumentService.getFileIcon;
+        $scope.getStateLabel = DocumentService.getStateLabel;
+        $scope.getStateClass = DocumentService.getStateClass;
 
         $scope.formatDate = function(dateString) {
             if (!dateString) return 'Unknown';

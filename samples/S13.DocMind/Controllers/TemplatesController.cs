@@ -11,7 +11,7 @@ using Koan.Web.Controllers;
 namespace S13.DocMind.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/document-types")]
 public sealed class TemplatesController : EntityController<SemanticTypeProfile>
 {
     private readonly ITemplateSuggestionService _templates;

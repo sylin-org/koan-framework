@@ -1,6 +1,6 @@
 angular.module('s13DocMindApp').controller('AnalysisController', [
-    '$scope', '$location', 'AnalysisService', 'FileService', 'DocumentTypeService', 'ToastService',
-    function($scope, $location, AnalysisService, FileService, DocumentTypeService, ToastService) {
+    '$scope', '$location', 'AnalysisService', 'DocumentService', 'TemplateService', 'ToastService',
+    function($scope, $location, AnalysisService, DocumentService, TemplateService, ToastService) {
 
         $scope.loading = true;
         $scope.analyses = [];
@@ -46,7 +46,7 @@ angular.module('s13DocMindApp').controller('AnalysisController', [
         }
 
         function loadAnalyses() {
-            return AnalysisService.getAllAnalyses()
+            return AnalysisService.getAll()
                 .then(function(analyses) {
                     $scope.analyses = analyses;
                     return analyses;
@@ -54,7 +54,7 @@ angular.module('s13DocMindApp').controller('AnalysisController', [
         }
 
         function loadFiles() {
-            return FileService.getAllFiles()
+            return DocumentService.getAll()
                 .then(function(files) {
                     $scope.files = files;
                     return files;
@@ -62,7 +62,7 @@ angular.module('s13DocMindApp').controller('AnalysisController', [
         }
 
         function loadDocumentTypes() {
-            return DocumentTypeService.getAllTypes()
+            return TemplateService.getAll()
                 .then(function(types) {
                     $scope.documentTypes = [{ id: '', name: 'All Types' }].concat(types);
                     return types;
@@ -154,7 +154,7 @@ angular.module('s13DocMindApp').controller('AnalysisController', [
         };
 
         $scope.viewFile = function(analysis) {
-            $location.path('/files/' + analysis.fileId);
+            $location.path('/documents/' + analysis.fileId);
         };
 
         $scope.deleteAnalysis = function(analysis) {
@@ -162,7 +162,7 @@ angular.module('s13DocMindApp').controller('AnalysisController', [
                 return;
             }
 
-            AnalysisService.deleteAnalysis(analysis.id)
+            AnalysisService.delete(analysis.id)
                 .then(function() {
                     ToastService.success('Analysis deleted successfully');
                     return loadAnalyses();
@@ -230,7 +230,7 @@ angular.module('s13DocMindApp').controller('AnalysisController', [
             }
 
             var promises = $scope.selectedAnalyses.map(function(analysisId) {
-                return AnalysisService.deleteAnalysis(analysisId);
+                return AnalysisService.delete(analysisId);
             });
 
             Promise.all(promises)

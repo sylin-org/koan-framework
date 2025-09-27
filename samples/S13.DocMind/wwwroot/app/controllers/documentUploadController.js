@@ -1,6 +1,6 @@
-angular.module('s13DocMindApp').controller('FileUploadController', [
-    '$scope', '$location', 'FileService', 'ToastService',
-    function($scope, $location, FileService, ToastService) {
+angular.module('s13DocMindApp').controller('DocumentUploadController', [
+    '$scope', '$location', 'DocumentService', 'ToastService',
+    function($scope, $location, DocumentService, ToastService) {
 
         $scope.uploading = false;
         $scope.uploadProgress = {};
@@ -149,7 +149,7 @@ angular.module('s13DocMindApp').controller('FileUploadController', [
                     }
                 };
 
-                FileService.uploadFile(formData, progressCallback)
+                DocumentService.uploadFile(formData, progressCallback)
                     .then(function(result) {
                         $scope.uploadedFiles.push({
                             file: result,
@@ -171,11 +171,11 @@ angular.module('s13DocMindApp').controller('FileUploadController', [
 
         // Navigation and actions
         $scope.viewUploadedFile = function(file) {
-            $location.path('/files/' + file.id);
+            $location.path('/documents/' + file.id);
         };
 
         $scope.goToFiles = function() {
-            $location.path('/files');
+            $location.path('/documents');
         };
 
         $scope.uploadMore = function() {
@@ -197,8 +197,8 @@ angular.module('s13DocMindApp').controller('FileUploadController', [
         };
 
         // Helper methods
-        $scope.formatFileSize = FileService.formatFileSize;
-        $scope.getFileIcon = FileService.getFileIcon;
+        $scope.formatFileSize = DocumentService.formatFileSize;
+        $scope.getFileIcon = DocumentService.getFileIcon;
 
         $scope.getOverallProgress = function() {
             var progressValues = Object.values($scope.uploadProgress);

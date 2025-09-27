@@ -41,8 +41,14 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IDocumentDiscoveryRefreshScheduler>(sp => sp.GetRequiredService<DocumentDiscoveryRefreshService>());
         services.AddSingleton(TimeProvider.System);
 
+        // AI Model Management Services
+        services.AddSingleton<IModelCatalogService, InMemoryModelCatalogService>();
+        services.AddSingleton<IModelInstallationQueue, InMemoryModelInstallationQueue>();
+
         services.AddHostedService<DocumentProcessingWorker>();
         services.AddHostedService<DocumentVectorBootstrapper>();
+        // Temporarily comment out ModelInstallationBackgroundService to test
+        // services.AddHostedService<ModelInstallationBackgroundService>();
         services.AddHostedService(sp => sp.GetRequiredService<DocumentDiscoveryRefreshService>());
 
         services.AddHealthChecks()

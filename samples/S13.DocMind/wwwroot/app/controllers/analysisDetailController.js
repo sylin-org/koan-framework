@@ -3,7 +3,7 @@ angular.module('s13DocMindApp').controller('AnalysisDetailController', ['$scope'
     $scope.analysis = null;
 
     function loadAnalysis() {
-        AnalysisService.get($routeParams.id)
+        AnalysisService.getById($routeParams.id)
             .then(function(response) {
                 $scope.analysis = response.data;
             })

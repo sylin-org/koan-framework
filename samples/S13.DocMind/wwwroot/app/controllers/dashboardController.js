@@ -14,14 +14,27 @@ angular.module('s13DocMindApp').controller('DashboardController', [
                 profiles: InsightsService.getProfileCollections('all'),
                 feed: InsightsService.getFeeds()
             }).then(function(results) {
-                $scope.overview = results.overview;
-                $scope.profileCollections = results.profiles || [];
-                $scope.activityFeed = (results.feed || []).slice(0, 10);
+                $scope.overview = results.overview || {};
+
+                // Ensure profileCollections is always an array
+                var profiles = results.profiles;
+                $scope.profileCollections = Array.isArray(profiles) ? profiles : [];
+
+                // Ensure activityFeed is always an array
+                var feed = results.feed;
+                $scope.activityFeed = Array.isArray(feed) ? feed.slice(0, 10) : [];
+
                 $scope.loading = false;
                 $scope.$applyAsync();
             }).catch(function(error) {
                 console.error('Failed to load dashboard insights', error);
                 ToastService.handleError(error, 'Failed to load insights');
+
+                // Initialize with safe defaults on error
+                $scope.overview = {};
+                $scope.profileCollections = [];
+                $scope.activityFeed = [];
+
                 $scope.loading = false;
                 $scope.$applyAsync();
             });
@@ -35,7 +48,8 @@ angular.module('s13DocMindApp').controller('DashboardController', [
         };
 
         $scope.getTopCollections = function() {
-            return ($scope.profileCollections || []).slice(0, 3);
+            var collections = $scope.profileCollections;
+            return Array.isArray(collections) ? collections.slice(0, 3) : [];
         };
 
         $scope.formatTimestamp = function(timestamp) {
