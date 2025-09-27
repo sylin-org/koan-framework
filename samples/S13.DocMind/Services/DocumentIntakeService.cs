@@ -16,20 +16,20 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
 {
     private readonly IDocumentStorage _storage;
     private readonly DocumentPipelineQueue _queue;
-    private readonly DocMindStorageOptions _storageOptions;
+    private readonly DocMindOptions _options;
     private readonly ILogger<DocumentIntakeService> _logger;
     private readonly TimeProvider _clock;
 
     public DocumentIntakeService(
         IDocumentStorage storage,
         DocumentPipelineQueue queue,
-        IOptions<DocMindStorageOptions> storageOptions,
+        IOptions<DocMindOptions> options,
         ILogger<DocumentIntakeService> logger,
         TimeProvider clock)
     {
         _storage = storage;
         _queue = queue;
-        _storageOptions = storageOptions.Value;
+        _options = options.Value;
         _logger = logger;
         _clock = clock;
     }
@@ -44,13 +44,13 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
             throw new ValidationException("File is empty");
         }
 
-        if (request.File.Length > _storageOptions.MaxFileSizeBytes)
+        if (request.File.Length > _options.Storage.MaxFileSizeBytes)
         {
-            throw new ValidationException($"File exceeds {_storageOptions.MaxFileSizeBytes / (1024 * 1024)} MB limit");
+            throw new ValidationException($"File exceeds {_options.Storage.MaxFileSizeBytes / (1024 * 1024)} MB limit");
         }
 
-        if (_storageOptions.AllowedContentTypes.Length > 0 &&
-            !_storageOptions.AllowedContentTypes.Contains(request.File.ContentType, StringComparer.OrdinalIgnoreCase))
+        if (_options.Storage.AllowedContentTypes.Length > 0 &&
+            !_options.Storage.AllowedContentTypes.Contains(request.File.ContentType, StringComparer.OrdinalIgnoreCase))
         {
             _logger.LogWarning("File {File} uploaded with unsupported content type {ContentType}", request.File.FileName, request.File.ContentType);
         }

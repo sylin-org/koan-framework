@@ -16,14 +16,14 @@ namespace S13.DocMind.Services;
 public sealed class TemplateSuggestionService : ITemplateSuggestionService
 {
     private readonly IAi? _ai;
-    private readonly DocMindAiOptions _aiOptions;
+    private readonly DocMindOptions _options;
     private readonly IEmbeddingGenerator _embeddingGenerator;
     private readonly ILogger<TemplateSuggestionService> _logger;
 
-    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindAiOptions> aiOptions, IEmbeddingGenerator embeddingGenerator, ILogger<TemplateSuggestionService> logger)
+    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, IEmbeddingGenerator embeddingGenerator, ILogger<TemplateSuggestionService> logger)
     {
         _ai = serviceProvider.GetService<IAi>();
-        _aiOptions = aiOptions.Value;
+        _options = options.Value;
         _embeddingGenerator = embeddingGenerator;
         _logger = logger;
     }
@@ -46,7 +46,7 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
                 var prompt = BuildTemplatePrompt(request);
                 var response = await _ai.PromptAsync(new AiChatRequest
                 {
-                    Model = _aiOptions.DefaultModel,
+                    Model = _options.Ai.DefaultModel,
                     Messages =
                     {
                         new AiMessage("system", "Design a JSON extraction template."),
@@ -100,7 +100,7 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
 
         var response = await _ai.PromptAsync(new AiChatRequest
         {
-            Model = _aiOptions.DefaultModel,
+            Model = _options.Ai.DefaultModel,
             Messages =
             {
                 new AiMessage("system", profile.Prompt.SystemPrompt),
@@ -113,7 +113,7 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
             RawResponse = response.Text,
             Diagnostics = new Dictionary<string, string>
             {
-                ["model"] = response.Model ?? _aiOptions.DefaultModel,
+                ["model"] = response.Model ?? _options.Ai.DefaultModel,
                 ["tokensIn"] = response.TokensIn?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 ["tokensOut"] = response.TokensOut?.ToString(CultureInfo.InvariantCulture) ?? string.Empty
             }

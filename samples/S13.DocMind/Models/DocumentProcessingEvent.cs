@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions.Annotations;
@@ -30,7 +32,11 @@ public sealed class DocumentProcessingEvent : FlowEntity<DocumentProcessingEvent
     public DocumentProcessingStatus Status { get; set; }
         = DocumentProcessingStatus.Queued;
 
-    public DateTimeOffset OccurredAt { get; set; }
+    [MaxLength(300)]
+    public string Message { get; set; }
+        = string.Empty;
+
+    public DateTimeOffset CreatedAt { get; set; }
         = DateTimeOffset.UtcNow;
 
     public TimeSpan? Duration { get; set; }
@@ -44,8 +50,8 @@ public sealed class DocumentProcessingEvent : FlowEntity<DocumentProcessingEvent
         = null;
 
     [Column(TypeName = "jsonb")]
-    public object? EventData { get; set; }
-        = null;
+    public Dictionary<string, string> Context { get; set; }
+        = new(StringComparer.OrdinalIgnoreCase);
 
     [Column(TypeName = "jsonb")]
     public Dictionary<string, double> Metrics { get; set; }

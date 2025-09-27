@@ -1,41 +1,62 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace S13.DocMind.Infrastructure;
 
-public sealed class DocMindStorageOptions
+public sealed class DocMindOptions
 {
-    public const string Section = "DocMind:Storage";
+    public const string Section = "DocMind";
 
     [Required]
-    public string BasePath { get; set; } = "uploads";
+    public StorageOptions Storage { get; set; } = new();
 
-    public long MaxFileSizeBytes { get; set; } = 20 * 1024 * 1024;
+    [Required]
+    public ProcessingOptions Processing { get; set; } = new();
 
-    public string[] AllowedContentTypes { get; set; } =
+    [Required]
+    public AiOptions Ai { get; set; } = new();
+
+    public sealed class StorageOptions
     {
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "text/plain",
-        "image/png",
-        "image/jpeg"
-    };
-}
+        [Required]
+        public string BasePath { get; set; } = "uploads";
 
-public sealed class DocMindProcessingOptions
-{
-    public const string Section = "DocMind:Processing";
+        [Range(1, long.MaxValue)]
+        public long MaxFileSizeBytes { get; set; } = 20 * 1024 * 1024;
 
-    public int QueueCapacity { get; set; } = 64;
-    public int MaxConcurrency { get; set; } = Environment.ProcessorCount;
-    public int ChunkSizeTokens { get; set; } = 800;
-    public bool EnableVisionExtraction { get; set; } = true;
-}
+        [Required]
+        public string[] AllowedContentTypes { get; set; } =
+        {
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+            "image/png",
+            "image/jpeg"
+        };
+    }
 
-public sealed class DocMindAiOptions
-{
-    public const string Section = "DocMind:Ai";
+    public sealed class ProcessingOptions
+    {
+        [Range(1, int.MaxValue)]
+        public int QueueCapacity { get; set; } = 64;
 
-    public string DefaultModel { get; set; } = "llama3";
-    public string EmbeddingModel { get; set; } = "nomic-embed-text";
-    public string? VisionModel { get; set; } = "llava";
+        [Range(1, int.MaxValue)]
+        public int MaxConcurrency { get; set; } = Environment.ProcessorCount;
+
+        [Range(128, 4096)]
+        public int ChunkSizeTokens { get; set; } = 800;
+
+        public bool EnableVisionExtraction { get; set; } = true;
+    }
+
+    public sealed class AiOptions
+    {
+        [Required]
+        public string DefaultModel { get; set; } = "llama3";
+
+        [Required]
+        public string EmbeddingModel { get; set; } = "nomic-embed-text";
+
+        public string? VisionModel { get; set; } = "llava";
+    }
 }

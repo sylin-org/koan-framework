@@ -11,10 +11,10 @@ namespace S13.DocMind.Services;
 public sealed class EmbeddingGenerator : IEmbeddingGenerator
 {
     private readonly IAi? _ai;
-    private readonly DocMindAiOptions _options;
+    private readonly DocMindOptions _options;
     private readonly ILogger<EmbeddingGenerator> _logger;
 
-    public EmbeddingGenerator(IServiceProvider serviceProvider, IOptions<DocMindAiOptions> options, ILogger<EmbeddingGenerator> logger)
+    public EmbeddingGenerator(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, ILogger<EmbeddingGenerator> logger)
     {
         _ai = serviceProvider.GetService<IAi>();
         _options = options.Value;
@@ -32,7 +32,7 @@ public sealed class EmbeddingGenerator : IEmbeddingGenerator
         {
             var response = await _ai.EmbedAsync(new AiEmbeddingsRequest
             {
-                Model = _options.EmbeddingModel,
+                Model = _options.Ai.EmbeddingModel,
                 Input = { text }
             }, cancellationToken).ConfigureAwait(false);
 

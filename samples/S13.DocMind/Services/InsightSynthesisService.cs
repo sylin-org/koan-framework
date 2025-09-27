@@ -15,13 +15,13 @@ namespace S13.DocMind.Services;
 public sealed class InsightSynthesisService : IInsightSynthesisService
 {
     private readonly IAi? _ai;
-    private readonly DocMindAiOptions _aiOptions;
+    private readonly DocMindOptions _options;
     private readonly ILogger<InsightSynthesisService> _logger;
 
-    public InsightSynthesisService(IServiceProvider serviceProvider, IOptions<DocMindAiOptions> aiOptions, ILogger<InsightSynthesisService> logger)
+    public InsightSynthesisService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, ILogger<InsightSynthesisService> logger)
     {
         _ai = serviceProvider.GetService<IAi>();
-        _aiOptions = aiOptions.Value;
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -36,7 +36,7 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
                 var prompt = BuildPrompt(document, extraction);
                 var response = await _ai.PromptAsync(new AiChatRequest
                 {
-                    Model = _aiOptions.DefaultModel,
+                    Model = _options.Ai.DefaultModel,
                     Messages =
                     {
                         new AiMessage("system", "You are DocMind, an analyst producing structured findings."),
@@ -55,7 +55,7 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
                         Channel = DocumentChannels.Text,
                         Metadata = new Dictionary<string, string>
                         {
-                            ["model"] = response.Model ?? _aiOptions.DefaultModel,
+                            ["model"] = response.Model ?? _options.Ai.DefaultModel,
                             ["tokensIn"] = response.TokensIn?.ToString(CultureInfo.InvariantCulture) ?? "",
                             ["tokensOut"] = response.TokensOut?.ToString(CultureInfo.InvariantCulture) ?? ""
                         }

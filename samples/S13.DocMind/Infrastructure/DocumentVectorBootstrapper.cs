@@ -19,7 +19,7 @@ public sealed class DocumentVectorBootstrapper : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!Vector<DocumentChunk>.IsAvailable)
+        if (!Vector<DocumentChunkEmbedding>.IsAvailable)
         {
             _logger.LogInformation("Vector provider not configured; skipping DocMind vector bootstrap");
             return;
@@ -27,7 +27,7 @@ public sealed class DocumentVectorBootstrapper : BackgroundService
 
         try
         {
-            await Vector<DocumentChunk>.EnsureCreated(stoppingToken).ConfigureAwait(false);
+            await Vector<DocumentChunkEmbedding>.EnsureCreated(stoppingToken).ConfigureAwait(false);
             _logger.LogInformation("DocMind vector index ensured");
         }
         catch (Exception ex)

@@ -19,20 +19,20 @@ public sealed class DocumentAnalysisPipeline : BackgroundService
 {
     private readonly DocumentPipelineQueue _queue;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly DocMindProcessingOptions _processingOptions;
+    private readonly DocMindOptions _options;
     private readonly ILogger<DocumentAnalysisPipeline> _logger;
 
-    public DocumentAnalysisPipeline(DocumentPipelineQueue queue, IServiceScopeFactory scopeFactory, IOptions<DocMindProcessingOptions> options, ILogger<DocumentAnalysisPipeline> logger)
+    public DocumentAnalysisPipeline(DocumentPipelineQueue queue, IServiceScopeFactory scopeFactory, IOptions<DocMindOptions> options, ILogger<DocumentAnalysisPipeline> logger)
     {
         _queue = queue;
         _scopeFactory = scopeFactory;
-        _processingOptions = options.Value;
+        _options = options.Value;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var concurrency = Math.Max(1, _processingOptions.MaxConcurrency);
+        var concurrency = Math.Max(1, _options.Processing.MaxConcurrency);
         using var semaphore = new SemaphoreSlim(concurrency);
         var running = new ConcurrentBag<Task>();
 

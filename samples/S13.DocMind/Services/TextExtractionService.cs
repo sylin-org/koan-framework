@@ -15,12 +15,12 @@ namespace S13.DocMind.Services;
 public sealed class TextExtractionService : ITextExtractionService
 {
     private readonly ILogger<TextExtractionService> _logger;
-    private readonly DocMindProcessingOptions _processingOptions;
+    private readonly DocMindOptions _options;
 
-    public TextExtractionService(IOptions<DocMindProcessingOptions> options, ILogger<TextExtractionService> logger)
+    public TextExtractionService(IOptions<DocMindOptions> options, ILogger<TextExtractionService> logger)
     {
         _logger = logger;
-        _processingOptions = options.Value;
+        _options = options.Value;
     }
 
     public async Task<DocumentExtractionResult> ExtractAsync(SourceDocument document, CancellationToken cancellationToken)
@@ -54,7 +54,7 @@ public sealed class TextExtractionService : ITextExtractionService
         }
 
         var wordCount = CountWords(text);
-        var chunks = BuildChunks(text, _processingOptions.ChunkSizeTokens);
+        var chunks = BuildChunks(text, _options.Processing.ChunkSizeTokens);
         return new DocumentExtractionResult(text, chunks, wordCount, pageCount, containsImages);
     }
 

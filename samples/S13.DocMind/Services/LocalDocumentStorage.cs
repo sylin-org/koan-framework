@@ -7,10 +7,10 @@ namespace S13.DocMind.Services;
 
 public sealed class LocalDocumentStorage : IDocumentStorage
 {
-    private readonly DocMindStorageOptions _options;
+    private readonly DocMindOptions _options;
     private readonly ILogger<LocalDocumentStorage> _logger;
 
-    public LocalDocumentStorage(IOptions<DocMindStorageOptions> options, ILogger<LocalDocumentStorage> logger)
+    public LocalDocumentStorage(IOptions<DocMindOptions> options, ILogger<LocalDocumentStorage> logger)
     {
         _options = options.Value;
         _logger = logger;
@@ -61,7 +61,7 @@ public sealed class LocalDocumentStorage : IDocumentStorage
 
     private string EnsureBasePath()
     {
-        var path = _options.BasePath;
+        var path = _options.Storage.BasePath;
         if (!Path.IsPathFullyQualified(path))
         {
             path = Path.Combine(AppContext.BaseDirectory, path);

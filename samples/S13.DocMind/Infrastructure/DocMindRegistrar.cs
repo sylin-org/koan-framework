@@ -16,9 +16,7 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddKoanOptions<DocMindStorageOptions>(DocMindStorageOptions.Section);
-        services.AddKoanOptions<DocMindProcessingOptions>(DocMindProcessingOptions.Section);
-        services.AddKoanOptions<DocMindAiOptions>(DocMindAiOptions.Section);
+        services.AddKoanOptions<DocMindOptions>(DocMindOptions.Section);
 
         services.AddSingleton<DocumentPipelineQueue>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
@@ -37,9 +35,9 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
     {
         report.AddModule(ModuleName, ModuleVersion);
 
-        var storageSection = configuration.GetSection(DocMindStorageOptions.Section);
-        report.AddSetting("Storage.BasePath", storageSection[nameof(DocMindStorageOptions.BasePath)] ?? "uploads");
-        report.AddSetting("Processing.MaxConcurrency", configuration[$"{DocMindProcessingOptions.Section}:{nameof(DocMindProcessingOptions.MaxConcurrency)}"] ?? "auto");
-        report.AddSetting("AI.DefaultModel", configuration[$"{DocMindAiOptions.Section}:{nameof(DocMindAiOptions.DefaultModel)}"] ?? "llama3");
+        var docMindSection = configuration.GetSection(DocMindOptions.Section);
+        report.AddSetting("Storage.BasePath", docMindSection[$"Storage:{nameof(DocMindOptions.StorageOptions.BasePath)}"] ?? "uploads");
+        report.AddSetting("Processing.MaxConcurrency", docMindSection[$"Processing:{nameof(DocMindOptions.ProcessingOptions.MaxConcurrency)}"] ?? "auto");
+        report.AddSetting("AI.DefaultModel", docMindSection[$"Ai:{nameof(DocMindOptions.AiOptions.DefaultModel)}"] ?? "llama3");
     }
 }
