@@ -108,7 +108,7 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
 
         // Check for additional configuration from WeaviateOptions
         var options = new WeaviateOptions();
-        new WeaviateOptionsConfigurator(configuration, null).Configure(options);
+        new WeaviateOptionsConfigurator(configuration).Configure(options);
 
         return await Task.FromResult(new DependencyDescriptor
         {
