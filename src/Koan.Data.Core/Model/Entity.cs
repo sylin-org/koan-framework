@@ -55,7 +55,7 @@ namespace Koan.Data.Core.Model
         }
         // Example usage:
         // var result = GetMethodDelegate(typeof(TEntity), "FacadeMethodName")(entity, new object?[] { arg1, arg2 });
-    [Key]
+        [Key]
         public virtual TKey Id { get; set; } = default!;
 
         public static EntityEventsBuilder<TEntity, TKey> Events => EntityEventRegistry<TEntity, TKey>.Builder;
@@ -148,19 +148,19 @@ namespace Koan.Data.Core.Model
                 .ConfigureAwait(false);
         }
 
-    public static async Task<int> UpsertMany(IEnumerable<TEntity> models, string set, CancellationToken ct = default)
-    {
-        if (models is null) throw new ArgumentNullException(nameof(models));
-        if (string.IsNullOrWhiteSpace(set)) throw new ArgumentException("Set must be provided.", nameof(set));
+        public static async Task<int> UpsertMany(IEnumerable<TEntity> models, string set, CancellationToken ct = default)
+        {
+            if (models is null) throw new ArgumentNullException(nameof(models));
+            if (string.IsNullOrWhiteSpace(set)) throw new ArgumentException("Set must be provided.", nameof(set));
 
-        var list = models as IReadOnlyList<TEntity> ?? models.ToList();
-        return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertManyAsync(
-            list,
-            (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, set, token),
-            (entity, token) => LoadPriorSnapshotAsync(entity, token, set),
-            ct)
-        .ConfigureAwait(false);
-    }
+            var list = models as IReadOnlyList<TEntity> ?? models.ToList();
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertManyAsync(
+                list,
+                (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, set, token),
+                (entity, token) => LoadPriorSnapshotAsync(entity, token, set),
+                ct)
+            .ConfigureAwait(false);
+        }
 
         // Removal helpers
         public static Task<bool> Remove(TKey id, CancellationToken ct = default)

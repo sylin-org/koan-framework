@@ -13,6 +13,7 @@ Date: 2025-09-28
 Status: Accepted
 
 ## Context
+
 - Koan entities currently expose rich static CRUD helpers, but lack a unified interception surface for cross-cutting policies (moderation, audit, enrichment) at the model level.
 - Teams often duplicate pre/post persistence logic inside controllers or services, leading to inconsistent behavior and harder reuse.
 - Batch operations (`UpsertMany`, `DeleteMany`) and streaming adapters require predictable cancellation semantics to avoid partial writes or undetected failures.
@@ -20,6 +21,7 @@ Status: Accepted
 - Hooks must allow in-place mutation of the in-flight entity, yet protect framework-managed fields (IDs, concurrency tokens, provider metadata) from accidental tampering.
 
 ## Decision
+
 - Introduce a lifecycle event pipeline for `Entity<TEntity, TKey>` covering `Load`, `Upsert`, and `Remove` operations with `Before*` and `After*` hooks.
 - Provide fluent, static registration via a dedicated events facade (`Article.Events.Setup(...)`, `Article.Events.BeforeUpsert(...)`, etc.) backed by a thread-safe registry initialized at application startup.
 - Define an `EntityEventContext<TEntity>` that exposes:
@@ -90,6 +92,7 @@ Article.Events.AfterRemove(static ctx =>
 ```
 
 ## Consequences
+
 - **Positive:** Centralizes entity lifecycle policies, improves DX, and makes moderation/audit patterns reusable. Enables future modules (soft delete, caching) to plug into the same surface.
 - **Positive:** Lazy prior loading keeps hot paths fast while supporting advanced comparisons when needed. Guardrails reduce accidental corruption of framework-managed fields.
 - **Negative:** Adds complexity to persistence calls; adapters must invoke the pipeline and respect cancellation signals, increasing implementation effort.
@@ -97,5 +100,6 @@ Article.Events.AfterRemove(static ctx =>
 - **Risk:** Misconfigured atomic batch settings could mask provider limitations; adapters must clearly signal unsupported modes. Additional perf validation is required to ensure hook overhead remains low.
 
 ## References
+
 - DATA-0059 (Entity-first facade and Save semantics)
 - Prior design discussion on event pipelines (2025-09-28 planning notes)

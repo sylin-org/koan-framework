@@ -55,26 +55,31 @@ Welcome to the complete Koan Framework documentation. This restructured document
 ## 🎯 Quick Navigation by Role
 
 ### **New to Koan?**
+
 1. [5-Minute Quickstart](getting-started/quickstart.md)
 2. [Framework Overview](getting-started/overview.md)
 3. [Enterprise Adoption](getting-started/enterprise-adoption.md)
 
 ### **Building an API?**
+
 1. [Building APIs Guide](guides/building-apis.md)
 2. [Data Modeling](guides/data-modeling.md)
 3. [Authentication Setup](guides/authentication-setup.md)
 
 ### **Adding AI Features?**
+
 1. [AI Integration Guide](guides/ai-integration.md)
 2. [Semantic Pipelines](guides/semantic-pipelines.md)
 3. [AI Reference](reference/ai/index.md)
 
 ### **Going to Production?**
+
 1. [Performance Optimization](guides/performance.md)
 2. [Troubleshooting – Adapter Issues](guides/troubleshooting/adapter-connection-issues.md)
 3. [Troubleshooting – Bootstrap Failures](guides/troubleshooting/bootstrap-failures.md)
 
 ### **Enterprise Architecture?**
+
 1. [Framework Principles](architecture/principles.md)
 2. [Pagination Refactor Plan](architecture/pagination-refactor-plan.md)
 3. [Entity Pattern Scaling](examples/entity-pattern-scaling.md)
@@ -84,6 +89,7 @@ Welcome to the complete Koan Framework documentation. This restructured document
 ## 📝 Documentation Standards
 
 ### Content Types
+
 - **REF**: Reference documentation (API specs, technical details)
 - **GUIDE**: Task-oriented how-to content
 - **ARCH**: High-level architectural documentation
@@ -91,7 +97,9 @@ Welcome to the complete Koan Framework documentation. This restructured document
 - **SUPPORT**: Troubleshooting and problem-solving content
 
 ### Quality Standards
+
 All documentation (except ADRs) undergoes **correctness validation** against:
+
 - Current framework version compatibility
 - Code example accuracy and testing
 - API reference consistency
@@ -99,6 +107,7 @@ All documentation (except ADRs) undergoes **correctness validation** against:
 - Link integrity and navigation flow
 
 ### Frontmatter Standard
+
 ```yaml
 ---
 type: REF | GUIDE | ARCH | DEV | SUPPORT
@@ -108,7 +117,7 @@ audience: [developers, architects, ai-agents]
 last_updated: 2025-01-17
 framework_version: "v0.2.18+"
 status: current | deprecated | draft
-validation: {date-last-tested}
+validation: { date-last-tested }
 ---
 ```
 

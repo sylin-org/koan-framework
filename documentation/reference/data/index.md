@@ -172,13 +172,13 @@ var results = await Data<Product>.Query(@"
 
 ## Providers
 
-| Provider | Package | Use Case |
-|----------|---------|----------|
-| SQLite | `Koan.Data.Sqlite` | Local development, embedded |
-| Postgres | `Koan.Data.Postgres` | Production relational |
-| MongoDB | `Koan.Data.MongoDB` | Document storage |
-| Redis | `Koan.Data.Redis` | Caching, vector search |
-| JSON | `Koan.Data.Json` | File-based storage |
+| Provider | Package              | Use Case                    |
+| -------- | -------------------- | --------------------------- |
+| SQLite   | `Koan.Data.Sqlite`   | Local development, embedded |
+| Postgres | `Koan.Data.Postgres` | Production relational       |
+| MongoDB  | `Koan.Data.MongoDB`  | Document storage            |
+| Redis    | `Koan.Data.Redis`    | Caching, vector search      |
+| JSON     | `Koan.Data.Json`     | File-based storage          |
 
 ## Configuration
 
@@ -199,6 +199,7 @@ var results = await Data<Product>.Query(@"
 ```
 
 Environment variables:
+
 ```bash
 export Koan__Data__DefaultProvider=Postgres
 export Koan__Data__Postgres__ConnectionString="Host=prod;Database=app"

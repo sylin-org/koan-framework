@@ -5,7 +5,7 @@ param(
   [switch]$Serve,
   [int]$Port = 8080,
   [switch]$Strict,
-  [ValidateSet('Verbose','Info','Warning','Error')]
+  [ValidateSet('Verbose', 'Info', 'Warning', 'Error')]
   [string]$LogLevel = 'Warning'
 )
 
@@ -31,7 +31,7 @@ function Get-DocfxCommand() {
 # Generate docs/reference/_generated/adapter-matrix.md from docs/reference/_data/adapters.yml
 function Write-AdapterMatrixMarkdown {
   param(
-    [Parameter(Mandatory=$true)][string]$RepoRoot
+    [Parameter(Mandatory = $true)][string]$RepoRoot
   )
   try {
     if (-not (Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue)) {
@@ -105,22 +105,22 @@ function Write-AdapterMatrixMarkdown {
     $lines += "|---|---|---:|---:|---|---|---|---|---|---|---|"
 
     foreach ($a in $adapters) {
-      $name   = "$($a.name)"
-      $stor   = "$($a.storage)"
-      $tx     = if ($a.transactions) { if ($a.transactions -is [string]) { $a.transactions } elseif ($a.transactions) { 'Yes' } else { 'No' } } else { 'No' }
-      $batch  = if ($a.batching) { if ($a.batching -is [string]) { $a.batching } elseif ($a.batching) { 'Yes' } else { 'No' } } else { 'No' }
+      $name = "$($a.name)"
+      $stor = "$($a.storage)"
+      $tx = if ($a.transactions) { if ($a.transactions -is [string]) { $a.transactions } elseif ($a.transactions) { 'Yes' } else { 'No' } } else { 'No' }
+      $batch = if ($a.batching) { if ($a.batching -is [string]) { $a.batching } elseif ($a.batching) { 'Yes' } else { 'No' } } else { 'No' }
       $paging = if ($a.pagingPushdown) { $a.pagingPushdown } else { 'n/a' }
       $filter = if ($a.filterPushdown) { $a.filterPushdown } else { 'n/a' }
       $schema = if ($a.schemaTools) { $a.schemaTools } else { 'n/a' }
-      $instr  = if ($a.instructionApi) { $a.instructionApi } else { 'n/a' }
+      $instr = if ($a.instructionApi) { $a.instructionApi } else { 'n/a' }
       $vector = if ($a.vector) { $a.vector } else { 'none' }
-      $guard  = ''
+      $guard = ''
       $gps = $null; $gmps = $null; $gtk = $null
       if ($a.guardrails) { $gps = $a.guardrails.defaultPageSize; $gmps = $a.guardrails.maxPageSize; $gtk = $a.guardrails.defaultTopK }
       else { $gps = $a.defaultPageSize; $gmps = $a.maxPageSize; $gtk = $a.defaultTopK }
       if ($gps -or $gmps) { $guard = "page $gps/$gmps" }
       elseif ($gtk) { $guard = "topK $gtk" }
-      $notes  = ($a.notes ?? '') -replace '\r?\n', ' '
+      $notes = ($a.notes ?? '') -replace '\r?\n', ' '
 
       $lines += "| $name | $stor | $tx | $batch | $paging | $filter | $schema | $instr | $vector | $guard | $notes |"
     }
@@ -141,10 +141,11 @@ try {
   $configFullPath = $null
   try {
     $configFullPath = Resolve-Path $ConfigPath -ErrorAction Stop
-  } catch {
+  }
+  catch {
     # Try discovery, prefer docs/ or documentation/ folders before repo root
     $searchRoots = @()
-    foreach ($folder in 'docs','documentation') {
+    foreach ($folder in 'docs', 'documentation') {
       $candidateDir = Join-Path $repoRootPath $folder
       if (Test-Path $candidateDir) { $searchRoots += $candidateDir }
     }
@@ -153,8 +154,8 @@ try {
     $candidate = $null
     foreach ($root in $searchRoots) {
       $candidate = Get-ChildItem -Path $root -Recurse -Filter 'docfx.json' -File -ErrorAction SilentlyContinue |
-        Sort-Object FullName |
-        Select-Object -First 1
+      Sort-Object FullName |
+      Select-Object -First 1
       if ($candidate) { break }
     }
 
@@ -164,7 +165,8 @@ try {
 
     if ($candidate) {
       $configFullPath = $candidate.FullName
-    } else {
+    }
+    else {
       throw "DocFX config not found. Tried '$ConfigPath' and discovery under 'docs/**/docfx.json' or repo root."
     }
   }
@@ -178,12 +180,13 @@ try {
   $json = $null
   try {
     $json = Get-Content $configFullPath -Raw | ConvertFrom-Json -ErrorAction Stop
-  } catch { }
+  }
+  catch { }
 
   if ($json -and $json.PSObject.Properties.Name -contains 'disabled' -and $json.disabled -eq $true) {
     Write-Host "DocFX config is marked as disabled. Skipping DocFX build." -ForegroundColor Yellow
     # Still generate any pre-build content that other docs might depend on
-  $artifactsRoot = Join-Path $repoRootPath 'artifacts/docs'
+    $artifactsRoot = Join-Path $repoRootPath 'artifacts/docs'
     if (-not (Test-Path $artifactsRoot)) { New-Item -ItemType Directory -Path $artifactsRoot | Out-Null }
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $logFile = Join-Path $artifactsRoot "build-$stamp.log"
@@ -207,7 +210,8 @@ try {
   try {
     if (-not $json) { $json = Get-Content $configFullPath -Raw | ConvertFrom-Json -ErrorAction Stop }
     $destFromConfig = $json.build.dest
-  } catch { }
+  }
+  catch { }
 
   $explicitOutput = $PSBoundParameters.ContainsKey('OutputDir')
   if (-not $OutputDir) { $OutputDir = if ($destFromConfig) { $destFromConfig } else { "_site" } }
@@ -281,13 +285,14 @@ try {
   Write-Heading "Output verification"
   if (-not (Test-Path $targetDest)) {
     Write-Warning "Target path not found after build: $targetDest"
-  } else {
-    $targetCount  = (Get-ChildItem -Path $targetDest  -Recurse -Force | Measure-Object).Count
+  }
+  else {
+    $targetCount = (Get-ChildItem -Path $targetDest  -Recurse -Force | Measure-Object).Count
     Write-Host "Items in target: $targetCount" -ForegroundColor DarkGray
   }
 
   # Quick verification to reduce confusion about publish location (with short retry)
-  $candidates = @('index.html','toc.html','README.html')
+  $candidates = @('index.html', 'toc.html', 'README.html')
   $found = $false
   $hit = $null
   for ($i = 0; $i -lt 12 -and -not $found; $i++) {
@@ -299,13 +304,14 @@ try {
   }
   if ($found) {
     Write-Host "Published root doc: $hit" -ForegroundColor Green
-  } else {
+  }
+  else {
     Write-Warning "No top-level doc file (index/toc/README) found under target. Contents may differ from expectation."
   }
 
   if ($Serve) {
-  Write-Heading "Starting DocFX server"
-  $serveArgs = @('serve', $targetDest)
+    Write-Heading "Starting DocFX server"
+    $serveArgs = @('serve', $targetDest)
     if ($Port -gt 0) { $serveArgs += @('--port', $Port) }
     & $docfx @serveArgs | Write-Host
   }

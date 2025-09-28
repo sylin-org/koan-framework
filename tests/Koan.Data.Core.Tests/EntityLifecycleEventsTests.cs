@@ -126,8 +126,8 @@ public sealed class EntityLifecycleEventsTests : IDisposable
 
         await Assert.ThrowsAsync<EntityEventCancelledException>(() => LifecycleEntity.UpsertAsync(blocked));
 
-    var all = await LifecycleEntity.All(set.Name);
-    all.Should().BeEmpty();
+        var all = await LifecycleEntity.All(set.Name);
+        all.Should().BeEmpty();
     }
 
     [Fact]
@@ -267,12 +267,12 @@ public sealed class EntityLifecycleEventsTests : IDisposable
                 return ValueTask.CompletedTask;
             });
 
-    var saved = await LifecycleEntity.UpsertAsync(new LifecycleEntity { Title = "Load" });
+        var saved = await LifecycleEntity.UpsertAsync(new LifecycleEntity { Title = "Load" });
 
-    var originalRevision = saved.Revision;
-    var loaded = await LifecycleEntity.Get(saved.Id, set.Name);
+        var originalRevision = saved.Revision;
+        var loaded = await LifecycleEntity.Get(saved.Id, set.Name);
         loaded.Should().NotBeNull();
-    loaded!.Revision.Should().Be(originalRevision + 10);
+        loaded!.Revision.Should().Be(originalRevision + 10);
     }
 
     public sealed class LifecycleEntity : Entity<LifecycleEntity, string>
