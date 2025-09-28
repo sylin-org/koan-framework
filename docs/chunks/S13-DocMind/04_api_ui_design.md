@@ -5,10 +5,10 @@ We retain Koan’s `EntityController<T>` base but wrap it with intentful control
 
 | Controller | Purpose | Key Endpoints | Notes |
 |------------|---------|---------------|-------|
-| `DocumentsController` (`EntityController<SourceDocument>`) | Upload, status, insight retrieval | `POST /api/documents/upload`, `POST /api/documents/{id}/assign-profile`, `GET /api/documents/{id}/timeline`, `GET /api/documents/{id}/chunks` | Upload endpoint streams file, returns `DocumentUploadReceipt`, and enqueues pipeline work. |
-| `TemplatesController` (`EntityController<SemanticTypeProfile>`) | Manage profiles, generate new templates, prompt testing | `POST /api/templates/generate`, `POST /api/templates/{id}/prompt-test` | Uses `TemplateSuggestionService` + Koan AI to create new templates and run test prompts. |
+| `DocumentsController` (`EntityController<SourceDocument>`) | Upload, status, insight retrieval | `POST /api/documents/upload`, `POST /api/documents/{id}/assign-profile`, `GET /api/documents/{id}/timeline`, `GET /api/documents/{id}/chunks` | Upload endpoint streams file, returns `DocumentUploadReceipt`, and schedules processing via `DocumentProcessingJob`. |
+| `TemplatesController` (`EntityController<SemanticTypeProfile>`) | Manage profiles, generate new templates, prompt testing | `POST /api/document-types/generate`, `POST /api/document-types/{id}/prompt-test` | Uses `TemplateSuggestionService` + Koan AI to create new templates and run test prompts. |
 | `InsightsController` (`EntityController<DocumentInsight>`) | Surface structured insights and aggregated collections | `GET /api/documents/{id}/insights`, `GET /api/insights/collections/{profileId}` | Provides filtered, paginated insight feeds for UI dashboards. |
-| `ProcessingController` | Diagnostics & admin | `POST /api/processing/replay`, `POST /api/processing/retry`, `GET /api/processing/config` | Bridges CLI/MCP automation with hosted pipeline configuration. |
+| `ProcessingController` | Diagnostics & admin | `GET /api/processing/queue`, `GET /api/processing/timeline`, `POST /api/processing/replay`, `GET /api/processing/config` | Bridges CLI workflows with hosted pipeline configuration and replay operations. |
 | `ModelsController` | Provider status and installation | `GET /api/models`, `POST /api/models/install`, `GET /api/models/providers` | Mirrors Angular client expectations and surfaces Koan AI provider telemetry. |
 
 **Design goals**
@@ -35,7 +35,7 @@ public async Task<ActionResult<DocumentUploadReceipt>> UploadAsync(
 2. Stream file to configured storage provider.
 3. Create `SourceDocument` with `Status = Uploaded` and `Summary.TextExtracted = false`.
 4. Record a `DocumentProcessingEvent` (stage `Upload`).
-5. Enqueue `DocumentWorkItem` on the channel queue.
+5. Ensure a `DocumentProcessingJob` exists (or create one) so the background worker picks up the document at the correct stage.
 6. Return `DocumentUploadReceipt` containing document ID, file name, and initial status.
 
 `GET /api/documents/{id}/timeline` returns ordered `DocumentProcessingEvent` entries, enabling the UI to render progress bars.
@@ -43,7 +43,7 @@ public async Task<ActionResult<DocumentUploadReceipt>> UploadAsync(
 ### 3. Assigning Profiles & Triggering Analysis
 - `POST /api/documents/{id}/assign-profile` accepts `AssignProfileRequest { Guid ProfileId, bool AcceptSuggestion }`.
 - Service updates `SourceDocument.AssignedProfileId`, sets `AssignedBySystem` accordingly, records processing event `Stage = Deduplicate` with context, and re-enqueues document if analysis not yet run.
-- MCP tool `docmind.assign-profile` mirrors the endpoint for agent-driven workflows.
+  - Document assignment events update timeline entries so UI and diagnostics endpoints stay consistent.
 
 ### 4. Insights & Chunk Retrieval
 - `GET /api/documents/{id}/chunks` supports `includeInsights=true` to join chunk metadata with insights.
@@ -85,14 +85,9 @@ public async Task<ActionResult<SemanticTypeProfileResponse>> GenerateAsync(
 - Generate TypeScript clients from OpenAPI to ensure DTO consistency.
 
 ### 8. MCP Integration
-- Expose MCP tools that wrap the same services:
-  - `docmind.list-documents`
-  - `docmind.upload`
-  - `docmind.assign-profile`
-  - `docmind.timeline`
-  - `docmind.generate-template`
-- Resources: `docmind/document/{id}`, `docmind/template/{id}`, `docmind/insight/{id}`.
-- Each tool delegates to controller endpoints, preserving minimal implementation cost while demonstrating Koan MCP integration.
+- `[McpEntity]` attributes on `SourceDocument`, `DocumentInsight`, and `SemanticTypeProfile` expose read models over the HTTP SSE transport enabled in `appsettings.json` (`Koan:Mcp:EnableHttpSseTransport = true`, route `/mcp`).
+- Controller DTOs double as MCP resource payloads so agent clients receive the same shapes as the Angular application without bespoke serializers.
+- Tool definitions are intentionally left as a backlog item—the docs highlight how to wrap existing controller actions if/when deeper automation is prioritized.
 
 ### 9. Developer Experience Optimizations
 - Consolidate service registration via `S13DocMindRegistrar` that maps configuration sections (`Processing`, `Storage`, `Vision`, `Embedding`).

@@ -3,7 +3,7 @@
     "document_id": "S13-DocMind-Refactor-Plan",
     "source_file": "../../proposals/S13-DocMind-Proposal.md",
     "total_lines": 3274,
-    "total_chunks": 10,
+    "total_chunks": 11,
     "chunking_strategy": "semantic_coherence",
     "extraction_date": "2025-09-26",
     "framework": "Koan Framework"
@@ -19,7 +19,8 @@
       6,
       7,
       8,
-      9
+      9,
+      11
     ],
     "parallel_groups": [
       {
@@ -85,10 +86,10 @@
       "file_name": "01_executive_overview.md",
       "content_type": "strategic_overview",
       "koan_concepts": [
-        "framework_transformation",
-        "entity_first_development",
-        "registrar_bootstrap",
-        "architecture_challenges"
+        "reference_equals_intent",
+        "auto_registration",
+        "background_processing",
+        "mcp_integration"
       ],
       "key_sections": [
         "Executive Summary",
@@ -101,12 +102,6 @@
         "transformation_goals",
         "refactoring_vision",
         "dx_opportunities"
-      ],
-      "koan_concepts": [
-        "reference_equals_intent",
-        "auto_registration",
-        "background_processing",
-        "mcp_integration"
       ]
     },
     {
@@ -197,14 +192,12 @@
         "Observability"
       ],
       "recommended_agent": "Koan-bootstrap-specialist",
-      "processing_notes": "Capture AddDocMind registration, configuration sections, compose scenarios, and diagnostics.",
+      "processing_notes": "Infrastructure foundation. Extract provider election logic and DocMind registrar patterns.",
       "outputs": [
         "service_registration_plan",
         "configuration_matrix",
         "infra_dx_enhancements"
-      ],
-      "recommended_agent": "Koan-bootstrap-specialist",
-      "processing_notes": "Infrastructure foundation. Extract provider election logic and DocMind registrar patterns."
+      ]
     },
     {
       "chunk_id": "06_implementation",
@@ -246,7 +239,7 @@
       ],
       "koan_concepts": [
         "IntegrationTesting",
-        "OpenTelemetry",
+        "BootReportDiagnostics",
         "DockerCompose"
       ]
     },
@@ -365,61 +358,126 @@
       ],
       "recommended_agent": "general-purpose",
       "processing_notes": "Validate that all collateral reflects the registrar-based startup guidance."
+    },
+    {
+      "chunk_id": "11_scope_reduction_opportunities",
+      "file_name": "11_scope_reduction_opportunities.md",
+      "content_type": "scope_review",
+      "koan_concepts": [
+        "document_processing_events",
+        "boot_report",
+        "mcp_http_sse",
+        "ai_fallbacks"
+      ],
+      "key_sections": [
+        "Evaluation Approach",
+        "Observability & Diagnostics",
+        "MCP Integration",
+        "Vision & Insight Generation",
+        "Manual Analysis & Diagnostics APIs",
+        "Recommended Documentation Actions"
+      ],
+      "recommended_agent": "general-purpose",
+      "processing_notes": "Use this chunk to summarize how the runnable sample constrains deliverable scope.",
+      "outputs": [
+        "scope_trim_opportunities",
+        "code_to_doc_alignment_report"
+      ]
     }
   ],
   "agent_coordination": {
     "primary_agents": [
       {
         "agent_type": "Koan-data-architect",
-        "assigned_chunks": [2, 5],
+        "assigned_chunks": [
+          2,
+          5
+        ],
         "coordination_role": "entity_design_authority",
-        "output_dependencies": ["entity_schemas", "provider_strategies"]
+        "output_dependencies": [
+          "entity_schemas",
+          "provider_strategies"
+        ]
       },
       {
         "agent_type": "Koan-flow-specialist",
-        "assigned_chunks": [3],
+        "assigned_chunks": [
+          3
+        ],
         "coordination_role": "ai_processing_authority",
-        "output_dependencies": ["flow_patterns", "event_sourcing_specs"]
+        "output_dependencies": [
+          "flow_patterns",
+          "event_sourcing_specs"
+        ]
       },
       {
         "agent_type": "Koan-developer-experience-enhancer",
-        "assigned_chunks": [4],
+        "assigned_chunks": [
+          4
+        ],
         "coordination_role": "api_design_authority",
-        "output_dependencies": ["api_specifications", "user_workflows"]
+        "output_dependencies": [
+          "api_specifications",
+          "user_workflows"
+        ]
       },
       {
         "agent_type": "Koan-bootstrap-specialist",
-        "assigned_chunks": [5],
+        "assigned_chunks": [
+          5
+        ],
         "coordination_role": "infrastructure_authority",
-        "output_dependencies": ["bootstrap_patterns", "registrar_validation"]
+        "output_dependencies": [
+          "bootstrap_patterns",
+          "registrar_validation"
+        ]
       },
       {
         "agent_type": "Koan-framework-specialist",
-        "assigned_chunks": [6],
+        "assigned_chunks": [
+          6
+        ],
         "coordination_role": "compliance_authority",
-        "output_dependencies": ["implementation_specs", "framework_alignment"]
+        "output_dependencies": [
+          "implementation_specs",
+          "framework_alignment"
+        ]
       },
       {
         "agent_type": "Koan-orchestration-devops",
-        "assigned_chunks": [7],
+        "assigned_chunks": [
+          7
+        ],
         "coordination_role": "deployment_authority",
-        "output_dependencies": ["deployment_configs", "operational_procedures"]
+        "output_dependencies": [
+          "deployment_configs",
+          "operational_procedures"
+        ]
       }
     ],
     "coordination_points": [
       {
         "checkpoint": "entity_design_review",
-        "participating_agents": ["Koan-data-architect", "Koan-flow-specialist"],
+        "participating_agents": [
+          "Koan-data-architect",
+          "Koan-flow-specialist"
+        ],
         "deliverable": "validated_entity_specifications"
       },
       {
         "checkpoint": "api_workflow_alignment",
-        "participating_agents": ["Koan-developer-experience-enhancer", "Koan-flow-specialist"],
+        "participating_agents": [
+          "Koan-developer-experience-enhancer",
+          "Koan-flow-specialist"
+        ],
         "deliverable": "integrated_api_flow_specifications"
       },
       {
         "checkpoint": "deployment_readiness",
-        "participating_agents": ["Koan-orchestration-devops", "Koan-framework-specialist"],
+        "participating_agents": [
+          "Koan-orchestration-devops",
+          "Koan-framework-specialist"
+        ],
         "deliverable": "production_deployment_plan"
       }
     ]

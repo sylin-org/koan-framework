@@ -2,11 +2,11 @@
 
 ## **Executive Summary**
 
-**S13.DocMind** is a comprehensive guided sample that showcases how the Koan Framework stitches together data and AI capabilities to build an AI-native document intelligence experience with **full GDoc feature parity** and **complete MCP orchestration**. This enhanced version demonstrates rich structured document analysis, complete visual content understanding, intelligent auto-classification capabilities, and seamless AI agent integration through the Model Context Protocol. Rather than prescribing an enterprise migration, it walks readers through advanced architectural patterns and building blocks they can reuse when crafting sophisticated document intelligence solutions.
+**S13.DocMind** is a guided sample that demonstrates how the Koan Framework stitches together data and AI capabilities to build an AI-native document intelligence experience focused on ingestion, staged processing, and actionable insights. The deliverable is intentionally scoped to the features that ship in the repository today: streaming uploads, queued background processing, chunk-level analysis, insight synthesis with graceful fallbacks, and timeline diagnostics backed by persisted processing events. Rather than promising a feature-for-feature clone of productivity suites, it walks readers through the concrete architectural patterns and building blocks they can reuse when crafting document intelligence solutions inside Koan.
 
-This sample assumes lightweight evaluation datasets (dozens of documents, individual files ≤10 MB) and is optimized for interactive walkthroughs, scripted demos, and workshop labs. Larger workloads, multi-team governance, and production-grade SLAs are called out as optional explorations for teams who want to push the framework further.
+This sample assumes lightweight evaluation datasets (dozens of documents, individual files ≤10 MB) and is optimized for interactive walkthroughs, scripted demos, and workshop labs. Larger workloads, multi-team governance, and production-grade SLAs are explicitly positioned as future extensions so workshop content can stay focused on the working baseline.
 
-The enhanced sample provides sophisticated document intelligence features including entity extraction, diagram understanding, semantic type matching, and document chunking for large files. It demonstrates advanced Koan Framework patterns for multi-provider data strategies, AI integration, auto-generated APIs, and **process-complete MCP integration** that enables full AI agent orchestration while maintaining the framework's core principle of "Reference = Intent."
+The current experience highlights ingestion → chunking → AI insight generation, optional embedding enrichment, and HTTP SSE-based MCP exposure for entity data. It demonstrates core Koan Framework patterns for multi-provider data strategies, AI integration, auto-generated APIs, and event-backed diagnostics while maintaining the framework's "Reference = Intent" posture.
 
 ### **Transformation Overview**
 
@@ -16,54 +16,44 @@ The enhanced sample provides sophisticated document intelligence features includ
 | **Data Layer** | MongoDB-only, repository pattern | Multi-provider patterns (MongoDB + optional Weaviate) |
 | **AI Integration** | Manual Ollama client | Built-in `AI.Prompt()`, `AI.Embed()`, and `AI.VisionPrompt()` |
 | **APIs** | Manual controller implementation | Auto-generated via `EntityController<T>` with rich enrichments |
-| **Document Analysis** | Basic string extraction | **Rich structured extraction** (entities, topics, key facts) |
-| **Visual Analysis** | Limited image processing | **Complete diagram understanding** (graphs, flows, security) |
-| **Type System** | Manual type assignment | **Auto-classification** with semantic matching |
-| **User Experience** | Basic file metadata | **Enhanced UX** (user names, notes, analytics) |
-| **Large Files** | Single-pass processing | **Document chunking** with aggregated analysis |
-| **Search & Discovery** | Simple filename search | **Rich content search** with confidence filtering |
+| **Document Analysis** | Basic string extraction | Chunked extraction with summary synthesis and fallback messaging |
+| **Visual Analysis** | Limited image processing | Image metadata capture with optional vision prompt fallbacks |
+| **Type System** | Manual type assignment | Suggestion service with semantic heuristics and embedding assist when available |
+| **User Experience** | Basic file metadata | Timeline, insight views, and queue diagnostics aligned to Angular client |
+| **Large Files** | Single-pass processing | Document chunking with aggregated status metadata |
+| **Search & Discovery** | Simple filename search | Content-based filtering via chunk summaries and optional embeddings |
 | **Processing** | Synchronous with manual orchestration | Streamlined background processing with hosted services |
-| **Scalability** | Single provider, container-aware | Multi-provider with performance analytics |
+| **Scalability** | Single provider, container-aware | Multi-provider with graceful degradation hooks |
 | **Developer Experience** | Complex setup, manual patterns | "Reference = Intent", zero configuration |
-| **AI Agent Orchestration** | Manual API integration required | **Full MCP protocol support** with tools, resources, and prompts |
+| **AI Agent Orchestration** | Manual API integration required | HTTP SSE MCP exposure for entity resources |
 
 ---
 
 ## **Problem Domain Analysis**
 
-### **Enhanced Solution Capabilities (GDoc Feature Parity)**
-The enhanced S13-DocMind solution now provides comprehensive document intelligence features:
+### **Document Intelligence Capabilities Demonstrated**
+The refactored documentation now spotlights the capabilities that ship today:
 
 **Core Processing:**
-- **Multi-format Processing**: .txt, .pdf, .docx, images with text extraction
-- **Rich Structured Analysis**: Entity extraction, topic identification, key facts with confidence scoring
-- **Template System**: Configurable document type templates with AI generation and auto-matching
-- **Document Chunking**: Large file processing with chunk-by-chunk analysis and aggregation
+- **Multi-format Intake**: `.txt`, `.pdf`, `.docx`, and common image uploads routed through `DocumentIntakeService`
+- **Chunked Extraction**: Paragraph-level chunking with token estimates to keep downstream prompts focused
+- **Insight Synthesis**: `InsightSynthesisService` produces narrative summaries with safe fallbacks when the model declines
+- **Timeline Tracking**: `DocumentProcessingEvent` timeline captures every stage for UI progress indicators and diagnostics
 
 **AI-Powered Intelligence:**
-- **Comprehensive Document Analysis**: Entities, topics, structured data, key facts extraction
-- **Diagram Understanding**: Complete visual analysis with graph extraction, flow identification, security analysis
-- **Auto-Classification**: Intelligent document type suggestions using semantic similarity and keyword matching
-- **Multi-Model Support**: Vision models for diagrams, text models for analysis, embedding models for similarity
+- **Vision Metadata**: `VisionInsightService` records image dimensions and optional AI commentary when configured
+- **Template Suggestions**: `TemplateSuggestionService` blends semantic heuristics with embeddings (when Weaviate is enabled)
+- **Manual Analysis Support**: `ManualAnalysisService` enables ad-hoc insight runs and stats surfaced via `AnalysisController`
 
-**User Experience:**
-- **Enhanced File Management**: User-friendly filenames, per-file notes, processing state tracking
-- **Auto-Suggestion Workflow**: Smart document type recommendations with confidence scores
-- **Rich Search & Filtering**: Content search, type-based filtering, confidence-based queries
-- **Analytics & Insights**: Type usage analytics, processing metrics, confidence trends
+**User & Operator Experience:**
+- **Angular Alignment**: Upload wizard, insight views, and diagnostics panels map directly to the controller contracts shipped
+- **Processing Diagnostics**: `ProcessingController` exposes queue, timeline, replay, and config endpoints for workshops
+- **Boot Report Visibility**: Koan boot report lists detected providers, registered hosted services, and MCP resources
 
-**Advanced Features:**
-- **Generation Workflow**: Source documents → individual analysis → multi-document aggregation → templated results
-- **Vector Embeddings**: Semantic search and type matching using AI embeddings
-- **Performance Analytics**: Detailed processing metrics, model usage tracking, confidence analysis
-- **Visual Content Intelligence**: Architectural diagram analysis, security mechanism detection, risk assessment
-
-**MCP Agent Orchestration:**
-- **Process-Complete MCP Integration**: Every workflow step exposed as standardized MCP tools
-- **AI Agent Workflow Orchestration**: Full document intelligence pipeline controllable by AI agents
-- **Structured Resource Access**: Document content, analysis results, and templates accessible via MCP resources
-- **Intelligent Prompt Templates**: Context-aware prompts for document analysis, classification, and interpretation
-- **Multi-Transport Support**: STDIO and HTTP+SSE transports for different integration scenarios
+**Extensibility Hooks:**
+- **Embedding Optionality**: `[VectorAdapter("weaviate")]` entities activate automatically when the container is running
+- **HTTP SSE MCP Exposure**: `[McpEntity]` attributes surface documents, insights, and templates to MCP clients over HTTP SSE
+- **Prompt Reuse**: Templates store curated prompt fragments so the UI, services, and MCP layer share the same language
 
 ### **Architectural Challenges Identified**
 1. **Manual Infrastructure**: 60+ lines of DI registration in `Program.cs`
@@ -75,7 +65,7 @@ The enhanced S13-DocMind solution now provides comprehensive document intelligen
 
 ### **Refactoring Vision**
 - **Bedrock-first**: Stabilize the data foundation around clearly named models—`SourceDocument`, `DocumentTemplate`, `DocumentChunk`, `DocumentInsight`, and `SemanticTypeProfile`—so downstream services read as intent instead of plumbing.
-- **Processing lanes with guardrails**: Replace ad-hoc workflow logic with a queue-backed `DocumentAnalysisPipeline` hosted service that orchestrates ingestion, enrichment, semantic search, and insights while publishing status projections through Koan observability primitives.
+- **Processing lanes with guardrails**: Center orchestration on the existing `DocumentProcessingWorker` + `DocumentProcessingJob` queue so ingestion, enrichment, embeddings, and insight synthesis all flow through one BackgroundService while publishing status projections through Koan observability primitives.
 - **Composable AI services**: Centralize prompting, extraction, and embedding in focused collaborators (`TextExtractionService`, `InsightSynthesisService`, `TemplateSuggestionService`) that consume Koan AI abstractions directly and can be swapped for provider-specific implementations without touching controllers.
 - **UI-aligned APIs**: Shape controllers around scenario-first endpoints (`DocumentsController`, `TemplatesController`, `InsightsController`, `ModelsController`) that pair naturally with the Angular client, limit chatty round-trips, and expose MCP tools with shared contracts.
 - **Minimal-yet-extensible stack**: Keep Docker Compose as the happy path—API + MongoDB + Weaviate + Ollama—while providing clear switches for optional GPU, vector, or storage providers so workshops stay approachable.

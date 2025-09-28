@@ -89,12 +89,13 @@ The Koan Framework automatically resolves data adapters and table mappings witho
 
 ### 5. Observability & Telemetry
 
-- Enable Koan boot report and extend it with DocMind-specific sections (documenting queue configuration, provider readiness, sample documents).
+- Lean on the Koan boot report plus `DocMindRegistrar.Describe` output for queue configuration, provider readiness, and vector health notes.
+- Persist every stage transition through `DocumentProcessingEvent` and surface summaries via `ProcessingController` queue/timeline endpoints.
 - Add health checks:
   - `/health/storage` – verifies storage root writable.
-  - `/health/embedding` – pings Weaviate when enabled.
+  - `/health/embedding` – pings Weaviate when enabled (skips when adapter unavailable).
   - `/health/models` – checks required Ollama models installed.
-- Integrate OpenTelemetry exporters already supported by Koan; provide `otel-collector` compose override for workshops.
+- Capture lightweight diagnostics artifacts (boot snapshot + recent processing timeline) in CI instead of wiring new exporters.
 
 ### 6. Deployment Profiles
 
