@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
+using System.Linq;
+using Koan.Orchestration.Attributes;
 
 namespace Koan.Core.Orchestration;
 
@@ -90,7 +93,9 @@ public static class ServiceDiscoveryExtensions
         string? username = null,
         string? password = null)
     {
-        return ForDatabase("mongodb", 27017, databaseName, username, password);
+        // Read the host name from MongoAdapterFactory's KoanServiceAttribute
+        var serviceName = GetServiceHostFromAttribute("MongoAdapterFactory", "mongodb");
+        return ForDatabase(serviceName, 27017, databaseName, username, password);
     }
 
     /// <summary>
@@ -204,5 +209,32 @@ public static class ServiceDiscoveryExtensions
     {
         var auth = string.IsNullOrEmpty(username) ? "" : $"{username}:{password ?? ""}@";
         return $"amqp://{auth}{hostname}:{port}";
+    }
+
+    /// <summary>
+    /// Gets the host name from KoanServiceAttribute for the specified adapter type.
+    /// </summary>
+    private static string GetServiceHostFromAttribute(string typeName, string fallbackHost)
+    {
+        try
+        {
+            // Find the adapter type across loaded assemblies
+            var adapterType = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => a.GetTypes())
+                .FirstOrDefault(t => t.Name == typeName);
+
+            if (adapterType == null)
+                return fallbackHost;
+
+            var attribute = adapterType.GetCustomAttribute<KoanServiceAttribute>();
+            if (attribute?.Host != null)
+                return attribute.Host;
+
+            return fallbackHost;
+        }
+        catch
+        {
+            return fallbackHost;
+        }
     }
 }

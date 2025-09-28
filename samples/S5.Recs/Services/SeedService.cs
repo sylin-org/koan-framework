@@ -12,10 +12,9 @@ using Koan.Data.Vector;
 using Koan.Core.Observability;
 using Koan.Core.Pipelines;
 using Koan.Core;
-using Koan.Messaging;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Newtonsoft.Json;
@@ -676,8 +675,7 @@ internal sealed class SeedService : ISeedService
                     }))
                 .OnFailure(failure => failure
                     .Tap(_ => Interlocked.Increment(ref failures))
-                    .Trace(env => $"Vector pipeline failed for media {env.Entity.Id}: {env.Error?.Message ?? "unknown"}")
-                    .Notify(env => new VectorPipelineFailure(env.Entity.Id ?? string.Empty, env.Error?.Message ?? "Unknown error"))))
+                    .Trace(env => $"Vector pipeline failed for media {env.Entity.Id}: {env.Error?.Message ?? "unknown"}")))
             .ExecuteAsync(ct);
 
         if (failures > 0)
@@ -723,5 +721,3 @@ internal sealed class SeedService : ISeedService
         return text.Trim();
     }
 }
-
-internal sealed record VectorPipelineFailure(string MediaId, string Error);

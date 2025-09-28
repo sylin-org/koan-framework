@@ -12,7 +12,9 @@ using Koan.Core.Adapters;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
+using Koan.Data.Mongo.Discovery;
 using Koan.Data.Mongo.Orchestration;
 
 namespace Koan.Data.Mongo.Initialization;
@@ -56,6 +58,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Register orchestration evaluator for dependency management
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, MongoOrchestrationEvaluator>());
 
+        // NEW: Register MongoDB discovery adapter (maintains "Reference = Intent")
+        // Adding Koan.Data.Mongo automatically enables MongoDB discovery capabilities
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, MongoDiscoveryAdapter>());
+
         // Apply MongoDB GUID optimization directly for v3.5.0 compatibility
         Console.WriteLine("[MONGO-KOAN-AUTO-REGISTRAR] Applying MongoDB GUID optimization directly...");
         var optimizer = new MongoOptimizationAutoRegistrar();
@@ -66,94 +72,30 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         report.AddModule(ModuleName, ModuleVersion);
 
-        // NEW: Decision logging for connection string resolution
-        var connectionAttempts = new List<(string source, string connectionString, bool canConnect, string? error)>();
+        // Autonomous discovery adapter handles all connection string resolution
+        // Boot report shows discovery results from MongoDiscoveryAdapter
 
-        // Try configured connection strings first
-        var configuredCs = Configuration.ReadFirst(cfg, string.Empty,
-            Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
-
-        if (!string.IsNullOrWhiteSpace(configuredCs))
-        {
-            report.AddDiscovery("configuration", configuredCs);
-            connectionAttempts.Add(("configuration", configuredCs, true, null)); // Assume configured strings work
-        }
-
-        // Auto-discovery logic with decision logging
-        var finalCs = configuredCs;
-        if (string.IsNullOrWhiteSpace(finalCs))
-        {
-            var isProd = KoanEnv.IsProduction;
-            var inContainer = KoanEnv.InContainer;
-
-            if (isProd)
-            {
-                finalCs = MongoConstants.DefaultLocalUri;
-                report.AddDiscovery("production-default", finalCs);
-                connectionAttempts.Add(("production-default", finalCs, true, null));
-            }
-            else
-            {
-                if (inContainer)
-                {
-                    finalCs = MongoConstants.DefaultComposeUri;
-                    report.AddDiscovery("container-discovery", finalCs);
-                    connectionAttempts.Add(("container-discovery", finalCs, true, null));
-                }
-                else
-                {
-                    finalCs = MongoConstants.DefaultLocalUri;
-                    report.AddDiscovery("localhost-fallback", finalCs);
-                    connectionAttempts.Add(("localhost-fallback", finalCs, true, null));
-                }
-            }
-        }
-
-        // Normalize connection string
-        if (!string.IsNullOrWhiteSpace(finalCs) &&
-            !finalCs.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase) &&
-            !finalCs.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase))
-        {
-            finalCs = "mongodb://" + finalCs.Trim();
-        }
-
-        // Log connection attempts
-        foreach (var attempt in connectionAttempts)
-        {
-            report.AddConnectionAttempt("Data.Mongo", attempt.connectionString, attempt.canConnect, attempt.error);
-        }
-
-        // Log provider election decision
         var availableProviders = DiscoverAvailableDataProviders();
-        if (connectionAttempts.Any(a => a.canConnect))
-        {
-            report.AddProviderElection("Data", "Mongo", availableProviders, "first successful connection");
-        }
-        else
-        {
-            report.AddDecision("Data", "InMemory", "no Mongo connection available", availableProviders);
-        }
+        report.AddNote($"Available providers: {string.Join(", ", availableProviders)}");
+        report.AddNote("MongoDB discovery handled by autonomous MongoDiscoveryAdapter");
 
-        var o = new MongoOptions
-        {
-            ConnectionString = finalCs,
-            Database = Configuration.ReadFirst(cfg, "Koan",
-                Infrastructure.Constants.Configuration.Keys.Database,
-                Infrastructure.Constants.Configuration.Keys.AltDatabase)
-        };
+        // Configure default options for reporting
+        var defaultOptions = new MongoOptions();
+        var databaseName = Configuration.ReadFirst(cfg, defaultOptions.Database,
+            Infrastructure.Constants.Configuration.Keys.Database,
+            Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
-        report.AddSetting("Database", o.Database);
-        report.AddSetting("ConnectionString", finalCs, isSecret: true);
+        report.AddSetting("Database", databaseName);
+        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
+
         // Announce schema capability per acceptance criteria
         report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+
         // Announce paging guardrails (decision 0044)
-        var defSize = Configuration.ReadFirst(cfg, o.DefaultPageSize,
+        var defSize = Configuration.ReadFirst(cfg, defaultOptions.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        var maxSize = Configuration.ReadFirst(cfg, o.MaxPageSize,
+        var maxSize = Configuration.ReadFirst(cfg, defaultOptions.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
         report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defSize.ToString());

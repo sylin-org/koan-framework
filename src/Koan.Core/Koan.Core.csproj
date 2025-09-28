@@ -26,6 +26,9 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.8.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
+  </ItemGroup>
   <!-- Explicitly exclude adapter files to prevent Docker build conflicts -->
   <ItemGroup>
     <Compile Remove="Adapters/**/*.cs" />
