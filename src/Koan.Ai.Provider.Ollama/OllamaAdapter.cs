@@ -16,18 +16,10 @@ using Koan.Core.Adapters;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
 using Koan.Orchestration.Models;
+using Koan.Ai.Provider.Ollama.Options;
 
 namespace Koan.Ai.Provider.Ollama;
 
-/// <summary>
-/// Configuration options for Ollama adapter
-/// </summary>
-public class OllamaOptions
-{
-    public string? DefaultModel { get; set; }
-
-    public AdapterReadinessConfiguration Readiness { get; set; } = new();
-}
 
 internal sealed class OllamaAdapter : BaseKoanAdapter,
     IAiAdapter,
@@ -70,7 +62,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         _readinessDefaults = readinessDefaults ?? new AdaptersReadinessOptions();
         var options = GetOptions<OllamaOptions>();
         var serviceDefault = GetServiceDefaultModel();
-        _readiness = options.Readiness ?? new AdapterReadinessConfiguration();
+        _readiness = (AdapterReadinessConfiguration)(options.Readiness ?? new AdapterReadinessConfiguration());
         if (_readiness.Timeout <= TimeSpan.Zero)
         {
             _readiness.Timeout = _readinessDefaults.DefaultTimeout;

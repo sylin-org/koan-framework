@@ -6,8 +6,10 @@ using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Postgres.Discovery;
 using Koan.Data.Postgres.Orchestration;
 using Koan.Orchestration.Aspire;
 using Aspire.Hosting;
@@ -30,35 +32,40 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         // Register orchestration evaluator for dependency management
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, PostgresOrchestrationEvaluator>());
 
+        // Register PostgreSQL discovery adapter (maintains "Reference = Intent")
+        // Adding Koan.Data.Postgres automatically enables PostgreSQL discovery capabilities
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, PostgresDiscoveryAdapter>());
+
         services.AddSingleton<IDataAdapterFactory, PostgresAdapterFactory>();
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var o = new PostgresOptions
-        {
-            ConnectionString = Configuration.ReadFirst(cfg, "Host=localhost;Port=5432;Database=Koan;Username=postgres;Password=postgres",
-                Infrastructure.Constants.Configuration.Keys.ConnectionString,
-                Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-                Infrastructure.Constants.Configuration.Keys.ConnectionStringsPostgres,
-                Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
-            DefaultPageSize = Configuration.ReadFirst(cfg, 50,
-                Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-                Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize),
-            MaxPageSize = Configuration.ReadFirst(cfg, 200,
-                Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-                Infrastructure.Constants.Configuration.Keys.AltMaxPageSize),
-            SearchPath = Configuration.ReadFirst(cfg, "public",
-                Infrastructure.Constants.Configuration.Keys.SearchPath)
-        };
-        report.AddSetting("ConnectionString", o.ConnectionString, isSecret: true);
-        report.AddSetting("NamingStyle", o.NamingStyle.ToString());
-        report.AddSetting("Separator", o.Separator);
-        report.AddSetting("SearchPath", o.SearchPath ?? "public");
+
+        // Autonomous discovery adapter handles all connection string resolution
+        // Boot report shows discovery results from PostgresDiscoveryAdapter
+        report.AddNote("PostgreSQL discovery handled by autonomous PostgresDiscoveryAdapter");
+
+        // Configure default options for reporting
+        var defaultOptions = new PostgresOptions();
+        var searchPath = Configuration.ReadFirst(cfg, defaultOptions.SearchPath ?? "public",
+            Infrastructure.Constants.Configuration.Keys.SearchPath);
+
+        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
+        report.AddSetting("NamingStyle", defaultOptions.NamingStyle.ToString());
+        report.AddSetting("Separator", defaultOptions.Separator);
+        report.AddSetting("SearchPath", searchPath);
         report.AddSetting("EnsureCreatedSupported", true.ToString());
-        report.AddSetting("DefaultPageSize", o.DefaultPageSize.ToString());
-        report.AddSetting("MaxPageSize", o.MaxPageSize.ToString());
+
+        var defSize = Configuration.ReadFirst(cfg, defaultOptions.DefaultPageSize,
+            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+        var maxSize = Configuration.ReadFirst(cfg, defaultOptions.MaxPageSize,
+            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
+        report.AddSetting("DefaultPageSize", defSize.ToString());
+        report.AddSetting("MaxPageSize", maxSize.ToString());
     }
 
     // IKoanAspireRegistrar implementation

@@ -1,68 +1,188 @@
 using System;
-
+using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters;
+using Koan.Core.Adapters.Configuration;
+using Koan.Core.Infrastructure;
 using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
 
 namespace Koan.Data.OpenSearch;
 
-internal sealed class OpenSearchOptionsConfigurator(
-    IConfiguration configuration,
-    ILogger<OpenSearchOptionsConfigurator> logger) : IConfigureOptions<OpenSearchOptions>
+/// <summary>
+/// OpenSearch configuration using autonomous service discovery.
+/// Inherits from AdapterOptionsConfigurator for consistent provider patterns.
+/// </summary>
+internal sealed class OpenSearchOptionsConfigurator : AdapterOptionsConfigurator<OpenSearchOptions>
 {
-    public void Configure(OpenSearchOptions options)
+    private readonly IServiceDiscoveryCoordinator? _discoveryCoordinator;
+
+    protected override string ProviderName => "OpenSearch";
+
+    public OpenSearchOptionsConfigurator(
+        IConfiguration config,
+        ILogger<OpenSearchOptionsConfigurator> logger,
+        IOptions<AdaptersReadinessOptions> readinessOptions,
+        IServiceDiscoveryCoordinator? discoveryCoordinator = null)
+        : base(config, logger, readinessOptions)
     {
-        logger.LogDebug("Configuring OpenSearch options");
-
-        options.IndexPrefix = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:IndexPrefix", options.IndexPrefix);
-        options.IndexName = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:IndexName", options.IndexName);
-        options.VectorField = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:VectorField", options.VectorField) ?? options.VectorField;
-        options.MetadataField = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:MetadataField", options.MetadataField) ?? options.MetadataField;
-        options.IdField = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:IdField", options.IdField) ?? options.IdField;
-        options.SimilarityMetric = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:Similarity", options.SimilarityMetric) ?? options.SimilarityMetric;
-        options.RefreshMode = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:Refresh", options.RefreshMode) ?? options.RefreshMode;
-        options.Dimension = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:Dimension", options.Dimension);
-        options.ApiKey = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:ApiKey", options.ApiKey);
-        options.Username = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:Username", options.Username);
-        options.Password = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:Password", options.Password);
-        options.DisableIndexAutoCreate = Configuration.Read(configuration, $"{Infrastructure.Constants.Section}:DisableIndexAutoCreate", options.DisableIndexAutoCreate);
-
-        options.Endpoint = ResolveEndpoint(options.Endpoint);
+        _discoveryCoordinator = discoveryCoordinator;
     }
 
-    private string ResolveEndpoint(string? current)
+    // Simplified constructor for orchestration scenarios without DI
+    public OpenSearchOptionsConfigurator(IConfiguration config)
+        : base(config, NullLogger<OpenSearchOptionsConfigurator>.Instance,
+               Microsoft.Extensions.Options.Options.Create(new AdaptersReadinessOptions()))
     {
-        var explicitEndpoint = Configuration.ReadFirst(configuration,
-            $"{Infrastructure.Constants.Section}:Endpoint",
-            $"{Infrastructure.Constants.Section}:BaseUrl",
+        _discoveryCoordinator = null;
+    }
+
+    protected override void ConfigureProviderSpecific(OpenSearchOptions options)
+    {
+        Logger?.LogInformation("OpenSearch Orchestration-Aware Configuration Started");
+        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
+            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
+        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Endpoint: '{Endpoint}'",
+            options.ConnectionString, options.Endpoint);
+
+        // Read OpenSearch-specific configuration
+        var endpoint = ReadProviderConfiguration(options.Endpoint,
+            "Koan:Data:OpenSearch:Endpoint",
+            "Koan:Data:OpenSearch:BaseUrl");
+
+        var apiKey = ReadProviderConfiguration(options.ApiKey ?? "",
+            "Koan:Data:OpenSearch:ApiKey");
+
+        var username = ReadProviderConfiguration(options.Username ?? "",
+            "Koan:Data:OpenSearch:Username");
+
+        var password = ReadProviderConfiguration(options.Password ?? "",
+            "Koan:Data:OpenSearch:Password");
+
+        var explicitConnectionString = ReadProviderConfiguration("",
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
             "ConnectionStrings:OpenSearch",
             "ConnectionStrings:opensearch");
 
-        if (!string.IsNullOrWhiteSpace(explicitEndpoint))
+        if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            logger.LogDebug("Using explicit OpenSearch endpoint {Endpoint}", explicitEndpoint);
-            return explicitEndpoint!;
+            Logger?.LogInformation("Using explicit connection string from configuration");
+            options.ConnectionString = explicitConnectionString;
+            options.Endpoint = explicitConnectionString; // For backward compatibility
+        }
+        else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
+                 string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
+            options.ConnectionString = ResolveAutonomousConnection(Logger);
+            options.Endpoint = options.ConnectionString; // For backward compatibility
+        }
+        else
+        {
+            Logger?.LogInformation("Using pre-configured connection string");
+            options.Endpoint = options.ConnectionString; // For backward compatibility
         }
 
-        if (!string.IsNullOrWhiteSpace(current) && !string.Equals(current, "auto", StringComparison.OrdinalIgnoreCase))
-        {
-            logger.LogDebug("Using preconfigured OpenSearch endpoint {Endpoint}", current);
-            return current!;
-        }
+        // Apply other configuration
+        if (!string.IsNullOrWhiteSpace(apiKey))
+            options.ApiKey = apiKey;
+        if (!string.IsNullOrWhiteSpace(username))
+            options.Username = username;
+        if (!string.IsNullOrWhiteSpace(password))
+            options.Password = password;
 
+        // Configure OpenSearch-specific options
+        options.IndexPrefix = ReadProviderConfiguration(
+            options.IndexPrefix ?? "koan",
+            "Koan:Data:OpenSearch:IndexPrefix");
+        options.IndexName = ReadProviderConfiguration(
+            options.IndexName ?? "",
+            "Koan:Data:OpenSearch:IndexName");
+        options.VectorField = ReadProviderConfiguration(
+            options.VectorField,
+            "Koan:Data:OpenSearch:VectorField");
+        options.MetadataField = ReadProviderConfiguration(
+            options.MetadataField,
+            "Koan:Data:OpenSearch:MetadataField");
+        options.IdField = ReadProviderConfiguration(
+            options.IdField,
+            "Koan:Data:OpenSearch:IdField");
+        options.SimilarityMetric = ReadProviderConfiguration(
+            options.SimilarityMetric,
+            "Koan:Data:OpenSearch:SimilarityMetric");
+        options.RefreshMode = ReadProviderConfiguration(
+            options.RefreshMode,
+            "Koan:Data:OpenSearch:RefreshMode");
+        options.DefaultTimeoutSeconds = ReadProviderConfiguration(
+            options.DefaultTimeoutSeconds,
+            "Koan:Data:OpenSearch:TimeoutSeconds");
+
+        if (int.TryParse(ReadProviderConfiguration("", "Koan:Data:OpenSearch:Dimension"), out var dimension))
+            options.Dimension = dimension;
+
+        options.DisableIndexAutoCreate = ReadProviderConfiguration(
+            options.DisableIndexAutoCreate,
+            "Koan:Data:OpenSearch:DisableIndexAutoCreate");
+
+        Logger?.LogInformation("Final OpenSearch Configuration");
+        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
+        Logger?.LogInformation("Endpoint: {Endpoint}", options.Endpoint);
+        Logger?.LogInformation("OpenSearch Orchestration-Aware Configuration Complete");
+    }
+
+    private string ResolveAutonomousConnection(ILogger? logger)
+    {
         try
         {
-            var discovery = new OrchestrationAwareServiceDiscovery(configuration);
-            var result = discovery.DiscoverServiceAsync("opensearch", ServiceDiscoveryExtensions.ForHttpService("opensearch", 9200, "/_cluster/health")).GetAwaiter().GetResult();
-            logger.LogInformation("Discovered OpenSearch endpoint via {Method}: {Url}", result.DiscoveryMethod, result.ServiceUrl);
-            return result.ServiceUrl;
+            if (IsAutoDetectionDisabled())
+            {
+                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
+                return "http://localhost:9200";
+            }
+
+            if (_discoveryCoordinator == null)
+            {
+                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
+                return "http://localhost:9200";
+            }
+
+            // Create discovery context with OpenSearch-specific parameters
+            var context = new DiscoveryContext
+            {
+                OrchestrationMode = KoanEnv.OrchestrationMode,
+                HealthCheckTimeout = TimeSpan.FromMilliseconds(500),
+                Parameters = new Dictionary<string, object>()
+            };
+
+            // Use autonomous discovery coordinator
+            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("opensearch", context);
+            var result = discoveryTask.GetAwaiter().GetResult();
+
+            if (result.IsSuccessful)
+            {
+                logger?.LogInformation("OpenSearch discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                return result.ServiceUrl;
+            }
+            else
+            {
+                logger?.LogWarning("Autonomous OpenSearch discovery failed, falling back to localhost");
+                return "http://localhost:9200";
+            }
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Falling back to localhost for OpenSearch endpoint resolution");
+            logger?.LogError(ex, "Error in autonomous OpenSearch discovery, falling back to localhost");
             return "http://localhost:9200";
         }
+    }
+
+    private bool IsAutoDetectionDisabled()
+    {
+        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:OpenSearch:DisableAutoDetection", false);
     }
 }

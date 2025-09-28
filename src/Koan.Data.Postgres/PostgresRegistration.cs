@@ -14,7 +14,7 @@ public static class PostgresRegistration
     public static IServiceCollection AddPostgresAdapter(this IServiceCollection services, Action<PostgresOptions>? configure = null)
     {
         services.AddKoanOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Keys.Section);
-        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>());
         if (configure is not null) services.Configure(configure);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
         services.AddSingleton<IDataAdapterFactory, PostgresAdapterFactory>();

@@ -6,8 +6,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.OpenSearch.Discovery;
 
 namespace Koan.Data.OpenSearch.Initialization;
 
@@ -19,22 +21,37 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         services.AddKoanOptions<OpenSearchOptions>(Infrastructure.Constants.Section);
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<OpenSearchOptions>, OpenSearchOptionsConfigurator>());
+        services.AddSingleton<IConfigureOptions<OpenSearchOptions>, OpenSearchOptionsConfigurator>();
 
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Abstractions.Naming.INamingDefaultsProvider, OpenSearchNamingDefaultsProvider>());
-
-        services.AddSingleton<IVectorAdapterFactory, OpenSearchVectorAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, OpenSearchHealthContributor>());
 
+        // Register OpenSearch discovery adapter (maintains "Reference = Intent")
+        // Adding Koan.Data.OpenSearch automatically enables OpenSearch discovery capabilities
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, OpenSearchDiscoveryAdapter>());
+
+        services.AddSingleton<IVectorAdapterFactory, OpenSearchVectorAdapterFactory>();
         services.AddHttpClient(Infrastructure.Constants.HttpClientName);
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var endpoint = Configuration.Read(cfg, $"{Infrastructure.Constants.Section}:Endpoint", "http://localhost:9200");
-        report.AddSetting("OpenSearch:Endpoint", endpoint, isSecret: false);
-        report.AddSetting("OpenSearch:IndexPrefix", Configuration.Read(cfg, $"{Infrastructure.Constants.Section}:IndexPrefix", "koan"), isSecret: false);
+
+        // Autonomous discovery adapter handles all connection string resolution
+        // Boot report shows discovery results from OpenSearchDiscoveryAdapter
+        report.AddNote("OpenSearch discovery handled by autonomous OpenSearchDiscoveryAdapter");
+
+        // Configure default options for reporting
+        var defaultOptions = new OpenSearchOptions();
+
+        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
+        report.AddSetting("Endpoint", "auto (resolved by discovery)", isSecret: false);
+        report.AddSetting("IndexPrefix", defaultOptions.IndexPrefix ?? "koan");
+        report.AddSetting("VectorField", defaultOptions.VectorField);
+        report.AddSetting("MetadataField", defaultOptions.MetadataField);
+        report.AddSetting("SimilarityMetric", defaultOptions.SimilarityMetric);
+        report.AddSetting("TimeoutSeconds", defaultOptions.DefaultTimeoutSeconds.ToString());
     }
 }

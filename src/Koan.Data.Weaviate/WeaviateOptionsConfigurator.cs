@@ -1,161 +1,165 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters;
+using Koan.Core.Adapters.Configuration;
+using Koan.Core.Infrastructure;
 using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
 
 namespace Koan.Data.Weaviate;
 
 /// <summary>
-/// Orchestration-aware Weaviate configuration using centralized service discovery.
-/// Replaces custom auto-detection with unified Koan orchestration patterns.
+/// Weaviate configuration using autonomous service discovery.
+/// Inherits from AdapterOptionsConfigurator for consistent provider patterns.
 /// </summary>
-internal sealed class WeaviateOptionsConfigurator(IConfiguration config, ILogger<WeaviateOptionsConfigurator> logger) : IConfigureOptions<WeaviateOptions>
+internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<WeaviateOptions>
 {
-    public void Configure(WeaviateOptions options)
+    private readonly IServiceDiscoveryCoordinator? _discoveryCoordinator;
+
+    protected override string ProviderName => "Weaviate";
+
+    public WeaviateOptionsConfigurator(
+        IConfiguration config,
+        ILogger<WeaviateOptionsConfigurator> logger,
+        IOptions<AdaptersReadinessOptions> readinessOptions,
+        IServiceDiscoveryCoordinator? discoveryCoordinator = null)
+        : base(config, logger, readinessOptions)
     {
-        logger.LogInformation("Weaviate Orchestration-Aware Configuration Started");
-        logger.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
+        _discoveryCoordinator = discoveryCoordinator;
+    }
+
+    // Simplified constructor for orchestration scenarios without DI
+    public WeaviateOptionsConfigurator(IConfiguration config)
+        : base(config, NullLogger<WeaviateOptionsConfigurator>.Instance,
+               Microsoft.Extensions.Options.Options.Create(new AdaptersReadinessOptions()))
+    {
+        _discoveryCoordinator = null;
+    }
+
+    protected override void ConfigureProviderSpecific(WeaviateOptions options)
+    {
+        Logger?.LogInformation("Weaviate Orchestration-Aware Configuration Started");
+        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
             KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        logger.LogInformation("Initial options - Endpoint: '{Endpoint}'", options.Endpoint);
+        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Endpoint: '{Endpoint}'",
+            options.ConnectionString, options.Endpoint);
 
-        // Use centralized orchestration-aware service discovery
-        var serviceDiscovery = new OrchestrationAwareServiceDiscovery(config, null);
-
-        // Check for explicit endpoint configuration first
-        var explicitEndpoint = Configuration.ReadFirst(config, "",
+        // Read Weaviate-specific configuration
+        var endpoint = ReadProviderConfiguration(options.Endpoint,
             "Koan:Data:Weaviate:Endpoint",
-            "Koan:Data:Weaviate:BaseUrl",
-            "ConnectionStrings:weaviate",
-            "ConnectionStrings:Weaviate");
+            "Koan:Data:Weaviate:BaseUrl");
 
-        if (!string.IsNullOrWhiteSpace(explicitEndpoint))
+        var apiKey = ReadProviderConfiguration(options.ApiKey ?? "",
+            "Koan:Data:Weaviate:ApiKey",
+            "Koan:Data:Weaviate:Key");
+
+        var explicitConnectionString = ReadProviderConfiguration("",
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            "ConnectionStrings:Weaviate",
+            "ConnectionStrings:weaviate");
+
+        if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            logger.LogInformation("Using explicit endpoint from configuration");
-            options.Endpoint = explicitEndpoint;
+            Logger?.LogInformation("Using explicit connection string from configuration");
+            options.ConnectionString = explicitConnectionString;
+            options.Endpoint = explicitConnectionString; // For backward compatibility
         }
-        else if (string.Equals(options.Endpoint?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
-                 string.IsNullOrWhiteSpace(options.Endpoint) ||
-                 IsDefault(options.Endpoint))
+        else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
+                 string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            logger.LogInformation("Auto-detection mode - using orchestration-aware service discovery");
-            options.Endpoint = ResolveOrchestrationAwareEndpoint(serviceDiscovery, logger);
+            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
+            options.ConnectionString = ResolveAutonomousConnection(Logger);
+            options.Endpoint = options.ConnectionString; // For backward compatibility
         }
         else
         {
-            logger.LogInformation("Using pre-configured endpoint");
+            Logger?.LogInformation("Using pre-configured connection string");
+            options.Endpoint = options.ConnectionString; // For backward compatibility
         }
 
-        // Final endpoint logging
-        logger.LogInformation("Final Weaviate Configuration");
-        logger.LogInformation("Endpoint: {Endpoint}", options.Endpoint);
-        logger.LogInformation("Weaviate Orchestration-Aware Configuration Complete");
+        // Apply other configuration
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            options.ApiKey = apiKey;
+        }
+
+        // Configure Weaviate-specific options
+        options.DefaultTopK = ReadProviderConfiguration(
+            options.DefaultTopK,
+            "Koan:Data:Weaviate:DefaultTopK");
+        options.MaxTopK = ReadProviderConfiguration(
+            options.MaxTopK,
+            "Koan:Data:Weaviate:MaxTopK");
+        options.Dimension = ReadProviderConfiguration(
+            options.Dimension,
+            "Koan:Data:Weaviate:Dimension");
+        options.Metric = ReadProviderConfiguration(
+            options.Metric,
+            "Koan:Data:Weaviate:Metric");
+        options.DefaultTimeoutSeconds = ReadProviderConfiguration(
+            options.DefaultTimeoutSeconds,
+            "Koan:Data:Weaviate:TimeoutSeconds");
+
+        Logger?.LogInformation("Final Weaviate Configuration");
+        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
+        Logger?.LogInformation("Endpoint: {Endpoint}", options.Endpoint);
+        Logger?.LogInformation("Weaviate Orchestration-Aware Configuration Complete");
     }
 
-    private string ResolveOrchestrationAwareEndpoint(
-        IOrchestrationAwareServiceDiscovery serviceDiscovery,
-        ILogger logger)
+    private string ResolveAutonomousConnection(ILogger? logger)
     {
         try
         {
-            // Check if auto-detection is explicitly disabled
             if (IsAutoDetectionDisabled())
             {
-                logger.LogInformation("Auto-detection disabled via configuration - using localhost");
-                return "http://localhost:8080"; // Use standard Weaviate port
+                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
+                return "http://localhost:8080";
             }
 
-            // Create service discovery options with Weaviate-specific health checking
-            var discoveryOptions = ServiceDiscoveryExtensions.ForWeaviate();
-
-            // Add Weaviate-specific health checking with custom validation
-            discoveryOptions = discoveryOptions with
+            if (_discoveryCoordinator == null)
             {
-                HealthCheck = new HealthCheckOptions
-                {
-                    CustomHealthCheck = async (serviceUrl, ct) =>
-                    {
-                        return await TryWeaviateHealthCheck(serviceUrl, TimeSpan.FromMilliseconds(500), ct);
-                    },
-                    Timeout = TimeSpan.FromMilliseconds(500),
-                    Required = !KoanEnv.IsProduction // Less strict in production
-                },
-                AdditionalCandidates = GetAdditionalCandidatesFromEnvironment()
+                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
+                return "http://localhost:8080";
+            }
+
+            // Create discovery context with Weaviate-specific parameters
+            var context = new DiscoveryContext
+            {
+                OrchestrationMode = KoanEnv.OrchestrationMode,
+                HealthCheckTimeout = TimeSpan.FromMilliseconds(500),
+                Parameters = new Dictionary<string, object>()
             };
 
-            // Use centralized service discovery
-            var discoveryTask = serviceDiscovery.DiscoverServiceAsync("weaviate", discoveryOptions);
+            // Use autonomous discovery coordinator
+            var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("weaviate", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
-            logger.LogInformation("Weaviate discovered via {Method}: {ServiceUrl}",
-                result.DiscoveryMethod, result.ServiceUrl);
-
-            if (!result.IsHealthy && discoveryOptions.HealthCheck?.Required == true)
+            if (result.IsSuccessful)
             {
-                logger.LogWarning("Discovered Weaviate service failed health check but proceeding anyway");
+                logger?.LogInformation("Weaviate discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                return result.ServiceUrl;
             }
-
-            return result.ServiceUrl;
+            else
+            {
+                logger?.LogWarning("Autonomous Weaviate discovery failed, falling back to localhost");
+                return "http://localhost:8080";
+            }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error in orchestration-aware Weaviate discovery, falling back to localhost");
+            logger?.LogError(ex, "Error in autonomous Weaviate discovery, falling back to localhost");
             return "http://localhost:8080";
         }
     }
 
     private bool IsAutoDetectionDisabled()
     {
-        return Configuration.Read(config, "Koan:Data:Weaviate:DisableAutoDetection", false)
-               || Configuration.Read(config, "Koan_DATA_WEAVIATE_DISABLE_AUTO_DETECTION", false);
-    }
-
-    private string[] GetAdditionalCandidatesFromEnvironment()
-    {
-        var candidates = new List<string>();
-
-        // Legacy environment variable support for backward compatibility
-        var envList = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.EnvList);
-        if (!string.IsNullOrWhiteSpace(envList))
-        {
-            candidates.AddRange(envList.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => s.Trim())
-                .Where(s => !string.IsNullOrWhiteSpace(s)));
-        }
-
-        return candidates.ToArray();
-    }
-
-    private static bool IsDefault(string endpoint)
-        => endpoint.TrimEnd('/') == "http://localhost:8085";
-
-    private static async Task<bool> TryWeaviateHealthCheck(string serviceUrl, TimeSpan timeout, CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var httpClient = new HttpClient { Timeout = timeout };
-
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(timeout);
-
-            // Prefer well-known readiness endpoint (no version prefix in some Weaviate releases)
-            var readyUrl = new Uri(new Uri(serviceUrl), "/.well-known/ready").ToString();
-            var response = await httpClient.GetAsync(readyUrl, cts.Token);
-            if (response.IsSuccessStatusCode) return true;
-
-            // Fallback for deployments exposing readiness under /v1
-            var readyV1Url = new Uri(new Uri(serviceUrl), "/v1/.well-known/ready").ToString();
-            var responseV1 = await httpClient.GetAsync(readyV1Url, cts.Token);
-            if (responseV1.IsSuccessStatusCode) return true;
-
-            // Final fallback to schema endpoint
-            var schemaUrl = new Uri(new Uri(serviceUrl), "/v1/schema").ToString();
-            var schemaResponse = await httpClient.GetAsync(schemaUrl, cts.Token);
-            return schemaResponse.IsSuccessStatusCode || (int)schemaResponse.StatusCode == 405; // 405 on POST-only clusters still implies reachability
-        }
-        catch
-        {
-            return false;
-        }
+        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Weaviate:DisableAutoDetection", false);
     }
 }

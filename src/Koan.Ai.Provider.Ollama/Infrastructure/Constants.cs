@@ -2,9 +2,17 @@ namespace Koan.Ai.Provider.Ollama.Infrastructure;
 
 internal static class Constants
 {
+    public const string Section = "Koan:Ai:Provider:Ollama";
+
     public static class Configuration
     {
         public const string ServicesRoot = "Koan:Ai:Services:Ollama";
+
+        public static class Keys
+        {
+            public const string ConnectionString = "Koan:Ai:Provider:Ollama:ConnectionString";
+            public const string AltConnectionString = "Koan:Ai:ConnectionString";
+        }
     }
 
     public static class Discovery

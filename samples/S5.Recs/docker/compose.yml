@@ -12,7 +12,6 @@ services:
       ASPNETCORE_URLS: "http://+:5084"
       Koan__Web__ExposeObservabilitySnapshot: "true"
       Koan__Data__Couchbase__Bucket: "Koan"
-      Koan__Data__Weaviate__Endpoint: "http://weaviate:8080"
       Koan__Ai__AutoDiscoveryEnabled: "true"
       Koan__Ai__AllowDiscoveryInNonDev: "true"
       Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
@@ -32,8 +31,12 @@ services:
     volumes:
       - ../data:/app/data
     depends_on:
-      - mongo
-      - weaviate
+      mongo:
+        condition: service_healthy
+      weaviate:
+        condition: service_healthy
+      ollama:
+        condition: service_started
   mongo:
     image: mongo:latest
     container_name: mongo
@@ -54,6 +57,11 @@ services:
       # Stable single-node clustering to avoid RAFT bootstrap loops
       CLUSTER_HOSTNAME: "node1"
       RAFT_BOOTSTRAP_EXPECT: "1"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/meta"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - ../data/weaviate:/var/lib/weaviate
     ports:

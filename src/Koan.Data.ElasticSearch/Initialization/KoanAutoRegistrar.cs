@@ -6,8 +6,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.ElasticSearch.Discovery;
 
 namespace Koan.Data.ElasticSearch.Initialization;
 
@@ -19,22 +21,37 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         services.AddKoanOptions<ElasticSearchOptions>(Infrastructure.Constants.Section);
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<ElasticSearchOptions>, ElasticSearchOptionsConfigurator>());
+        services.AddSingleton<IConfigureOptions<ElasticSearchOptions>, ElasticSearchOptionsConfigurator>();
 
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Abstractions.Naming.INamingDefaultsProvider, ElasticSearchNamingDefaultsProvider>());
-
-        services.AddSingleton<IVectorAdapterFactory, ElasticSearchVectorAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, ElasticSearchHealthContributor>());
 
+        // Register ElasticSearch discovery adapter (maintains "Reference = Intent")
+        // Adding Koan.Data.ElasticSearch automatically enables ElasticSearch discovery capabilities
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, ElasticSearchDiscoveryAdapter>());
+
+        services.AddSingleton<IVectorAdapterFactory, ElasticSearchVectorAdapterFactory>();
         services.AddHttpClient(Infrastructure.Constants.HttpClientName);
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var endpoint = Configuration.Read(cfg, $"{Infrastructure.Constants.Section}:Endpoint", "http://localhost:9200");
-        report.AddSetting("ElasticSearch:Endpoint", endpoint, isSecret: false);
-        report.AddSetting("ElasticSearch:IndexPrefix", Configuration.Read(cfg, $"{Infrastructure.Constants.Section}:IndexPrefix", "koan"), isSecret: false);
+
+        // Autonomous discovery adapter handles all connection string resolution
+        // Boot report shows discovery results from ElasticSearchDiscoveryAdapter
+        report.AddNote("ElasticSearch discovery handled by autonomous ElasticSearchDiscoveryAdapter");
+
+        // Configure default options for reporting
+        var defaultOptions = new ElasticSearchOptions();
+
+        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
+        report.AddSetting("Endpoint", "auto (resolved by discovery)", isSecret: false);
+        report.AddSetting("IndexPrefix", defaultOptions.IndexPrefix ?? "koan");
+        report.AddSetting("VectorField", defaultOptions.VectorField);
+        report.AddSetting("MetadataField", defaultOptions.MetadataField);
+        report.AddSetting("SimilarityMetric", defaultOptions.SimilarityMetric);
+        report.AddSetting("TimeoutSeconds", defaultOptions.DefaultTimeoutSeconds.ToString());
     }
 }

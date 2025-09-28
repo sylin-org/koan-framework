@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Redis.Orchestration;
 using StackExchange.Redis;
@@ -28,11 +29,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         services.AddKoanOptions<RedisOptions>();
         services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
-        services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, RedisHealthContributor>());
 
         // Register orchestration evaluator for dependency management
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, RedisOrchestrationEvaluator>());
+
+        // Register Redis discovery adapter (maintains "Reference = Intent")
+        // Adding Koan.Data.Redis automatically enables Redis discovery capabilities
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, Discovery.RedisDiscoveryAdapter>());
+
+        services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
 
         // Only register connection multiplexer if Redis is available or in Aspire context
         RegisterConnectionMultiplexer(services, logger);
@@ -66,17 +72,20 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var o = new RedisOptions();
-        new RedisOptionsConfigurator(cfg).Configure(o);
-        report.AddSetting("Database", o.Database.ToString());
-        report.AddSetting("ConnectionString", o.ConnectionString ?? string.Empty, isSecret: true);
+
+        // Autonomous discovery adapter handles all connection string resolution
+        // Boot report shows discovery results from RedisDiscoveryAdapter
+        report.AddNote("Redis discovery handled by autonomous RedisDiscoveryAdapter");
+
+        // Configure default options for reporting
+        var defaultOptions = new RedisOptions();
+        var database = Koan.Core.Configuration.Read(cfg, "Koan:Data:Redis:Database", defaultOptions.Database);
+
+        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
+        report.AddSetting("Database", database.ToString());
         report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, o.DefaultPageSize.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, o.MaxPageSize.ToString());
-        // Discovery visibility
-        report.AddSetting("Discovery:EnvList", Infrastructure.Constants.Discovery.EnvRedisList, isSecret: false);
-        report.AddSetting("Discovery:DefaultLocal", Infrastructure.Constants.Discovery.DefaultLocal, isSecret: false);
-        report.AddSetting("Discovery:DefaultCompose", Infrastructure.Constants.Discovery.DefaultCompose, isSecret: false);
+        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defaultOptions.DefaultPageSize.ToString());
+        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, defaultOptions.MaxPageSize.ToString());
     }
 
     // IKoanAspireRegistrar implementation

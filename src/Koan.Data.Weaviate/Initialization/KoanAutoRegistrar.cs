@@ -6,9 +6,11 @@ using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
+using Koan.Core.Orchestration.Abstractions;
 using Microsoft.Extensions.Logging;
 using Koan.Data.Abstractions;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Weaviate.Discovery;
 using Koan.Data.Weaviate.Orchestration;
 
 namespace Koan.Data.Weaviate.Initialization;
@@ -24,27 +26,40 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         logger?.Log(LogLevel.Debug, "Koan.Data.Weaviate KoanAutoRegistrar loaded.");
         services.AddKoanOptions<WeaviateOptions>(Infrastructure.Constants.Configuration.Section);
 
-        // Register orchestration-aware configuration
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<WeaviateOptions>, WeaviateOptionsConfigurator>());
-
+        services.AddSingleton<IConfigureOptions<WeaviateOptions>, WeaviateOptionsConfigurator>();
         services.TryAddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(Abstractions.Naming.INamingDefaultsProvider), typeof(WeaviateNamingDefaultsProvider), ServiceLifetime.Singleton));
-        services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, WeaviateHealthContributor>());
 
         // Register orchestration evaluator for dependency management
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, WeaviateOrchestrationEvaluator>());
 
+        // Register Weaviate discovery adapter (maintains "Reference = Intent")
+        // Adding Koan.Data.Weaviate automatically enables Weaviate discovery capabilities
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, WeaviateDiscoveryAdapter>());
+
+        services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
         services.AddHttpClient("weaviate");
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var endpoint = Configuration.Read(cfg, "Koan:Data:Weaviate:Endpoint", null) ?? "http://localhost:8080";
-        report.AddSetting("Weaviate:Endpoint", endpoint, isSecret: false);
-        report.AddSetting("Weaviate:OrchestrationMode", KoanEnv.OrchestrationMode.ToString(), isSecret: false);
-        report.AddSetting("Weaviate:Configuration", "Orchestration-aware service discovery enabled", isSecret: false);
+
+        // Autonomous discovery adapter handles all connection string resolution
+        // Boot report shows discovery results from WeaviateDiscoveryAdapter
+        report.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
+
+        // Configure default options for reporting
+        var defaultOptions = new WeaviateOptions();
+
+        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
+        report.AddSetting("Endpoint", "auto (resolved by discovery)", isSecret: false);
+        report.AddSetting("DefaultTopK", defaultOptions.DefaultTopK.ToString());
+        report.AddSetting("MaxTopK", defaultOptions.MaxTopK.ToString());
+        report.AddSetting("Dimension", defaultOptions.Dimension.ToString());
+        report.AddSetting("Metric", defaultOptions.Metric);
+        report.AddSetting("TimeoutSeconds", defaultOptions.DefaultTimeoutSeconds.ToString());
     }
 
 }

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Relational.Orchestration;
@@ -25,39 +26,40 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
+
+        // Register SQLite discovery adapter (maintains "Reference = Intent")
+        // Adding Koan.Data.Sqlite automatically enables SQLite discovery capabilities
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, Discovery.SqliteDiscoveryAdapter>());
+
         // Ensure relational orchestration services are available (schema validation/creation)
         services.AddRelationalOrchestration();
         // Bridge SQLite governance options into relational orchestrator options
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqliteToRelationalBridgeConfigurator>());
-        // Health contributor for readiness checks
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
+
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var o = new SqliteOptions
-        {
-            ConnectionString = Configuration.ReadFirst(cfg, "Data Source=./data/app.db",
-                Infrastructure.Constants.Configuration.Keys.ConnectionString,
-                Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-                Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
-                Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault),
-            DefaultPageSize = Configuration.ReadFirst(cfg, 50,
-                Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-                Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize),
-            MaxPageSize = Configuration.ReadFirst(cfg, 200,
-                Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-                Infrastructure.Constants.Configuration.Keys.AltMaxPageSize)
-        };
-        var cs = o.ConnectionString;
-        report.AddSetting("ConnectionString", cs, isSecret: true);
-        report.AddSetting("NamingStyle", o.NamingStyle.ToString());
-        report.AddSetting("Separator", o.Separator);
-        // Announce schema capability per acceptance criteria
+
+        // Autonomous discovery adapter handles all connection string resolution
+        // Boot report shows discovery results from SqliteDiscoveryAdapter
+        report.AddNote("SQLite discovery handled by autonomous SqliteDiscoveryAdapter");
+
+        // Configure default options for reporting
+        var defaultOptions = new SqliteOptions();
+        var defaultPageSize = Koan.Core.Configuration.Read(cfg,
+            Infrastructure.Constants.Configuration.Keys.DefaultPageSize, defaultOptions.DefaultPageSize);
+        var maxPageSize = Koan.Core.Configuration.Read(cfg,
+            Infrastructure.Constants.Configuration.Keys.MaxPageSize, defaultOptions.MaxPageSize);
+
+        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
+        report.AddSetting("NamingStyle", defaultOptions.NamingStyle.ToString());
+        report.AddSetting("Separator", defaultOptions.Separator);
         report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, o.DefaultPageSize.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, o.MaxPageSize.ToString());
+        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defaultPageSize.ToString());
+        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, maxPageSize.ToString());
     }
 }

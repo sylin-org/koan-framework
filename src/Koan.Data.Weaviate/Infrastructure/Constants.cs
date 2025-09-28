@@ -5,6 +5,12 @@ public static class Constants
     public static class Configuration
     {
         public const string Section = "Koan:Data:Weaviate";
+
+        public static class Keys
+        {
+            public const string ConnectionString = "Koan:Data:Weaviate:ConnectionString";
+            public const string AltConnectionString = "Koan:Data:ConnectionString";
+        }
     }
 
     public static class Discovery
