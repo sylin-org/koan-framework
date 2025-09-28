@@ -80,6 +80,19 @@ angular.module('s13DocMindApp').service('DocumentService', ['ApiService', '$http
             return '/api/Documents/' + documentId + '/download';
         },
 
+        // Convenience wrappers to support legacy controller usage
+        downloadFile: function(documentId) {
+            return service.downloadDocument(documentId);
+        },
+
+        deleteFile: function(documentId) {
+            return service.delete(documentId);
+        },
+
+        assignType: function(documentId, typeId) {
+            return service.assignProfile(documentId, typeId);
+        },
+
         // Utility methods for UI display
         getStateLabel: function(document) {
             if (!document) return 'Unknown';

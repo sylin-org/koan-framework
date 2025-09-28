@@ -27,12 +27,12 @@ angular.module('s13DocMindApp').controller('DocumentDetailController', [
                 loadAnalyses()
             ]).then(function() {
                 $scope.loading = false;
-                $scope.$apply();
+                $scope.$applyAsync();
             }).catch(function(error) {
                 console.error('Failed to load file details:', error);
                 ToastService.error('Failed to load file details');
                 $scope.loading = false;
-                $scope.$apply();
+                $scope.$applyAsync();
             });
         }
 
@@ -40,7 +40,7 @@ angular.module('s13DocMindApp').controller('DocumentDetailController', [
             return DocumentService.getById(fileId)
                 .then(function(file) {
                     $scope.file = file;
-                    $scope.selectedTypeId = file.typeId || '';
+                    $scope.selectedTypeId = file.typeId || file.assignedProfileId || '';
                     return file;
                 })
                 .catch(function(error) {
@@ -61,13 +61,26 @@ angular.module('s13DocMindApp').controller('DocumentDetailController', [
         }
 
         function loadAnalyses() {
-            return AnalysisService.getByDocument(fileId)
+            return DocumentService.getInsights(fileId)
                 .then(function(analyses) {
                     $scope.analyses = analyses.sort(function(a, b) {
-                        return new Date(b.createdAt) - new Date(a.createdAt);
+                        return new Date(b.generatedAt) - new Date(a.generatedAt);
                     });
                     return analyses;
                 });
+        }
+
+        function getStateValue(file) {
+            if (!file) {
+                return null;
+            }
+            if (typeof file.state !== 'undefined' && file.state !== null) {
+                return file.state;
+            }
+            if (typeof file.status !== 'undefined' && file.status !== null) {
+                return file.status;
+            }
+            return null;
         }
 
         // File operations
@@ -79,7 +92,7 @@ angular.module('s13DocMindApp').controller('DocumentDetailController', [
         $scope.deleteFile = function() {
             if (!$scope.file) return;
 
-            if (!confirm('Are you sure you want to delete "' + $scope.file.displayName + '"? This action cannot be undone.')) {
+            if (!confirm('Are you sure you want to delete "' + ($scope.file.displayName || $scope.file.fileName) + '"? This action cannot be undone.')) {
                 return;
             }
 
@@ -104,24 +117,25 @@ angular.module('s13DocMindApp').controller('DocumentDetailController', [
 
             $scope.assigningType = true;
 
-            DocumentService.assignType($scope.file.id, $scope.selectedTypeId, null)
+            DocumentService.assignType($scope.file.id, $scope.selectedTypeId)
                 .then(function() {
                     ToastService.success('Document type assigned successfully');
                     return loadFile();
                 })
                 .then(function() {
                     $scope.assigningType = false;
-                    $scope.$apply();
+                    $scope.$applyAsync();
                 })
                 .catch(function(error) {
                     ToastService.handleError(error, 'Failed to assign document type');
                     $scope.assigningType = false;
-                    $scope.$apply();
+                    $scope.$applyAsync();
                 });
         };
 
         $scope.triggerAnalysis = function() {
-            if (!$scope.file.typeId) {
+            var profileId = ($scope.file && ($scope.file.typeId || $scope.file.assignedProfileId)) || $scope.selectedTypeId;
+            if (!profileId) {
                 ToastService.warning('Please assign a document type before triggering analysis');
                 return;
             }
@@ -130,7 +144,7 @@ angular.module('s13DocMindApp').controller('DocumentDetailController', [
 
             $scope.analysisInProgress = true;
 
-            AnalysisService.triggerAnalysis($scope.file.id, $scope.file.typeId)
+            DocumentService.assignProfile($scope.file.id, profileId)
                 .then(function() {
                     ToastService.success('Analysis started successfully');
                     return loadFile();
@@ -138,41 +152,22 @@ angular.module('s13DocMindApp').controller('DocumentDetailController', [
                 .then(function() {
                     setTimeout(function() {
                         loadAnalyses().then(function() {
-                            $scope.$apply();
+                            $scope.$applyAsync();
                         });
                     }, 2000);
 
                     $scope.analysisInProgress = false;
-                    $scope.$apply();
+                    $scope.$applyAsync();
                 })
                 .catch(function(error) {
                     ToastService.handleError(error, 'Failed to trigger analysis');
                     $scope.analysisInProgress = false;
-                    $scope.$apply();
+                    $scope.$applyAsync();
                 });
         };
 
-        // Analysis operations
         $scope.viewAnalysis = function(analysis) {
             $location.path('/analysis/' + analysis.id);
-        };
-
-        $scope.deleteAnalysis = function(analysis) {
-            if (!confirm('Are you sure you want to delete this analysis?')) {
-                return;
-            }
-
-            AnalysisService.delete(analysis.id)
-                .then(function() {
-                    ToastService.success('Analysis deleted successfully');
-                    return loadAnalyses();
-                })
-                .then(function() {
-                    $scope.$apply();
-                })
-                .catch(function(error) {
-                    ToastService.handleError(error, 'Failed to delete analysis');
-                });
         };
 
         // Navigation
@@ -207,11 +202,13 @@ angular.module('s13DocMindApp').controller('DocumentDetailController', [
         };
 
         $scope.canAssignType = function() {
-            return $scope.file && $scope.file.state === 0;
+            var state = getStateValue($scope.file);
+            return state === 0 || state === null;
         };
 
         $scope.canTriggerAnalysis = function() {
-            return $scope.file && $scope.file.typeId && ($scope.file.state === 1 || $scope.file.state === 5);
+            var state = getStateValue($scope.file);
+            return !!(($scope.file && ($scope.file.typeId || $scope.file.assignedProfileId)) && (state === 1 || state === 5 || state === null));
         };
 
         $scope.hasAnalyses = function() {

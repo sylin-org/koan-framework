@@ -93,6 +93,9 @@ angular.module('s13DocMindApp').controller('HomeController', [
         $scope.getConfidenceLabel = AnalysisService.getConfidenceLabel;
         $scope.getConfidenceClass = AnalysisService.getConfidenceClass;
         $scope.formatConfidenceScore = AnalysisService.formatConfidenceScore;
+        $scope.getStatusLabel = AnalysisService.statusLabel;
+        $scope.getStatusClass = AnalysisService.statusClass;
+        $scope.primaryFinding = AnalysisService.getPrimaryFinding;
         $scope.getTypeIcon = TemplateService.getTypeIcon;
         $scope.formatDate = DocumentService.formatDate;
 
@@ -107,11 +110,11 @@ angular.module('s13DocMindApp').controller('HomeController', [
         };
 
         $scope.navigateToFiles = function() {
-            window.location.href = '#/files';
+            window.location.href = '#/documents';
         };
 
         $scope.navigateToUpload = function() {
-            window.location.href = '#/files/upload';
+            window.location.href = '#/documents/upload';
         };
 
         $scope.navigateToDocumentTypes = function() {
@@ -127,7 +130,7 @@ angular.module('s13DocMindApp').controller('HomeController', [
         };
 
         $scope.viewFile = function(fileId) {
-            window.location.href = '#/files/' + fileId;
+            window.location.href = '#/documents/' + fileId;
         };
 
         $scope.viewAnalysis = function(analysisId) {
@@ -154,7 +157,7 @@ angular.module('s13DocMindApp').controller('HomeController', [
                 if (files.length > 0) {
                     ToastService.info('Redirecting to upload page...');
                     setTimeout(function() {
-                        window.location.href = '#/files/upload';
+                        window.location.href = '#/documents/upload';
                     }, 1000);
                 }
             };
