@@ -14,11 +14,10 @@
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Couchbase\Koan.Data.Couchbase.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Weaviate\Koan.Data.Weaviate.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Ai.Provider.Ollama\Koan.Ai.Provider.Ollama.csproj" />
     <ProjectReference Include="..\..\src\Koan.Scheduling\Koan.Scheduling.csproj" />
     <!-- Auth core and dev TestProvider for Development login/testing -->
@@ -37,5 +36,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Linq.Async" Version="6.0.1" />
   </ItemGroup>
 </Project>
