@@ -136,25 +136,42 @@ function Write-AdapterMatrixMarkdown {
 Push-Location (Resolve-Path "$PSScriptRoot\..\")
 try {
   $repoRoot = Get-Location
+  $repoRootPath = $repoRoot.ProviderPath
   # Resolve config; if default not found, auto-discover under docs/**/docfx.json
   $configFullPath = $null
   try {
     $configFullPath = Resolve-Path $ConfigPath -ErrorAction Stop
   } catch {
-    # Try discovery
-    $candidate = Get-ChildItem -Path $repoRoot.Path -Recurse -Filter 'docfx.json' -File -ErrorAction SilentlyContinue |
-      Where-Object { $_.FullName -like '*\docs\*' } |
-      Select-Object -First 1
+    # Try discovery, prefer docs/ or documentation/ folders before repo root
+    $searchRoots = @()
+    foreach ($folder in 'docs','documentation') {
+      $candidateDir = Join-Path $repoRootPath $folder
+      if (Test-Path $candidateDir) { $searchRoots += $candidateDir }
+    }
+    if (-not $searchRoots) { $searchRoots = @($repoRootPath) }
+
+    $candidate = $null
+    foreach ($root in $searchRoots) {
+      $candidate = Get-ChildItem -Path $root -Recurse -Filter 'docfx.json' -File -ErrorAction SilentlyContinue |
+        Sort-Object FullName |
+        Select-Object -First 1
+      if ($candidate) { break }
+    }
+
+    if (-not $candidate -and (Test-Path (Join-Path $repoRootPath 'docfx.json'))) {
+      $candidate = Get-Item (Join-Path $repoRootPath 'docfx.json')
+    }
+
     if ($candidate) {
       $configFullPath = $candidate.FullName
     } else {
-      throw "DocFX config not found. Tried '$ConfigPath' and discovery under 'docs/**/docfx.json'."
+      throw "DocFX config not found. Tried '$ConfigPath' and discovery under 'docs/**/docfx.json' or repo root."
     }
   }
   $configDir = Split-Path -Parent $configFullPath
 
   Write-Heading "Koan Docs Build"
-  Write-Host "Repo Root: $repoRoot"
+  Write-Host "Repo Root: $repoRootPath"
   Write-Host "Config   : $configFullPath"
 
   # Read config JSON early to honor optional disabled stub files
@@ -166,7 +183,7 @@ try {
   if ($json -and $json.PSObject.Properties.Name -contains 'disabled' -and $json.disabled -eq $true) {
     Write-Host "DocFX config is marked as disabled. Skipping DocFX build." -ForegroundColor Yellow
     # Still generate any pre-build content that other docs might depend on
-    $artifactsRoot = Join-Path $repoRoot 'artifacts/docs'
+  $artifactsRoot = Join-Path $repoRootPath 'artifacts/docs'
     if (-not (Test-Path $artifactsRoot)) { New-Item -ItemType Directory -Path $artifactsRoot | Out-Null }
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $logFile = Join-Path $artifactsRoot "build-$stamp.log"
@@ -216,14 +233,14 @@ try {
   }
 
   # Logs directory
-  $artifactsRoot = Join-Path $repoRoot 'artifacts/docs'
+  $artifactsRoot = Join-Path $repoRootPath 'artifacts/docs'
   if (-not (Test-Path $artifactsRoot)) { New-Item -ItemType Directory -Path $artifactsRoot | Out-Null }
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
   $logFile = Join-Path $artifactsRoot "build-$stamp.log"
 
   # Pre-build content generation
   Write-Heading "Generating docs content"
-  Write-AdapterMatrixMarkdown -RepoRoot $repoRoot.Path
+  Write-AdapterMatrixMarkdown -RepoRoot $repoRootPath
 
   Write-Heading "Building docs with DocFX ($LogLevel)"
   $docfxArgs = @('build', $configFullPath, '--logLevel', $LogLevel)

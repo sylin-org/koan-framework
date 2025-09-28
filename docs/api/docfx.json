@@ -1,0 +1,44 @@
+﻿{
+  "metadata": [
+    {
+      "src": [
+        {
+          "files": [
+            "../../src/**/*.csproj"
+          ],
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/*Tests.csproj",
+            "**/*.Test.csproj"
+          ]
+        }
+      ],
+      "dest": "api",
+      "includePrivateMembers": false,
+      "disableGitFeatures": false,
+      "disableDefaultFilter": false,
+      "allowCompilationErrors": true
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "api/**.yml",
+          "index.md"
+        ]
+      }
+    ],
+    "resource": [],
+    "overwrite": [],
+    "dest": "../../artifacts/docs/api",
+    "template": [
+      "default"
+    ],
+    "globalMetadata": {
+      "_appTitle": "Koan Framework API",
+      "_enableSearch": false
+    }
+  }
+}

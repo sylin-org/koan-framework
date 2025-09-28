@@ -1,62 +1,62 @@
 - name: Home
-  href: README.md
+  href: ../README.md
 - name: Getting Started
-  href: documentation/getting-started/
+  href: ../documentation/getting-started/getting-started.md
   items:
   - name: Quickstart
-    href: documentation/getting-started/quickstart.md
+    href: ../documentation/getting-started/quickstart.md
   - name: Getting Started Guide
-    href: documentation/getting-started/getting-started.md
+    href: ../documentation/getting-started/getting-started.md
 - name: Developer Guides
-  href: documentation/guides/
+  href: ../documentation/guides/README.md
   items:
   - name: Building APIs
-    href: documentation/guides/building-apis.md
+    href: ../documentation/guides/building-apis.md
   - name: Data Modeling
-    href: documentation/guides/data-modeling.md
+    href: ../documentation/guides/data-modeling.md
   - name: AI Integration
-    href: documentation/guides/ai-integration.md
+    href: ../documentation/guides/ai-integration.md
   - name: Authentication Setup
-    href: documentation/guides/authentication-setup.md
+    href: ../documentation/guides/authentication-setup.md
   - name: Performance Optimization
-    href: documentation/guides/performance.md
+    href: ../documentation/guides/performance.md
 - name: API Reference
-  href: api/
+  href: api/index.md
   items:
   - name: Core
-    href: documentation/reference/core/index.md
+    href: ../documentation/reference/core/index.md
   - name: Data
-    href: documentation/reference/data/index.md
+    href: ../documentation/reference/data/index.md
     items:
     - name: Data Pillar Reference
-      href: documentation/reference/data/index.md
+      href: ../documentation/reference/data/index.md
     - name: Entity Lifecycle Events
-      href: documentation/reference/data/entity-lifecycle-events.md
+      href: ../documentation/reference/data/entity-lifecycle-events.md
   - name: Web
-    href: documentation/reference/web/index.md
+    href: ../documentation/reference/web/index.md
   - name: AI
-    href: documentation/reference/ai/index.md
+    href: ../documentation/reference/ai/index.md
   - name: Messaging
-    href: documentation/reference/messaging/index.md
+    href: ../documentation/reference/messaging/index.md
   - name: Storage
-    href: documentation/reference/storage/index.md
+    href: ../documentation/reference/storage/index.md
   - name: Orchestration
-    href: documentation/reference/orchestration/index.md
+    href: ../documentation/reference/orchestration/index.md
   - name: Flow
-    href: documentation/reference/flow/index.md
+    href: ../documentation/reference/flow/index.md
   - name: Auto-Generated API
-    href: api/
+    href: api/index.md
 - name: Architecture
-  href: documentation/architecture/
+  href: ../documentation/architecture/principles.md
   items:
   - name: Framework Principles
-    href: documentation/architecture/principles.md
+    href: ../documentation/architecture/principles.md
 - name: Architecture Decisions
-  href: documentation/decisions/
+  href: ../documentation/decisions/index.md
   items:
   - name: Decision Index
-    href: documentation/decisions/index.md
+    href: ../documentation/decisions/index.md
   - name: Browse by Category
-    href: documentation/decisions/toc.yml
+    href: ../documentation/decisions/README.md
 - name: Contributing
-  href: CONTRIBUTING.md
+  href: ../CONTRIBUTING.md

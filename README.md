@@ -2,7 +2,7 @@
 
 **Try it. Be delighted. Build sophisticated apps with simple patterns.**
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/sylin-org/koan-framework/blob/dev/LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/download)
 [![Framework Version](https://img.shields.io/badge/Version-v0.2.18-green.svg)](https://github.com/sylin-org/koan-framework/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/sylin-org/koan-framework)](https://github.com/sylin-org/koan-framework/stargazers)
@@ -197,7 +197,7 @@ Koan gives you **Active Record ergonomics** with the **scalability of a Data Map
 - **One pattern, many backends:** Swap providers without rewriting your domain or controllers.
 - **AI‑native:** Semantic search, embeddings, and streaming pipelines are first‑class, not bolt‑ons.
 
-**Deep comparison:** [See the full, categorized matrix.](docs/architecture/comparison.md)
+**Deep comparison:** [See the full, categorized matrix.](https://github.com/sylin-org/koan-framework/blob/dev/docs/architecture/comparison.md)
 
 ---
 
