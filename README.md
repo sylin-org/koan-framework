@@ -13,7 +13,7 @@
 
 ## From Simple to Sophisticated in Minutes
 
-**Koan keeps the AR ergonomics developers love**-entities with `Save()`, discoverable CRUD controllers-**while neutralizing the common AR traps** with set-scoped routing, capability-aware queries, batch ops, a shared endpoint service, and first-class event flows. You get AR’s "don't make me think" feel without painting yourself into a single-DB, fat-controller, N+1-ridden corner.
+**Koan keeps the AR ergonomics developers love** - entities with `Save()`, discoverable CRUD controllers - **while neutralizing the common AR traps** with set-scoped routing, capability-aware queries, batch ops, a shared endpoint service, and first-class event flows. You get AR’s "don't make me think" feel without painting yourself into a single-DB, fat-controller, N+1-ridden corner.
 
 ### **1. Get started quickly**
 
