@@ -181,15 +181,15 @@ Koan gives you **Active Record ergonomics** with the **scalability of a Data Map
 
 **Legend:** 🟩 Good · 🟨 Mixed/depends · 🟥 Weak
 
-| Capability                                                     | EF (Entity Framework)      | Active Record (classic) | Koan                                              |
-| -------------------------------------------------------------- | -------------------------- | ----------------------- | ------------------------------------------------- |
-| **Time to first API**                                          | 🟨 Needs setup/scaffolding | 🟩 Fast CRUD            | 🟩 2‑min REST via `Entity<>`                      |
-| **Polyglot storage (SQL/NoSQL/Vector)**                        | 🟨 Relational‑focused      | 🟥 Typically one store  | 🟩 First‑class across providers                   |
-| **Multi‑tenant & view routing** (drafts/published, per‑tenant) | 🟨 Manual filters          | 🟥 Ad hoc/global        | 🟩 `?set=` + `DataSetContext.With(...)`           |
-| **Event‑driven & projections**                                 | 🟨 Add‑ons/outbox          | 🟥 Rare                 | 🟩 Built‑in Flow (canonical/lineage views)        |
-| **Semantic/Vector pipeline**                                   | 🟥 External add‑ons        | 🟥 Rare                 | 🟩 Native embeddings, semantic search, pipelines  |
-| **Capability detection / fallback**                            | 🟨 Partial                 | 🟥 None                 | 🟩 `QueryCaps`/`WriteCaps` with graceful fallback |
-| **Migrations & schema**                                        | 🟩 EF Migrations           | 🟨 ORM‑specific         | 🟨 Use store‑native tools today                   |
+| Capability                          | EF  | AR  | Koan |
+| ----------------------------------- | --- | --- | ---- |
+| Time to first API                   | 🟨  | 🟩  | 🟩   |
+| Polyglot storage (SQL/NoSQL/Vector) | 🟨  | 🟥  | 🟩   |
+| Multi-tenant & view routing         | 🟨  | 🟥  | 🟩   |
+| Event-driven & projections          | 🟨  | 🟥  | 🟩   |
+| Semantic/Vector pipeline            | 🟥  | 🟥  | 🟩   |
+| Capability detection / fallback     | 🟨  | 🟥  | 🟩   |
+| Migrations & schema                 | 🟩  | 🟨  | 🟨   |
 
 **What this means in practice**
 
