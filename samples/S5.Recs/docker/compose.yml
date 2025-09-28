@@ -32,18 +32,18 @@ services:
     volumes:
       - ../data:/app/data
     depends_on:
-      - couchbase
+      - mongo
       - weaviate
-  couchbase:
-    image: public.ecr.aws/docker/library/couchbase:latest
-    volumes:
-      - ../data/couchbase:/opt/couchbase/var
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     ports:
-      - "5081:8091"  # Web UI
-      - "8092:8092"  # Views
-      - "8093:8093"  # Query
-      - "8094:8094"  # Search
-      - "11210:11210" # Data service
+      - "4900:27017"
   weaviate:
     image: semitechnologies/weaviate:latest
     environment:
