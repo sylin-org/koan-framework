@@ -1,6 +1,59 @@
 angular.module('s13DocMindApp').service('AnalysisService', ['ApiService', function(ApiService) {
+    var statusLabels = {
+        draft: 'Draft',
+        ready: 'Ready',
+        running: 'Running',
+        completed: 'Completed',
+        archived: 'Archived'
+    };
+
+    var statusClasses = {
+        draft: 'badge bg-secondary',
+        ready: 'badge bg-info',
+        running: 'badge bg-warning text-dark',
+        completed: 'badge bg-success',
+        archived: 'badge bg-dark'
+    };
+
+    function normalizeStatus(status) {
+        if (status === undefined || status === null) {
+            return null;
+        }
+
+        if (typeof status === 'string') {
+            return status.toLowerCase();
+        }
+
+        if (typeof status === 'number') {
+            switch (status) {
+                case 0: return 'draft';
+                case 1: return 'ready';
+                case 2: return 'running';
+                case 3: return 'completed';
+                case 4: return 'archived';
+                default: return status.toString();
+            }
+        }
+
+        return status.toString().toLowerCase();
+    }
+
+    function coerceScore(score) {
+        if (score === undefined || score === null) {
+            return null;
+        }
+
+        var numeric = parseFloat(score);
+        if (isNaN(numeric)) {
+            return null;
+        }
+
+        if (numeric < 0) numeric = 0;
+        if (numeric > 1) numeric = 1;
+        return numeric;
+    }
+
     var service = {
-        // EntityController<DocumentInsight> provides these automatically:
         getAll: function() {
             return ApiService.get('/analysis');
         },
@@ -9,133 +62,130 @@ angular.module('s13DocMindApp').service('AnalysisService', ['ApiService', functi
             return ApiService.get('/analysis/' + id);
         },
 
-        create: function(analysis) {
-            return ApiService.post('/analysis', analysis);
+        create: function(session) {
+            return ApiService.post('/analysis', session);
         },
 
-        update: function(id, analysis) {
-            return ApiService.put('/analysis/' + id, analysis);
+        update: function(id, session) {
+            return ApiService.put('/analysis/' + id, session);
         },
 
         delete: function(id) {
             return ApiService.delete('/analysis/' + id);
         },
 
-        // Business-specific endpoint from AnalysisController:
         getRecent: function(limit) {
-            return ApiService.get('/analysis/recent?limit=' + (limit || 5));
+            return ApiService.get('/analysis/recent', { limit: limit || 5 });
         },
 
-        // Get insights for a specific document (from DocumentsController):
-        getByDocument: function(documentId, channel) {
-            var url = '/Documents/' + documentId + '/insights';
-            if (channel) {
-                url += '?channel=' + encodeURIComponent(channel);
+        getStats: function() {
+            return ApiService.get('/analysis/stats');
+        },
+
+        runSession: function(id, request) {
+            return ApiService.post('/analysis/' + id + '/run', request || {});
+        },
+
+        statusLabel: function(status) {
+            var normalized = normalizeStatus(status);
+            if (!normalized) {
+                return statusLabels.draft;
             }
-            return ApiService.get(url);
+
+            return statusLabels[normalized] || status;
         },
 
-        // Trigger analysis for a document (DocumentsController assign-profile endpoint):
-        triggerAnalysis: function(documentId, profileId) {
-            return ApiService.post('/Documents/' + documentId + '/assign-profile', {
-                ProfileId: profileId,
-                AcceptSuggestion: true
-            });
+        statusClass: function(status) {
+            var normalized = normalizeStatus(status);
+            if (!normalized) {
+                return statusClasses.draft;
+            }
+
+            return statusClasses[normalized] || 'badge bg-secondary';
         },
 
-        // Export multiple analyses to JSON/CSV:
-        exportAnalyses: function(analysisIds) {
-            return ApiService.post('/analysis/export', {
-                AnalysisIds: analysisIds
-            }, {
-                responseType: 'blob'
-            });
-        },
-
-        // Helper methods for UI display
         getConfidenceLabel: function(score) {
-            if (!score && score !== 0) return 'Unknown';
-            if (score >= 0.9) return 'Excellent';
-            if (score >= 0.8) return 'High';
-            if (score >= 0.7) return 'Good';
-            if (score >= 0.6) return 'Fair';
-            if (score >= 0.5) return 'Low';
+            var numeric = coerceScore(score);
+            if (numeric === null) {
+                return 'Unknown';
+            }
+
+            if (numeric >= 0.9) return 'Excellent';
+            if (numeric >= 0.8) return 'High';
+            if (numeric >= 0.7) return 'Good';
+            if (numeric >= 0.6) return 'Fair';
+            if (numeric >= 0.5) return 'Low';
             return 'Very Low';
         },
 
         getConfidenceClass: function(score) {
-            if (!score && score !== 0) return 'secondary';
-            if (score >= 0.8) return 'bg-success';
-            if (score >= 0.7) return 'bg-info';
-            if (score >= 0.6) return 'bg-warning';
+            var numeric = coerceScore(score);
+            if (numeric === null) {
+                return 'bg-secondary';
+            }
+
+            if (numeric >= 0.8) return 'bg-success';
+            if (numeric >= 0.7) return 'bg-info';
+            if (numeric >= 0.6) return 'bg-warning';
             return 'bg-danger';
         },
 
         formatConfidenceScore: function(score) {
-            if (!score && score !== 0) return 'N/A';
-            return Math.round(score * 100) + '%';
+            var numeric = coerceScore(score);
+            if (numeric === null) {
+                return 'N/A';
+            }
+
+            return Math.round(numeric * 100) + '%';
         },
 
         formatDate: function(dateString) {
-            if (!dateString) return 'Unknown';
+            if (!dateString) {
+                return 'Unknown';
+            }
+
             var date = new Date(dateString);
+            if (isNaN(date.getTime())) {
+                return dateString;
+            }
+
             return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
         },
 
-        parseStructuredData: function(structuredData) {
-            if (!structuredData) return null;
-
-            try {
-                if (typeof structuredData === 'string') {
-                    return JSON.parse(structuredData);
-                }
-                return structuredData;
-            } catch (e) {
-                console.warn('Failed to parse structured data:', e);
+        getPrimaryFinding: function(session) {
+            if (!session) {
                 return null;
             }
-        },
 
-        extractKeyValuePairs: function(structuredData) {
-            var parsed = service.parseStructuredData(structuredData);
-            if (!parsed) return [];
+            if (session.primaryFinding) {
+                return session.primaryFinding;
+            }
 
-            var pairs = [];
-            for (var key in parsed) {
-                if (parsed.hasOwnProperty(key)) {
-                    pairs.push({
-                        key: key.replace(/_/g, ' ').replace(/\b\w/g, function(l) {
-                            return l.toUpperCase();
-                        }),
-                        value: parsed[key]
-                    });
+            if (session.lastSynthesis) {
+                if (session.lastSynthesis.findings && session.lastSynthesis.findings.length > 0) {
+                    return session.lastSynthesis.findings[0].body;
+                }
+
+                if (session.lastSynthesis.filledTemplate) {
+                    return session.lastSynthesis.filledTemplate;
+                }
+
+                if (session.lastSynthesis.contextSummary) {
+                    return session.lastSynthesis.contextSummary;
                 }
             }
-            return pairs;
+
+            return null;
         },
 
-        getChannelIcon: function(channel) {
-            var icons = {
-                'entities': 'bi-tags',
-                'sections': 'bi-list-ul',
-                'actions': 'bi-check-circle',
-                'summary': 'bi-file-text',
-                'metadata': 'bi-info-circle'
-            };
-            return icons[channel] || 'bi-lightbulb';
-        },
+        normalizeStatus: normalizeStatus,
 
-        getChannelColor: function(channel) {
-            var colors = {
-                'entities': 'primary',
-                'sections': 'info',
-                'actions': 'success',
-                'summary': 'secondary',
-                'metadata': 'warning'
-            };
-            return colors[channel] || 'light';
+        hasSynthesis: function(session) {
+            return !!(session && session.lastSynthesis);
         }
     };
+
+    service.getConfidenceScore = coerceScore;
 
     return service;
 }]);

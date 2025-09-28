@@ -37,9 +37,17 @@ angular.module('s13DocMindApp', [
             templateUrl: 'app/views/analysis/list.html',
             controller: 'AnalysisController'
         })
+        .when('/analysis/new', {
+            templateUrl: 'app/views/analysis/editor.html',
+            controller: 'AnalysisEditorController'
+        })
         .when('/analysis/:id', {
             templateUrl: 'app/views/analysis/detail.html',
             controller: 'AnalysisDetailController'
+        })
+        .when('/analysis/:id/edit', {
+            templateUrl: 'app/views/analysis/editor.html',
+            controller: 'AnalysisEditorController'
         })
         .when('/configuration', {
             templateUrl: 'app/views/configuration/index.html',

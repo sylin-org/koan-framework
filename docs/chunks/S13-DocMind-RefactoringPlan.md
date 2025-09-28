@@ -1,59 +1,58 @@
 # S13.DocMind Refactoring Plan (Updated)
 
 ## Current Coverage Snapshot
-- **Durable pipeline core in place.** The hosted `DocumentProcessingWorker` advances `DocumentProcessingJob` ledgers through extraction, embeddings, vision, insights, and aggregation while emitting persisted telemetry, delivering the resilient orchestration envisioned in the proposal’s AI processing plan.【F:docs/chunks/S13-DocMind/03_ai_processing.md†L35-L66】【F:samples/S13.DocMind/Infrastructure/DocumentProcessingWorker.cs†L17-L418】【F:samples/S13.DocMind/Models/DocumentProcessingJob.cs†L15-L170】
-- **Entity-first persistence enforced.** Repository helpers were removed in favour of `Entity<T>` access directly inside intake, diagnostics, discovery, and worker flows, ensuring projections, queue slices, and retries operate through the canonical static APIs recommended by the proposal.【F:samples/S13.DocMind/Services/DocumentIntakeService.cs†L78-L205】【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L20-L214】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L52-L236】【F:samples/S13.DocMind/Infrastructure/DocumentProcessingWorker.cs†L39-L139】
-- **Operator visibility partially delivered.** Discovery refresh scheduling, vector bootstrap checks, and diagnostics endpoints expose queue slices, vector readiness, and replay scaffolding, giving operators insight into the live system but without the incremental and contract guardrails the proposal targets.【F:samples/S13.DocMind/Infrastructure/DocumentDiscoveryRefreshService.cs†L12-L173】【F:samples/S13.DocMind/Infrastructure/DocMindVectorHealth.cs†L8-L109】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L15-L210】
+- **Durable pipeline realised.** `DocumentProcessingWorker` advances the ledger through extraction, embeddings, vision, and synthesis services, persisting stage telemetry and refresh scheduling hooks that match the resilient orchestration in the proposal.【F:samples/S13.DocMind/Infrastructure/DocumentProcessingWorker.cs†L36-L200】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L14-L165】
+- **Entity-first ingestion complete.** Uploads deduplicate binaries, persist `SourceDocument` summaries, emit timeline events, and queue processing work without custom repositories, aligning with the entity-first mandate.【F:samples/S13.DocMind/Services/DocumentIntakeService.cs†L38-L155】【F:samples/S13.DocMind/Models/SourceDocument.cs†L12-L120】【F:samples/S13.DocMind/Models/DocumentProcessingEvent.cs†L13-L70】
+- **Discovery dashboards partially live.** Cached `DocumentDiscoveryProjection` snapshots feed the dashboard and diagnostics endpoints, though the projection still issues full collection scans when changes occur.【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L52-L181】【F:samples/S13.DocMind/Services/DocumentInsightsService.cs†L30-L115】
+- **Model catalog surfaced.** Controllers expose catalog, installation, and provider metadata, but configuration edits remain client-side only, leaving `DocMindOptions` untouched.【F:samples/S13.DocMind/Controllers/ModelsController.cs†L27-L126】【F:samples/S13.DocMind/wwwroot/app/services/configurationService.js†L56-L105】【F:samples/S13.DocMind/Infrastructure/DocMindOptions.cs†L6-L84】
 
-## Delta Analysis
+## Delta Analysis & Trim Assessment
 
-### 1. Domain, storage, and client alignment
-- Entities, value objects, and projections still live inside the sample web project with no dedicated domain assembly, migration scripts, or seed routines, leaving schema evolution disconnected from the blueprint’s phase-one expectations.【F:docs/chunks/S13-DocMind/06_implementation.md†L22-L44】【F:samples/S13.DocMind/Models/SourceDocument.cs†L1-L189】【F:samples/S13.DocMind/Models/DocumentProcessingJob.cs†L15-L206】
-- DTOs and API contracts have not been regenerated for Angular or MCP consumers, so cross-channel alignment (UI, CLI, MCP) remains incomplete compared to the proposal’s contract synchronisation goals.【F:docs/chunks/S13-DocMind/06_implementation.md†L34-L44】【F:samples/S13.DocMind/Controllers/DocumentsController.cs†L1-L138】
-
-### 2. AI prompting and semantic tooling
-- Template generation and insight synthesis currently rely on ad-hoc prompts and JSON parsing instead of the delimiter-driven, schema-safe patterns captured from the GDoc reference (e.g., strict delimiter JSON for document type creation, consolidated analysis scaffolds), increasing the risk of brittle outputs.【F:docs/chunks/S13-DocMind/AI_Prompting_Patterns_from_GDoc.md†L10-L118】【F:samples/S13.DocMind/Services/TemplateSuggestionService.cs†L18-L208】【F:samples/S13.DocMind/Services/InsightSynthesisService.cs†L18-L220】
-- Prompt variables and extraction schemas on `SemanticTypeProfile` are not yet wired into a reusable prompt-builder abstraction, so downstream services duplicate string manipulation instead of following the lean prompt architecture described in the proposal package.【F:docs/chunks/S13-DocMind/AI_Prompting_Patterns_from_GDoc.md†L120-L209】【F:samples/S13.DocMind/Models/SemanticTypeProfile.cs†L1-L82】【F:samples/S13.DocMind/Services/TemplateGeneratorService.cs†L1-L78】
-
-### 3. Discovery projections and diagnostics
-- `DocumentDiscoveryProjectionBuilder` still performs full collection scans and emits coarse aggregates, missing the incremental `InsightCollection` projections, freshness windows, and lateness comparisons outlined in the data model blueprint.【F:docs/chunks/S13-DocMind/02_entity_models.md†L3-L122】【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L18-L212】
-- Diagnostics endpoints query live collections each time and lack cached queue/timeline comparisons, so operator experiences do not yet meet the proposal’s dashboard guardrails for latency and backlog tracking.【F:docs/chunks/S13-DocMind/01_executive_overview.md†L72-L95】【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L54-L236】
-
-### 4. Observability and operational automation
-- Telemetry exporters, OpenTelemetry spans, and compose-ready instrumentation from the infrastructure plan remain unimplemented; `Program.cs` and the registrar only register Koan defaults and health checks, leaving traces/metrics absent from the promised dashboards.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L60-L109】【F:samples/S13.DocMind/Program.cs†L1-L9】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L19-L115】
-- Operational scripts (reset tooling, compose overrides, env-var matrices) have not been produced, so bootstrapping and failover steps described in the proposal are still manual exercises.【F:docs/chunks/S13-DocMind/05_infrastructure.md†L5-L32】【F:samples/S13.DocMind/docker-compose.yml†L1-L120】
-
-### 5. Testing, contracts, and CI guardrails
-- HTTP-level integration tests, OpenAPI/MCP diffing, and CI automation have not been wired; existing tests stop at harness-level checks and leave the full upload→completion path unverified over HTTP or MCP contracts.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L1-L82】【F:tests/S13.DocMind.IntegrationTests/DocMindProcessingHarnessTests.cs†L1-L88】
-- CLI smoke scripts and replay automation are scaffolded but not executed in CI, so the operational guarantees in the testing plan remain aspirational.【F:docs/chunks/S13-DocMind/07_testing_ops.md†L61-L110】【F:samples/S13.DocMind.Tools/Program.cs†L1-L142】
+| Theme | Gap | Trim evaluation |
+|-------|-----|-----------------|
+| Manual analysis management | The proposal’s manual multi-document workflow is absent; Angular analysis screens still surface per-document `DocumentInsight` rows and legacy vocabulary.【F:samples/S13.DocMind/wwwroot/app/controllers/analysisController.js†L1-L158】【F:samples/S13.DocMind/wwwroot/app/views/analysis/list.html†L13-L124】 | Cannot trim. Manual session creation/editing is a flagship objective and prerequisite for workshops. |
+| Front-end contract alignment | Dashboard, documents, and template flows rely on outdated field names (`file.state`, `documentTypeName`) and never consume the new summaries/timelines.【F:samples/S13.DocMind/wwwroot/app/services/documentService.js†L24-L130】【F:samples/S13.DocMind/wwwroot/app/views/dashboard/index.html†L88-L125】 | Cannot trim. Mislabelled data undermines the new domain narrative and confuses users. |
+| Prompting consistency | `InsightSynthesisService` operates per document with fallback snippets; the delimiter-based multi-document patterns are unused.【F:samples/S13.DocMind/Services/InsightSynthesisService.cs†L29-L170】【F:docs/chunks/S13-DocMind/Implementation_Examples_GDoc_Integration.md†L520-L599】 | Cannot trim. Manual sessions depend on reliable multi-document synthesis payloads. |
+| Configuration lifecycle | UI sliders/toggles never persist to `DocMindOptions`, creating a false sense of control.【F:samples/S13.DocMind/wwwroot/app/controllers/configurationController.js†L12-L152】【F:samples/S13.DocMind/wwwroot/app/services/configurationService.js†L56-L105】 | Cannot trim. Workshops require real configuration feedback loops. |
+| Discovery refresh strategy | Projection builder still scans entire collections; freshness metadata lacks drift signalling.【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L52-L181】 | Should keep. Scaling demos and dashboards depend on reliable freshness windows. |
+| Domain packaging | Entities live inside the sample project but already follow the new shapes and MCP metadata.【F:samples/S13.DocMind/Models/SourceDocument.cs†L12-L120】【F:samples/S13.DocMind/S13.DocMind.csproj†L1-L120】 | Can defer. A dedicated domain assembly adds polish but is not blocking the core objectives. |
+| Observability & CI | Registrar lacks OpenTelemetry exporters; integration coverage stops at harness tests.【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L23-L118】【F:tests/S13.DocMind.IntegrationTests/DocMindProcessingHarnessTests.cs†L15-L71】 | Should keep. Ops stories remain fragile without telemetry and automated smoke suites. |
 
 ## Refactoring Plan
 
-1. **Domain packaging & migrations**
-   - Create `S13.DocMind.Domain` (entities, value objects, configuration) and move models out of the sample project.
-   - Introduce migration/seed routines for `SourceDocument`, `DocumentProcessingJob`, and related projections plus scripts to project legacy data into the new schema.
-   - Regenerate API/TypeScript/MCP clients once contracts stabilise and document breaking changes for workshops.
+1. **Manual Analysis Sessions & Multi-Document Synthesis**
+   - Model a `DocumentAnalysisSession` entity capturing selected document IDs, synthesis prompt revisions, and stored outputs.
+   - Extend `InsightSynthesisService` (or a new coordinator) to accept multi-document requests and parse the delimiter-driven payloads from the proposal, emitting structured findings for sessions.【F:docs/chunks/S13-DocMind/Implementation_Examples_GDoc_Integration.md†L520-L599】
+   - Add session-focused controller endpoints (list/view/create/update/publish) and regenerate OpenAPI/MCP manifests accordingly.
+   - Rebuild Angular’s analysis area around session management (wizard for selecting documents/profiles, run/poll status, revision history) and remove the legacy per-insight grid.【F:samples/S13.DocMind/wwwroot/app/controllers/analysisController.js†L1-L158】
 
-2. **Prompting framework & semantic tooling alignment**
-   - Implement a dedicated prompt builder that encapsulates the GDoc delimiter patterns (document type generation, consolidated analysis, lean prompts) and expose it through `TemplateGeneratorService`, `InsightSynthesisService`, and future multi-document flows.
-   - Store canonical system/user prompts and extraction schemas in `SemanticTypeProfile`, wire variable substitution, and persist prompt revisions for auditing.
-   - Update AI responses to emit the delimited payloads, add strict extractors, and expand testing with captured transcripts.
+2. **Client Contract Realignment**
+   - Regenerate TypeScript clients from the current OpenAPI spec; replace bespoke REST calls (`/analysis`, `/document-types`) with strongly typed SDKs.
+   - Rename services, controllers, and views to the new vocabulary (e.g., `DocumentsController` → `SourceDocumentsController` in JS context, templates → profiles) and consume the `SourceDocument.Summary` fields for dashboard cards and detail panes.【F:samples/S13.DocMind/wwwroot/app/services/documentService.js†L24-L130】【F:samples/S13.DocMind/wwwroot/app/views/dashboard/index.html†L13-L125】
+   - Wire document detail and dashboard views to the `/timeline`, `/chunks`, and `/insights` endpoints so progress and highlights reflect real ledger telemetry.【F:samples/S13.DocMind/Controllers/DocumentsController.cs†L52-L170】
 
-3. **Discovery projections & diagnostics**
-   - Replace full scans with incremental `InsightCollection` projections, freshness metadata, and cached queue/timeline snapshots.
-   - Extend diagnostics APIs to surface projection freshness, backlog drift, and retry pacing with thresholds matching the executive dashboard requirements.
+3. **Configuration & Boot Telemetry**
+   - Introduce APIs that read/write `DocMindOptions` (storage, processing, AI) with validation mirroring the registrar, and persist edits (e.g., to Mongo or configuration store).
+   - Update the Angular configuration module to load actual option snapshots, persist changes, and display registrar health/notes to close the feedback loop.【F:samples/S13.DocMind/Infrastructure/DocMindOptions.cs†L6-L84】【F:samples/S13.DocMind/Infrastructure/DocMindRegistrar.cs†L60-L122】
+   - Surface model installation queue status within the same view using the existing `/models/installations` endpoints.【F:samples/S13.DocMind/Controllers/ModelsController.cs†L67-L126】
 
-4. **Observability & operations**
-   - Wire OpenTelemetry tracing/metrics around worker stages, AI calls, and vector interactions; document compose overrides for the otel collector and sampling knobs.
-   - Ship operational scripts (reset, smoke, profile toggles) and enrich the boot report with telemetry/exporter configuration per the infrastructure chapter.
+4. **Prompting & Template Alignment**
+   - Build a shared prompt builder that stores delimiter templates and extraction schemas on `SemanticTypeProfile`, replacing ad-hoc string concatenation in synthesis/template services.【F:samples/S13.DocMind/Services/TemplateSuggestionService.cs†L18-L208】【F:samples/S13.DocMind/Models/SemanticTypeProfile.cs†L1-L82】
+   - Ensure manual analysis sessions and template galleries capture prompt revisions and parsed outputs to power previews/tests.
 
-5. **Testing & CI guardrails**
-   - Add `WebApplicationFactory`-based integration tests covering upload→completion, template suggestions, and diagnostics endpoints; include vector fallback cases.
-   - Automate OpenAPI/MCP diffing, CLI smoke runs, and replay workflows in CI so pipeline regressions surface immediately.
+5. **Discovery & Diagnostics Hardening**
+   - Refactor `DocumentDiscoveryProjectionBuilder` to compute deltas using change tokens or incremental aggregation, recording freshness timestamps and queue drift for the dashboard.【F:samples/S13.DocMind/Services/DocumentDiscoveryProjectionBuilder.cs†L52-L181】
+   - Enhance diagnostics APIs with projection freshness, vector status, and retry pacing thresholds so the dashboard highlights staleness before it impacts users.【F:samples/S13.DocMind/Services/ProcessingDiagnosticsService.cs†L71-L165】
+
+6. **Observability & CI Guardrails**
+   - Wire OpenTelemetry tracing/metrics around worker stages, AI calls, and vector operations; document compose overrides and sampling defaults in README.
+   - Automate HTTP-level tests for upload→manual session flows and CLI/MCP smoke scripts in CI to catch regression early.【F:tests/S13.DocMind.IntegrationTests/DocMindProcessingHarnessTests.cs†L15-L71】
 
 ## Delivery Order
-1. Domain packaging & migrations.
-2. Prompting framework & semantic tooling alignment.
-3. Discovery projections & diagnostics.
-4. Observability & operations.
-5. Testing & CI guardrails.
+1. Manual analysis sessions & multi-document synthesis.
+2. Client contract realignment.
+3. Configuration persistence & prompt builder alignment.
+4. Discovery & diagnostics hardening.
+5. Observability and CI guardrails.
+
+Deferring the separate domain assembly keeps focus on the manual analysis experience, UI contract parity, and operational readiness that unlock the proposal’s primary outcomes.
