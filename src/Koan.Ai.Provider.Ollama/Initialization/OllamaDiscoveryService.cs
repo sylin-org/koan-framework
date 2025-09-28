@@ -119,10 +119,30 @@ internal sealed class OllamaDiscoveryService : IHostedService
     {
         try
         {
-            return _cfg.GetSection("Koan:Ai:Ollama:RequiredModels").Get<string[]>()?.FirstOrDefault();
+            // Bootstrap-time canonical model selection (like data adapters do)
+            // 1. Try canonical path first: Koan:Ai:Ollama:DefaultModel
+            var canonicalModel = _cfg["Koan:Ai:Ollama:DefaultModel"];
+            if (!string.IsNullOrWhiteSpace(canonicalModel))
+            {
+                _logger.LogDebug("Bootstrap model selection: canonical path 'Koan:Ai:Ollama:DefaultModel' = {Model}", canonicalModel);
+                return canonicalModel;
+            }
+
+            // 2. Fallback to RequiredModels[0] for backward compatibility
+            var requiredModels = _cfg.GetSection("Koan:Ai:Ollama:RequiredModels").Get<string[]>();
+            var fallbackModel = requiredModels?.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(fallbackModel))
+            {
+                _logger.LogDebug("Bootstrap model selection: fallback to RequiredModels[0] = {Model}", fallbackModel);
+                return fallbackModel;
+            }
+
+            _logger.LogDebug("Bootstrap model selection: no default model configured, will use adapter defaults");
+            return null;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogDebug(ex, "Error reading default model configuration");
             return null;
         }
     }
@@ -306,8 +326,23 @@ internal sealed class OllamaDiscoveryService : IHostedService
             var id = $"ollama@{baseAddress.Host}:{baseAddress.Port}";
             var adapterLogger = _sp.GetService<Microsoft.Extensions.Logging.ILogger<OllamaAdapter>>();
 
-            // Create minimal configuration for the adapter
+            // Preserve bootstrap-time model choice (canonical pattern like data adapters)
             var configBuilder = new Microsoft.Extensions.Configuration.ConfigurationBuilder();
+
+            // If we have a bootstrap-decided default model, embed it in adapter configuration
+            // Use the canonical path that OllamaOptionsConfigurator expects
+            if (!string.IsNullOrWhiteSpace(defaultModel))
+            {
+                var configData = new Dictionary<string, string>
+                {
+                    ["Koan:Ai:Ollama:DefaultModel"] = defaultModel
+                };
+                configBuilder.AddInMemoryCollection(configData);
+                _logger.LogDebug("Preserving bootstrap model choice in adapter config: DefaultModel = {Model}", defaultModel);
+            }
+
+            // Chain with main configuration to inherit other settings
+            configBuilder.AddConfiguration(_cfg);
             var adapterConfig = configBuilder.Build();
 
             var readinessDefaults = _sp.GetService<IOptions<AdaptersReadinessOptions>>()?.Value;

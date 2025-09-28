@@ -82,6 +82,17 @@ public static class PipelineFluentExtensions
     }
 
     /// <summary>
+    /// Executes an asynchronous operation on the envelope.
+    /// </summary>
+    public static TBuilder Do<TEntity, TBuilder>(this IPipelineStageBuilder<TEntity, TBuilder> builder, Func<PipelineEnvelope<TEntity>, CancellationToken, Task> doAsync)
+        where TBuilder : IPipelineStageBuilder<TEntity, TBuilder>
+    {
+        if (builder is null) throw new ArgumentNullException(nameof(builder));
+        if (doAsync is null) throw new ArgumentNullException(nameof(doAsync));
+        return builder.AddStage(doAsync);
+    }
+
+    /// <summary>
     /// Registers a branch stage on the pipeline.
     /// </summary>
     public static PipelineBuilder<TEntity> Branch<TEntity>(this IAsyncEnumerable<TEntity> source, Action<PipelineBranchBuilder<TEntity>> configure)

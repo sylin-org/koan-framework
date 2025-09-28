@@ -9,8 +9,8 @@ using Koan.AI.Contracts;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
-using Koan.Core.Observability;
 using Koan.Core.Pipelines;
+using Koan.Core.Observability;
 using Koan.Core;
 using System.Linq;
 using System.Net.Http;
@@ -61,7 +61,39 @@ internal sealed class SeedService : ISeedService
         {
             try
             {
-                var typeJobId = await StartAsync(source, mediaType.Name, limit, overwrite, ct);
+                var typeJobId = await StartAsync(source, mediaType.Name, limit, overwrite, null, ct);
+                _logger?.LogInformation("Completed import for MediaType '{MediaType}' as part of job {JobId}",
+                    mediaType.Name, jobId);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to import MediaType '{MediaType}' in job {JobId}: {Error}",
+                    mediaType.Name, jobId, ex.Message);
+            }
+        }
+
+        return jobId;
+    }
+
+    public async Task<string> StartAsync(string source, int? limit, bool overwrite, string? embeddingModel, CancellationToken ct)
+    {
+        // Import all supported media types for comprehensive coverage
+        var mediaTypes = await MediaType.All(ct);
+        if (!mediaTypes.Any())
+        {
+            throw new InvalidOperationException("No MediaTypes found. Please seed reference data first.");
+        }
+
+        var jobId = Guid.CreateVersion7().ToString("n");
+        _logger?.LogInformation("Starting multi-type import job {JobId} for source={Source} with {TypeCount} media types and model={Model}",
+            jobId, source, mediaTypes.Count, embeddingModel ?? "default");
+
+        // Import each media type separately but track under one job
+        foreach (var mediaType in mediaTypes)
+        {
+            try
+            {
+                var typeJobId = await StartAsync(source, mediaType.Name, limit, overwrite, embeddingModel, ct);
                 _logger?.LogInformation("Completed import for MediaType '{MediaType}' as part of job {JobId}",
                     mediaType.Name, jobId);
             }
@@ -76,6 +108,9 @@ internal sealed class SeedService : ISeedService
     }
 
     public Task<string> StartAsync(string source, string mediaTypeName, int? limit, bool overwrite, CancellationToken ct)
+        => StartAsync(source, mediaTypeName, limit, overwrite, null, ct);
+
+    public Task<string> StartAsync(string source, string mediaTypeName, int? limit, bool overwrite, string? embeddingModel, CancellationToken ct)
     {
         // Prevent concurrent imports to avoid service saturation
         lock (_importLock)
@@ -154,7 +189,7 @@ internal sealed class SeedService : ISeedService
                         var batchImported = await ImportDataAsync(batch, internalToken);
                         totalImported += batchImported;
 
-                        var batchEmbedded = await EmbedAndIndexAsync(batch, internalToken);
+                        var batchEmbedded = await EmbedAndIndexAsync(batch, embeddingModel, internalToken);
                         totalEmbedded += batchEmbedded;
 
                         // Keep data for catalog building
@@ -226,6 +261,9 @@ internal sealed class SeedService : ISeedService
     }
 
     public Task<string> StartVectorUpsertAsync(IEnumerable<Media> items, CancellationToken ct)
+        => StartVectorUpsertAsync(items, null, ct);
+
+    public Task<string> StartVectorUpsertAsync(IEnumerable<Media> items, string? embeddingModel, CancellationToken ct)
     {
         var mediaItems = items.ToList();
 
@@ -239,7 +277,7 @@ internal sealed class SeedService : ISeedService
         {
             try
             {
-                var embedded = await UpsertVectorsAsync(mediaItems, ct);
+                var embedded = await UpsertVectorsAsync(mediaItems, embeddingModel, ct);
                 _progress[jobId] = (count, count, embedded, 0, true, null);
                 _logger?.LogInformation("Vector-only job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
                 await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest-vectors.json"),
@@ -600,7 +638,7 @@ internal sealed class SeedService : ISeedService
         _logger?.LogInformation("Genre catalog updated with {Count} genres", counts.Count);
     }
 
-    private async Task<int> EmbedAndIndexAsync(List<Media> items, CancellationToken ct)
+    private async Task<int> EmbedAndIndexAsync(List<Media> items, string? embeddingModel, CancellationToken ct)
     {
         try
         {
@@ -613,9 +651,7 @@ internal sealed class SeedService : ISeedService
                 return 0;
             }
 
-            var config = (IConfiguration?)_sp.GetService(typeof(IConfiguration));
-            var model = GetConfiguredModel(config);
-            var total = await RunVectorPipelineAsync(items, model, ct);
+            var total = await RunVectorPipelineAsync(items, embeddingModel, ct);
             _logger?.LogInformation("Vector pipeline stored {Stored} embeddings for recommendation content", total);
             return total;
         }
@@ -625,7 +661,7 @@ internal sealed class SeedService : ISeedService
         }
     }
 
-    private async Task<int> UpsertVectorsAsync(List<Media> docs, CancellationToken ct)
+    private async Task<int> UpsertVectorsAsync(List<Media> docs, string? embeddingModel, CancellationToken ct)
     {
         try
         {
@@ -638,9 +674,7 @@ internal sealed class SeedService : ISeedService
                 return 0;
             }
 
-            var config = (IConfiguration?)_sp.GetService(typeof(IConfiguration));
-            var model = GetConfiguredModel(config);
-            var total = await RunVectorPipelineAsync(docs, model, ct);
+            var total = await RunVectorPipelineAsync(docs, embeddingModel, ct);
             _logger?.LogInformation("Vector pipeline stored {Stored} embeddings for admin rebuild", total);
             return total;
         }
@@ -654,26 +688,63 @@ internal sealed class SeedService : ISeedService
     {
         var stored = 0;
         var failures = 0;
+        var itemsList = items.ToList();
 
-        await items
+        _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, model ?? "(default)");
+
+        await itemsList
             .ToAsyncEnumerable()
-            .Tokenize(m => BuildEmbeddingText(m), new AiTokenizeOptions { Model = model })
+            .Tokenize(m => BuildEmbeddingText(m), model != null ? new AiTokenizeOptions { Model = model } : new AiTokenizeOptions())
             .Branch(branch => branch
                 .OnSuccess(success => success
+                    .Tap(env => _logger?.LogDebug("Vector pipeline: tokenization success for media {Id}", env.Entity.Id))
                     .Mutate(envelope =>
                     {
-                        // Add metadata for vector storage before save
+                        // Add metadata for vector storage before save (canonical pattern from PipelineDataExtensions)
                         envelope.Features["vector:metadata"] = new { title = envelope.Entity.Title, genres = envelope.Entity.Genres, popularity = envelope.Entity.Popularity };
                     })
-                    .Save()
-                    .Tap(env =>
+                    .Do(async (envelope, ct) =>
                     {
-                        if (env.Metadata.TryGetValue("vector:affected", out var value) && value is int affectedCount)
+                        // Use canonical framework pattern from PipelineDataExtensions.cs
+                        if (envelope.Features.TryGetValue(PipelineFeatureKeys.Embedding, out var embeddingObj)
+                            && embeddingObj is float[] embedding)
                         {
-                            Interlocked.Add(ref stored, affectedCount);
+                            // Extract vector metadata if present
+                            var vectorMetadata = envelope.Features.TryGetValue("vector:metadata", out var metadataObj)
+                                               ? metadataObj as IReadOnlyDictionary<string, object>
+                                               : null;
+
+                            try
+                            {
+                                _logger?.LogDebug("Vector pipeline: attempting SaveWithVector for media {Id} with embedding length {Length}", envelope.Entity.Id, embedding.Length);
+
+                                // Use the canonical SaveWithVector method that handles both entity and vector
+                                await Data<Media, string>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
+
+                                // Populate metadata to indicate vector was saved (canonical pattern)
+                                envelope.Metadata["vector:affected"] = 1;
+                                _logger?.LogDebug("Vector pipeline: saved 1 vector for media {Id}", envelope.Entity.Id);
+                                Interlocked.Add(ref stored, 1);
+                            }
+                            catch (InvalidOperationException ex)
+                            {
+                                _logger?.LogWarning("Vector pipeline: vector storage not available for media {Id}: {Error}", envelope.Entity.Id, ex.Message);
+                                envelope.Metadata["vector:affected"] = 0;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger?.LogError(ex, "Vector pipeline: unexpected error saving vector for media {Id}: {Error}", envelope.Entity.Id, ex.Message);
+                                envelope.Metadata["vector:affected"] = 0;
+                            }
+                        }
+                        else
+                        {
+                            _logger?.LogWarning("Vector pipeline: no embeddings found for media {Id}", envelope.Entity.Id);
+                            envelope.Metadata["vector:affected"] = 0;
                         }
                     }))
                 .OnFailure(failure => failure
+                    .Tap(env => _logger?.LogWarning("Vector pipeline: tokenization failed for media {Id}: {Error}", env.Entity.Id, env.Error?.Message ?? "unknown"))
                     .Tap(_ => Interlocked.Increment(ref failures))
                     .Trace(env => $"Vector pipeline failed for media {env.Entity.Id}: {env.Error?.Message ?? "unknown"}")))
             .ExecuteAsync(ct);
@@ -686,25 +757,8 @@ internal sealed class SeedService : ISeedService
         return stored;
     }
 
-    private static string GetConfiguredModel(IConfiguration? configuration)
-    {
-        try
-        {
-            // Use Koan.Core Configuration helpers to read from multiple possible locations
-            var result = Configuration.ReadFirst(configuration, "all-minilm",
-                "Koan:Services:ollama:DefaultModel",
-                "Koan:Ai:Ollama:DefaultModel",
-                "Koan:Ai:Ollama:RequiredModels:0"  // First element of RequiredModels array
-            );
-            return result;
-        }
-        catch
-        {
-            return "all-minilm";
-        }
-    }
 
-    private static string BuildEmbeddingText(Media m)
+    private string BuildEmbeddingText(Media m)
     {
         var titles = new List<string>();
         if (!string.IsNullOrWhiteSpace(m.Title)) titles.Add(m.Title);
@@ -718,6 +772,8 @@ internal sealed class SeedService : ISeedService
         if (m.Tags is { Length: > 0 }) tags.AddRange(m.Tags);
 
         var text = $"{string.Join(" / ", titles.Distinct())}\n\n{m.Synopsis}\n\nTags: {string.Join(", ", tags.Distinct())}";
-        return text.Trim();
+        var trimmedText = text.Trim();
+        _logger?.LogDebug("BuildEmbeddingText for media {Id}: {Length} chars, text preview: {Preview}", m.Id, trimmedText.Length, trimmedText.Length > 100 ? trimmedText.Substring(0, 100) + "..." : trimmedText);
+        return trimmedText;
     }
 }

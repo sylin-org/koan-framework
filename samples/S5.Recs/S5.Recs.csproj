@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\Koan.Data.Weaviate\Koan.Data.Weaviate.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Web\Koan.AI.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Ai.Provider.Ollama\Koan.Ai.Provider.Ollama.csproj" />
     <ProjectReference Include="..\..\src\Koan.Scheduling\Koan.Scheduling.csproj" />
     <!-- Auth core and dev TestProvider for Development login/testing -->
