@@ -1,6 +1,6 @@
 ﻿# Architecture Comparison
 
-## Full Capability Matrix (Grouped)
+## Full Capability Matrix
 
 <p><strong>Legend:</strong> 🟦 Excellent · 🟩 Good · 🟨 Mixed/conditional · 🟧 Weak/partial · 🟥 Poor/missing</p>
 
