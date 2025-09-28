@@ -16,6 +16,9 @@ public sealed class DocMindOptions
     [Required]
     public AiOptions Ai { get; set; } = new();
 
+    [Required]
+    public ManualAnalysisOptions Manual { get; set; } = new();
+
     public sealed class StorageOptions
     {
         [Required]
@@ -82,5 +85,19 @@ public sealed class DocMindOptions
         public string EmbeddingModel { get; set; } = "nomic-embed-text";
 
         public string? VisionModel { get; set; } = "llava";
+    }
+
+    public sealed class ManualAnalysisOptions
+    {
+        [Range(2, 50)]
+        public int MaxDocuments { get; set; } = 10;
+
+        [Range(1, 20000)]
+        public int MaxPromptTokens { get; set; } = 8000;
+
+        public bool EnableSessions { get; set; } = true;
+
+        [Range(0.0, 1.0)]
+        public double DefaultConfidence { get; set; } = 0.85;
     }
 }

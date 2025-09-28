@@ -14,6 +14,11 @@ public sealed class DocMindOptionsValidator : IValidateOptions<DocMindOptions>
 
         var failures = new List<string>();
 
+        if (options.Manual is null)
+        {
+            failures.Add("DocMind:Manual section must be configured.");
+        }
+
         if (options.Storage.AllowedContentTypes is null || options.Storage.AllowedContentTypes.Length == 0)
         {
             failures.Add("DocMind:Storage:AllowedContentTypes must include at least one entry.");
@@ -37,6 +42,16 @@ public sealed class DocMindOptionsValidator : IValidateOptions<DocMindOptions>
         if (options.Processing.ChunkSizeTokens % 50 != 0)
         {
             failures.Add("DocMind:Processing:ChunkSizeTokens should be a multiple of 50 to align with tokenizer heuristics.");
+        }
+
+        if (options.Manual.MaxDocuments < 2)
+        {
+            failures.Add("DocMind:Manual:MaxDocuments must allow at least two documents for cross-document synthesis.");
+        }
+
+        if (options.Manual.MaxPromptTokens <= options.Processing.ChunkSizeTokens)
+        {
+            failures.Add("DocMind:Manual:MaxPromptTokens should exceed Processing:ChunkSizeTokens to support multi-chunk prompts.");
         }
 
         return failures.Count == 0

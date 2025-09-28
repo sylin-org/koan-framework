@@ -189,21 +189,23 @@
                         <div ng-if="recentAnalyses.length > 0">
                             <div ng-repeat="analysis in recentAnalyses" class="d-flex align-items-center py-2 border-bottom"
                                  ng-class="{'border-0': $last}">
-                                <div class="me-3">
-                                    <div class="badge {{getConfidenceClass(analysis)}} rounded-pill">
-                                        {{formatConfidenceScore(analysis.confidenceScore)}}
+                                <div class="me-3 text-center">
+                                    <div class="badge {{getConfidenceClass(analysis.confidence)}} rounded-pill">
+                                        {{formatConfidenceScore(analysis.confidence)}}
                                     </div>
+                                    <div class="badge mt-2 {{getStatusClass(analysis.status)}}">{{getStatusLabel(analysis.status)}}</div>
                                 </div>
                                 <div class="flex-grow-1 min-w-0">
-                                    <h6 class="mb-1 text-truncate">{{analysis.fileName || 'Unknown File'}}</h6>
+                                    <h6 class="mb-1 text-truncate">{{analysis.title}}</h6>
                                     <small class="text-muted d-block text-truncate">
-                                        {{analysis.summary || 'Analysis completed'}}
+                                        {{primaryFinding(analysis) || 'Manual session ready'}}
                                     </small>
                                 </div>
-                                <div class="ms-2">
-                                    <small class="text-muted">{{formatDate(analysis.createdAt)}}</small>
+                                <div class="text-end me-3">
+                                    <div class="text-muted small">{{analysis.documentCount || 0}} document(s)</div>
+                                    <div class="text-muted small">{{formatDate(analysis.lastRunAt || analysis.createdAt)}}</div>
                                 </div>
-                                <div class="ms-2">
+                                <div>
                                     <button class="btn btn-sm btn-outline-secondary" ng-click="viewAnalysis(analysis.id)">
                                         <i class="bi bi-eye"></i>
                                     </button>
