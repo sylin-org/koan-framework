@@ -25,17 +25,12 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
 
     public void Initialize(IServiceCollection services)
     {
-        Console.WriteLine("[MONGO-AUTO-REGISTRAR] MongoOptimizationAutoRegistrar.Initialize() called!");
-
         lock (_lock)
         {
             if (_globalConfigurationApplied)
             {
-                Console.WriteLine("[MONGO-AUTO-REGISTRAR] Already initialized, skipping...");
                 return;
             }
-
-            Console.WriteLine("[MONGO-AUTO-REGISTRAR] Initializing MongoDB GUID optimization...");
 
             try
             {
@@ -49,12 +44,10 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
                 // Step 3: Register global serializers for discovered types
                 RegisterGlobalSerializers(optimizedEntityTypes);
 
-                Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Successfully configured GUID optimization for {optimizedEntityTypes.Count} entity types");
                 _globalConfigurationApplied = true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Failed to initialize MongoDB optimization: {ex.Message}");
                 throw;
             }
         }
@@ -65,8 +58,6 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
     /// </summary>
     private static void ConfigureGlobalMongoDriverSettings()
     {
-        Console.WriteLine("[MONGO-AUTO-REGISTRAR] Applying global MongoDB driver configuration...");
-
         // Configure global conventions for MongoDB driver v3.5.0
         var conventionPack = new ConventionPack
         {
@@ -84,7 +75,6 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
         BsonSerializer.RegisterSerializer(typeof(Guid), new GuidSerializer(GuidRepresentation.Standard));
         BsonSerializer.RegisterSerializer(typeof(Guid?), new NullableSerializer<Guid>(new GuidSerializer(GuidRepresentation.Standard)));
 
-        Console.WriteLine("[MONGO-AUTO-REGISTRAR] Global MongoDB driver configuration applied");
     }
 
     /// <summary>
@@ -92,15 +82,12 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
     /// </summary>
     private static List<EntityOptimizationInfo> ScanForOptimizedEntityTypes()
     {
-        Console.WriteLine("[MONGO-AUTO-REGISTRAR] Scanning assemblies for Entity<> types...");
 
         var optimizedTypes = new List<EntityOptimizationInfo>();
         // Use cached assemblies instead of bespoke AppDomain scanning
         var assemblies = AssemblyCache.Instance.GetAllAssemblies()
             .Where(a => !a.IsDynamic && !IsSystemAssembly(a))
             .ToList();
-
-        Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Scanning {assemblies.Count} assemblies...");
 
         foreach (var assembly in assemblies)
         {
@@ -116,7 +103,6 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
                     if (optimizationInfo != null)
                     {
                         optimizedTypes.Add(optimizationInfo);
-                        Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Found optimizable entity: {type.Name} -> {optimizationInfo.OptimizationType}");
                     }
                 }
             }
@@ -212,11 +198,8 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
     {
         if (!optimizedTypes.Any())
         {
-            Console.WriteLine("[MONGO-AUTO-REGISTRAR] No optimized entity types found");
             return;
         }
-
-        Console.WriteLine("[MONGO-AUTO-REGISTRAR] Registering global GUID-aware string serializer...");
 
         try
         {
@@ -226,16 +209,10 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
 
             // Override the default string serializer globally - this affects ALL string properties
             BsonSerializer.RegisterSerializer(typeof(string), smartGuidSerializer);
-
-            Console.WriteLine("[MONGO-AUTO-REGISTRAR] Global SmartStringGuidSerializer registered for all string properties");
-            Console.WriteLine($"[MONGO-AUTO-REGISTRAR] This will optimize {optimizedTypes.Count} entity types: {string.Join(", ", optimizedTypes.Select(t => t.EntityType.Name))}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Failed to register global string serializer: {ex.Message}");
-
             // Fallback to per-class approach
-            Console.WriteLine("[MONGO-AUTO-REGISTRAR] Falling back to per-class serializer registration...");
             RegisterPerClassSerializers(optimizedTypes);
         }
     }
@@ -264,7 +241,6 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
                         if (memberMap != null)
                         {
                             memberMap.SetSerializer(smartGuidSerializer);
-                            Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Applied SmartStringGuidSerializer to {entityInfo.EntityType.Name}.{entityInfo.IdPropertyName}");
                         }
                     }
 

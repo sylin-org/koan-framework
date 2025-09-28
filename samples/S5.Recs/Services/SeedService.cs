@@ -647,12 +647,12 @@ internal sealed class SeedService : ISeedService
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)
             {
-                _logger?.LogWarning("Vector repository unavailable. Configure a vector engine (e.g., Weaviate) and set Koan:Data:Weaviate:Endpoint. In Docker compose, ensure service 'weaviate' is running and reachable.");
+                //_logger?.LogWarning("Vector repository unavailable. Configure a vector engine (e.g., Weaviate) and set Koan:Data:Weaviate:Endpoint. In Docker compose, ensure service 'weaviate' is running and reachable.");
                 return 0;
             }
 
             var total = await RunVectorPipelineAsync(items, embeddingModel, ct);
-            _logger?.LogInformation("Vector pipeline stored {Stored} embeddings for recommendation content", total);
+            //_logger?.LogInformation("Vector pipeline stored {Stored} embeddings for recommendation content", total);
             return total;
         }
         catch
@@ -670,12 +670,12 @@ internal sealed class SeedService : ISeedService
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)
             {
-                _logger?.LogWarning("Vector repository unavailable. Configure a vector engine (e.g., Weaviate) and set Koan:Data:Weaviate:Endpoint. In Docker compose, ensure service 'weaviate' is running and reachable.");
+                //_logger?.LogWarning("Vector repository unavailable. Configure a vector engine (e.g., Weaviate) and set Koan:Data:Weaviate:Endpoint. In Docker compose, ensure service 'weaviate' is running and reachable.");
                 return 0;
             }
 
             var total = await RunVectorPipelineAsync(docs, embeddingModel, ct);
-            _logger?.LogInformation("Vector pipeline stored {Stored} embeddings for admin rebuild", total);
+            //_logger?.LogInformation("Vector pipeline stored {Stored} embeddings for admin rebuild", total);
             return total;
         }
         catch
@@ -697,7 +697,7 @@ internal sealed class SeedService : ISeedService
             .Tokenize(m => BuildEmbeddingText(m), model != null ? new AiTokenizeOptions { Model = model } : new AiTokenizeOptions())
             .Branch(branch => branch
                 .OnSuccess(success => success
-                    .Tap(env => _logger?.LogDebug("Vector pipeline: tokenization success for media {Id}", env.Entity.Id))
+                    //.Tap(env => _logger?.LogDebug("Vector pipeline: tokenization success for media {Id}", env.Entity.Id))
                     .Mutate(envelope =>
                     {
                         // Add metadata for vector storage before save (canonical pattern from PipelineDataExtensions)
@@ -716,24 +716,24 @@ internal sealed class SeedService : ISeedService
 
                             try
                             {
-                                _logger?.LogDebug("Vector pipeline: attempting SaveWithVector for media {Id} with embedding length {Length}", envelope.Entity.Id, embedding.Length);
+                                //_logger?.LogDebug("Vector pipeline: attempting SaveWithVector for media {Id} with embedding length {Length}", envelope.Entity.Id, embedding.Length);
 
                                 // Use the canonical SaveWithVector method that handles both entity and vector
                                 await Data<Media, string>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
 
                                 // Populate metadata to indicate vector was saved (canonical pattern)
                                 envelope.Metadata["vector:affected"] = 1;
-                                _logger?.LogDebug("Vector pipeline: saved 1 vector for media {Id}", envelope.Entity.Id);
+                                //_logger?.LogDebug("Vector pipeline: saved 1 vector for media {Id}", envelope.Entity.Id);
                                 Interlocked.Add(ref stored, 1);
                             }
                             catch (InvalidOperationException ex)
                             {
-                                _logger?.LogWarning("Vector pipeline: vector storage not available for media {Id}: {Error}", envelope.Entity.Id, ex.Message);
+                                //_logger?.LogWarning("Vector pipeline: vector storage not available for media {Id}: {Error}", envelope.Entity.Id, ex.Message);
                                 envelope.Metadata["vector:affected"] = 0;
                             }
                             catch (Exception ex)
                             {
-                                _logger?.LogError(ex, "Vector pipeline: unexpected error saving vector for media {Id}: {Error}", envelope.Entity.Id, ex.Message);
+                                //_logger?.LogError(ex, "Vector pipeline: unexpected error saving vector for media {Id}: {Error}", envelope.Entity.Id, ex.Message);
                                 envelope.Metadata["vector:affected"] = 0;
                             }
                         }
@@ -773,7 +773,7 @@ internal sealed class SeedService : ISeedService
 
         var text = $"{string.Join(" / ", titles.Distinct())}\n\n{m.Synopsis}\n\nTags: {string.Join(", ", tags.Distinct())}";
         var trimmedText = text.Trim();
-        _logger?.LogDebug("BuildEmbeddingText for media {Id}: {Length} chars, text preview: {Preview}", m.Id, trimmedText.Length, trimmedText.Length > 100 ? trimmedText.Substring(0, 100) + "..." : trimmedText);
+        //_logger?.LogDebug("BuildEmbeddingText for media {Id}: {Length} chars, text preview: {Preview}", m.Id, trimmedText.Length, trimmedText.Length > 100 ? trimmedText.Substring(0, 100) + "..." : trimmedText);
         return trimmedText;
     }
 }

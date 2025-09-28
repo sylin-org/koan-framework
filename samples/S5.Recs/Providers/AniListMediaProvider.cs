@@ -147,7 +147,7 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                                 logger?.LogDebug("AniList page {Page}: skipped {Skipped} malformed media entries", pageNum, skipped);
                         }
 
-                        logger?.LogInformation("AniList page {Page} fetched. Accumulated: {Count}/{Limit}", pageNum, totalFetched, limit);
+                        //logger?.LogInformation("AniList page {Page} fetched. Accumulated: {Count}/{Limit}", pageNum, totalFetched, limit);
                         pageNum++;
                         await Task.Delay(TimeSpan.FromMilliseconds(300), ct);
                     }

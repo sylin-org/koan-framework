@@ -262,7 +262,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
             var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
             await collection.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct).ConfigureAwait(false);
-            _logger?.LogDebug("Mongo upsert {Entity} id={Id}", typeof(TEntity).Name, model.Id);
+            //_logger?.LogDebug("Mongo upsert {Entity} id={Id}", typeof(TEntity).Name, model.Id);
             return model;
         }, ct);
 
@@ -276,7 +276,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
             var result = await collection.DeleteOneAsync(filter, ct).ConfigureAwait(false);
             var deleted = result.DeletedCount > 0;
-            _logger?.LogDebug("Mongo delete {Entity} id={Id} deleted={Deleted}", typeof(TEntity).Name, id, deleted);
+            //_logger?.LogDebug("Mongo delete {Entity} id={Id} deleted={Deleted}", typeof(TEntity).Name, id, deleted);
             return deleted;
         }, ct);
 
@@ -301,7 +301,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
             var result = await collection.BulkWriteAsync(writes, cancellationToken: ct).ConfigureAwait(false);
             var count = (int)(result.ModifiedCount + result.Upserts.Count);
-            _logger?.LogInformation("Mongo bulk upsert {Entity} count={Count}", typeof(TEntity).Name, count);
+            //_logger?.LogDebug("Mongo bulk upsert {Entity} count={Count}", typeof(TEntity).Name, count);
             return count;
         }, ct);
 
@@ -321,7 +321,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var filter = Builders<TEntity>.Filter.In(x => x.Id, keys);
             var result = await collection.DeleteManyAsync(filter, ct).ConfigureAwait(false);
             var count = (int)result.DeletedCount;
-            _logger?.LogInformation("Mongo bulk delete {Entity} count={Count}", typeof(TEntity).Name, count);
+            //_logger?.LogDebug("Mongo bulk delete {Entity} count={Count}", typeof(TEntity).Name, count);
             return count;
         }, ct);
 
@@ -343,34 +343,34 @@ internal sealed class MongoRepository<TEntity, TKey> :
             switch (instruction.Name)
             {
                 case DataInstructions.EnsureCreated:
-                {
-                    var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-                    var database = GetDatabase(collection);
-
-                    try
                     {
-                        var existing = await database.ListCollectionNamesAsync(cancellationToken: ct).ConfigureAwait(false);
-                        var names = await existing.ToListAsync(ct).ConfigureAwait(false);
-                        if (!names.Contains(_collectionName, StringComparer.Ordinal))
+                        var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+                        var database = GetDatabase(collection);
+
+                        try
                         {
-                            await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
-                            _logger?.LogInformation("Mongo ensureCreated created collection {Name}", _collectionName);
+                            var existing = await database.ListCollectionNamesAsync(cancellationToken: ct).ConfigureAwait(false);
+                            var names = await existing.ToListAsync(ct).ConfigureAwait(false);
+                            if (!names.Contains(_collectionName, StringComparer.Ordinal))
+                            {
+                                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
+                                _logger?.LogDebug("Mongo ensureCreated created collection {Name}", _collectionName);
+                            }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", _collectionName);
-                    }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "Mongo ensureCreated encountered an error for collection {Name}", _collectionName);
+                        }
 
-                    object ok = true;
-                    return (TResult)ok;
-                }
+                        object ok = true;
+                        return (TResult)ok;
+                    }
                 case DataInstructions.Clear:
-                {
-                    var deleted = await DeleteAllAsync(ct).ConfigureAwait(false);
-                    object result = deleted;
-                    return (TResult)result;
-                }
+                    {
+                        var deleted = await DeleteAllAsync(ct).ConfigureAwait(false);
+                        object result = deleted;
+                        return (TResult)result;
+                    }
                 default:
                     throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Mongo adapter for {typeof(TEntity).Name}.");
             }
