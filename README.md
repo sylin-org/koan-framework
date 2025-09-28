@@ -13,6 +13,8 @@
 
 ## From Simple to Sophisticated in Minutes
 
+**Koan keeps the AR ergonomics developers love**-entities with `Save()`, discoverable CRUD controllers-**while neutralizing the common AR traps** with set-scoped routing, capability-aware queries, batch ops, a shared endpoint service, and first-class event flows. You get AR’s "don't make me think" feel without painting yourself into a single-DB, fat-controller, N+1-ridden corner.
+
 ### **1. Get started quickly**
 
 ```bash
@@ -175,19 +177,20 @@ dotnet build, dotnet test, dotnet publish
 
 ## Why Choose Koan
 
-| **What You Want** | **How Koan Delivers** |
-|-------------------|----------------------|
-| **Fast prototyping** | Functional apps in minutes, not hours |
-| **Modern patterns** | AI-native, event-driven, multi-provider by design |
-| **Simple scaling** | One pattern (`Entity<>`) from CRUD to enterprise |
-| **Team productivity** | Small teams build sophisticated solutions |
-| **Low risk adoption** | Works with existing .NET tools and knowledge |
+| **What You Want**     | **How Koan Delivers**                             |
+| --------------------- | ------------------------------------------------- |
+| **Fast prototyping**  | Functional apps in minutes, not hours             |
+| **Modern patterns**   | AI-native, event-driven, multi-provider by design |
+| **Simple scaling**    | One pattern (`Entity<>`) from CRUD to enterprise  |
+| **Team productivity** | Small teams build sophisticated solutions         |
+| **Low risk adoption** | Works with existing .NET tools and knowledge      |
 
 ---
 
 ## Quick Start Paths
 
 ### **For Individual Developers**
+
 ```bash
 # Try the quickstart
 git clone https://github.com/koan-framework/quickstart
@@ -199,6 +202,7 @@ dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
 ```
 
 ### **For Teams & Architects**
+
 ```bash
 # Explore enterprise patterns
 git clone https://github.com/koan-framework/enterprise-sample
@@ -208,6 +212,7 @@ cd enterprise-sample && ./start.bat
 ```
 
 ### **For AI-First Projects**
+
 ```bash
 # Start with AI-native patterns
 dotnet new web -n AiApp
@@ -221,6 +226,7 @@ dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 ## Technology Stack
 
 **70+ integrated modules spanning:**
+
 - **Data**: PostgreSQL, MongoDB, SQLite, Redis, Vector databases
 - **AI**: Ollama, OpenAI, Azure OpenAI, semantic search, embeddings
 - **Pipelines**: Semantic streaming, AI tokenization, cross-pillar integration
@@ -266,6 +272,7 @@ Feedback and contributions help improve the framework.
 - **5 minutes** to get started
 
 ### Install & Run
+
 ```bash
 # Option 1: Try the quickstart
 git clone https://github.com/koan-framework/quickstart
@@ -301,4 +308,4 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 **Koan Framework: Build sophisticated apps with simple patterns.**
 
-*A .NET framework that makes small teams capable of sophisticated solutions.*
+_A .NET framework that makes small teams capable of sophisticated solutions._
