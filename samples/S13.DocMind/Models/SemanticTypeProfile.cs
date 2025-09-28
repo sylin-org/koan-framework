@@ -41,6 +41,10 @@ public sealed class SemanticTypeProfile : Entity<SemanticTypeProfile>
         = new();
 
     [Column(TypeName = "jsonb")]
+    public Dictionary<string, string> PromptMetadata { get; set; }
+        = new(StringComparer.OrdinalIgnoreCase);
+
+    [Column(TypeName = "jsonb")]
     public TemplateExtractionSchema ExtractionSchema { get; set; }
         = new();
 

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;
 using Koan.Data.Core;
@@ -22,14 +21,16 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
     private readonly DocMindOptions _options;
     private readonly IEmbeddingGenerator _embeddingGenerator;
     private readonly DocMindVectorHealth _vectorHealth;
+    private readonly IDocMindPromptBuilder _promptBuilder;
     private readonly ILogger<TemplateSuggestionService> _logger;
 
-    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, IEmbeddingGenerator embeddingGenerator, DocMindVectorHealth vectorHealth, ILogger<TemplateSuggestionService> logger)
+    public TemplateSuggestionService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, IEmbeddingGenerator embeddingGenerator, DocMindVectorHealth vectorHealth, IDocMindPromptBuilder promptBuilder, ILogger<TemplateSuggestionService> logger)
     {
         _ai = serviceProvider.GetService<IAi>();
         _options = options.Value;
         _embeddingGenerator = embeddingGenerator;
         _vectorHealth = vectorHealth;
+        _promptBuilder = promptBuilder;
         _logger = logger;
     }
 
@@ -41,35 +42,74 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         {
             Name = request.Name,
             Description = request.Description,
-            Metadata = request.Metadata is null ? new Dictionary<string, string>() : new Dictionary<string, string>(request.Metadata, StringComparer.OrdinalIgnoreCase)
+            Metadata = request.Metadata is null
+                ? new Dictionary<string, string>()
+                : new Dictionary<string, string>(request.Metadata, StringComparer.OrdinalIgnoreCase)
         };
+
+        var promptMetadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        TemplateGenerationParseResult parseResult;
 
         if (_ai is not null)
         {
             try
             {
-                var prompt = BuildTemplatePrompt(request);
+                var envelope = _promptBuilder.BuildTemplateGenerationPrompt(request);
+                foreach (var (key, value) in envelope.Metadata)
+                {
+                    promptMetadata[key] = value;
+                }
+
+                _logger.LogDebug("Template generation system prompt for {Name}:{NewLine}{Prompt}", request.Name, envelope.SystemPrompt);
+                _logger.LogDebug("Template generation user prompt for {Name}:{NewLine}{Prompt}", request.Name, envelope.UserPrompt);
+
                 var response = await _ai.PromptAsync(new AiChatRequest
                 {
                     Model = _options.Ai.DefaultModel,
                     Messages =
                     {
-                        new AiMessage("system", "Design a JSON extraction template."),
-                        new AiMessage("user", prompt)
+                        new AiMessage("system", envelope.SystemPrompt),
+                        new AiMessage("user", envelope.UserPrompt)
                     }
                 }, cancellationToken).ConfigureAwait(false);
 
-                profile.Prompt = ParsePrompt(response.Text, request);
+                parseResult = _promptBuilder.ParseTemplateGenerationResponse(response.Text, request);
+                promptMetadata["prompt.mode"] = "ai";
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Template generation fallback used for {Name}", request.Name);
-                profile.Prompt = BuildFallbackPrompt(request);
+                promptMetadata["prompt.mode"] = "fallback";
+                promptMetadata["prompt.error"] = ex.GetType().Name;
+                parseResult = _promptBuilder.ParseTemplateGenerationResponse(null, request);
             }
         }
         else
         {
-            profile.Prompt = BuildFallbackPrompt(request);
+            var envelope = _promptBuilder.BuildTemplateGenerationPrompt(request);
+            foreach (var (key, value) in envelope.Metadata)
+            {
+                promptMetadata[key] = value;
+            }
+
+            promptMetadata["prompt.mode"] = "manual";
+            parseResult = _promptBuilder.ParseTemplateGenerationResponse(null, request);
+        }
+
+        foreach (var (key, value) in parseResult.Metadata)
+        {
+            promptMetadata[key] = value;
+        }
+
+        profile.Code = parseResult.Code;
+        profile.Description = parseResult.Description;
+        profile.Tags = parseResult.Tags.ToList();
+        profile.Prompt = parseResult.Prompt;
+        profile.PromptMetadata = promptMetadata;
+
+        if (!string.IsNullOrWhiteSpace(request.SampleText) && !profile.Prompt.Variables.ContainsKey("sample"))
+        {
+            profile.Prompt.Variables["sample"] = request.SampleText;
         }
 
         profile = await profile.Save(cancellationToken).ConfigureAwait(false);
@@ -164,62 +204,6 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
             _vectorHealth.RecordSearch(TimeSpan.Zero, fallback: true);
             return await SuggestWithCosineFallbackAsync(documentVector.Embedding!, cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    private static PromptTemplate BuildFallbackPrompt(TemplateGenerationRequest request)
-        => new()
-        {
-            SystemPrompt = "Extract structured information from the supplied document.",
-            UserTemplate = "Summarise key highlights from the document: {{text}}",
-            Variables = new Dictionary<string, string>
-            {
-                ["sample"] = request.SampleText ?? string.Empty
-            }
-        };
-
-    private static PromptTemplate ParsePrompt(string response, TemplateGenerationRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(response))
-        {
-            return BuildFallbackPrompt(request);
-        }
-
-        try
-        {
-            var parts = response.Split("---", StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2)
-            {
-                return new PromptTemplate
-                {
-                    SystemPrompt = parts[0].Trim(),
-                    UserTemplate = parts[1].Trim(),
-                    Variables = new Dictionary<string, string>
-                    {
-                        ["sample"] = request.SampleText ?? string.Empty
-                    }
-                };
-            }
-        }
-        catch
-        {
-            // Ignore and fallback
-        }
-
-        return BuildFallbackPrompt(request);
-    }
-
-    private static string BuildTemplatePrompt(TemplateGenerationRequest request)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine("Create a structured extraction template for the following document description:");
-        builder.AppendLine(request.Description);
-        if (!string.IsNullOrWhiteSpace(request.SampleText))
-        {
-            builder.AppendLine("Sample text:");
-            builder.AppendLine(request.SampleText.Length > 2000 ? request.SampleText[..2000] : request.SampleText);
-        }
-        builder.AppendLine("Respond with two sections separated by '---'. First line: system prompt, second section: user template referencing {{text}}.");
-        return builder.ToString();
     }
 
     private async Task<EmbeddingGenerationResult> BuildDocumentVectorAsync(IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
@@ -427,45 +411,6 @@ public sealed class TemplateSuggestionService : ITemplateSuggestionService
         };
 
         await entity.Save(cancellationToken).ConfigureAwait(false);
-    }
-
-    private static string GenerateCode(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return $"profile-{Guid.NewGuid():N}";
-        }
-
-        var span = name.Trim().ToLowerInvariant().AsSpan();
-        Span<char> buffer = stackalloc char[Math.Min(span.Length, 60)];
-        var index = 0;
-        foreach (var ch in span)
-        {
-            if (char.IsLetterOrDigit(ch))
-            {
-                buffer[index++] = ch;
-            }
-            else if (char.IsWhiteSpace(ch) || ch is '-' or '_')
-            {
-                if (index > 0 && buffer[index - 1] != '-')
-                {
-                    buffer[index++] = '-';
-                }
-            }
-
-            if (index >= buffer.Length)
-            {
-                break;
-            }
-        }
-
-        if (index == 0)
-        {
-            return $"profile-{Guid.NewGuid():N}";
-        }
-
-        var code = new string(buffer[..index]).Trim('-');
-        return string.IsNullOrWhiteSpace(code) ? $"profile-{Guid.NewGuid():N}" : code;
     }
 
     private static double CosineSimilarity(float[] a, float[] b)
