@@ -197,7 +197,7 @@ Koan gives you **Active Record ergonomics** with the **scalability of a Data Map
 - **One pattern, many backends:** Swap providers without rewriting your domain or controllers.
 - **AI‑native:** Semantic search, embeddings, and streaming pipelines are first‑class, not bolt‑ons.
 
-> **Deep comparison:** See the full, categorized matrix → `docs/architecture/comparison.md`
+**Deep comparison:** See the full, categorized matrix: [docs/architecture/comparison.md]
 
 ---
 
