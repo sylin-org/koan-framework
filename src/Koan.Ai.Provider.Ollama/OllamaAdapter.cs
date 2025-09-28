@@ -20,7 +20,6 @@ using Koan.Ai.Provider.Ollama.Options;
 
 namespace Koan.Ai.Provider.Ollama;
 
-
 internal sealed class OllamaAdapter : BaseKoanAdapter,
     IAiAdapter,
     IAdapterReadiness,

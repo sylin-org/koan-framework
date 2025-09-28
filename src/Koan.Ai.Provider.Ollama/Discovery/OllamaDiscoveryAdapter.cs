@@ -21,7 +21,7 @@ internal sealed class OllamaDiscoveryAdapter : ServiceDiscoveryAdapterBase
         : base(configuration, logger) { }
 
     /// <summary>Ollama adapter knows which factory contains its KoanServiceAttribute</summary>
-    protected override Type GetFactoryType() => typeof(OllamaAdapter);
+    protected override Type GetFactoryType() => typeof(OllamaServiceDescriptor);
 
     /// <summary>Ollama-specific health validation using API health checks with model verification</summary>
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
@@ -115,23 +115,23 @@ internal sealed class OllamaDiscoveryAdapter : ServiceDiscoveryAdapterBase
             candidates.Add(new DiscoveryCandidate(explicitConfig, "explicit-config", 1));
         }
 
-        // Container vs Local detection logic
+        // Host-first detection logic for AI services (models persist better on host)
         if (KoanEnv.InContainer)
         {
-            // In container: Try container instance first, then local fallback
+            // In container: Try host instance first (with models), then container fallback
+            if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
+            {
+                var hostUrl = $"{attribute.LocalScheme}://{attribute.LocalHost}:{attribute.LocalPort}";
+                candidates.Add(new DiscoveryCandidate(hostUrl, "host-first", 2));
+                _logger.LogDebug("Ollama adapter: Added host candidate {HostUrl} (host-first priority)", hostUrl);
+            }
+
+            // Container fallback when in container
             if (!string.IsNullOrWhiteSpace(attribute.Host))
             {
                 var containerUrl = $"{attribute.Scheme}://{attribute.Host}:{attribute.EndpointPort}";
-                candidates.Add(new DiscoveryCandidate(containerUrl, "container-instance", 2));
-                _logger.LogDebug("Ollama adapter: Added container candidate {ContainerUrl} (in container environment)", containerUrl);
-            }
-
-            // Local fallback when in container
-            if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
-            {
-                var localhostUrl = $"{attribute.LocalScheme}://{attribute.LocalHost}:{attribute.LocalPort}";
-                candidates.Add(new DiscoveryCandidate(localhostUrl, "local-fallback", 3));
-                _logger.LogDebug("Ollama adapter: Added local fallback {LocalUrl}", localhostUrl);
+                candidates.Add(new DiscoveryCandidate(containerUrl, "container-fallback", 3));
+                _logger.LogDebug("Ollama adapter: Added container fallback {ContainerUrl}", containerUrl);
             }
         }
         else

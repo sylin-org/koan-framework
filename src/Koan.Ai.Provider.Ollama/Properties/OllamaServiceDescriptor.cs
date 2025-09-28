@@ -22,7 +22,7 @@ namespace Koan.Ai.Provider.Ollama;
     HealthTimeoutSeconds = 2,
     HealthRetries = 12,
     Scheme = "http", Host = "ollama", EndpointPort = 11434, UriPattern = "http://{host}:{port}",
-    LocalScheme = "http", LocalHost = "localhost", LocalPort = 11434, LocalPattern = "http://{host}:{port}")]
+    LocalScheme = "http", LocalHost = "host.docker.internal", LocalPort = 11434, LocalPattern = "http://{host}:{port}")]
 internal sealed class OllamaServiceDescriptor
 {
     // No runtime behavior; discovery-only marker.
