@@ -177,13 +177,27 @@ dotnet build, dotnet test, dotnet publish
 
 ## Why Choose Koan
 
-| **What You Want**     | **How Koan Delivers**                             |
-| --------------------- | ------------------------------------------------- |
-| **Fast prototyping**  | Functional apps in minutes, not hours             |
-| **Modern patterns**   | AI-native, event-driven, multi-provider by design |
-| **Simple scaling**    | One pattern (`Entity<>`) from CRUD to enterprise  |
-| **Team productivity** | Small teams build sophisticated solutions         |
-| **Low risk adoption** | Works with existing .NET tools and knowledge      |
+Koan gives you **Active Record ergonomics** with the **scalability of a Data Mapper**—and adds polyglot storage, flows, and semantic pipelines without ceremony.
+
+**Legend:** 🟩 Good · 🟨 Mixed/depends · 🟥 Weak
+
+| Capability                                                     | EF (Entity Framework)      | Active Record (classic) | Koan                                              |
+| -------------------------------------------------------------- | -------------------------- | ----------------------- | ------------------------------------------------- |
+| **Time to first API**                                          | 🟨 Needs setup/scaffolding | 🟩 Fast CRUD            | 🟩 2‑min REST via `Entity<>`                      |
+| **Polyglot storage (SQL/NoSQL/Vector)**                        | 🟨 Relational‑focused      | 🟥 Typically one store  | 🟩 First‑class across providers                   |
+| **Multi‑tenant & view routing** (drafts/published, per‑tenant) | 🟨 Manual filters          | 🟥 Ad hoc/global        | 🟩 `?set=` + `DataSetContext.With(...)`           |
+| **Event‑driven & projections**                                 | 🟨 Add‑ons/outbox          | 🟥 Rare                 | 🟩 Built‑in Flow (canonical/lineage views)        |
+| **Semantic/Vector pipeline**                                   | 🟥 External add‑ons        | 🟥 Rare                 | 🟩 Native embeddings, semantic search, pipelines  |
+| **Capability detection / fallback**                            | 🟨 Partial                 | 🟥 None                 | 🟩 `QueryCaps`/`WriteCaps` with graceful fallback |
+| **Migrations & schema**                                        | 🟩 EF Migrations           | 🟨 ORM‑specific         | 🟨 Use store‑native tools today                   |
+
+**What this means in practice**
+
+- **Start simple, scale cleanly:** AR‑easy CRUD today; switch on Flow, sets, and vectors when complexity appears.
+- **One pattern, many backends:** Swap providers without rewriting your domain or controllers.
+- **AI‑native:** Semantic search, embeddings, and streaming pipelines are first‑class, not bolt‑ons.
+
+> **Deep comparison:** See the full, categorized matrix → `docs/architecture/comparison.md`
 
 ---
 
