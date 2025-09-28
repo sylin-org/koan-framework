@@ -32,6 +32,7 @@ public sealed class DocMindRegistrar : IKoanAutoRegistrar
         services.AddScoped<IVisionInsightService, VisionInsightService>();
         services.AddScoped<IInsightSynthesisService, InsightSynthesisService>();
         services.AddScoped<IManualAnalysisService, ManualAnalysisService>();
+        services.AddSingleton<IDocMindPromptBuilder, DocMindPromptBuilder>();
         services.AddScoped<ITemplateSuggestionService, TemplateSuggestionService>();
         services.AddScoped<IEmbeddingGenerator, EmbeddingGenerator>();
         services.AddScoped<IDocumentInsightsService, DocumentInsightsService>();
