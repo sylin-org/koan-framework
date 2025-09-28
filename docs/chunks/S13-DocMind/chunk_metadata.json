@@ -246,7 +246,7 @@
       ],
       "koan_concepts": [
         "IntegrationTesting",
-        "OpenTelemetry",
+        "BootReportDiagnostics",
         "DockerCompose"
       ]
     },

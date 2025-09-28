@@ -54,8 +54,8 @@
 
 5. **Observability Enhancements**
    - Emit structured logs with `LoggerMessage` source generators for each stage
-   - Publish OpenTelemetry spans around long-running AI calls
-   - Surface `DocumentProcessingEvent` query endpoints for debugging
+   - Persist `DocumentProcessingEvent` entries and expose them via `ProcessingController` queue/timeline queries
+   - Extend the boot report with stage counts and provider readiness derived from `DocumentProcessingDiagnostics`
 
 6. **Error Handling**
    - Simple retry logic with configurable retry counts

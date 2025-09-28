@@ -72,9 +72,9 @@ public class UploadDocument_ProcessesToCompletion : IClassFixture<DocMindApiFact
 - **Health checks**: Monitor `/health`, `/health/storage`, `/health/embedding`, `/health/models` endpoints exposed by the API.
 
 ### 7. Observability Dashboards
-- Leverage Koan boot report output to confirm provider readiness.
-- Configure OpenTelemetry exporters to send traces/metrics to the provided `otel-collector` compose override.
-- Build Grafana dashboard showing queue depth, processing durations, and model latency using metrics emitted by `DocumentAnalysisPipeline`.
+- Capture Koan boot report output (from `/actuator/boot` or startup logs) in CI artifacts to confirm provider readiness and vector fallback state.
+- Use `ProcessingController` queue/timeline APIs to power lightweight dashboards or scripts that visualize stage counts and retry activity; surface the same data in the Angular diagnostics panel.
+- Persist recent `DocumentProcessingEvent` slices (e.g., last 50 events) as JSON artifacts during automated test runs to aid workshop troubleshooting without layering new telemetry infrastructure.
 
 ### 8. Release Readiness Checklist
 - ✅ All tests passing in CI and compose environment.

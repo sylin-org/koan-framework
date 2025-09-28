@@ -4,10 +4,10 @@
 
 | Phase | Focus | Key Outcomes |
 |-------|-------|--------------|
-| **0. Baseline Audit** | Confirm compose stack, run existing app smoke tests | Document current gaps, capture API/UI mismatches, ensure telemetry logging works. |
+| **0. Baseline Audit** | Confirm compose stack, run existing app smoke tests | Document current gaps, capture API/UI mismatches, confirm boot report + diagnostics endpoints surface data. |
 | **1. Domain Foundation** | Introduce new entities/value objects, migrations | `SourceDocument`, `SemanticTypeProfile`, `DocumentChunk`, `DocumentInsight`, `DocumentProcessingEvent` live with seed data + updated TypeScript clients. |
-| **2. Background Pipeline** | Implement channel-based `DocumentAnalysisPipeline` | Hosted service orchestrates extraction → insights → suggestions with retry + telemetry. |
-| **3. API / MCP Alignment** | Replace controllers, surface DTOs, wire MCP tools | Controllers match UI expectations, MCP tools share contracts, OpenAPI regenerated. |
+| **2. Background Pipeline** | Harden `DocumentProcessingWorker` + job orchestration | Hosted service sequences extraction → insights → suggestions with retry + timeline recording. |
+| **3. API / MCP Alignment** | Ensure controllers + DTOs match UI, surface MCP resources | Controllers match UI expectations, HTTP SSE resources reuse DTOs, OpenAPI regenerated. |
 | **4. UI & DX Polish** | Update Angular flows, add diagnostics, finalize docs | Upload wizard, insight views, timeline, Postman/CLI assets, README refresh. |
 
 Each phase completes with a demo script and validation checklist so workshops can stop mid-way if needed.
@@ -17,7 +17,7 @@ Each phase completes with a demo script and validation checklist so workshops ca
 #### Phase 0 – Baseline Audit
 - Run `docker compose up` and validate API reaches MongoDB/Weaviate/Ollama using existing smoke script.
 - Capture current API responses to inventory differences vs. Angular expectations.
-- Configure logging to ensure future stages emit structured logs (`Serilog` or Koan defaults).
+- Confirm boot report + `/api/processing/queue` timeline endpoints light up with the baseline processing sample.
 
 #### Phase 1 – Domain Foundation
 - Add new domain project (`S13.DocMind.Domain`) containing entities, enums, and value objects.
@@ -26,15 +26,15 @@ Each phase completes with a demo script and validation checklist so workshops ca
 - Write unit tests for value objects (e.g., `DocumentProcessingSummary` ensures unique insight references).
 
 #### Phase 2 – Background Pipeline
-- Implement `DocumentIntakeService`, `DocumentAnalysisPipeline`, and supporting services as detailed in chunk 03.
-- Introduce `DocumentProcessingOptions` and configuration binding.
-- Add integration tests using in-memory storage + Koan AI test double to exercise entire pipeline.
-- Ensure `DocumentProcessingEvent` entries created per stage; expose metrics via boot report.
+- Keep `DocumentIntakeService`, `DocumentProcessingWorker`, and supporting services aligned with chunk 03 patterns.
+- Introduce or refine `DocMindOptions` validation/binding for queue sizes, retries, and polling intervals.
+- Add integration tests using in-memory storage + Koan AI test double to exercise entire pipeline and validate stage transitions.
+- Ensure `DocumentProcessingEvent` entries created per stage and visible through diagnostics endpoints + boot report notes.
 
 #### Phase 3 – API & MCP Alignment
-- Replace old controllers with scenario-centric controllers; ensure minimal code in `Program.cs`.
+- Keep controllers scenario-centric while holding `Program.cs` to the single `AddKoan()` call.
 - Generate OpenAPI specification and TypeScript clients; update Angular services.
-- Implement MCP tools/resources, verifying they invoke the same services (no duplicate logic).
+- Ensure MCP HTTP SSE resources reuse DTO contracts (tool definitions can remain backlog items called out in docs).
 - Add CLI commands (e.g., `dotnet run -- replay`) hooking into `ProcessingController` endpoints.
 
 #### Phase 4 – UI & DX Polish
@@ -45,7 +45,7 @@ Each phase completes with a demo script and validation checklist so workshops ca
 ### 3. Coding Standards & Best Practices
 - **SoC**: Keep controllers thin, services focus on single responsibility, domain models stay persistence-agnostic except for Koan attributes.
 - **Koan-first**: Prefer Koan-provided abstractions (`Entity<T>`, `IAiClient`, `IStorageClient`, `AddKoan()`) over custom plumbing.
-- **Telemetry**: Use structured logging with message templates, persist processing events, expose metrics via OpenTelemetry.
+- **Telemetry**: Use structured logging with message templates, persist processing events, and surface diagnostics via boot report + processing endpoints.
 - **Naming clarity**: Use verbs for commands/services (`TemplateGeneratorService.GenerateAsync`) and nouns for models/DTOs.
 - **Configuration**: All tunables (queue size, retry counts, models) live under `DocMind` configuration sections with sensible defaults.
 

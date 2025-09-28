@@ -1,41 +1,38 @@
 ### **8. Success Criteria & Acceptance Testing**
 
 #### **Functional Requirements Checklist**
-- [ ] **Document Upload**: Support .txt, .pdf, .docx, and image formats up to 10 MB each (stretch: 25 MB with streaming enabled).
-- [ ] **Text Extraction**: Demonstrate ≥95 % accuracy on the curated sample pack; document gaps for edge formats.
-- [ ] **AI Analysis**: Produce structured summaries with confidence scoring and human-review routing.
-- [ ] **Template System**: Generate templates via AI and persist review decisions.
-- [ ] **Vector Search**: Return top-5 similar templates in <2 s across the 200-document demo corpus.
-- [ ] **Event Sourcing**: Persist a complete audit trail of upload → analysis Flow events.
-- [ ] **Multi-Provider (core)**: Operate across MongoDB, Weaviate, and Ollama with simplified infrastructure stack.
-- [ ] **Auto-Registration**: Boot sample with a single `AddKoan()` call plus provider packages.
-- [ ] **API Generation**: Expose CRUD APIs with pagination, filtering, and relationship expansion.
+- [ ] **Document Upload**: Support `.txt`, `.pdf`, `.docx`, and common image formats up to 50 MB (default configuration) with duplicate detection.
+- [ ] **Text Extraction**: Demonstrate reliable PDF/DOCX extraction and document any image/OCR fallbacks.
+- [ ] **Insight Generation**: Produce narrative summaries via `InsightSynthesisService` and record fallbacks when the model defers.
+- [ ] **Template System**: Generate templates through `TemplateSuggestionService` and allow prompt-test runs before acceptance.
+- [ ] **Embedding Assist (optional)**: When Weaviate is present, persist embeddings and confirm graceful degradation when absent.
+- [ ] **Timeline Diagnostics**: Persist `DocumentProcessingEvent` records for each stage and expose them via `/api/documents/{id}/timeline` + `/api/processing/queue`.
+- [ ] **Manual Analysis**: Enable ad-hoc insight runs via `AnalysisController` endpoints.
+- [ ] **MCP Exposure**: Confirm `[McpEntity]` resources for documents, insights, and templates are discoverable over the HTTP SSE transport.
+- [ ] **Auto-Registration**: Boot sample with a single `AddKoan()` call and the shipped `DocMindRegistrar`.
+- [ ] **API Generation**: Expose CRUD + workflow endpoints with pagination and filtering aligned to the Angular client.
 
 #### **Performance Requirements Checklist**
-- [ ] **Throughput**: Process 4 documents per minute in sequential demo runs (stretch: 20 with optional load script).
-- [ ] **Concurrency**: Support 3 concurrent users in the base environment (stretch: 15 with scaled resources).
+- [ ] **Throughput**: Process at least one standard sample document per minute on developer hardware (stretch: parallel batch via `WorkerBatchSize` tuning).
+- [ ] **Concurrency**: Sustain two simultaneous uploads without starving the background worker (stretch: validate with `MaxConcurrency = 4`).
 - [ ] **Response Time**: CRUD API responses under 500 ms (excluding AI work); health endpoints under 200 ms.
-- [ ] **AI Processing**: Document analysis completes within 90 s for sample inputs.
+- [ ] **Processing Duration**: Document analysis completes within 90 s for sample inputs, with timelines showing each stage timestamp.
 - [ ] **Memory Usage**: Keep API container below 1.5 GB RSS during demos.
 - [ ] **Startup Time**: Application ready in under 20 s on a developer laptop.
 
-#### **Security Requirements Checklist**
-- [ ] **Data Encryption**: All sensitive content encrypted at rest (filesystem volume encryption by default, object storage SSE when enabled) plus field-level encryption for secrets.
-- [ ] **Audit Logging**: Complete audit trail for all user actions with exportable lineage reports.
-- [ ] **Sensitive Data Classification**: Automated PII/PHI detection with redaction prior to AI prompts.
-- [ ] **Retention & Erasure**: Lifecycle policies enforced and `RightToBeForgottenFlow` validated end-to-end.
-- [ ] **Human Review Controls**: Low-confidence outputs held for manual approval before release.
-- [ ] **Input Validation**: Comprehensive validation and antivirus scanning preventing malicious uploads.
-- [ ] **Rate Limiting**: API rate limiting to prevent abuse.
-- [ ] **Authentication**: Support for OAuth 2.0 and JWT tokens.
-- [ ] **Authorization**: Role-based access control for documents and templates.
+#### **Security & Compliance Checklist**
+- [ ] **Data Storage**: Document storage path isolated per environment with clear cleanup scripts (`docmind-reset`).
+- [ ] **Audit Trail**: `DocumentProcessingEvent` entries retained for the life of the workshop dataset.
+- [ ] **Input Validation**: Enforce file size/content-type checks and document any manual review for untrusted inputs.
+- [ ] **Access Model**: Document the sample's anonymous defaults and outline steps to enable auth when required.
+- [ ] **Operational Hygiene**: Provide reset scripts and instructions for purging data between workshops.
 
 #### **Observability & Cost Checklist**
-- [ ] **Tracing**: Distributed traces stitched across upload, Flow worker, and AI calls using OpenTelemetry.
-- [ ] **Metrics**: Dashboards covering queue depth, stage latency, embedding throughput, and AI token spend.
-- [ ] **Logging**: Structured logs with document IDs, review outcomes, and cost annotations.
-- [ ] **Budgets & Alerts**: `AIUsageBudget` thresholds enforced with alerting and automatic model downgrades when exceeded.
-- [ ] **SLO Reviews**: Weekly review ritual evaluating success metrics vs targets, with action items captured in runbook.
+- [ ] **Boot Snapshot**: Capture Koan boot report output for each environment and store with deployment artifacts.
+- [ ] **Processing Timeline Export**: Save recent `DocumentProcessingEvent` data (queue + timeline endpoints) as part of diagnostics bundles.
+- [ ] **Logging**: Ensure structured logs include document IDs and stage names for correlation.
+- [ ] **Model Usage Awareness**: Document how to inspect `ModelsController` usage stats; no automated budgeting is required for the sample scope.
+- [ ] **Workshop Runbook**: Maintain a lightweight runbook covering reset steps, model install commands, and known limits.
 
 ### **9. Migration & Rollback Procedures**
 
