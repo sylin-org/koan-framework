@@ -46,6 +46,8 @@
           href: DATA-0072-parent-relationship-attribute-explicit-type.md
         - name: Use JObject for Dynamic Entity Models
           href: DATA-0073-jobject-for-dynamic-entities.md
+        - name: Entity lifecycle event pipeline
+          href: DATA-0074-entity-lifecycle-event-pipeline.md
         - name: Vector module split and clean separation
           href: DATA-0060-vector-module-split-and-clean-separation.md
     - name: Adapter role attributes and entity mapping

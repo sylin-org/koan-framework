@@ -142,9 +142,9 @@ try {
     $configFullPath = Resolve-Path $ConfigPath -ErrorAction Stop
   } catch {
     # Try discovery
-    $candidate = Get-ChildItem -Path $repoRoot -Recurse -Filter 'docfx.json' -File -ErrorAction SilentlyContinue \
-      | Where-Object { $_.FullName -like '*\docs\*' } \
-      | Select-Object -First 1
+    $candidate = Get-ChildItem -Path $repoRoot.Path -Recurse -Filter 'docfx.json' -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -like '*\docs\*' } |
+      Select-Object -First 1
     if ($candidate) {
       $configFullPath = $candidate.FullName
     } else {

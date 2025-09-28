@@ -27,6 +27,11 @@
     href: documentation/reference/core/index.md
   - name: Data
     href: documentation/reference/data/index.md
+    items:
+    - name: Data Pillar Reference
+      href: documentation/reference/data/index.md
+    - name: Entity Lifecycle Events
+      href: documentation/reference/data/entity-lifecycle-events.md
   - name: Web
     href: documentation/reference/web/index.md
   - name: AI

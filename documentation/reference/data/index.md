@@ -74,6 +74,36 @@ var electronics = await Product.InCategory("Electronics");
 var deals = await Product.OnSale();
 ```
 
+## Lifecycle Events
+
+Lifecycle pipelines let entities guard mutations, enforce policy, and enrich loads without external repositories. Configure hooks with `TEntity.Events` during startup.
+
+```csharp
+public static class ProductLifecycle
+{
+  static ProductLifecycle()
+  {
+    Product.Events
+      .Setup(ctx =>
+      {
+        ctx.ProtectAll();
+        ctx.AllowMutation(nameof(Product.Price));
+      })
+      .BeforeUpsert(ctx =>
+      {
+        if (ctx.Current.Price < 0)
+        {
+          return ctx.Cancel("Price must be non-negative.", "product.price_negative");
+        }
+
+        return ctx.Proceed();
+      });
+  }
+}
+```
+
+See the [Entity Lifecycle Events reference](./entity-lifecycle-events.md) for stage order, cancellation patterns, atomic batching, and reset guidance.
+
 ## Relationships
 
 ```csharp
