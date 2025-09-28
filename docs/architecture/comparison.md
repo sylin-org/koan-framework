@@ -1,12 +1,5 @@
 ﻿# Architecture Comparison
 
-This document helps developers and architects evaluate **Koan** alongside **Entity Framework (EF)** and **classic Active Record (AR)** patterns. It is the deep-dive counterpart to the short 3-color table in the README.
-
-**Legend:**  
-🟦 Excellent · 🟩 Good · 🟨 Mixed/conditional · 🟧 Weak/partial · 🟥 Poor/missing
-
----
-
 ## Full Capability Matrix (Grouped)
 
 <p><strong>Legend:</strong> 🟦 Excellent · 🟩 Good · 🟨 Mixed/conditional · 🟧 Weak/partial · 🟥 Poor/missing</p>
