@@ -26,6 +26,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IConfigureOptions<OllamaOptions>, OllamaOptionsConfigurator>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, OllamaDiscoveryAdapter>());
 
+        // Register the hosted service that creates and registers OllamaAdapter instances to the AI registry
+        services.AddHostedService<OllamaDiscoveryService>();
+
         // Register orchestration evaluator for dependency management
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, OllamaOrchestrationEvaluator>());
 
