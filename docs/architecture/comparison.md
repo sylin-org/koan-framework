@@ -9,9 +9,6 @@ This document helps developers and architects evaluate **Koan** alongside **Enti
 
 ## Full Capability Matrix (Grouped)
 
-> GitHub Markdown doesn’t support column span in tables, so this section uses a single HTML table with category headers.
-
-<!-- Legend (inline for GitHub rendering) -->
 <p><strong>Legend:</strong> 🟦 Excellent · 🟩 Good · 🟨 Mixed/conditional · 🟧 Weak/partial · 🟥 Poor/missing</p>
 
 <table>
@@ -24,7 +21,6 @@ This document helps developers and architects evaluate **Koan** alongside **Enti
     </tr>
   </thead>
   <tbody>
-    <!-- 1) Data & Modeling -->
     <tr><th colspan="4" style="text-align:left;">1) Data &amp; Modeling</th></tr>
     <tr>
       <td><strong>Programming model</strong></td>
@@ -44,8 +40,6 @@ This document helps developers and architects evaluate **Koan** alongside **Enti
       <td>🟥 Ad hoc / globals</td>
       <td>🟦 First-class <code>?set=</code> + <code>DataSetContext.With(set)</code></td>
     </tr>
-
-    <!-- 2) Querying, Projections & Performance -->
     <tr><th colspan="4" style="text-align:left;">2) Querying, Projections &amp; Performance</th></tr>
     <tr>
       <td><strong>LINQ / composability</strong></td>
@@ -71,8 +65,6 @@ This document helps developers and architects evaluate **Koan** alongside **Enti
       <td>🟧 Manual loops</td>
       <td>🟦 First-class bulk upsert/delete paths</td>
     </tr>
-
-    <!-- 3) API Surface & Developer Experience -->
     <tr><th colspan="4" style="text-align:left;">3) API Surface &amp; Developer Experience</th></tr>
     <tr>
       <td><strong>Controllers / endpoints</strong></td>
@@ -92,8 +84,6 @@ This document helps developers and architects evaluate **Koan** alongside **Enti
       <td>🟦 Very low</td>
       <td>🟩 Low start; one pattern scales (Entities → REST/GraphQL/agents)</td>
     </tr>
-
-    <!-- 4) Eventing, Views & AI/Vector -->
     <tr><th colspan="4" style="text-align:left;">4) Eventing, Views &amp; AI/Vector (Semantic Pipeline)</th></tr>
     <tr>
       <td><strong>Event-driven flows</strong></td>
@@ -113,8 +103,6 @@ This document helps developers and architects evaluate **Koan** alongside **Enti
       <td>🟥 Rare</td>
       <td>🟩 Built-in vector module; <code>SemanticSearch</code>, <code>SaveWithVector</code></td>
     </tr>
-
-    <!-- 5) Operations, Deployment & Tooling -->
     <tr><th colspan="4" style="text-align:left;">5) Operations, Deployment &amp; Tooling</th></tr>
     <tr>
       <td><strong>Migrations</strong></td>
@@ -134,8 +122,6 @@ This document helps developers and architects evaluate **Koan** alongside **Enti
       <td>🟩 Raw SQL common</td>
       <td>🟩 Direct SQL / custom controllers while preserving sets/caps</td>
     </tr>
-
-    <!-- 6) Testing & Transactions -->
     <tr><th colspan="4" style="text-align:left;">6) Testing &amp; Transactions</th></tr>
     <tr>
       <td><strong>Unit testing ergonomics</strong></td>
@@ -149,7 +135,6 @@ This document helps developers and architects evaluate **Koan** alongside **Enti
       <td>🟥 Very limited</td>
       <td>🟨 Across heterogeneous stores → eventual consistency via Flow</td>
     </tr>
-
   </tbody>
 </table>
 
