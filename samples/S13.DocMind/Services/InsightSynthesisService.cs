@@ -20,12 +20,14 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
 {
     private readonly IAi? _ai;
     private readonly DocMindOptions _options;
+    private readonly IDocMindPromptBuilder _promptBuilder;
     private readonly ILogger<InsightSynthesisService> _logger;
 
-    public InsightSynthesisService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, ILogger<InsightSynthesisService> logger)
+    public InsightSynthesisService(IServiceProvider serviceProvider, IOptions<DocMindOptions> options, IDocMindPromptBuilder promptBuilder, ILogger<InsightSynthesisService> logger)
     {
         _ai = serviceProvider.GetService<IAi>();
         _options = options.Value;
+        _promptBuilder = promptBuilder;
         _logger = logger;
     }
 
@@ -400,6 +402,15 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
             metadata["profileName"] = profile.Name;
         }
 
+        var promptEnvelope = _promptBuilder.BuildManualSessionPrompt(session, profile, snapshots, _options);
+        foreach (var (key, value) in promptEnvelope.Metadata)
+        {
+            metadata[key] = value;
+        }
+
+        _logger.LogDebug("Manual session {SessionId} system prompt:{NewLine}{Prompt}", session.Id, promptEnvelope.SystemPrompt);
+        _logger.LogDebug("Manual session {SessionId} user prompt:{NewLine}{Prompt}", session.Id, promptEnvelope.UserPrompt);
+
         AiChatResponse? response = null;
         var usedAi = _ai is not null && _options.Manual.EnableSessions;
 
@@ -412,8 +423,8 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
                     Model = _options.Ai.DefaultModel,
                     Messages =
                     {
-                        new AiMessage("system", BuildManualSystemPrompt(session, profile, snapshots)),
-                        new AiMessage("user", BuildManualUserPrompt(session, profile, snapshots))
+                        new AiMessage("system", promptEnvelope.SystemPrompt),
+                        new AiMessage("user", promptEnvelope.UserPrompt)
                     }
                 };
 
@@ -431,6 +442,7 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
         if (usedAi && response is not null)
         {
             metadata["mode"] = "ai";
+            metadata["prompt.mode"] = "ai";
             if (!string.IsNullOrWhiteSpace(response.Model))
             {
                 metadata["model"] = response.Model!;
@@ -446,8 +458,12 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
                 metadata["tokensOut"] = response.TokensOut.Value.ToString(CultureInfo.InvariantCulture);
             }
         }
+        else
+        {
+            metadata["prompt.mode"] = "fallback";
+        }
 
-        var synthesis = BuildManualSynthesis(session, profile, snapshots, response, usedAi, averageConfidence, metadata);
+        var synthesis = BuildManualSynthesis(session, profile, snapshots, response, usedAi, averageConfidence, metadata, promptEnvelope);
         var telemetry = BuildManualRunTelemetry(session, snapshots, response, synthesis);
 
         return new ManualAnalysisSynthesisResult(synthesis, telemetry);
@@ -550,126 +566,6 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
         return builder.ToString();
     }
 
-    private static string BuildManualSystemPrompt(ManualAnalysisSession session, SemanticTypeProfile? profile, IReadOnlyList<ManualDocumentSnapshot> snapshots)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine("You are DocMind, an analyst consolidating structured findings across multiple documents.");
-        builder.AppendLine("Use DOC_## citations (e.g. DOC_01) whenever referencing a source document.");
-        builder.AppendLine("Return only the requested delimited sections.");
-
-        if (profile is not null && !string.IsNullOrWhiteSpace(profile.Prompt.SystemPrompt))
-        {
-            builder.AppendLine();
-            builder.AppendLine("Template guidance:");
-            builder.AppendLine(profile.Prompt.SystemPrompt);
-        }
-
-        if (!string.IsNullOrWhiteSpace(session.Prompt.Instructions))
-        {
-            builder.AppendLine();
-            builder.AppendLine("Operator instructions:");
-            builder.AppendLine(session.Prompt.Instructions);
-        }
-
-        builder.AppendLine();
-        builder.AppendLine($"Documents provided: {snapshots.Count}");
-        return builder.ToString();
-    }
-
-    private string BuildManualUserPrompt(ManualAnalysisSession session, SemanticTypeProfile? profile, IReadOnlyList<ManualDocumentSnapshot> snapshots)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine("=== SESSION CONTEXT ===");
-        builder.AppendLine($"Title: {session.Title}");
-        if (!string.IsNullOrWhiteSpace(session.Description))
-        {
-            builder.AppendLine($"Description: {session.Description}");
-        }
-        builder.AppendLine($"Documents selected: {snapshots.Count}");
-        builder.AppendLine();
-
-        for (var i = 0; i < snapshots.Count; i++)
-        {
-            var snapshot = snapshots[i];
-            var alias = $"DOC_{i + 1:00}";
-            builder.AppendLine($"=== {alias} | {snapshot.Document.DisplayName ?? snapshot.Document.FileName} ===");
-            builder.AppendLine($"Status: {snapshot.Document.Status}");
-            builder.AppendLine($"Confidence: {snapshot.Confidence:0.000}");
-            if (snapshot.SessionDocument is not null && !string.IsNullOrWhiteSpace(snapshot.SessionDocument.Notes))
-            {
-                builder.AppendLine($"Operator notes: {snapshot.SessionDocument.Notes}");
-            }
-            if (!string.IsNullOrWhiteSpace(snapshot.Summary))
-            {
-                builder.AppendLine($"Summary: {snapshot.Summary}");
-            }
-            if (snapshot.Topics.Count > 0)
-            {
-                builder.AppendLine($"Topics: {string.Join(", ", snapshot.Topics)}");
-            }
-
-            var topInsight = snapshot.Insights.FirstOrDefault();
-            if (topInsight is not null)
-            {
-                builder.AppendLine($"Top insight: {topInsight.Heading} -> {topInsight.Body}");
-            }
-
-            builder.AppendLine();
-        }
-
-        var consolidatedTopics = snapshots
-            .SelectMany(snapshot => snapshot.Topics)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        if (consolidatedTopics.Count > 0)
-        {
-            builder.AppendLine("=== CONSOLIDATED TOPICS ===");
-            builder.AppendLine(string.Join(", ", consolidatedTopics));
-            builder.AppendLine();
-        }
-
-        var findings = BuildManualFindings(snapshots);
-        if (findings.Count > 0)
-        {
-            builder.AppendLine("=== CONSOLIDATED KEY FACTS ===");
-            foreach (var finding in findings.Take(20))
-            {
-                var source = finding.Sources.FirstOrDefault() ?? "DOC_??";
-                var confidence = finding.Confidence ?? _options.Manual.DefaultConfidence;
-                builder.AppendLine($"- {finding.Body} (from {source}, confidence: {confidence:0.000})");
-            }
-            builder.AppendLine();
-        }
-
-        if (profile is not null)
-        {
-            builder.AppendLine("=== TEMPLATE MARKUP ===");
-            builder.AppendLine(profile.Prompt.UserTemplate);
-            builder.AppendLine();
-        }
-
-        if (session.Prompt.Variables.Count > 0)
-        {
-            builder.AppendLine("=== VARIABLE OVERRIDES ===");
-            foreach (var (key, value) in session.Prompt.Variables)
-            {
-                builder.AppendLine($"{key}: {value}");
-            }
-            builder.AppendLine();
-        }
-
-        builder.AppendLine("=== OUTPUT REQUIREMENTS ===");
-        builder.AppendLine("Return ONLY these blocks in order:");
-        builder.AppendLine("---FILLED_DOCUMENT_TYPE_START---");
-        builder.AppendLine("(filled template using consolidated findings with DOC_## citations)");
-        builder.AppendLine("---FILLED_DOCUMENT_TYPE_END---");
-        builder.AppendLine("---CONTEXT_UNDERSTANDING_START---");
-        builder.AppendLine("(brief synthesis of approach, sources used, and confidence)");
-        builder.AppendLine("---CONTEXT_UNDERSTANDING_END---");
-
-        return builder.ToString();
-    }
-
     private ManualAnalysisSynthesis BuildManualSynthesis(
         ManualAnalysisSession session,
         SemanticTypeProfile? profile,
@@ -677,20 +573,36 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
         AiChatResponse? response,
         bool usedAi,
         double averageConfidence,
-        Dictionary<string, string> metadata)
+        Dictionary<string, string> metadata,
+        ManualPromptEnvelope promptEnvelope)
     {
-        var filled = usedAi ? ExtractDelimitedContent(response?.Text, "---FILLED_DOCUMENT_TYPE_START---", "---FILLED_DOCUMENT_TYPE_END---") : string.Empty;
-        var context = usedAi ? ExtractDelimitedContent(response?.Text, "---CONTEXT_UNDERSTANDING_START---", "---CONTEXT_UNDERSTANDING_END---") : string.Empty;
+        var filledResult = usedAi
+            ? _promptBuilder.ExtractDelimitedContent(response?.Text, DocMindPromptBuilder.FilledDocumentTypeStart, DocMindPromptBuilder.FilledDocumentTypeEnd)
+            : DelimitedContentResult.Missing;
+        var contextResult = usedAi
+            ? _promptBuilder.ExtractDelimitedContent(response?.Text, DocMindPromptBuilder.ContextUnderstandingStart, DocMindPromptBuilder.ContextUnderstandingEnd)
+            : DelimitedContentResult.Missing;
 
-        if (string.IsNullOrWhiteSpace(filled))
+        metadata["prompt.output.filled"] = filledResult.Success ? "ai" : "fallback";
+        metadata["prompt.output.context"] = contextResult.Success ? "ai" : "fallback";
+
+        if (filledResult.Success)
         {
-            filled = BuildFallbackFilledTemplate(profile, snapshots);
+            metadata["prompt.output.filled.length"] = filledResult.Content.Length.ToString(CultureInfo.InvariantCulture);
         }
 
-        if (string.IsNullOrWhiteSpace(context))
+        if (contextResult.Success)
         {
-            context = BuildFallbackContext(session, snapshots, usedAi);
+            metadata["prompt.output.context.length"] = contextResult.Content.Length.ToString(CultureInfo.InvariantCulture);
         }
+
+        var filled = filledResult.Success
+            ? filledResult.Content
+            : BuildFallbackFilledTemplate(profile, snapshots);
+
+        var context = contextResult.Success
+            ? contextResult.Content
+            : BuildFallbackContext(session, snapshots, usedAi);
 
         var findings = BuildManualFindings(snapshots);
 
@@ -889,34 +801,4 @@ public sealed class InsightSynthesisService : IInsightSynthesisService
         return builder.ToString().Trim();
     }
 
-    private static string ExtractDelimitedContent(string? text, string startDelimiter, string endDelimiter)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return string.Empty;
-        }
-
-        var startIndex = text.IndexOf(startDelimiter, StringComparison.Ordinal);
-        if (startIndex < 0)
-        {
-            return string.Empty;
-        }
-
-        startIndex += startDelimiter.Length;
-        var endIndex = text.IndexOf(endDelimiter, startIndex, StringComparison.Ordinal);
-        if (endIndex < 0)
-        {
-            return string.Empty;
-        }
-
-        return text[startIndex..endIndex].Trim();
-    }
-
-    private sealed record ManualDocumentSnapshot(
-        SourceDocument Document,
-        ManualAnalysisDocument? SessionDocument,
-        IReadOnlyList<DocumentInsight> Insights,
-        double Confidence,
-        string Summary,
-        IReadOnlyList<string> Topics);
 }
