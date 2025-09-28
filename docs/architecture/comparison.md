@@ -143,26 +143,6 @@
 
 ---
 
-## Quick Snapshot (3-Color Mini Grid)
-
-For slide decks and exec summaries, this is the TL;DR.
-
-**Legend:** 🟩 Good · 🟨 Mixed/depends · 🟥 Weak
-
-| Capability                          | EF  | AR  | Koan |
-| ----------------------------------- | --- | --- | ---- |
-| Time to first API                   | 🟨  | 🟩  | 🟩   |
-| Polyglot storage (SQL/NoSQL/Vector) | 🟨  | 🟥  | 🟩   |
-| Multi-tenant & view routing         | 🟨  | 🟥  | 🟩   |
-| Event-driven & projections          | 🟨  | 🟥  | 🟩   |
-| Semantic/Vector pipeline            | 🟥  | 🟥  | 🟩   |
-| Capability detection / fallback     | 🟨  | 🟥  | 🟩   |
-| Migrations & schema                 | 🟩  | 🟨  | 🟨   |
-
-> Tip: Put the mini grid in the README; link back to this full page.
-
----
-
 # Adjacent Tech (Other Ecosystems)
 
 A quick map to similar ideas in other languages—useful for evaluators comparing patterns.
