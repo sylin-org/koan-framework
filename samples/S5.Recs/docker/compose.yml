@@ -45,6 +45,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    volumes:
+      - ../data/mongo:/data/db
     ports:
       - "4900:27017"
   weaviate:
