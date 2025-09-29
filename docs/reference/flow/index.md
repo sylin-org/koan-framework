@@ -145,15 +145,15 @@ await Document.AllStream()
 
 ### Core Operations
 
-| Operation | Purpose | Notes |
-| --- | --- | --- |
-| `.ForEach(...)` | Mutate entities or call services (sync/async). | Perform domain logic, metadata enrichment, or external lookups.
-| `.Tokenize(...)` | Produce tokens via the configured AI provider. | Supply selector + optional `AiTokenizeOptions` (max tokens/model).
-| `.Embed(...)` | Generate embeddings and persist vectors. | Configure batch size/model; works when vector adapters are installed.
-| `.Branch(...)` | Split success/failure/conditional paths. | Combine `.OnSuccess`, `.OnFailure`, or `.When` clauses.
-| `.Save()` | Persist entity + vector changes in one call. | Batched persistence keeps providers efficient.
-| `.Notify(...)` | Emit messaging events after processing. | Integrates with Messaging pillar transports.
-| `.Trace(...)` | Log structured telemetry per envelope. | Ideal for latency tracking and diagnostics.
+| Operation        | Purpose                                        | Notes                                                                 |
+| ---------------- | ---------------------------------------------- | --------------------------------------------------------------------- |
+| `.ForEach(...)`  | Mutate entities or call services (sync/async). | Perform domain logic, metadata enrichment, or external lookups.       |
+| `.Tokenize(...)` | Produce tokens via the configured AI provider. | Supply selector + optional `AiTokenizeOptions` (max tokens/model).    |
+| `.Embed(...)`    | Generate embeddings and persist vectors.       | Configure batch size/model; works when vector adapters are installed. |
+| `.Branch(...)`   | Split success/failure/conditional paths.       | Combine `.OnSuccess`, `.OnFailure`, or `.When` clauses.               |
+| `.Save()`        | Persist entity + vector changes in one call.   | Batched persistence keeps providers efficient.                        |
+| `.Notify(...)`   | Emit messaging events after processing.        | Integrates with Messaging pillar transports.                          |
+| `.Trace(...)`    | Log structured telemetry per envelope.         | Ideal for latency tracking and diagnostics.                           |
 
 ### Branching & Error Capture
 

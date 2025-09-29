@@ -33,12 +33,12 @@ nav: true
 
 Koan lets small teams ship sophisticated, AI-native services with governance intact. The framework amplifies productivity through the `Entity<T>` pattern, produces deployment artifacts automatically, and keeps your architecture portable across providers.
 
-| Enterprise Challenge | Koan Response |
-| --- | --- |
-| Large teams required for advanced features | Lean teams deliver via consistent patterns |
-| Prototype-to-production gap | Same code path from local to prod |
-| Vendor lock-in risk | Provider transparency across data, messaging, AI |
-| Governance overhead | Generated Compose profiles, health checks, and observability hooks |
+| Enterprise Challenge                       | Koan Response                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| Large teams required for advanced features | Lean teams deliver via consistent patterns                         |
+| Prototype-to-production gap                | Same code path from local to prod                                  |
+| Vendor lock-in risk                        | Provider transparency across data, messaging, AI                   |
+| Governance overhead                        | Generated Compose profiles, health checks, and observability hooks |
 
 ---
 
@@ -102,12 +102,12 @@ Flow.OnUpdate<CustomerRecord>(async (record, previous) =>
 
 ## 4. Team Enablement
 
-| Week | Focus | Outcomes |
-| --- | --- | --- |
-| 1 | Entity pattern & controllers | CRUD API live, health checks wired |
-| 2 | Messaging + Flow | Event automation logging in lower environments |
-| 3 | AI & vector | Semantic search or chat endpoint validated |
-| 4 | Production hardening | Compose export reviewed, observability dashboards baselined |
+| Week | Focus                        | Outcomes                                                    |
+| ---- | ---------------------------- | ----------------------------------------------------------- |
+| 1    | Entity pattern & controllers | CRUD API live, health checks wired                          |
+| 2    | Messaging + Flow             | Event automation logging in lower environments              |
+| 3    | AI & vector                  | Semantic search or chat endpoint validated                  |
+| 4    | Production hardening         | Compose export reviewed, observability dashboards baselined |
 
 Create a guild of "Koan champions" who review architecture proposals, run office hours, and document organization-specific recipes.
 

@@ -20,7 +20,7 @@ if (Test-Path $termMapFile) {
         $termMap = Get-Content -Path $termMapFile -Raw | ConvertFrom-Json
     }
     catch {
-    Write-Warning "Unable to parse term map at ${TermMapPath}: $_"
+        Write-Warning "Unable to parse term map at ${TermMapPath}: $_"
         $termMap = @{}
     }
 }
@@ -111,11 +111,11 @@ function Add-Issue {
     )
 
     $issues.Add([PSCustomObject]@{
-        Path     = $Path
-        Severity = $Severity
-        Check    = $Check
-        Message  = $Message
-    }) | Out-Null
+            Path     = $Path
+            Severity = $Severity
+            Check    = $Check
+            Message  = $Message
+        }) | Out-Null
 }
 
 function Get-AudienceValues {
@@ -184,7 +184,7 @@ foreach ($entry in $documentCache.Values) {
     }
 
     if ($frontMatter.Contains("audience")) {
-    $audienceValues = Get-AudienceValues -Value $frontMatter["audience"]
+        $audienceValues = Get-AudienceValues -Value $frontMatter["audience"]
         if ($audienceValues.Count -eq 0) {
             Add-Issue -Path $relativePath -Severity "Error" -Check "FrontMatter" -Message "audience must list at least one value"
         }

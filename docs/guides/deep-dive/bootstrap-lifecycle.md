@@ -11,7 +11,7 @@
 
 The Koan Framework implements a **sophisticated multi-layer bootstrap system** that coordinates infrastructure readiness, framework initialization, and application startup. Understanding this lifecycle is crucial for diagnosing startup issues and ensuring reliable deployments.
 
-**Key Principle**: *Each layer must achieve readiness before the next layer begins, but the system handles timing coordination and failure recovery automatically.*
+**Key Principle**: _Each layer must achieve readiness before the next layer begins, but the system handles timing coordination and failure recovery automatically._
 
 ---
 
@@ -55,6 +55,7 @@ graph TD
 ### Database Container Initialization
 
 **Phase 1: Container Startup**
+
 ```bash
 # Container lifecycle
 docker-compose up -d database
@@ -62,6 +63,7 @@ docker-compose up -d database
 ```
 
 **Phase 2: Service Discovery**
+
 ```csharp
 // From CouchbaseClusterProvider.cs
 private async Task WaitForCouchbaseAndCheckInitializationAsync(
@@ -92,6 +94,7 @@ private async Task WaitForCouchbaseAndCheckInitializationAsync(
 ```
 
 **Phase 3: Cluster Initialization**
+
 ```csharp
 // Auto-provision cluster if needed
 if (await IsClusterInitializedAsync(baseUrl, username, password, ct))
@@ -105,6 +108,7 @@ await InitializeClusterAsync(baseUrl, username, password, bucketName, ct);
 ```
 
 **Timing Considerations:**
+
 - **Container Ready ≠ Service Ready**: HTTP responses don't guarantee query services
 - **Cluster vs Service**: Cluster can be initialized but N1QL service still starting
 - **Persistence**: State persisted in volumes affects initialization decisions
@@ -116,6 +120,7 @@ await InitializeClusterAsync(baseUrl, username, password, bucketName, ct);
 ### Adapter Readiness System
 
 **Phase 1: Auto-Registration**
+
 ```csharp
 // From KoanAutoRegistrar pattern
 [assembly: KoanAutoRegistrar(typeof(CouchbaseAutoRegistrar))]
@@ -138,6 +143,7 @@ public class CouchbaseAutoRegistrar : IKoanAutoRegistrar
 ```
 
 **Phase 2: SDK Initialization**
+
 ```csharp
 // Enhanced SDK bootstrap with timing fixes
 public async Task EnsureConnectionAsync(CancellationToken ct = default)
@@ -159,6 +165,7 @@ public async Task EnsureConnectionAsync(CancellationToken ct = default)
 ```
 
 **Phase 3: Service Readiness Verification**
+
 ```csharp
 // N1QL-specific readiness check
 private async Task WaitForN1QLServiceReadinessAsync(string baseUrl, string username, string password, CancellationToken ct)
@@ -194,6 +201,7 @@ private async Task WaitForN1QLServiceReadinessAsync(string baseUrl, string usern
 ```
 
 **Phase 4: Health Reporting**
+
 ```csharp
 // StartupProbeService validation
 public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct)
@@ -217,6 +225,7 @@ public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context
 ### Startup Task Discovery
 
 **Phase 1: Task Discovery**
+
 ```csharp
 // From SchedulingOrchestrator
 public async Task StartAsync(CancellationToken cancellationToken)
@@ -239,6 +248,7 @@ public async Task StartAsync(CancellationToken cancellationToken)
 ### Reference Data Bootstrap
 
 **Phase 2: Bootstrap Task Execution**
+
 ```csharp
 // Generic bootstrap task pattern
 public async Task RunAsync(CancellationToken ct)
@@ -277,6 +287,7 @@ public async Task RunAsync(CancellationToken ct)
 ```
 
 **Phase 3: Reference Data Seeder Execution**
+
 ```csharp
 // Generic reference data seeder pattern
 public async Task SeedReferenceDataAsync(CancellationToken ct = default)
@@ -346,7 +357,9 @@ sequenceDiagram
 ### Common Timing Issues
 
 #### 1. **Task Discovery Race Condition**
+
 **Problem**: Startup tasks discovered before adapters fully initialized
+
 ```csharp
 // ISSUE: SchedulingOrchestrator starts too early
 services.AddHostedService<SchedulingOrchestrator>();  // Starts immediately
@@ -356,7 +369,9 @@ services.Configure<HostOptions>(opts => opts.StartupTimeout = TimeSpan.FromMinut
 ```
 
 #### 2. **SDK vs Service Readiness Gap**
+
 **Problem**: SDK reports ready but services still initializing
+
 ```csharp
 // ISSUE: Connection ready ≠ Query services ready
 await _cluster.WaitUntilReadyAsync(TimeSpan.FromSeconds(30));
@@ -367,7 +382,9 @@ await WaitForN1QLServiceReadinessAsync(baseUrl, username, password, ct);
 ```
 
 #### 3. **Container Restart vs Fresh Start**
+
 **Problem**: Different behavior on restart vs fresh deployment
+
 ```csharp
 // Fresh start: All initialization runs
 // Restart: Cached state may skip initialization
@@ -414,7 +431,7 @@ private async Task<bool> IsClusterInitializedAsync(...)
 
 ```yaml
 # docker-compose.yml
-version: '3.8'
+version: "3.8"
 services:
   couchbase:
     image: couchbase:latest
@@ -456,6 +473,7 @@ docker logs [api-container] | grep -E "(attempt|retry|waiting)"
 ### Common Bootstrap Failures
 
 #### 1. **Startup Tasks Not Discovered**
+
 ```
 Symptoms:
 - No bootstrap task logs
@@ -474,6 +492,7 @@ Resolution:
 ```
 
 #### 2. **Adapter Readiness Timing**
+
 ```
 Symptoms:
 - "Connection refused" errors
@@ -492,6 +511,7 @@ Resolution:
 ```
 
 #### 3. **Reference Data Issues**
+
 ```
 Symptoms:
 - Bootstrap task runs but no data created
@@ -548,4 +568,4 @@ Resolution:
 
 ---
 
-*The bootstrap lifecycle is the foundation of Koan's "just works" experience. Understanding this system enables reliable deployments and effective troubleshooting when initialization issues occur.*
+_The bootstrap lifecycle is the foundation of Koan's "just works" experience. Understanding this system enables reliable deployments and effective troubleshooting when initialization issues occur._

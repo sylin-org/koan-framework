@@ -4,96 +4,70 @@ domain: data
 title: "Garden Cooperative Journal"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-09-28
+last_updated: 2025-09-29
 framework_version: v0.6.2
 validation:
-  date_last_tested: 2025-09-28
-  status: verified
+  date_last_tested: 2025-09-29
+  status: pending
   scope: docs/guides/garden-cooperative-journal.md
 ---
 
 # Garden Cooperative Journal
 
-Spend a day with the Maple Street cooperative and learn Koan by following the people who tend its raised beds. This how-to keeps the architecture bound to the story—no abstract best-practice detours—so every code sample pays off a moment from the garden journal. The cast stays light (`Plot`, `Reading`, `Reminder`, `Member`), letting the narrative do the teaching while you explore what Koan can do.
+_There is no tech yet._ The Maple Street co-op runs on a corkboard and goodwill. Riley keeps a pencil behind her ear; Mara trusts memory more than she should. Beds get watered twice or not at all.
+
+**Riley’s pitch:** “Let’s put up a tiny web API that speaks garden. We’ll keep the Pis dumb—just posting numbers—and keep the journal human.”
+
+This chapter walks from **no tech** to **one Koan slice** using **only the data framework**: entity statics, relationship helpers, and lifecycle hooks. No Flow, no schedulers, no config files.
+
+---
 
 ## What you’ll build
 
-- A single Koan slice where moisture sensors post readings, Flow tallies hydration scores, and members get nudged when soil dries out.
-- Story-first controllers that mirror the cooperative’s language: `POST /api/garden/readings`, `GET /api/garden/reminders`, and a lightweight acknowledgment loop.
-- Lifecycle hooks that narrate state changes instead of burying them in infrastructure.
+- **A garden slice** that accepts readings and surfaces reminders in the co-op’s own language.
+- **Dumb sensors, honest write path**: Pis `POST`; the service decides—immediately—whether a bed is dry enough to nudge.
+- **Three member moves**: see what’s dry, water it, mark it done.
 
-### What you’ll learn
+### Before you start (truthfully low-tech)
 
-- How Koan’s entity statics, relationship helpers, and Flow batches fit together without leaving the story’s point of view.
-- How to enrich responses (`?with=`) and page or stream (`FirstPage`, `Page`, `AllStream`) without inventing extra layers.
-- How to keep Chapter 1 grounded in SQLite while leaving room for a future Mongo chapter.
-
-### Field reminders from the co-op
-
-- **Sensor jitter happens** – Clamp or toss duplicate readings so reminders only fire when soil is truly dry.
-- **Keep configuration external** – Swapping adapters later should feel like changing hoses, not rewriting code.
-- **Members miss pings** – Let reminders reactivate when acknowledgements lag; the co-op forgives late-night watering.
-- **Flow batches can lag** – Pass cancellation tokens through handlers so long jobs can yield when the crew closes the gate.
+- People with watering cans.
+- Paper labels on beds.
+- A few Raspberry Pis you can script (or simulate with `curl`).
+- .NET 9 and a blank Koan web slice.
 
 ---
 
-## Storyboard at a Glance
+## Zero-Tech Reality → Single-Slice Moves
 
-| Moment | API Surface | What happens |
-| --- | --- | --- |
-| Dawn moisture check | `POST /api/garden/readings` | A sensor reports moisture for Plot A. Reading saves immediately via entity controller. |
-| Midday hydration review | Flow pipeline | Batched readings compute hydration score; pipeline flips `Reminder.Status` to `Active` when the soil is dry. |
-| Evening journal entry | `GET /api/garden/reminders` | Member sees active reminders, logs a watering acknowledgement, and the lifecycle hook records the status return to `Idle`. |
-
-Use the sections below to implement each beat.
+| Garden moment                      | Without tech                             | What we’ll do (no Flow)                                                                                |
+| ---------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Is Bed 3 actually dry?**         | Intuition and arguments.                 | On each `Reading` upsert, compute a short rolling average with entity statics; set/clear a `Reminder`. |
+| **Too many pings / radio silence** | Group chats spiral, or nobody speaks.    | Enforce **one active reminder per plot** via a simple upsert; no batching, no timers.                  |
+| **Forgot to “mark it done”**       | Watering happens; the corkboard doesn’t. | `PATCH` reminder to `Acknowledged`; lifecycle notes the change so the journal stays trustworthy.       |
 
 ---
 
-## 1. Configure SQLite for the Garden
+## 1) Ground the journal in SQLite (code-first, config-free)
 
-*Morning check-in: Riley unlocks the tool shed and confirms the Raspberry Pi is still whispering readings to Koan.*
-
-```csharp
-// appsettings.Development.json
-{
-  "Koan": {
-    "Data": {
-      "DefaultAdapter": "sqlite",
-      "Adapters": {
-        "sqlite": {
-          "ConnectionString": "Data Source=./data/garden.db"
-        }
-      }
-    }
-  }
-}
-```
-
-`Program.cs` stays minimal—Koan discovers the adapter and Flow components automatically.
+_Morning: one laptop, one command. No servers to nurse._
 
 ```csharp
+using Koan.Data.Sqlite;
+using Koan.Web.Extensions;
+
 var builder = WebApplication.CreateBuilder(args);
+
 builder.Services.AddKoan();
 
 var app = builder.Build();
 app.Run();
 ```
 
-Riley saves the file, runs the service, and watches Koan create `data/garden.db` on first boot. If you want to peek at the blank canvas, launch the slice once:
-
-```powershell
-# from the project root
-pwsh -File scripts/cli-build.ps1
-pwsh -File scripts/cli-run.ps1
-```
-
-Shut the app down after the adapters announce themselves in the logs—you only need the schema migration for now.
-
 ---
 
-## 2. Model the Cooperative
+## 2) Name the things people actually say
 
-*Late morning planning: Mara sketches plots, stewards, and reminder cards on the whiteboard before anyone writes code.*
+_Late morning: four boxes on the whiteboard. No hieroglyphics._
 
 ```csharp
 using Koan.Data.Core.Relationships;
@@ -101,9 +75,7 @@ using Koan.Data.Core.Relationships;
 public class Plot : Entity<Plot>
 {
     public string Name { get; set; } = "";
-
-    [Parent(typeof(Member))]
-    public string MemberId { get; set; } = "";
+    [Parent(typeof(Member))] public string MemberId { get; set; } = "";
 }
 
 public class Member : Entity<Member>
@@ -113,9 +85,7 @@ public class Member : Entity<Member>
 
 public class Reading : Entity<Reading>
 {
-    [Parent(typeof(Plot))]
-    public string PlotId { get; set; } = "";
-
+    [Parent(typeof(Plot))] public string PlotId { get; set; } = "";
     public double Moisture { get; set; }
     public DateTimeOffset SampledAt { get; set; } = DateTimeOffset.UtcNow;
 
@@ -130,246 +100,200 @@ public enum ReminderStatus { Idle, Active, Acknowledged }
 
 public class Reminder : Entity<Reminder>
 {
-    [Parent(typeof(Plot))]
-    public string PlotId { get; set; } = "";
-
-    [Parent(typeof(Member))]
-    public string MemberId { get; set; } = "";
+    [Parent(typeof(Plot))] public string PlotId { get; set; } = "";
+    [Parent(typeof(Member))] public string MemberId { get; set; } = "";
 
     public ReminderStatus Status { get; private set; } = ReminderStatus.Idle;
     public string Notes { get; private set; } = "";
 
-    public Task<Reminder> Activate(string notes)
-    {
-        Status = ReminderStatus.Active;
-        Notes = notes;
-        return Save();
-    }
-
-    public Task<Reminder> Acknowledge(string notes)
-    {
-        Status = ReminderStatus.Acknowledged;
-        Notes = notes;
-        return Save();
-    }
+    public Task<Reminder> Activate(string notes) { Status = ReminderStatus.Active; Notes = notes; return Save(); }
+    public Task<Reminder> Acknowledge(string notes) { Status = ReminderStatus.Acknowledged; Notes = notes; return Save(); }
 }
 ```
 
-`GetParent<TParent>()` now works everywhere—`await plot.GetParent<Member>(ct)` fetches the steward, `await reading.GetParent<Plot>(ct)` returns the plot, and `await reminder.GetParent<Member>(ct)` links the reminder back to its owner. To walk down the graph, rely on `GetChildren<TChild>()`:
+**Narrative truth**
 
-```csharp
-var reminders = await member.GetChildren<Reminder>(ct);
-var active = reminders.Where(r => r.Status == ReminderStatus.Active).ToArray();
-```
-
-For dashboards, batch-resolve relationships with the `Relatives` extension from `Koan.Data.Core.Extensions` and keep UIs from issuing N+1 queries:
-
-```csharp
-using Koan.Data.Core.Extensions;
-
-var plots = await Plot.All(ct);
-var withMembers = await plots.Relatives<Plot, string>(ct);
-```
-
-**Character cheat sheet**
-
-- `Plot` entries map the raised beds. Riley likes naming them after fruits.
-- `Member` records keep the stewards visible without extra join logic.
-- `Reading` snapshots arrive from the sensors and stay tied to a plot.
-- `Reminder` slips are the gentle nudges that let the co-op stay on schedule.
-
-> **Learning checkpoint** – Relationship helpers replace bespoke repositories. Spend a moment in your console and call `await member.GetChildren<Reminder>()` after seeding a few records; you’ll see the story graph form with no extra plumbing.
+- `Plot` is a bed with a steward (`Member`).
+- Sensors produce `Reading` snapshots, tied to a plot.
+- `Reminder` is the polite nudge, not a siren.
 
 ---
 
-## 3. Accept Sensor Readings
+## 3) Give the Pis one sentence to say
 
-*Lunch hour upload: The Pi posts another moisture snapshot while the crew shares sandwiches on the picnic tables.*
+_Lunch: Riley tapes labels to the Pis—Bed-1, Bed-2, Bed-3. “You only need one phrase,” she tells them. “`POST /api/garden/readings`.”_
 
 ```csharp
 [Route("api/garden/readings")]
 public sealed class ReadingsController : EntityController<Reading> { }
 ```
 
-Koan wires up CRUD endpoints automatically. Sensors can submit data without bespoke handlers.
+A Pi speaks plainly:
 
 ```http
 POST /api/garden/readings
 Content-Type: application/json
 
 {
-  "plotId": "plots/raspberry-bed",
+  "plotId": "plots/bed-3",
   "moisture": 14.2,
   "sampledAt": "2025-09-28T09:15:00Z"
 }
 ```
 
-**Journal prompt** – Seed a plot (`plots/raspberry-bed`), add a member, and fire this request from your terminal. When the 201 response returns, flip open the SQLite file and check that Koan stamped the `Id` with a GUID v7 automatically.
+**What happens**
+Koan validates the parent (`Plot`), stamps an ID (v7), stores the snapshot. No CSV archaeology.
 
-Use `Reading.Recent(plotId)` for dashboards or Flow jobs that need context around each sensor update.
-
-> **Field note** – When the cooperative grows beyond a handful of plots, switch to the built-in pagers and streamers to stay responsive.
-
-```csharp
-var firstPage = await Reading.FirstPage(size: 25, ct);
-var secondPage = await Reading.Page(page: 2, size: 25, ct);
-
-await foreach (var reading in Reading.AllStream(batchSize: 500, ct))
-{
-    // Process long-running analytics without loading everything into memory.
-}
-```
-
-These helpers mirror the guidance in the [paging and streaming playbook](../guides/data/all-query-streaming-and-pager.md) and keep dashboards or Flow analytics from overfetching.
+**Field sense**
+If hardware is chatty, clamp identical `(plotId, sampledAt)` in the Pi script; keep the server logic simple.
 
 ---
 
-## 4. Score Hydration with Flow
+## 4) Decide “dry” on the write path (no timers, no Flow)
 
-*Afternoon analysis: After lunch, the Flow pipeline chews through the last batch and flags thirsty plots before anyone forgets.*
+_Afternoon: Bed 3 dips; Bed 1 wobbles. Mara squints. “Feelings aren’t data.” Riley nods. “So we decide when the reading arrives.”_
+
+We do the “is it dry?” decision **right after** each upsert—using entity statics only. Register the automation once so every process shares the same story.
 
 ```csharp
-public static class HydrationPipeline
+using System.Runtime.CompilerServices;
+using Koan.Data.Core.Events;
+
+public static class GardenAutomation
 {
-    public static void Configure(FlowPipeline pipeline)
+    private const int WindowSize = 8;
+    private const double DryThreshold = 20.0;
+
+    [ModuleInitializer]
+    public static void Initialize()
     {
-        pipeline.Batch("garden-hydration")
-                .FromEntity<Reading>()
-                .Every(TimeSpan.FromMinutes(15))
-                .Run(async (batch, ct) =>
-                {
-                    var byPlot = batch.GroupBy(r => r.PlotId);
-                    foreach (var group in byPlot)
-                    {
-                        var average = group.Average(r => r.Moisture);
-                        if (average < 20)
-                        {
-                            await EnsureReminder(group.Key, ct);
-                        }
-                    }
-                });
+        ConfigureReadingLifecycle();
+        ConfigureReminderLifecycle();
     }
 
-    private static async Task EnsureReminder(string plotId, CancellationToken ct)
+    private static void ConfigureReadingLifecycle()
     {
-        var reminder = await Reminder.Query()
-                                     .Where(r => r.PlotId == plotId && r.Status == ReminderStatus.Active)
-                                     .FirstOrDefaultAsync(ct);
-
-        if (reminder is null)
-        {
-            var steward = await Plot.ById(plotId, ct);
-            if (steward is null) return;
-
-            await new Reminder
+        Reading.Events
+            .Setup(ctx => ctx.ProtectAll())
+            .AfterUpsert(async ctx =>
             {
-                PlotId = plotId,
-                MemberId = steward.MemberId
-            }.Activate("Soil moisture low – consider watering today.");
-        }
-    }
-}
-```
+                var reading = ctx.Current;
+                var ct = ctx.CancellationToken;
 
-The pipeline batches readings every 15 minutes, checks moisture averages, and activates a reminder when soil is too dry. All adapters are accessed through entity statics so swapping providers later is low-risk.
+                var recent = await Reading.Recent(reading.PlotId, WindowSize, ct);
+                if (recent.Length == 0) return;
 
-> **Learning checkpoint** – Watch the timeline unfold by logging `average` inside the loop and running a quick CLI replay. Flow batches hand you the context (`batch`) so you never reach for a custom scheduler.
+                var average = recent.Average(r => r.Moisture);
 
----
+                var active = await Reminder.Query()
+                    .Where(r => r.PlotId == reading.PlotId && r.Status == ReminderStatus.Active)
+                    .FirstOrDefaultAsync(ct);
 
-## 5. React to Reminder Status Changes
-
-*Evening wrap-up: Reminders flip states as the stewards log who watered what, and Koan keeps the journal tidy.*
-
-```csharp
-public static class ReminderLifecycle
-{
-    public static void Configure(EntityLifecycleBuilder<Reminder> pipeline)
-    {
-        pipeline.ProtectAll()
-                .Allow(r => r.Status, r => r.Notes)
-                .AfterUpsert(async (ctx, next) =>
+                if (average < DryThreshold)
                 {
-                    var previous = ctx.Previous?.Status ?? ReminderStatus.Idle;
-                    var current = ctx.Entity.Status;
-
-                    await next();
-
-                    if (previous != ReminderStatus.Active && current == ReminderStatus.Active)
+                    if (active is null)
                     {
-                        await Flow.Emit(new ReminderActivated
-                        {
-                            ReminderId = ctx.Entity.Id,
-                            PlotId = ctx.Entity.PlotId,
-                            MemberId = ctx.Entity.MemberId
-                        });
-                    }
-                });
-    }
-}
+                        var plot = await Plot.Get(reading.PlotId, ct);
+                        if (plot is null) return;
 
-public sealed class ReminderActivated : Entity<ReminderActivated>
-{
-    public string ReminderId { get; set; } = "";
-    public string PlotId { get; set; } = "";
-    public string MemberId { get; set; } = "";
+                        await new Reminder
+                        {
+                            PlotId = reading.PlotId,
+                            MemberId = plot.MemberId
+                        }.Activate($"Low moisture (avg={average:F1}) – consider watering today.");
+                    }
+                }
+                else if (active is not null)
+                {
+                    await active.Acknowledge("Moisture back above threshold.");
+                }
+            });
+    }
+
+    private static void ConfigureReminderLifecycle()
+    {
+        Reminder.Events
+            .Setup(ctx =>
+            {
+                ctx.ProtectAll();
+                ctx.AllowMutation(nameof(Reminder.Status));
+                ctx.AllowMutation(nameof(Reminder.Notes));
+            })
+            .AfterUpsert(async ctx =>
+            {
+                var prior = await ctx.Prior.GetAsync(ctx.CancellationToken);
+                var was = prior?.Status ?? ReminderStatus.Idle;
+                var now = ctx.Current.Status;
+
+                // Journal-friendly: narrate first activation; stay quiet on routine edits.
+                if (was != ReminderStatus.Active && now == ReminderStatus.Active)
+                {
+                    Console.WriteLine($"[Journal] Reminder {ctx.Current.Id} activated for {ctx.Current.PlotId}");
+                }
+            });
+    }
 }
 ```
 
-The hook compares the previous and current status, emits an event when a reminder becomes active, and otherwise stays quiet. Consumers can subscribe to `ReminderActivated` for analytics or optional notifications.
+**What’s happening**
 
-> **Optional extension** – Add a background worker that listens for `ReminderActivated` events and sends a daily digest email. Keep it disabled by default so the how-to remains focused.
+- Every `Reading` upsert triggers a small, local computation (no background jobs).
+- We average a short, recent window and **upsert** the plot’s reminder accordingly.
+- Net effect: simple, predictable, and immediate feedback.
 
-**Knowledge handoff** – The lifecycle pipeline does the storytelling for you. Run a quick patch request that flips `Status` to `Active` and inspect the emitted event; you’ll see the journal and analytics stay in sync without separate save hooks.
+**Tuning notes**
+
+- Adjust `WindowSize` and `DryThreshold` for your soil/sensor combo.
+- Add hysteresis later (for example, activate below 20, retire above 24) if you see flapping.
+- Per-plot thresholds? Add a `DryThreshold` field on `Plot` and read it instead of the constant.
 
 ---
 
-## 6. Journal-Friendly APIs
+## 5) Three member moves, expressed as verbs
 
-*Nightly journal entry: The co-op lead runs a few curl commands to publish the day’s snapshot before locking the gate.*
-
-Give members three canonical endpoints:
+_Night: the gate squeaks. Two commands later, tomorrow’s plan is clear._ The lifecycles above keep the journal honest; these requests let people stay in the loop.
 
 ```bash
-# Record a new sensor reading
-curl -X POST https://localhost:5001/api/garden/readings ^
-  -H "Content-Type: application/json" ^
-  -d '{"plotId":"plots/raspberry-bed","moisture":18.6}'
+# 1) Record a reading (Pi or human)
+curl -X POST https://localhost:5001/api/garden/readings \
+  -H "Content-Type: application/json" \
+  -d '{"plotId":"plots/bed-3","moisture":18.6}'
 
-# See active reminders for the dashboard
-curl https://localhost:5001/api/garden/reminders?status=Active
+# 2) See what needs attention (pre-expanded)
+curl "https://localhost:5001/api/garden/reminders?status=Active&with=plot,member"
 
-# Acknowledge a reminder after watering
-curl -X PATCH https://localhost:5001/api/garden/reminders/reminders/42 ^
-  -H "Content-Type: application/json" ^
+# 3) Mark it done after watering (correct route)
+curl -X PATCH https://localhost:5001/api/garden/reminders/{id} \
+  -H "Content-Type: application/json" \
   -d '{"status":"Acknowledged","notes":"Evening watering complete"}'
 ```
 
-### Enrich the nightly journal
+**Why this is enough**
 
-`EntityController<T>` already speaks the relationship enrichment dialect: append `?with=` to any GET and Koan will invoke `GetRelatives()` internally.
-
-```bash
-# Pull every reminder with its plot + member already expanded
-curl "https://localhost:5001/api/garden/reminders?status=Active&with=plot,member"
-
-# Or grab a single reminder with the blunt instrument
-curl "https://localhost:5001/api/garden/reminders/reminders/42?with=all"
-
-# Paging still works with enrichment
-curl "https://localhost:5001/api/garden/reminders?status=Active&page=1&pageSize=10&with=all"
-```
-
-Use targeted lists (`with=plot,member`) when the UI only needs specific relatives; reach for `with=all` during diagnostics or when previewing the full relationship graph. Because the controller delegates to the same relationship helpers we outlined earlier, you can mix `with=` with streaming endpoints or paging without crafting bespoke transformers.
-
-Mara usually starts with `with=plot,member` while writing the co-op recap, then switches to `with=all` when debugging sensors. Follow her lead and you’ll rarely need custom DTO projects.
-
-Use transformers (see the [API Delivery Playbook](./building-apis.md)) if you need to enrich reminder responses with plot or member metadata before rendering the journal UI.
+- The system decides dryness the moment data arrives.
+- The list stays clean: one active reminder per plot, retired automatically when readings recover or manually when people water.
 
 ---
 
-## Next Steps
+## Field wisdom (paper → pixels, without drama)
 
-- **Chapter 2 preview** – Swap the adapter to MongoDB, keeping the same entity names while exploring document modeling and vector-friendly projections.
-- **AI add-on** – Pair the reminders with semantic search using the [AI Integration Playbook](./ai-integration.md).
-- **Troubleshooting** – If hydration scores stop moving, start with the [Troubleshooting Hub](../support/troubleshooting.md) to confirm Flow scheduling and adapter readiness.
+- **Start dumb at the edges**: Pis publish numbers, not meaning.
+- **Decide on write**: small computations beat background machinery for v1.
+- **Limit noise**: enforce one active reminder per plot; no alert storms.
+- **Let mistakes breathe**: manual acknowledgements are always allowed; the next good reading retires a stale nudge.
+- **Keep adapters swappable**: SQLite today, Mongo tomorrow—move it in config/DI, not code shape.
+
+---
+
+## Next steps
+
+- Add **hysteresis** (`activate < 20`, `retire > 24`) to avoid edge jitter.
+- Add **per-plot thresholds** (herbs vs. tomatoes) as fields on `Plot`.
+- Swap SQLite → Mongo later by config; your entities and lifecycles stay put.
+
+**Garden journal recap**
+You began with pencils and habit. You now have a tiny web API, dumb Pis that say one sentence, and a write-path that decides, gently and immediately, what needs water—using **only** the data framework.
+
+---
+
+Want me to append a tiny Pi script (Python) that posts readings and clamps duplicate timestamps so teams can copy-paste and be done?

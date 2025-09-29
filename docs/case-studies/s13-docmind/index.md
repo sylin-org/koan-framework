@@ -34,11 +34,11 @@ validation:
 
 S13.DocMind demonstrates how Koan composes data adapters, AI services, and hosted workers into a document-intelligence loop. The curated content here replaces the earlier raw chunk exports; deep research artefacts now live under [`/docs/archive/chunks/S13-DocMind/`](../../archive/chunks/S13-DocMind/).
 
-| Phase | Highlights | References |
-|-------|------------|------------|
-| **Intake** | Entity-first upload flow, immediate dedupe via SHA-512, background orchestration kick-off | [`data-modeling.md`](data-modeling.md) |
-| **Processing** | Hosted job sequencer, chunk projection, insight synthesis with graceful fallbacks | [`ai-pipeline.md`](ai-pipeline.md) |
-| **Discovery** | Vector-enabled search when available, MCP surface for agents, UI-aligned controllers | [`operations-and-diagnostics.md`](operations-and-diagnostics.md) |
+| Phase          | Highlights                                                                                | References                                                       |
+| -------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Intake**     | Entity-first upload flow, immediate dedupe via SHA-512, background orchestration kick-off | [`data-modeling.md`](data-modeling.md)                           |
+| **Processing** | Hosted job sequencer, chunk projection, insight synthesis with graceful fallbacks         | [`ai-pipeline.md`](ai-pipeline.md)                               |
+| **Discovery**  | Vector-enabled search when available, MCP surface for agents, UI-aligned controllers      | [`operations-and-diagnostics.md`](operations-and-diagnostics.md) |
 
 ## Quick start
 

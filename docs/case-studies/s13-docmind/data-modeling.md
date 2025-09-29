@@ -29,12 +29,12 @@ validation:
 
 ## Domain slices
 
-| Domain | Responsibility | Key entities |
-|--------|----------------|--------------|
-| Intake | file metadata, dedupe receipts, upload guidance | `SourceDocument`, `DocumentUploadReceipt` |
-| Templates & types | semantic profile catalogues and prompts | `SemanticTypeProfile`, `TemplateSection` |
-| Processing | chunk projections and insight storage | `DocumentChunk`, `DocumentInsight`, `InsightCollection` |
-| Diagnostics | stage transitions and replay hints | `DocumentProcessingEvent`, `ProcessingStage` |
+| Domain            | Responsibility                                  | Key entities                                            |
+| ----------------- | ----------------------------------------------- | ------------------------------------------------------- |
+| Intake            | file metadata, dedupe receipts, upload guidance | `SourceDocument`, `DocumentUploadReceipt`               |
+| Templates & types | semantic profile catalogues and prompts         | `SemanticTypeProfile`, `TemplateSection`                |
+| Processing        | chunk projections and insight storage           | `DocumentChunk`, `DocumentInsight`, `InsightCollection` |
+| Diagnostics       | stage transitions and replay hints              | `DocumentProcessingEvent`, `ProcessingStage`            |
 
 ## Core entities
 

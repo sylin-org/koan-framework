@@ -256,9 +256,9 @@ function Get-KoanDocTypeHint {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-    [string]$RelativePath,
-    [Parameter(Mandatory)]
-    [System.Collections.IDictionary]$FrontMatter
+        [string]$RelativePath,
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary]$FrontMatter
     )
 
     if ($FrontMatter.ContainsKey("type")) { return $FrontMatter["type"] }
@@ -282,9 +282,9 @@ function Get-KoanDocDomainHint {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-    [string]$RelativePath,
-    [Parameter(Mandatory)]
-    [System.Collections.IDictionary]$FrontMatter
+        [string]$RelativePath,
+        [Parameter(Mandatory)]
+        [System.Collections.IDictionary]$FrontMatter
     )
 
     if ($FrontMatter.ContainsKey("domain")) { return $FrontMatter["domain"] }

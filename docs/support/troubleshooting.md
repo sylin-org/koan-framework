@@ -126,13 +126,16 @@ if (health.Status != HealthStatus.Healthy)
 Typical symptoms: `SocketNotAvailableException`, `Service n1ql is either not configured or cannot be reached`, empty query results.
 
 1. **Verify container state**
+
    ```powershell
    docker compose ps
    docker logs couchbase --tail 50
    ```
+
    Look for ✅ `Cluster initialized successfully` or ❌ `Connection refused`.
 
 2. **Check adapter readiness logs**
+
    ```powershell
    docker logs api | Select-String "StartupProbe: data"
    ```
@@ -257,6 +260,7 @@ public sealed class DatabaseHealthCheck : IHealthContributor
 ### Embeddings & Semantic Search
 
 - Annotate vector-bearing properties with `[VectorField]`:
+
   ```csharp
   public class Document : Entity<Document>
   {
@@ -266,6 +270,7 @@ public sealed class DatabaseHealthCheck : IHealthContributor
       public float[] ContentEmbedding { get; set; } = [];
   }
   ```
+
 - Validate dimensions before saving:
   ```csharp
   var embedding = await _ai.EmbedAsync(new AiEmbeddingRequest { Input = doc.Content });

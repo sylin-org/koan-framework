@@ -147,7 +147,7 @@ function Get-Headings {
     foreach ($match in $headingMatches) {
         $headings += [PSCustomObject]@{
             Level = $match.Groups["level"].Value.Length
-            Text = $match.Groups["text"].Value.Trim()
+            Text  = $match.Groups["text"].Value.Trim()
         }
     }
     return $headings
@@ -220,9 +220,9 @@ function Get-OutboundLinks {
         }
 
         $links += [PSCustomObject]@{
-            Raw = $targetRaw
-            Path = $normalizedPath
-            Anchor = $anchor
+            Raw        = $targetRaw
+            Path       = $normalizedPath
+            Anchor     = $anchor
             IsExternal = $isExternal -or ($null -eq $normalizedPath -and $targetRaw.StartsWith('#'))
         }
     }
@@ -319,16 +319,16 @@ foreach ($file in $files) {
     $links = Get-OutboundLinks -Content $content -FilePath $file.FullName -Root $repoRoot
 
     $entries += [PSCustomObject]@{
-        Path = $relativePath
-        Title = $title
-        FrontMatter = $frontMatter
-    Type = Get-InferredType -RelativePath $relativePath -FrontMatter $frontMatter
-    Domain = Get-InferredDomain -RelativePath $relativePath -FrontMatter $frontMatter
-        Status = $frontMatter["status"]
-        LastUpdated = $frontMatter["last_updated"]
-        Headings = $headings
+        Path          = $relativePath
+        Title         = $title
+        FrontMatter   = $frontMatter
+        Type          = Get-InferredType -RelativePath $relativePath -FrontMatter $frontMatter
+        Domain        = Get-InferredDomain -RelativePath $relativePath -FrontMatter $frontMatter
+        Status        = $frontMatter["status"]
+        LastUpdated   = $frontMatter["last_updated"]
+        Headings      = $headings
         OutboundLinks = $links
-        InNav = $tocPaths.ContainsKey($relativePath)
+        InNav         = $tocPaths.ContainsKey($relativePath)
     }
 }
 

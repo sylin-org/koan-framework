@@ -32,12 +32,12 @@ validation:
 
 ## Quick Reference Map
 
-| Scenario | Start here | Combine with |
-| --- | --- | --- |
-| CRUD service with paging | [Stage 1 – CRUD Backbone](../guides/data-modeling.md#stage-1--crud-backbone) | [API Delivery Playbook](../guides/building-apis.md) |
-| Event-driven projections | [Stage 2 – Event-Driven Messaging](../guides/data-modeling.md#stage-2--event-driven-messaging) | [Semantic Pipelines Playbook](../guides/semantic-pipelines.md) |
-| AI-assisted workflows | [Stage 3 – AI-Enriched Domain](../guides/data-modeling.md#stage-3--ai-enriched-domain) | [AI Integration Playbook](../guides/ai-integration.md) |
-| Governance / audit | [Soft Delete with Guardrails](../guides/data-modeling.md#soft-delete-with-guardrails) | [Koan Troubleshooting Hub](../support/troubleshooting.md#flow--pipeline-health) |
+| Scenario                 | Start here                                                                                     | Combine with                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| CRUD service with paging | [Stage 1 – CRUD Backbone](../guides/data-modeling.md#stage-1--crud-backbone)                   | [API Delivery Playbook](../guides/building-apis.md)                             |
+| Event-driven projections | [Stage 2 – Event-Driven Messaging](../guides/data-modeling.md#stage-2--event-driven-messaging) | [Semantic Pipelines Playbook](../guides/semantic-pipelines.md)                  |
+| AI-assisted workflows    | [Stage 3 – AI-Enriched Domain](../guides/data-modeling.md#stage-3--ai-enriched-domain)         | [AI Integration Playbook](../guides/ai-integration.md)                          |
+| Governance / audit       | [Soft Delete with Guardrails](../guides/data-modeling.md#soft-delete-with-guardrails)          | [Koan Troubleshooting Hub](../support/troubleshooting.md#flow--pipeline-health) |
 
 ---
 
@@ -59,6 +59,7 @@ public class Product : Entity<Product>
 ```
 
 **Checklist**
+
 - Use constructor defaults instead of null checks downstream.
 - Add paging helpers (`FirstPage`, `Page`) before exposing collection endpoints.
 - Keep mutations inside instance methods (`ApplyDiscount`, `Archive`).
@@ -93,6 +94,7 @@ public static class InventoryPipeline
 ```
 
 **Checklist**
+
 - Emit events from lifecycle hooks rather than controllers.
 - Route notifications through Flow or Messaging adapters instead of custom dispatchers.
 - Attach payload transformers in Web to surface event outcomes consistently.
@@ -114,6 +116,7 @@ public class DocumentIndex : Entity<DocumentIndex>
 ```
 
 **Checklist**
+
 - Generate embeddings during writes or via Flow background jobs.
 - Validate dimension sizes before saving vectors.
 - Capture provider/model IDs in configuration for quick swaps.

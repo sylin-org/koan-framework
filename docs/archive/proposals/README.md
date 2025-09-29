@@ -18,29 +18,29 @@
 
 ## Disposition summary
 
-| Proposal | Status | Notes |
-| --- | --- | --- |
-| [Parent relationship system](parent-relationship-system.md) | **Superseded** | Incorporated into `DATA-0072` and `FLOW-0102`; keep for historical context only. |
-| [Implementation roadmap](implementation-roadmap.md) | **Superseded** | Schedule replaced by the phased delivery in `DX-0039`; use as a planning template. |
-| [Relationship response format v2](relationship-response-format-v2.md) | **Archived** | Concepts folded into the Koan entity transformers described in `WEB-0035`. |
-| [Koan MCP HTTP/SSE transport](koan-mcp-http-sse-transport.md) | **Partially adopted** | Transport primitives now governed by `AI-0012` and `AI-0013`; revisit gaps during MCP hardening. |
-| [Adapter infrastructure centralization](PROPOSAL_Adapter_Infrastructure_Centralization.md) | **Needs ADR** | Core ideas live in the new orchestration stack; capture remaining deltas in a follow-up OPS ADR. |
-| [Provider readiness system](PROPOSAL_Provider_Readiness_System.md) | **Superseded** | Mechanism replaced by the readiness matrix in `ARCH-0044`. |
-| [Service adapter realignment](service-adapter-realignment.md) | **Superseded** | Decisions folded into `ARCH-0045` and `ARCH-0047`; keep only for citation. |
-| [Koan Aspire analysis set](koan-aspire-architecture-review.md) | **Archived** | Outcomes ratified in `ARCH-0055`; retain for historical appendices. |
-| [Koan Aspire implementation roadmap](koan-aspire-implementation-roadmap.md) | **Archived** | Implementation now tracked via ADR `ARCH-0055`. |
-| [Koan Aspire technical specification](koan-aspire-technical-specification.md) | **Archived** | Specifics superseded by the approved integration doc `ARCH-0055`. |
-| [Koan MCP integration](koan-mcp-integration.md) | **Archived** | Superseded by the MCP ADR set (`AI-0012` / `AI-0013`). |
-| [Pagination attribute system](pagination-attribute-system.md) | **Superseded** | Pagination semantics now defined in `DATA-0061`; attribute concept dropped. |
-| [Entity endpoint service extraction](entity-endpoint-service-extraction.md) | **Pending triage** | Consider folding into a DX ADR once controller surface stabilises. |
-| [Backup/restore comprehensive specification](backup-restore-comprehensive-specification.md) | **Pending triage** | Needs alignment with `Koan.Data.Backup` deliverables; schedule follow-up ADR. |
-| [Entity ID storage optimisation](entity-id-storage-optimization.md) | **Archived** | ID policy governed by `ARCH-0052`; revisit only if new providers demand changes. |
-| [Entity ID optimisation (appendix)](entity-id-optimization/) | **Reference only** | Contains exploratory notebooks and diagrams; no direct implementation plan. |
-| [S10 DevPortal comprehensive proposal](s10-devportal-comprehensive-proposal.md) | **Archived** | Superseded by `/samples/S10.DevPortal` implementation guide. |
-| [S12 MedTrials proposal](s12-medtrials-sample-proposal.md) | **Archived** | Implementation captured in ADR `AI-0013` and the shipped sample. |
-| [Service authentication proposal](PROP-0052-service-authentication.md) | **Superseded** | Decisions merged into `DEC-0053`. |
-| [Observability over escape hatches](PROP-0053-observability-over-escape-hatches.md) | **Pending triage** | Needs conversion into an OPS ADR with current telemetry posture. |
-| [Koan data relationship refactoring](Koan-data-relationship-refactoring-proposal.md) | **Superseded** | See `DATA-0072` and `FLOW-0102`. |
+| Proposal                                                                                    | Status                | Notes                                                                                            |
+| ------------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------ |
+| [Parent relationship system](parent-relationship-system.md)                                 | **Superseded**        | Incorporated into `DATA-0072` and `FLOW-0102`; keep for historical context only.                 |
+| [Implementation roadmap](implementation-roadmap.md)                                         | **Superseded**        | Schedule replaced by the phased delivery in `DX-0039`; use as a planning template.               |
+| [Relationship response format v2](relationship-response-format-v2.md)                       | **Archived**          | Concepts folded into the Koan entity transformers described in `WEB-0035`.                       |
+| [Koan MCP HTTP/SSE transport](koan-mcp-http-sse-transport.md)                               | **Partially adopted** | Transport primitives now governed by `AI-0012` and `AI-0013`; revisit gaps during MCP hardening. |
+| [Adapter infrastructure centralization](PROPOSAL_Adapter_Infrastructure_Centralization.md)  | **Needs ADR**         | Core ideas live in the new orchestration stack; capture remaining deltas in a follow-up OPS ADR. |
+| [Provider readiness system](PROPOSAL_Provider_Readiness_System.md)                          | **Superseded**        | Mechanism replaced by the readiness matrix in `ARCH-0044`.                                       |
+| [Service adapter realignment](service-adapter-realignment.md)                               | **Superseded**        | Decisions folded into `ARCH-0045` and `ARCH-0047`; keep only for citation.                       |
+| [Koan Aspire analysis set](koan-aspire-architecture-review.md)                              | **Archived**          | Outcomes ratified in `ARCH-0055`; retain for historical appendices.                              |
+| [Koan Aspire implementation roadmap](koan-aspire-implementation-roadmap.md)                 | **Archived**          | Implementation now tracked via ADR `ARCH-0055`.                                                  |
+| [Koan Aspire technical specification](koan-aspire-technical-specification.md)               | **Archived**          | Specifics superseded by the approved integration doc `ARCH-0055`.                                |
+| [Koan MCP integration](koan-mcp-integration.md)                                             | **Archived**          | Superseded by the MCP ADR set (`AI-0012` / `AI-0013`).                                           |
+| [Pagination attribute system](pagination-attribute-system.md)                               | **Superseded**        | Pagination semantics now defined in `DATA-0061`; attribute concept dropped.                      |
+| [Entity endpoint service extraction](entity-endpoint-service-extraction.md)                 | **Pending triage**    | Consider folding into a DX ADR once controller surface stabilises.                               |
+| [Backup/restore comprehensive specification](backup-restore-comprehensive-specification.md) | **Pending triage**    | Needs alignment with `Koan.Data.Backup` deliverables; schedule follow-up ADR.                    |
+| [Entity ID storage optimisation](entity-id-storage-optimization.md)                         | **Archived**          | ID policy governed by `ARCH-0052`; revisit only if new providers demand changes.                 |
+| [Entity ID optimisation (appendix)](entity-id-optimization/)                                | **Reference only**    | Contains exploratory notebooks and diagrams; no direct implementation plan.                      |
+| [S10 DevPortal comprehensive proposal](s10-devportal-comprehensive-proposal.md)             | **Archived**          | Superseded by `/samples/S10.DevPortal` implementation guide.                                     |
+| [S12 MedTrials proposal](s12-medtrials-sample-proposal.md)                                  | **Archived**          | Implementation captured in ADR `AI-0013` and the shipped sample.                                 |
+| [Service authentication proposal](PROP-0052-service-authentication.md)                      | **Superseded**        | Decisions merged into `DEC-0053`.                                                                |
+| [Observability over escape hatches](PROP-0053-observability-over-escape-hatches.md)         | **Pending triage**    | Needs conversion into an OPS ADR with current telemetry posture.                                 |
+| [Koan data relationship refactoring](Koan-data-relationship-refactoring-proposal.md)        | **Superseded**        | See `DATA-0072` and `FLOW-0102`.                                                                 |
 
 ## How to use this archive
 

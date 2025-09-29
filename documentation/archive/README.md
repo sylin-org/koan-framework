@@ -17,15 +17,17 @@ Technical analysis documents including performance studies and optimization rese
 
 ### `/proposals/`
 
-**Archived proposals and implementation roadmaps**
+**Active Proposals and Implementation Roadmaps**
 
-Historical proposals retained for reference. Latest decisions are captured in the ADR catalog under `/docs/decisions/`.
+Current proposals for framework enhancements and implementation plans.
 
 **Contents:**
 
-- Legacy relationship refactor RFCs (now superseded by `DATA-0072` / `FLOW-0102`)
-- Adapter orchestration concepts awaiting follow-up ADRs
-- Aspire adoption analyses preserved as appendices
+- Backup/restore specifications
+- Entity ID optimization proposals
+- Authentication service proposals
+- Observability enhancement proposals
+- Data relationship refactoring plans
 
 ### `/technical/`
 
@@ -66,8 +68,8 @@ Preserved content from the original docs/ structure that may contain valuable re
 
 For current framework documentation, please refer to:
 
-- [Main Documentation Index](../index.md)
-- [Getting Started Guide](../getting-started/overview.md)
+- [Main Documentation Index](../README.md)
+- [Getting Started Guide](../docs/getting-started/)
 - [Reference Documentation](../reference/)
 - [Architecture Documentation](../architecture/)
 - [Troubleshooting Guide](../support/troubleshooting.md)

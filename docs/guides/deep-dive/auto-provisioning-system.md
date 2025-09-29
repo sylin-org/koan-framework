@@ -11,7 +11,7 @@
 
 The Koan Framework implements a sophisticated **automatic schema provisioning system** that creates database collections, tables, and indices on-demand without developer intervention. This system enables the "just works" experience for Entity<> patterns across multiple storage providers.
 
-**Key Principle**: *Storage structures should be created automatically when first accessed, not manually configured.*
+**Key Principle**: _Storage structures should be created automatically when first accessed, not manually configured._
 
 ---
 
@@ -81,6 +81,7 @@ public static async Task<T> ExecuteWithSchemaProvisioningAsync<T, TEntity>(
 ```
 
 **Key Features:**
+
 - **Transparent Integration**: All repository operations automatically wrapped
 - **Provider Agnostic**: Works with any adapter implementing `IInstructionExecutor<T>`
 - **Failure Detection**: Smart pattern matching for schema-related exceptions
@@ -127,6 +128,7 @@ public static class DataInstructions
 ```
 
 **Provider Implementation Example (Couchbase)**:
+
 ```csharp
 public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     => ExecuteWithReadinessAsync(async () =>
@@ -157,41 +159,48 @@ public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, Cancellation
 ### Step-by-Step Execution
 
 1. **Operation Triggered**
+
    ```csharp
    var todos = await Todo.All(); // User calls Entity<> method
    ```
 
 2. **Repository Method Invocation**
+
    ```csharp
    public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
        => ExecuteWithReadinessAsync(() => QueryInternalAsync(query, null, ct), ct);
    ```
 
 3. **Readiness Extension Wrapping**
+
    ```csharp
    // All operations automatically wrapped by ExecuteWithSchemaProvisioningAsync
    return await adapter.WithReadinessAsync<TEntity>(() => QueryInternalAsync(...), ct);
    ```
 
 4. **First Attempt Execution**
+
    ```csharp
    // Try normal query operation
    var result = await ctx.Cluster.QueryAsync<T>(finalStatement, queryOptions);
    ```
 
 5. **Exception Analysis**
+
    ```csharp
    // Exception caught: "Keyspace not found in CB datastore: default:Koan._default.Todos"
    // IsSchemaRelatedFailure(ex) returns true
    ```
 
 6. **Automatic Provisioning**
+
    ```csharp
    // Reflection-based instruction execution
    await adapter.ExecuteAsync<bool>(new Instruction("EnsureCreated"), ct);
    ```
 
 7. **Provider-Specific Creation**
+
    ```csharp
    // Couchbase: Create scope + collection
    await manager.CreateScopeAsync(scopeName);
@@ -253,12 +262,14 @@ private static bool IsAlreadyExists(CouchbaseException ex)
 ```
 
 **Key Patterns:**
+
 - **Idempotent Operations**: Safe to call multiple times
 - **Timing Awareness**: Waits for collections to be query-ready
 - **Hierarchy Support**: Creates scopes before collections
 - **Error Handling**: Distinguishes "already exists" from real failures
 
 ### MongoDB Implementation Pattern
+
 ```csharp
 private async Task EnsureCollectionAsync(string collectionName, CancellationToken ct)
 {
@@ -278,6 +289,7 @@ private async Task EnsureCollectionAsync(string collectionName, CancellationToke
 ```
 
 ### SQL Provider Pattern
+
 ```csharp
 private async Task EnsureTableAsync(string tableName, CancellationToken ct)
 {
@@ -300,11 +312,13 @@ private async Task EnsureTableAsync(string tableName, CancellationToken ct)
 ## ⚡ Performance Considerations
 
 ### 1. **Single Operation Cost**
+
 - **First Access**: ~2-5 seconds (includes provisioning)
 - **Subsequent Access**: ~50-200ms (normal operation)
 - **Concurrent Access**: Handled via provider-level locking
 
 ### 2. **Caching and Optimization**
+
 ```csharp
 // Providers typically cache existence checks
 private readonly ConcurrentDictionary<string, bool> _collectionCache = new();
@@ -321,6 +335,7 @@ private async Task<bool> CollectionExistsAsync(string name, CancellationToken ct
 ```
 
 ### 3. **Bulk Provisioning**
+
 ```csharp
 // Framework supports bulk provisioning for multiple entities
 await Entity<Todo>.EnsureCreated();
@@ -334,6 +349,7 @@ await Entity<Product>.EnsureCreated();
 ## 🔧 Configuration and Customization
 
 ### 1. **Disable Auto-Provisioning**
+
 ```json
 {
   "Koan": {
@@ -348,6 +364,7 @@ await Entity<Product>.EnsureCreated();
 ```
 
 ### 2. **Provider-Specific Settings**
+
 ```json
 {
   "Koan": {
@@ -365,6 +382,7 @@ await Entity<Product>.EnsureCreated();
 ```
 
 ### 3. **Custom Instructions**
+
 ```csharp
 // Providers can implement custom provisioning instructions
 public const string CreateIndices = "CreateIndices";
@@ -379,6 +397,7 @@ await repository.ExecuteAsync<bool>(new Instruction("CreateIndices"), ct);
 ## 🚨 Error Handling and Recovery
 
 ### 1. **Provisioning Failures**
+
 ```csharp
 catch (Exception provisioningEx)
 {
@@ -390,11 +409,13 @@ catch (Exception provisioningEx)
 ```
 
 ### 2. **Partial Provisioning**
+
 - **Scope exists, collection missing**: Continue with collection creation
 - **Collection exists, indices missing**: Create missing indices only
 - **Network interruption**: Retry with exponential backoff
 
 ### 3. **Monitoring and Alerting**
+
 ```csharp
 // Metrics integration
 _telemetry.RecordProvisioningTime(entityType, elapsed);
@@ -413,6 +434,7 @@ public async Task<bool> IsProvisioningHealthyAsync()
 ## 🧪 Testing Patterns
 
 ### 1. **Unit Testing Auto-Provisioning**
+
 ```csharp
 [Test]
 public async Task Should_AutoProvision_When_Collection_Missing()
@@ -430,6 +452,7 @@ public async Task Should_AutoProvision_When_Collection_Missing()
 ```
 
 ### 2. **Integration Testing**
+
 ```csharp
 [Test]
 public async Task Should_Handle_Concurrent_Provisioning()
@@ -480,4 +503,4 @@ public async Task Should_Handle_Concurrent_Provisioning()
 
 ---
 
-*The auto-provisioning system enables Koan's "just works" philosophy by eliminating manual database schema management while maintaining production reliability and performance.*
+_The auto-provisioning system enables Koan's "just works" philosophy by eliminating manual database schema management while maintaining production reliability and performance._

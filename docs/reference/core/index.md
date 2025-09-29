@@ -7,9 +7,9 @@ status: current
 last_updated: 2025-09-28
 framework_version: v0.6.2
 validation:
-    date_last_tested: 2025-09-28
-    status: verified
-    scope: docs/reference/core/index.md
+  date_last_tested: 2025-09-28
+  status: verified
+  scope: docs/reference/core/index.md
 ---
 
 # Core Pillar Reference
@@ -64,6 +64,7 @@ That's it. Your module registers automatically when referenced.
 Built-in health endpoints with custom contributors.
 
 ### Endpoints
+
 - `GET /api/health` - Overall health
 - `GET /api/health/live` - Liveness probe
 - `GET /api/health/ready` - Readiness probe
@@ -118,6 +119,7 @@ var value = Configuration.ReadFirst(config,
 ```
 
 Environment variables work too:
+
 ```bash
 export Koan__MyApp__Setting=value
 ```

@@ -11,6 +11,7 @@ validation:
   status: verified
   scope: docs/reference/data/index.md
 ---
+
 # Data Pillar Reference
 
 ## Contract
@@ -291,14 +292,14 @@ All direct commands respect configured connections, logging, and retry policies.
 
 ## Provider Matrix
 
-| Provider | Package | Primary Use Case |
-| --- | --- | --- |
-| SQLite | `Koan.Data.Sqlite` | Local development, embedded deployments |
-| Postgres | `Koan.Data.Postgres` | Production relational workloads |
-| SQL Server | `Koan.Data.SqlServer` | Legacy and enterprise relational |
-| MongoDB | `Koan.Data.MongoDB` | Document storage |
-| Redis | `Koan.Data.Redis` | Caching, vector search |
-| JSON | `Koan.Data.Json` | File-based storage |
+| Provider   | Package               | Primary Use Case                        |
+| ---------- | --------------------- | --------------------------------------- |
+| SQLite     | `Koan.Data.Sqlite`    | Local development, embedded deployments |
+| Postgres   | `Koan.Data.Postgres`  | Production relational workloads         |
+| SQL Server | `Koan.Data.SqlServer` | Legacy and enterprise relational        |
+| MongoDB    | `Koan.Data.MongoDB`   | Document storage                        |
+| Redis      | `Koan.Data.Redis`     | Caching, vector search                  |
+| JSON       | `Koan.Data.Json`      | File-based storage                      |
 
 Consult each adapter’s README for capability flags (bulk operations, vectors, transactions, etc.).
 
@@ -309,15 +310,15 @@ Consult each adapter’s README for capability flags (bulk operations, vectors, 
 ```json
 {
   "Koan": {
-  "Data": {
-    "DefaultProvider": "Sqlite",
-    "Sqlite": {
-    "ConnectionString": "Data Source=app.db"
-    },
-    "Postgres": {
-    "ConnectionString": "Host=localhost;Database=myapp"
+    "Data": {
+      "DefaultProvider": "Sqlite",
+      "Sqlite": {
+        "ConnectionString": "Data Source=app.db"
+      },
+      "Postgres": {
+        "ConnectionString": "Host=localhost;Database=myapp"
+      }
     }
-  }
   }
 }
 ```

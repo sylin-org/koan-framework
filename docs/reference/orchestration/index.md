@@ -128,6 +128,7 @@ Koan up
 ```
 
 **Profile Characteristics:**
+
 - Conservative timeouts
 - Bind mounts enabled
 - Optional telemetry exporters
@@ -141,6 +142,7 @@ Koan up
 ```
 
 **Profile Characteristics:**
+
 - Ephemeral named volumes
 - Deterministic ports with auto-avoid
 - Faster failure timeouts
@@ -154,6 +156,7 @@ Koan export compose --profile staging
 ```
 
 **Profile Characteristics:**
+
 - Export-only (no local execution)
 - Bind mounts for persistence
 - Production-like configuration
@@ -166,6 +169,7 @@ Koan export compose --profile prod
 ```
 
 **Profile Characteristics:**
+
 - Export-only
 - No automatic mount injection
 - Strict port conflict handling
@@ -261,6 +265,7 @@ public class PostgresService
 ```
 
 **Mount Behavior by Profile:**
+
 - **Local/Staging**: `./Data/postgres:/var/lib/postgresql/data`
 - **CI**: `data_postgres:/var/lib/postgresql/data` (named volume)
 - **Production**: No automatic mounts
@@ -434,7 +439,7 @@ Koan up --engine podman
 
 ```yaml
 # .Koan/compose.yml (generated)
-version: '3.8'
+version: "3.8"
 
 services:
   postgres:
@@ -494,20 +499,20 @@ spec:
         app: postgres
     spec:
       containers:
-      - name: postgres
-        image: postgres:15
-        env:
-        - name: POSTGRES_DB
-          value: myapp
-        ports:
-        - containerPort: 5432
-        volumeMounts:
-        - name: postgres-data
-          mountPath: /var/lib/postgresql/data
+        - name: postgres
+          image: postgres:15
+          env:
+            - name: POSTGRES_DB
+              value: myapp
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
       volumes:
-      - name: postgres-data
-        persistentVolumeClaim:
-          claimName: postgres-pvc
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
 ```
 
 ## Troubleshooting
@@ -577,14 +582,14 @@ public class HealthCheckAttribute : Attribute { }
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | General error |
-| 2 | Configuration error |
-| 3 | Engine not available |
-| 4 | Readiness timeout |
-| 5 | Port conflict (when --conflicts fail) |
+| Code | Meaning                               |
+| ---- | ------------------------------------- |
+| 0    | Success                               |
+| 1    | General error                         |
+| 2    | Configuration error                   |
+| 3    | Engine not available                  |
+| 4    | Readiness timeout                     |
+| 5    | Port conflict (when --conflicts fail) |
 
 ### Environment Variables
 

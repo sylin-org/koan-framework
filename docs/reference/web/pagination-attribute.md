@@ -43,6 +43,7 @@ public class ProductsController : EntityController<Product>
 ## PaginationMode Options
 
 ### On (Default)
+
 Always paginate with configurable limits. Clients can adjust page size within bounds.
 
 ```csharp
@@ -56,6 +57,7 @@ public class TodosController : EntityController<Todo>
 ```
 
 ### Required
+
 Always paginate, ignore client requests to disable pagination.
 
 ```csharp
@@ -68,6 +70,7 @@ public class AuditLogController : EntityController<AuditLog>
 ```
 
 ### Optional
+
 Paginate only when explicitly requested by client.
 
 ```csharp
@@ -81,6 +84,7 @@ public class MetricsController : EntityController<Metric>
 ```
 
 ### Off
+
 Never paginate - always return full dataset.
 
 ```csharp
@@ -95,6 +99,7 @@ public class StatusController : EntityController<SystemStatus>
 ## Configuration Options
 
 ### Method-Level Override
+
 Method attributes take precedence over controller-level settings:
 
 ```csharp
@@ -112,6 +117,7 @@ public class ProductsController : EntityController<Product>
 ```
 
 ### Include Count Control
+
 Control whether total record counts are calculated:
 
 ```csharp
@@ -124,6 +130,7 @@ public class BigDataController : EntityController<LogEntry>
 ```
 
 ### Default Sorting
+
 Specify default sort order for consistent pagination:
 
 ```csharp
@@ -156,6 +163,7 @@ builder.Services.AddPaginationSafetyBounds(builder.Configuration);
 ```
 
 Safety bounds ensure:
+
 - No page sizes below MinPageSize or above MaxPageSize
 - Total query results never exceed AbsoluteMaxRecords
 - Framework prevents memory exhaustion and poor performance
@@ -178,6 +186,7 @@ public class QueryResult<T>
 ```
 
 ### Example Response
+
 ```json
 {
   "items": [
@@ -196,6 +205,7 @@ public class QueryResult<T>
 ## Performance Optimizations
 
 ### Provider-Specific Optimization
+
 The framework automatically detects provider capabilities:
 
 ```csharp
@@ -206,6 +216,7 @@ The framework automatically detects provider capabilities:
 ```
 
 ### Single-Query Optimization
+
 When providers support `IPagedRepository`, the framework uses optimized single-query pagination:
 
 ```csharp
@@ -217,6 +228,7 @@ When providers support `IPagedRepository`, the framework uses optimized single-q
 ## Client Usage Patterns
 
 ### Query Parameters
+
 Standard pagination parameters work across all endpoints:
 
 ```http
@@ -226,6 +238,7 @@ GET /api/products?pageSize=100  # page defaults to 1
 ```
 
 ### Sorting
+
 Consistent sort syntax across all endpoints:
 
 ```http
@@ -286,24 +299,29 @@ public class PublicProductsController : EntityController<Product> { }
 ### From KoanDataBehaviorAttribute
 
 **Before:**
+
 ```csharp
 [KoanDataBehavior(DisablePagination = true)]
 public class LegacyController : EntityController<Item> { }
 ```
 
 **After:**
+
 ```csharp
 [Pagination(Mode = PaginationMode.Off)]
 public class ModernController : EntityController<Item> { }
 ```
 
 ### Migration Mapping
+
 - `DisablePagination = true` → `Mode = PaginationMode.Off`
 - `DisablePagination = false` → `Mode = PaginationMode.On`
 - No attribute → Uses framework defaults (PaginationMode.On)
 
 ### Compatibility Period
+
 The framework maintains backward compatibility:
+
 - Existing `KoanDataBehaviorAttribute` continues to work
 - New `PaginationAttribute` takes precedence when both are present
 - Migration warnings logged in development mode
@@ -311,6 +329,7 @@ The framework maintains backward compatibility:
 ## Advanced Scenarios
 
 ### Custom Pagination Logic
+
 Override pagination behavior for specific business requirements:
 
 ```csharp
@@ -337,6 +356,7 @@ public class CustomController : EntityController<Product>
 ```
 
 ### Tenant-Specific Configuration
+
 Different pagination rules per tenant:
 
 ```csharp
@@ -369,6 +389,7 @@ public class TenantAwareController : EntityController<Order>
 **Solution**: Always specify `DefaultSort` for stable ordering
 
 ### Debug Information
+
 Enable detailed pagination logging:
 
 ```json
@@ -382,6 +403,7 @@ Enable detailed pagination logging:
 ```
 
 This enables detailed logs showing:
+
 - Pagination policy resolution
 - Safety bounds application
 - Query optimization decisions

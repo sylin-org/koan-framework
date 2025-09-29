@@ -7,9 +7,9 @@ status: current
 last_updated: 2025-09-28
 framework_version: v0.6.2
 validation:
-    date_last_tested: 2025-09-28
-    status: verified
-    scope: docs/index.md
+  date_last_tested: 2025-09-28
+  status: verified
+  scope: docs/index.md
 ---
 
 # Koan Framework Documentation

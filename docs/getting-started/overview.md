@@ -70,6 +70,7 @@ Everything starts minimal and grows by intent—add packages, not boilerplate.
    public class TodosController : EntityController<Todo> { }
    ```
 4. **Keep `Program.cs` minimal**
+
    ```csharp
    var builder = WebApplication.CreateBuilder(args);
    builder.Services.AddKoan();
@@ -77,6 +78,7 @@ Everything starts minimal and grows by intent—add packages, not boilerplate.
    var app = builder.Build();
    app.Run();
    ```
+
 5. **Run and verify**
    ```powershell
    dotnet run
@@ -126,6 +128,7 @@ You now have REST CRUD, health checks, telemetry, and SQLite storage without con
   dotnet add package Koan.AI.Ollama
   ```
 - Inject `IAiService` for chat + semantic search:
+
   ```csharp
   public class TodosController : EntityController<Todo>
   {
@@ -146,6 +149,7 @@ You now have REST CRUD, health checks, telemetry, and SQLite storage without con
       => Ok(await Todo.SemanticSearch(query));
   }
   ```
+
 - Skip the AI step when providers are unavailable; everything else still works.
 
 ---

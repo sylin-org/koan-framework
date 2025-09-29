@@ -265,6 +265,7 @@ dotnet add package Koan.Web.GraphQL
 Schema automatically includes all `EntityController<T>` types.
 
 Query example:
+
 ```graphql
 query {
   products(where: { category: "Electronics" }) {
