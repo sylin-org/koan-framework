@@ -90,6 +90,11 @@
 - Cross-pillar checklists for Web, Flow, AI, and Messaging
 - Links back to the Data Modeling Playbook for deeper coverage
 
+### [Garden Cooperative Journal](garden-cooperative-journal.md)
+- Narrative-bound slice showing Plot, Reading, Reminder, and Member working together
+- SQLite-first setup with Flow hydration scoring and lifecycle events
+- API storyboard with minimal controllers and optional reminder extensions
+
 ---
 
 ## 📊 Documentation Priorities

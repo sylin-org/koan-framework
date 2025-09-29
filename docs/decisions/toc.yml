@@ -268,6 +268,8 @@
       href: DX-0040-docs-restructure-and-governance.md
     - name: DX-0041 Pillar documentation consolidation roadmap
       href: DX-0041-docs-pillar-consolidation.md
+    - name: DX-0042 Narrative sample entity naming simplification
+      href: DX-0042-narrative-samples-simple-entity-names.md
 - name: Security (DEC)
   items:
     - name: DEC-0053 Service-to-service authentication
