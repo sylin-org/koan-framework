@@ -46,7 +46,7 @@ public class LocationInterceptor : IKoanAutoRegistrar
                     var normalized = addressService.NormalizeAddress(location.Address);
                     var hash = addressService.ComputeSHA512(normalized);
                     location.AddressHash = hash;
-                    
+
                     // Check for hash collision (duplicate address already processed)
                     var existingCache = await ResolutionCache.FindAsync(hash);
                     if (existingCache != null)
@@ -54,7 +54,7 @@ public class LocationInterceptor : IKoanAutoRegistrar
                         Console.WriteLine("[LocationInterceptor] Hash collision detected - dropping duplicate address");
                         return CanonIntakeActions.Drop(location, $"Duplicate address hash: {hash}");
                     }
-                    
+
                     Console.WriteLine("[LocationInterceptor] New address hash {0} - parking for resolution", hash.Substring(0, 8));
                 }
 
@@ -66,21 +66,21 @@ public class LocationInterceptor : IKoanAutoRegistrar
                 // Post-association processing - notify external systems
                 if (!string.IsNullOrEmpty(location.AgnosticLocationId))
                 {
-                    Console.WriteLine("[LocationInterceptor] Location successfully associated with canonical ID: {0}", 
+                    Console.WriteLine("[LocationInterceptor] Location successfully associated with canonical ID: {0}",
                         location.AgnosticLocationId);
-                    
+
                     // Could trigger external system notifications here
                     // await _notificationService.NotifyLocationResolved(location);
                 }
-                
+
                 return Task.FromResult(CanonStageActions.Continue(location));
             })
             .BeforeProjection(location =>
             {
                 // Enrich location before canonical projection
-                Console.WriteLine("[LocationInterceptor] Enriching location {0} before projection", 
+                Console.WriteLine("[LocationInterceptor] Enriching location {0} before projection",
                     location.Id ?? "unknown");
-                
+
                 return Task.FromResult(CanonStageActions.Continue(location));
             });
 

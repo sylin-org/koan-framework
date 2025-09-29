@@ -60,7 +60,7 @@ public sealed class CanonActionHandler
     private static async Task HandleSeedAsync(Type modelType, CanonAction msg, CancellationToken ct)
     {
         // Create StageRecord<TModel> and save to intake set
-    var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
+        var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
         var record = Activator.CreateInstance(recordType)!;
         recordType.GetProperty("Id")!.SetValue(record, Guid.CreateVersion7().ToString("n"));
         recordType.GetProperty("SourceId")!.SetValue(record, msg.Payload is IDictionary<string, object?> p && p.TryGetValue("source", out var s) ? (s?.ToString() ?? msg.Model) : (msg.ReferenceId ?? msg.Model));
@@ -68,7 +68,7 @@ public sealed class CanonActionHandler
         // Convert payload to clean business data
         var data = ToDict(msg.Payload);
         recordType.GetProperty("Data")!.SetValue(record, data);
-        
+
         // Create separate source metadata dictionary
         var sourceMetadata = new Dictionary<string, object?>
         {

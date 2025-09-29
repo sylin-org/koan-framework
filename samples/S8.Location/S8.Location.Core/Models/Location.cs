@@ -8,12 +8,12 @@ namespace S8.Location.Core.Models;
 public class Location : CanonEntity<Location>
 {
     public string Address { get; set; } = "";
-    
+
     public string? AddressHash { get; set; }  // SHA512 of normalized address for interceptor deduplication
-    
+
     [AggregationKey]
     public string? AgnosticLocationId { get; set; }  // ULID from AgnosticLocationResolver - THIS aggregates resolved locations
-    
+
     // Status is tracked by the Canon pipeline stages, not an entity property
     // Entities in canon.intake = just received
     // Entities in canon.parked = validation failed or resolution error

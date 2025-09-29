@@ -70,7 +70,7 @@ public static class CanonActionsRegistration
     public static IServiceCollection AddCanonActions(this IServiceCollection services)
     {
         services.TryAddSingleton<ICanonActions, CanonActionsSender>();
-        
+
         // Register CanonAction handler using modern .On<T>() pattern  
         services.TryAddSingleton<CanonActionHandler>();
         services.On<CanonAction>(async canonAction =>
@@ -85,7 +85,7 @@ public static class CanonActionsRegistration
             {
             }
         });
-        
+
         return services;
     }
 }

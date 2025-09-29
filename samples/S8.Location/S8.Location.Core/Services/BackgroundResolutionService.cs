@@ -40,13 +40,13 @@ public class BackgroundResolutionService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("[BackgroundResolutionService] Starting address resolution background service");
-        
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 await ProcessParkedAddresses(stoppingToken);
-                
+
                 // Run every 5 minutes
                 await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
             }
@@ -58,46 +58,46 @@ public class BackgroundResolutionService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[BackgroundResolutionService] Error in background resolution cycle");
-                
+
                 // Wait before retrying on error
                 await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             }
         }
     }
-    
+
     private async Task ProcessParkedAddresses(CancellationToken ct)
     {
         using var scope = _serviceProvider.CreateScope();
         var resolver = scope.ServiceProvider.GetRequiredService<IAddressResolutionService>();
-        
+
         _logger.LogInformation("[BackgroundResolutionService] Starting parked address resolution cycle");
-        
+
         try
         {
             // Query Canon's native parked collection for locations waiting for address resolution
             using var context = DataSetContext.With(CanonSets.StageShort(CanonSets.Parked));
             var parkedRecords = await Data<ParkedRecord<Models.Location>, string>.FirstPage(100, ct);
             var waitingRecords = parkedRecords.Where(pr => pr.ReasonCode == "WAITING_ADDRESS_RESOLVE").ToList();
-            
+
             _logger.LogInformation("[BackgroundResolutionService] Found {Count} parked addresses to resolve", waitingRecords.Count);
-            
+
             foreach (var parkedRecord in waitingRecords)
             {
                 try
                 {
                     if (parkedRecord.Data == null) continue;
-                    
+
                     // Extract address from the parked Location data
                     var address = parkedRecord.Data.Address;
                     if (string.IsNullOrEmpty(address)) continue;
-                    
+
                     _logger.LogDebug("[BackgroundResolutionService] Resolving address: {Address}", address);
-                    
+
                     // Resolve using the AddressResolutionService
                     var agnosticLocationId = await resolver.ResolveToCanonicalIdAsync(address, ct);
-                    
+
                     _logger.LogInformation("[BackgroundResolutionService] Resolved address to AgnosticLocationId: {AgnosticId}", agnosticLocationId);
-                    
+
                     // Create a dictionary payload with resolved AgnosticLocationId
                     var healedLocationData = new Dictionary<string, object?>
                     {
@@ -106,23 +106,23 @@ public class BackgroundResolutionService : BackgroundService
                         ["AddressHash"] = parkedRecord.Data.AddressHash,
                         ["AgnosticLocationId"] = agnosticLocationId
                     };
-                    
+
                     // Heal the parked record using the semantic Canon extension method
-                    await parkedRecord.HealAsync(_canonActions, healedLocationData, 
-                        healingReason: $"Address resolved to canonical location {agnosticLocationId}", 
+                    await parkedRecord.HealAsync(_canonActions, healedLocationData,
+                        healingReason: $"Address resolved to canonical location {agnosticLocationId}",
                         ct: ct);
-                    
+
                     _logger.LogDebug("[BackgroundResolutionService] Successfully resolved and reinjected location {Id}", parkedRecord.Id);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "[BackgroundResolutionService] Failed to resolve address from parked record {Id}", parkedRecord.Id);
-                    
+
                     // Could implement retry logic here by updating the parked record
                     // For now, leave it parked for the next cycle
                 }
             }
-            
+
             _logger.LogInformation("[BackgroundResolutionService] Completed parked address resolution cycle");
         }
         catch (Exception ex)

@@ -41,14 +41,14 @@ app.Lifetime.ApplicationStarted.Register(async () =>
 {
     try
     {
-        var testLocation = new Location 
-        { 
-            Id = "startup-test-" + Guid.NewGuid().ToString("N").Substring(0, 8), 
+        var testLocation = new Location
+        {
+            Id = "startup-test-" + Guid.NewGuid().ToString("N").Substring(0, 8),
             Address = "123 Main Street, Springfield, IL 62701"
             // Status removed - Canon pipeline tracks entity state
         };
         await testLocation.Save();
-        
+
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
         logger?.LogInformation("[API] Data provider test: Location saved successfully");

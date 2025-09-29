@@ -38,18 +38,18 @@ public static class Constants
     public static class Messaging
     {
         // Default delivery is MQ; expose DLQ names for external monitoring
-    public const string ExchangeIntake = "canon.intake";
-    public const string ExchangeStandardized = "canon.standardized";
-    public const string ExchangeKeyed = "canon.keyed";
-    public const string ExchangeAssociation = "canon.association";
-    public const string ExchangeProjection = "canon.projection";
+        public const string ExchangeIntake = "canon.intake";
+        public const string ExchangeStandardized = "canon.standardized";
+        public const string ExchangeKeyed = "canon.keyed";
+        public const string ExchangeAssociation = "canon.association";
+        public const string ExchangeProjection = "canon.projection";
         public const string QueueControlPrefix = "control.adapter.";
 
-    public const string DlqIntake = "canon.intake.dlq";
-    public const string DlqStandardized = "canon.standardized.dlq";
-    public const string DlqKeyed = "canon.keyed.dlq";
-    public const string DlqAssociation = "canon.association.dlq";
-    public const string DlqProjection = "canon.projection.dlq";
+        public const string DlqIntake = "canon.intake.dlq";
+        public const string DlqStandardized = "canon.standardized.dlq";
+        public const string DlqKeyed = "canon.keyed.dlq";
+        public const string DlqAssociation = "canon.association.dlq";
+        public const string DlqProjection = "canon.projection.dlq";
     }
 
     // Common envelope keys expected in stage payloads (case-insensitive lookups recommended at call sites)

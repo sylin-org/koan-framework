@@ -20,12 +20,12 @@ namespace S8.Location.Core.Orchestration;
 /// </summary>
 [CanonOrchestrator]
 public class LocationOrchestrator : CanonOrchestratorBase
-{    
-    public LocationOrchestrator(IServiceProvider serviceProvider, IConfiguration configuration) 
+{
+    public LocationOrchestrator(IServiceProvider serviceProvider, IConfiguration configuration)
         : base(serviceProvider.GetRequiredService<ILogger<LocationOrchestrator>>(), configuration, serviceProvider)
     {
     }
-    
+
     protected override void Configure()
     {
         Logger.LogInformation("[LocationOrchestrator] Configuring Canon.OnUpdate handler for pre-resolved Location entities");
