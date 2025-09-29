@@ -46,4 +46,4 @@ public async Task ReprojectOrderAsync(string referenceId, CancellationToken ct)
 
 ## Reference
 - See `DaprCanonRuntime` for runtime details and task enqueue logic.
-- Documentation: `/docs/patterns/canon/runtime.md` (create/update if missing).
+- Technical reference: [`TECHNICAL.md`](./TECHNICAL.md) (validated 2025-09-29).

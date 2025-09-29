@@ -1,5 +1,7 @@
 ﻿# Koan.Core.Adapters
 
+> ✅ Validated against `BaseKoanAdapter` and readiness services on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for the deep dive.
+
 ## Contract
 - **Purpose**: Provide the unified adapter foundation for Koan modules (storage, messaging, orchestration) with capability negotiation and bootstrap reporting.
 - **Primary inputs**: Implementations of `BaseKoanAdapter`, adapters registered through `IKoanAdapter`, configuration snapshots, and capability manifests.
@@ -53,6 +55,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 - `Koan.Core` – shared configuration/environment facilities used for adapter discovery.
 - `Koan.Orchestration.Abstractions` – orchestration bridge interfaces consumed by adapter scaffolding.
 - `Koan.Data.Abstractions` – provides base entity contracts for data adapters.
+
+## Documentation
+- [`TECHNICAL.md`](./TECHNICAL.md) – lifecycle, readiness pipeline, and capability DSL reference.
 
 ## Reference
 - `BaseKoanAdapter` – base class implementing capability negotiation.

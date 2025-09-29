@@ -1,47 +1,52 @@
 ﻿# Koan.Orchestration.Renderers.Compose
 
-## Contract
-- **Purpose**: Render Koan orchestration plans into Docker Compose manifests for local and CI workloads.
-- **Primary inputs**: `OrchestrationPlan` produced by Koan planners, provider metadata (Docker/Podman), and adapter capabilities describing services.
-- **Outputs**: Compose YAML, supporting documentation, and boot report annotations summarizing generated artifacts.
-- **Failure modes**: Missing provider metadata (e.g., container image), unsupported Compose features, or plan inconsistencies.
-- **Success criteria**: Generated Compose files start services without manual edits, modules contribute volumes/env correctly, and diagnostics highlight unsupported capabilities.
+> ✅ Validated against host-mount discovery, healthcheck rendering, and network defaults on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for component breakdown and edge-case coverage.
 
-## Quick start
+Exporter that turns a `Koan.Orchestration.Models.Plan` into a Docker Compose v2 manifest used by the Koan CLI and orchestration tooling.
+
+## Capabilities
+
+- Declares `internal`/`external` networks and attaches services appropriately (app on both; dependencies on internal only).
+- Injects persistence mounts based on `HostMountAttribute` or image heuristics (Postgres, Mongo, Redis, SQL Server, Weaviate, Ollama).
+- Emits healthchecks when `Plan` services provide an HTTP endpoint, falling back to TCP probing when curl/wget are unavailable.
+- Adds named volumes automatically for Ci profile; bind-mounts `./Data/{service}` for Local/Staging; skips auto-mounting in Prod.
+- Generates optional `build` blocks for the app (`api`) when a project file is present, using the repo root as context.
+
+## Quick verification
+
+```pwsh
+# Render compose for the current project
+dotnet run --project src/Koan.Orchestration.Cli -- export compose
+
+# Inspect the generated YAML
+Get-Content .Koan/compose.yml
+```
+
+## Programmatic usage
+
 ```csharp
 using Koan.Orchestration.Renderers.Compose;
+using Koan.Orchestration.Models;
 
-var plan = await OrchestrationPlanner.PlanAsync(ct);
+Plan plan = Planner.Build(Profile.Local); // or your custom discovery flow
 var exporter = new ComposeExporter();
-var compose = await exporter.RenderAsync(plan, new ComposeExportOptions
-{
-    ProjectName = "koan-dev",
-    OutputPath = Path.Combine(solutionRoot, "compose"),
-    IncludeProfiles = { "dev" }
-});
 
-Console.WriteLine($"Compose written to {compose.OutputPath}");
+await exporter.GenerateAsync(plan, Profile.Local, ".Koan/compose.yml");
 ```
-- Generate an orchestration plan (aggregating adapters/providers) and pass it to `ComposeExporter` to emit YAML.
-- Customize output via `ComposeExportOptions` (project name, profiles, secrets, networks).
 
-## Configuration
-- Merge environment-specific overrides by populating `ComposeExportOptions.Overrides`.
-- Enable healthcheck rendering by ensuring providers supply health metadata; exporter will embed Compose healthchecks.
-- To generate Podman-compatible manifests, combine with `Koan.Orchestration.Provider.Podman` metadata.
+- `Profile` drives persistence heuristics (bind mounts vs named volumes vs none).
+- The exporter writes directly to `outPath`; it does not return an in-memory representation.
+- `ExporterCapabilities` advertises readiness probe support so callers know healthchecks are emitted.
 
-## Edge cases
-- Port conflicts: exporter auto-detects collisions; monitor warnings and override using explicit port assignments in adapter metadata.
-- Secret mounts: ensure referenced secrets exist in Koan secrets providers; exporter renders mounts but cannot provision secret values.
-- Multi-network setups: declare networks in provider metadata; exporter creates networks but requires Docker/Podman engine permissions.
-- Large configs: break outputs into per-module files using `ComposeExportOptions.ServiceFilters` to keep YAML manageable.
+## Tips & edge cases
 
-## Related packages
-- `Koan.Orchestration.Abstractions` – orchestration planner producing plans for the exporter.
-- `Koan.Orchestration.Provider.Docker` / `.Podman` – feed runtime metadata.
-- `Koan.Orchestration.Cli` – CLI front-end that invokes this exporter.
+- Ensure services include container images (`ServiceSpec.Image`); missing images cause empty entries and Compose will fail to boot.
+- Healthchecks rely on curl/wget/bash inside the container—supply lightweight base images when possible.
+- If reflection-based host mount discovery fails (e.g., missing optional assembly), the exporter falls back to heuristic mounts or none at all; add explicit entries to `ServiceSpec.Volumes` to override.
+- To avoid bind mounts in Local profile, set your own volumes before handing the plan to the exporter.
 
-## Reference
-- `ComposeExporter` – main entry point for rendering Compose.
-- `ComposeExportOptions` – configuration options controlling output shape.
-- `ComposeArtifacts` – result structure with output path and metadata.
+## Related docs
+
+- [`Koan.Orchestration.Cli`](../Koan.Orchestration.Cli/README.md) – CLI front-end invoking the exporter.
+- [`Koan.Orchestration.Provider.Docker`](../Koan.Orchestration.Provider.Docker/README.md), [`Koan.Orchestration.Provider.Podman`](../Koan.Orchestration.Provider.Podman/README.md) – providers consuming the generated Compose files.
+- `/docs/engineering/index.md`, `/docs/architecture/principles.md` – orchestration design principles.

@@ -1,58 +1,64 @@
 ﻿# Koan.Secrets.Core
 
-## Contract
-- **Purpose**: Provide the secret runtime for Koan, coordinating providers, caching, and secret materialization.
-- **Primary inputs**: Secret descriptors from `Koan.Secrets.Abstractions`, provider registrations, Koan configuration sources.
-- **Outputs**: Scoped secret resolutions, provider health diagnostics, and boot notes summarizing secret availability.
-- **Failure modes**: Provider connectivity failures, missing descriptors, or attempts to resolve secrets without scope information.
-- **Success criteria**: Secrets resolve quickly with appropriate scoping, provider failures surface via diagnostics, and rotation policies can be enforced centrally.
+> ✅ Validated against configuration bootstrap upgrades, provider chaining, and cache expiry refresh on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for runtime architecture and edge-case coverage.
+
+Koan’s secrets runtime coordinates provider discovery, caching, and configuration interpolation so apps can consume `secret://` URIs without bespoke wiring.
 
 ## Quick start
+
 ```csharp
-using Koan.Secrets.Core;
+using Koan.Secrets.Abstractions;
+using Koan.Secrets.Core.Configuration;
+using Koan.Secrets.Core.DI;
 
-public sealed class SecretsAutoRegistrar : IKoanAutoRegistrar
+var builder = WebApplication.CreateBuilder(args);
+
+// Resolve ${secret://...} placeholders from configuration
+builder.Configuration.AddSecretsReferenceConfiguration();
+
+// Register the secrets runtime (env + configuration providers by default)
+builder.Services
+    .AddKoanSecrets(options => options.DefaultTtl = TimeSpan.FromMinutes(10))
+    .AddProvider<VaultSecretProvider>(); // optional custom provider
+
+var app = builder.Build();
+
+// Upgrade bootstrap configuration providers to the DI-backed resolver once the container is ready
+SecretResolvingConfigurationExtensions.UpgradeSecretsConfiguration(app.Services);
+
+app.MapGet("/stripe-key", async (ISecretResolver resolver, CancellationToken ct) =>
 {
-    public string ModuleName => "Secrets";
+    var secret = await resolver.GetAsync(SecretId.Parse("secret://stripe/api-key"), ct);
+    return Results.Ok(secret.AsString());
+});
 
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddSecretsCore(options =>
-        {
-            options.CacheDuration = TimeSpan.FromMinutes(5);
-        });
-    }
+app.Run();
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-        => report.AddNote("Secrets runtime enabled");
-}
-
-public async Task<string> ResolveStripeKeyAsync(CancellationToken ct)
+sealed class VaultSecretProvider : ISecretProvider
 {
-    var secret = await SecretResolver.ResolveAsync("stripe:api-key", SecretScope.Environment("Production"), ct);
-    return secret.Value;
+    public Task<SecretValue> GetAsync(SecretId id, CancellationToken ct) => throw new NotImplementedException();
 }
 ```
-- Register the secrets runtime to enable provider discovery, caching, and diagnostics.
-- Resolve secrets through `SecretResolver.ResolveAsync` using descriptor IDs and scopes.
 
-## Configuration
-- Configure caching strategy (`CacheDuration`, `CacheSize`) to balance freshness and performance.
-- Enable health checks by calling `AddSecretsHealthChecks()`; integrate into Koan Web health endpoints.
-- Wire environment fallbacks using `SecretResolver.TryResolveAsync` to handle optional secrets.
+- `AddKoanSecrets` wires the default env/config providers, memory cache, and resolver chain; return value lets you append custom providers.
+- Call `UpgradeSecretsConfiguration` after DI is fully built so configuration uses the chained resolver instead of the bootstrap fallback.
 
-## Edge cases
-- Provider outages: fallback to cached secrets but log warnings; consider short cache lifetimes for high-rotation secrets.
-- Missing tenants: ensure scope parameters include tenant identifiers to avoid cross-tenant leaks.
-- Rotations: call `SecretResolver.InvalidateAsync` after pushing new values to force refresh.
-- Async deadlocks: always use async APIs; synchronous calls can block on provider I/O.
+## Configuration & caching guidelines
 
-## Related packages
-- `Koan.Secrets.Abstractions` – descriptor and provider contracts.
-- `Koan.Secrets.Vault` – HashiCorp Vault provider to plug into the runtime.
-- `Koan.Core` – boot reporting and DI helpers used by the runtime.
+- `SecretsOptions.DefaultTtl` controls how long cached material stays valid when providers omit TTL metadata.
+- Provide per-secret TTLs via `SecretMetadata.Ttl` to align with rotation policies; the cache honours the shortest value returned.
+- Configuration values containing `${secret://scope/name}` or whole `secret://` URIs resolve automatically once the upgrade step runs.
+- Combine with health checks by adding a probing provider (e.g., Vault) that validates connectivity during app boot.
 
-## Reference
-- `SecretResolver` – main entry point for resolving secrets.
-- `SecretsOptions` – configuration object for runtime behavior.
-- `SecretProviderRegistry` – internal registry managing providers and descriptors.
+## Operational tips
+
+- Prefer provider-qualified URIs (`secret+vault://team/api-key`) when multiple backends are active; the runtime respects the `Provider` hint.
+- Cache misses fall through each registered provider until one succeeds; order providers from fastest to slowest (config → env → remote).
+- When rotating secrets, clear cached values by setting `SecretMetadata.Ttl` to a low value or restarting the app; a targeted invalidation helper can be added via custom resolver wrappers.
+- Use structured logging (inject `ILogger<ChainSecretResolver>`) to trace provider fallbacks during incident diagnosis.
+
+## Related docs
+
+- [`Koan.Secrets.Abstractions`](../Koan.Secrets.Abstractions/README.md) – identifier and payload contracts.
+- [`Koan.Secrets.Vault`](../Koan.Secrets.Vault/README.md) – concrete provider leveraging Vault.
+- [`docs/architecture/capability-map.md`](../../docs/architecture/capability-map.md) – high-level capability overview including the secrets stack.

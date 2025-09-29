@@ -1,6 +1,8 @@
 # Koan Orchestration CLI - Build and Install
 
-This CLI provides export/doctor/up/down/status/logs for Koan orchestration (Docker/Podman).
+> ✅ Validated against planning pipeline, provider workflows, and endpoint formatting on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for detailed flows, edge cases, and component references.
+
+This CLI provides inspect/export/doctor/up/down/status/logs for Koan orchestration (Docker/Podman).
 
 ## Prerequisites
 
@@ -10,8 +12,9 @@ This CLI provides export/doctor/up/down/status/logs for Koan orchestration (Dock
 Optional environment knobs:
 
 - `Koan_ENV` - profile: `Local` (default), `Ci`, `Staging`, `Prod`.
+- `Koan_ORCHESTRATION_PREFERRED_PROVIDERS` - comma-separated provider order, e.g. `docker,podman`.
 - `Koan_PORT_PROBE_MAX` - max increments when auto-avoiding host ports in non-prod (default 200).
-- `Koan_PREFERRED_PROVIDERS` - comma-separated provider order, e.g. `docker,podman`.
+- `Koan_NO_INSPECT` - set to `1` to suppress the automatic `inspect` banner in human mode.
 
 ## Quick run (no install)
 
@@ -21,7 +24,8 @@ Run the CLI from source.
 # From repo root
 dotnet run --project src/Koan.Orchestration.Cli -- --help
 
-# Example: export compose to the default path
+# Example: inspect the current project and export compose to the default path
+dotnet run --project src/Koan.Orchestration.Cli -- inspect --json
 dotnet run --project src/Koan.Orchestration.Cli -- export compose
 
 # Example: check provider availability in JSON
@@ -129,24 +133,26 @@ Notes
 
 ## Commands (reference)
 
-- export compose --out <path> [--profile <local|ci|staging|prod>]
+- inspect [--json] [--engine <docker|podman>] [--profile <p>] [--base-port <n>] [--port <n>] [--expose-internals]
+- export compose --out <path> [--profile <local|ci|staging|prod>] [--base-port <n>] [--port <n>] [--expose-internals] [--no-launch-manifest]
 - doctor [--json] [--engine <docker|podman>]
-- up [--file <compose.yml>] [--engine <id>] [--profile <p>] [--timeout <seconds>] [--base-port <n>] [--explain] [--dry-run] [-v|-vv|--trace|--quiet]
+- up [--file <compose.yml>] [--engine <id>] [--profile <p>] [--timeout <seconds>] [--base-port <n>] [--port <n>] [--expose-internals] [--no-launch-manifest] [--conflicts warn|fail] [--dry-run] [-v|-vv|--trace|--quiet]
 - down [--file <compose.yml>] [--engine <id>] [--volumes|--prune-data]
-- status [--json] [--engine <id>] [--profile <p>] [--base-port <n>]
+- status [--json] [--engine <id>] [--profile <p>] [--base-port <n>] [--port <n>] [--expose-internals] [--no-launch-manifest]
 - logs [--engine <id>] [--service <name>] [--follow] [--tail <n>] [--since <duration>]
 
 Defaults
 
-- Windows-first provider selection: Docker preferred.
-- Default compose path: .Koan/compose.yml
-- Profile resolution: --profile > Koan_ENV env var > Local (default)
+- Windows-first provider selection: Docker preferred (override with `Koan_ORCHESTRATION_PREFERRED_PROVIDERS`).
+- Default compose path: `.Koan/compose.yml`.
+- Profile resolution: `--profile` > `Koan_ENV` env var > `Local` (default).
 
 Notes
 
 - Console outputs (doctor/logs) redact sensitive values by key pattern. JSON outputs are not redacted.
-- status prints endpoint hints from the planned services and flags conflicting ports when detected.
+- `status` prints provider endpoints and plan hints, and flags conflicting ports when detected.
 - `up` is disabled for Staging/Prod; use `export compose` to generate artifacts instead.
+- Port avoidance respects `Koan_PORT_PROBE_MAX`; services skipped due to conflicts are listed with their host ports.
 
 ## Planning and discovery (how plans are built)
 

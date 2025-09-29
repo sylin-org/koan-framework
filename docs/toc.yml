@@ -80,6 +80,10 @@
        href: architecture/pagination-refactor-plan.md
      - name: Comparison with Zen
        href: architecture/comparison.md
+     - name: Capability Map
+       href: architecture/capability-map.md
+     - name: Module Ledger
+       href: architecture/module-ledger.md
  - name: Architecture Decisions
    href: decisions/index.md
  - name: Support

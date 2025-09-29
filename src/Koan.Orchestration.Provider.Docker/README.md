@@ -1,52 +1,57 @@
 ﻿# Koan.Orchestration.Provider.Docker
 
-## Contract
-- **Purpose**: Integrate Docker container metadata into Koan orchestration, powering Compose export and container health probing.
-- **Primary inputs**: Adapter registration via `IKoanAutoRegistrar`, Docker engine connection settings, module descriptors emitted by Koan adapters.
-- **Outputs**: Docker-specific orchestration descriptors, health/readiness notes in the boot report, and Compose artifacts assembled by Koan orchestration renderers.
-- **Failure modes**: Docker daemon unreachable, missing permissions to query containers, or adapters not advertising container capabilities.
-- **Success criteria**: Modules targeting Docker receive accurate service definitions, Compose files include correct mounts and ports, and orchestration diagnostics surface container issues.
+> ✅ Validated against availability probes, compose lifecycle orchestration, and port parsing on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for full flows, component map, and edge-case coverage.
 
-## Quick start
+Docker implementation of `IHostingProvider`, used by the Koan CLI and orchestration tooling to manage Compose-based environments.
+
+## Capabilities
+
+- Detect Docker availability (`docker version --format '{{.Server.Version}}'`).
+- Start stacks with `docker compose up`, waiting for all services to reach a healthy state within the configured timeout.
+- Stop and optionally prune volumes via `docker compose down`.
+- Stream logs, capture service status, and enumerate live port bindings for downstream endpoint formatting.
+- Surface engine metadata (server version, current context) for diagnostics and provider election.
+
+## Quick verification
+
+```pwsh
+# From repo root, run the Koan CLI doctor command against the Docker provider
+dotnet run --project src/Koan.Orchestration.Cli -- doctor --engine docker --json
+
+# Bring up a compose plan (non-prod) and watch readiness handling
+dotnet run --project src/Koan.Orchestration.Cli -- up --engine docker --dry-run --explain
+```
+
+If Docker is reachable, `doctor` reports `available=true` and the `engine` block lists the detected server version and context.
+
+## Programmatic usage
+
 ```csharp
-public sealed class DockerAutoRegistrar : IKoanAutoRegistrar
+var provider = new DockerProvider();
+var availability = await provider.IsAvailableAsync();
+
+if (availability.Ok)
 {
-    public string ModuleName => "Docker";
-
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddKoanAdapter<DockerOrchestrationAdapter>();
-        services.Configure<DockerOptions>(options =>
-        {
-            options.Host = "unix:///var/run/docker.sock";
-            options.DefaultNetwork = "koan-dev";
-        });
-    }
-
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-        => report.AddNote("Docker orchestration provider registered");
+    await provider.Up(".Koan/compose.yml", Profile.Local, new RunOptions(Detach: true, ReadinessTimeout: TimeSpan.FromSeconds(60)));
+    var status = await provider.Status(new StatusOptions(Service: null));
+    var ports = await provider.LivePorts();
+    await provider.Down(".Koan/compose.yml", new StopOptions(RemoveVolumes: false));
 }
 ```
-- Register the Docker adapter to expose container metadata; configure host/network defaults through typed options.
-- When rendering Compose bundles, call `OrchestrationPlanner.PlanAsync()`; the Docker provider contributes container images, environment variables, and volume mounts.
 
-## Configuration
-- `DockerOptions.Host`: socket or TCP endpoint for the Docker engine.
-- `DockerOptions.Networks`: custom networks to create or reuse during Compose generation.
-- Provide credentials (if remote) via Koan secrets integration.
+- `RunOptions.Detach` controls whether `docker compose up` returns immediately or attaches to service output.
+- `RunOptions.ReadinessTimeout` ensures the call fails if containers never reach `running/healthy`.
+- `StopOptions.RemoveVolumes` maps to `docker compose down -v`.
 
-## Edge cases
-- Rootless Docker: ensure socket path is accessible to the Koan process; adjust `DockerOptions.Host` accordingly.
-- Windows containers: confirm Compose renderer selects the correct isolation; supply explicit `Platform` hints via adapter metadata.
-- Rate limit on Docker API: throttle discovery calls or cache responses between Compose renders.
-- SELinux/AppArmor mount restrictions: declare mounts explicitly and document policies in adapter capability notes.
+## Edge cases to watch
 
-## Related packages
-- `Koan.Orchestration.Abstractions` – provides the planner and descriptor models.
-- `Koan.Orchestration.Renderers.Compose` – consumes Docker metadata to render Compose files.
-- `Koan.Orchestration.Provider.Podman` – sibling provider for Podman engines.
+- Docker CLI may emit NDJSON; parsers tolerate both NDJSON and array outputs.
+- Informational stderr output is expected even on success—only exit codes are treated as failures.
+- IPv6 bindings (`:::8080->80/tcp`) are parsed and normalized before returning `PortBinding` records.
+- When the CLI is missing, status/logs fall back quietly while `IsAvailableAsync` delivers a helpful reason string.
 
-## Reference
-- `DockerOrchestrationAdapter` – adapter implementation surfacing container metadata.
-- `DockerOptions` – configuration object for engine connectivity.
-- `OrchestrationRuntimeBridge` – orchestrator integration used by the provider.
+## Related docs
+
+- [`Koan.Orchestration.Cli`](../Koan.Orchestration.Cli/README.md) – commands using this provider.
+- [`Koan.Orchestration.Provider.Podman`](../Koan.Orchestration.Provider.Podman/README.md) – sibling provider for Podman engines.
+- `/docs/engineering/index.md`, `/docs/architecture/principles.md` – orchestration design principles.

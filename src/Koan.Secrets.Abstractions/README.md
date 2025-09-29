@@ -1,56 +1,86 @@
 ﻿# Koan.Secrets.Abstractions
 
-## Contract
-- **Purpose**: Define contracts and options for secret providers within the Koan framework.
-- **Primary inputs**: `SecretDescriptor`, `SecretScope`, and provider capability definitions consumed by runtime modules.
-- **Outputs**: Typed options, serialization helpers, and provider interfaces used by Koan secrets implementations.
-- **Failure modes**: Providers failing to implement required interfaces, mismatched secret scopes, or serialization incompatibilities when transporting secrets.
-- **Success criteria**: Secret providers register seamlessly, secrets resolve with scoped context, and options validation guards against misconfiguration.
+> ✅ Validated against `SecretId` parsing, `SecretValue` projections, and resolver template paths on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for full contract details and edge cases.
+ 
+Shared primitives for expressing secret identifiers, payloads, and provider contracts. Concrete providers (`Koan.Secrets.Core`, Vault, environment-based resolvers) wire into these interfaces so apps can request secrets without binding to a specific backend.
 
 ## Quick start
+
+Implement a provider that fetches payloads and register a resolver that supports templated strings:
+
 ```csharp
+using System.Text.RegularExpressions;
 using Koan.Secrets.Abstractions;
 
-public sealed class ApiKeySecret : SecretDescriptor
+public sealed class EnvSecretProvider : ISecretProvider
 {
-    public ApiKeySecret() : base("stripe:api-key")
+    public Task<SecretValue> GetAsync(SecretId id, CancellationToken ct)
     {
-        Scopes.Add(SecretScope.Environment("Production"));
-        Metadata["rotation"] = "30d";
+        var key = $"SECRETS__{id.Scope}__{id.Name}".ToUpperInvariant();
+        var value = Environment.GetEnvironmentVariable(key)
+            ?? throw new SecretNotFoundException(id.ToString());
+
+        var secret = new SecretValue(
+            System.Text.Encoding.UTF8.GetBytes(value),
+            SecretContentType.Text,
+            new SecretMetadata { Provider = "env", Version = id.Version });
+
+        return Task.FromResult(secret);
     }
 }
 
-public sealed class SecretsAutoRegistrar : IKoanAutoRegistrar
+public sealed class TemplateSecretResolver : ISecretResolver
 {
-    public string ModuleName => "Secrets";
+    private readonly ISecretProvider _provider;
+    private static readonly Regex TokenRegex = new(@"secret://[A-Za-z0-9\-_.~/]+(?:\?version=[^}\""\s]+)?", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    public void Initialize(IServiceCollection services)
-        => services.AddSecretDescriptor<ApiKeySecret>();
+    public TemplateSecretResolver(ISecretProvider provider) => _provider = provider;
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-        => report.AddNote("Stripe API key descriptor registered");
+    public Task<SecretValue> GetAsync(SecretId id, CancellationToken ct = default)
+        => _provider.GetAsync(id, ct);
+
+    public async Task<string> ResolveAsync(string template, CancellationToken ct = default)
+    {
+        if (!TokenRegex.IsMatch(template)) return template;
+
+        var result = template;
+        foreach (Match match in TokenRegex.Matches(template))
+        {
+            ct.ThrowIfCancellationRequested();
+            var parsed = SecretId.Parse(match.Value);
+            var secret = await _provider.GetAsync(parsed, ct);
+            result = result.Replace(match.Value, secret.AsString(), StringComparison.Ordinal);
+        }
+
+        return result;
+    }
 }
 ```
-- Describe secrets using strongly-typed descriptors; providers leverage metadata when fetching material.
-- Register descriptors through auto-registrar to enable discovery and rotation tooling.
 
-## Configuration
-- Use `SecretProviderOptions` to configure provider-specific endpoints or authentication.
-- Bind scope defaults from configuration (e.g., `Koan:Secrets:DefaultScope`).
-- Combine with Koan adapters to expose secret availability in boot reports.
+- `SecretId` URIs (`secret://scope/name`) keep scopes and names canonical; optional provider hints (`secret+vault://`) steer routing when multiple providers coexist.
+- `SecretValue` wraps the payload and ensures projections (`AsString()`, `AsJson<T>()`) match the declared `SecretContentType`.
+
+## Contract highlights
+
+- `ISecretProvider.GetAsync` is the single source of truth for fetching secrets. Throw `SecretNotFoundException`, `SecretUnauthorizedException`, or `SecretProviderUnavailableException` for precise error semantics.
+- `ISecretResolver.ResolveAsync` performs best-effort templating—strings without tokens short-circuit without provider calls.
+- `SecretMetadata` captures provider hints, versions, and TTLs so rotation tooling can make informed decisions.
+- `SecretId.Parse` rejects malformed URIs early (missing scope/name, unsupported schemes) to avoid propagating invalid identifiers.
 
 ## Edge cases
-- Missing descriptors: runtime logs warnings when a secret is requested without a descriptor—add descriptors for every consumer-facing secret.
-- Scope mismatches: ensure requesting code passes the same tenant/environment scope used by the descriptor.
-- Rotation windows: track `Metadata` values to align with external rotation policies.
-- Serialization: keep secret payloads simple (strings/JSON) to avoid deserialization issues in provider implementations.
 
-## Related packages
-- `Koan.Secrets.Core` – uses these abstractions to orchestrate providers.
-- `Koan.Secrets.Vault` – concrete provider built on top of the abstractions.
-- `Koan.Core` – options binding and boot reporting infrastructure.
+- Whitespace or relative URIs throw `ArgumentException` during `SecretId.Parse`.
+- Binary payloads (`SecretContentType.Bytes`) can only be accessed via `AsBytes()`; attempting to call `AsString()`/`AsJson<T>()` raises `InvalidOperationException`.
+- Provider-qualified URIs (`secret+vault://prod/payment-key`) fill the `Provider` property so orchestrators can direct the call to a specific backend.
+- Hostless URIs (`secret:///prod/payment-key`) remain valid; parsing normalizes host/path combinations to `(Scope="prod", Name="payment-key")`.
 
-## Reference
-- `SecretDescriptor` – core descriptor base class.
-- `ISecretProvider` – interface implemented by provider modules.
-- `SecretScope` – helpers for environment/tenant scoping.
+## Validation checklist
+
+- Unit tests: `tests/Koan.Secrets.Core.Tests` cover resolver templating, ID parsing, and provider routing logic. Run them after provider changes.
+- DocFX: `pwsh -File scripts/build-docs.ps1 -ConfigPath docs/api/docfx.json -Strict` ensures this documentation stays linked and warning-free.
+
+## Related docs
+
+- [`TECHNICAL.md`](./TECHNICAL.md) – complete contract narrative and architectural positioning.
+- `/docs/architecture/principles.md` – cross-cutting security principles referenced by secrets modules.
+- `src/Koan.Secrets.Core/README.md` – runtime orchestrator that consumes these abstractions.

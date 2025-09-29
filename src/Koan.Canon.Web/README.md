@@ -1,6 +1,6 @@
 ﻿# Koan.Canon.Web
 
-HTTP controllers for Flow operations and views. Auto-registered.
+HTTP controllers for Canon intake, replay, projections, and policy introspection. Auto-registered when the package is referenced.
 
 Routes
 - POST /intake/records
@@ -14,3 +14,4 @@ Notes
 - Views use a pagination envelope: { page, size, hasNext, total?, items }.
 - Samples use first-class entity statics (Save/Get/Page/Query).
 - See `../Koan.Canon.Core/TECHNICAL.md` for AggregationTags rules and options.
+- Technical reference: [`TECHNICAL.md`](./TECHNICAL.md) (validated 2025-09-29).

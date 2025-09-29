@@ -1,48 +1,58 @@
 ﻿# Koan.Orchestration.Generators
 
-## Contract
-- **Purpose**: Supply Roslyn analyzers and source generators that light up Koan orchestration features with zero-boilerplate diagnostics.
-- **Primary inputs**: Projects referencing Koan orchestration assemblies, `KoanAutoRegistrar` implementations, annotated adapters.
-- **Outputs**: Generated partial classes, diagnostic warnings for misconfigured modules, and incremental source for registry wiring.
-- **Failure modes**: Missing analyzer reference, unsupported language version, or generators running on trimmed assemblies without metadata.
-- **Success criteria**: Developers receive actionable diagnostics (e.g., missing adapter capability), generated code compiles cleanly, and analyzers respect incremental build performance.
+> ✅ Validated against manifest generation and Koan0049 diagnostics on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for the full diagnostic matrix and manifest flow.
+
+Roslyn analyzers/source generators that emit the orchestration manifest (`__KoanOrchestrationManifest.Json`) and enforce adapter hygiene.
 
 ## Quick start
+
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <PackageReference Include="Sylin.Koan.Orchestration.Generators" Version="0.6.2" PrivateAssets="all" />
+    <PackageReference Include="Sylin.Koan.Orchestration.Generators"
+                      Version="0.6.3"
+                      PrivateAssets="all" />
   </ItemGroup>
 </Project>
 ```
+
+Annotate your adapters with `KoanServiceAttribute` (and related metadata attributes) so the generator can materialize a manifest entry.
+
 ```csharp
-[KoanModule]
-public sealed class MyModuleAutoRegistrar : IKoanAutoRegistrar
-{
-    public string ModuleName => "MyModule";
-    public void Initialize(IServiceCollection services) { /* ... */ }
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env) { }
-}
+[KoanService(ServiceKind.Database, "postgres", "Postgres")
+ContainerDefaults("postgres", Ports = new[] { 5432 }, Tag = "16.4")]
+public sealed class PostgresAdapter : IServiceAdapter { /* ... */ }
 ```
-- Add the analyzer package as a `PrivateAssets=all` reference to enable diagnostics without distributing it downstream.
-- Generators emit hints when `IKoanAutoRegistrar` implementations miss required metadata or capabilities.
 
-## Configuration
-- No runtime configuration required; analyzers follow MSBuild conventions.
-- Suppress specific diagnostics via `NoWarn` or `[SuppressMessage]` attributes as needed.
-- Ensure projects compile with the repository default language version (`latestMajor`).
+- Add the package as an analyzer reference (`PrivateAssets=all`) to avoid leaking it to consumers.
+- Build the project and inspect `obj/<tfm>/__KoanOrchestrationManifest.g.cs` to verify generated content.
 
-## Edge cases
-- Large solutions: incremental generators minimize overhead, but monitor build times and disable specific analyzers via `.editorconfig` if needed.
-- Generated code conflicts: clean intermediate folders if stale generated sources remain after upgrades.
-- CI builds: include `-warnaserror` to prevent shipping when orchestration diagnostics detect misconfiguration.
-- Analyzer version mismatch: update the package reference to match your Koan release to stay in sync with schema expectations.
+## Manifest output
 
-## Related packages
-- `Koan.Orchestration.Abstractions` – types inspected by the analyzers.
-- `Koan.Orchestration.Cli` – benefits from analyzer hints when generating CLI descriptors.
-- `Koan.Core` – base constructs validated by diagnostics.
+- Generated type: `Koan.Orchestration.__KoanOrchestrationManifest` with a `Json` constant consumed by planners/CLI.
+- Includes the app section when `KoanAppAttribute` or `IKoanManifest` is present.
+- Aggregates assembly-level `AuthProviderDescriptorAttribute` values so the CLI can list auth providers.
 
-## Reference
-- `AnalyzerReleases.Shipped.md` / `AnalyzerReleases.Unshipped.md` – diagnostic catalog and release history.
-- `Koan.Orchestration.Generators.csproj` – packaging metadata including analyzer assets.
+## Diagnostics
+
+- `Koan0049A` – `[KoanService]` must target an `IServiceAdapter` implementation.
+- `Koan0049B/C` – short code validation (format + reserved names).
+- `Koan0049D` – malformed `qualifiedCode`.
+- `Koan0049E` – missing container image for container deployments.
+- `Koan0049F` – discourage `latest` tags.
+- `Koan0049G` – duplicates within the same compilation.
+
+Treat these as build blockers (`-warnaserror`) to keep orchestration metadata healthy.
+
+## Edge cases & tips
+
+- Language version must support source generators (C# 9+); the repo defaults to `latestMajor` via `Directory.Build.props`.
+- If incremental build caches stale manifest data, run `dotnet clean` to clear `obj/` artifacts.
+- Suppress or disable specific diagnostics through `.editorconfig` (`dotnet_diagnostic.Koan0049X.severity = none`) when justified.
+- Match generator package version with your Koan runtime packages to stay in sync with manifest schema.
+
+## Related docs
+
+- `/docs/architecture/principles.md` – orchestration design tenets referenced by diagnostics.
+- [`Koan.Orchestration.Cli`](../Koan.Orchestration.Cli/README.md) – consumes the generated manifest for discovery.
+- `AnalyzerReleases.Shipped.md` / `AnalyzerReleases.Unshipped.md` – diagnostic release notes.

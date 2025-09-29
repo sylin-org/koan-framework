@@ -1,5 +1,7 @@
 # Koan.Orchestration.Aspire
 
+> ✅ Validated against discovery pipeline, initialization registrar, and self-orchestration services on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for detailed lifecycle diagrams and edge-case coverage.
+
 Distributed Aspire resource registration for Koan Framework modules via the KoanAutoRegistrar pattern.
 
 ## Overview
@@ -242,6 +244,9 @@ public void RegisterAspireResources(IDistributedApplicationBuilder builder, ICon
 - Verify configuration keys match module expectations
 - Check configuration precedence and sources
 - Use logging to debug configuration values
+
+## Documentation
+- [`TECHNICAL.md`](./TECHNICAL.md) – discovery flow, registrar contract, orchestration modes, self-orchestration, and validation notes.
 
 ### Diagnostic Information
 

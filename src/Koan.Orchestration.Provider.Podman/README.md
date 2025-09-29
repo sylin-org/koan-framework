@@ -1,52 +1,60 @@
 ﻿# Koan.Orchestration.Provider.Podman
 
-## Contract
-- **Purpose**: Extend Koan orchestration to Podman environments, mirroring Docker features with pod-native configuration.
-- **Primary inputs**: Podman engine connection options, Koan adapter descriptors, and module metadata.
-- **Outputs**: Podman-specific orchestration descriptors, Compose-compatible manifests, and boot diagnostics capturing provider state.
-- **Failure modes**: Podman socket not reachable, missing Podman Compose features, or containers requiring privileges unavailable in Podman.
-- **Success criteria**: Generated manifests run under Podman, adapters receive accurate pod metadata, and planners detect Podman capabilities correctly.
+> ✅ Validated against availability probes, compose lifecycle orchestration, and port parsing on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for detailed flows, component map, and edge-case coverage.
 
-## Quick start
+Podman implementation of `IHostingProvider`, allowing Koan CLI and orchestration tooling to manage Compose environments on rootless or Podman-first setups.
+
+## Capabilities
+
+- Detect Podman availability via `podman version --format json`.
+- Start Compose plans with `podman compose up`, waiting for services to reach a `running`+`healthy` state within the configured timeout.
+- Tear down stacks with `podman compose down` (optionally pruning volumes).
+- Stream logs, capture live service status, and enumerate port bindings for downstream endpoint hinting.
+- Report Podman engine metadata (client/server version, default system connection) for diagnostics and provider election.
+
+## Quick verification
+
+```pwsh
+# From repo root, check Podman availability
+dotnet run --project src/Koan.Orchestration.Cli -- doctor --engine podman --json
+
+# Dry-run a compose launch with verbose diagnostics
+dotnet run --project src/Koan.Orchestration.Cli -- up --engine podman --dry-run --explain
+```
+
+When Podman is reachable, `doctor` returns `available=true` and surfaces the detected engine version and connection name.
+
+## Programmatic usage
+
 ```csharp
-public sealed class PodmanAutoRegistrar : IKoanAutoRegistrar
+var provider = new PodmanProvider();
+var availability = await provider.IsAvailableAsync();
+
+if (availability.Ok)
 {
-    public string ModuleName => "Podman";
+    await provider.Up(".Koan/compose.yml", Profile.Local,
+        new RunOptions(Detach: true, ReadinessTimeout: TimeSpan.FromSeconds(60)));
 
-    public void Initialize(IServiceCollection services)
-    {
-        services.AddKoanAdapter<PodmanOrchestrationAdapter>();
-        services.Configure<PodmanOptions>(options =>
-        {
-            options.Uri = "unix:///run/podman/podman.sock";
-            options.GenerateKubeSpecs = true;
-        });
-    }
+    var status = await provider.Status(new StatusOptions(Service: null));
+    var ports = await provider.LivePorts();
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
-        => report.AddNote("Podman orchestration provider registered");
+    await provider.Down(".Koan/compose.yml", new StopOptions(RemoveVolumes: false));
 }
 ```
-- Register the Podman adapter to surface Podman-specific features (pods, kube manifests, rootless support).
-- Compose renderers reuse metadata emitted by the provider, so Docker/Podman parity requires no extra wiring.
 
-## Configuration
-- `PodmanOptions.Uri`: socket or TCP endpoint.
-- `PodmanOptions.GenerateKubeSpecs`: enable extra Kubernetes manifest exports.
-- Provide registry credentials via Koan secrets to support private image pulls.
+- `RunOptions.Detach` maps to `podman compose up -d`.
+- `RunOptions.ReadinessTimeout` controls how long the provider waits for `running`/`healthy` containers before throwing.
+- `StopOptions.RemoveVolumes` adds `-v` to `podman compose down`.
 
-## Edge cases
-- Rootless users: ensure Podman socket permissions allow the Koan process to connect.
-- SELinux contexts: configure volume labels in adapter metadata when targeting Podman on SELinux-enabled systems.
-- Compose gaps: Podman Compose lags Docker Compose features; document provider capability differences using `AdapterCapabilities`.
-- Remote Podman: secure the connection with TLS if running Podman machine.
+## Edge cases to watch
 
-## Related packages
-- `Koan.Orchestration.Abstractions` – orchestration planner consumed here.
-- `Koan.Orchestration.Renderers.Compose` – uses Podman metadata when rendering Compose.
-- `Koan.Orchestration.Provider.Docker` – sibling provider for Docker parity testing.
+- Podman sockets often require group membership (`podman` group) or custom permissions in rootless scenarios.
+- Compose feature gaps (e.g., secrets, build directives) may differ from Docker; inspect `ProviderStatus` output to confirm readiness states.
+- `podman compose ps --format json` returns JSON arrays; if future releases switch to NDJSON, Koan will skip malformed entries instead of failing.
+- Informational stderr output is expected; exit codes determine failure.
 
-## Reference
-- `PodmanOrchestrationAdapter` – implementation bridging Podman APIs.
-- `PodmanOptions` – typed configuration used to connect to the engine.
-- `AdapterCapabilities` – declare per-engine feature support.
+## Related docs
+
+- [`Koan.Orchestration.Cli`](../Koan.Orchestration.Cli/README.md) – caller of this provider.
+- [`Koan.Orchestration.Provider.Docker`](../Koan.Orchestration.Provider.Docker/README.md) – sibling provider for Docker parity testing.
+- `/docs/engineering/index.md`, `/docs/architecture/principles.md` – orchestration design tenets.
