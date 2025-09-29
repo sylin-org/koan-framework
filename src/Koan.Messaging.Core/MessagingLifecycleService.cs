@@ -25,7 +25,7 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
     private readonly AdaptiveMessageProxy _proxy;
     private readonly IEnumerable<IMessagingProvider> _providers;
     private readonly IServiceProvider _serviceProvider;
-    
+
     public MessagingLifecycleService(
         ILogger<MessagingLifecycleService> logger,
         IConfiguration configuration,
@@ -34,11 +34,11 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
         IEnumerable<IMessagingProvider> providers)
         : base(logger, configuration)
     {
-    _serviceProvider = serviceProvider;
+        _serviceProvider = serviceProvider;
         _proxy = proxy;
         _providers = providers;
     }
-    
+
     public override async Task ExecuteCoreAsync(CancellationToken cancellationToken)
     {
         try
@@ -56,10 +56,10 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
                 }
             }
             catch { /* ignore diagnostics failures */ }
-            
+
             // Phase 2: Initialize messaging provider
             var provider = await SelectAndInitializeProviderAsync(cancellationToken);
-            
+
             if (provider == null)
             {
                 Logger.LogWarning("[Messaging] No providers available - messages will remain buffered");
@@ -70,40 +70,40 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
                 });
                 return;
             }
-            
+
             // Phase 3: Go live and create consumers
             await _proxy.GoLiveAsync(provider, cancellationToken);
-            
+
             // Create consumers for all registered handlers
             await handlerRegistry.CreateConsumersAsync(provider, cancellationToken);
-            
+
             Logger.LogInformation("[Messaging] System ready - {HandlerCount} consumers active", handlerCount);
-            
+
             await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Messaging.Ready, new MessagingReadyEventArgs
             {
                 HandlerCount = handlerCount,
                 ProviderName = provider.GetType().Name,
                 ReadyAt = DateTimeOffset.UtcNow
             });
-            
+
             // Keep service running
             await Task.Delay(Timeout.Infinite, cancellationToken);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "[Messaging] Failed to start messaging lifecycle");
-            
+
             await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Messaging.Failed, new MessagingFailedEventArgs
             {
                 Reason = ex.Message,
                 FailedAt = DateTimeOffset.UtcNow,
                 Exception = ex
             });
-            
+
             // Don't rethrow - app should still start even if messaging fails
         }
     }
-    
+
     [ServiceAction(Koan.Core.Actions.KoanServiceActions.Messaging.RestartMessaging)]
     public virtual Task RestartMessagingAction(CancellationToken cancellationToken)
     {
@@ -111,23 +111,23 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
         // Could implement restart logic here
         return Task.CompletedTask;
     }
-    
+
     private async Task<IMessageBus?> SelectAndInitializeProviderAsync(CancellationToken cancellationToken)
     {
         var availableProviders = _providers.ToList();
-        
+
         if (!availableProviders.Any())
         {
             Logger.LogWarning("No messaging providers registered");
             return null;
         }
-        
+
         Logger.LogDebug("[Messaging] Selecting provider from {ProviderCount} available", availableProviders.Count);
-        
+
         // Retry configuration
         const int maxRetries = 5;
         const int baseDelayMs = 2000; // Start with 2 seconds
-        
+
         // Try providers in priority order with retry logic
         foreach (var provider in availableProviders.OrderByDescending(p => p.Priority))
         {
@@ -143,10 +143,10 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
                     {
                         Logger.LogDebug("[Messaging] Retry {Attempt}/{MaxRetries} for provider: {ProviderName}", attempt, maxRetries, provider.Name);
                     }
-                    
+
                     // Check if provider can connect
                     var canConnect = await provider.CanConnectAsync(cancellationToken);
-                    
+
                     if (!canConnect)
                     {
                         if (attempt < maxRetries)
@@ -162,13 +162,13 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
                             break; // Move to next provider
                         }
                     }
-                    
+
                     // Initialize the provider
                     var bus = await provider.CreateBusAsync(cancellationToken);
-                    
+
                     // Verify it's actually working
                     var isHealthy = await bus.IsHealthyAsync(cancellationToken);
-                    
+
                     if (!isHealthy)
                     {
                         if (attempt < maxRetries)
@@ -184,7 +184,7 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
                             break; // Move to next provider
                         }
                     }
-                    
+
                     Logger.LogInformation("[Messaging] Phase 2: Selected provider '{ProviderName}' after {Attempt} attempt(s)", provider.Name, attempt);
                     return bus;
                 }
@@ -204,11 +204,11 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
                 }
             }
         }
-        
+
         Logger.LogWarning("[Messaging] No providers could be initialized after retry attempts");
         return null;
     }
-    
+
     private HandlerRegistry GetHandlerRegistry()
     {
         var options = _serviceProvider.GetService<IOptions<HandlerRegistry>>();

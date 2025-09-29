@@ -38,7 +38,7 @@ public class StreamingBackupServiceTests : IClassFixture<BackupTestFixture>
         manifest.Should().NotBeNull();
         manifest.Name.Should().Be(backupName);
         manifest.Description.Should().Be(options.Description);
-    manifest.Labels.Should().BeEquivalentTo(options.Tags);
+        manifest.Labels.Should().BeEquivalentTo(options.Tags);
         manifest.Status.Should().Be(BackupStatus.Completed);
         manifest.Entities.Should().HaveCount(1);
 
@@ -111,7 +111,7 @@ public class StreamingBackupServiceTests : IClassFixture<BackupTestFixture>
         var manifest = await backupService.BackupEntityAsync<TestProduct, string>(backupName, options);
 
         // Assert
-    manifest.Labels.Should().Contain(tag);
+        manifest.Labels.Should().Contain(tag);
         manifest.Status.Should().Be(BackupStatus.Completed);
     }
 
