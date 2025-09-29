@@ -35,12 +35,12 @@ Prior work in [ARCH-0053](./ARCH-0053-Koan-flow-pillar-entity-first-and-auto-reg
 
 ## Options Considered
 
-| Option | Outcome | Evaluation |
-| --- | --- | --- |
-| Keep "Koan.Canon" and add clarifying docs | Minimal engineering work | Rejected. Branding ambiguity persists and contradicts the pillar's canonization charter. |
-| Rename to "Koan.CanonicalFlow" | Hybrid name | Rejected. Retains the confusing "Flow" noun while creating verbose identifiers. |
-| Rename to "Koan.Reference" | Focus on reference entities | Rejected. Understates ingestion and projection responsibilities; risks conflation with read-only stores. |
-| **Rename to "Koan.Canon"** | Canonization-focused naming | **Accepted.** Concise, signals purpose, aligns with `ReferenceItem`, `CanonicalProjection`, and identity linkage vocabulary. |
+| Option                                    | Outcome                     | Evaluation                                                                                                                   |
+| ----------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Keep "Koan.Canon" and add clarifying docs | Minimal engineering work    | Rejected. Branding ambiguity persists and contradicts the pillar's canonization charter.                                     |
+| Rename to "Koan.CanonicalFlow"            | Hybrid name                 | Rejected. Retains the confusing "Flow" noun while creating verbose identifiers.                                              |
+| Rename to "Koan.Reference"                | Focus on reference entities | Rejected. Understates ingestion and projection responsibilities; risks conflation with read-only stores.                     |
+| **Rename to "Koan.Canon"**                | Canonization-focused naming | **Accepted.** Concise, signals purpose, aligns with `ReferenceItem`, `CanonicalProjection`, and identity linkage vocabulary. |
 
 ## Implementation Guidelines
 

@@ -27,17 +27,17 @@ function ShouldSkip([string]$path, [string[]]$exclude) {
 }
 
 $excludeDirs = @(
-    '.git','bin','obj','artifacts','node_modules','.vs','.idea','packages','TestResults','logs','.dccache','.angular'
+    '.git', 'bin', 'obj', 'artifacts', 'node_modules', '.vs', '.idea', 'packages', 'TestResults', 'logs', '.dccache', '.angular'
 )
 
 $pathMap = [ordered]@{
-    'src/Koan.Canon.Core'            = 'src/Koan.Canon.Core'
-    'src/Koan.Canon.Web'             = 'src/Koan.Canon.Web'
-    'src/Koan.Canon.Runtime.Dapr'    = 'src/Koan.Canon.Runtime.Dapr'
-    'src/Koan.Canon.RabbitMq'        = 'src/Koan.Canon.RabbitMq'
-    'tests/Koan.Canon.Core.Tests'    = 'tests/Koan.Canon.Core.Tests'
-    'docs/reference/flow'           = 'docs/reference/canon'
-    'samples/S8.Canon'               = 'samples/S8.Canon'
+    'src/Koan.Canon.Core'         = 'src/Koan.Canon.Core'
+    'src/Koan.Canon.Web'          = 'src/Koan.Canon.Web'
+    'src/Koan.Canon.Runtime.Dapr' = 'src/Koan.Canon.Runtime.Dapr'
+    'src/Koan.Canon.RabbitMq'     = 'src/Koan.Canon.RabbitMq'
+    'tests/Koan.Canon.Core.Tests' = 'tests/Koan.Canon.Core.Tests'
+    'docs/reference/flow'         = 'docs/reference/canon'
+    'samples/S8.Canon'            = 'samples/S8.Canon'
 }
 
 foreach ($entry in $pathMap.GetEnumerator() | Sort-Object { $_.Key.Length } -Descending) {
@@ -57,7 +57,7 @@ foreach ($entry in $pathMap.GetEnumerator() | Sort-Object { $_.Key.Length } -Des
 
 # After top-level moves, ensure nested directories/files containing Koan.Canon are renamed.
 $directoryMatches = Get-ChildItem -Path $Root -Recurse -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like '*Koan.Canon*' -and -not (ShouldSkip $_.FullName $excludeDirs) }
+Where-Object { $_.Name -like '*Koan.Canon*' -and -not (ShouldSkip $_.FullName $excludeDirs) }
 foreach ($dir in $directoryMatches | Sort-Object { $_.FullName.Length } -Descending) {
     $newName = $dir.Name -replace 'Koan.Canon', 'Koan.Canon'
     if ($newName -ne $dir.Name) {
@@ -67,7 +67,7 @@ foreach ($dir in $directoryMatches | Sort-Object { $_.FullName.Length } -Descend
 }
 
 $fileMatches = Get-ChildItem -Path $Root -Recurse -File -Filter '*Koan.Canon*' -ErrorAction SilentlyContinue |
-    Where-Object { -not (ShouldSkip $_.DirectoryName $excludeDirs) }
+Where-Object { -not (ShouldSkip $_.DirectoryName $excludeDirs) }
 foreach ($file in $fileMatches) {
     $newName = $file.Name -replace 'Koan.Canon', 'Koan.Canon'
     if ($newName -ne $file.Name) {
@@ -79,7 +79,7 @@ foreach ($file in $fileMatches) {
 
 # Additional directory renames for sample sub-folders containing S8.Canon pattern.
 $sampleDirs = Get-ChildItem -Path (Join-Path $Root 'samples/S8.Canon') -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like '*S8.Canon*' }
+Where-Object { $_.Name -like '*S8.Canon*' }
 foreach ($dir in $sampleDirs) {
     $newName = $dir.Name -replace 'S8.Canon', 'S8.Canon'
     if ($newName -ne $dir.Name) {
@@ -90,7 +90,7 @@ foreach ($dir in $sampleDirs) {
 
 # Rename sample files containing S8.Canon pattern
 $sampleFiles = Get-ChildItem -Path (Join-Path $Root 'samples/S8.Canon') -Recurse -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like '*S8.Canon*' }
+Where-Object { $_.Name -like '*S8.Canon*' }
 foreach ($file in $sampleFiles) {
     $newName = $file.Name -replace 'S8.Canon', 'S8.Canon'
     if ($newName -ne $file.Name) {
@@ -104,33 +104,33 @@ $replacementPairs = @(
     @{ From = 'Koan.Canon'; To = 'Koan.Canon' },
     @{ From = 'KOAN.CANON'; To = 'KOAN.CANON' },
     @{ From = 'koan.canon'; To = 'koan.canon' },
-    @{ From = 'KoanCanon';  To = 'KoanCanon' },
+    @{ From = 'KoanCanon'; To = 'KoanCanon' },
     @{ From = 'KOAN_CANON'; To = 'KOAN_CANON' },
     @{ From = 'koan_canon'; To = 'koan_canon' },
-    @{ From = 'S8.Canon';   To = 'S8.Canon' },
-    @{ From = 's8.canon';   To = 's8.canon' },
-    @{ From = 'S8Canon';    To = 'S8Canon' }
+    @{ From = 'S8.Canon'; To = 'S8.Canon' },
+    @{ From = 's8.canon'; To = 's8.canon' },
+    @{ From = 'S8Canon'; To = 'S8Canon' }
 )
 
 $textExtensions = @(
-    '.cs','.csproj','.fs','.fsproj','.vb','.vbproj',
-    '.sln','.slnf','.props','.targets','.json','.jsonc',
-    '.yml','.yaml','.md','.txt','.ps1','.psm1','.psd1',
-    '.cshtml','.razor','.html','.htm','.css','.scss','.less',
-    '.ts','.tsx','.js','.jsx','.config','.ini','.xml','.sql',
-    '.bat','.cmd','.sh','.dockerfile','.graphql','.gql'
+    '.cs', '.csproj', '.fs', '.fsproj', '.vb', '.vbproj',
+    '.sln', '.slnf', '.props', '.targets', '.json', '.jsonc',
+    '.yml', '.yaml', '.md', '.txt', '.ps1', '.psm1', '.psd1',
+    '.cshtml', '.razor', '.html', '.htm', '.css', '.scss', '.less',
+    '.ts', '.tsx', '.js', '.jsx', '.config', '.ini', '.xml', '.sql',
+    '.bat', '.cmd', '.sh', '.dockerfile', '.graphql', '.gql'
 )
 
-$explicitNames = @('Dockerfile','.editorconfig','Makefile','README','LICENSE')
+$explicitNames = @('Dockerfile', '.editorconfig', 'Makefile', 'README', 'LICENSE')
 
 $files = Get-ChildItem -Path $Root -Recurse -File -ErrorAction SilentlyContinue |
-    Where-Object {
-        -not (ShouldSkip $_.DirectoryName $excludeDirs) -and (
-            $textExtensions -contains $_.Extension.ToLower() -or
-            $explicitNames -contains $_.Name -or
-            $explicitNames -contains ([System.IO.Path]::GetFileNameWithoutExtension($_.Name))
-        )
-    }
+Where-Object {
+    -not (ShouldSkip $_.DirectoryName $excludeDirs) -and (
+        $textExtensions -contains $_.Extension.ToLower() -or
+        $explicitNames -contains $_.Name -or
+        $explicitNames -contains ([System.IO.Path]::GetFileNameWithoutExtension($_.Name))
+    )
+}
 
 foreach ($file in $files) {
     $content = [System.IO.File]::ReadAllText($file.FullName)

@@ -7,9 +7,9 @@ status: current
 last_updated: 2025-09-28
 framework_version: v0.6.2
 validation:
-    date_last_tested: 2025-09-28
-    status: verified
-    scope: docs/reference/canon/index.md
+  date_last_tested: 2025-09-28
+  status: verified
+  scope: docs/reference/canon/index.md
 ---
 
 # Canon Pillar Reference
@@ -461,4 +461,3 @@ public async Task DevicePipeline_ShouldPersistProjection()
 - [Messaging Reference](../messaging/index.md)
 - [Semantic Pipelines Playbook](../../guides/semantic-pipelines.md)
 - [DX-0041 Consolidation ADR](../../decisions/DX-0041-docs-consolidation.md)
-
