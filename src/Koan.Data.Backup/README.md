@@ -1,5 +1,7 @@
 ﻿# Koan.Data.Backup
 
+> ✅ Validated against streaming backup/restore pipelines and maintenance loops on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for the full reference.
+
 ## Contract
 - **Purpose**: Provide backup and restore orchestration for Koan data entities with streaming export, import staging, and progress tracking.
 - **Primary inputs**: `BackupPlan` definitions, entity metadata from `Data<TEntity, TKey>`, storage adapters registered through Koan Core.
@@ -55,6 +57,9 @@ public sealed class BackupAutoRegistrar : IKoanAutoRegistrar
 - `Koan.Data.Core` – entity persistence primitives powering backup sessions.
 - `Koan.Web.Backup` – HTTP controllers for monitoring and controlling backups.
 - `Koan.Core.Adapters` – capability plumbing used by backup storage providers.
+
+## Documentation
+- [`TECHNICAL.md`](./TECHNICAL.md) – end-to-end architecture, workflows, configuration, and edge cases.
 
 ## Reference
 - `IBackupPlanRegistry` – plan discovery and registration.
