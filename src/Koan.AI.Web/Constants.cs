@@ -12,5 +12,8 @@ internal static class Constants
         public const string Adapters = "adapters";
         public const string Models = "models";
         public const string Capabilities = "capabilities";
+        public const string AdapterModelInstall = "adapters/{adapterId}/models/install";
+        public const string AdapterModelRefresh = "adapters/{adapterId}/models/refresh";
+        public const string AdapterModelFlush = "adapters/{adapterId}/models/flush";
     }
 }
