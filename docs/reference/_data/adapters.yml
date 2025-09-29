@@ -1,0 +1,110 @@
+﻿adapters:
+  - name: SQLite
+    storage: relational/sqlite
+    transactions: true
+    batching: false
+    pagingPushdown: native
+    filterPushdown: linq
+    schemaTools: migrations
+    instructionApi: direct
+    vector: none
+    guardrails:
+      defaultPageSize: 50
+      maxPageSize: 250
+    notes: "Embedded development provider; ships as the default local store."
+
+  - name: PostgreSQL
+    storage: relational/postgresql
+    transactions: true
+    batching: true
+    pagingPushdown: native
+    filterPushdown: linq
+    schemaTools: migrations
+    instructionApi: direct
+    vector: pgvector
+    guardrails:
+      defaultPageSize: 75
+      maxPageSize: 500
+    notes: "Primary production relational provider; enables pgvector for semantic workloads."
+
+  - name: SQL Server
+    storage: relational/sqlserver
+    transactions: true
+    batching: true
+    pagingPushdown: native
+    filterPushdown: linq
+    schemaTools: migrations
+    instructionApi: direct
+    vector: none
+    guardrails:
+      defaultPageSize: 75
+      maxPageSize: 400
+    notes: "Enterprise SQL Server adapter with full transactional semantics."
+
+  - name: MongoDB
+    storage: document/mongodb
+    transactions: false
+    batching: true
+    pagingPushdown: limited
+    filterPushdown: bson
+    schemaTools: \"—\"
+    instructionApi: aggregation
+    vector: atlas-search
+    guardrails:
+      defaultPageSize: 100
+      maxPageSize: 500
+    notes: "Document-first adapter using native aggregation pipelines and Atlas Search when available."
+
+  - name: Redis JSON
+    storage: keyvalue/redis
+    transactions: false
+    batching: true
+    pagingPushdown: limited
+    filterPushdown: search
+    schemaTools: none
+    instructionApi: commands
+    vector: redisearch
+    guardrails:
+      defaultPageSize: 50
+      maxPageSize: 200
+    notes: "High-throughput cache and search scenarios backed by RedisJSON and RediSearch."
+
+  - name: JSON Files
+    storage: filesystem/json
+    transactions: false
+    batching: false
+    pagingPushdown: none
+    filterPushdown: in-memory
+    schemaTools: none
+    instructionApi: none
+    vector: none
+    guardrails:
+      defaultPageSize: 25
+      maxPageSize: 100
+    notes: "Simplest adapter for demos and local-first prototypes; all evaluation performed in-process."
+
+  - name: Milvus
+    storage: vector/milvus
+    transactions: false
+    batching: true
+    pagingPushdown: top-k
+    filterPushdown: hybrid
+    schemaTools: collections
+    instructionApi: commands
+    vector: milvus
+    guardrails:
+      defaultTopK: 10
+    notes: "Specialized vector database integration used for high-recall semantic retrieval."
+
+  - name: Weaviate
+    storage: vector/weaviate
+    transactions: false
+    batching: true
+    pagingPushdown: top-k
+    filterPushdown: hybrid
+    schemaTools: classes
+    instructionApi: graphql
+    vector: weaviate
+    guardrails:
+      defaultTopK: 10
+    notes: "Managed vector search platform with hybrid filters and GraphQL façade."

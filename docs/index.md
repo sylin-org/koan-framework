@@ -1,52 +1,70 @@
+---
+type: GUIDE
+domain: core
+title: "Koan Framework documentation"
+audience: [developers, architects, ai-agents]
+status: current
+last_updated: 2025-09-28
+framework_version: v0.6.2
+validation:
+    date_last_tested: 2025-09-28
+    status: verified
+    scope: docs/index.md
+---
+
 # Koan Framework Documentation
 
 **Zero-configuration .NET for the container-native era. Build sophisticated services that just work.**
 
 ## Quick Navigation
 
-### 🚀 [Getting Started](../documentation/getting-started/quickstart.md)
+### 🚀 [Getting Started](getting-started/overview.md)
 
 Get a Koan API running in 5 minutes or less.
 
-### 📖 [Developer Guides](../documentation/guides/)
+### 📖 [Developer Guides](guides/README.md)
 
 Step-by-step guides for building with Koan Framework:
 
-- [Building APIs](../documentation/guides/building-apis.md) - REST APIs with zero configuration
-- [Data Modeling](../documentation/guides/data-modeling.md) - Entity-first development patterns
-- [AI Integration](../documentation/guides/ai-integration.md) - Add AI capabilities to your apps
-- [Authentication](../documentation/guides/authentication-setup.md) - Zero-config OAuth, JWT, and service-to-service auth
+- [Building APIs](guides/building-apis.md) - REST APIs with zero configuration
+- [Data Modeling](guides/data-modeling.md) - Entity-first development patterns
+- [AI Integration](guides/ai-integration.md) - Add AI capabilities to your apps
+- [Authentication](guides/authentication-setup.md) - Zero-config OAuth, JWT, and service-to-service auth
 
-### 🚨 [Troubleshooting](../documentation/guides/troubleshooting/)
+### 🚨 [Troubleshooting](guides/troubleshooting/adapter-connection-issues.md)
 
 Common issues and their solutions:
 
-- **[Adapter Connection Issues](../documentation/guides/troubleshooting/adapter-connection-issues.md)** - Database connectivity and provisioning failures
-- **[Bootstrap Failures](../documentation/guides/troubleshooting/bootstrap-failures.md)** - Application startup and initialization problems
+- **[Adapter Connection Issues](guides/troubleshooting/adapter-connection-issues.md)** - Database connectivity and provisioning failures
+- **[Bootstrap Failures](guides/troubleshooting/bootstrap-failures.md)** - Application startup and initialization problems
 
-### 🔬 [Deep Dive](../documentation/guides/deep-dive/)
+### 🔬 [Deep Dive](guides/deep-dive/auto-provisioning-system.md)
 
 Advanced architectural documentation:
 
-- **[Auto-Provisioning System](../documentation/guides/deep-dive/auto-provisioning-system.md)** - How schema provisioning works automatically
-- **[Bootstrap Lifecycle](../documentation/guides/deep-dive/bootstrap-lifecycle.md)** - Multi-layer application initialization process
+- **[Auto-Provisioning System](guides/deep-dive/auto-provisioning-system.md)** - How schema provisioning works automatically
+- **[Bootstrap Lifecycle](guides/deep-dive/bootstrap-lifecycle.md)** - Multi-layer application initialization process
 
-### 📚 [API Reference](../api/)
+### 📚 [API Reference](api/index.md)
 
 Complete API documentation for all Koan modules:
 
-- **[Core](../documentation/reference/core/index.md)** - Foundational abstractions and configuration
-- **[Data](../documentation/reference/data/index.md)** - Entity-first data access across providers
-- **[Web](../documentation/reference/web/index.md)** - ASP.NET Core integration and controllers
-- **[AI](../documentation/reference/ai/index.md)** - Vector stores, embeddings, and agent endpoints
-- **[Auto-Generated API Docs](../api/)** - Complete API reference from code comments
+- **[Core](reference/core/index.md)** - Foundational abstractions and configuration
+- **[Data](reference/data/index.md)** - Entity-first data access across providers
+- **[Web](reference/web/index.md)** - ASP.NET Core integration and controllers
+- **[AI](reference/ai/index.md)** - Vector stores, embeddings, and agent endpoints
+- **[Auto-Generated API Docs](api/index.md)** - Complete API reference from code comments
 
-### 🏗️ [Architecture](../documentation/architecture/principles.md)
+### 🏗️ [Architecture](architecture/principles.md)
 
 Framework principles and design decisions:
 
-- **[Framework Principles](../documentation/architecture/principles.md)** - Core architectural patterns
-- **[Architecture Decisions](../documentation/decisions/)** - Complete ADR system with 70+ decisions
+- **[Framework Principles](architecture/principles.md)** - Core architectural patterns
+- **[Architecture Decisions](decisions/index.md)** - Complete ADR system with 70+ decisions
+
+### 📂 [Case Studies](case-studies/s13-docmind/index.md)
+
+Scenario-first walkthroughs showing framework patterns in production samples.
 
 ## Framework Features
 

@@ -305,10 +305,10 @@ dotnet run
 
 ## Enterprise Support & Documentation
 
-- **[Complete Documentation](documentation/README.md)** - Architecture, patterns, and guides
-- **[Quickstart Guide](documentation/getting-started/quickstart.md)** - Get running immediately
-- **[Enterprise Architecture Guide](documentation/architecture/principles.md)** - Strategic framework adoption
-- **[Troubleshooting Guide](documentation/support/troubleshooting.md)** - Solutions to common challenges
+- **[Complete Documentation](docs/index.md)** - Architecture, patterns, and guides
+- **[Quickstart Guide](docs/getting-started/quickstart.md)** - Get running immediately
+- **[Enterprise Architecture Guide](docs/architecture/principles.md)** - Strategic framework adoption
+- **[Troubleshooting Guide](docs/support/troubleshooting.md)** - Solutions to common challenges
 
 **For enterprise adoption support and architecture guidance, explore our comprehensive documentation.**
 

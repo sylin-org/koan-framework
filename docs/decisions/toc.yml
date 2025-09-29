@@ -1,0 +1,274 @@
+- name: Decisions overview
+  href: index.md
+- name: Templates
+  items:
+    - name: AAAA-0000 ADR authoring template
+      href: AAAA-0000-template.md
+- name: Architecture (ARCH)
+  items:
+    - name: ARCH-0001 Rename generic parameter to TEntity
+      href: ARCH-0001-rename-generic-to-tentity.md
+    - name: ARCH-0010 Meta packages (Koan, Koan.App)
+      href: ARCH-0010-meta-packages.md
+    - name: ARCH-0011 Logging and headers layering
+      href: ARCH-0011-logging-and-headers-layering.md
+    - name: ARCH-0013 Health announcements and readiness
+      href: ARCH-0013-health-announcements-and-readiness.md
+    - name: ARCH-0033 OpenTelemetry integration
+      href: ARCH-0033-opentelemetry-integration.md
+    - name: ARCH-0034 DDD documentation and glossary
+      href: ARCH-0034-ddd-documentation-and-glossary.md
+    - name: ARCH-0039 KoanEnv static runtime
+      href: ARCH-0039-Koanenv-static-runtime.md
+    - name: ARCH-0040 Config and constants naming
+      href: ARCH-0040-config-and-constants-naming.md
+    - name: ARCH-0041 Docs posture – instructions over tutorials
+      href: ARCH-0041-docs-posture-instructions-over-tutorials.md
+    - name: ARCH-0042 Per-project companion docs (README + TECHNICAL)
+      href: ARCH-0042-per-project-companion-docs.md
+    - name: ARCH-0043 Lightweight parity roadmap
+      href: ARCH-0043-lightweight-parity-roadmap.md
+    - name: ARCH-0044 Standardized module config and discovery
+      href: ARCH-0044-standardized-module-config-and-discovery.md
+    - name: ARCH-0045 Foundational SoC namespaces and abstractions
+      href: ARCH-0045-foundational-soc-namespaces-and-abstractions.md
+    - name: ARCH-0045 Proactive assembly loading for auto-registration
+      href: ARCH-0045-proactive-assembly-loading-for-autoreg.md
+    - name: ARCH-0046 Integration recipes – bootstrap and layered config
+      href: ARCH-0046-recipes-intention-driven-bootstrap-and-layered-config.md
+    - name: ARCH-0047 Orchestration – hosting and exporters as adapters
+      href: ARCH-0047-orchestration-hosting-and-exporters-as-pluggable-adapters.md
+    - name: ARCH-0048 Endpoint resolution and persistence mounts
+      href: ARCH-0048-endpoint-resolution-and-persistence-mounts.md
+    - name: ARCH-0049 Unified service metadata and discovery
+      href: ARCH-0049-unified-service-metadata-and-discovery.md
+    - name: ARCH-0050 Secrets management and configuration resolution
+      href: ARCH-0050-secrets-management-and-configuration-resolution.md
+    - name: ARCH-0051 Secrets – dev alignment and provider-swap guardrails
+      href: ARCH-0051-secrets-dev-alignment-and-provider-swap-guardrails.md
+    - name: ARCH-0052 Core IDs and JSON merge policy
+      href: ARCH-0052-core-ids-and-json-merge-policy.md
+    - name: ARCH-0053 Flow pillar – entity-first and auto-registrar
+      href: ARCH-0053-Koan-flow-pillar-entity-first-and-auto-registrar.md
+    - name: ARCH-0054 Framework positioning – container native
+      href: ARCH-0054-framework-positioning-container-native.md
+    - name: ARCH-0055 Koan Aspire integration approval
+      href: ARCH-0055-koan-aspire-integration-approval.md
+- name: Data (DATA)
+  items:
+    - name: DATA-0002 Query capabilities flag
+      href: DATA-0002-query-capabilities-flag.md
+    - name: DATA-0003 Write capabilities and bulk markers
+      href: DATA-0003-write-capabilities-and-bulk-markers.md
+    - name: DATA-0004 Index anchoring and JSON mapping
+      href: DATA-0004-index-anchoring-and-json-mapping.md
+    - name: DATA-0005 Relational schema toolkit
+      href: DATA-0005-relational-schema-toolkit.md
+    - name: DATA-0006 Instruction execution API
+      href: DATA-0006-instruction-execution-api.md
+    - name: DATA-0007 Relational LINQ-to-SQL helper
+      href: DATA-0007-relational-linq-to-sql-helper.md
+    - name: DATA-0007 Transactional batch and concurrency
+      href: DATA-0007-transactional-batch-and-concurrency.md
+    - name: DATA-0008 Relational command caching
+      href: DATA-0008-relational-command-caching.md
+    - name: DATA-0009 Unify on IEntity
+      href: DATA-0009-unify-on-ientity.md
+    - name: DATA-0016 Entity extensions naming and parity
+      href: DATA-0016-entity-extensions-naming-and-parity.md
+    - name: DATA-0017 Storage naming conventions
+      href: DATA-0017-storage-naming-conventions.md
+    - name: DATA-0018 Centralized naming registry and DX
+      href: DATA-0018-centralized-naming-registry-and-dx.md
+    - name: DATA-0019 Outbox helper and defaults
+      href: DATA-0019-outbox-helper-and-defaults.md
+    - name: DATA-0020 Outbox provider discovery and priority
+      href: DATA-0020-outbox-provider-discovery-and-priority.md
+    - name: DATA-0029 JSON filter language and endpoint
+      href: DATA-0029-json-filter-language-and-endpoint.md
+    - name: DATA-0030 Entity set routing and storage suffixing
+      href: DATA-0030-entity-sets-routing-and-storage-suffixing.md
+    - name: DATA-0031 Filter ignore-case option
+      href: DATA-0031-filter-ignore-case-option.md
+    - name: DATA-0032 Paging pushdown and in-memory fallback
+      href: DATA-0032-paging-pushdown-and-in-memory-fallback.md
+    - name: DATA-0044 Paging guardrails and tracing MUST
+      href: DATA-0044-paging-guardrails-and-tracing-must.md
+    - name: DATA-0045 Default projection policy and JSON pushdown
+      href: DATA-0045-default-projection-policy-and-json-pushdown.md
+    - name: DATA-0046 SQLite schema governance (DDL policy)
+      href: DATA-0046-sqlite-schema-governance-ddl-policy.md
+    - name: DATA-0047 Postgres adapter baseline
+      href: DATA-0047-postgres-adapter.md
+    - name: DATA-0049 Direct commands API
+      href: DATA-0049-direct-commands-api.md
+    - name: DATA-0050 Instruction name constants and scoping
+      href: DATA-0050-instruction-name-constants-and-scoping.md
+    - name: DATA-0051 Direct routing via instruction executors
+      href: DATA-0051-direct-routing-via-instruction-executors.md
+    - name: DATA-0052 Relational Dapper boundary and Direct ADO.NET
+      href: DATA-0052-relational-dapper-boundary-and-direct-ado.md
+    - name: DATA-0053 Direct relational capability and connection factory
+      href: DATA-0053-direct-relational-capability-and-connection-factory.md
+    - name: DATA-0054 Vector search capability and contracts
+      href: DATA-0054-vector-search-capability-and-contracts.md
+    - name: DATA-0056 Vector filter AST and translators
+      href: DATA-0056-vector-filter-ast-and-translators.md
+    - name: DATA-0057 SingleFlight inflight de-duplication
+      href: DATA-0057-core-singleflight-inflight-dedupe.md
+    - name: DATA-0058 Adapter role attributes and entity-store mapping
+      href: DATA-0058-adapter-role-attributes-and-entity-store-mapping.md
+    - name: DATA-0059 Entity-first facade and Save semantics
+      href: DATA-0059-entity-first-facade-and-save-semantics.md
+    - name: DATA-0060 Vector module split and clean separation
+      href: DATA-0060-vector-module-split-and-clean-separation.md
+    - name: DATA-0061 Data access semantics (All/Query/Stream/Page)
+      href: DATA-0061-data-access-pagination-and-streaming.md
+    - name: DATA-0062 Instance Save(set) is first-class
+      href: DATA-0062-instance-save-set-first-class.md
+    - name: DATA-0063 Ranges as canonical and materialized model
+      href: DATA-0063-ranges-as-canonical-and-materialized-model.md
+    - name: DATA-0070 External ID correlation framework
+      href: DATA-0070-external-id-correlation.md
+    - name: DATA-0072 Messaging envelope transformers
+      href: DATA-0072-messaging-envelope-transformers.md
+    - name: DATA-0072 Parent relationship attribute explicit type
+      href: DATA-0072-parent-relationship-attribute-explicit-type.md
+    - name: DATA-0073 JObject for dynamic entities
+      href: DATA-0073-jobject-for-dynamic-entities.md
+    - name: DATA-0074 Entity lifecycle event pipeline
+      href: DATA-0074-entity-lifecycle-event-pipeline.md
+- name: Web (WEB)
+  items:
+    - name: WEB-0010 Separate AI web surface
+      href: WEB-0010-separate-ai-web.md
+    - name: WEB-0012 Web templates and rate limiters
+      href: WEB-0012-web-templates-and-rate-limiters.md
+    - name: WEB-0035 EntityController transformers
+      href: WEB-0035-entitycontroller-transformers.md
+    - name: WEB-0041 GraphQL module and controller
+      href: WEB-0041-graphql-module-and-controller.md
+    - name: WEB-0042 GraphQL naming and discovery
+      href: WEB-0042-graphql-naming-and-discovery.md
+    - name: WEB-0043 Multi-protocol authentication (OIDC/OAuth2/SAML)
+      href: WEB-0043-auth-multi-protocol-oauth-oidc-saml.md
+    - name: WEB-0044 Web auth discovery and health
+      href: WEB-0044-web-auth-discovery-and-health.md
+    - name: WEB-0045 Auth provider adapters as separate modules
+      href: WEB-0045-auth-provider-adapters-separate-projects.md
+    - name: WEB-0046 Entity capabilities – short endpoints and set routing
+      href: WEB-0046-entity-capabilities-short-endpoints-and-set-routing.md
+    - name: WEB-0047 Capability authorization – fallback and defaults
+      href: WEB-0047-capability-authorization-fallback-and-defaults.md
+    - name: WEB-0048 Entity moderation controller standard flow
+      href: WEB-0048-entity-moderation-controller-standard-flow.md
+    - name: WEB-0049 Role attribution layer and claims transformation
+      href: WEB-0049-role-attribution-layer-and-claims-transformation.md
+    - name: WEB-0050 S8 Flow IoT sample and SSE monitor
+      href: WEB-0050-s8-flow-iot-sample-and-sse-monitor.md
+    - name: WEB-0060 Flow messaging refactor
+      href: WEB-0060-flow-messaging-refactor.md
+- name: Flow (FLOW)
+  items:
+    - name: FLOW-0070 Flow commands bus
+      href: FLOW-0070-flow-commands-bus.md
+    - name: FLOW-0101 Flow bindings, canonical IDs, and VO ingest
+      href: FLOW-0101-bindings-canonical-ids-and-vo-ingest.md
+    - name: FLOW-0102 Identity map, provisional mappings, and aliasing
+      href: FLOW-0102-identity-map-provisional-and-aliasing.md
+    - name: FLOW-0103 Flow DX toolkit
+      href: FLOW-0103-flow-dx-toolkit-controllers-monitor-adapter.md
+    - name: FLOW-0104 ULID primary ID with CanonicalId
+      href: FLOW-0104-ulid-primary-id-and-canonical-id.md
+    - name: FLOW-0105 External ID translation and adapter identity
+      href: FLOW-0105-external-id-translation-adapter-identity-and-normalized-payloads.md
+    - name: FLOW-0106 Adapter auto-scan and minimal boot
+      href: FLOW-0106-adapter-auto-scan-and-minimal-boot.md
+    - name: FLOW-0110 Flow direct seeding bypass FlowActions
+      href: FLOW-0110-flow-direct-seeding-bypass-flowactions.md
+- name: Messaging (MESS)
+  items:
+    - name: MESS-0021 Messaging capabilities and negotiation
+      href: MESS-0021-messaging-capabilities-and-negotiation.md
+    - name: MESS-0022 MQ provisioning, aliases, and dispatcher
+      href: MESS-0022-mq-provisioning-aliases-and-dispatcher.md
+    - name: MESS-0023 Alias defaults, DefaultGroup, and OnMessage
+      href: MESS-0023-alias-defaults-default-group-and-onmessage.md
+    - name: MESS-0024 Batch semantics and aliasing
+      href: MESS-0024-batch-semantics-and-aliasing.md
+    - name: MESS-0025 Inbox contract and client
+      href: MESS-0025-inbox-contract-and-client.md
+    - name: MESS-0026 Discovery over MQ policy
+      href: MESS-0026-discovery-over-mq-policy.md
+    - name: MESS-0027 Standalone MQ services and naming
+      href: MESS-0027-standalone-mq-services-and-naming.md
+    - name: MESS-0028 MQ provisioning – plan/diff/apply modes
+      href: MESS-0028-mq-provisioning-plan-diff-apply-modes.md
+    - name: MESS-0029 Terse handler delegates and semantic aliases
+      href: MESS-0029-terse-handler-delegates-and-aliases.md
+    - name: MESS-0070 Messaging topology primitives (zero-config)
+      href: MESS-0070-messaging-topology-system-primitives-zero-config.md
+    - name: MESS-0071 Messaging DX and topology provisioning
+      href: MESS-0071-messaging-dx-and-topology-provisioning.md
+- name: Storage (STOR)
+  items:
+    - name: STOR-0001 Storage module and contracts
+      href: STOR-0001-storage-module-and-contracts.md
+    - name: STOR-0002 Storage HTTP endpoints and semantics
+      href: STOR-0002-storage-http-endpoints-and-semantics.md
+    - name: STOR-0003 Storage profiles and routing rules
+      href: STOR-0003-storage-profiles-and-routing-rules.md
+    - name: STOR-0004 Storage ingest pipeline and policy steps
+      href: STOR-0004-storage-ingest-pipeline-and-policy-steps.md
+    - name: STOR-0005 Storage local provider
+      href: STOR-0005-storage-local-provider.md
+    - name: STOR-0006 Storage default routing and fallbacks
+      href: STOR-0006-storage-default-routing-and-fallbacks.md
+    - name: STOR-0007 Storage DX helpers
+      href: STOR-0007-storage-dx-helpers.md
+    - name: STOR-0008 Storage DX – stream reads and key-first helpers
+      href: STOR-0008-storage-dx-stream-and-key-first-helpers.md
+- name: Media (MEDIA)
+  items:
+    - name: MEDIA-0001 Media pillar baseline and storage integration
+      href: MEDIA-0001-media-pillar-baseline-and-storage-integration.md
+    - name: MEDIA-0002 S6 Social Creator sample and htmx UI
+      href: MEDIA-0002-s6-social-creator-and-htmx-ui.md
+    - name: MEDIA-0003 Media variant routing and transforms
+      href: MEDIA-0003-media-variant-routing-and-transforms.md
+- name: Operations (OPS)
+  items:
+    - name: OPS-0014 Samples port allocation
+      href: OPS-0014-samples-port-allocation.md
+    - name: OPS-0015 Default configuration fallback
+      href: OPS-0015-default-configuration-fallback.md
+    - name: OPS-0043 Mongo container default host
+      href: OPS-0043-mongo-container-default-host.md
+    - name: OPS-0048 Standardized Docker probing for tests
+      href: OPS-0048-standardize-docker-probing-for-tests.md
+    - name: OPS-0049 Recs sample Mongo, Weaviate, and Ollama
+      href: OPS-0049-recs-sample-mongo-weaviate-ollama.md
+    - name: OPS-0050 Scheduling core and bootstrap unification
+      href: OPS-0050-scheduling-and-bootstrap-unification.md
+    - name: OPS-0051 Container smart defaults and discovery
+      href: OPS-0051-container-smart-defaults-and-discovery.md
+- name: Developer Experience (DX)
+  items:
+    - name: DX-0028 Service project naming and conventions
+      href: DX-0028-service-project-naming-and-conventions.md
+    - name: DX-0036 Sylin prefix and package IDs
+      href: DX-0036-sylin-prefix-and-package-ids.md
+    - name: DX-0037 Tiny templates family
+      href: DX-0037-tiny-templates-family.md
+    - name: DX-0038 Auto-registration
+      href: DX-0038-auto-registration.md
+    - name: DX-0039 S5.Recs UI refactor and code hygiene
+      href: DX-0039-s5-recs-ui-refactor-and-code-hygiene.md
+    - name: DX-0040 Documentation restructure and governance
+      href: DX-0040-docs-restructure-and-governance.md
+    - name: DX-0041 Pillar documentation consolidation roadmap
+      href: DX-0041-docs-pillar-consolidation.md
+- name: Security (DEC)
+  items:
+    - name: DEC-0053 Service-to-service authentication
+      href: DEC-0053-service-to-service-authentication.md

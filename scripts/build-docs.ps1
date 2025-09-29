@@ -35,7 +35,8 @@ function Write-AdapterMatrixMarkdown {
   )
   try {
     if (-not (Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue)) {
-      Write-Warning "ConvertFrom-Yaml is not available; attempting simple YAML parse fallback."
+      try { Import-Module powershell-yaml -ErrorAction Stop | Out-Null }
+      catch { }
     }
 
     $dataPath = Join-Path $RepoRoot 'docs/reference/_data/adapters.yml'
