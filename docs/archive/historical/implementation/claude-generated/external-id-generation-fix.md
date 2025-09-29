@@ -1,4 +1,4 @@
-# CLD_EXTERNAL_ID_GENERATION_FIX
+﻿# CLD_EXTERNAL_ID_GENERATION_FIX
 
 ## Problem Statement: External ID Generation Regression
 
@@ -346,7 +346,7 @@ Required fields in StageRecord.Source:
 
 ### Files Modified
 
-- `src/Koan.Flow.Core/ServiceCollectionExtensions.cs` - Enhanced `GetSourceSystem()` method
+- `src/Koan.Canon.Core/ServiceCollectionExtensions.cs` - Enhanced `GetSourceSystem()` method
 
 ### Key Changes
 

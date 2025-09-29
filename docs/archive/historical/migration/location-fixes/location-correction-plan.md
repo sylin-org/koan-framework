@@ -1,4 +1,4 @@
-# S8.Location Implementation Correction Plan
+﻿# S8.Location Implementation Correction Plan
 
 **Date**: 2025-01-09  
 **Status**: Implementation Review & Corrections Required
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-The current S8.Location implementation has several critical mistakes that deviate from both the corrected proposal and Koan.Flow best practices. The main issues are:
+The current S8.Location implementation has several critical mistakes that deviate from both the corrected proposal and Koan.Canon best practices. The main issues are:
 
 1. **Wrong AggregationKey usage** - Using result ID instead of hash for deduplication
 2. **Missing FlowOrchestratorBase** - No orchestrator with Flow.OnUpdate handlers
@@ -58,8 +58,8 @@ public class Location : FlowEntity<Location>
 
 **Correction Required - Create LocationOrchestrator.cs:**
 ```csharp
-using Koan.Flow.Core.Orchestration;
-using Koan.Flow;
+using Koan.Canon.Core.Orchestration;
+using Koan.Canon;
 
 namespace S8.Location.Core.Orchestration;
 
@@ -215,13 +215,13 @@ LocationInterceptor.Register();
 
 **Missing:**
 - No orchestrator registration
-- No AddKoanFlow() call
+- No AddKoanCanon() call
 
 **Correction Required:**
 ```csharp
 // Koan framework with Flow
 builder.Services.AddKoan();
-builder.Services.AddKoanFlow(); // Enable Flow pipeline
+builder.Services.AddKoanCanon(); // Enable Flow pipeline
 
 // Register orchestrator
 builder.Services.AddHostedService<LocationOrchestrator>();
@@ -265,7 +265,7 @@ LocationInterceptor.Register();
 ### Step 4: Update Program.cs
 ```bash
 # Edit S8.Location.Api/Program.cs
-- Add builder.Services.AddKoanFlow()
+- Add builder.Services.AddKoanCanon()
 - Add builder.Services.AddHostedService<LocationOrchestrator>()
 ```
 
@@ -326,7 +326,7 @@ docker logs s8-location-api | grep "Flow.OnUpdate"
 | Location.cs | Fix AggregationKey, remove Status | CRITICAL |
 | LocationOrchestrator.cs | Create new file with Flow.OnUpdate | CRITICAL |
 | LocationInterceptor.cs | Remove resolution logic, validation only | HIGH |
-| Program.cs | Add AddKoanFlow(), register orchestrator | HIGH |
+| Program.cs | Add AddKoanCanon(), register orchestrator | HIGH |
 | Adapter comments | Fix incorrect references | MEDIUM |
 | AddressResolutionService | Make helper methods public | LOW |
 

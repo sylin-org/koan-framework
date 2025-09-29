@@ -1,10 +1,10 @@
-# FLOW-0104 - ULID as Primary Id with CanonicalId (Business Key)
+﻿# FLOW-0104 - ULID as Primary Id with CanonicalId (Business Key)
 
 Status: Approved
 
 ## Contract
 
-- Scope: Koan.Flow entity identity and all derived artifacts (stages, projections, links, APIs)
+- Scope: Koan.Canon entity identity and all derived artifacts (stages, projections, links, APIs)
 - Inputs: Aggregation tags → CanonicalId (business key); new entity creation events
 - Outputs: A minted ULID as the primary Id; CanonicalId retained and indexed; both propagated end-to-end
 - Error modes: Duplicate CanonicalId races, merges/splits, backfill gaps; must be handled deterministically

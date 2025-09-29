@@ -1,4 +1,4 @@
-# S8.Location Implementation Guide
+﻿# S8.Location Implementation Guide
 
 **Zero to Completion Development Plan**
 
@@ -20,7 +20,7 @@ This document provides step-by-step implementation instructions for the S8.Locat
 All dependencies are handled automatically via Koan's self-registration:
 
 - ✅ **Koan.Data** (MongoDB integration)
-- ✅ **Koan.Flow** (Flow entity and orchestrator support)
+- ✅ **Koan.Canon** (Flow entity and orchestrator support)
 - ✅ **Koan.Messaging** (RabbitMQ integration)
 - ✅ **Koan.AI** (Ollama provider for address correction)
 
@@ -40,7 +40,7 @@ All dependencies are handled automatically via Koan's self-registration:
 **File: `S8.Location.Core/Models/Location.cs`**
 
 ```csharp
-using Koan.Flow.Model;
+using Koan.Canon.Model;
 using Koan.Data.Abstractions.Annotations;
 
 namespace S8.Location.Core.Models;
@@ -238,7 +238,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     <!-- Core Koan Framework -->
     <ProjectReference Include="..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Koan.Flow.Core\Koan.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Messaging\Koan.Messaging.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
 
@@ -578,8 +578,8 @@ public class GoogleMapsGeocodingService : IGeocodingService
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Models;
 using S8.Location.Core.Services;
-using Koan.Flow.Attributes;
-using Koan.Flow.Core.Orchestration;
+using Koan.Canon.Attributes;
+using Koan.Canon.Core.Orchestration;
 
 namespace S8.Location.Core.Orchestration;
 
@@ -643,7 +643,7 @@ public class LocationOrchestrator : IFlowOrchestrator<Location>
 **File: `S8.Location.Core/Models/LocationEvents.cs`**
 
 ```csharp
-using Koan.Flow.Model;
+using Koan.Canon.Model;
 
 namespace S8.Location.Core.Models;
 
@@ -756,7 +756,7 @@ public record CreateLocationRequest(string Address, string? ExternalId = null);
 ```csharp
 using S8.Location.Core.Models;
 using Koan.Data.Core;
-using Koan.Flow.Initialization;
+using Koan.Canon.Initialization;
 using Koan.Web.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -831,7 +831,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Models;
 using Koan.Core;
-using Koan.Flow.Attributes;
+using Koan.Canon.Attributes;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -923,7 +923,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S8.Location.Core.Models;
 using Koan.Core;
-using Koan.Flow.Attributes;
+using Koan.Canon.Attributes;
 
 var builder = Host.CreateApplicationBuilder(args);
 

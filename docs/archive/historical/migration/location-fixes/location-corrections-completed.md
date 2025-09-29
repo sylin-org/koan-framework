@@ -1,4 +1,4 @@
-# S8.Location Corrections - Implementation Complete
+﻿# S8.Location Corrections - Implementation Complete
 
 **Date**: 2025-01-09  
 **Status**: ✅ All Corrections Applied
@@ -7,7 +7,7 @@
 
 ## Summary of Corrections Applied
 
-All critical issues identified in the correction plan have been successfully addressed. The S8.Location implementation now correctly uses Koan.Flow patterns and capabilities.
+All critical issues identified in the correction plan have been successfully addressed. The S8.Location implementation now correctly uses Koan.Canon patterns and capabilities.
 
 ---
 
@@ -62,8 +62,8 @@ All critical issues identified in the correction plan have been successfully add
 **File**: `S8.Location.Api/Program.cs`
 
 **Changes Made:**
-- Added `using Koan.Flow;`
-- Added `builder.Services.AddKoanFlow();` to enable Flow pipeline
+- Added `using Koan.Canon;`
+- Added `builder.Services.AddKoanCanon();` to enable Flow pipeline
 - Added `builder.Services.AddHostedService<LocationOrchestrator>();`
 - Fixed test location to remove `Status` field
 - Updated comments about interceptor purpose
@@ -136,7 +136,7 @@ graph TD
 ### 4. No Anti-Patterns
 - Removed entity `Status` field
 - Removed references to non-existent features
-- Follows Koan.Flow best practices
+- Follows Koan.Canon best practices
 
 ---
 
@@ -188,7 +188,7 @@ All corrections from the plan have been successfully implemented. The S8.Locatio
 - ✅ Properly leverages AggregationKey for deduplication  
 - ✅ Has resolution logic in the right place (orchestrator)
 - ✅ Uses interceptors for validation only
-- ✅ Follows Koan.Flow best practices
+- ✅ Follows Koan.Canon best practices
 - ✅ Has accurate comments and documentation
 
-The implementation is now aligned with both the corrected proposal and Koan.Flow's actual architecture.
+The implementation is now aligned with both the corrected proposal and Koan.Canon's actual architecture.

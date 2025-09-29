@@ -181,21 +181,21 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7.TechDocs", "samples\S7.T
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Roles", "src\Koan.Web.Auth.Roles\Koan.Web.Auth.Roles.csproj", "{E2AE3507-9B7F-459F-9A47-59CDDDAE8119}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Flow.Core", "src\Koan.Flow.Core\Koan.Flow.Core.csproj", "{E6D0BF87-6995-41A5-AC26-7D69BB5CC7AE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Canon.Core", "src\Koan.Canon.Core\Koan.Canon.Core.csproj", "{E6D0BF87-6995-41A5-AC26-7D69BB5CC7AE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Flow.Web", "src\Koan.Flow.Web\Koan.Flow.Web.csproj", "{D9228411-D98B-46AD-9C25-C3173C59886C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Canon.Web", "src\Koan.Canon.Web\Koan.Canon.Web.csproj", "{D9228411-D98B-46AD-9C25-C3173C59886C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Flow.Runtime.Dapr", "src\Koan.Flow.Runtime.Dapr\Koan.Flow.Runtime.Dapr.csproj", "{CF15EF5F-7B2D-4FAD-8DD4-3C16E83C5ECF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Canon.Runtime.Dapr", "src\Koan.Canon.Runtime.Dapr\Koan.Canon.Runtime.Dapr.csproj", "{CF15EF5F-7B2D-4FAD-8DD4-3C16E83C5ECF}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "S8.Flow", "S8.Flow", "{B31C479E-FAE6-62FF-1E7C-8A8FB8D50E89}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "S8.Canon", "S8.Canon", "{B31C479E-FAE6-62FF-1E7C-8A8FB8D50E89}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Flow.Shared", "samples\S8.Flow\S8.Flow.Shared\S8.Flow.Shared.csproj", "{1DDCF9DB-3910-40C1-92F8-81AC1A1B9877}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Canon.Shared", "samples\S8.Canon\S8.Canon.Shared\S8.Canon.Shared.csproj", "{1DDCF9DB-3910-40C1-92F8-81AC1A1B9877}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Flow.Api", "samples\S8.Flow\S8.Flow.Api\S8.Flow.Api.csproj", "{9772AD83-7F60-4FA0-A07A-6547E1FC9C80}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Canon.Api", "samples\S8.Canon\S8.Canon.Api\S8.Canon.Api.csproj", "{9772AD83-7F60-4FA0-A07A-6547E1FC9C80}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Flow.Adapters.Bms", "samples\S8.Flow\S8.Flow.Adapters.Bms\S8.Flow.Adapters.Bms.csproj", "{ECF4E7F0-753A-4201-B593-3193247D2D4C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Canon.Adapters.Bms", "samples\S8.Canon\S8.Canon.Adapters.Bms\S8.Canon.Adapters.Bms.csproj", "{ECF4E7F0-753A-4201-B593-3193247D2D4C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Flow.Adapters.Oem", "samples\S8.Flow\S8.Flow.Adapters.Oem\S8.Flow.Adapters.Oem.csproj", "{6478B03C-20AE-4457-850D-337EACB764F5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Canon.Adapters.Oem", "samples\S8.Canon\S8.Canon.Adapters.Oem\S8.Canon.Adapters.Oem.csproj", "{6478B03C-20AE-4457-850D-337EACB764F5}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "S8.Location", "S8.Location", "{385CD3A0-E844-469A-BA85-93E0868F727F}"
 EndProject
@@ -207,17 +207,17 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Location.Adapters.Invent
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Location.Adapters.Healthcare", "samples\S8.Location\S8.Location.Adapters.Healthcare\S8.Location.Adapters.Healthcare.csproj", "{381FADF5-2180-6919-B7A1-69CD34B189C4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Flow.Core.Tests", "tests\Koan.Flow.Core.Tests\Koan.Flow.Core.Tests.csproj", "{A1A1A1A1-B2B2-C3C3-D4D4-E5E5E5E5E5E5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Canon.Core.Tests", "tests\Koan.Canon.Core.Tests\Koan.Canon.Core.Tests.csproj", "{A1A1A1A1-B2B2-C3C3-D4D4-E5E5E5E5E5E5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Web.Auth.Tests", "tests\Koan.Web.Auth.Tests\Koan.Web.Auth.Tests.csproj", "{A2A2A2A2-B3B3-C4C4-D5D5-E6E6E6E6E6E6}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Secrets.Core.Tests", "tests\Koan.Secrets.Core.Tests\Koan.Secrets.Core.Tests.csproj", "{A3A3A3A3-B4B4-C5C5-D6D6-E7E7E7E7E7E7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Flow.Web.Tests", "tests\Koan.Flow.Web.Tests\Koan.Flow.Web.Tests.csproj", "{A4A4A4A4-B5B5-C6C6-D7D7-E8E8E8E8E8E8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Canon.Web.Tests", "tests\Koan.Canon.Web.Tests\Koan.Canon.Web.Tests.csproj", "{A4A4A4A4-B5B5-C6C6-D7D7-E8E8E8E8E8E8}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.AI.Tests", "tests\Koan.AI.Tests\Koan.AI.Tests.csproj", "{A5A5A5A5-B6B6-C7C7-D8D8-E9E9E9E9E9E9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Flow", "samples\S8.Flow\S8.Flow.csproj", "{A6A6A6A6-B7B7-C8C8-D9D9-EAEAEAEAEAEA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S8.Canon", "samples\S8.Canon\S8.Canon.csproj", "{A6A6A6A6-B7B7-C8C8-D9D9-EAEAEAEAEAEA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7.ContentPlatform", "samples\S7.TechDocs\S7.ContentPlatform.csproj", "{A7A7A7A7-B8B8-C9C9-DADA-EBEBEBEBEBE8}"
 EndProject

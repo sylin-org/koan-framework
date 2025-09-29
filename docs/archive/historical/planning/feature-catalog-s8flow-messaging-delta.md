@@ -1,7 +1,7 @@
-# S8.Flow Messaging: Remaining Integration Delta (Post-ADR MESS-0070)
+﻿# S8.Canon Messaging: Remaining Integration Delta (Post-ADR MESS-0070)
 
 ## Overview
-Tracks the shrinking gap to full S8.Flow operational readiness on the greenfield, primitives‑driven messaging stack (ADR MESS-0070 / MESS-0071). Updated after enabling centralized orchestrated plan→inspect→diff→apply (RabbitMQ), diagnostics timing + plan hash, and FlowEvent version suffix parity.
+Tracks the shrinking gap to full S8.Canon operational readiness on the greenfield, primitives‑driven messaging stack (ADR MESS-0070 / MESS-0071). Updated after enabling centralized orchestrated plan→inspect→diff→apply (RabbitMQ), diagnostics timing + plan hash, and FlowEvent version suffix parity.
 
 ---
 
@@ -60,7 +60,7 @@ Tracks the shrinking gap to full S8.Flow operational readiness on the greenfield
 8. **Documentation and Samples**
    - [ ] Expand docs for orchestrator lifecycle + diagnostics field semantics.
    - [ ] Add guidance for interpreting timing metrics & plan hash.
-   - [ ] Update S8.Flow sample README to remove any legacy provisioning references.
+   - [ ] Update S8.Canon sample README to remove any legacy provisioning references.
    - [ ] Add minimal recipe: enabling retry + DLQ safely in production.
 
 9. **New / Emerging Items**

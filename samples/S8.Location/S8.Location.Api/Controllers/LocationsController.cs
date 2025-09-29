@@ -49,7 +49,7 @@ public class LocationsController : ControllerBase
             Address = request.Address
         };
 
-        // Send through Flow for orchestration
+    // Send through the Canon pipeline for orchestration
         await location.Send();
 
         return CreatedAtAction(nameof(GetLocation), new { id = location.Id }, location);
@@ -85,7 +85,7 @@ public class LocationsController : ControllerBase
         _logger.LogInformation("Test location from {Source}: {ExternalId} -> {Address}", 
             source, request.ExternalId, request.Address);
 
-        // Send through Flow for orchestration
+    // Send through the Canon pipeline for orchestration
         await location.Send();
 
         return Ok(location);
@@ -124,7 +124,7 @@ public class LocationsController : ControllerBase
         {
             var allLocations = await Core.Models.Location.All();
             var total = allLocations.Count();
-            // Flow pipeline stages track status, not entity properties
+            // Canon pipeline stages track status, not entity properties
             var active = allLocations.Count(l => !string.IsNullOrEmpty(l.AgnosticLocationId));
             // AI corrections based on locations with canonical IDs
             var aiCorrected = allLocations.Count(l => !string.IsNullOrEmpty(l.AgnosticLocationId));

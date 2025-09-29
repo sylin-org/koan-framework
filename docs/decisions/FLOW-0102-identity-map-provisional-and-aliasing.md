@@ -1,4 +1,4 @@
----
+﻿---
 id: FLOW-0102
 slug: identity-map-provisional-and-aliasing
 domain: flow
@@ -36,7 +36,7 @@ The Flow runtime must stay type‑agnostic while supporting high‑volume value 
 
 4. Attribute‑driven, default‑on indexing
 
-   - Introduce an attribute under `Koan.Flow.Attributes` to mark VO properties that link to entities:
+   - Introduce an attribute under `Koan.Canon.Attributes` to mark VO properties that link to entities:
      - Deprecated: `EntityLinkAttribute(Type flowEntityType, LinkKind kind)` where `kind ∈ { CanonicalId, ExternalId }`.
        Use reserved keys `identifier.external.{source}` in intake payloads instead; mapping uses `system|adapter|externalId` composites.
    - Enable indexing by default for any VO property decorated with this attribute:

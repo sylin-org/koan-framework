@@ -1,4 +1,4 @@
-# S8.Location Development Reference
+﻿# S8.Location Development Reference
 
 **Quick reference for future coding sessions**
 
@@ -236,7 +236,7 @@ GOOGLE_MAPS_API_KEY=your_key_here
 - `Entity<T>` base class with MongoDB via `[Storage]` attributes
 - Automatic CRUD: `Location.Get()`, `Location.All()`, `location.Save()`
 
-### Koan.Flow
+### Koan.Canon
 
 - `FlowEntity<T>` adds messaging: `await location.Send()`
 - `[FlowOrchestrator]` automatic discovery and registration
@@ -356,7 +356,7 @@ GOOGLE_MAPS_API_KEY=your_key_here
 
 - **CLD_ORCHESTRATOR_BIDIRECTIONAL_PATTERN.md**: Complete architecture spec
 - **CLD_LOCATION_STANDARDIZATION.md**: Full system design document
-- **samples/S8.Flow**: Reference Flow implementation patterns
+- **samples/S8.Canon**: Reference Flow implementation patterns
 - **samples/S5.Recs**: Reference AI integration patterns
 
 ---

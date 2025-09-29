@@ -1,4 +1,4 @@
----
+﻿---
 type: SUPPORT
 domain: troubleshooting
 title: "Koan Troubleshooting Hub"
@@ -360,7 +360,7 @@ If failures persist, log envelope errors and inspect provider capability mismatc
     "Logging": {
       "LogLevel": {
         "Koan.Data": "Debug",
-        "Koan.Flow": "Debug",
+        "Koan.Canon": "Debug",
         "Koan.AI": "Debug"
       }
     }

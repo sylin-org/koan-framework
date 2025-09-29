@@ -1,12 +1,12 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Core;
-using Koan.Flow.Actions;
-using Koan.Flow.Core.Extensions;
-using Koan.Flow.Infrastructure;
-using Koan.Flow.Model;
+using Koan.Canon.Actions;
+using Koan.Canon.Core.Extensions;
+using Koan.Canon.Infrastructure;
+using Koan.Canon.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

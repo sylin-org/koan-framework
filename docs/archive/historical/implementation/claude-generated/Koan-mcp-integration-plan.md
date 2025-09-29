@@ -1,4 +1,4 @@
-# CLD_Koan_MCP_INTEGRATION_PLAN
+﻿# CLD_Koan_MCP_INTEGRATION_PLAN
 
 ## Executive Summary
 
@@ -1792,7 +1792,7 @@ public class McpServiceHealthCheck : IHealthContributor
 
 - **Koan.AI Enhancement**: Expose AI capabilities as MCP tools automatically
 - **Koan.Data Integration**: Generic data access tools via MCP
-- **Koan.Flow Coordination**: Event sourcing and workflow orchestration tools
+- **Koan.Canon Coordination**: Event sourcing and workflow orchestration tools
 - **Third-Party Providers**: MCP adapters for popular services (GitHub, Slack, etc.)
 
 ---

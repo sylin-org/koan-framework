@@ -1,4 +1,4 @@
-# Koan Framework: Universal Instance-Based Relationship System
+﻿# Koan Framework: Universal Instance-Based Relationship System
 **RFC: Instance-Based Semantic Relationships with Streaming Support**
 
 ## Executive Summary
@@ -383,9 +383,9 @@ src/Koan.Data.Core/Extensions/RelationshipExtensions.cs
 
 **Critical Files**:
 ```bash
-src/Koan.Flow.Core/Attributes/FlowAttributes.cs     # DELETE ParentKeyAttribute
-src/Koan.Flow.Core/Infrastructure/FlowRegistry.cs   # Use ParentAttribute
-src/Koan.Flow.Core/Services/ParentKeyResolutionService.cs  # Use instance methods
+src/Koan.Canon.Core/Attributes/FlowAttributes.cs     # DELETE ParentKeyAttribute
+src/Koan.Canon.Core/Infrastructure/FlowRegistry.cs   # Use ParentAttribute
+src/Koan.Canon.Core/Services/ParentKeyResolutionService.cs  # Use instance methods
 docs/reference/flow-entity-lifecycle-guide.md       # Update examples
 ```
 

@@ -1,4 +1,4 @@
-# Flow Framework - Remaining Work
+﻿# Flow Framework - Remaining Work
 
 ## Status as of 2025-01-07
 
@@ -84,34 +84,34 @@ public async Task SendToQueueAsync<T>(string queueName, T message, CancellationT
 ## 2. Flow Orchestrator Pattern
 
 ### 2.1 FlowOrchestratorBase Class
-**Location**: `src/Koan.Flow.Core/Orchestration/FlowOrchestratorBase.cs`
+**Location**: `src/Koan.Canon.Core/Orchestration/FlowOrchestratorBase.cs`
 **Status**: Not implemented
 **Purpose**: Provide base class for Flow entity orchestration
 **Required Features**:
-- Auto-subscribe to "Koan.Flow.FlowEntity" queue
+- Auto-subscribe to "Koan.Canon.FlowEntity" queue
 - Type-safe deserialization based on envelope type
 - Direct intake writing with metadata separation
 - Support for FlowEntity, DynamicFlowEntity, and FlowValueObject
 
 ### 2.2 FlowOrchestrator Attribute
-**Location**: `src/Koan.Flow.Core/Attributes/FlowOrchestratorAttribute.cs`
+**Location**: `src/Koan.Canon.Core/Attributes/FlowOrchestratorAttribute.cs`
 **Status**: Not implemented
 **Purpose**: Mark classes as Flow orchestrators for auto-discovery
 
 ### 2.3 Auto-Discovery in KoanAutoRegistrar
-**Location**: `src/Koan.Flow.Core/Initialization/KoanAutoRegistrar.cs`
+**Location**: `src/Koan.Canon.Core/Initialization/KoanAutoRegistrar.cs`
 **Status**: Not implemented
 **Purpose**: Automatically discover and register [FlowOrchestrator] classes
 
 ### 2.4 DefaultFlowOrchestrator
-**Location**: `src/Koan.Flow.Core/Orchestration/DefaultFlowOrchestrator.cs`
+**Location**: `src/Koan.Canon.Core/Orchestration/DefaultFlowOrchestrator.cs`
 **Status**: Not implemented
 **Purpose**: Provide zero-config orchestration for simple scenarios
 
 ## 3. Queue Provisioning
 
 ### 3.1 Flow Queue Provider
-**Location**: `src/Koan.Flow.Core/Infrastructure/FlowQueueProvider.cs`
+**Location**: `src/Koan.Canon.Core/Infrastructure/FlowQueueProvider.cs`
 **Status**: Not implemented
 **Purpose**: Define Flow-specific queues
 **Implementation Approach**:
@@ -127,19 +127,19 @@ public class FlowQueueProvider : IFlowQueueProvider
     {
         return new[]
         {
-            "Koan.Flow.FlowEntity",
-            "Koan.Flow.FlowValueObject",
-            "Koan.Flow.FlowCommand"
+            "Koan.Canon.FlowEntity",
+            "Koan.Canon.FlowValueObject",
+            "Koan.Canon.FlowCommand"
         };
     }
 }
 ```
 
 ### 3.2 Queue Provisioner Hosted Service
-**Location**: `src/Koan.Flow.Core/Infrastructure/FlowQueueProvisioner.cs`
+**Location**: `src/Koan.Canon.Core/Infrastructure/FlowQueueProvisioner.cs`
 **Status**: Not implemented
 **Purpose**: Auto-provision Flow queues at startup
-**Registration**: Add to AddKoanFlow() in ServiceCollectionExtensions
+**Registration**: Add to AddKoanCanon() in ServiceCollectionExtensions
 
 ## Implementation Priority
 
@@ -163,7 +163,7 @@ public class FlowQueueProvider : IFlowQueueProvider
 ## Testing Requirements
 
 ### Integration Tests Needed
-1. Verify messages route to "Koan.Flow.FlowEntity" queue
+1. Verify messages route to "Koan.Canon.FlowEntity" queue
 2. Test cross-system parent-child resolution
 3. Confirm external IDs contain source IDs (e.g., "D1") not aggregation keys
 4. Validate canonical models have no 'id' field
@@ -187,7 +187,7 @@ The Flow framework implementation focused on the complex business logic (externa
 4. **Direct MongoDB integration**: Reduces latency by eliminating extra messaging hops
 
 ## Success Criteria
-- [ ] Flow entities route to dedicated "Koan.Flow.FlowEntity" queue
+- [ ] Flow entities route to dedicated "Koan.Canon.FlowEntity" queue
 - [ ] External IDs correctly populated with source entity IDs
 - [ ] ParentKey relationships resolved across systems
 - [ ] No source 'id' fields in canonical models

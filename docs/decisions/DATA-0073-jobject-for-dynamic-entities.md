@@ -1,4 +1,4 @@
-# DATA-0073: Use JObject for Dynamic Entity Models
+﻿# DATA-0073: Use JObject for Dynamic Entity Models
 
 - Status: accepted
 - Date: 2025-09-10
@@ -6,7 +6,7 @@
 
 ## Context and Problem Statement
 
-When processing dynamic entities within `Koan.Flow.Core`, the system encountered critical serialization errors at the data persistence layer. Specifically, `MongoDB.Bson.BsonSerializationException` and `System.FormatException` were thrown when attempting to serialize or deserialize models based on `System.Dynamic.ExpandoObject`.
+When processing dynamic entities within `Koan.Canon.Core`, the system encountered critical serialization errors at the data persistence layer. Specifically, `MongoDB.Bson.BsonSerializationException` and `System.FormatException` were thrown when attempting to serialize or deserialize models based on `System.Dynamic.ExpandoObject`.
 
 The root cause was traced to the inherent limitations of the default MongoDB C# driver serializers when handling the dynamic nature of `ExpandoObject`, especially when the object contained non-standard or primitive BSON types that could not be cleanly mapped to a dictionary representation. This led to unpredictable runtime failures, particularly when data was passed through messaging systems and its shape was not strictly controlled.
 
@@ -30,7 +30,7 @@ This decision was implemented by:
 
 1.  **Creating a Custom `JObjectSerializer`**: A new serializer (`Koan.Data.Mongo.Initialization.JObjectSerializer`) was created to handle the serialization and deserialization of `JObject` to and from BSON. This serializer is designed to be robust, correctly handling both BSON documents and primitive types by wrapping primitives in a standard `{"value": ...}` structure.
 2.  **Creating a `JObjectSerializationProvider`**: A corresponding `IBsonSerializationProvider` was created to register the custom serializer with the MongoDB driver for types `JObject` and `object`.
-3.  **Refactoring Core Components**: All instances of `ExpandoObject` in `Koan.Flow.Core` were replaced with `JObject`. This included `IDynamicFlowEntity`, `DynamicFlowEntity<TModel>`, and various extension methods.
+3.  **Refactoring Core Components**: All instances of `ExpandoObject` in `Koan.Canon.Core` were replaced with `JObject`. This included `IDynamicFlowEntity`, `DynamicFlowEntity<TModel>`, and various extension methods.
 4.  **Updating Orchestration Logic**: The `FlowOrchestratorBase` was updated to materialize incoming message payloads directly into `JObject`, ensuring that the model is treated consistently throughout the processing pipeline.
 
 ### Positive Consequences

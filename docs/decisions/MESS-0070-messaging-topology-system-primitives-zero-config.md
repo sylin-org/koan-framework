@@ -1,8 +1,8 @@
-# ADR: Messaging Topology, System Primitives, and Zero-Config Developer Experience
+﻿# ADR: Messaging Topology, System Primitives, and Zero-Config Developer Experience
 
 ## Context
 
-Koan.Flow and Koan.Messaging previously required some manual configuration and entity-centric modeling for messaging primitives. System-level primitives (Command, Announcement) were not first-class, and developers often needed to configure queues, exchanges, or bindings to get the stack working. This led to friction, risk of misconfiguration, and a suboptimal developer experience.
+Koan.Canon and Koan.Messaging previously required some manual configuration and entity-centric modeling for messaging primitives. System-level primitives (Command, Announcement) were not first-class, and developers often needed to configure queues, exchanges, or bindings to get the stack working. This led to friction, risk of misconfiguration, and a suboptimal developer experience.
 
 ## Decision
 

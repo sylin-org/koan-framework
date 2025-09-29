@@ -1,4 +1,4 @@
-# CLD_FLOW_MESSAGE_ROUTING_ARCHITECTURE
+﻿# CLD_FLOW_MESSAGE_ROUTING_ARCHITECTURE
 
 ## Problem Statement: Flow Entity Message Routing Architecture
 
@@ -15,7 +15,7 @@ The current Flow messaging system has inconsistent routing mechanisms that preve
    - FlowEntity/DynamicFlowEntity objects are sent via `.Send()`
    - `MessagingInterceptors` transform objects into transport envelopes (JSON)
    - **Multiple routing paths**:
-     - Regular FlowEntity → `FlowQueuedMessage` → `"Koan.Flow.FlowEntity"` queue
+     - Regular FlowEntity → `FlowQueuedMessage` → `"Koan.Canon.FlowEntity"` queue
      - DynamicFlowEntity → `StringQueuedMessage` → `"System.String"` queue (attempted fix)
 
 2. **Orchestrator Side**:
@@ -75,7 +75,7 @@ Implement the unified generic string handler architecture to replace the current
 #### Phase 2: Simplify Message Interceptors ✅ **COMPLETED**
 
 - [x] **Remove FlowQueuedMessage/StringQueuedMessage**: Eliminated `StringQueuedMessage` class entirely
-- [x] **Unified interceptor**: All Flow entities now route through `FlowQueuedMessage` to `"Koan.Flow.FlowEntity"` queue
+- [x] **Unified interceptor**: All Flow entities now route through `FlowQueuedMessage` to `"Koan.Canon.FlowEntity"` queue
 - [x] **Single queue routing**: Consistent routing through orchestrator queue instead of separate string queue
 
 #### Phase 3: Enhanced DynamicFlowEntity Support ✅ **COMPLETED**
@@ -112,21 +112,21 @@ This architecture provides a clean, consistent, and extensible foundation for Fl
 
 #### Core Flow Messaging Files
 
-- **`src/Koan.Flow.Core/Initialization/FlowMessagingInitializer.cs`**: Current String handler registration, needs conversion to generic handler
-- **`src/Koan.Flow.Core/Extensions/FlowEntityExtensions.cs`**: Message interceptor registration, contains broken StringQueuedMessage
-- **`src/Koan.Flow.Core/Messaging/FlowQueuedMessage.cs`**: Routes to "Koan.Flow.FlowEntity" queue - to be removed
-- **`src/Koan.Flow.Core/ServiceCollectionExtensions.cs`**: Contains `.On<>()` handler registrations and ExtractDict logic
+- **`src/Koan.Canon.Core/Initialization/FlowMessagingInitializer.cs`**: Current String handler registration, needs conversion to generic handler
+- **`src/Koan.Canon.Core/Extensions/FlowEntityExtensions.cs`**: Message interceptor registration, contains broken StringQueuedMessage
+- **`src/Koan.Canon.Core/Messaging/FlowQueuedMessage.cs`**: Routes to "Koan.Canon.FlowEntity" queue - to be removed
+- **`src/Koan.Canon.Core/ServiceCollectionExtensions.cs`**: Contains `.On<>()` handler registrations and ExtractDict logic
 
 #### DynamicFlowEntity Support Files
 
-- **`src/Koan.Flow.Core/Model/DynamicFlowExtensions.cs`**: ExpandoObject manipulation and path-based operations
-- **`src/Koan.Flow.Core/Model/Typed.cs`**: DynamicFlowEntity<T> definition and IDynamicFlowEntity interface
-- **`src/Koan.Flow.Core/Model/DynamicTransportEnvelope.cs`**: Envelope structure for DynamicFlowEntity messages
+- **`src/Koan.Canon.Core/Model/DynamicFlowExtensions.cs`**: ExpandoObject manipulation and path-based operations
+- **`src/Koan.Canon.Core/Model/Typed.cs`**: DynamicFlowEntity<T> definition and IDynamicFlowEntity interface
+- **`src/Koan.Canon.Core/Model/DynamicTransportEnvelope.cs`**: Envelope structure for DynamicFlowEntity messages
 
 #### Sample Data and Testing
 
-- **`samples/S8.Flow/S8.Flow.Shared/SampleData.cs`**: Contains test Manufacturer data using `ToDynamicFlowEntity<T>()`
-- **`samples/S8.Flow/S8.Flow.Shared/Manufacturer.cs`**: DynamicFlowEntity<Manufacturer> model
+- **`samples/S8.Canon/S8.Canon.Shared/SampleData.cs`**: Contains test Manufacturer data using `ToDynamicFlowEntity<T>()`
+- **`samples/S8.Canon/S8.Canon.Shared/Manufacturer.cs`**: DynamicFlowEntity<Manufacturer> model
 - **Container logs**: `docker logs koan-s8-flow-api-1` and `docker logs koan-s8-flow-adapter-bms-1`
 
 ### Current Message Flow Analysis
@@ -149,7 +149,7 @@ MessagingInterceptors.RegisterForInterface<IDynamicFlowEntity>(entity =>
   "version": "1",
   "source": "bms",
   "model": "Manufacturer",
-  "type": "DynamicTransportEnvelope<S8.Flow.Shared.Manufacturer>",
+  "type": "DynamicTransportEnvelope<S8.Canon.Shared.Manufacturer>",
   "payload": {
     "identifier.code": "MFG001",
     "identifier.name": "Acme Corp",
@@ -188,7 +188,7 @@ services.On<string>(async json => {
 
 ```
 [RabbitMQ] Consumer created for String on queue System.String  // ✅ Queue exists
-[Koan.Flow] DEBUG: FlowEntity message handler called with payload length: 477  // ❌ Wrong handler
+[Koan.Canon] DEBUG: FlowEntity message handler called with payload length: 477  // ❌ Wrong handler
 ```
 
 #### Database Evidence
@@ -210,7 +210,7 @@ services.On<string>(async json => {
 **Date**: 2025-09-09  
 **Status**: ✅ **COMPLETED SUCCESSFULLY** - All phases implemented  
 **Priority**: ✅ **RESOLVED** - DynamicFlowEntity functionality restored  
-**Environment**: S8.Flow sample project, MongoDB + RabbitMQ containers  
+**Environment**: S8.Canon sample project, MongoDB + RabbitMQ containers  
 **Commit**: `7069bb5` - feat(Flow): implement unified DynamicFlowEntity routing architecture
 
 ### Development Environment Setup
@@ -219,13 +219,13 @@ services.On<string>(async json => {
 
 - **Docker Desktop** running on Windows
 - **Git repository** at `F:\Replica\NAS\Files\repo\github\Koan-framework`
-- **S8.Flow sample project** with MongoDB and RabbitMQ containers
+- **S8.Canon sample project** with MongoDB and RabbitMQ containers
 
 #### Starting the Stack
 
 ```bash
-# Navigate to S8.Flow sample directory
-cd "F:\Replica\NAS\Files\repo\github\Koan-framework\samples\S8.Flow"
+# Navigate to S8.Canon sample directory
+cd "F:\Replica\NAS\Files\repo\github\Koan-framework\samples\S8.Canon"
 
 # Clean rebuild (recommended after code changes)
 docker compose -p koan-s8-flow -f S8.Compose/docker-compose.yml build --no-cache
@@ -278,13 +278,13 @@ docker logs koan-s8-flow-adapter-bms-1 | grep -i "StringQueuedMessage\|ToDynamic
 docker exec s8-mongo mongosh s8 --eval "db.getCollectionNames()"
 
 # Check latest parked Manufacturer records (shows the problem)
-docker exec s8-mongo mongosh s8 --eval "db['S8.Flow.Shared.Manufacturer#flow.parked'].find().sort({OccurredAt: -1}).limit(3).forEach(printjson)"
+docker exec s8-mongo mongosh s8 --eval "db['S8.Canon.Shared.Manufacturer#flow.parked'].find().sort({OccurredAt: -1}).limit(3).forEach(printjson)"
 
 # Check if any Manufacturer records made it to intake
-docker exec s8-mongo mongosh s8 --eval "db['S8.Flow.Shared.Manufacturer#flow.intake'].countDocuments()"
+docker exec s8-mongo mongosh s8 --eval "db['S8.Canon.Shared.Manufacturer#flow.intake'].countDocuments()"
 
 # Check successful Device/Sensor processing for comparison
-docker exec s8-mongo mongosh s8 --eval "db['S8.Flow.Shared.Device'].find().limit(2).forEach(printjson)"
+docker exec s8-mongo mongosh s8 --eval "db['S8.Canon.Shared.Device'].find().limit(2).forEach(printjson)"
 ```
 
 ##### 4. RabbitMQ Queue Inspection
@@ -323,7 +323,7 @@ Data: {
 
 ```bash
 # In API logs - Wrong handler receiving DynamicFlowEntity
-[Koan.Flow] DEBUG: FlowEntity message handler called with payload length: 477
+[Koan.Canon] DEBUG: FlowEntity message handler called with payload length: 477
 [FlowOrchestrator] Found DynamicFlowEntity, Model type: null
 [FlowOrchestrator] WARNING: DynamicFlowEntity.Model is null!
 
@@ -342,7 +342,7 @@ Evidence: { reason: 'no-payload', tags: ['identifier.code', 'identifier.name'] }
 [StringQueuedMessage] DEBUG: JSON payload length: 477
 
 # Payload preview should show proper structure
-"type":"DynamicTransportEnvelope<S8.Flow.Shared.Manufacturer>"
+"type":"DynamicTransportEnvelope<S8.Canon.Shared.Manufacturer>"
 "payload":{"identifier.code":"MFG001","identifier.name":"Acme Corp"...}
 ```
 
@@ -469,7 +469,7 @@ This debugging guide provides a systematic approach to identify issues, track im
 
 - **CLD_ORCHESTRATOR_BIDIRECTIONAL_PATTERN.md**: Context on Flow orchestration patterns
 - **CLD_Koan_MCP_INTEGRATION_PLAN.md**: Related messaging architecture
-- **src/Koan.Flow.Core/USAGE.md**: Flow framework usage patterns
+- **src/Koan.Canon.Core/USAGE.md**: Flow framework usage patterns
 
 ### Key Classes and Interfaces
 
@@ -483,7 +483,7 @@ class TransportEnvelope<T> { string Model, Type, Source; T Payload; }
 class DynamicTransportEnvelope<T> { string Model, Type, Source; Dictionary<string,object> Payload; }
 
 // Current problem classes (to be removed/modified)
-class FlowQueuedMessage : IQueuedMessage { QueueName = "Koan.Flow.FlowEntity"; }
+class FlowQueuedMessage : IQueuedMessage { QueueName = "Koan.Canon.FlowEntity"; }
 class StringQueuedMessage : IQueuedMessage { QueueName = "System.String"; }
 ```
 
@@ -510,7 +510,7 @@ The primary issue - **DynamicFlowEntity messages being parked as "NO_KEYS"** - w
 
 #### ✅ **Architectural Improvements**
 
-1. **Unified Message Flow**: `Adapter → FlowQueuedMessage → "Koan.Flow.FlowEntity" queue → FlowOrchestrator`
+1. **Unified Message Flow**: `Adapter → FlowQueuedMessage → "Koan.Canon.FlowEntity" queue → FlowOrchestrator`
 2. **Smart Service Detection**: Background workers only run on services with user-defined `[FlowOrchestrator]` classes
 3. **Adapter Isolation**: Lightweight adapters operate cleanly without data service dependencies
 4. **Clean Code**: Removed obsolete `StringQueuedMessage` class and competing handler registrations
@@ -525,7 +525,7 @@ The original plan called for routing all Flow messages through a single `System.
 
 Instead, we implemented a more elegant solution:
 
-- **Single Queue**: All Flow entities route to `"Koan.Flow.FlowEntity"` queue
+- **Single Queue**: All Flow entities route to `"Koan.Canon.FlowEntity"` queue
 - **Orchestrator-Based**: Processing handled by `FlowOrchestratorBase` with type-specific methods
 - **Cleaner Abstraction**: No generic string parsing needed - direct object processing
 
@@ -543,10 +543,10 @@ Instead, we implemented a more elegant solution:
 ```csharp
 // OLD: Competing routing paths
 DynamicFlowEntity → StringQueuedMessage → "System.String" → FlowMessagingInitializer (BROKEN)
-FlowEntity       → FlowQueuedMessage   → "Koan.Flow.FlowEntity" → FlowOrchestrator (WORKED)
+FlowEntity       → FlowQueuedMessage   → "Koan.Canon.FlowEntity" → FlowOrchestrator (WORKED)
 
 // NEW: Unified routing path
-ALL Flow Entities → FlowQueuedMessage → "Koan.Flow.FlowEntity" → FlowOrchestrator (WORKS)
+ALL Flow Entities → FlowQueuedMessage → "Koan.Canon.FlowEntity" → FlowOrchestrator (WORKS)
 ```
 
 #### **Critical Code Changes**
@@ -555,7 +555,7 @@ ALL Flow Entities → FlowQueuedMessage → "Koan.Flow.FlowEntity" → FlowOrche
 2. **FlowOrchestratorBase.cs**: Added `ProcessDynamicTransportEnvelope()` method for proper DynamicFlowEntity handling
 3. **ServiceCollectionExtensions.cs**: Added smart `HasFlowOrchestrators()` detection and unified message handler
 4. **DefaultFlowOrchestrator.cs**: Removed `[FlowOrchestrator]` attribute to prevent adapter conflicts
-5. **S8.Flow.Api/Program.cs**: Added `S8FlowOrchestrator` class with `[FlowOrchestrator]` attribute
+5. **S8.Canon.Api/Program.cs**: Added `S8CanonOrchestrator` class with `[FlowOrchestrator]` attribute
 
 ### Current Status & Remaining Work
 
@@ -583,13 +583,13 @@ configured as a type that is allowed to be serialized for this instance of Objec
 
 ```bash
 # ✅ Routing Success - Messages reach orchestrator
-[Koan.Flow] DEBUG: FlowEntity message handler called with payload length: 312
-[Koan.Flow] DEBUG: Found FlowOrchestrator, processing FlowEntity message
-[Koan.Flow] DEBUG: FlowOrchestrator completed processing
+[Koan.Canon] DEBUG: FlowEntity message handler called with payload length: 312
+[Koan.Canon] DEBUG: Found FlowOrchestrator, processing FlowEntity message
+[Koan.Canon] DEBUG: FlowOrchestrator completed processing
 
 # ✅ Model Reconstruction Success - ExpandoObjects created
-[S8FlowOrchestrator] Processing DynamicTransportEnvelope for Manufacturer
-[S8FlowOrchestrator] DynamicTransportEnvelope path values count: 15
+[S8CanonOrchestrator] Processing DynamicTransportEnvelope for Manufacturer
+[S8CanonOrchestrator] DynamicTransportEnvelope path values count: 15
 
 # ⚠️ Separate Issue - BSON serialization fails at write stage
 Error writing Manufacturer to intake: Type Newtonsoft.Json.Linq.JArray is not configured

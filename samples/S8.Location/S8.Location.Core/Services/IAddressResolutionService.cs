@@ -4,7 +4,7 @@ public interface IAddressResolutionService
 {
     /// <summary>
     /// Resolves an address to its canonical AgnosticLocation ID.
-    /// Note: Flow handles deduplication via AddressHash AggregationKey.
+    /// Note: the Canon pipeline handles deduplication via AddressHash AggregationKey.
     /// This service is only called for NEW addresses that need resolution.
     /// </summary>
     Task<string> ResolveToCanonicalIdAsync(string address, CancellationToken ct = default);

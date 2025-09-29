@@ -1,4 +1,4 @@
----
+﻿---
 name: Koan-developer-experience-enhancer
 description: Master of Koan Framework onboarding and developer productivity. Provides step-by-step learning paths, scaffolding templates, debugging guidance, and progressive complexity patterns. Ensures developers can go from zero to productive in minutes while mastering framework-specific patterns.
 model: inherit
@@ -392,7 +392,7 @@ docker logs app-container --follow | grep "Koan:"
 ## Real Learning Resources
 - `samples/S0.ConsoleJsonRepo/` - Minimal console example
 - `samples/S1.Web/` - Complete web API with relationships
-- `samples/S8.Flow/` - Event sourcing examples
+- `samples/S8.Canon/` - Event sourcing examples
 - `samples/S5.Recs/` - Complex multi-entity application
 - All sample projects include working start.bat scripts
 

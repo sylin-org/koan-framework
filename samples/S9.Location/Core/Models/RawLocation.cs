@@ -1,7 +1,7 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Koan.Data.Abstractions.Annotations;
-using Koan.Flow.Attributes;
-using Koan.Flow.Model;
+using Koan.Canon.Attributes;
+using Koan.Canon.Model;
 
 namespace S9.Location.Core.Models;
 

@@ -1,4 +1,4 @@
-# External ID Correlation Framework Proposal
+﻿# External ID Correlation Framework Proposal
 
 ## Executive Summary
 
@@ -151,13 +151,13 @@ Enable efficient parent lookups across systems with canonical ULID resolution:
 
 **✅ FULLY IMPLEMENTED Components**:
 
-1. **IdentityLink<T> Model**: Complete external ID → ReferenceUlid mapping system (`src/Koan.Flow.Core/Model/Identity.cs:7`)
-2. **Canonical Projection Pipeline**: Enhanced with external ID auto-population (`src/Koan.Flow.Core/ServiceCollectionExtensions.cs:217-250`)
-3. **FlowRegistry**: GetExternalIdKeys method with policy-driven detection (`src/Koan.Flow.Core/Infrastructure/FlowRegistry.cs:106-119`)
-4. **Data/Source Separation**: Clean separation in StageRecord<T> with Data and Source properties (`src/Koan.Flow.Core/Model/Typed.cs:57-59`)
-5. **External ID Resolution**: Working IdentityLink resolution in intake pipeline (`src/Koan.Flow.Core/ServiceCollectionExtensions.cs:636-709`)
-6. **Reserved Key Infrastructure**: Constants for `identifier.external.*` prefix (`src/Koan.Flow.Core/Infrastructure/Constants.cs:66`)
-7. **Policy Framework**: FlowPolicyAttribute with ExternalIdPolicy enum (`src/Koan.Flow.Core/Attributes/FlowPolicyAttribute.cs`)
+1. **IdentityLink<T> Model**: Complete external ID → ReferenceUlid mapping system (`src/Koan.Canon.Core/Model/Identity.cs:7`)
+2. **Canonical Projection Pipeline**: Enhanced with external ID auto-population (`src/Koan.Canon.Core/ServiceCollectionExtensions.cs:217-250`)
+3. **FlowRegistry**: GetExternalIdKeys method with policy-driven detection (`src/Koan.Canon.Core/Infrastructure/FlowRegistry.cs:106-119`)
+4. **Data/Source Separation**: Clean separation in StageRecord<T> with Data and Source properties (`src/Koan.Canon.Core/Model/Typed.cs:57-59`)
+5. **External ID Resolution**: Working IdentityLink resolution in intake pipeline (`src/Koan.Canon.Core/ServiceCollectionExtensions.cs:636-709`)
+6. **Reserved Key Infrastructure**: Constants for `identifier.external.*` prefix (`src/Koan.Canon.Core/Infrastructure/Constants.cs:66`)
+7. **Policy Framework**: FlowPolicyAttribute with ExternalIdPolicy enum (`src/Koan.Canon.Core/Attributes/FlowPolicyAttribute.cs`)
 8. **Source Entity ID Extraction**: GetSourceEntityId() extracts [Key] property values (`ServiceCollectionExtensions.cs:926-972`)
 9. **ParentKey Resolution**: TryResolveParentViaExternalId() for cross-system parent lookup (`ServiceCollectionExtensions.cs:806-831`)
 10. **Source ID Stripping**: Canonical models exclude source 'id' fields (`ServiceCollectionExtensions.cs:256-259`)
@@ -176,7 +176,7 @@ The external ID correlation infrastructure is **FULLY FUNCTIONAL**. The system n
 
 #### Phase 1: Core External ID Processing ✅ (COMPLETED)
 
-**File**: `src/Koan.Flow.Core/ServiceCollectionExtensions.cs`
+**File**: `src/Koan.Canon.Core/ServiceCollectionExtensions.cs`
 **Location**: Lines 208-231 (canonical projection loop)
 **Current State**: Processing only Data payload, no Source metadata integration
 **Required Changes**:
@@ -224,7 +224,7 @@ foreach (var r in all)
 
 #### Phase 2: Policy Framework
 
-**New File**: `src/Koan.Flow.Core/Attributes/FlowPolicyAttribute.cs`
+**New File**: `src/Koan.Canon.Core/Attributes/FlowPolicyAttribute.cs`
 
 ```csharp
 [AttributeUsage(AttributeTargets.Class)]
@@ -245,7 +245,7 @@ public enum ExternalIdPolicy
 
 #### Phase 3: Enhanced FlowRegistry
 
-**File**: `src/Koan.Flow.Core/Infrastructure/FlowRegistry.cs`
+**File**: `src/Koan.Canon.Core/Infrastructure/FlowRegistry.cs`
 **Method**: `GetExternalIdKeys` (lines 104-108)
 **Current State**: Returns empty array with comment "vNext: rely on reserved identifier.external.\* keys"
 **Required Changes**:
@@ -283,7 +283,7 @@ private static string GetDefaultAggregationKey(Type modelType)
 
 #### Phase 4: Auto-Index Management
 
-**File**: `src/Koan.Flow.Core/ServiceCollectionExtensions.cs`
+**File**: `src/Koan.Canon.Core/ServiceCollectionExtensions.cs`
 **Addition**: Automatic IdentityLink creation with proper indexing
 
 ```csharp

@@ -1,11 +1,11 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using S8.Location.Core.Models;
 using Koan.Core;
 using Koan.Core.Hosting;
 using Koan.Data.Core;
-using Koan.Flow.Attributes;
+using Koan.Canon.Attributes;
 using Koan.Messaging;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -26,7 +26,7 @@ builder.Services.AddKoan();
 var app = builder.Build();
 await app.RunAsync();
 
-[FlowAdapter(system: "healthcare", adapter: "healthcare", DefaultSource = "healthcare")]
+[CanonAdapter(system: "healthcare", adapter: "healthcare", DefaultSource = "healthcare")]
 public sealed class HealthcareLocationAdapter : BackgroundService
 {
     private readonly ILogger<HealthcareLocationAdapter> _logger;
@@ -56,7 +56,7 @@ public sealed class HealthcareLocationAdapter : BackgroundService
                     {
                         var location = new Location
                         {
-                            Id = externalId, // HP1, HP2, etc. - tracked via Flow metadata (source.system, source.adapter)
+                            Id = externalId, // HP1, HP2, etc. - tracked via Canon metadata (source.system, source.adapter)
                             Address = address
                         };
 

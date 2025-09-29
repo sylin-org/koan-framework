@@ -1,4 +1,4 @@
-# Koan Framework Agent Guidelines
+﻿# Koan Framework Agent Guidelines
 
 ## Core Principles
 
@@ -436,7 +436,7 @@ public class TodosController : EntityController<Todo>
 
 ```xml
 <!-- ❌ WRONG: Adding dependencies you don't use -->
-<ProjectReference Include="..\..\src\Koan.Flow.Core\Koan.Flow.Core.csproj" />
+<ProjectReference Include="..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
 <!-- If you're not using Flow patterns, don't reference it -->
 ```
 

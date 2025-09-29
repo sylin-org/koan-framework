@@ -1,4 +1,4 @@
-# S8.Flow - IoT Monitor with Multi-Key Aggregation and SSE
+﻿# S8.Canon - IoT Monitor with Multi-Key Aggregation and SSE
 
 This sample demonstrates Koan Flow aggregating IoT telemetry from multiple adapters into unified device views using namespaced tags and multi-key association, with a live SSE-powered monitor UI.
 

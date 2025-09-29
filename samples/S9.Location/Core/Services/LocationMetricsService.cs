@@ -1,8 +1,8 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Core;
-using Koan.Flow.Infrastructure;
-using Koan.Flow.Model;
+using Koan.Canon.Infrastructure;
+using Koan.Canon.Model;
 using Microsoft.Extensions.Logging;
 using S9.Location.Core.Diagnostics;
 using S9.Location.Core.Models;

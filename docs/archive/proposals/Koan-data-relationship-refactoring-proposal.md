@@ -1,4 +1,4 @@
-# Koan Framework: Data Relationship System Refactoring Proposal
+﻿# Koan Framework: Data Relationship System Refactoring Proposal
 
 **Document Version**: 1.0
 **Date**: January 2025
@@ -309,7 +309,7 @@ public virtual async Task<IActionResult> GetStream(CancellationToken ct)
 
 ```bash
 # DELETE: Flow-specific relationship infrastructure
-rm src/Koan.Flow.Core/Services/ParentKeyResolutionService.cs              # -437 lines
+rm src/Koan.Canon.Core/Services/ParentKeyResolutionService.cs              # -437 lines
 
 # DELETE: Duplicate attribute definition
 # Remove ParentKeyAttribute from FlowAttributes.cs                         # -14 lines

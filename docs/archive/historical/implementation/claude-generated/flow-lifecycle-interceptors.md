@@ -1,7 +1,7 @@
-# CLD Document: Koan.Flow Lifecycle Interceptors - Fluent API Architecture
+﻿# CLD Document: Koan.Canon Lifecycle Interceptors - Fluent API Architecture
 
 **Document Type**: Comprehensive Library Design (CLD)  
-**Project Name**: Koan.Flow Lifecycle Interceptor Enhancement  
+**Project Name**: Koan.Canon Lifecycle Interceptor Enhancement  
 **Version**: 1.0  
 **Date**: 2025-01-10  
 **Status**: PROPOSED - Ready for Implementation  
@@ -13,7 +13,7 @@
 
 ### Core Objective
 
-**Transform Koan.Flow interceptor system** from ambiguous single-point interception to **explicit lifecycle-aware fluent API** that provides precise control over Flow pipeline stages with crystal-clear semantics.
+**Transform Koan.Canon interceptor system** from ambiguous single-point interception to **explicit lifecycle-aware fluent API** that provides precise control over Flow pipeline stages with crystal-clear semantics.
 
 ### The Problem We're Solving
 
@@ -84,9 +84,9 @@ FlowInterceptors
 
 #### File Locations
 
-- **Core Implementation**: `src/Koan.Flow.Core/Interceptors/FlowIntakeInterceptors.cs`
-- **Registration Extensions**: `src/Koan.Flow.Core/ServiceCollectionExtensions.cs`
-- **Action Types**: `src/Koan.Flow.Core/Infrastructure/FlowIntakeActions.cs`
+- **Core Implementation**: `src/Koan.Canon.Core/Interceptors/FlowIntakeInterceptors.cs`
+- **Registration Extensions**: `src/Koan.Canon.Core/ServiceCollectionExtensions.cs`
+- **Action Types**: `src/Koan.Canon.Core/Infrastructure/FlowIntakeActions.cs`
 
 #### Current API Surface
 
@@ -136,10 +136,10 @@ FlowIntakeInterceptors.RegisterForType<Models.Location>(location =>
 });
 ```
 
-#### Example 2: S8.Flow Device (Limited)
+#### Example 2: S8.Canon Device (Limited)
 
 ```csharp
-// Current S8.Flow implementation
+// Current S8.Canon implementation
 FlowIntakeInterceptors.RegisterForType<Device>(device =>
 {
     // Can only validate/transform at one point
@@ -401,10 +401,10 @@ FlowInterceptors
 
 #### 1.1 Create Fluent Builder Classes
 
-**File**: `src/Koan.Flow.Core/Interceptors/FlowInterceptorBuilder.cs`
+**File**: `src/Koan.Canon.Core/Interceptors/FlowInterceptorBuilder.cs`
 
 ```csharp
-namespace Koan.Flow.Core.Interceptors;
+namespace Koan.Canon.Core.Interceptors;
 
 public class FlowInterceptorBuilder<T> where T : IFlowEntity
 {
@@ -433,10 +433,10 @@ public class FlowInterceptorBuilder<T> where T : IFlowEntity
 
 #### 1.2 Create Registry System
 
-**File**: `src/Koan.Flow.Core/Interceptors/FlowInterceptorRegistry.cs`
+**File**: `src/Koan.Canon.Core/Interceptors/FlowInterceptorRegistry.cs`
 
 ```csharp
-namespace Koan.Flow.Core.Interceptors;
+namespace Koan.Canon.Core.Interceptors;
 
 internal class FlowInterceptorRegistry<T> where T : IFlowEntity
 {
@@ -466,10 +466,10 @@ internal class FlowInterceptorRegistry<T> where T : IFlowEntity
 
 #### 1.3 Create Enhanced Action Types
 
-**File**: `src/Koan.Flow.Core/Infrastructure/FlowStageActions.cs`
+**File**: `src/Koan.Canon.Core/Infrastructure/FlowStageActions.cs`
 
 ```csharp
-namespace Koan.Flow.Core.Infrastructure;
+namespace Koan.Canon.Core.Infrastructure;
 
 public static class FlowStageActions
 {
@@ -524,7 +524,7 @@ public class FlowStageAction
 
 Each pipeline stage needs interceptor integration points:
 
-**File**: `src/Koan.Flow.Core/Pipeline/IntakeStage.cs` (Enhanced)
+**File**: `src/Koan.Canon.Core/Pipeline/IntakeStage.cs` (Enhanced)
 
 ```csharp
 public async Task<StageResult> ProcessAsync<T>(T entity) where T : IFlowEntity
@@ -565,10 +565,10 @@ Each Flow stage needs interceptor hooks:
 
 #### 3.1 Create Migration Utilities
 
-**File**: `src/Koan.Flow.Core/Migration/FlowInterceptorMigration.cs`
+**File**: `src/Koan.Canon.Core/Migration/FlowInterceptorMigration.cs`
 
 ```csharp
-namespace Koan.Flow.Core.Migration;
+namespace Koan.Canon.Core.Migration;
 
 [Obsolete("Use FlowInterceptors.For<T>().BeforeIntake() instead. Will be removed in v2.0.")]
 public static class FlowIntakeInterceptors
@@ -643,9 +643,9 @@ public void Initialize(IServiceCollection services)
 }
 ```
 
-#### 4.2 Update S8.Flow Device Sample
+#### 4.2 Update S8.Canon Device Sample
 
-**File**: `samples/S8.Flow/S8.Flow.Shared/FlowConfiguration.cs`
+**File**: `samples/S8.Canon/S8.Canon.Shared/FlowConfiguration.cs`
 
 ```csharp
 public static void ConfigureInterceptors()
@@ -751,7 +751,7 @@ FlowInterceptors
     });
 ```
 
-### For Existing S8.Flow Samples
+### For Existing S8.Canon Samples
 
 #### Device Interceptor Migration
 
@@ -1152,7 +1152,7 @@ docker exec s8-mongo mongosh s8 --eval "
 - `samples/S8.Location/S8.Location.Core/Interceptors/LocationInterceptor.cs` - Main migration target
 - `samples/S8.Location/S8.Location.Core/Models/ResolutionCache.cs` - Entity fix
 - `samples/S8.Location/S8.Location.Core/Models/AgnosticLocation.cs` - Entity fix
-- `src/Koan.Flow.Core/Interceptors/FlowInterceptorBuilder.cs` - New infrastructure
+- `src/Koan.Canon.Core/Interceptors/FlowInterceptorBuilder.cs` - New infrastructure
 
 #### **Success Indicators**
 
@@ -1166,7 +1166,7 @@ docker exec s8-mongo mongosh s8 --eval "
 
 ## 🎯 Summary
 
-This CLD document establishes the comprehensive architecture for transforming Koan.Flow's interceptor system from a limited, ambiguous single-point API to a sophisticated, fluent lifecycle API that provides precise control over every stage of the data processing pipeline.
+This CLD document establishes the comprehensive architecture for transforming Koan.Canon's interceptor system from a limited, ambiguous single-point API to a sophisticated, fluent lifecycle API that provides precise control over every stage of the data processing pipeline.
 
 **Key Outcomes:**
 
@@ -1178,7 +1178,7 @@ This CLD document establishes the comprehensive architecture for transforming Ko
 
 **Immediate Priority**: Fix S8.Location's hash collision detection using the new BeforeIntake interceptor pattern, demonstrating the value and necessity of this architectural enhancement.
 
-The fluent interceptor API represents a **significant maturity milestone** for Koan.Flow, transforming it from a good framework to an **exceptional enterprise data orchestration platform** with sophisticated lifecycle control capabilities.
+The fluent interceptor API represents a **significant maturity milestone** for Koan.Canon, transforming it from a good framework to an **exceptional enterprise data orchestration platform** with sophisticated lifecycle control capabilities.
 
 ---
 

@@ -1,4 +1,4 @@
-# Decision Record: DATA-0072-messaging-envelope-transformers
+﻿# Decision Record: DATA-0072-messaging-envelope-transformers
 
 ## Title
 Koan Messaging Envelope and Transformer Architecture
@@ -7,11 +7,11 @@ Koan Messaging Envelope and Transformer Architecture
 Accepted
 
 ## Context
-Koan.Messaging previously required clients to construct transport envelopes and inject metadata manually. This led to duplicated logic, tight coupling, and inconsistent onboarding. Koan.Flow and other domain modules need a unified, metadata-rich transport pattern, but messaging should remain agnostic to domain-specific envelopes and types.
+Koan.Messaging previously required clients to construct transport envelopes and inject metadata manually. This led to duplicated logic, tight coupling, and inconsistent onboarding. Koan.Canon and other domain modules need a unified, metadata-rich transport pattern, but messaging should remain agnostic to domain-specific envelopes and types.
 
 ## Decision
 - **Envelope Ownership:**
-  - `TransportEnvelope` is a domain concern (e.g., Koan.Flow), not a messaging concern.
+  - `TransportEnvelope` is a domain concern (e.g., Koan.Canon), not a messaging concern.
   - Only domain modules construct envelopes and inject metadata.
 - **Messaging Transformers:**
   - Koan.Messaging maintains a transformer/interceptor registry keyed by type, open generic, or interface.
@@ -22,9 +22,9 @@ Koan.Messaging previously required clients to construct transport envelopes and 
   - Clients/adapters use standard `.Send(ct)` semantics only.
   - No envelope construction or metadata injection in client code.
 - **FlowAdapter Metadata:**
-  - Koan.Flow registers an interceptor for its types/interfaces that wraps payloads in a `TransportEnvelope` and injects `[FlowAdapter]` metadata.
+  - Koan.Canon registers an interceptor for its types/interfaces that wraps payloads in a `TransportEnvelope` and injects `[FlowAdapter]` metadata.
 - **Onboarding Handlers:**
-  - Arrival handlers in Koan.Flow inspect envelope metadata and route accordingly.
+  - Arrival handlers in Koan.Canon inspect envelope metadata and route accordingly.
   - Both `FlowEntity` and `DynamicFlowEntity` are handled via the same onboarding pipeline, differentiated only by envelope metadata.
 - **Legacy Removal:**
   - Remove all legacy envelope construction from samples/adapters.

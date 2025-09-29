@@ -1,12 +1,12 @@
-# Koan.Flow Performance Analysis and Optimization Recommendations
+﻿# Koan.Canon Performance Analysis and Optimization Recommendations
 
 **Date**: 2025-09-11  
 **Analyst**: Leo Botinelly  
-**Scope**: Koan.Flow background services performance assessment and parallelization opportunities
+**Scope**: Koan.Canon background services performance assessment and parallelization opportunities
 
 ## Executive Summary
 
-This analysis identified significant performance bottlenecks in Koan.Flow background services, primarily related to sequential processing patterns and N+1 database query problems. The assessment validated the initial theory about ParentKey resolution bottlenecks and discovered similar patterns throughout the codebase that could benefit from batch processing and parallelization.
+This analysis identified significant performance bottlenecks in Koan.Canon background services, primarily related to sequential processing patterns and N+1 database query problems. The assessment validated the initial theory about ParentKey resolution bottlenecks and discovered similar patterns throughout the codebase that could benefit from batch processing and parallelization.
 
 **Key Results:**
 
@@ -32,7 +32,7 @@ This analysis identified significant performance bottlenecks in Koan.Flow backgr
 
 ### 1. ParentKey Resolution Service (✅ RESOLVED)
 
-**Location**: `src/Koan.Flow.Core/Services/ParentKeyResolutionService.cs`
+**Location**: `src/Koan.Canon.Core/Services/ParentKeyResolutionService.cs`
 
 **Original Problem**:
 
@@ -57,7 +57,7 @@ This analysis identified significant performance bottlenecks in Koan.Flow backgr
 
 ### 2. ModelAssociationWorker (🔍 OPTIMIZATION OPPORTUNITY)
 
-**Location**: `src/Koan.Flow.Core/ServiceCollectionExtensions.cs` (Lines 784-792)
+**Location**: `src/Koan.Canon.Core/ServiceCollectionExtensions.cs` (Lines 784-792)
 
 **Current Problem**:
 
@@ -81,7 +81,7 @@ foreach (var c in candidates)
 
 ### 3. ModelProjectionWorker (🔍 OPTIMIZATION OPPORTUNITY)
 
-**Location**: `src/Koan.Flow.Core/ServiceCollectionExtensions.cs` (Lines 226-276)
+**Location**: `src/Koan.Canon.Core/ServiceCollectionExtensions.cs` (Lines 226-276)
 
 **Current Problems**:
 
@@ -101,7 +101,7 @@ foreach (var c in candidates)
 
 ### 4. Flow Orchestrator Pipeline (🔍 OPTIMIZATION OPPORTUNITY)
 
-**Location**: `src/Koan.Flow.Core/Orchestration/FlowOrchestratorBase.cs`
+**Location**: `src/Koan.Canon.Core/Orchestration/FlowOrchestratorBase.cs`
 
 **Current Problems**:
 
@@ -367,7 +367,7 @@ public static void ConfigureForPerformance(FlowOptions options)
 
 ### ParentKey Resolution Service Testing
 
-- ✅ **Environment**: S8.Flow sample project in Docker containerized stack
+- ✅ **Environment**: S8.Canon sample project in Docker containerized stack
 - ✅ **Method**: Started services using `start.ps1` script
 - ✅ **Validation**: Service successfully registered and running alongside existing Flow services
 - ✅ **Logging**: Confirmed batch processing and service poke pattern functionality
@@ -426,6 +426,6 @@ The recommended optimizations follow established Koan Framework patterns and lev
 
 **Files Modified/Created During Analysis:**
 
-- ✅ `src/Koan.Flow.Core/Services/ParentKeyResolutionService.cs` (NEW - 428 lines)
-- ✅ `src/Koan.Flow.Core/ServiceCollectionExtensions.cs` (MODIFIED - Added service registration)
+- ✅ `src/Koan.Canon.Core/Services/ParentKeyResolutionService.cs` (NEW - 428 lines)
+- ✅ `src/Koan.Canon.Core/ServiceCollectionExtensions.cs` (MODIFIED - Added service registration)
 - 📄 `docs/analysis/Koan-flow-performance-analysis.md` (THIS DOCUMENT)

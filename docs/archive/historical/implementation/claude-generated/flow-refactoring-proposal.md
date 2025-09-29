@@ -1,7 +1,7 @@
-# Flow Messaging Architecture - FRAMEWORK-LEVEL IMPLEMENTATION
+﻿# Flow Messaging Architecture - FRAMEWORK-LEVEL IMPLEMENTATION
 
 ## Executive Summary
-**🎯 OBJECTIVE**: Implement clean Flow messaging architecture at the Koan.Messaging/Koan.Flow framework level to provide lean, meaningful developer experience with zero user code changes.
+**🎯 OBJECTIVE**: Implement clean Flow messaging architecture at the Koan.Messaging/Koan.Canon framework level to provide lean, meaningful developer experience with zero user code changes.
 
 **📋 STATUS**: Requirements analysis complete. Ready for framework-level implementation with dedicated queue routing and orchestrator pattern.
 
@@ -87,28 +87,28 @@ await DirectSeedToIntake(modelType, model, referenceId, payload);
 ## ✅ IMPLEMENTED Architecture
 
 ### 1. Entity Discovery & Registration ✅
-**Implementation**: `Koan.Flow.Core/Initialization/FlowMessagingInitializer.cs`
+**Implementation**: `Koan.Canon.Core/Initialization/FlowMessagingInitializer.cs`
 - **✅ RegisterFlowTransformers()**: Scans all assemblies for Flow entity types
 - **✅ Automatic registration**: MessagingTransformers.Register() for each entity type  
 - **✅ Context capture**: FlowContext.Current captured in transport envelope
 - **✅ Assembly discovery**: Uses existing DiscoverAllFlowTypes() pattern
 
 ### 2. Send Extension Method ✅
-**Implementation**: `Koan.Flow.Core/Extensions/FlowEntityExtensions.cs`
+**Implementation**: `Koan.Canon.Core/Extensions/FlowEntityExtensions.cs`
 - **✅ entity.Send()**: Clean extension method for direct entity sending
 - **✅ Type safety**: Runtime validation of Flow entity types
 - **✅ Context integration**: Automatic FlowContext capture via stack trace analysis
 - **✅ Transport wrapping**: Automatic TransportEnvelope creation with metadata
 
 ### 3. Flow Context for Adapter Identity ✅
-**Implementation**: `Koan.Flow.Core/Context/FlowContext.cs`
+**Implementation**: `Koan.Canon.Core/Context/FlowContext.cs`
 - **✅ AsyncLocal context**: Thread-safe adapter identity preservation
 - **✅ Push/dispose pattern**: Clean context management with automatic cleanup
 - **✅ Attribute integration**: Enhanced [FlowAdapter] to set context automatically  
 - **✅ Stack trace fallback**: GetAdapterContextFromCallStack() for context recovery
 
 ### 4. Transport Handler ✅
-**Implementation**: `Koan.Flow.Core/Initialization/FlowMessagingInitializer.cs` (TransportEnvelopeProcessor)
+**Implementation**: `Koan.Canon.Core/Initialization/FlowMessagingInitializer.cs` (TransportEnvelopeProcessor)
 - **✅ Single handler**: Centralized processing for all transport envelopes
 - **✅ Model resolution**: Uses FlowRegistry.ResolveModel() for type resolution
 - **✅ Entity extraction**: Handles both regular and DynamicFlowEntity types
@@ -119,7 +119,7 @@ await DirectSeedToIntake(modelType, model, referenceId, payload);
 
 ### Core Files Structure
 ```
-src/Koan.Flow.Core/
+src/Koan.Canon.Core/
 ├── Context/
 │   ├── FlowContext.cs                    ✅ AsyncLocal context management
 │   └── FlowAdapterContextService.cs      ✅ Context service registration
@@ -129,22 +129,22 @@ src/Koan.Flow.Core/
 │   └── DynamicTransportEnvelope.cs       ✅ Dynamic entity transport
 ├── Initialization/
 │   └── FlowMessagingInitializer.cs       ✅ Transport handler & direct MongoDB integration
-└── ServiceCollectionExtensions.cs        ✅ Auto-registration via AddKoanFlow()
+└── ServiceCollectionExtensions.cs        ✅ Auto-registration via AddKoanCanon()
 
 src/Koan.Messaging.Core/
 └── TransportEnvelope.cs                  ✅ Generic transport envelope
 
-samples/S8.Flow/
-├── S8.Flow.Api/Program.cs                ✅ Uses AddFlowTransportHandler()
-├── S8.Flow.Adapters.Bms/Program.cs       ✅ Uses entity.Send() pattern
-└── S8.Flow.Adapters.Oem/Program.cs       ✅ Uses entity.Send() pattern
+samples/S8.Canon/
+├── S8.Canon.Api/Program.cs                ✅ Uses AddFlowTransportHandler()
+├── S8.Canon.Adapters.Bms/Program.cs       ✅ Uses entity.Send() pattern
+└── S8.Canon.Adapters.Oem/Program.cs       ✅ Uses entity.Send() pattern
 ```
 
 ### Key Implementation Patterns
 
 #### 1. Zero-Config Registration
 ```csharp
-// In ServiceCollectionExtensions.cs - automatic during AddKoanFlow()
+// In ServiceCollectionExtensions.cs - automatic during AddKoanCanon()
 services.AddSingleton<IHostedService>(sp =>
 {
     FlowEntityExtensions.RegisterFlowInterceptors();
@@ -198,7 +198,7 @@ services.On<string>(async json =>
 3. **Queue-Specific Routing**
    ```csharp
    // Add SendToQueueAsync method to messaging providers
-   // Support "Koan.Flow.FlowEntity" dedicated queue
+   // Support "Koan.Canon.FlowEntity" dedicated queue
    ```
 
 ### Phase 2: Flow Orchestrator Pattern (Priority: HIGH)
@@ -207,7 +207,7 @@ services.On<string>(async json =>
 #### Tasks:
 1. **FlowOrchestrator Base Class**
    ```csharp
-   // Koan.Flow.Core/Orchestration/FlowOrchestratorBase.cs
+   // Koan.Canon.Core/Orchestration/FlowOrchestratorBase.cs
    [FlowOrchestrator]
    public abstract class FlowOrchestratorBase : BackgroundService
    {
@@ -221,7 +221,7 @@ services.On<string>(async json =>
    ```csharp
    // Update KoanAutoRegistrar to find [FlowOrchestrator] classes
    // Register as hosted services
-   // Auto-configure "Koan.Flow.FlowEntity" queue handler
+   // Auto-configure "Koan.Canon.FlowEntity" queue handler
    ```
 
 3. **Default Orchestrator**
@@ -239,7 +239,7 @@ services.On<string>(async json =>
    ```csharp
    // Modify FlowEntityExtensions interceptors
    // Return FlowQueuedMessage instead of JSON string
-   // Route to "Koan.Flow.FlowEntity" queue
+   // Route to "Koan.Canon.FlowEntity" queue
    ```
 
 2. **Metadata Separation**
@@ -416,7 +416,7 @@ builder.Services.AddKoan();  // Auto-orchestrator handles everything
 ```mermaid
 graph TD
     A[Adapter] -->|entity.Send()| B[MessagingInterceptors]
-    B -->|IQueuedMessage| C[Koan.Flow.FlowEntity Queue]
+    B -->|IQueuedMessage| C[Koan.Canon.FlowEntity Queue]
     C --> D[FlowOrchestrator]
     D -->|Type-based| E[Intake]
     D -->|Metadata separate| F[StageMetadata]
@@ -427,7 +427,7 @@ graph TD
 | Component | Framework Changes | User Impact |
 |-----------|-----------------|-------------|
 | **Koan.Messaging** | Add IQueuedMessage interface | Zero - Backward compatible |
-| **Koan.Flow.Core** | Major orchestrator refactor | Zero - Transparent operation |
+| **Koan.Canon.Core** | Major orchestrator refactor | Zero - Transparent operation |
 | **Adapters** | None | Zero - Existing code works |
 | **API** | None | Zero - Auto-orchestrator |
 
@@ -437,7 +437,7 @@ graph TD
 |-------------|------------------------|------------------|
 | **Source Detection** | FlowContext + [FlowAdapter] | Just add attribute |
 | **Transport Wrapping** | MessagingInterceptors | Automatic via .Send() |
-| **Queue Strategy** | Dedicated "Koan.Flow.FlowEntity" | Invisible to users |
+| **Queue Strategy** | Dedicated "Koan.Canon.FlowEntity" | Invisible to users |
 | **Orchestrator** | Auto-discovery + [FlowOrchestrator] | Zero-config or custom |
 | **Metadata Separation** | StagePayload vs StageMetadata | Clean data model |
 
@@ -449,7 +449,7 @@ graph TD
 - **Zero Learning Curve**: Framework handles complexity
 
 #### Technical Excellence
-- **Dedicated Flow Queue**: "Koan.Flow.FlowEntity" 
+- **Dedicated Flow Queue**: "Koan.Canon.FlowEntity" 
 - **Type-Safe Processing**: FlowEntity vs DynamicFlowEntity vs FlowValueObject
 - **Clean Metadata**: Source info separate from model payload
 - **External ID Composition**: Using metadata only (e.g., "identifier.external.oem")
@@ -494,7 +494,7 @@ graph TD
 - ✅ Direct MongoDB integration
 
 #### Root Collection Architecture (100%)
-- ✅ **Flat Root Storage**: Root collections (e.g., `S8.Flow.Shared.Device`) store entities as direct mirrors of the class definition
+- ✅ **Flat Root Storage**: Root collections (e.g., `S8.Canon.Shared.Device`) store entities as direct mirrors of the class definition
 - ✅ **Perfect Entity Alignment**: No `Model` wrapper in root storage - documents match Entity<T> structure exactly
 - ✅ **Clean Separation**: Flow metadata remains in Flow-specific views (canonical, lineage, etc.)
 - ✅ **Optimal Performance**: Direct field access for queries, smaller documents, natural MongoDB patterns

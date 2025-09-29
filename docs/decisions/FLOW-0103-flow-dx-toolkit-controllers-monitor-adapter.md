@@ -47,7 +47,7 @@ Adopt a Flow DX toolkit with the following pillars:
 5. OOB sane defaults + KoanAutoRegistrar
 
 - A registrar in Flow Web/Runtime wires: controllers for all discovered `FlowEntity<T>` models, a default monitor, and action client/agent with the default verbs.
-- Opt-out or override via `Koan:Flow` options.
+- Opt-out or override via `Koan:Canon` options.
 
 ## Scope
 
@@ -70,14 +70,14 @@ Cons
 
 - Controllers: implement `FlowEntityController<TModel>` in Flow Web; register via `AddFlowControllers(o => o.AddForAllModels())` and KoanAutoRegistrar.
 - Monitor: implement `ProjectionContext<TModel>` with `Model: IDictionary<string,object?>` and `Policies: IDictionary<string,string>`; commit occurs in the projection worker after hook returns.
-- Adapter metadata: add `FlowAdapterAttribute` under `Koan.Flow.Attributes`; runtime reads it at startup and configures enrichment and capabilities.
+- Adapter metadata: add `FlowAdapterAttribute` under `Koan.Canon.Attributes`; runtime reads it at startup and configures enrichment and capabilities.
 - Actions: define `IFlowActions`, `FlowAction<TModel>`, `FlowAck`, `FlowReport` in Flow Messaging; map default verbs; wire a responder in adapter hosts.
-- Options: enable/disable auto-registration via `Koan:Flow:AutoRegister` and customize route prefix/paging.
+- Options: enable/disable auto-registration via `Koan:Canon:AutoRegister` and customize route prefix/paging.
 
 ## Follow-ups
 
 - Document controller routes and samples; include guidance on protecting admin/action endpoints.
-- Add a sample in `samples/S8.Flow` using the controller set, monitor hooks, and adapter metadata.
+- Add a sample in `samples/S8.Canon` using the controller set, monitor hooks, and adapter metadata.
 - Provide unit tests for OnProjected commit semantics and action correlation.
 
 ## References
@@ -86,3 +86,4 @@ Cons
 - FLOW-0102 - identity map, provisional mappings, and VO indexing
 - DATA-0061 - data access pagination and streaming
 - WEB-0035 - entity controller transformers
+

@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+  <ProjectReference Include="..\..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
+  <ProjectReference Include="..\..\..\src\Koan.Canon.Web\Koan.Canon.Web.csproj" />
+  <ProjectReference Include="..\..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
+    <ProjectReference Include="..\S8.Canon.Shared\S8.Canon.Shared.csproj" />
+  <ProjectReference Include="..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+  <ProjectReference Include="..\..\..\src\Koan.Messaging.RabbitMq\Koan.Messaging.RabbitMq.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

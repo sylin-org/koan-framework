@@ -1,4 +1,4 @@
-# FLOW-0110: Direct Seeding of Flow Transport Envelopes (Bypass FlowActions)
+﻿# FLOW-0110: Direct Seeding of Flow Transport Envelopes (Bypass FlowActions)
 
 Status: Proposed
 
@@ -17,7 +17,7 @@ Previous Flow ingestion used `FlowActions` to enqueue and process staged actions
 Adopt direct seeding for transport envelopes produced by Flow entity interception:
 
 1. Interceptor wraps entity → JSON `TransportEnvelope<T>`.
-2. Envelope routed to dedicated `Koan.Flow.FlowEntity` queue.
+2. Envelope routed to dedicated `Koan.Canon.FlowEntity` queue.
 3. `FlowMessagingInitializer` identifies envelope type and writes intake record directly.
 4. Downstream association/materialization unchanged.
 

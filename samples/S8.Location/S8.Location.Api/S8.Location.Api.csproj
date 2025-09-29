@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -10,7 +10,7 @@
   <ItemGroup>
     <!-- Core Koan Framework -->
     <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Koan.Flow.Core\Koan.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Web\Koan.Web.csproj" />
     

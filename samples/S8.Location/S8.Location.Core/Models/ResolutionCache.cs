@@ -1,6 +1,6 @@
 using Koan.Data.Core.Model;
 using Koan.Data.Abstractions.Annotations;
-
+using Koan.Data.Core;
 
 namespace S8.Location.Core.Models;
 
@@ -38,4 +38,10 @@ public class ResolutionCache : Entity<ResolutionCache>
             ResolvedAt = DateTime.UtcNow
         };
     }
+
+    /// <summary>
+    /// Retrieve an existing resolution cache entry by its address hash.
+    /// </summary>
+    public static Task<ResolutionCache?> FindAsync(string addressHash, CancellationToken ct = default) =>
+        Data<ResolutionCache, string>.GetAsync(addressHash, ct);
 }

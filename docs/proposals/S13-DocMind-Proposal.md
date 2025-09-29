@@ -1,4 +1,4 @@
-# **S13.DocMind: AI-Native Document Intelligence Platform**
+﻿# **S13.DocMind: AI-Native Document Intelligence Platform**
 
 ## **Executive Summary**
 
@@ -1313,7 +1313,7 @@ This architecture serves as a comprehensive reference implementation for buildin
     <PackageReference Include="Koan.Data" Version="1.0.0" />
     <PackageReference Include="Koan.Web" Version="1.0.0" />
     <PackageReference Include="Koan.AI" Version="1.0.0" />
-    <PackageReference Include="Koan.Flow" Version="1.0.0" />
+    <PackageReference Include="Koan.Canon" Version="1.0.0" />
 
     <!-- Provider Packages - Auto-registered when referenced -->
     <PackageReference Include="Koan.Data.MongoDB" Version="1.0.0" />
@@ -1943,7 +1943,7 @@ namespace S13.DocMind.Tests.Integration
 
 #### **Docker Compose Development Setup (Following S5/S8 Patterns)**
 
-Based on successful patterns from S5.Recs and S8.Flow/S8.Location samples, S13.DocMind provides multiple deployment scenarios:
+Based on successful patterns from S5.Recs and S8.Canon/S8.Location samples, S13.DocMind provides multiple deployment scenarios:
 
 ##### **Option 1: API with Embedded Client (S5.Recs Pattern)**
 ```yaml

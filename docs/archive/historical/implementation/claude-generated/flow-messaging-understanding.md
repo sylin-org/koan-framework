@@ -1,4 +1,4 @@
-# Flow & Messaging System - Complete Understanding Document
+﻿# Flow & Messaging System - Complete Understanding Document
 
 ## Table of Contents
 
@@ -31,7 +31,7 @@ The Koan Flow system is a data orchestration pipeline that processes entities th
 - **Core**: Message publishing/subscription via RabbitMQ
 - **Pattern**: `services.On<T>(handler)` for receiving, `message.Send()` for sending
 - **Transformers**: `MessagingTransformers.Register()` for message transformation
-- **Queues**: Named by message type, e.g., `Koan.Flow.Sending.FlowTargetedMessage<S8.Flow.Shared.Device>`
+- **Queues**: Named by message type, e.g., `Koan.Canon.Sending.FlowTargetedMessage<S8.Canon.Shared.Device>`
 
 #### 2. **Flow Entities**
 
@@ -96,7 +96,7 @@ public class BmsPublisher : BackgroundService
 #### API Side (Flow Processor)
 
 ```csharp
-// In S8.Flow.Api/Program.cs
+// In S8.Canon.Api/Program.cs
 builder.Services.AutoConfigureFlow(typeof(Reading).Assembly);
 
 // This creates hidden handlers that:
@@ -180,7 +180,7 @@ builder.Services.AutoConfigureFlow(typeof(Reading).Assembly);
 
 ### The Auto-Handler Problem
 
-1. **Registration** (S8.Flow.Api startup):
+1. **Registration** (S8.Canon.Api startup):
 
    - `AutoConfigureFlow(typeof(Reading).Assembly)` scans assembly
    - Finds Device, Sensor, Manufacturer, Reading types
@@ -305,7 +305,7 @@ graph LR
 
 #### 1.1 Create FlowContext
 
-**File**: `Koan.Flow.Core/Context/FlowContext.cs`
+**File**: `Koan.Canon.Core/Context/FlowContext.cs`
 
 ```csharp
 public class FlowContext
@@ -321,7 +321,7 @@ public class FlowContext
 
 #### 1.2 Create Send Extension
 
-**File**: `Koan.Flow.Core/Extensions/FlowEntityExtensions.cs`
+**File**: `Koan.Canon.Core/Extensions/FlowEntityExtensions.cs`
 
 ```csharp
 public static async Task Send<T>(this T entity) where T : class, IFlowEntity
@@ -333,7 +333,7 @@ public static async Task Send<T>(this T entity) where T : class, IFlowEntity
 
 #### 1.3 Register Transformers
 
-**File**: `Koan.Flow.Core/Initialization/FlowMessagingInitializer.cs`
+**File**: `Koan.Canon.Core/Initialization/FlowMessagingInitializer.cs`
 
 - Scan all assemblies for IFlowEntity implementations
 - Register transformer for each to wrap in TransportEnvelope
@@ -341,7 +341,7 @@ public static async Task Send<T>(this T entity) where T : class, IFlowEntity
 
 #### 1.4 Create Transport Handler
 
-**File**: `Koan.Flow.Core/Handlers/TransportEnvelopeHandler.cs`
+**File**: `Koan.Canon.Core/Handlers/TransportEnvelopeHandler.cs`
 
 - Single handler for all TransportEnvelope messages
 - Extract entity and metadata
@@ -353,8 +353,8 @@ public static async Task Send<T>(this T entity) where T : class, IFlowEntity
 
 **Files**:
 
-- `S8.Flow.Adapters.Bms/Program.cs`
-- `S8.Flow.Adapters.Oem/Program.cs`
+- `S8.Canon.Adapters.Bms/Program.cs`
+- `S8.Canon.Adapters.Oem/Program.cs`
 
 **Changes**:
 
@@ -369,7 +369,7 @@ await device.Send();
 
 #### 2.2 Update API
 
-**File**: `S8.Flow.Api/Program.cs`
+**File**: `S8.Canon.Api/Program.cs`
 
 **Changes**:
 
@@ -385,8 +385,8 @@ builder.Services.AddFlowTransportHandler();
 
 #### 3.1 Remove Files
 
-- `Koan.Flow.Core/Configuration/FlowServiceExtensions.cs` (auto-handlers)
-- `Koan.Flow.Core/Sending/FlowTargetedMessage.cs`
+- `Koan.Canon.Core/Configuration/FlowServiceExtensions.cs` (auto-handlers)
+- `Koan.Canon.Core/Sending/FlowTargetedMessage.cs`
 - `AUTOCONFIGURE_FLOW_EXAMPLES.md`
 
 #### 3.2 Clean Up Code
@@ -402,7 +402,7 @@ builder.Services.AddFlowTransportHandler();
 ### Core Flow Files
 
 ```
-src/Koan.Flow.Core/
+src/Koan.Canon.Core/
 ├── Attributes/
 │   ├── FlowAttributes.cs          # [AggregationKey], [FlowModel]
 │   └── FlowAdapterAttribute.cs    # [FlowAdapter(system, adapter)]
@@ -435,14 +435,14 @@ src/Koan.Flow.Core/
 ### Sample Application Files
 
 ```
-samples/S8.Flow/
-├── S8.Flow.Api/
+samples/S8.Canon/
+├── S8.Canon.Api/
 │   └── Program.cs                 # Uses AutoConfigureFlow (UPDATE)
-├── S8.Flow.Adapters.Bms/
+├── S8.Canon.Adapters.Bms/
 │   └── Program.cs                 # Uses FlowTargetedMessage (UPDATE)
-├── S8.Flow.Adapters.Oem/
+├── S8.Canon.Adapters.Oem/
 │   └── Program.cs                 # Uses FlowTargetedMessage (UPDATE)
-└── S8.Flow.Shared/
+└── S8.Canon.Shared/
     ├── Device.cs                  # FlowEntity<Device>
     ├── Sensor.cs                  # FlowEntity<Sensor>
     ├── Manufacturer.cs            # DynamicFlowEntity<Manufacturer>
@@ -453,13 +453,13 @@ samples/S8.Flow/
 
 ```
 MongoDB (s8 database):
-├── S8.Flow.Shared.Device#flow.intake
-├── S8.Flow.Shared.Device#flow.keyed
-├── S8.Flow.Shared.Device#flow.views.canonical
-├── S8.Flow.Shared.Device#flow.parked
-├── S8.Flow.Shared.Manufacturer#flow.intake
-├── S8.Flow.Shared.Manufacturer#flow.parked
-└── Koan.Flow.Diagnostics.RejectionReport
+├── S8.Canon.Shared.Device#flow.intake
+├── S8.Canon.Shared.Device#flow.keyed
+├── S8.Canon.Shared.Device#flow.views.canonical
+├── S8.Canon.Shared.Device#flow.parked
+├── S8.Canon.Shared.Manufacturer#flow.intake
+├── S8.Canon.Shared.Manufacturer#flow.parked
+└── Koan.Canon.Diagnostics.RejectionReport
 ```
 
 ---
@@ -523,7 +523,7 @@ MongoDB (s8 database):
 
 - **Type-safe registration**: `RegisterForType<T>()` and `RegisterForInterface<T>()`
 - **Automatic discovery**: All Flow entity types found and registered at startup
-- **Zero-config**: Registration happens automatically via `AddKoanFlow()`
+- **Zero-config**: Registration happens automatically via `AddKoanCanon()`
 - **Clean separation**: Regular entities vs DynamicFlowEntity handled differently
 
 ##### **JSON String Transport (Solved JsonElement Issue)**
@@ -570,7 +570,7 @@ docker exec s8-mongo mongosh --quiet --eval "
 
 # Check rejections
 docker exec s8-mongo mongosh --quiet --eval "
-  db.getSiblingDB('s8')['Koan.Flow.Diagnostics.RejectionReport']
+  db.getSiblingDB('s8')['Koan.Canon.Diagnostics.RejectionReport']
     .find().sort({CreatedAt: -1}).limit(1).toArray()
 "
 
@@ -583,7 +583,7 @@ docker logs koan-s8-flow-adapter-bms-1 --tail 50
 1. **IQueuedMessage Interface**: Add to Koan.Messaging.Core for dedicated queue routing
 2. **FlowOrchestrator Pattern**: Implement auto-discovery and [FlowOrchestrator] attribute support
 3. **Metadata Separation**: Fix StagePayload contamination - keep source info in StageMetadata
-4. **Queue Architecture**: Route Flow entities to "Koan.Flow.FlowEntity" dedicated queue
+4. **Queue Architecture**: Route Flow entities to "Koan.Canon.FlowEntity" dedicated queue
 5. **Zero-Config Experience**: Ensure adapters need only [FlowAdapter] + entity.Send()
 
 ### Important Context

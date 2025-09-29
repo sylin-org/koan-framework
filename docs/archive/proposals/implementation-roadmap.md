@@ -1,4 +1,4 @@
-# Instance-Based Relationship System: Implementation Roadmap
+﻿# Instance-Based Relationship System: Implementation Roadmap
 **Detailed Work Breakdown Structure for Semantic Methods and Streaming**
 
 ## Phase Overview
@@ -89,8 +89,8 @@ public static async IAsyncEnumerable<RelationshipGraph<TEntity>> Relatives<TEnti
 
 #### Day 1-2: Flow Module Updates
 ```bash
-# DELETE: src/Koan.Flow.Core/Attributes/FlowAttributes.cs (ParentKeyAttribute)
-# UPDATE: src/Koan.Flow.Core/Infrastructure/FlowRegistry.cs
+# DELETE: src/Koan.Canon.Core/Attributes/FlowAttributes.cs (ParentKeyAttribute)
+# UPDATE: src/Koan.Canon.Core/Infrastructure/FlowRegistry.cs
 ```
 **Tasks**:
 - [ ] Remove `ParentKeyAttribute` class entirely from FlowAttributes.cs
@@ -112,7 +112,7 @@ if (pk != null) { var parentType = pk.ParentType; }
 
 #### Day 3-4: ParentKeyResolutionService Migration
 ```bash
-# UPDATE: src/Koan.Flow.Core/Services/ParentKeyResolutionService.cs
+# UPDATE: src/Koan.Canon.Core/Services/ParentKeyResolutionService.cs
 ```
 **Tasks**:
 - [ ] Replace static resolution with instance-based methods where possible

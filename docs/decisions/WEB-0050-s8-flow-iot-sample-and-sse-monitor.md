@@ -1,4 +1,4 @@
----
+﻿---
 id: WEB-0050
 slug: s8-flow-iot-sample-and-sse-monitor
 domain: Web
@@ -26,7 +26,7 @@ We want a sample (S8) that demonstrates Koan Flow’s ingest → associate → p
 
 ## Scope
 
-- Sample projects: S8.Flow.Shared (constants), S8.Flow.Api (host, adapters, materializers, controllers, wwwroot).
+- Sample projects: S8.Canon.Shared (constants), S8.Canon.Api (host, adapters, materializers, controllers, wwwroot).
 - Module: Koan.Web.Sse with in-memory broadcaster; optional Dapr-backed broadcaster later.
 - Demonstrate conflict handling: NO_KEYS, MULTI_OWNER_COLLISION, KEY_OWNER_MISMATCH via adapter toggles.
 

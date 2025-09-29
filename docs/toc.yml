@@ -12,8 +12,8 @@
    items:
      - name: Building APIs
        href: guides/building-apis.md
-     - name: Data Modeling
-       href: guides/data-modeling.md
+    - name: Data Modeling
+      href: guides/data-modeling.md
     - name: Garden Cooperative Journal
       href: guides/garden-cooperative-journal.md
      - name: AI Integration
@@ -62,8 +62,8 @@
        href: reference/messaging/index.md
      - name: Storage
        href: reference/storage/index.md
-     - name: Flow
-       href: reference/flow/index.md
+    - name: Canon
+      href: reference/canon/index.md
      - name: Orchestration
        href: reference/orchestration/index.md
  - name: Architecture

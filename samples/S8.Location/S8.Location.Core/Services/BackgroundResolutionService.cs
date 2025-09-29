@@ -1,12 +1,12 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using S8.Location.Core.Models;
-using Koan.Flow.Core;
-using Koan.Flow.Core.Extensions;
-using Koan.Flow.Model;
-using Koan.Flow.Infrastructure;
-using Koan.Flow.Actions;
+using Koan.Canon.Core;
+using Koan.Canon.Core.Extensions;
+using Koan.Canon.Model;
+using Koan.Canon.Infrastructure;
+using Koan.Canon.Actions;
 using Koan.Data.Core;
 using System;
 using System.Collections.Generic;
@@ -17,24 +17,24 @@ using System.Threading.Tasks;
 namespace S8.Location.Core.Services;
 
 /// <summary>
-/// Background service that monitors Koan.Flow's native parked collection 
+/// Background service that monitors Koan.Canon's native parked collection 
 /// and resolves addresses that were parked with "WAITING_ADDRESS_RESOLVE" status.
-/// Uses ONLY Flow's native parking mechanisms - no custom parking entities.
+/// Uses ONLY Canon's native parking mechanisms - no custom parking entities.
 /// </summary>
 public class BackgroundResolutionService : BackgroundService
 {
     private readonly ILogger<BackgroundResolutionService> _logger;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IFlowActions _flowActions;
+    private readonly ICanonActions _canonActions;
 
     public BackgroundResolutionService(
         ILogger<BackgroundResolutionService> logger,
         IServiceProvider serviceProvider,
-        IFlowActions flowActions)
+        ICanonActions canonActions)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
-        _flowActions = flowActions;
+        _canonActions = canonActions;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -74,8 +74,8 @@ public class BackgroundResolutionService : BackgroundService
         
         try
         {
-            // Query Flow's native parked collection for locations waiting for address resolution
-            using var context = DataSetContext.With(FlowSets.StageShort(FlowSets.Parked));
+            // Query Canon's native parked collection for locations waiting for address resolution
+            using var context = DataSetContext.With(CanonSets.StageShort(CanonSets.Parked));
             var parkedRecords = await Data<ParkedRecord<Models.Location>, string>.FirstPage(100, ct);
             var waitingRecords = parkedRecords.Where(pr => pr.ReasonCode == "WAITING_ADDRESS_RESOLVE").ToList();
             
@@ -107,8 +107,8 @@ public class BackgroundResolutionService : BackgroundService
                         ["AgnosticLocationId"] = agnosticLocationId
                     };
                     
-                    // Heal the parked record using the semantic Flow extension method
-                    await parkedRecord.HealAsync(_flowActions, healedLocationData, 
+                    // Heal the parked record using the semantic Canon extension method
+                    await parkedRecord.HealAsync(_canonActions, healedLocationData, 
                         healingReason: $"Address resolved to canonical location {agnosticLocationId}", 
                         ct: ct);
                     
@@ -127,7 +127,7 @@ public class BackgroundResolutionService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BackgroundResolutionService] Error querying parked addresses from Flow");
+            _logger.LogError(ex, "[BackgroundResolutionService] Error querying parked addresses from Canon");
         }
     }
 }

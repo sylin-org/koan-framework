@@ -1,4 +1,4 @@
-# CLD Document: Orchestrator Bidirectional Pattern for Location Standardization
+﻿# CLD Document: Orchestrator Bidirectional Pattern for Location Standardization
 
 **Document Type**: Core Library Design (CLD)  
 **Pattern Name**: Orchestrator Bidirectional Pattern with SHA512 Deduplication  
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-This document describes the refined architecture for S8.Location, implementing a canonical location storage system using Koan.Flow's orchestrator pattern with bidirectional flow, SHA512-based deduplication, and sequential processing to eliminate race conditions.
+This document describes the refined architecture for S8.Location, implementing a canonical location storage system using Koan.Canon's orchestrator pattern with bidirectional flow, SHA512-based deduplication, and sequential processing to eliminate race conditions.
 
 ### Key Architecture Decisions
 - **Single FlowEntity Model**: `Location : FlowEntity<Location>` with minimal properties
@@ -509,7 +509,7 @@ This architecture achieves the core objective of canonical location storage thro
 4. **Traceability**: External identity preservation maintains source attribution
 5. **Cost-Effectiveness**: 95% reduction in AI/geocoding costs
 
-The Orchestrator Bidirectional Pattern with SHA512 deduplication represents a production-ready solution that leverages Koan.Flow's native capabilities while maintaining elegant simplicity.
+The Orchestrator Bidirectional Pattern with SHA512 deduplication represents a production-ready solution that leverages Koan.Canon's native capabilities while maintaining elegant simplicity.
 
 ---
 

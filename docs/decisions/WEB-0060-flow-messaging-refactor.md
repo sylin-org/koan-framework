@@ -1,8 +1,8 @@
-# WEB-0060: Flow Messaging Refactor
+﻿# WEB-0060: Flow Messaging Refactor
 
 ## Objective
 
-Implement clean Flow messaging architecture at the Koan.Messaging/Koan.Flow framework level for improved developer experience and maintainability.
+Implement clean Flow messaging architecture at the Koan.Messaging/Koan.Canon framework level for improved developer experience and maintainability.
 
 ## Architectural Improvements
 

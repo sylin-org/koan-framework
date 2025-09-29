@@ -1,0 +1,71 @@
+﻿services:
+  mongo:
+    image: mongo:7
+    container_name: s8-mongo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "4900:27017"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: s8-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "4901:5672"    # AMQP
+      - "4902:15672"   # Mgmt UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../../..
+      dockerfile: samples/S8.Canon/S8.Canon.Api/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:4903
+      # Use Mongo in containers
+      Koan__Data__Mongo__Database: s8
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_ENVIRONMENT: Development
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "4903:4903"
+    command: ["dotnet", "S8.Canon.Api.dll"]
+
+  adapter-bms:
+    build:
+      context: ../../..
+      dockerfile: samples/S8.Canon/S8.Canon.Adapters.Bms/Dockerfile
+    environment:
+      DOTNET_ENVIRONMENT: Development
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: ["dotnet", "S8.Canon.Adapters.Bms.dll"]
+
+  adapter-oem:
+    build:
+      context: ../../..
+      dockerfile: samples/S8.Canon/S8.Canon.Adapters.Oem/Dockerfile
+    environment:
+      DOTNET_ENVIRONMENT: Development
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: ["dotnet", "S8.Canon.Adapters.Oem.dll"]
