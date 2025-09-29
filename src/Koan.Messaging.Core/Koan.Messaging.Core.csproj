@@ -3,14 +3,13 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>preview</LangVersion>
     <AssemblyName>Koan.Messaging.Core</AssemblyName>
     <RootNamespace>Koan.Messaging</RootNamespace>
     <Description>Core messaging abstractions and helpers for Koan: bus configuration, auto-registration, and options binding.</Description>
     <PackageTags>$(CommonPackageTags);messaging;bus;abstractions;options;configuration</PackageTags>
-    <Version>0.6.2</Version>
-    <AssemblyVersion>0.6.2</AssemblyVersion>
-    <FileVersion>0.6.2</FileVersion>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />

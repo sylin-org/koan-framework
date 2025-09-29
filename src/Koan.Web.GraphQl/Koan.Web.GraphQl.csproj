@@ -7,9 +7,9 @@
     <RootNamespace>Koan.Web.GraphQl</RootNamespace>
     <Description>Koan GraphQL module providing a controller-hosted GraphQL endpoint and schema for IEntity&lt;&gt; types.</Description>
     <PackageTags>$(CommonPackageTags);web;graphql;hotchocolate;controllers</PackageTags>
-    <Version>0.6.2</Version>
-    <AssemblyVersion>0.6.2</AssemblyVersion>
-    <FileVersion>0.6.2</FileVersion>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="HotChocolate.AspNetCore" Version="13.8.1" />

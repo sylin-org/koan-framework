@@ -30,6 +30,11 @@
        href: guides/deep-dive/auto-provisioning-system.md
      - name: Bootstrap Lifecycle
        href: guides/deep-dive/bootstrap-lifecycle.md
+    - name: Engineering
+      href: engineering/index.md
+      items:
+        - name: Packaging Policy
+          href: engineering/packaging.md
  - name: Case Studies
    href: case-studies/s13-docmind/index.md
    items:

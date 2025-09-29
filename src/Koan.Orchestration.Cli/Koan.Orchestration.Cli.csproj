@@ -5,9 +5,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Koan.Orchestration.Cli</RootNamespace>
-    <Version>0.6.2</Version>
-    <AssemblyVersion>0.6.2</AssemblyVersion>
-    <FileVersion>0.6.2</FileVersion>
+    <Description>Command-line interface for Koan orchestration: discover modules, render Compose bundles, and execute provider workflows.</Description>
+    <PackageTags>$(CommonPackageTags);cli;orchestration;compose;devhost</PackageTags>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>koan-orchestrate</ToolCommandName>
+    <IsPackable>true</IsPackable>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />

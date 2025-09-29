@@ -238,6 +238,10 @@
       href: MEDIA-0002-s6-social-creator-and-htmx-ui.md
     - name: MEDIA-0003 Media variant routing and transforms
       href: MEDIA-0003-media-variant-routing-and-transforms.md
+- name: Build (BUILD)
+  items:
+    - name: BUILD-0072 Script-owned versioning
+      href: BUILD-0072-script-owned-versioning.md
 - name: Operations (OPS)
   items:
     - name: OPS-0014 Samples port allocation

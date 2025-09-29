@@ -8,9 +8,9 @@
     <RootNamespace>Koan.Web.Backup</RootNamespace>
     <Description>ASP.NET Core Web API controllers for Koan Data Backup/Restore operations with polling-based progress tracking and comprehensive management endpoints.</Description>
     <PackageTags>$(CommonPackageTags);web;backup;restore;api;controllers;polling;progress-tracking</PackageTags>
-    <Version>0.6.2</Version>
-    <AssemblyVersion>0.6.2</AssemblyVersion>
-    <FileVersion>0.6.2</FileVersion>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

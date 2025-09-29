@@ -7,9 +7,9 @@
     <PackageTags>$(CommonPackageTags);orchestration;hosting;compose;docker;podman;cli;spi</PackageTags>
     <AssemblyName>Koan.Orchestration.Abstractions</AssemblyName>
     <RootNamespace>Koan.Orchestration</RootNamespace>
-    <Version>0.6.2</Version>
-    <AssemblyVersion>0.6.2</AssemblyVersion>
-    <FileVersion>0.6.2</FileVersion>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />

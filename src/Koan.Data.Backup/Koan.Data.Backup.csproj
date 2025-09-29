@@ -5,9 +5,9 @@
     <Nullable>enable</Nullable>
     <Description>Comprehensive backup and restore system for Koan Framework applications with streaming, compression, and multi-provider support.</Description>
     <PackageTags>$(CommonPackageTags);backup;restore;data;streaming;compression</PackageTags>
-    <Version>0.6.2</Version>
-    <AssemblyVersion>0.6.2</AssemblyVersion>
-    <FileVersion>0.6.2</FileVersion>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
