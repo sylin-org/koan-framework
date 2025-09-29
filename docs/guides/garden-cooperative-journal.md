@@ -18,7 +18,7 @@ _There is no tech yet._ The Maple Street co-op runs on a corkboard and goodwill.
 
 **Riley’s pitch:** “Let’s put up a tiny web API that speaks garden. We’ll keep the Pis dumb—just posting numbers—and keep the journal human.”
 
-This chapter walks from **no tech** to **one Koan slice** using **only the data framework**: entity statics, relationship helpers, and lifecycle hooks. No Flow, no schedulers, no config files.
+This chapter walks from **no tech** to **one Koan slice** using **only the data framework**: entity statics, relationship helpers, and lifecycle hooks. No config files.
 
 ---
 
@@ -39,7 +39,7 @@ This chapter walks from **no tech** to **one Koan slice** using **only the data 
 
 ## Zero-Tech Reality → Single-Slice Moves
 
-| Garden moment                      | Without tech                             | What we’ll do (no Flow)                                                                                |
+| Garden moment                      | Without tech                             | What we’ll do                                                                                          |
 | ---------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | **Is Bed 3 actually dry?**         | Intuition and arguments.                 | On each `Reading` upsert, compute a short rolling average with entity statics; set/clear a `Reminder`. |
 | **Too many pings / radio silence** | Group chats spiral, or nobody speaks.    | Enforce **one active reminder per plot** via a simple upsert; no batching, no timers.                  |
@@ -149,7 +149,7 @@ If hardware is chatty, clamp identical `(plotId, sampledAt)` in the Pi script; k
 
 ---
 
-## 4) Decide “dry” on the write path (no timers, no Flow)
+## 4) Decide “dry” on the write path
 
 _Afternoon: Bed 3 dips; Bed 1 wobbles. Mara squints. “Feelings aren’t data.” Riley nods. “So we decide when the reading arrives.”_
 
