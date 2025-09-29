@@ -11,6 +11,7 @@ validation:
   status: verified
   scope: docs/guides/building-apis.md
 ---
+
 # API Delivery Playbook
 
 ## Contract
@@ -40,8 +41,6 @@ This playbook mirrors the canonical [Web Pillar Reference](../reference/web/inde
 5. **Secure** – Apply policies, register providers, and guard capability-sensitive endpoints.
 6. **Validate & Observe** – Add request validation, tracing, and structured logging.
 
-Each section below links to deeper reference material.
-
 ---
 
 ## 1. Bootstrap & Health
@@ -59,6 +58,27 @@ Each section below links to deeper reference material.
 - Keep CRUD while adding business routes with attribute routing.
 - Use static helpers on entities for queries and flows; avoid injecting repositories.
 - Return IActionResults for richer responses (pagination metadata, status codes).
+
+#### Example – File Upload Endpoint
+
+```csharp
+[Route("api/[controller]")]
+public class ProductsController : EntityController<Product>
+{
+    [HttpPost("{id}/image")]
+    public async Task<IActionResult> UploadImage(string id, IFormFile file, CancellationToken ct)
+    {
+        var product = await Product.ById(id, ct);
+        if (product is null) return NotFound();
+
+        var image = await ProductImage.UploadAsync(file, ct);
+        product.ImageId = image.Id;
+        await product.Save();
+
+        return Ok(new { imageUrl = $"/media/{image.Id}" });
+    }
+}
+```
 
 🔎 Reference: [Entity controllers in depth](../reference/web/index.md#entity-controllers-in-depth)
 
@@ -90,6 +110,30 @@ Each section below links to deeper reference material.
 - Gate domain operations with policies mapped to roles or claims.
 - Log challenge/response flows for observability and support.
 
+#### Example – Policy-Protected Endpoints
+
+```csharp
+[Route("api/[controller]")]
+[Authorize]
+public class OrdersController : EntityController<Order>
+{
+    [HttpGet]
+    public Task<Order[]> GetMyOrders(CancellationToken ct)
+    {
+        var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        return Order.ForCustomer(userEmail!, ct);
+    }
+
+    [HttpPost]
+    [Authorize(Policy = "CanCreateOrders")]
+    public override Task<IActionResult> Post([FromBody] Order entity)
+    {
+        entity.CustomerEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;
+        return base.Post(entity);
+    }
+}
+```
+
 🔎 Reference: [Authentication & authorization](../reference/web/index.md#authentication--authorization)
 
 ---
@@ -99,6 +143,31 @@ Each section below links to deeper reference material.
 - Apply data annotations or FluentValidation for input models.
 - Wrap controllers with middleware to capture validation errors, correlation IDs, and telemetry.
 - Emit structured logs with request/response context.
+
+#### Example – Error Handling Pattern
+
+```csharp
+[HttpPost("{id}/refund")]
+public async Task<IActionResult> Refund(string id, [FromBody] RefundRequest request, CancellationToken ct)
+{
+    try
+    {
+        var order = await Order.ById(id, ct);
+        if (order is null) return NotFound();
+
+        await order.ProcessRefund(request.Amount, request.Reason, ct);
+        return Ok();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return BadRequest(new { error = ex.Message });
+    }
+    catch (InsufficientFundsException ex)
+    {
+        return StatusCode(StatusCodes.Status409Conflict, new { error = ex.Message });
+    }
+}
+```
 
 🔎 Reference: [Error handling & observability](../reference/web/index.md#error-handling--observability)
 
@@ -117,7 +186,7 @@ Each section below links to deeper reference material.
 ## Review Checklist
 
 - [ ] CRUD endpoints verified via `EntityController<T>`.
-- [ ] Custom routes use entity statics or endpoint service.
+- [ ] Custom routes use entity statics or the entity endpoint service.
 - [ ] Payload transformers return consistent shapes.
 - [ ] Auth policies documented and enforced.
 - [ ] Validation and error responses standardized.
@@ -127,108 +196,9 @@ Each section below links to deeper reference material.
 
 ## Where to Go Next
 
-- Generate OpenAPI docs via Koan’s Swagger integration (development only).
+- Generate OpenAPI documents for development environments.
 - Add streaming endpoints backed by Flow pipelines for background processing.
 - Explore GraphQL or MCP surfaces that reuse the same entity endpoint service.
-## File Uploads
-
-```csharp
-[Route("api/[controller]")]
-public class ProductsController : EntityController<Product>
-{
-    [HttpPost("{id}/image")]
-    public async Task<IActionResult> UploadImage(string id, IFormFile file)
-    {
-        var product = await Product.ById(id);
-        if (product == null) return NotFound();
-
-        var image = await ProductImage.UploadAsync(file);
-        product.ImageId = image.Id;
-        await product.Save();
-
-        return Ok(new { imageUrl = $"/media/{image.Id}" });
-    }
-}
-```
-
-## Authentication
-
-```csharp
-[Route("api/[controller]")]
-[Authorize]
-public class OrdersController : EntityController<Order>
-{
-    [HttpGet]
-    public Task<Order[]> GetMyOrders()
-    {
-        var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
-        return Order.ForCustomer(userEmail);
-    }
-
-    [HttpPost]
-    [Authorize(Policy = "CanCreateOrders")]
-    public override Task<IActionResult> Post([FromBody] Order entity)
-    {
-        entity.CustomerEmail = User.FindFirst(ClaimTypes.Email)?.Value;
-        return base.Post(entity);
-    }
-}
-```
-
-## Error Handling
-
-```csharp
-[Route("api/[controller]")]
-public class OrdersController : EntityController<Order>
-{
-    [HttpPost("{id}/refund")]
-    public async Task<IActionResult> Refund(string id, [FromBody] RefundRequest request)
-    {
-        try
-        {
-            var order = await Order.ById(id);
-            if (order == null) return NotFound();
-
-            await order.ProcessRefund(request.Amount, request.Reason);
-            return Ok();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (InsufficientFundsException ex)
-        {
-            return BadRequest(new { error = "Refund amount exceeds order total" });
-        }
-    }
-}
-```
-
-## Testing
-
-```csharp
-[Test]
-public async Task Should_Create_Product()
-{
-    // Arrange
-    var controller = new ProductsController();
-    var request = new CreateProductRequest
-    {
-        Name = "Test Product",
-        Price = 99.99m,
-        Category = "Electronics"
-    };
-
-    // Act
-    var result = await controller.Create(request);
-
-    // Assert
-    Assert.IsInstanceOf<CreatedAtActionResult>(result);
-    var products = await Product.All();
-    Assert.AreEqual(1, products.Length);
-    Assert.AreEqual("Test Product", products[0].Name);
-}
-```
 
 ---
 

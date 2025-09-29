@@ -81,6 +81,17 @@
 
 ---
 
+## 🧪 Pattern Catalog
+
+**Scenario-driven walkthroughs that connect multiple pillars.**
+
+### [Entity Pattern Recipe Catalog](../examples/entity-pattern-recipes.md)
+- CRUD, messaging, and AI recipes built on a single entity model
+- Cross-pillar checklists for Web, Flow, AI, and Messaging
+- Links back to the Data Modeling Playbook for deeper coverage
+
+---
+
 ## 📊 Documentation Priorities
 
 ### Immediate Needs (Implemented)

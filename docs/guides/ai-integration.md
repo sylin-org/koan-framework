@@ -11,67 +11,42 @@ validation:
   status: verified
   scope: docs/guides/ai-integration.md
 ---
-        var summary = await _ai.ChatAsync(new AiChatRequest
-        {
-            Model = "llama2",
-            Messages = [
-                new() { Role = AiMessageRole.System, Content = "Summarize this document concisely." },
-                new() { Role = AiMessageRole.User, Content = request.Content }
-            ]
-        });
 
-        var sentiment = await _ai.ChatAsync(new AiChatRequest
-        {
-            Model = "sentiment-analysis",
-            Messages = [
-                new() { Role = AiMessageRole.System, Content = "Analyze sentiment: positive, negative, or neutral." },
-                new() { Role = AiMessageRole.User, Content = request.Content }
-            ]
-        });
+# AI Integration Playbook
 
-        return Ok(new
-        {
-            Summary = summary.Choices?.FirstOrDefault()?.Message?.Content,
-            Sentiment = sentiment.Choices?.FirstOrDefault()?.Message?.Content
-        });
-    }
-}
-```
+## Contract
 
-Model selection per task.
+- **Inputs**: Koan AI provider configured, entities ready to store embeddings or AI outputs, and familiarity with Flow/Data pillars.
+- **Outputs**: Chat endpoints, streaming responses, embedding pipelines, and RAG workflows that productionize AI without bespoke infrastructure.
+- **Error Modes**: Provider rate limits, token exhaustion, missing embeddings on legacy records, or chat history overruns.
+- **Success Criteria**: Deterministic chat behavior, embeddings persisted with vector indices, RAG pipelines reuse Flow/Data helpers, and observability covers cost plus latency.
 
-## Budget Management
+### Edge Cases
 
-```json
-{
-  "Koan": {
-    "AI": {
-      "Budget": {
-        "MaxTokensPerRequest": 2000,
-        "MaxRequestsPerMinute": 60,
-        "MaxCostPerDay": 50.0,
-        "AlertThreshold": 0.8
-      }
-    }
-  }
-}
-```
+- **Offline vs cloud providers** – ensure local Ollama fallbacks mirror cloud model interfaces.
+- **Long prompts** – summarize conversation history to avoid truncation.
+- **Embeddings** – keep dimensionality consistent across models; re-index when swapping providers.
+- **Secrets management** – source credentials from options or secret stores rather than code.
+- **Streaming gaps** – surface reconnection guidance to clients when SSE channels drop.
 
-```csharp
-public class BudgetMiddleware
-{
-    public async Task InvokeAsync(HttpContext context, RequestDelegate next)
-    {
-        // Budget checks happen automatically
-        // Requests are blocked when limits exceeded
-        await next(context);
-    }
-}
-```
+---
 
-Automatic cost protection.
+## How to Use This Playbook
 
-## Production Configuration
+- 📌 Canonical reference: [AI Pillar Reference](../reference/ai/index.md)
+- 🌊 Flow automation: [Semantic Pipelines Playbook](./semantic-pipelines.md)
+- 🗂️ Data storage: [Data Modeling Playbook](./data-modeling.md)
+- 🔐 Access surfaces: [API Delivery Playbook](./building-apis.md)
+
+Follow each step as you introduce or review AI surfaces in your service.
+
+---
+
+## 1. Choose a Provider Strategy
+
+- Start with a local provider (Ollama) for fast iteration, then mirror configuration for hosted providers.
+- Record provider, model, and region identifiers in configuration—never hardcode them.
+- Capture currency and latency budgets before exposing endpoints.
 
 ```json
 {
@@ -86,138 +61,171 @@ Automatic cost protection.
         "Fallback": {
           "Type": "Azure",
           "Endpoint": "{AZURE_ENDPOINT}",
-          "ApiKey": "{AZURE_API_KEY}"
+          "ApiKey": "{AZURE_API_KEY}",
+          "Model": "gpt-4o"
         }
-    # AI Integration Playbook
+      },
+      "Budget": {
+        "MaxTokensPerRequest": 2000,
+        "MaxRequestsPerMinute": 60,
+        "MaxCostPerDay": 50.0,
+        "AlertThreshold": 0.8
+      }
+    }
+  }
+}
+```
 
-    ## Contract
+---
 
-    - **Inputs**: Koan AI provider configured, entities ready to store embeddings or AI results, and familiarity with Flow/Data pillars.
-    - **Outputs**: Chat endpoints, streaming responses, embedding pipelines, and RAG workflows that productionize AI without bespoke infrastructure.
-    - **Error Modes**: Provider rate limits, token exhaustion, missing embeddings on legacy records, or chat history overflows.
-    - **Success Criteria**: Deterministic chat responses, embeddings persisted with vector indices, RAG pipelines reuse Flow/Data helpers, and observability covers cost + latency.
+## 2. Build Chat Surfaces
 
-    ### Edge Cases
+- Use `IAi.ChatAsync` for synchronous responses.
+- Introduce system prompts to anchor persona and guardrails.
+- Log `AiChatResponse.Usage` for chargeback or quota tracking.
 
-    - **Offline vs cloud providers** – ensure local Ollama fallbacks mirror cloud model interfaces.
-    - **Long prompts** – pre-trim or summarize conversation history to avoid truncation.
-    - **Embeddings** – keep dimensionality consistent across models; reflow data after model swaps.
-    - **Secrets management** – load provider credentials through options or secret stores, not code.
+```csharp
+[Route("api/[controller]")]
+public class SummariesController : ControllerBase
+{
+    private readonly IAi _ai;
 
-    ---
+    public SummariesController(IAi ai) => _ai = ai;
 
-    ## How to Use This Playbook
+    [HttpPost]
+    public async Task<IActionResult> Post([FromBody] SummaryRequest request, CancellationToken ct)
+    {
+        var response = await _ai.ChatAsync(new AiChatRequest
+        {
+            Model = request.Model ?? "gpt-4",
+            Messages =
+            [
+                new() { Role = AiMessageRole.System, Content = "Summarize the user content in three bullet points." },
+                new() { Role = AiMessageRole.User, Content = request.Content }
+            ]
+        }, ct);
 
-    - 📌 Canonical reference: [AI Pillar Reference](../reference/ai/index.md)
-    - 🧭 Flow integration: [Flow Pillar Reference](../reference/flow/index.md#semantic-pipelines)
-    - 🗂️ Data storage: [Data Pillar Reference](../reference/data/index.md#vector-search--ai-integration)
+        return Ok(new
+        {
+            Summary = response.Choices?.FirstOrDefault()?.Message?.Content,
+            response.Usage
+        });
+    }
+}
+```
 
-    Follow the steps below each time you introduce AI functionality.
+---
 
-    ---
+## 3. Stream Responses (Optional)
 
-    ## 1. Pick a Provider Strategy
+- Expose Server-Sent Events when the provider supports streaming.
+- Gracefully handle cancellations and client disconnects.
+- Document retry/delay guidance for UI clients.
 
-    - Start with Ollama locally for quick iteration; mirror settings in production with a hosted provider.
-    - Record provider + model IDs in configuration—never hardcode them.
-    - Capture rate limits and latency budgets before exposing endpoints.
+```csharp
+[HttpGet("stream")]
+public async Task Stream([FromQuery] string prompt, CancellationToken ct)
+{
+    Response.Headers.Append("Content-Type", "text/event-stream");
 
-    🧭 Reference: [Installation & configuration](../reference/ai/index.md#installation--configuration)
+    await foreach (var chunk in _ai.ChatStreamAsync(new AiChatRequest
+    {
+        Model = "gpt-4o-mini",
+        Messages =
+        [
+            new() { Role = AiMessageRole.System, Content = "Stream markdown back to the caller." },
+            new() { Role = AiMessageRole.User, Content = prompt }
+        ]
+    }, ct))
+    {
+        await Response.WriteAsync($"data: {chunk.Delta}\n\n", ct);
+        await Response.Body.FlushAsync(ct);
+    }
+}
+```
 
-    ---
+---
 
-    ## 2. Stand Up a Chat Endpoint
+## 4. Persist Embeddings
 
-    - Use `IAi.ChatAsync` for synchronous responses, `ChatStreamAsync` for SSE.
-    - Introduce system prompts to enforce guardrails and persona behavior.
-    - Measure token usage per request; log `AiChatResponse.Usage`.
+- Annotate vector fields with `[VectorField]` to enable provider-backed search.
+- Generate embeddings during writes or from Flow pipelines.
+- Validate dimension counts before saving to avoid runtime errors.
 
-    🧭 Reference: [Chat completion patterns](../reference/ai/index.md#chat-completion-patterns)
+```csharp
+[DataAdapter("vector-store")]
+public class DocumentIndex : Entity<DocumentIndex>
+{
+    public string DocumentId { get; set; } = "";
+    public string Content { get; set; } = "";
 
-    ---
+    [VectorField]
+    public float[] Embedding { get; set; } = [];
+}
+```
 
-    ## 3. Add Real-Time Streaming (Optional)
+---
 
-    - Expose SSE endpoints only if the provider supports streaming.
-    - Ensure clients gracefully handle partial chunks and reconnection.
-    - Include `CancellationToken` to terminate long-running requests.
+## 5. Build RAG Workflows
 
-    🧭 Reference: [Streaming responses](../reference/ai/index.md#chat-completion-patterns)
+- Use vector queries to retrieve relevant documents, then assemble prompts with citations.
+- Track source provenance for every generated answer.
+- Run heavy orchestration inside Flow pipelines to gain retries, telemetry, and throttling.
 
-    ---
+---
 
-    ## 4. Persist Embeddings
+## 6. Automate with Background Services
 
-    - Annotate vector fields with `[VectorField]` on the entity.
-    - Generate embeddings during writes or in background jobs; handle retries for provider hiccups.
-    - Validate the returned dimension count before saving.
+- Subscribe to domain events such as `DocumentUploaded` and enrich them asynchronously.
+- Leverage `BackgroundServiceExtensions.On<TEvent>` for terse event handlers.
+- Emit follow-up events (`DocumentIndexed`) so downstream services stay informed.
 
-    🧭 Reference: [Embeddings & vector search](../reference/ai/index.md#embeddings--vector-search)
+---
 
-    ---
+## 7. Route Across Multiple Models
 
-    ## 5. Build RAG Workflows
+- Centralize routing logic so cost vs fidelity decisions are transparent.
+- Collect latency and quality metrics per provider/model pair.
+- Expose configuration toggles to swap providers without redeploying code.
 
-    - Retrieve similar documents via vector search and join them into prompts.
-    - Track which sources contributed to each answer.
-    - Move heavy retrieval/orchestration into Flow pipelines for retry + observability.
+---
 
-    🧭 Reference: [Retrieval-augmented generation](../reference/ai/index.md#retrieval-augmented-generation-rag)
+## 8. Control Cost & Tokens
 
-    ---
+- Run `IAi.TokenizeAsync` against large prompts to stay within provider limits.
+- Trim or summarize conversation history once thresholds are exceeded.
+- Surface alerts when the configured budget crosses the warning threshold.
 
-    ## 6. Automate with Background Services
+---
 
-    - Subscribe to domain events (e.g., `DocumentUploaded`) and enrich with embeddings or summaries.
-    - Use `BackgroundService` helpers like `.On<TEvent>` for succinct event handling.
-    - Emit follow-up events when enrichment completes (ex: `DocumentIndexed`).
+## 9. Harden Observability
 
-    🧭 Reference: [Background processing & messaging](../reference/ai/index.md#background-processing--messaging)
+- Wrap AI calls with retries tuned to provider guidance.
+- Emit structured logs including provider, model, prompt size, latency, and failure reason.
+- Translate provider errors (429, safety breaks) into actionable HTTP responses.
 
-    ---
+---
 
-    ## 7. Route Across Multiple Models
+## Review Checklist
 
-    - Define routing logic (cost vs. fidelity) in a single place; decorate requests with `request.Provider`.
-    - Collect latency and quality metrics per provider to feed future decisions.
+- [ ] Provider configuration stored outside source control.
+- [ ] Chat endpoints expose synchronous (and streaming where supported) variants.
+- [ ] Embeddings persist reliably with dimension validation and retries.
+- [ ] RAG flows cite sources and run inside Flow pipelines when orchestration grows complex.
+- [ ] Token usage and cost metrics recorded for analysis.
+- [ ] Error responses map provider failures to user-friendly payloads.
 
-    🧭 Reference: [Multi-model & routing strategies](../reference/ai/index.md#multi-model--routing-strategies)
+---
 
-    ---
+## Next Steps
 
-    ## 8. Control Cost & Tokens
+- Combine AI outputs with Messaging to trigger downstream automations.
+- Add moderation and safety filters before returning generated content.
+- Explore agentic workflows by orchestrating multi-step prompts via the [Semantic Pipelines Playbook](./semantic-pipelines.md).
 
-    - Run `IAi.TokenizeAsync` before sending large prompts.
-    - Trim conversation history when crossing a threshold.
-    - Persist usage metrics for chargeback or quota tracking.
+---
 
-    🧭 Reference: [Tokenization & cost control](../reference/ai/index.md#tokenization--cost-control)
+## Validation
 
-    ---
-
-    ## 9. Harden Observability
-
-    - Wrap AI calls with retries tuned to provider guidance.
-    - Attach structured logs including provider, model, prompt size, latency, and errors.
-    - Provide actionable HTTP responses when providers return rate-limit or safety errors.
-
-    🧭 Reference: [Error handling & observability](../reference/ai/index.md#error-handling--observability)
-
-    ---
-
-    ## Review Checklist
-
-    - [ ] Provider configuration stored in environment-specific settings.
-    - [ ] Chat endpoints expose both sync and streaming variants (if supported).
-    - [ ] Embeddings persist reliably with validation & retries.
-    - [ ] RAG flows cite sources and run inside Flow pipelines when complex.
-    - [ ] Token usage & cost metrics are logged.
-    - [ ] Error responses map provider failures to user-friendly messages.
-
-    ---
-
-    ## Next Steps
-
-    - Integrate AI outputs with Messaging to notify downstream services.
-    - Add moderation and safety filters before returning generated content.
-    - Explore agentic workflows by orchestrating multiple prompts inside Flow pipelines.
+- Last reviewed: 2025-09-28
+- Verified across OpenAI, Azure, and Ollama provider adapters.
