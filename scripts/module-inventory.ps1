@@ -24,11 +24,11 @@ $projects = Get-ChildItem -Path $Root -Filter *.csproj -Recurse | ForEach-Object
         $sortedRefs = @()
     }
     [PSCustomObject]@{
-        Name = $projName
-        Path = $projPath
+        Name       = $projName
+        Path       = $projPath
         References = @($sortedRefs)
-        Docs = [PSCustomObject]@{
-            Readme = Test-Path -LiteralPath (Join-Path $projDir 'README.md')
+        Docs       = [PSCustomObject]@{
+            Readme    = Test-Path -LiteralPath (Join-Path $projDir 'README.md')
             Technical = Test-Path -LiteralPath (Join-Path $projDir 'TECHNICAL.md')
         }
     }
@@ -57,11 +57,11 @@ $enriched = $projects | ForEach-Object {
         $dependents = $referenceMap[$_.Name] | Sort-Object -Unique
     }
     [PSCustomObject]@{
-        Name = $_.Name
-        Path = $_.Path
-        References = @($_.References)
+        Name         = $_.Name
+        Path         = $_.Path
+        References   = @($_.References)
         ReferencedBy = @($dependents)
-        Docs = $_.Docs
+        Docs         = $_.Docs
     }
 }
 
