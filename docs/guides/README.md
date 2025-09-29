@@ -94,6 +94,7 @@
 - Narrative-bound slice showing Plot, Reading, Reminder, and Member working together
 - SQLite-first setup with Flow hydration scoring and lifecycle events
 - API storyboard with minimal controllers and optional reminder extensions
+- Proposal spec: [Garden Cooperative Journal How-To Spec](../proposals/garden-cooperative-journal.md)
 
 ---
 

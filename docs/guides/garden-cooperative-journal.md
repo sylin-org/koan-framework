@@ -14,19 +14,26 @@ validation:
 
 # Garden Cooperative Journal
 
-## Contract
+Spend a day with the Maple Street cooperative and learn Koan by following the people who tend its raised beds. This how-to keeps the architecture bound to the story—no abstract best-practice detours—so every code sample pays off a moment from the garden journal. The cast stays light (`Plot`, `Reading`, `Reminder`, `Member`), letting the narrative do the teaching while you explore what Koan can do.
 
-- **Inputs**: Koan application with `builder.Services.AddKoan()`, the SQLite adapter enabled, and Raspberry Pi (or similar) moisture sensors posting JSON to the service.
-- **Outputs**: A running slice that stores plots, readings, and reminders; exposes friendly APIs for the cooperative journal; and nudges members when hydration dips.
-- **Error Modes**: Adapter misconfiguration, missing Flow registration for the hydration pipeline, or lifecycle hooks that never call `next()`.
-- **Success Criteria**: Entities stay simple (`Plot`, `Reading`, `Reminder`, `Member`), lifecycle hooks publish status changes, API calls mirror the narrative storyboard, and Chapter 2 can swap SQLite for Mongo without renaming everything.
+## What you’ll build
 
-### Edge Cases
+- A single Koan slice where moisture sensors post readings, Flow tallies hydration scores, and members get nudged when soil dries out.
+- Story-first controllers that mirror the cooperative’s language: `POST /api/garden/readings`, `GET /api/garden/reminders`, and a lightweight acknowledgment loop.
+- Lifecycle hooks that narrate state changes instead of burying them in infrastructure.
 
-- **Sensor jitter** – Clamp negative or duplicate readings before saving to avoid noisy reminders.
-- **Adapter swap** – Keep connection strings external so Chapter 2 (Mongo) only touches configuration.
-- **Offline members** – Allow reminders to re-trigger if acknowledgements arrive late or not at all.
-- **Pipeline delays** – Guard Flow handlers with cancellation tokens so long batches can be aborted gracefully.
+### What you’ll learn
+
+- How Koan’s entity statics, relationship helpers, and Flow batches fit together without leaving the story’s point of view.
+- How to enrich responses (`?with=`) and page or stream (`FirstPage`, `Page`, `AllStream`) without inventing extra layers.
+- How to keep Chapter 1 grounded in SQLite while leaving room for a future Mongo chapter.
+
+### Field reminders from the co-op
+
+- **Sensor jitter happens** – Clamp or toss duplicate readings so reminders only fire when soil is truly dry.
+- **Keep configuration external** – Swapping adapters later should feel like changing hoses, not rewriting code.
+- **Members miss pings** – Let reminders reactivate when acknowledgements lag; the co-op forgives late-night watering.
+- **Flow batches can lag** – Pass cancellation tokens through handlers so long jobs can yield when the crew closes the gate.
 
 ---
 
@@ -43,6 +50,8 @@ Use the sections below to implement each beat.
 ---
 
 ## 1. Configure SQLite for the Garden
+
+*Morning check-in: Riley unlocks the tool shed and confirms the Raspberry Pi is still whispering readings to Koan.*
 
 ```csharp
 // appsettings.Development.json
@@ -73,6 +82,8 @@ app.Run();
 ---
 
 ## 2. Model the Cooperative
+
+*Late morning planning: Mara sketches plots, stewards, and reminder cards on the whiteboard before anyone writes code.*
 
 ```csharp
 using Koan.Data.Core.Relationships;
@@ -154,6 +165,8 @@ var withMembers = await plots.Relatives<Plot, string>(ct);
 
 ## 3. Accept Sensor Readings
 
+*Lunch hour upload: The Pi posts another moisture snapshot while the crew shares sandwiches on the picnic tables.*
+
 ```csharp
 [Route("api/garden/readings")]
 public sealed class ReadingsController : EntityController<Reading> { }
@@ -174,7 +187,7 @@ Content-Type: application/json
 
 Use `Reading.Recent(plotId)` for dashboards or Flow jobs that need context around each sensor update.
 
-> **Scaling tip** – When the cooperative grows beyond a handful of plots, switch to the built-in pagers and streamers to stay responsive.
+> **Field note** – When the cooperative grows beyond a handful of plots, switch to the built-in pagers and streamers to stay responsive.
 
 ```csharp
 var firstPage = await Reading.FirstPage(size: 25, ct);
@@ -191,6 +204,8 @@ These helpers mirror the guidance in the [paging and streaming playbook](../guid
 ---
 
 ## 4. Score Hydration with Flow
+
+*Afternoon analysis: After lunch, the Flow pipeline chews through the last batch and flags thirsty plots before anyone forgets.*
 
 ```csharp
 public static class HydrationPipeline
@@ -241,6 +256,8 @@ The pipeline batches readings every 15 minutes, checks moisture averages, and a
 
 ## 5. React to Reminder Status Changes
 
+*Evening wrap-up: Reminders flip states as the stewards log who watered what, and Koan keeps the journal tidy.*
+
 ```csharp
 public static class ReminderLifecycle
 {
@@ -283,6 +300,8 @@ The hook compares the previous and current status, emits an event when a reminde
 ---
 
 ## 6. Journal-Friendly APIs
+
+*Nightly journal entry: The co-op lead runs a few curl commands to publish the day’s snapshot before locking the gate.*
 
 Give members three canonical endpoints:
 
