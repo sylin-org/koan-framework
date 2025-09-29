@@ -6,4 +6,6 @@ public record AiChatRequest
     public string? Model { get; init; }
     public AiPromptOptions? Options { get; init; }
     public AiRouteHints? Route { get; init; }
+    public AiConversationContext? Context { get; init; }
+    public List<AiAugmentationInvocation> Augmentations { get; init; } = new();
 }

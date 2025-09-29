@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;
@@ -26,6 +27,15 @@ public static class Ai
 
     public static Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
         => Resolve().EmbedAsync(req, ct);
+
+    public static AiConversationBuilder Conversation()
+        => new(Resolve());
+
+    public static AiConversationBuilder Conversation(this IAi ai)
+    {
+        if (ai is null) throw new ArgumentNullException(nameof(ai));
+        return new AiConversationBuilder(ai);
+    }
 
     // Discovery helpers for optional usage
     public static bool IsAvailable

@@ -21,6 +21,7 @@ using Koan.Ai.Provider.Ollama.Infrastructure;
 
 namespace Koan.Ai.Provider.Ollama;
 
+[AiAdapterDescriptor(priority: 10, Weight = 2)]
 internal sealed class OllamaAdapter : BaseKoanAdapter,
     IAiAdapter,
     IAdapterReadiness,
@@ -572,7 +573,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     {
         if (req.Messages.Count == 1 && string.Equals(req.Messages[0].Role, "user", StringComparison.OrdinalIgnoreCase))
         {
-            return req.Messages[0].Content;
+            return ResolveMessageContent(req.Messages[0]);
         }
 
         var sb = new StringBuilder();
@@ -580,19 +581,48 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         {
             if (string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase))
             {
-                sb.AppendLine($"[system]\n{m.Content}\n");
+                sb.AppendLine($"[system]\n{ResolveMessageContent(m)}\n");
             }
             else if (string.Equals(m.Role, "user", StringComparison.OrdinalIgnoreCase))
             {
-                sb.AppendLine($"[user]\n{m.Content}\n");
+                sb.AppendLine($"[user]\n{ResolveMessageContent(m)}\n");
             }
             else if (string.Equals(m.Role, "assistant", StringComparison.OrdinalIgnoreCase))
             {
-                sb.AppendLine($"[assistant]\n{m.Content}\n");
+                sb.AppendLine($"[assistant]\n{ResolveMessageContent(m)}\n");
             }
         }
 
         return sb.ToString();
+    }
+
+    private static string ResolveMessageContent(AiMessage message)
+    {
+        if (message.Parts is { Count: > 0 })
+        {
+            var builder = new StringBuilder();
+            foreach (var part in message.Parts)
+            {
+                if (!string.IsNullOrWhiteSpace(part.Text))
+                {
+                    builder.Append(part.Text);
+                    continue;
+                }
+
+                if (part.Data is not null)
+                {
+                    builder.Append(JsonConvert.SerializeObject(part.Data));
+                }
+            }
+
+            var text = builder.ToString();
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                return text;
+            }
+        }
+
+        return message.Content;
     }
 
     private static IDictionary<string, object?> MapOptions(AiPromptOptions? o)
