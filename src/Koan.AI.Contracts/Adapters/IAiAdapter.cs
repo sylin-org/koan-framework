@@ -15,6 +15,9 @@ public interface IAiAdapter
     /// <summary>Optional provider type (e.g., "ollama", "openai").</summary>
     string Type { get; }
 
+    /// <summary>An optional model manager surfaced when the adapter can provision or retire models.</summary>
+    IAiModelManager? ModelManager => null;
+
     /// <summary>Return true if the adapter believes it can serve the request (model, limits, etc.).</summary>
     bool CanServe(AiChatRequest request);
 

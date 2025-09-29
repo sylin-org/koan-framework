@@ -17,6 +17,7 @@ using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
 using Koan.Orchestration.Models;
 using Koan.Ai.Provider.Ollama.Options;
+using Koan.Ai.Provider.Ollama.Infrastructure;
 
 namespace Koan.Ai.Provider.Ollama;
 
@@ -31,6 +32,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     private readonly AdapterReadinessConfiguration _readiness;
     private readonly AdaptersReadinessOptions _readinessDefaults;
     private readonly ReadinessStateManager _stateManager = new();
+    private readonly OllamaModelManager _modelManager;
     private readonly object _initGate = new();
     private Task? _initializationTask;
     private UnifiedServiceMetadata? _orchestrationContext;
@@ -49,6 +51,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     public string Id => AdapterId;
     public override string Name => DisplayName;
     public string Type => "ollama";
+    public IAiModelManager? ModelManager => _modelManager;
 
     public OllamaAdapter(
         HttpClient http,
@@ -68,6 +71,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         }
 
         _defaultModel = options.DefaultModel ?? serviceDefault ?? "all-minilm";
+        _modelManager = new OllamaModelManager(_http, Logger, AdapterId, Type);
         Logger.LogInformation(
             "Ollama adapter '{AdapterId}' model resolution: options.DefaultModel='{OptionsDefault}', serviceDefault='{ServiceDefault}', final='{Final}'",
             Id,
@@ -245,14 +249,31 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         }, ct).ConfigureAwait(false);
 
     public Task<AiCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
-        => Task.FromResult(new AiCapabilities
+    {
+        var modelMetadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["default_model"] = _defaultModel,
+            ["supports_pull"] = "true"
+        };
+
+        return Task.FromResult(new AiCapabilities
         {
             AdapterId = Id,
             AdapterType = Type,
             SupportsChat = true,
             SupportsStreaming = true,
-            SupportsEmbeddings = true
+            SupportsEmbeddings = true,
+            ModelManagement = new AiModelManagementCapabilities
+            {
+                SupportsInstall = true,
+                SupportsRemove = true,
+                SupportsRefresh = true,
+                SupportsProvenance = true,
+                ProvisioningModes = new[] { "pull" },
+                ProviderMetadata = modelMetadata
+            }
         });
+    }
 
     public AdapterReadinessState ReadinessState => _stateManager.State;
     public bool IsReady => _stateManager.IsReady;
@@ -502,13 +523,35 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             return true;
         }
 
-        var tags = await FetchTagsAsync(ct).ConfigureAwait(false);
-        if (tags?.models is null || tags.models.Count == 0)
+        var provenance = new AiModelProvenance
         {
-            return false;
+            RequestedBy = AdapterId,
+            Reason = "readiness:default-model",
+            RequestedAt = DateTimeOffset.UtcNow,
+            Metadata = new Dictionary<string, string>
+            {
+                ["adapter_id"] = AdapterId,
+                ["phase"] = "readiness"
+            }
+        };
+
+        var request = new AiModelOperationRequest
+        {
+            Model = _defaultModel,
+            Provenance = provenance
+        };
+
+        var result = await _modelManager.EnsureInstalledAsync(request, ct).ConfigureAwait(false);
+        if (!result.Success)
+        {
+            Logger.LogWarning("[{AdapterId}] Failed to ensure default model '{Model}' is available: {Message}", AdapterId, _defaultModel, result.Message);
+        }
+        else if (result.OperationPerformed)
+        {
+            Logger.LogInformation("[{AdapterId}] Installed default model '{Model}' during readiness initialization", AdapterId, _defaultModel);
         }
 
-        return tags.models.Any(tag => MatchesDefaultModel(tag.name));
+        return result.Success;
     }
 
     private async Task<OllamaTagsResponse?> FetchTagsAsync(CancellationToken ct)
@@ -523,22 +566,6 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
         var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         return JsonConvert.DeserializeObject<OllamaTagsResponse>(json);
-    }
-
-    private bool MatchesDefaultModel(string? candidate)
-    {
-        if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(_defaultModel))
-        {
-            return false;
-        }
-
-        if (string.Equals(candidate, _defaultModel, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var baseName = candidate.Split(':')[0];
-        return string.Equals(baseName, _defaultModel, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildPrompt(AiChatRequest req)
