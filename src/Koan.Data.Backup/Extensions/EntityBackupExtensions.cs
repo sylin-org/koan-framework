@@ -8,7 +8,7 @@ using Koan.Data.Core.Model;
 namespace Koan.Data.Backup.Extensions;
 
 /// <summary>
-/// Extension methods for Entity<> types to provide simple backup/restore functionality
+/// Extension methods for <see cref="Entity{TEntity,TKey}"/> types that provide simple backup and restore helpers.
 /// </summary>
 public static class EntityBackupExtensions
 {

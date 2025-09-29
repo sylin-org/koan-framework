@@ -24,25 +24,43 @@ namespace Koan.Data.Core.Relationships
             var parentRels = metadata.GetParentRelationships(typeof(TEntity));
             foreach (var (propertyName, parentType) in parentRels)
             {
+                var property = typeof(TEntity).GetProperty(propertyName);
+                if (property is null)
+                {
+                    continue;
+                }
+
                 var parentIds = entities
-                    .Select(e => typeof(TEntity).GetProperty(propertyName)?.GetValue(e))
-                    .Where(id => id != null)
+                    .Select(e => property.GetValue(e))
+                    .OfType<TKey>()
                     .Distinct()
                     .ToList();
+
                 var parentDict = new Dictionary<object, object?>();
                 if (parentIds.Count > 0)
                 {
                     var dataType = typeof(Data<,>).MakeGenericType(parentType, typeof(TKey));
                     var method = dataType.GetMethod("GetAsync", new[] { typeof(TKey), typeof(CancellationToken) });
+                    if (method is null)
+                    {
+                        continue;
+                    }
+
                     foreach (var id in parentIds)
                     {
-                        var task = (Task)method.Invoke(null, new object[] { id, ct });
+                        var parameters = new object[] { id, ct };
+                        if (method.Invoke(null, parameters) is not Task task)
+                        {
+                            continue;
+                        }
+
                         await task.ConfigureAwait(false);
                         var resultProp = task.GetType().GetProperty("Result");
                         var parent = resultProp?.GetValue(task);
                         parentDict[id] = parent;
                     }
                 }
+
                 result[(propertyName, parentType)] = parentDict;
             }
             return result;
@@ -59,30 +77,55 @@ namespace Koan.Data.Core.Relationships
             var childRels = metadata.GetChildRelationships(typeof(TEntity));
             foreach (var (referenceProperty, childType) in childRels)
             {
-                var entityIds = entities.Select(e => e.Id).Distinct().ToList();
+                var entityIds = entities.Select(e => e.Id).Where(id => id is not null).Cast<TKey>().Distinct().ToList();
+                if (entityIds.Count == 0)
+                {
+                    continue;
+                }
+
                 var childDict = new Dictionary<object, List<object>>();
                 var dataType = typeof(Data<,>).MakeGenericType(childType, typeof(TKey));
                 var allMethod = dataType.GetMethod("All", new[] { typeof(CancellationToken) });
-                var task = (Task)allMethod.Invoke(null, new object[] { ct });
-                await task.ConfigureAwait(false);
-                var resultProp = task.GetType().GetProperty("Result");
-                var allChildren = (System.Collections.IEnumerable?)resultProp?.GetValue(task);
-                if (allChildren != null)
+                if (allMethod is null)
                 {
-                    foreach (var id in entityIds)
-                    {
-                        var matches = new List<object>();
-                        foreach (var child in allChildren)
-                        {
-                            var prop = childType.GetProperty(referenceProperty);
-                            if (prop != null && Equals(prop.GetValue(child), id))
-                            {
-                                matches.Add(child);
-                            }
-                        }
-                        childDict[id] = matches;
-                    }
+                    continue;
                 }
+
+                var allTask = allMethod.Invoke(null, new object[] { ct }) as Task;
+                if (allTask is null)
+                {
+                    continue;
+                }
+
+                await allTask.ConfigureAwait(false);
+                var resultProp = allTask.GetType().GetProperty("Result");
+                var allChildren = resultProp?.GetValue(allTask) as System.Collections.IEnumerable;
+                if (allChildren is null)
+                {
+                    continue;
+                }
+
+                var referencePropertyInfo = childType.GetProperty(referenceProperty);
+                if (referencePropertyInfo is null)
+                {
+                    continue;
+                }
+
+                foreach (var id in entityIds)
+                {
+                    var matches = new List<object>();
+                    foreach (var child in allChildren)
+                    {
+                        var value = referencePropertyInfo.GetValue(child);
+                        if (Equals(value, id))
+                        {
+                            matches.Add(child);
+                        }
+                    }
+
+                    childDict[id] = matches;
+                }
+
                 result[(referenceProperty, childType)] = childDict;
             }
             return result;

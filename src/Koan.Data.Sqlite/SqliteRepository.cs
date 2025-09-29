@@ -261,8 +261,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    private static Type GetIdStorageType<TKey>(StorageOptimizationInfo optimizationInfo)
-        where TKey : notnull
+    private static Type GetIdStorageType(StorageOptimizationInfo optimizationInfo)
     {
         // For non-string keys, use the key type directly (no optimization needed)
         if (typeof(TKey) != typeof(string))

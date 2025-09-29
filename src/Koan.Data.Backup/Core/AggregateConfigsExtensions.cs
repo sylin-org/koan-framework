@@ -3,6 +3,7 @@ using Koan.Data.Core;
 using Koan.Data.Backup.Models;
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Koan.Data.Backup.Core;
 
@@ -75,7 +76,7 @@ public static class AggregateConfigsExtensions
     }
 
     /// <summary>
-    /// Gets the Data<> type for an entity
+    /// Gets the generic <see cref="Data{TEntity,TKey}"/> facade type for an entity.
     /// </summary>
     public static Type GetDataType(Type entityType, Type keyType)
     {
@@ -93,16 +94,16 @@ public static class AggregateConfigsExtensions
         if (allStreamMethod == null)
             throw new InvalidOperationException($"AllStream method not found for {entityType.Name}");
 
-        var asyncEnumerable = allStreamMethod.Invoke(null, new object[] { batchSize, ct });
+        var asyncEnumerable = allStreamMethod.Invoke(null, new object?[] { batchSize, ct });
 
-        if (asyncEnumerable == null)
+        if (asyncEnumerable is null)
             throw new InvalidOperationException($"AllStream returned null for {entityType.Name}");
 
         // Get the async enumerator
         var getEnumeratorMethod = asyncEnumerable.GetType().GetMethod("GetAsyncEnumerator");
-        var enumerator = getEnumeratorMethod?.Invoke(asyncEnumerable, new object[] { ct });
+        var enumerator = getEnumeratorMethod?.Invoke(asyncEnumerable, new object?[] { ct });
 
-        if (enumerator == null)
+        if (enumerator is null)
             throw new InvalidOperationException($"Could not get enumerator for {entityType.Name}");
 
         // Iterate through the async enumerable
@@ -116,8 +117,12 @@ public static class AggregateConfigsExtensions
         {
             while (true)
             {
-                var moveNextTask = (ValueTask<bool>)moveNextMethod.Invoke(enumerator, null);
-                if (!await moveNextTask) break;
+                var moveNextResult = moveNextMethod.Invoke(enumerator, null);
+                if (moveNextResult is not ValueTask<bool> moveNextTask)
+                    throw new InvalidOperationException($"MoveNextAsync did not return ValueTask<bool> for {entityType.Name}");
+
+                if (!await moveNextTask.ConfigureAwait(false))
+                    break;
 
                 var current = currentProperty.GetValue(enumerator);
                 if (current != null)
@@ -127,8 +132,15 @@ public static class AggregateConfigsExtensions
         finally
         {
             // Dispose the enumerator if it implements IAsyncDisposable
-            if (enumerator is IAsyncDisposable asyncDisposable)
-                await asyncDisposable.DisposeAsync();
+            switch (enumerator)
+            {
+                case IAsyncDisposable asyncDisposable:
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                    break;
+                case IDisposable disposable:
+                    disposable.Dispose();
+                    break;
+            }
         }
     }
 
@@ -143,9 +155,20 @@ public static class AggregateConfigsExtensions
         if (upsertManyMethod == null)
             throw new InvalidOperationException($"UpsertManyAsync method not found for {entityType.Name}");
 
-        var task = upsertManyMethod.Invoke(null, new object[] { entities, ct }) as Task<int>;
+        var invocationResult = upsertManyMethod.Invoke(null, new object?[] { entities, ct });
 
-        return task != null ? await task : 0;
+        switch (invocationResult)
+        {
+            case Task<int> typedTask:
+                return await typedTask.ConfigureAwait(false);
+            case Task genericTask:
+                await genericTask.ConfigureAwait(false);
+                return 0;
+            case null:
+                return 0;
+            default:
+                return 0;
+        }
     }
 
     private static string GetProviderForType(Type entityType, Type keyType)

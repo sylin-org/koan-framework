@@ -173,14 +173,15 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
 
     public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
+        => ExecuteWithReadinessAsync<TEntity?>(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.get");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
             var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
-            return await collection.Find(filter).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            var result = await collection.Find(filter).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            return result;
         }, ct);
 
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)

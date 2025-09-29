@@ -130,7 +130,8 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         // Use the overload that takes params string[]
         if (typeof(T) == typeof(string))
         {
-            var result = Core.Configuration.ReadFirst(Configuration, defaultValue as string, providerKeys);
+            var defaultString = defaultValue as string;
+            var result = Core.Configuration.ReadFirst(Configuration, providerKeys) ?? defaultString;
             return (T)(object)(result ?? string.Empty);
         }
         else if (typeof(T) == typeof(int))

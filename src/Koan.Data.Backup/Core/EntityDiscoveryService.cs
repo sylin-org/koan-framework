@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using System.Reflection;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace Koan.Data.Backup.Core;
 
@@ -21,7 +22,7 @@ public class EntityDiscoveryService : IEntityDiscoveryService
         _logger = logger;
     }
 
-    public async Task<EntityDiscoveryResult> DiscoverAllEntitiesAsync(CancellationToken ct = default)
+    public Task<EntityDiscoveryResult> DiscoverAllEntitiesAsync(CancellationToken ct = default)
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation("Starting entity discovery...");
@@ -101,15 +102,15 @@ public class EntityDiscoveryService : IEntityDiscoveryService
             _discoveryCache[cacheKey] = result;
             _currentDiscovery = result;
 
-            return result;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Entity discovery failed");
             result.Errors.Add($"Discovery failed: {ex.Message}");
             result.DiscoveryDuration = stopwatch.Elapsed;
-            return result;
         }
+
+        return Task.FromResult(result);
     }
 
     public async Task WarmupAllEntitiesAsync(CancellationToken ct = default)

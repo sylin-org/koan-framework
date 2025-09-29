@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Ai.Provider.Ollama.Options;
 using Koan.AI.Contracts.Routing;
@@ -26,7 +28,7 @@ internal sealed class OllamaConfigRegistrationService : IHostedService
                 try
                 {
                     var http = new HttpClient { BaseAddress = new Uri(opt.BaseUrl), Timeout = TimeSpan.FromSeconds(60) };
-                    var logger = _sp.GetService<Microsoft.Extensions.Logging.ILogger<OllamaAdapter>>();
+                    var logger = _sp.GetService<ILogger<OllamaAdapter>>() ?? NullLogger<OllamaAdapter>.Instance;
 
                     // Create minimal configuration for the adapter
                     var configBuilder = new Microsoft.Extensions.Configuration.ConfigurationBuilder();

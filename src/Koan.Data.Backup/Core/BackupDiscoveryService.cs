@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace Koan.Data.Backup.Core;
 
@@ -401,7 +402,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
                 Id = manifest?.Id ?? Guid.CreateVersion7().ToString(),
                 Name = manifest?.Name ?? backupName,
                 Description = manifest?.Description ?? string.Empty,
-                Tags = manifest?.Tags ?? Array.Empty<string>(),
+                Tags = manifest?.Labels ?? Array.Empty<string>(),
                 CreatedAt = manifest?.CreatedAt ?? createdAt,
                 CompletedAt = manifest?.CompletedAt,
                 Status = manifest?.Status ?? BackupStatus.Unknown,
@@ -447,11 +448,11 @@ public class BackupDiscoveryService : IBackupDiscoveryService
         };
     }
 
-    private async Task<string[]> GetAllStorageProfilesAsync(CancellationToken ct)
+    private Task<string[]> GetAllStorageProfilesAsync(CancellationToken ct)
     {
         // This is a simplified implementation - in reality you'd get this from your storage configuration
         // For now, return a default profile
-        return new[] { string.Empty }; // Empty string often represents the default profile
+        return Task.FromResult(new[] { string.Empty }); // Empty string often represents the default profile
     }
 
     private string GenerateBackupPath(string backupName, DateTimeOffset createdAt)

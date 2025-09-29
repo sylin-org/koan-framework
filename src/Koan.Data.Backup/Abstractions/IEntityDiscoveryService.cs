@@ -5,7 +5,7 @@ namespace Koan.Data.Backup.Abstractions;
 public interface IEntityDiscoveryService
 {
     /// <summary>
-    /// Discovers all Entity<> types in the application domain
+    /// Discovers all <see cref="Koan.Data.Abstractions.IEntity{TKey}"/> implementations in the application domain.
     /// </summary>
     Task<EntityDiscoveryResult> DiscoverAllEntitiesAsync(CancellationToken ct = default);
 

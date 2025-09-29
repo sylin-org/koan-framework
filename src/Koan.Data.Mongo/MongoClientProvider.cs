@@ -149,7 +149,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
         return _database!;
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         // MongoClient doesn't implement IAsyncDisposable, but we can dispose if it implements IDisposable
         if (_client is IDisposable disposable)
@@ -161,5 +161,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
         _database = null;
         _databaseName = null;
         _sync.Dispose();
+
+        return ValueTask.CompletedTask;
     }
 }

@@ -105,10 +105,11 @@ internal class MessagingLifecycleService : KoanFluentServiceBase
     }
     
     [ServiceAction(Koan.Core.Actions.KoanServiceActions.Messaging.RestartMessaging)]
-    public virtual async Task RestartMessagingAction(CancellationToken cancellationToken)
+    public virtual Task RestartMessagingAction(CancellationToken cancellationToken)
     {
         Logger.LogInformation("Manual messaging restart requested");
         // Could implement restart logic here
+        return Task.CompletedTask;
     }
     
     private async Task<IMessageBus?> SelectAndInitializeProviderAsync(CancellationToken cancellationToken)

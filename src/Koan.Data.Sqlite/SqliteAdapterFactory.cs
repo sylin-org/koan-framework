@@ -9,6 +9,7 @@ namespace Koan.Data.Sqlite;
 
 [ProviderPriority(10)]
 [KoanService(ServiceKind.Database, shortCode: "sqlite", name: "SQLite",
+    DeploymentKind = DeploymentKind.InProcess,
     DefaultPorts = new int[] { }, // SQLite is file-based, no network ports
     Capabilities = new[] { "protocol=file" },
     Volumes = new[] { "./Data/sqlite:/data" },

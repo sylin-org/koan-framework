@@ -71,30 +71,37 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
     {
         var candidates = context.OrchestrationMode switch
         {
-            OrchestrationMode.DockerCompose or OrchestrationMode.Kubernetes => new[]
-            {
-                new DiscoveryCandidate(BuildServiceUrl(attribute.Scheme, attribute.Host, attribute.EndpointPort), "container-dns", 1),
-                new DiscoveryCandidate(ReadExplicitConfiguration(), "explicit-config", 2),
-                new DiscoveryCandidate(BuildServiceUrl(attribute.LocalScheme, attribute.LocalHost, attribute.LocalPort), "host-fallback", 3)
-            },
-            OrchestrationMode.AspireAppHost => new[]
-            {
-                new DiscoveryCandidate(ReadAspireServiceDiscovery(), "aspire-discovery", 1),
-                new DiscoveryCandidate(ReadExplicitConfiguration(), "explicit-config", 2)
-            },
-            OrchestrationMode.SelfOrchestrating => new[]
-            {
-                new DiscoveryCandidate(ReadExplicitConfiguration(), "explicit-config", 1),
-                new DiscoveryCandidate(BuildServiceUrl(attribute.LocalScheme, attribute.LocalHost, attribute.LocalPort), "self-orchestrated", 2)
-            },
-            _ => new[]
-            {
-                new DiscoveryCandidate(ReadExplicitConfiguration(), "explicit-config", 1),
-                new DiscoveryCandidate(BuildServiceUrl(attribute.LocalScheme, attribute.LocalHost, attribute.LocalPort), "localhost", 2)
-            }
+            OrchestrationMode.DockerCompose or OrchestrationMode.Kubernetes => CreateCandidates(
+                (BuildServiceUrl(attribute.Scheme, attribute.Host, attribute.EndpointPort), "container-dns", 1),
+                (ReadExplicitConfiguration(), "explicit-config", 2),
+                (BuildServiceUrl(attribute.LocalScheme, attribute.LocalHost, attribute.LocalPort), "host-fallback", 3)
+            ),
+            OrchestrationMode.AspireAppHost => CreateCandidates(
+                (ReadAspireServiceDiscovery(), "aspire-discovery", 1),
+                (ReadExplicitConfiguration(), "explicit-config", 2)
+            ),
+            OrchestrationMode.SelfOrchestrating => CreateCandidates(
+                (ReadExplicitConfiguration(), "explicit-config", 1),
+                (BuildServiceUrl(attribute.LocalScheme, attribute.LocalHost, attribute.LocalPort), "self-orchestrated", 2)
+            ),
+            _ => CreateCandidates(
+                (ReadExplicitConfiguration(), "explicit-config", 1),
+                (BuildServiceUrl(attribute.LocalScheme, attribute.LocalHost, attribute.LocalPort), "localhost", 2)
+            )
         };
 
-        return candidates.Where(c => !string.IsNullOrWhiteSpace(c.Url));
+        return candidates;
+    }
+
+    private static IEnumerable<DiscoveryCandidate> CreateCandidates(params (string? Url, string Method, int Priority)[] entries)
+    {
+        foreach (var (url, method, priority) in entries)
+        {
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                yield return new DiscoveryCandidate(url!, method, priority);
+            }
+        }
     }
 
     private KoanServiceAttribute? GetServiceAttribute() =>

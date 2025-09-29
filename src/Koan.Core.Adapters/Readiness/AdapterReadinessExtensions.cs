@@ -132,10 +132,10 @@ public static class AdapterReadinessExtensions
                 }
                 catch (Exception provisioningEx)
                 {
-                    // If provisioning fails, throw the original exception
+                    // If provisioning fails, surface the provisioning failure with original context attached
                     throw new InvalidOperationException(
                         $"Schema auto-provisioning failed for {entityType.Name}. Original error: {ex.Message}",
-                        ex);
+                        provisioningEx);
                 }
             }
 

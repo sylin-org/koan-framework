@@ -9,6 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsAspireHost>true</IsAspireHost>
     <UserSecretsId>aspire-KoanAspireIntegration-AppHost</UserSecretsId>
+    <NoWarn>$(NoWarn);ASPIRE004</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

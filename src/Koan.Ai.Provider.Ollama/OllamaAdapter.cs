@@ -286,7 +286,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
     public Task<bool> IsReadyAsync(CancellationToken ct = default)
     {
-        EnsureInitializationStarted();
+    _ = EnsureInitializationStarted();
         return Task.FromResult(_stateManager.IsReady);
     }
 
@@ -347,7 +347,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             _http.BaseAddress = new Uri(baseUrl);
         }
 
-        EnsureInitializationStarted();
+    _ = EnsureInitializationStarted();
 
         try
         {
@@ -378,7 +378,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             await WaitForContainerReadiness(cancellationToken).ConfigureAwait(false);
         }
 
-        EnsureInitializationStarted();
+    _ = EnsureInitializationStarted();
         try
         {
             await WaitForReadinessAsync(ReadinessTimeout, cancellationToken).ConfigureAwait(false);

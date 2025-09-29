@@ -47,7 +47,7 @@ public class StreamingBackupService : IBackupService
             Id = Guid.CreateVersion7().ToString(),
             Name = backupName,
             Description = options.Description ?? $"Backup of {typeof(TEntity).Name}",
-            Tags = options.Tags,
+            Labels = options.Tags ?? Array.Empty<string>(),
             CreatedAt = DateTimeOffset.UtcNow,
             Status = BackupStatus.InProgress,
             Version = "1.0"
@@ -165,7 +165,7 @@ public class StreamingBackupService : IBackupService
             Id = Guid.CreateVersion7().ToString(),
             Name = backupName,
             Description = options.Description ?? $"Backup of {allEntities.Count} entity types",
-            Tags = options.Tags,
+            Labels = options.Tags ?? Array.Empty<string>(),
             CreatedAt = DateTimeOffset.UtcNow,
             Status = BackupStatus.InProgress,
             Version = "1.0"

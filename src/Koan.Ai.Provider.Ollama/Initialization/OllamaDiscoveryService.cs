@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using Koan.Ai.Provider.Ollama.Options;
 using Koan.AI.Contracts.Routing;
@@ -317,14 +318,14 @@ internal sealed class OllamaDiscoveryService : IHostedService
         }
     }
 
-    private async Task RegisterOllamaAdapter(string serviceUrl, string? defaultModel, CancellationToken cancellationToken)
+    private Task RegisterOllamaAdapter(string serviceUrl, string? defaultModel, CancellationToken cancellationToken)
     {
         try
         {
             var baseAddress = new Uri(serviceUrl);
             var client = new HttpClient { BaseAddress = baseAddress, Timeout = TimeSpan.FromSeconds(60) };
             var id = $"ollama@{baseAddress.Host}:{baseAddress.Port}";
-            var adapterLogger = _sp.GetService<Microsoft.Extensions.Logging.ILogger<OllamaAdapter>>();
+            var adapterLogger = _sp.GetService<ILogger<OllamaAdapter>>() ?? NullLogger<OllamaAdapter>.Instance;
 
             // Preserve bootstrap-time model choice (canonical pattern like data adapters)
             var configBuilder = new Microsoft.Extensions.Configuration.ConfigurationBuilder();
@@ -333,7 +334,7 @@ internal sealed class OllamaDiscoveryService : IHostedService
             // Use the canonical path that OllamaOptionsConfigurator expects
             if (!string.IsNullOrWhiteSpace(defaultModel))
             {
-                var configData = new Dictionary<string, string>
+                var configData = new Dictionary<string, string?>
                 {
                     ["Koan:Ai:Ollama:DefaultModel"] = defaultModel
                 };
@@ -356,6 +357,8 @@ internal sealed class OllamaDiscoveryService : IHostedService
         {
             _logger.LogError(ex, "Error registering Ollama adapter for {ServiceUrl}", serviceUrl);
         }
+
+        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

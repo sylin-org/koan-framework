@@ -48,6 +48,7 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Failed to apply global configuration: {ex.Message}");
                 throw;
             }
         }
@@ -212,6 +213,7 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[MONGO-AUTO-REGISTRAR] Falling back to per-class serializer registration: {ex.Message}");
             // Fallback to per-class approach
             RegisterPerClassSerializers(optimizedTypes);
         }
