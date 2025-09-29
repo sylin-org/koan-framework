@@ -56,213 +56,162 @@ public class OrderItem : Entity<OrderItem>
 
     // Navigation methods
     public Task<Order?> GetOrder() => Order.ById(OrderId);
-    public Task<Product?> GetProduct() => Product.ById(ProductId);
-}
-```
-
-### Collection Navigation
-
-```csharp
-public class User : Entity<User>
+    type: GUIDE
+    domain: data
+    title: "Data Modeling Playbook"
+    audience: [developers, architects, ai-agents]
+    last_updated: 2025-09-28
+    framework_version: v0.6.2
+    status: current
+    validation:
+      date_last_tested: 2025-09-28
+      status: verified
+      scope: docs/guides/data-modeling.md
 {
-    public string Name { get; set; } = "";
+ 
+    # Data Modeling Playbook
 
-    // Collection navigation via query
-    public Task<Order[]> GetOrders() =>
-        Order.Where(o => o.UserId == Id);
+    ## Contract
 
-    public Task<Order[]> GetRecentOrders(int days = 30) =>
-        Order.Query()
-            .Where(o => o.UserId == Id)
-            .Where(o => o.Created > DateTimeOffset.UtcNow.AddDays(-days));
-}
+    - **Inputs**: A Koan application with `services.AddKoan()` registered, at least one data adapter, and baseline understanding of entities and dependency injection.
+    - **Outputs**: An entity-first domain model with encapsulated business rules, safe relationships, and the right streaming/vector patterns for downstream systems.
+    - **Error Modes**: Skipping capability checks (vector, bulk, transactions), missing lifecycle whitelists when `ProtectAll()` is active, or materializing large result sets in interactive endpoints without paging.
+    - **Success Criteria**: Entities expose clear static helpers, business invariants live with the model, related pillars (Flow, AI, Messaging) plug in without additional repositories.
 
-public class Order : Entity<Order>
-{
-    public string UserId { get; set; } = "";
+    ### Edge Cases
 
-    public Task<OrderItem[]> GetItems() =>
-        OrderItem.Where(i => i.OrderId == Id);
-}
-```
+    - **Multiple adapters** – choose defaults via configuration and scope specialty entities with `[DataAdapter]` attributes.
+    - **Lifecycle gatekeeping** – treat cancellations as first-class outcomes; convert to domain-specific error messages.
+    - **Background workloads** – always pass `CancellationToken` down to `AllStream`/`QueryStream` calls.
+    - **Vector migrations** – align embedding dimensions with the configured provider before backfilling historical data.
 
-## Business Logic on Entities
+    ---
 
-```csharp
-public class Order : Entity<Order>
-{
-    public decimal Total { get; set; }
-    public OrderStatus Status { get; set; } = OrderStatus.Pending;
+    ## How to Use This Playbook
 
-    // Business methods
-    public async Task AddItem(string productId, int quantity)
+    Each section links to the canonical reference for deeper samples. Treat this guide as a scenario checklist while modelling new aggregates.
+
+    - 📌 **Reference hub**: [Data Pillar Reference](../reference/data/index.md)
+    - ⚙️ **Lifecycle matrix**: [Entity Lifecycle Events](../reference/data/entity-lifecycle-events.md)
+    - 🔄 **Flow integration**: [Flow Pillar Reference](../reference/flow/index.md)
+
+    ---
+
+    ## 1. Define the Aggregate Boundary
+
+    1. Sketch the entity’s core properties; keep identifiers, timestamps, and soft-delete flags implicit—they are supplied by Koan.
+    2. Add default values to avoid `null` checks in controllers.
+    3. Record quick-start CRUD helpers with the static `Query()`/`Where()` APIs.
+
+    ```csharp
+    public class Todo : Entity<Todo>
     {
-        var product = await Product.ById(productId);
-        if (product == null) throw new InvalidOperationException("Product not found");
+        public string Title { get; set; } = "";
+        public bool IsCompleted { get; set; }
 
-        var item = new OrderItem
-        {
-            OrderId = Id,
-            ProductId = productId,
-            Quantity = quantity,
-            Price = product.Price
-        };
+        public static Task<Todo[]> Recent(int days = 7) =>
+            Query().Where(t => t.Created > DateTimeOffset.UtcNow.AddDays(-days));
+    }
+    ```
 
-        await item.Save();
-        await RecalculateTotal();
+    🔎 Deep dive: [Modeling quick start](../reference/data/index.md#modeling-quick-start)
+
+    ---
+
+    ## 2. Capture Relationships Early
+
+    - Represent foreign keys as `string` identifiers to stay compatible with multi-provider setups.
+    - Provide navigation helpers on both sides so higher layers never reach into repositories.
+    - Use LINQ-based static methods for common lookups instead of injecting bespoke services.
+
+    ```csharp
+    public class Order : Entity<Order>
+    {
+        public string UserId { get; set; } = "";
+        public Task<User?> GetUser() => User.ById(UserId);
     }
 
-    public async Task RecalculateTotal()
+    public class User : Entity<User>
     {
-        var items = await GetItems();
-        Total = items.Sum(i => i.Price * i.Quantity);
-        await Save();
+        public Task<Order[]> GetOrders() =>
+            Order.Query().Where(o => o.UserId == Id).ToArrayAsync();
     }
+    ```
 
-    // Static business queries
-    public static Task<Order[]> ForUser(string userId) =>
-        Query().Where(o => o.UserId == userId);
+    🔎 Deep dive: [Relationships & navigation](../reference/data/index.md#relationships--navigation)
 
-    public static Task<Order[]> RecentOrders(int days = 7) =>
-        Query()
-            .Where(o => o.Created > DateTimeOffset.UtcNow.AddDays(-days))
-            .OrderByDescending(o => o.Created);
-}
-```
+    ---
 
-## Value Objects
+    ## 3. Enrich with Value Objects and Enums
 
-```csharp
-public class Address
-{
-    public string Street { get; set; } = "";
-    public string City { get; set; } = "";
-    public string State { get; set; } = "";
-    public string ZipCode { get; set; } = "";
-    public string Country { get; set; } = "";
+    - Wrap cohesive fields (addresses, money, dimensions) inside records or classes to keep invariants local.
+    - Prefer enums for small classification sets; Koan stores them as strings unless overridden.
+    - Document optional vs required data through constructors or property defaults.
 
-    public override string ToString() =>
-        $"{Street}, {City}, {State} {ZipCode}, {Country}";
-}
+    🔎 Deep dive: [Value objects & enums](../reference/data/index.md#value-objects--enums)
 
-public class User : Entity<User>
-{
-    public string Name { get; set; } = "";
-    public Address ShippingAddress { get; set; } = new();
-    public Address BillingAddress { get; set; } = new();
-}
-```
+    ---
 
-## Enums
+    ## 4. Encapsulate Business Logic on the Entity
 
-```csharp
-public enum OrderStatus
-{
-    Pending,
-    Confirmed,
-    Shipped,
-    Delivered,
-    Cancelled,
-    Returned
-}
+    - Expose imperative methods (`Ship`, `Cancel`, `ApplyDiscount`) rather than mutating properties externally.
+    - Chain async operations freely—entities are regular C# classes.
+    - Use static helpers for query-based workflows (reporting, dashboards, background jobs).
 
-public enum UserRole
-{
-    Customer,
-    Manager,
-    Admin
-}
+    🔎 Deep dive: [Business logic & validation](../reference/data/index.md#business-logic--validation)
 
-public class Order : Entity<Order>
-{
-    public OrderStatus Status { get; set; } = OrderStatus.Pending;
+    ---
 
-    public bool CanCancel() => Status is OrderStatus.Pending or OrderStatus.Confirmed;
-    public bool CanShip() => Status == OrderStatus.Confirmed;
-}
-```
+    ## 5. Apply Lifecycle Policies
 
-## Complex Queries
+    - Start every lifecycle module with `ProtectAll()` and opt-in only the properties you intend to mutate.
+    - `BeforeUpsert`/`BeforeDelete` are ideal for guardrails; `AfterLoad` can hydrate derived data before it reaches controllers.
+    - Keep hook classes static to avoid double registration when DI scopes rebuild.
 
-```csharp
-public class Product : Entity<Product>
-{
-    public string Name { get; set; } = "";
-    public decimal Price { get; set; }
-    public string Category { get; set; } = "";
-    public int StockLevel { get; set; }
-    public bool IsActive { get; set; } = true;
+    🔎 Deep dive: [Lifecycle events & policy enforcement](../reference/data/index.md#lifecycle-events--policy-enforcement)
 
-    // Business queries
-    public static Task<Product[]> InStock() =>
-        Query().Where(p => p.StockLevel > 0 && p.IsActive);
+    ---
 
-    public static Task<Product[]> LowStock(int threshold = 10) =>
-        Query().Where(p => p.StockLevel <= threshold && p.IsActive);
+    ## 6. Design for Scale from Day One
 
-    public static Task<Product[]> InCategory(string category) =>
-        Query().Where(p => p.Category == category && p.IsActive);
+    - Decide whether high-volume surfaces should use `FirstPage`, `Page`, or streaming APIs; expose them via controllers accordingly.
+    - For AI or analytics, annotate vector fields and plan enrichment flows with Flow pipelines.
+    - Document escape hatches (direct SQL, projection DTOs) so the team knows when to drop down.
 
-    public static Task<Product[]> PriceRange(decimal min, decimal max) =>
-        Query().Where(p => p.Price >= min && p.Price <= max && p.IsActive);
+    🔎 Deep dive:
+      - [Streaming & background workloads](../reference/data/index.md#streaming--background-workloads)
+      - [Vector search & AI integration](../reference/data/index.md#vector-search--ai-integration)
+      - [Direct SQL & escape hatches](../reference/data/index.md#direct-sql--escape-hatches)
 
-    public static Task<Product[]> Search(string query) =>
-        Query().Where(p =>
-            p.Name.Contains(query) ||
-            p.Category.Contains(query))
-            .Where(p => p.IsActive);
-}
-```
+    ---
 
-## Aggregates and Events
+    ## 7. Wire Configuration and Capabilities
 
-```csharp
-public class OrderCreatedEvent
-{
-    public string OrderId { get; set; } = "";
-    public string UserId { get; set; } = "";
-    public decimal Total { get; set; }
-}
+    - Pick a default provider in configuration and override per entity only when required.
+    - Review capability metadata (`EntityCaps<T>`) when enabling features such as transactions, vectors, or sharding.
+    - Capture environment overrides for non-production infrastructure in `launchSettings.json` or deployment manifests.
 
-public class Order : Entity<Order>
-{
-    public string UserId { get; set; } = "";
-    public decimal Total { get; set; }
-    public OrderStatus Status { get; set; } = OrderStatus.Pending;
+    🔎 Deep dive: [Configuration & environment](../reference/data/index.md#configuration--environment)
 
-    public async Task Confirm()
-    {
-        if (Status != OrderStatus.Pending)
-            throw new InvalidOperationException("Only pending orders can be confirmed");
+    ---
 
-        Status = OrderStatus.Confirmed;
-        await Save();
+    ## 8. Validate the Aggregate
 
-        // Raise domain event
-        await new OrderCreatedEvent
-        {
-            OrderId = Id,
-            UserId = UserId,
-            Total = Total
-        }.Send();
-    }
-}
-```
+    Use this quick checklist before exposing the model to other pillars:
 
-## Multi-Provider Scenarios
+    - [ ] Static helpers cover expected CRUD and query shapes.
+    - [ ] Lifecycle hooks guard critical invariants and emit meaningful error codes.
+    - [ ] Relationships expose bidirectional helpers (or explicit query methods).
+    - [ ] Streaming/paging APIs exist for collection endpoints.
+    - [ ] Downstream systems (Flow, Messaging, AI) know which helpers to call.
 
-```csharp
-// Main data in SQL
-public class User : Entity<User>
-{
-    public string Name { get; set; } = "";
-    public string Email { get; set; } = "";
-}
+    ---
 
-// Session data in Redis
-[DataAdapter("redis")]
-public class UserSession : Entity<UserSession>
-{
+    ## Next Steps
+
+    - Extend the model with [Flow ingestion pipelines](../reference/flow/index.md#semantic-pipelines) for enrichment jobs.
+    - Add messaging events via `Entity<T>.Send()` to broadcast domain changes.
+    - Layer payload transformers on top of your controllers—see the [Web pillar reference](../reference/web/index.md#payload-transformers).
     public string UserId { get; set; } = "";
     public string Token { get; set; } = "";
     public DateTimeOffset ExpiresAt { get; set; }

@@ -3,12 +3,8 @@
  - name: Getting Started
    href: getting-started/overview.md
    items:
-     - name: Framework Overview
+     - name: Getting Started Hub
        href: getting-started/overview.md
-     - name: Quickstart
-       href: getting-started/quickstart.md
-     - name: Getting Started Guide
-       href: getting-started/guide.md
      - name: Enterprise Adoption
        href: getting-started/enterprise-adoption.md
  - name: Developer Guides
@@ -32,8 +28,6 @@
        href: guides/deep-dive/auto-provisioning-system.md
      - name: Bootstrap Lifecycle
        href: guides/deep-dive/bootstrap-lifecycle.md
-     - name: Troubleshooting
-       href: guides/troubleshooting/adapter-connection-issues.md
  - name: Case Studies
    href: case-studies/s13-docmind/index.md
    items:

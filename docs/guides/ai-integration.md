@@ -1,204 +1,16 @@
 ---
 type: GUIDE
 domain: ai
-title: "AI Integration with Koan"
-audience: [developers, ai-engineers]
-last_updated: 2025-01-17
-framework_version: "v0.2.18+"
+title: "AI Integration Playbook"
+audience: [developers, architects, ai-agents]
+last_updated: 2025-09-28
+framework_version: v0.6.2
 status: current
-validation: 2025-01-17
+validation:
+  date_last_tested: 2025-09-28
+  status: verified
+  scope: docs/guides/ai-integration.md
 ---
-
-# AI Integration with Koan
-
-**Document Type**: GUIDE
-**Target Audience**: Developers, AI Engineers
-**Last Updated**: 2025-01-17
-**Framework Version**: v0.2.18+
-
----
-
-## 3-Line Chat Integration
-
-```bash
-dotnet add package Koan.AI
-```
-
-```csharp
-[Route("api/[controller]")]
-public class ChatController : ControllerBase
-{
-    private readonly IAi _ai;
-
-    public ChatController(IAi ai) => _ai = ai;
-
-    [HttpPost]
-    public async Task<IActionResult> Chat([FromBody] string message)
-    {
-        var response = await _ai.ChatAsync(new AiChatRequest
-        {
-            Messages = [new() { Role = AiMessageRole.User, Content = message }]
-        });
-
-        return Ok(response.Choices?.FirstOrDefault()?.Message?.Content);
-    }
-}
-```
-
-That's it. You have working AI chat.
-
-## Local Development Setup
-
-```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Pull a model
-ollama pull llama2
-```
-
-```json
-{
-  "Koan": {
-    "AI": {
-      "DefaultProvider": "Ollama",
-      "Ollama": {
-        "BaseUrl": "http://localhost:11434",
-        "DefaultModel": "llama2"
-      }
-    }
-  }
-}
-```
-
-No API keys. No cloud dependencies. Pure local development.
-
-## Streaming Responses
-
-```csharp
-[HttpPost("stream")]
-public async Task StreamChat([FromBody] string message)
-{
-    Response.Headers.Add("Content-Type", "text/event-stream");
-
-    await foreach (var chunk in _ai.ChatStreamAsync(new AiChatRequest
-    {
-        Messages = [new() { Role = AiMessageRole.User, Content = message }],
-        Stream = true
-    }))
-    {
-        await Response.WriteAsync($"data: {chunk.Content}\n\n");
-        await Response.Body.FlushAsync();
-    }
-}
-```
-
-Real-time streaming with server-sent events.
-
-## Vector Search
-
-```csharp
-public class Document : Entity<Document>
-{
-    public string Title { get; set; } = "";
-    public string Content { get; set; } = "";
-
-    [VectorField]
-    public float[] ContentEmbedding { get; set; } = [];
-
-    // Semantic search
-    public static Task<Document[]> SimilarTo(string query) =>
-        Vector<Document>.SearchAsync(query);
-}
-
-// Usage
-var documents = await Document.SimilarTo("machine learning concepts");
-```
-
-Automatic vectorization and semantic search.
-
-## RAG (Retrieval-Augmented Generation)
-
-```csharp
-[Route("api/[controller]")]
-public class KnowledgeController : ControllerBase
-{
-    private readonly IAi _ai;
-
-    public KnowledgeController(IAi ai) => _ai = ai;
-
-    [HttpPost("ask")]
-    public async Task<IActionResult> Ask([FromBody] string question)
-    {
-        // Find relevant documents
-        var docs = await Document.SimilarTo(question);
-        var context = string.Join("\n\n", docs.Select(d => d.Content));
-
-        // Generate answer with context
-        var response = await _ai.ChatAsync(new AiChatRequest
-        {
-            Messages = [
-                new() { Role = AiMessageRole.System, Content = $"Answer based on this context: {context}" },
-                new() { Role = AiMessageRole.User, Content = question }
-            ]
-        });
-
-        return Ok(new
-        {
-            Answer = response.Choices?.FirstOrDefault()?.Message?.Content,
-            Sources = docs.Select(d => d.Title)
-        });
-    }
-}
-```
-
-Knowledge base with citations.
-
-## Document Processing
-
-```csharp
-public class DocumentProcessor : BackgroundService
-{
-    private readonly IAi _ai;
-
-    public DocumentProcessor(IAi ai) => _ai = ai;
-
-    protected override async Task ExecuteAsync(CancellationToken ct)
-    {
-        await this.On<DocumentUploaded>(async evt =>
-        {
-            var document = await Document.ById(evt.DocumentId);
-            if (document == null) return;
-
-            // Generate embedding
-            var embedding = await _ai.EmbedAsync(new AiEmbeddingRequest
-            {
-                Input = document.Content
-            });
-
-            document.ContentEmbedding = embedding.Embeddings.FirstOrDefault()?.Vector ?? [];
-            await document.Save();
-        });
-    }
-}
-
-// Trigger processing
-await new DocumentUploaded { DocumentId = doc.Id }.Send();
-```
-
-Automatic document vectorization pipeline.
-
-## Multi-Model Setup
-
-```csharp
-public class SmartChatController : ControllerBase
-{
-    private readonly IAi _ai;
-
-    [HttpPost("analyze")]
-    public async Task<IActionResult> AnalyzeDocument([FromBody] AnalyzeRequest request)
-    {
-        // Use different models for different tasks
         var summary = await _ai.ChatAsync(new AiChatRequest
         {
             Model = "llama2",
@@ -276,118 +88,136 @@ Automatic cost protection.
           "Endpoint": "{AZURE_ENDPOINT}",
           "ApiKey": "{AZURE_API_KEY}"
         }
-      },
-      "FallbackStrategy": "Cascade",
-      "Timeout": "00:00:30"
-    }
-  }
-}
-```
+    # AI Integration Playbook
 
-High availability with fallbacks.
+    ## Contract
 
-## Error Handling
+    - **Inputs**: Koan AI provider configured, entities ready to store embeddings or AI results, and familiarity with Flow/Data pillars.
+    - **Outputs**: Chat endpoints, streaming responses, embedding pipelines, and RAG workflows that productionize AI without bespoke infrastructure.
+    - **Error Modes**: Provider rate limits, token exhaustion, missing embeddings on legacy records, or chat history overflows.
+    - **Success Criteria**: Deterministic chat responses, embeddings persisted with vector indices, RAG pipelines reuse Flow/Data helpers, and observability covers cost + latency.
 
-```csharp
-[HttpPost("safe-chat")]
-public async Task<IActionResult> SafeChat([FromBody] string message)
-{
-    try
-    {
-        var response = await _ai.ChatAsync(new AiChatRequest
-        {
-            Messages = [new() { Role = AiMessageRole.User, Content = message }],
-            MaxTokens = 500
-        });
+    ### Edge Cases
 
-        return Ok(response.Choices?.FirstOrDefault()?.Message?.Content);
-    }
-    catch (AiBudgetExceededException)
-    {
-        return StatusCode(429, "Daily budget exceeded");
-    }
-    catch (AiModelUnavailableException)
-    {
-        return StatusCode(503, "AI service temporarily unavailable");
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, "AI processing failed");
-    }
-}
-```
+    - **Offline vs cloud providers** – ensure local Ollama fallbacks mirror cloud model interfaces.
+    - **Long prompts** – pre-trim or summarize conversation history to avoid truncation.
+    - **Embeddings** – keep dimensionality consistent across models; reflow data after model swaps.
+    - **Secrets management** – load provider credentials through options or secret stores, not code.
 
-Graceful degradation.
+    ---
 
-## Content Moderation
+    ## How to Use This Playbook
 
-```csharp
-public class ModerationService
-{
-    private readonly IAi _ai;
+    - 📌 Canonical reference: [AI Pillar Reference](../reference/ai/index.md)
+    - 🧭 Flow integration: [Flow Pillar Reference](../reference/flow/index.md#semantic-pipelines)
+    - 🗂️ Data storage: [Data Pillar Reference](../reference/data/index.md#vector-search--ai-integration)
 
-    public async Task<bool> IsContentSafe(string content)
-    {
-        var response = await _ai.ChatAsync(new AiChatRequest
-        {
-            Model = "content-moderator",
-            Messages = [
-                new() { Role = AiMessageRole.System, Content = "Rate this content as 'safe' or 'unsafe'" },
-                new() { Role = AiMessageRole.User, Content = content }
-            ]
-        });
+    Follow the steps below each time you introduce AI functionality.
 
-        return response.Choices?.FirstOrDefault()?.Message?.Content?.Contains("safe") == true;
-    }
-}
+    ---
 
-[HttpPost("moderate")]
-public async Task<IActionResult> PostWithModeration([FromBody] PostRequest request)
-{
-    if (!await _moderation.IsContentSafe(request.Content))
-        return BadRequest("Content violates community guidelines");
+    ## 1. Pick a Provider Strategy
 
-    // Process safe content...
-    return Ok();
-}
-```
+    - Start with Ollama locally for quick iteration; mirror settings in production with a hosted provider.
+    - Record provider + model IDs in configuration—never hardcode them.
+    - Capture rate limits and latency budgets before exposing endpoints.
 
-Built-in safety checks.
+    🧭 Reference: [Installation & configuration](../reference/ai/index.md#installation--configuration)
 
-## Testing
+    ---
 
-```csharp
-[Test]
-public async Task Should_Generate_Response()
-{
-    // Arrange
-    var ai = new MockAi();
-    var controller = new ChatController(ai);
+    ## 2. Stand Up a Chat Endpoint
 
-    // Act
-    var result = await controller.Chat("Hello");
+    - Use `IAi.ChatAsync` for synchronous responses, `ChatStreamAsync` for SSE.
+    - Introduce system prompts to enforce guardrails and persona behavior.
+    - Measure token usage per request; log `AiChatResponse.Usage`.
 
-    // Assert
-    var response = result as OkObjectResult;
-    Assert.IsNotNull(response);
-    Assert.IsNotEmpty(response.Value?.ToString());
-}
+    🧭 Reference: [Chat completion patterns](../reference/ai/index.md#chat-completion-patterns)
 
-public class MockAi : IAi
-{
-    public Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
-    {
-        return Task.FromResult(new AiChatResponse
-        {
-            Choices = [new() { Message = new() { Content = "Mock response" } }]
-        });
-    }
-}
-```
+    ---
 
-Testable AI integration.
+    ## 3. Add Real-Time Streaming (Optional)
 
----
+    - Expose SSE endpoints only if the provider supports streaming.
+    - Ensure clients gracefully handle partial chunks and reconnection.
+    - Include `CancellationToken` to terminate long-running requests.
 
-**Last Validation**: 2025-01-17 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
+    🧭 Reference: [Streaming responses](../reference/ai/index.md#chat-completion-patterns)
+
+    ---
+
+    ## 4. Persist Embeddings
+
+    - Annotate vector fields with `[VectorField]` on the entity.
+    - Generate embeddings during writes or in background jobs; handle retries for provider hiccups.
+    - Validate the returned dimension count before saving.
+
+    🧭 Reference: [Embeddings & vector search](../reference/ai/index.md#embeddings--vector-search)
+
+    ---
+
+    ## 5. Build RAG Workflows
+
+    - Retrieve similar documents via vector search and join them into prompts.
+    - Track which sources contributed to each answer.
+    - Move heavy retrieval/orchestration into Flow pipelines for retry + observability.
+
+    🧭 Reference: [Retrieval-augmented generation](../reference/ai/index.md#retrieval-augmented-generation-rag)
+
+    ---
+
+    ## 6. Automate with Background Services
+
+    - Subscribe to domain events (e.g., `DocumentUploaded`) and enrich with embeddings or summaries.
+    - Use `BackgroundService` helpers like `.On<TEvent>` for succinct event handling.
+    - Emit follow-up events when enrichment completes (ex: `DocumentIndexed`).
+
+    🧭 Reference: [Background processing & messaging](../reference/ai/index.md#background-processing--messaging)
+
+    ---
+
+    ## 7. Route Across Multiple Models
+
+    - Define routing logic (cost vs. fidelity) in a single place; decorate requests with `request.Provider`.
+    - Collect latency and quality metrics per provider to feed future decisions.
+
+    🧭 Reference: [Multi-model & routing strategies](../reference/ai/index.md#multi-model--routing-strategies)
+
+    ---
+
+    ## 8. Control Cost & Tokens
+
+    - Run `IAi.TokenizeAsync` before sending large prompts.
+    - Trim conversation history when crossing a threshold.
+    - Persist usage metrics for chargeback or quota tracking.
+
+    🧭 Reference: [Tokenization & cost control](../reference/ai/index.md#tokenization--cost-control)
+
+    ---
+
+    ## 9. Harden Observability
+
+    - Wrap AI calls with retries tuned to provider guidance.
+    - Attach structured logs including provider, model, prompt size, latency, and errors.
+    - Provide actionable HTTP responses when providers return rate-limit or safety errors.
+
+    🧭 Reference: [Error handling & observability](../reference/ai/index.md#error-handling--observability)
+
+    ---
+
+    ## Review Checklist
+
+    - [ ] Provider configuration stored in environment-specific settings.
+    - [ ] Chat endpoints expose both sync and streaming variants (if supported).
+    - [ ] Embeddings persist reliably with validation & retries.
+    - [ ] RAG flows cite sources and run inside Flow pipelines when complex.
+    - [ ] Token usage & cost metrics are logged.
+    - [ ] Error responses map provider failures to user-friendly messages.
+
+    ---
+
+    ## Next Steps
+
+    - Integrate AI outputs with Messaging to notify downstream services.
+    - Add moderation and safety filters before returning generated content.
+    - Explore agentic workflows by orchestrating multiple prompts inside Flow pipelines.

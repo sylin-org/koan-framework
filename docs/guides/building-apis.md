@@ -1,206 +1,135 @@
 ---
 type: GUIDE
 domain: web
-title: "Building APIs with Koan"
-audience: [developers, ai-agents]
-last_updated: 2025-01-17
-framework_version: "v0.2.18+"
+title: "API Delivery Playbook"
+audience: [developers, architects, ai-agents]
+last_updated: 2025-09-28
+framework_version: v0.6.2
 status: current
-validation: 2025-01-17
+validation:
+  date_last_tested: 2025-09-28
+  status: verified
+  scope: docs/guides/building-apis.md
+---
+# API Delivery Playbook
+
+## Contract
+
+- **Inputs**: Working knowledge of ASP.NET Core controllers, Koan entities, and the Data pillar.
+- **Outputs**: An intentional HTTP surface where CRUD, custom routes, payload shaping, and auth policies are unified.
+- **Error Modes**: Duplicate business logic in controllers, inconsistent pagination, unsecured capability endpoints, or stream endpoints without cancellation.
+- **Success Criteria**: Entity controllers expose CRUD + focused routes, transformers keep responses consistent, validation & auth policies live close to the action, and observability is wired in.
+
+### Edge Cases
+
+- **Cross-pillar coupling** – controllers should only call entity statics or shared services; avoid direct data store access.
+- **Long-running jobs** – do not serve heavy processing inside HTTP; hand off to Flow pipelines or background workers.
+- **Error surfaces** – translate lifecycle cancellations into HTTP 4xx with descriptive payloads.
+- **Auth negotiation** – ensure `/auth/providers` returns your configured providers before relying on challenge endpoints.
+
 ---
 
-# Building APIs with Koan
+## Guided Workflow
 
-**Document Type**: GUIDE
-**Target Audience**: Developers
-**Last Updated**: 2025-01-17
-**Framework Version**: v0.2.18+
+This playbook mirrors the canonical [Web Pillar Reference](../reference/web/index.md). Follow each stage when building or reviewing an API surface.
+
+1. **Bootstrap** – Add `Koan.Web` and call `services.AddKoan()`.
+2. **Expose CRUD** – Start with `EntityController<T>` and confirm standard operations.
+3. **Add intent endpoints** – Layer custom routes for business cases (search, analytics, state transitions).
+4. **Shape payloads** – Attach payload transformers for response consistency.
+5. **Secure** – Apply policies, register providers, and guard capability-sensitive endpoints.
+6. **Validate & Observe** – Add request validation, tracing, and structured logging.
+
+Each section below links to deeper reference material.
 
 ---
 
-## Basic REST API
+## 1. Bootstrap & Health
 
-### Entity and Controller
+- Install `Koan.Web` alongside your data adapters.
+- Call `AddKoan()` in `Program.cs`; health endpoints light up automatically.
+- Verify `/api/health`, `/api/health/live`, and `/api/health/ready` before layering features.
 
-```csharp
-// Models/Product.cs
-public class Product : Entity<Product>
-{
-    public string Name { get; set; } = "";
-    public decimal Price { get; set; }
-    public string Category { get; set; } = "";
-    public bool IsActive { get; set; } = true;
-}
+🔎 Reference: [Quick start](../reference/web/index.md#quick-start-two-file-api)
 
-// Controllers/ProductsController.cs
-[Route("api/[controller]")]
-public class ProductsController : EntityController<Product> { }
-```
+---
 
-That's it. You have:
-- `GET /api/products` - List all
-- `GET /api/products/{id}` - Get by ID
-- `POST /api/products` - Create
-- `PUT /api/products/{id}` - Update
-- `DELETE /api/products/{id}` - Delete
+## 2. Extend Entity Controllers
 
-### Custom Endpoints
+- Keep CRUD while adding business routes with attribute routing.
+- Use static helpers on entities for queries and flows; avoid injecting repositories.
+- Return IActionResults for richer responses (pagination metadata, status codes).
 
-```csharp
-[Route("api/[controller]")]
-public class ProductsController : EntityController<Product>
-{
-    [HttpGet("featured")]
-    public Task<Product[]> GetFeatured() =>
-        Product.Where(p => p.IsFeatured);
+🔎 Reference: [Entity controllers in depth](../reference/web/index.md#entity-controllers-in-depth)
 
-    [HttpGet("category/{category}")]
-    public Task<Product[]> GetByCategory(string category) =>
-        Product.Where(p => p.Category == category);
+---
 
-    [HttpPost("{id}/activate")]
-    public async Task<IActionResult> Activate(string id)
-    {
-        var product = await Product.ById(id);
-        if (product == null) return NotFound();
+## 3. Compose Custom Controllers
 
-        product.IsActive = true;
-        await product.Save();
-        return Ok();
-    }
-}
-```
+- Switch to `ControllerBase` when orchestrating multiple aggregates or external services.
+- Pull data via entity statics and Flow pipelines; avoid duplicating query logic.
+- Embrace `IActionResult` to express success/failure paths cleanly.
 
-## Business Logic in Entities
+🔎 Reference: [Custom controllers & composition](../reference/web/index.md#custom-controllers--composition)
 
-```csharp
-public class Order : Entity<Order>
-{
-    public string CustomerEmail { get; set; } = "";
-    public decimal Total { get; set; }
-    public OrderStatus Status { get; set; } = OrderStatus.Pending;
+---
 
-    // Business methods
-    public async Task Ship()
-    {
-        Status = OrderStatus.Shipped;
-        await Save();
-        await new OrderShippedEvent { OrderId = Id }.Send();
-    }
+## 4. Shape Payloads
 
-    public async Task Cancel(string reason)
-    {
-        if (Status == OrderStatus.Shipped)
-            throw new InvalidOperationException("Cannot cancel shipped order");
+- Implement `IPayloadTransformer<T>` for canonical API responses.
+- Use transformers to add hypermedia links, computed fields, or redactions.
+- Register transformers once; the entity endpoint service reuses them across surfaces (REST, GraphQL, MCP).
 
-        Status = OrderStatus.Cancelled;
-        CancellationReason = reason;
-        await Save();
-    }
+🔎 Reference: [Payload transformers](../reference/web/index.md#payload-transformers)
 
-    // Query methods
-    public static Task<Order[]> ForCustomer(string email) =>
-        Query().Where(o => o.CustomerEmail == email);
+---
 
-    public static Task<Order[]> Recent(int days = 30) =>
-        Query().Where(o => o.Created > DateTimeOffset.UtcNow.AddDays(-days));
-}
-```
+## 5. Secure the Surface
 
-## Complex Controllers
+- Enable auth providers (OIDC, OAuth, SAML) before exposing restricted routes.
+- Gate domain operations with policies mapped to roles or claims.
+- Log challenge/response flows for observability and support.
 
-```csharp
-[Route("api/[controller]")]
-public class OrdersController : EntityController<Order>
-{
-    [HttpPost("{id}/ship")]
-    public async Task<IActionResult> Ship(string id)
-    {
-        var order = await Order.ById(id);
-        if (order == null) return NotFound();
+🔎 Reference: [Authentication & authorization](../reference/web/index.md#authentication--authorization)
 
-        try
-        {
-            await order.Ship();
-            return Ok(new { message = "Order shipped successfully" });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
+---
 
-    [HttpGet("customer/{email}")]
-    public Task<Order[]> GetCustomerOrders(string email) =>
-        Order.ForCustomer(email);
+## 6. Validate & Observe
 
-    [HttpGet("analytics/revenue")]
-    public async Task<IActionResult> GetRevenue([FromQuery] int days = 30)
-    {
-        var orders = await Order.Recent(days);
-        var revenue = orders.Sum(o => o.Total);
-        return Ok(new { revenue, orderCount = orders.Length });
-    }
-}
-```
+- Apply data annotations or FluentValidation for input models.
+- Wrap controllers with middleware to capture validation errors, correlation IDs, and telemetry.
+- Emit structured logs with request/response context.
 
-## Request/Response Transformation
+🔎 Reference: [Error handling & observability](../reference/web/index.md#error-handling--observability)
 
-```csharp
-public class ProductTransformer : IPayloadTransformer<Product>
-{
-    public Task<object> TransformResponse(Product product, TransformContext context)
-    {
-        return Task.FromResult<object>(new
-        {
-            product.Id,
-            product.Name,
-            product.Price,
-            FormattedPrice = $"${product.Price:F2}",
-            Url = $"/products/{product.Id}",
-            InStock = product.Quantity > 0
-        });
-    }
-}
-```
+---
 
-## Validation
+## 7. Configuration Checklist
 
-```csharp
-public class CreateProductRequest
-{
-    [Required]
-    public string Name { get; set; } = "";
+- Configure CORS for any SPA or remote agent clients.
+- Register auth provider secrets in environment variables or secret stores.
+- Document capability toggles (pagination, moderation) for your team.
 
-    [Range(0.01, double.MaxValue)]
-    public decimal Price { get; set; }
+🔎 Reference: [Configuration & environment](../reference/web/index.md#configuration--environment)
 
-    [Required]
-    public string Category { get; set; } = "";
-}
+---
 
-[Route("api/[controller]")]
-public class ProductsController : EntityController<Product>
-{
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateProductRequest request)
-    {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+## Review Checklist
 
-        var product = new Product
-        {
-            Name = request.Name,
-            Price = request.Price,
-            Category = request.Category
-        };
+- [ ] CRUD endpoints verified via `EntityController<T>`.
+- [ ] Custom routes use entity statics or endpoint service.
+- [ ] Payload transformers return consistent shapes.
+- [ ] Auth policies documented and enforced.
+- [ ] Validation and error responses standardized.
+- [ ] Logs and traces include correlation identifiers.
 
-        await product.Save();
-        return CreatedAtAction(nameof(Get), new { id = product.Id }, product);
-    }
-}
-```
+---
 
+## Where to Go Next
+
+- Generate OpenAPI docs via Koan’s Swagger integration (development only).
+- Add streaming endpoints backed by Flow pipelines for background processing.
+- Explore GraphQL or MCP surfaces that reuse the same entity endpoint service.
 ## File Uploads
 
 ```csharp

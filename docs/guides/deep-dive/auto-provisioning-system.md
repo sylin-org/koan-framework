@@ -474,7 +474,7 @@ public async Task Should_Handle_Concurrent_Provisioning()
 ## 📚 Related Documentation
 
 - [Bootstrap Lifecycle](bootstrap-lifecycle.md) - Understanding startup coordination
-- [Adapter Connection Issues](../troubleshooting/adapter-connection-issues.md) - Troubleshooting provisioning failures
+- [Adapter & Data Connectivity](../../support/troubleshooting.md#adapter--data-connectivity) - Troubleshooting provisioning failures
 - [Entity Storage Patterns](entity-storage-patterns.md) - How Entity<> leverages auto-provisioning
 - [Performance Optimization](../../advanced/performance-optimization/query-optimization.md) - Optimizing provisioned structures
 

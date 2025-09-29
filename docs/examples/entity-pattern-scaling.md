@@ -920,8 +920,8 @@ public class EcosystemProductsController : EntityController<Product>
 
 ### **Try the Scaling Progression**
 
-1. **[5-Minute Quickstart](../docs/getting-started/quickstart.md)** - Experience Stage 1 & 2
-2. **[Complete Getting Started](../docs/getting-started/guide.md)** - Build through all stages
+1. **[Stage 1 Quickstart](../docs/getting-started/overview.md#stage-1--launch-the-service-5-minutes)** - Experience foundational CRUD patterns
+2. **[Stage 2–4 Expansion](../docs/getting-started/overview.md#stage-2--expand-the-pattern)** - Add messaging, AI, and Flow automation
 3. **[Enterprise Adoption Guide](../docs/getting-started/enterprise-adoption.md)** - Strategic scaling approach
 
 ### **Deep Dive Resources**

@@ -31,12 +31,12 @@ Step-by-step guides for building with Koan Framework:
 - [AI Integration](guides/ai-integration.md) - Add AI capabilities to your apps
 - [Authentication](guides/authentication-setup.md) - Zero-config OAuth, JWT, and service-to-service auth
 
-### 🚨 [Troubleshooting](guides/troubleshooting/adapter-connection-issues.md)
+### 🚨 [Troubleshooting Hub](support/troubleshooting.md)
 
 Common issues and their solutions:
 
-- **[Adapter Connection Issues](guides/troubleshooting/adapter-connection-issues.md)** - Database connectivity and provisioning failures
-- **[Bootstrap Failures](guides/troubleshooting/bootstrap-failures.md)** - Application startup and initialization problems
+- **[Adapter & Data Connectivity](support/troubleshooting.md#adapter--data-connectivity)** - Database connectivity and provisioning failures
+- **[Boot & Auto-Registration](support/troubleshooting.md#boot--auto-registration)** - Startup discoveries and initialization problems
 
 ### 🔬 [Deep Dive](guides/deep-dive/auto-provisioning-system.md)
 

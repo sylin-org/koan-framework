@@ -8,21 +8,13 @@
 
 **Start here when things aren't working properly.**
 
-### [Adapter Connection Issues](troubleshooting/adapter-connection-issues.md)
-- Database connectivity failures
-- Schema auto-provisioning problems
-- SDK bootstrap and timing issues
-- Service readiness verification
+### [Troubleshooting Hub](../support/troubleshooting.md)
+- Adapter and data connectivity checks
+- Boot and auto-registration diagnostics
+- AI, Flow, and health endpoint runbooks
+- Escalation template with required artifacts
 
-*Common symptoms*: `SocketNotAvailableException`, `Service n1ql not configured`, empty collections returning `[]`
-
-### [Bootstrap Failures](troubleshooting/bootstrap-failures.md)
-- Application startup problems
-- Reference data not seeding
-- Startup task discovery issues
-- Bootstrap timing coordination
-
-*Common symptoms*: Missing MediaTypes, "Please seed reference data first" errors, empty reference endpoints
+*Highlights*: Stage backlog queries, provider readiness probes, AI rate-limit tuning, and bootstrap task patterns.
 
 ---
 

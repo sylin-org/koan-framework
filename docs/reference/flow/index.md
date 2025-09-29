@@ -1,3 +1,4 @@
+---
 type: REF
 domain: flow
 title: "Flow Pillar Reference"
@@ -6,35 +7,66 @@ status: current
 last_updated: 2025-09-28
 framework_version: v0.6.2
 validation:
-    date_last_tested: 2025-09-28
-    status: verified
-    scope: docs/reference/flow/index.md
+  date_last_tested: 2025-09-28
+  status: verified
+  scope: docs/reference/flow/index.md
 ---
 
 # Flow Pillar Reference
 
-**Document Type**: REF
-**Target Audience**: Developers, Architects
-**Last Updated**: 2025-09-28
-**Framework Version**: v0.6.2
+## Contract
+
+- **Inputs**: Koan application bootstrapped with `builder.Services.AddKoan()`, Flow packages installed, and at least one storage adapter for entities and vectors when required.
+- **Outputs**: Repeatable ingestion pipelines, semantic processing flows, controllers, and adapters that keep intake, enrichment, and projection concerns separate.
+- **Error Modes**: Misaligned stage configuration, unbounded pipelines that ignore cancellation, provider limitations (no vector/search support), or missing adapter registration preventing intake from running.
+- **Success Criteria**: Data reliably progresses from intake to projections, semantic pipelines scale with streaming, Flow controllers expose predictable APIs, and telemetry captures throughput plus failures.
+
+### Edge Cases
+
+- **Multi-source ingestion** – make the default adapter explicit when multiple Flow providers exist; annotate flow entities with `[DataAdapter]` when routing to specialized stores.
+- **Stage replays** – use `Requeue()` sparingly and record idempotency keys to avoid duplicate events.
+- **Pipeline concurrency** – throttle AI-heavy stages with `AiEmbedOptions.Batch` to respect rate limits.
+- **Large lineage queries** – page or stream projection reads to avoid materializing entire audit trails in memory.
+- **Long-lived adapters** – wrap background services with health checks and cancellation to prevent orphaned threads.
+
+---
+
+## Pillar Overview
+
+Flow orchestrates inbound data, enrichment, and publication through orderly stages. Entities derived from `FlowEntity<T>` move through intake ➜ processing ➜ projections while semantic pipelines (`Pipeline()`) offer declarative transformations. Flow integrates directly with Data, AI, and Messaging pillars to stream entities, enrich with AI, emit events, and surface rich APIs without custom repositories.
+
+**Core packages**
+
+- `Koan.Flow` – runtime, entities, stages, interceptors, controllers.
+- `Koan.Flow.Semantic` – semantic streaming pipeline operators.
+- Adapter packages (`Koan.Data.Postgres`, `Koan.Data.Vector.Redis`, `Koan.Data.Mongo`, etc.) wired through Koan’s auto-registration.
 
 ---
 
 ## Installation
 
-```bash
-dotnet add package Koan.Flow
+Install the Flow runtime and supporting adapters:
+
+```powershell
+pwsh -c "dotnet add package Koan.Flow"
 ```
 
 ```csharp
 // Program.cs
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
-app.UseKoan();
+
+var app = builder.Build();
+app.Run();
 ```
 
-## Flow Entities
+Add data/vector adapters to match your providers; Koan will auto-detect them during boot.
 
-### Basic Flow Entity
+---
+
+## Flow Entities & Stages
+
+### Modeling Flow Entities
 
 ```csharp
 public sealed class Device : FlowEntity<Device>
@@ -44,132 +76,169 @@ public sealed class Device : FlowEntity<Device>
     public string Model { get; set; } = "";
     public string Status { get; set; } = "";
 }
-```
 
-### Dynamic Flow Entity (Contractless)
-
-```csharp
-// Send raw JSON data through the pipeline
-var dynamicDevice = new DynamicFlowEntity<Device>
+// Dynamic intake when payload shape varies per source
+var intakeRecord = new DynamicFlowEntity<Device>
 {
-    Id = "dev:123",
+    Id = "device:123",
     Model = new
     {
         inventory = new { serial = "DEV-001" },
-        person = new { identifier = new { username = "john.doe" } },
-        model = "Laptop",
-        status = "Active"
+        status = "active"
     }
 };
 
-await dynamicDevice.Save(FlowSets.Stage<Device>("intake"));
+await intakeRecord.Save(FlowSets.Stage<Device>("intake"));
 ```
 
-## Data Pipeline Stages
-
-### Intake → Processing
+### Stage Progression
 
 ```csharp
-// 1. Intake: Raw data from adapters
-await new DynamicFlowEntity<Device>
-{
-    Id = "dev:123",
-    Model = deviceData
-}.Save(FlowSets.Stage<Device>("intake"));
-
-// 2. Standardized: Normalized format
-var standardized = await StageRecord<Device>.Query()
-    .Where(r => r.Stage == "standardized")
-    .ToArrayAsync();
-
-// 3. Keyed: Aggregation keys extracted
 var keyed = await StageRecord<Device>.Query()
     .Where(r => r.Stage == "keyed")
     .ToArrayAsync();
 
-// 4. Processed: Final stage after projection
-var processed = await StageRecord<Device>.Query()
-    .Where(r => r.Stage == "processed")
-    .ToArrayAsync();
+await StageRecord<Device>.Query()
+    .Where(r => r.Stage == "failed")
+    .ForEachAsync(record => record.Requeue());
 ```
 
-### Projection Views
+### Projections & Views
 
 ```csharp
-// Query canonical projection
 using (DataSetContext.With(FlowSets.View<Device>("canonical")))
 {
-    var devices = await CanonicalProjection<Device>.FirstPage(50);
+    var recent = await CanonicalProjection<Device>.FirstPage(50);
 }
 
-// Query lineage projection
 using (DataSetContext.With(FlowSets.View<Device>("lineage")))
 {
-    var lineage = await LineageProjection<Device>.FirstPage(50);
+    var lineage = await LineageProjection<Device>.Query()
+        .Where(r => r.SerialNumber == "DEV-001" && r.Stage == "processed")
+        .ToArrayAsync();
 }
 ```
 
-## Flow Adapters
+`FlowSets.Stage<T>` and `FlowSets.View<T>` express stage and projection identifiers consistently; stay within helpers to keep providers interchangeable.
 
-### Background Service Adapter
+---
+
+## Semantic Pipelines
+
+Semantic pipelines express streaming and AI enrichment logic without bespoke orchestration code.
+
+### Pipeline Quick Start
+
+```csharp
+await Document.AllStream()
+    .Pipeline()
+    .ForEach(doc =>
+    {
+        doc.ProcessedAt = DateTimeOffset.UtcNow;
+        doc.Status = "processing";
+    })
+    .Tokenize(doc => doc.Content)
+    .Embed(new AiEmbedOptions { Model = "all-minilm", Batch = 100 })
+    .Save()
+    .ExecuteAsync();
+```
+
+### Core Operations
+
+| Operation | Purpose | Notes |
+| --- | --- | --- |
+| `.ForEach(...)` | Mutate entities or call services (sync/async). | Perform domain logic, metadata enrichment, or external lookups.
+| `.Tokenize(...)` | Produce tokens via the configured AI provider. | Supply selector + optional `AiTokenizeOptions` (max tokens/model).
+| `.Embed(...)` | Generate embeddings and persist vectors. | Configure batch size/model; works when vector adapters are installed.
+| `.Branch(...)` | Split success/failure/conditional paths. | Combine `.OnSuccess`, `.OnFailure`, or `.When` clauses.
+| `.Save()` | Persist entity + vector changes in one call. | Batched persistence keeps providers efficient.
+| `.Notify(...)` | Emit messaging events after processing. | Integrates with Messaging pillar transports.
+| `.Trace(...)` | Log structured telemetry per envelope. | Ideal for latency tracking and diagnostics.
+
+### Branching & Error Capture
+
+```csharp
+await Document.Where(d => d.Status == "uploaded")
+    .Pipeline()
+    .Branch(branch => branch
+        .OnSuccess(success => success
+            .Tokenize(doc => doc.Content)
+            .Embed(new AiEmbedOptions { Model = "all-minilm" })
+            .ForEach(doc => doc.Status = "completed")
+            .Save())
+        .OnFailure(failure => failure
+            .Trace(env => $"Failed {env.Entity.Id}: {env.Error?.Message}")
+            .ForEach(doc =>
+            {
+                doc.Status = "failed";
+                doc.ErrorMessage = env.Error?.Message;
+            })
+            .Save()))
+    .ExecuteAsync();
+```
+
+### Performance Patterns
+
+- Stream inputs (`AllStream`, `QueryStream`) to avoid loading entire datasets into memory.
+- Batch AI calls with `AiEmbedOptions.Batch` or provider-specific configuration.
+- Use `.When(...)` branches to handle content-types differently (text vs. image, etc.).
+- Compose reusable extensions for standard stages:
+
+```csharp
+public static PipelineBuilder<Document> AddStandardProcessing(this PipelineBuilder<Document> pipeline) =>
+    pipeline
+        .ForEach(doc => doc.ProcessedAt = DateTimeOffset.UtcNow)
+        .Tokenize(doc => doc.Content)
+        .Embed(new AiEmbedOptions { Model = "all-minilm" });
+```
+
+---
+
+## Adapters & Ingestion
+
+Background adapters keep intake resilient and autonomous.
 
 ```csharp
 [FlowAdapter("oem", "device-sync", DefaultSource = "oem-hub")]
-public class DeviceAdapter : BackgroundService
+public sealed class DeviceAdapter : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
-            var devices = await FetchDevicesFromOEM();
+            var snapshot = await _oemClient.GetDevicesAsync(ct);
 
-            foreach (var device in devices)
+            foreach (var payload in snapshot)
             {
-                await device.Send("oem-hub", DateTimeOffset.UtcNow);
+                await new DynamicFlowEntity<Device>
+                {
+                    Id = $"device:{payload.Serial}",
+                    Model = payload
+                }.Send("oem-hub", ct);
             }
 
             await Task.Delay(TimeSpan.FromMinutes(5), ct);
         }
     }
-
-    private async Task<Device[]> FetchDevicesFromOEM()
-    {
-        // Fetch from external system
-        var oemDevices = await _oemClient.GetDevicesAsync();
-
-        return oemDevices.Select(d => new Device
-        {
-            SerialNumber = d.Serial,
-            Model = d.ModelName,
-            Status = d.CurrentStatus
-        }).ToArray();
-    }
 }
 ```
 
-### HTTP Adapter
+For lightweight ingestion, expose HTTP endpoints that stage payloads:
 
 ```csharp
-[Route("api/[controller]")]
-public class DeviceIngestController : ControllerBase
+[Route("api/flow/devices")]
+public sealed class DeviceIngestController : ControllerBase
 {
-    [HttpPost("devices")]
-    public async Task<IActionResult> IngestDevices([FromBody] DeviceData[] devices)
+    [HttpPost]
+    public async Task<IActionResult> Ingest(DevicePayload[] devices, CancellationToken ct)
     {
         foreach (var device in devices)
         {
-            var flowEntity = new DynamicFlowEntity<Device>
+            await new DynamicFlowEntity<Device>
             {
                 Id = $"device:{device.Id}",
-                Model = new
-                {
-                    inventory = new { serial = device.SerialNumber },
-                    model = device.ModelName,
-                    status = device.Status
-                }
-            };
-
-            await flowEntity.Save(FlowSets.Stage<Device>("intake"));
+                Model = device
+            }.Save(FlowSets.Stage<Device>("intake"), ct);
         }
 
         return Ok(new { processed = devices.Length });
@@ -177,148 +246,66 @@ public class DeviceIngestController : ControllerBase
 }
 ```
 
-## External ID Management
+---
 
-### Entity with External References
+## Controllers & APIs
 
-```csharp
-public sealed class Sensor : FlowEntity<Sensor>
-{
-    [ParentKey(typeof(Device))]
-    public string DeviceId { get; set; } = "";
-
-    public string Type { get; set; } = "";
-    public double Value { get; set; }
-}
-```
-
-### Resolving External References
-
-```csharp
-// Send sensor data with external device reference
-var sensorData = new DynamicFlowEntity<Sensor>
-{
-    Id = "sensor:temp-01",
-    Model = new
-    {
-        sensor = new { identifier = "TEMP-001" },
-        type = "Temperature",
-        value = 22.5,
-        // Reference to device using external ID
-        reference = new
-        {
-            device = new
-            {
-                external = new { oem = "DEV-001" }
-            }
-        }
-    }
-};
-
-await sensorData.Save(FlowSets.Stage<Sensor>("intake"));
-```
-
-## Flow Controllers
-
-### Model-Specific Controllers
-
-```csharp
-// Auto-generated controller for Device flow operations
-[Route("api/flow/[controller]")]
-public class DeviceController : FlowEntityController<Device>
-{
-    // Inherits standard flow operations:
-    // GET /api/flow/device - list devices
-    // GET /api/flow/device/{id} - get device
-    // GET /api/flow/device/views/canonical/{id} - canonical view
-    // GET /api/flow/device/views/lineage/{id} - lineage view
-    // POST /api/flow/device/admin/reproject/{id} - trigger reprojection
-}
-```
-
-### Custom Flow Operations
+`FlowEntityController<T>` exposes Flow-specific CRUD and projection endpoints without custom routing.
 
 ```csharp
 [Route("api/flow/[controller]")]
-public class DeviceController : FlowEntityController<Device>
+public sealed class DevicesController : FlowEntityController<Device>
 {
     [HttpPost("admin/reprocess-failed")]
-    public async Task<IActionResult> ReprocessFailed()
+    public async Task<IActionResult> ReprocessFailed(CancellationToken ct)
     {
         var failed = await StageRecord<Device>.Query()
             .Where(r => r.Stage == "failed")
-            .ToArrayAsync();
+            .ToArrayAsync(ct);
 
         foreach (var record in failed)
         {
-            await record.Requeue();
+            await record.Requeue(ct);
         }
 
         return Ok(new { requeued = failed.Length });
     }
-
-    [HttpGet("stats")]
-    public async Task<IActionResult> GetStats()
-    {
-        var stats = new
-        {
-            Intake = await StageRecord<Device>.CountAsync(r => r.Stage == "intake"),
-            Processed = await StageRecord<Device>.CountAsync(r => r.Stage == "processed"),
-            Failed = await StageRecord<Device>.CountAsync(r => r.Stage == "failed")
-        };
-
-        return Ok(stats);
-    }
 }
 ```
 
-## Flow Events and Messaging
+The base controller emits:
 
-### Flow Event Publishing
+- `GET /api/flow/device` – list canonical Flow entities.
+- `GET /api/flow/device/{id}` – fetch canonical projection.
+- `GET /api/flow/device/views/{view}/{id}` – retrieve projections (`canonical`, `lineage`, custom).
+- `POST /api/flow/device/admin/reproject/{id}` – trigger reprojection/replay.
+
+---
+
+## Events & Messaging
 
 ```csharp
-// Send flow events for processing
 await FlowEvent.For<Device>()
     .WithSource("oem-hub")
-    .WithData(deviceData)
+    .WithData(devicePayload)
     .Send();
 
-// Batch flow events
-var events = devices.Select(d => FlowEvent.For<Device>()
-    .WithSource("oem-hub")
-    .WithData(d)).ToArray();
-
-await events.Send();
-```
-
-### Flow Event Handling
-
-```csharp
-public class DeviceFlowHandler : BackgroundService
+await this.On<FlowEvent<Device>>(async flowEvent =>
 {
-    protected override async Task ExecuteAsync(CancellationToken ct)
+    if (flowEvent.Data.Status == "critical")
     {
-        await this.On<FlowEvent<Device>>(async flowEvent =>
-        {
-            // Process device flow event
-            var device = flowEvent.Data;
-
-            // Custom business logic
-            if (device.Status == "Critical")
-            {
-                await _alertService.SendAlert($"Device {device.SerialNumber} is critical");
-            }
-
-            // Continue flow processing
-            await flowEvent.Continue();
-        });
+        await _alerts.SendAsync(flowEvent.Data.SerialNumber);
     }
-}
+
+    await flowEvent.Continue();
+});
 ```
 
-## Flow Interceptors
+Flow events connect pipelines with external systems, enabling replay, alerting, and cross-pillar workflows.
 
-### Pre-Processing Interceptors
+---
+
+## Interceptors & Lifecycle
 
 ```csharp
 public static class DeviceFlowInterceptors
@@ -326,20 +313,23 @@ public static class DeviceFlowInterceptors
     public static void Configure()
     {
         FlowInterceptors.For<Device>()
-            .BeforeIntake(async device =>
+            .BeforeIntake(device =>
             {
-                // Validate device data
-                if (string.IsNullOrEmpty(device.SerialNumber))
+                if (string.IsNullOrWhiteSpace(device.SerialNumber))
                 {
                     return FlowIntakeAction.Reject("Serial number required");
                 }
 
                 return FlowIntakeAction.Continue;
             })
-            .AfterKeying(async device =>
+            .AfterProjection(async device =>
             {
-                // Enrich with additional data
-                device.Model = await _deviceCatalog.GetModelName(device.SerialNumber);
+                await new DeviceProcessed
+                {
+                    DeviceId = device.Id,
+                    SerialNumber = device.SerialNumber,
+                    ProcessedAt = DateTimeOffset.UtcNow
+                }.Send();
 
                 return FlowStageAction.Continue;
             });
@@ -347,27 +337,11 @@ public static class DeviceFlowInterceptors
 }
 ```
 
-### Post-Processing Interceptors
+Interceptors resemble lifecycle hooks: validate intake, enrich intermediate data, and initiate downstream events.
 
-```csharp
-FlowInterceptors.For<Device>()
-    .AfterProjection(async device =>
-    {
-        // Trigger downstream processes
-        await new DeviceProcessed
-        {
-            DeviceId = device.Id,
-            SerialNumber = device.SerialNumber,
-            ProcessedAt = DateTimeOffset.UtcNow
-        }.Send();
+---
 
-        return FlowStageAction.Continue;
-    });
-```
-
-## Configuration
-
-### Basic Flow Configuration
+## Configuration & Environment
 
 ```json
 {
@@ -377,20 +351,7 @@ FlowInterceptors.For<Device>()
       "Adapters": {
         "AutoStart": true,
         "Include": ["oem:device-sync"],
-        "Exclude": []
-      }
-    }
-  }
-}
-```
-
-### Adapter-Specific Configuration
-
-```json
-{
-  "Koan": {
-    "Flow": {
-      "Adapters": {
+        "Exclude": [],
         "oem:device-sync": {
           "Enabled": true,
           "PollInterval": "00:05:00",
@@ -403,179 +364,98 @@ FlowInterceptors.For<Device>()
 }
 ```
 
-## Monitoring and Diagnostics
+Use per-environment overrides for adapter throttle, stage retention, or projection refresh cadence. Surface secrets (API keys, connection strings) through `IConfiguration` rather than code.
 
-### Flow Health Checks
+---
+
+## Monitoring & Diagnostics
 
 ```csharp
-public class FlowHealthCheck : IHealthContributor
+public sealed class FlowHealthCheck : IHealthContributor
 {
-    public string Name => "Flow Pipeline";
+    public string Name => "flow-pipeline";
     public bool IsCritical => true;
 
-    public async Task<HealthReport> CheckAsync(CancellationToken ct = default)
+    public async Task<HealthReport> CheckAsync(CancellationToken ct)
     {
-        var pendingCount = await StageRecord<Device>.CountAsync(r => r.Stage == "intake");
-        var failedCount = await StageRecord<Device>.CountAsync(r => r.Stage == "failed");
+        var pending = await StageRecord<Device>.CountAsync(r => r.Stage == "intake", ct);
+        var failed = await StageRecord<Device>.CountAsync(r => r.Stage == "failed", ct);
 
-        var isHealthy = pendingCount < 1000 && failedCount < 10;
-        var message = isHealthy ? null : $"Pending: {pendingCount}, Failed: {failedCount}";
-
-        return new HealthReport(Name, isHealthy, message);
+        var isHealthy = pending < 1_000 && failed < 10;
+        return new HealthReport(Name, isHealthy, isHealthy ? null : $"pending={pending}, failed={failed}");
     }
 }
 ```
 
-### Flow Monitoring
+Pair health checks with dashboards capturing throughput, stage latency, and adapter status to catch ingestion stalls quickly.
+
+---
+
+## Error Handling & Retries
 
 ```csharp
-[Route("api/[controller]")]
-public class FlowMonitorController : ControllerBase
+public sealed class DeviceRetryPolicy : IFlowRetryPolicy<Device>
 {
-    [HttpGet("status")]
-    public async Task<IActionResult> GetFlowStatus()
+    public Task<FlowRetryAction> ShouldRetry(Device device, Exception exception, int attempt)
     {
-        var models = new[] { typeof(Device), typeof(Sensor) };
-        var status = new Dictionary<string, object>();
-
-        foreach (var model in models)
+        if (exception is HttpRequestException && attempt < 3)
         {
-            var modelName = model.Name.ToLowerInvariant();
-            status[modelName] = new
-            {
-                Intake = await GetStageCount(model, "intake"),
-                Keyed = await GetStageCount(model, "keyed"),
-                Processed = await GetStageCount(model, "processed"),
-                Failed = await GetStageCount(model, "failed")
-            };
-        }
-
-        return Ok(status);
-    }
-
-    private async Task<int> GetStageCount(Type modelType, string stage)
-    {
-        // Generic query for stage records
-        return await StageRecord.CountAsync(modelType, stage);
-    }
-}
-```
-
-## Error Handling
-
-### Retry Policies
-
-```csharp
-public class DeviceRetryPolicy : IFlowRetryPolicy<Device>
-{
-    public async Task<FlowRetryAction> ShouldRetry(Device device, Exception exception, int attemptCount)
-    {
-        if (exception is HttpRequestException && attemptCount < 3)
-        {
-            var delay = TimeSpan.FromSeconds(Math.Pow(2, attemptCount));
-            return FlowRetryAction.RetryAfter(delay);
+            return Task.FromResult(FlowRetryAction.RetryAfter(TimeSpan.FromSeconds(Math.Pow(2, attempt))));
         }
 
         if (exception is ValidationException)
         {
-            return FlowRetryAction.DeadLetter("Validation failed");
+            return Task.FromResult(FlowRetryAction.DeadLetter("validation-failed"));
         }
 
-        return FlowRetryAction.Fail;
+        return Task.FromResult(FlowRetryAction.Fail);
     }
 }
 ```
 
-### Dead Letter Handling
+Dead-letter queues preserve payloads for investigation—subscribe to `FlowDeadLetter<T>` to route alerts or manual replays.
 
-```csharp
-public class FlowDeadLetterHandler : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken ct)
-    {
-        await this.On<FlowDeadLetter<Device>>(async deadLetter =>
-        {
-            _logger.LogError("Device flow failed: {Reason} - {Data}",
-                deadLetter.Reason, deadLetter.Data);
-
-            // Send to monitoring system
-            await _monitoring.RecordFailure(deadLetter);
-        });
-    }
-}
-```
+---
 
 ## Testing
 
-### Flow Testing
-
 ```csharp
 [Test]
-public async Task Should_Process_Device_Through_Pipeline()
+public async Task DevicePipeline_ShouldPersistProjection()
 {
-    // Arrange
-    var device = new Device
+    var device = new Device { SerialNumber = "TEST-001", Status = "active" };
+
+    await new DynamicFlowEntity<Device>
     {
-        SerialNumber = "TEST-001",
-        Model = "Test Device",
-        Status = "Active"
-    };
+        Id = device.Id,
+        Model = device
+    }.Save(FlowSets.Stage<Device>("intake"));
 
-    // Act - Send through intake
-    await device.Send("test-source");
+    await Device.AllStream()
+        .Pipeline()
+        .AddStandardProcessing()
+        .ForEach(d => d.Status = "completed")
+        .Save()
+        .ExecuteAsync();
 
-    // Trigger processing
-    await _flowProcessor.ProcessPendingAsync<Device>();
-
-    // Assert - Check canonical view
     using (DataSetContext.With(FlowSets.View<Device>("canonical")))
     {
         var canonical = await CanonicalProjection<Device>
             .Query()
             .FirstOrDefaultAsync(d => d.SerialNumber == "TEST-001");
 
-        Assert.IsNotNull(canonical);
-        Assert.AreEqual("Active", canonical.Status);
+        Assert.That(canonical, Is.Not.Null);
+        Assert.That(canonical!.Status, Is.EqualTo("completed"));
     }
-}
-```
-
-## API Reference
-
-### Core Types
-
-```csharp
-public abstract class FlowEntity<T> : Entity<T> where T : class
-{
-    // Automatic flow entity capabilities
-}
-
-public class DynamicFlowEntity<T> : Entity<DynamicFlowEntity<T>>
-{
-    public string Id { get; set; } = "";
-    public object Model { get; set; } = new();
-}
-
-public class StageRecord<T>
-{
-    public string Id { get; set; } = "";
-    public string Stage { get; set; } = "";
-    public object Data { get; set; } = new();
-    public DateTimeOffset Created { get; set; }
-}
-```
-
-### Flow Sets
-
-```csharp
-public static class FlowSets
-{
-    public static string Stage<T>(string stage) => $"flow.{typeof(T).Name.ToLower()}.{stage}";
-    public static string View<T>(string view) => $"flow.{typeof(T).Name.ToLower()}.views.{view}";
 }
 ```
 
 ---
 
-**Last Validation**: 2025-01-17 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
+## Related Resources
+
+- [Data Pillar Reference](../data/index.md)
+- [AI Pillar Reference](../ai/index.md)
+- [Messaging Reference](../messaging/index.md)
+- [Semantic Pipelines Playbook](../../guides/semantic-pipelines.md)
+- [DX-0041 Consolidation ADR](../../decisions/DX-0041-docs-consolidation.md)

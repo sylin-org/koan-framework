@@ -124,8 +124,7 @@ Create a guild of "Koan champions" who review architecture proposals, run office
 
 ## 6. Next Steps
 
-- Start with the [quickstart](./quickstart.md) to ground teams in the basics.
-- Share the [complete getting started guide](./guide.md) with squads taking ownership of new services.
+- Start with the [Getting Started Hub](./overview.md) to ground teams in the basics and staged rollout plan.
 - Compare Koan to adjacent stacks using the [architecture comparison](../architecture/comparison.md).
 - Coordinate distributed deployments with the [ASPIRE integration guide](../ASPIRE-INTEGRATION.md).
 

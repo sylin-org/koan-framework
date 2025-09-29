@@ -1,365 +1,209 @@
 ﻿---
-type: REF
+type: GUIDE
 domain: core
-title: "Koan Framework Overview"
+title: "Koan Getting Started Hub"
 audience: [developers, architects, ai-agents]
-last_updated: 2025-02-14
-framework_version: v0.2.18
 status: current
+last_updated: 2025-09-28
+framework_version: v0.6.2
 validation:
-  date_last_tested: 2025-02-14
+  date_last_tested: 2025-09-28
+  status: verified
+  scope: docs/getting-started/overview.md
 nav: true
 ---
 
-# Koan Framework Overview
+# Koan Getting Started Hub
 
 ## Contract
 
-- **Inputs**: Familiarity with .NET tooling and C# basics.
-- **Outputs**: Understanding of Koan's pillars, registration model, and next steps for adoption.
-- **Error Modes**: Missing Koan packages, misconfigured environment variables, or unsupported adapters.
-- **Success Criteria**: Able to bootstrap a Koan service, identify relevant documentation, and plan incremental adoption.
+- **Inputs**: .NET 9 SDK+, a terminal or IDE, and basic familiarity with C# web projects.
+- **Outputs**: Running Koan service with REST CRUD, messaging hooks, AI integration options, and pointers for production rollout.
+- **Error Modes**: Missing Koan packages, disabled container runtime (for optional steps), or adapters lacking advertised capabilities.
+- **Success Criteria**: `dotnet run` serves `/api/todos`, events and Flow hooks execute, optional AI endpoints respond once a provider is configured, and you know the next docs to visit.
 
 ### Edge Cases
 
-- **Incomplete environment configuration** (e.g., missing database endpoint) prevents module auto-registration.
-- **Adapter capability mismatches** where providers lack optional features (streaming, advanced queries).
-- **Production hardening gaps** if health, telemetry, or security defaults are overridden without replacements.
-- **Large-team rollouts** requiring governance policies and terminology alignment across services.
-
-## 🎯 What is Koan Framework?
-
-**Build services like you're talking to your code, not fighting it.**
-
-Koan is a modular .NET backend framework that standardizes data, web, messaging, and AI patterns with strong governance and observability—so teams ship faster with fewer surprises, and platforms scale with consistency.
-
-Whether you're spinning up a quick prototype or scaling into enterprise-grade patterns, Koan keeps the path clear. Start with a three-file API. Add messaging, vector search, or AI when you're ready. Nothing more, nothing less.
-
-### Core Philosophy
-
-**Key Principles:**
-
-- **Start Simple**: Build a real service in a single file
-- **Clear Structure**: Follow .NET conventions, not opinions
-- **Honest Complexity**: Add what you need, skip what you don't
-- **Escape Hatches Everywhere**: Drop to raw SQL, write custom controllers, override behavior freely
+- **SDK drift** – mismatch between repo `global.json` and local SDK; run `dotnet --list-sdks` if builds fail.
+- **Rate-limited AI** – set provider batch sizes before running semantic search at scale.
+- **Vector support** – confirm the selected data adapter advertises semantic capabilities before calling `Entity.SemanticSearch`.
+- **Automation scope** – run Flow hooks inside long-lived hosts (`dotnet watch run` or a hosted service) to avoid prematurely cancelled work.
+- **Enterprise rollout** – coordinate security policies and environment configuration before deploying shared services.
 
 ---
 
-## 🧱 From First Line to First Endpoint
+## Stage 0 – Understand Koan in One Glance
 
-Let's start simple:
+Koan is a modular .NET framework built around pillars you compose as you grow:
 
-```bash
-dotnet add package Koan.Core
-dotnet add package Koan.Web
-dotnet add package Koan.Data.Sqlite
-```
+- **Core** provides auto-registration (`builder.Services.AddKoan()`), health endpoints, boot reports, configuration helpers, and observability.
+- **Data** delivers entity-first persistence across SQL, NoSQL, JSON, and vector stores with static helpers (`All`, `Query`, `AllStream`, `Page`).
+- **Web** supplies MVC controllers, payload transformers, OpenAPI, and GraphQL surfaces.
+- **AI** adds chat, embeddings, vector search, and RAG helpers.
+- **Flow** orchestrates intake ➜ standardize ➜ projection pipelines and the semantic pipeline DSL.
 
-Then:
-
-```csharp
-public class Todo : Entity<Todo>
-{
-    public string Title { get; set; } = "";
-    public bool IsCompleted { get; set; }
-}
-
-[Route("api/[controller]")]
-public class TodosController : EntityController<Todo> { }
-```
-
-That's a full REST API:
-
-- `GET /api/todos`
-- `POST /api/todos`
-- `PUT /api/todos/{id}`
-- `DELETE /api/todos/{id}`
-- Health checks at `/api/health`
-
-It works. Right now. No ceremony.
+Everything starts minimal and grows by intent—add packages, not boilerplate.
 
 ---
 
-## 🏗️ Architecture Overview
+## Stage 1 – Launch the Service (≈5 minutes)
 
-Koan follows a **modular, composition-based architecture** with the following design principles:
+1. **Initialize the project**
+   ```powershell
+   mkdir my-koan-app
+   cd my-koan-app
+   dotnet new web
+   dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+   ```
+2. **Model the entity**
+   ```csharp
+   public class Todo : Entity<Todo>
+   {
+       public string Title { get; set; } = "";
+       public bool IsCompleted { get; set; }
+       public string Category { get; set; } = "General";
+   }
+   ```
+3. **Expose REST automatically**
+   ```csharp
+   [Route("api/[controller]")]
+   public class TodosController : EntityController<Todo> { }
+   ```
+4. **Keep `Program.cs` minimal**
+   ```csharp
+   var builder = WebApplication.CreateBuilder(args);
+   builder.Services.AddKoan();
 
-### 1. **Pillars Architecture**
+   var app = builder.Build();
+   app.Run();
+   ```
+5. **Run and verify**
+   ```powershell
+   dotnet run
+   curl -X POST http://localhost:5000/api/todos -H "Content-Type: application/json" -d '{"title":"Experience Koan"}'
+   curl http://localhost:5000/api/todos
+   curl http://localhost:5000/api/health
+   ```
 
-Each pillar is an independent module that works standalone or composes with others:
-
-```
-┌─────────────┬─────────────┬─────────────┬─────────────┐
-│    Core     │    Data     │    Web      │  Messaging  │
-├─────────────┼─────────────┼─────────────┼─────────────┤
-│     AI      │   Storage   │   Media     │    Flow     │
-├─────────────┼─────────────┼─────────────┼─────────────┤
-│  Recipes    │Orchestration│ Scheduling  │     ...     │
-└─────────────┴─────────────┴─────────────┴─────────────┘
-```
-
-### 2. **Auto-Registration Pattern**
-
-Koan uses `IKoanAutoRegistrar` for zero-config module discovery:
-
-```csharp
-// Modules auto-register themselves
-services.AddKoan(); // Discovers and loads all referenced Koan modules
-```
-
-### 3. **Configuration Hierarchy**
-
-Deterministic configuration layering:
-
-```
-Provider defaults < Recipe defaults < AppSettings/Env < Code overrides < Forced overrides
-```
-
-### 4. **Entity-Centric Design**
-
-Models are first-class citizens with static methods:
-
-```csharp
-public class Todo : Entity<Todo>
-{
-    public static Task<Todo[]> Recent() =>
-        Query().Where(t => t.Created > DateTime.Today.AddDays(-7));
-}
-```
+You now have REST CRUD, health checks, telemetry, and SQLite storage without configuration files.
 
 ---
 
-## 🧱 Framework Pillars
+## Stage 2 – Expand the Pattern
 
-### **Core** - Foundation Layer
+### Messaging in Minutes
 
-- **Purpose**: Unified runtime, secure defaults, health checks, observability
-- **Key Features**:
-  - Auto-registration pipeline (`IKoanAutoRegistrar`)
-  - Health/readiness endpoints (`/api/health`, `/api/health/live`, `/api/health/ready`)
-  - Configuration helpers (`KoanEnv`, configuration reading patterns)
-  - OpenTelemetry integration (opt-in)
-  - Boot reports with module discovery
+- Add intent-driven events:
+  ```csharp
+  public class TodoCompleted : Entity<TodoCompleted>
+  {
+      public string TodoId { get; set; } = "";
+      public string Title { get; set; } = "";
+      public DateTime CompletedAt { get; set; } = DateTime.UtcNow;
+  }
+  ```
+- Emit events when state transitions:
+  ```csharp
+  public override async Task<ActionResult<Todo>> Put(string id, Todo todo)
+  {
+      var result = await base.Put(id, todo);
+      if (todo.IsCompleted)
+      {
+          await new TodoCompleted { TodoId = todo.Id, Title = todo.Title }.Send();
+      }
+      return result;
+  }
+  ```
+- Reference a messaging transport when ready:
+  ```powershell
+  dotnet add package Koan.Messaging.InMemory
+  ```
 
-### **Data** - Persistence Abstraction
+### AI When You Need It
 
-- **Purpose**: Unified access to SQL, NoSQL, JSON, and vector databases
-- **Key Features**:
-  - Adapter-agnostic persistence with pushdown-first performance
-  - Production-ready adapters: Postgres, SQL Server, SQLite, MongoDB, Redis, JSON file
-  - Vector module (`Koan.Data.Vector`) with multi-provider support
-  - CQRS patterns with outbox support
-  - Direct SQL escape hatch for complex queries
+- Install providers (Ollama local, or hosted equivalents):
+  ```powershell
+  dotnet add package Koan.AI.Ollama
+  ```
+- Inject `IAiService` for chat + semantic search:
+  ```csharp
+  public class TodosController : EntityController<Todo>
+  {
+      private readonly IAiService _ai;
+      public TodosController(IAiService ai) => _ai = ai;
 
-### **Web** - HTTP Layer
+      [HttpPost("{id}/suggestions")]
+      public async Task<ActionResult<string>> GetSuggestions(string id)
+      {
+          var todo = await Todo.Get(id);
+          if (todo is null) return NotFound();
+          var suggestion = await _ai.Chat($"What should I do after completing: {todo.Title}?
+          return Ok(suggestion);
+      }
 
-- **Purpose**: REST and GraphQL from your models, clean routing
-- **Key Features**:
-  - Controllers-only HTTP (no inline endpoints)
-  - Generic `EntityController<T>` for automatic REST APIs
-  - Payload transformers for request/response shaping
-  - Web capabilities: Moderation, SoftDelete, Audit
-  - OpenAPI/Swagger generation (development)
-
-### **Flow** - Data Pipeline
-
-- **Purpose**: Model-typed pipeline for data ingestion, standardization, and projection
-- **Key Features**:
-  - Pipeline stages: Intake → Standardize → Key → Associate → Project
-  - Aggregation tags and identity mapping
-  - Canonical and lineage views
-  - Parked records and rejection reports
-  - External ID correlation system
-
-### **Storage** - File/Blob Handling
-
-- **Purpose**: Profile-based storage orchestration with thin providers
-- **Key Features**:
-  - Local filesystem provider (production-ready)
-  - Profile-based routing (hot/cold storage)
-  - Model-centric API with `StorageEntity<T>`
-  - Server-side operations (copy, move, presign when supported)
-  - Safe key handling and atomic writes
-
-### **Media** - First-Class Media
-
-- **Purpose**: Media objects, HTTP endpoints, transforms
-- **Key Features**:
-  - HTTP bytes/HEAD endpoints with range/conditional support
-  - Variants and derivatives system
-  - Transform pipeline (resize, rotate, type-convert)
-  - Storage integration with profiles
-  - Cache-control and CDN-friendly headers
-
-### **Messaging** - Reliable Queues
-
-- **Purpose**: Capability-aware semantics with multiple transports
-- **Key Features**:
-  - RabbitMQ, Redis, and in-memory transports
-  - Inbox services for deduplication
-  - Retry/DLQ patterns
-  - Type-safe message handlers
-
-### **AI** - AI Integration
-
-- **Purpose**: Chat, embeddings, vector search, RAG building blocks
-- **Key Features**:
-  - Local LLMs via Ollama provider
-  - Vector database adapters (Redis, Weaviate)
-  - Budget controls and observability
-  - RAG patterns with citations
-
-### **Recipes** - Best Practices
-
-- **Purpose**: Intention-driven bootstrap bundles
-- **Key Features**:
-  - Health checks, telemetry, reliability, workers
-  - Capability gating and dry-run mode
-  - Deterministic options layering
-
-### **Orchestration** - DevOps Tooling
-
-- **Purpose**: DevHost CLI for local dependencies and deployment
-- **Key Features**:
-  - Docker/Podman adapter support
-  - Compose v2 export with profile-aware behavior
-  - Readiness semantics and endpoint hints
-  - Single-binary distribution (`Koan.exe`)
+    [HttpGet("semantic-search")]
+    public async Task<ActionResult<IEnumerable<Todo>>> SemanticSearch([FromQuery] string query)
+      => Ok(await Todo.SemanticSearch(query));
+  }
+  ```
+- Skip the AI step when providers are unavailable; everything else still works.
 
 ---
 
-## 🌱 A Framework That Grows With You
+## Stage 3 – Automate with Flow
 
-Koan isn't trying to impress you with magic. It earns trust by staying out of your way—until you need more.
+- Enrich workflows with Flow hooks:
+  ```csharp
+  Flow.OnUpdate<Todo>(async (todo, previous) =>
+  {
+      if (todo.IsCompleted && !previous.IsCompleted)
+      {
+          await new TodoCompleted { TodoId = todo.Id, Title = todo.Title }.Send();
+      }
+      return UpdateResult.Continue();
+  });
+  ```
+- Promote long-running work into semantic pipelines:
+  ```csharp
+  await Todo.AllStream()
+      .Pipeline()
+      .ForEach(todo => todo.Status = "processing")
+      .Save()
+      .ExecuteAsync();
+  ```
+- Swap providers by intent:
+  ```powershell
+  dotnet add package Koan.Data.Postgres Koan.Data.Vector
+  ```
 
-- Add AI? One line.
-- Need vector search? Drop in a package.
-- Ready for messaging? Plug it in.
-- CQRS? Recipes exist.
-
-You never pay for complexity you didn't ask for.
-
-```bash
-dotnet add package Koan.AI                    # Local LLMs with Ollama
-dotnet add package Koan.Data.Weaviate         # Semantic search
-dotnet add package Koan.Messaging.RabbitMq    # Production messaging
-dotnet add package Koan.Web.GraphQl           # REST + GraphQL side-by-side
-```
-
-Everything integrates naturally. No glue scripts. No boilerplate.
-
----
-
-## 🛡️ Security & Production Readiness
-
-### Built-in Security
-
-- **Secure headers by default**
-- **HTTPS redirection** (production)
-- **Content Security Policy** (opt-in)
-- **Enterprise Authentication**: OAuth 2.1, OIDC, SAML 2.0 support
-- **Multi-Provider Auth**: Google, Microsoft, Discord, generic OIDC, SAML, TestProvider (dev)
-- **Account Linking**: Users can link multiple identity providers
-- **Security Features**: PKCE, state/nonce validation, rate limiting, secret management
-
-### Observability
-
-- **Health checks** with detailed status
-- **OpenTelemetry integration** (opt-in via observability configuration)
-- **Structured logging** with event IDs
-- **Boot reports** (redacted in production)
-
-### Production Patterns
-
-- **Configuration validation** at startup
-- **Graceful degradation** with fallbacks
-- **Circuit breaker patterns**
-- **Rate limiting** capabilities
-- **DDL governance** (NoDdl policy for production)
+Flow pipelines unify intake, AI enrichment, and messaging without bespoke orchestration.
 
 ---
 
-## 🔄 Framework Evolution
+## Stage 4 – Harden for Production
 
-### Current State (v0.2.18+)
-
-- ✅ **Stable**: Core, Data, Web, Storage, Messaging
-- ✅ **Production Ready**: All adapters, health system, orchestration
-- ✅ **AI Integration**: Ollama provider, vector search, RAG patterns
-- 🔄 **Active Development**: Flow pipeline enhancement, MCP HTTP+SSE transport, IDE integrations
-
-### Near-term Roadmap
-
-- **AI North Star**: One-call AI setup with auto-discovery
-- **Flow Enhancement**: Lifecycle interceptors, bidirectional orchestration
-- **MCP Integration**: Model Context Protocol support for AI agents
-- **Cloud Storage**: S3/Azure Blob/GCS adapters
-
-### Future Vision
-
-- **Protocol Interop**: gRPC, MCP, AI-RPC adapters
-- **Knowledge Systems**: SPARQL/RDF export, enhanced vector operations
-- **Data Bridge**: CDC, virtualization, materialization
+- **Security**: Enable HTTPS, configure auth providers, and review policies in `docs/guides/authentication-setup.md`.
+- **Observability**: Wire OpenTelemetry or capture boot reports; see [Flow monitoring](../reference/flow/index.md#monitoring--diagnostics).
+- **Configuration**: Layer settings via `Configuration.Read` helpers and environment variables.
+- **Health & Resilience**: Add custom `IHealthContributor` checks, implement retry policies, and monitor Flow stage depth.
+- **Deployment**: Use `koan export compose --profile Local` or Aspire integration for service meshes.
 
 ---
 
-## 💡 Why Choose Koan?
+## Stage 5 – Scale Adoption
 
-### For Developers
-
-- **Minimal Friction**: Real service in a single file
-- **Clear Path**: From prototype to production without architectural rewrites
-- **No Lock-in**: Escape hatches everywhere, standard .NET patterns
-- **Rich Ecosystem**: Adapters for all major databases and services
-
-### For Architects
-
-- **Modular Design**: Add only what you need
-- **Governance**: Built-in policies for security, performance, and compliance
-- **Observability**: Comprehensive telemetry and health monitoring
-- **Future-Proof**: Protocol adapters and standard interfaces
-
-### For Teams
-
-- **Consistency**: Unified patterns across all services
-- **Productivity**: Less boilerplate, more business logic
-- **Reliability**: Battle-tested patterns with guardrails
-- **Documentation**: Comprehensive guides and examples
+- Read [Enterprise Adoption Guide](./enterprise-adoption.md) for policy, governance, and rollout strategies.
+- Compare Koan with adjacent stacks in the [architecture comparison](../architecture/comparison.md).
+- Explore samples under `samples/` for end-to-end implementations (API, messaging, AI, Flow, automation).
+- Review ADRs like [DX-0041](../decisions/DX-0041-docs-pillar-consolidation.md) to understand documentation governance.
 
 ---
 
-## 🧪 Real Use, Not Just Hello World
+## Reference Map
 
-Koan is already being used to build:
+- Pillars: [Core](../reference/core/index.md), [Data](../reference/data/index.md), [Web](../reference/web/index.md), [AI](../reference/ai/index.md), [Flow](../reference/flow/index.md), [Messaging](../reference/messaging/index.md).
+- Recipes & automation: [Flow Pillar Reference](../reference/flow/index.md#semantic-pipelines), [Semantic Pipelines Playbook](../guides/semantic-pipelines.md).
+- Troubleshooting: [Support Troubleshooting Hub](../support/troubleshooting.md).
+- Tooling: [ASPIRE Integration](../ASPIRE-INTEGRATION.md), Koan CLI (`scripts/` & `packaging/Koan-cli`).
 
-- Microservices with event sourcing and inbox/outbox patterns
-- Developer tools with built-in AI assistance
-- Internal apps with rapid UI prototyping and API documentation
-
-It's ready for you too.
-
-```csharp
-var todo = await new Todo { Title = "Learn Koan" }.Save();
-var todos = await Todo.Where(t => !t.IsCompleted);
-```
-
----
-
-## 📚 Next Steps
-
-- Review the [architecture comparison](../architecture/comparison.md) to see how Koan aligns with adjacent stacks.
-- Explore the consolidated docs [index](../index.md) for migration status and entry points.
-- Check out the [ASPIRE integration guide](../ASPIRE-INTEGRATION.md) for distributed setups.
-- Browse the `samples/` directory to inspect end-to-end implementations.
-- Dive deeper with the [complete getting started guide](./guide.md) for automation and AI patterns.
-- Run through the [five-minute quickstart](./quickstart.md) to build the sample service end-to-end.
-
----
-
-**The Koan Framework: Build services like you're talking to your code, not fighting it.**
-
----
-
-**Last Validation**: 2025-02-14 by Framework Specialist
-**Framework Version Tested**: v0.2.18+
+Keep iterating—Koan grows with your intent, not against it.

@@ -1,3 +1,4 @@
+---
 type: REF
 domain: ai
 title: "AI Pillar Reference"
@@ -13,17 +14,44 @@ validation:
 
 # AI Pillar Reference
 
-**Document Type**: REF
-**Target Audience**: Developers, Architects, AI Agents
-**Last Updated**: 2025-09-28
-**Framework Version**: v0.6.2
+## Contract
+
+- **Inputs**: Koan application configured with `services.AddKoan()`, at least one AI provider package (local Ollama, OpenAI, Azure OpenAI, etc.), and entities that may store embeddings or AI-generated data.
+- **Outputs**: Reliable chat, embedding, and orchestration workflows that integrate with Data, Flow, and Messaging pillars.
+- **Error Modes**: Provider limits (tokens, rate limiting), misaligned embedding dimensions, unsupported streaming in chosen provider, or missing capability flags when routing across multiple services.
+- **Success Criteria**: Chat endpoints respond deterministically, embeddings persist with vector providers, RAG flows reuse Flow/Data surfaces, and observability captures token usage & latency.
+
+### Edge Cases
+
+- **Provider selection** – implement fallbacks when the default model is unavailable or rate-limited.
+- **Token budgets** – guard `MaxTokens` and conversation history to avoid truncation or 413 responses.
+- **Streaming** – check provider support before exposing SSE endpoints.
+- **Embedding migrations** – when swapping models, regenerate embeddings to avoid cosine drift.
+- **Security** – avoid storing sensitive prompts unencrypted; prefer secrets providers for API keys.
 
 ---
 
-## Installation
+## Pillar Overview
+
+Koan.AI unifies chat completion, embeddings, and vector-aware workflows:
+
+- `IAi` facade for chat, streaming, embeddings, and tokenization
+- Provider registry with capability discovery
+- Integration with Data (`[VectorField]`), Flow pipelines, and Messaging events
+- Configuration-first model selection (`DefaultProvider`, per-context overrides)
+
+The AI pillar stays stateless; combine with Flow/Background services for long-running orchestration.
+
+---
+
+## Installation & Configuration
 
 ```bash
 dotnet add package Koan.AI
+
+// Optional providers
+dotnet add package Koan.Ai.Provider.Ollama
+dotnet add package Koan.Ai.Provider.OpenAi
 ```
 
 ```csharp
@@ -31,9 +59,35 @@ dotnet add package Koan.AI
 builder.Services.AddKoan();
 ```
 
-## Chat Completion
+Example configuration:
 
-### Basic Chat
+```json
+{
+  "Koan": {
+    "AI": {
+      "DefaultProvider": "Ollama",
+      "Ollama": {
+        "BaseUrl": "http://localhost:11434",
+        "DefaultModel": "llama2"
+      }
+    }
+  }
+}
+```
+
+Environment overrides:
+
+```bash
+export Koan__AI__DefaultProvider=OpenAI
+export Koan__AI__OpenAI__ApiKey="***"
+export Koan__AI__OpenAI__DefaultModel="gpt-4o"
+```
+
+---
+
+## Chat Completion Patterns
+
+### Minimal Chat Endpoint
 
 ```csharp
 [Route("api/[controller]")]
@@ -56,22 +110,22 @@ public class ChatController : ControllerBase
 }
 ```
 
-### Streaming Chat
+### Streaming Responses
 
 ```csharp
 [HttpPost("stream")]
-public async Task StreamChat([FromBody] string message)
+public async Task StreamChat([FromBody] string message, CancellationToken ct)
 {
-    Response.Headers.Add("Content-Type", "text/event-stream");
+    Response.Headers.Append("Content-Type", "text/event-stream");
 
     await foreach (var chunk in _ai.ChatStreamAsync(new AiChatRequest
     {
         Messages = [new() { Role = AiMessageRole.User, Content = message }],
         Stream = true
-    }))
+    }, ct))
     {
-        await Response.WriteAsync($"data: {chunk.Content}\n\n");
-        await Response.Body.FlushAsync();
+        await Response.WriteAsync($"data: {chunk.Content}\n\n", ct);
+        await Response.Body.FlushAsync(ct);
     }
 }
 ```
@@ -79,20 +133,13 @@ public async Task StreamChat([FromBody] string message)
 ### Multi-Turn Conversations
 
 ```csharp
-[HttpPost("conversation")]
-public async Task<IActionResult> Conversation([FromBody] ConversationRequest request)
-{
-    var messages = request.History.Select(h => new AiMessage
-    {
-        Role = h.Role,
-        Content = h.Content
-    }).ToList();
+public record ConversationTurn(AiMessageRole Role, string Content);
 
-    messages.Add(new AiMessage
-    {
-        Role = AiMessageRole.User,
-        Content = request.Message
-    });
+[HttpPost("conversation")]
+public async Task<IActionResult> Conversation([FromBody] ConversationTurn[] history, [FromQuery] string input)
+{
+    var messages = history.Select(turn => new AiMessage { Role = turn.Role, Content = turn.Content }).ToList();
+    messages.Add(new AiMessage { Role = AiMessageRole.User, Content = input });
 
     var response = await _ai.ChatAsync(new AiChatRequest
     {
@@ -104,9 +151,13 @@ public async Task<IActionResult> Conversation([FromBody] ConversationRequest req
 }
 ```
 
-## Vector Search
+Guard memory growth by trimming history when token usage exceeds provider limits.
 
-### Entity with Vector Field
+---
+
+## Embeddings & Vector Search
+
+Annotate entity properties and generate embeddings on write.
 
 ```csharp
 public class Document : Entity<Document>
@@ -117,31 +168,26 @@ public class Document : Entity<Document>
     [VectorField]
     public float[] ContentEmbedding { get; set; } = [];
 
-    // Semantic search
-    public static Task<Document[]> SimilarTo(string query) =>
-        Vector<Document>.SearchAsync(query);
+    public static Task<Document[]> SimilarTo(string query, string? category = null) =>
+        Vector<Document>.SearchAsync(query, filter: category is null ? null : d => d.Category == category, limit: 20);
 }
-```
 
-### Manual Embedding Generation
-
-```csharp
-public class DocumentService
+public class DocumentIngestor
 {
     private readonly IAi _ai;
 
-    public async Task<Document> CreateDocument(string title, string content)
+    public DocumentIngestor(IAi ai) => _ai = ai;
+
+    public async Task<Document> CreateAsync(string title, string content)
     {
-        var embedding = await _ai.EmbedAsync(new AiEmbeddingRequest
-        {
-            Input = content
-        });
+        var embedding = await _ai.EmbedAsync(new AiEmbeddingRequest { Input = content });
+        var vector = embedding.Embeddings.FirstOrDefault()?.Vector ?? [];
 
         var document = new Document
         {
             Title = title,
             Content = content,
-            ContentEmbedding = embedding.Embeddings.FirstOrDefault()?.Vector ?? []
+            ContentEmbedding = vector
         };
 
         await document.Save();
@@ -150,21 +196,11 @@ public class DocumentService
 }
 ```
 
-### Vector Search with Filtering
+Vector providers advertise dimensionality via capabilities—validate before persisting historical records.
 
-```csharp
-public static Task<Product[]> SearchProducts(string query, string category)
-{
-    // Combine vector search with traditional filtering
-    return Vector<Product>.SearchAsync(query,
-        filter: p => p.Category == category,
-        limit: 20);
-}
-```
+---
 
-## RAG (Retrieval-Augmented Generation)
-
-### Basic RAG Pattern
+## Retrieval-Augmented Generation (RAG)
 
 ```csharp
 [Route("api/[controller]")]
@@ -172,19 +208,20 @@ public class KnowledgeController : ControllerBase
 {
     private readonly IAi _ai;
 
+    public KnowledgeController(IAi ai) => _ai = ai;
+
     [HttpPost("ask")]
     public async Task<IActionResult> Ask([FromBody] string question)
     {
-        // Find relevant documents
-        var docs = await Document.SimilarTo(question);
+        var docs = await Document.SimilarTo(question, limit: 5);
         var context = string.Join("\n\n", docs.Select(d => d.Content));
 
-        // Generate answer with context
         var response = await _ai.ChatAsync(new AiChatRequest
         {
-            Messages = [
-                new() { Role = AiMessageRole.System, Content = $"Answer based on this context: {context}" },
-                new() { Role = AiMessageRole.User, Content = question }
+            Messages =
+            [
+                new() { Role = AiMessageRole.System, Content = "Answer strictly from the provided context." },
+                new() { Role = AiMessageRole.User, Content = $"Context:\n{context}\n\nQuestion: {question}" }
             ]
         });
 
@@ -197,7 +234,102 @@ public class KnowledgeController : ControllerBase
 }
 ```
 
-### RAG with Citation Tracking
+For production flows, move retrieval and prompt assembly into Flow pipelines or background jobs.
+
+---
+
+## Background Processing & Messaging
+
+```csharp
+public class DocumentProcessor : BackgroundService
+{
+    private readonly IAi _ai;
+
+    public DocumentProcessor(IAi ai) => _ai = ai;
+
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        await this.On<DocumentUploaded>(async evt =>
+        {
+            var document = await Document.ById(evt.DocumentId);
+            if (document is null) return;
+
+            var embedding = await _ai.EmbedAsync(new AiEmbeddingRequest { Input = document.Content });
+            document.ContentEmbedding = embedding.Embeddings.FirstOrDefault()?.Vector ?? [];
+            await document.Save();
+
+            await new DocumentIndexed { DocumentId = document.Id }.Send();
+        }, ct);
+    }
+}
+```
+
+Combine with Flow pipelines for large datasets and retry semantics.
+
+---
+
+## Multi-Model & Routing Strategies
+
+Use policy-based routing when multiple providers are available.
+
+```csharp
+public class SmartAi : IAi
+{
+    private readonly IAi _ai;
+
+    public SmartAi(IAi ai) => _ai = ai;
+
+    public Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
+    {
+        var provider = request.Metadata.TryGetValue("provider", out var value)
+            ? value?.ToString()
+            : ChooseProvider(request);
+
+        request.Provider = provider;
+        return _ai.ChatAsync(request, ct);
+    }
+
+    // Other IAi members proxy similarly...
+}
+```
+
+Track latency, token cost, and success rate per provider to inform routing decisions.
+
+---
+
+## Tokenization & Cost Control
+
+- Use `IAi.TokenizeAsync` to estimate prompt size before sending expensive requests.
+- Truncate history or chunk documents based on token counts.
+- Record token usage from `AiChatResponse.Usage` for observability dashboards.
+
+---
+
+## Error Handling & Observability
+
+- Wrap AI calls in retry policies mindful of provider rate limits.
+- Emit structured logs containing provider, model, latency, and token usage.
+- Surface user-friendly error messages; keep raw provider responses for diagnostics only.
+
+```csharp
+try
+{
+    var result = await _ai.ChatAsync(request, ct);
+    return Ok(result);
+}
+catch (AiProviderException ex) when (ex.IsRateLimited)
+{
+    return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "rate_limited" });
+}
+```
+
+---
+
+## Related Reading
+
+- [Flow Pillar Reference](../flow/index.md) – semantic pipelines, enrichment, batching
+- [Data Pillar Reference](../data/index.md) – storing embeddings & entity patterns
+- [AI Provider ADRs](../../decisions/AI-0001-ai-baseline.md) for policy and governance context
 
 ```csharp
 public class AdvancedRAGService

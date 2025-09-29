@@ -542,8 +542,8 @@ Resolution:
 ## 📚 Related Documentation
 
 - [Auto-Provisioning System](auto-provisioning-system.md) - Schema provisioning integration
-- [Adapter Connection Issues](../troubleshooting/adapter-connection-issues.md) - Troubleshooting bootstrap failures
-- [Bootstrap Failures](../troubleshooting/bootstrap-failures.md) - Specific bootstrap troubleshooting
+- [Adapter & Data Connectivity](../../support/troubleshooting.md#adapter--data-connectivity) - Troubleshooting bootstrap-adjacent failures
+- [Boot & Auto-Registration](../../support/troubleshooting.md#boot--auto-registration) - Startup sequencing runbook
 - [Framework Principles](../../architecture/principles.md) - Understanding framework design philosophy
 
 ---
