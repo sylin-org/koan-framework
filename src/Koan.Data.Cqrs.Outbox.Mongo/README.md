@@ -1,5 +1,7 @@
 # Koan.Data.Cqrs.Outbox.Mongo
 
+> ✅ Validated against leasing, index creation, and connection resolution on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for deep-dive coverage.
+
 MongoDB-backed IOutboxStore for Koan's implicit CQRS pipeline.
 
 - Durable outbox storage using MongoDB
