@@ -19,14 +19,14 @@ validation:
 
 ## Core components
 
-| Concern | Types | Notes |
-| --- | --- | --- |
-| Provider contract | `DockerProvider : IHostingProvider` | Implements provider id, priority (100), and orchestration verbs. Priority keeps Docker first on Windows installs. |
-| Process runner | `Run`, `Stream` helpers | Thin wrappers over `System.Diagnostics.Process` to invoke `docker` CLI with redirected IO, shared across verbs. |
-| Readiness polling | `Up` + `ComposeStatusForFile` | After `docker compose up`, polls `docker compose ps --format json` until every service is running and healthy (when health information is exposed) or the timeout elapses. |
-| Status rendering | `ParseComposePsJson` | Accepts both JSON arrays and NDJSON output, normalizes empty health to `null`, and returns `(service, state, health)` tuples. |
-| Port extraction | `ParseComposePsPorts`, `ExtractPortsFromJsonArray`, `ParsePortsString` | Convert compose `Ports` strings into strongly-typed `PortBinding` instances (service, host, container, protocol, address). |
-| Engine metadata | `EngineInfo` helpers | Lazily fetch `docker version` (server) and `docker context show`, suppressing exceptions to keep telemetry non-blocking. |
+| Concern           | Types                                                                  | Notes                                                                                                                                                                      |
+| ----------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider contract | `DockerProvider : IHostingProvider`                                    | Implements provider id, priority (100), and orchestration verbs. Priority keeps Docker first on Windows installs.                                                          |
+| Process runner    | `Run`, `Stream` helpers                                                | Thin wrappers over `System.Diagnostics.Process` to invoke `docker` CLI with redirected IO, shared across verbs.                                                            |
+| Readiness polling | `Up` + `ComposeStatusForFile`                                          | After `docker compose up`, polls `docker compose ps --format json` until every service is running and healthy (when health information is exposed) or the timeout elapses. |
+| Status rendering  | `ParseComposePsJson`                                                   | Accepts both JSON arrays and NDJSON output, normalizes empty health to `null`, and returns `(service, state, health)` tuples.                                              |
+| Port extraction   | `ParseComposePsPorts`, `ExtractPortsFromJsonArray`, `ParsePortsString` | Convert compose `Ports` strings into strongly-typed `PortBinding` instances (service, host, container, protocol, address).                                                 |
+| Engine metadata   | `EngineInfo` helpers                                                   | Lazily fetch `docker version` (server) and `docker context show`, suppressing exceptions to keep telemetry non-blocking.                                                   |
 
 ## Provider workflow
 

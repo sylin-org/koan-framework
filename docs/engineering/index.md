@@ -15,6 +15,7 @@ validation:
 # Koan Engineering Front Door
 
 ## Contract
+
 - **Scope**: Day-to-day guardrails for contributors working inside the Koan repository.
 - **Inputs**: Existing modules, ADRs, scripts (`apply-version.ps1`, `scripts/validate-packages.ps1`), and framework conventions.
 - **Outputs**: Code and docs that comply with controller-first web APIs, entity-first data patterns, packaging standards, and documentation posture.
@@ -22,6 +23,7 @@ validation:
 - **Success criteria**: Features land with controllers, entity statics, centralized constants/options, validated packaging metadata, and updated companion docs.
 
 ## Quick Links
+
 - [Packaging policy](packaging.md)
 - [Architecture principles](../architecture/principles.md)
 - [Documentation posture (ARCH-0041)](../decisions/ARCH-0041-docs-posture-instructions-over-tutorials.md)
@@ -45,6 +47,7 @@ validation:
    Every shipping module maintains `README.md` (quick orientation) and `TECHNICAL.md` (in-depth contract) as mandated by [ARCH-0042](../decisions/ARCH-0042-per-project-companion-docs.md).
 
 ## Packaging Checklist
+
 - Update `version.json`; run `apply-version.ps1` instead of editing `<Version>` nodes.
 - Ensure `<Description>`, `<PackageTags>`, and `<GenerateDocumentationFile>true</GenerateDocumentationFile>` are set.
 - Write or update per-project `README.md` with controller/entity examples.
@@ -54,17 +57,20 @@ validation:
 See the [NuGet packaging policy](packaging.md) for detailed expectations and follow-ups.
 
 ## Documentation Guardrails
+
 - Author instruction-first content; avoid tutorials and quickstarts (per ARCH-0041).
 - Register new ADRs in `docs/decisions/toc.yml` and cross-link from relevant guides.
 - When adding new modules, update the Reference section and ensure samples align with guardrails.
 
 ## Change Workflow
+
 1. **Trace existing surfaces**: Search the repo/samples before introducing new helpers.
 2. **Document decisions**: Add ADRs for structural changes; update `docs/engineering/**` and module-level companion docs.
 3. **Validate**: Run unit or integration tests applicable to touched components plus the docs build (`scripts/build-docs.ps1 -Strict`).
 4. **Package lint**: Execute `scripts/validate-packages.ps1` to confirm metadata compliance before PRs.
 
 ## Edge Cases & Escalation
+
 - **Large data operations**: Prefer `Entity.AllStream(...)` or explicit paging; flag data guides when new patterns arise.
 - **Provider capabilities**: Guard fallbacks when `Data<TEntity, TKey>.QueryCaps` lacks LINQ pushdown.
 - **Environment detection**: Use `KoanEnv` for environment checks; avoid raw `IHostEnvironment` or env vars.

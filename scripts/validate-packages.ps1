@@ -24,7 +24,8 @@ $failures = @()
 foreach ($proj in $projects) {
     try {
         [xml]$xml = Get-Content -Path $proj.FullName
-    } catch {
+    }
+    catch {
         $failures += "Failed to parse XML for $($proj.FullName): $_"
         continue
     }

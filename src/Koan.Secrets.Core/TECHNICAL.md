@@ -19,16 +19,16 @@ validation:
 
 ## Key components
 
-| Component | Responsibility |
-| --- | --- |
-| `ServiceCollectionExtensions.AddKoanSecrets` | Registers `SecretsOptions`, memory cache, default providers (`EnvSecretProvider`, `ConfigurationSecretProvider`), and the `ChainSecretResolver`; returns `ISecretsBuilder` so callers can append providers. |
-| `SecretsBuilder` / `ISecretsBuilder` | Lightweight builder that adds additional `ISecretProvider` implementations to the chain. |
-| `SecretsOptions` | Holds runtime defaults, currently `DefaultTtl`, used when providers omit TTL metadata. |
-| `ChainSecretResolver` | Core resolver that checks the cache, walks the provider chain, caches results per TTL, and expands placeholders within strings. |
-| `SecretResolvingConfigurationSource` | Wraps an existing `IConfiguration` provider, resolving `${secret://}` templates and whole-value URIs; supports upgrading from bootstrap to DI resolver. |
-| `SecretResolvingConfigurationExtensions` | Adds bootstrap configuration providers and exposes `UpgradeSecretsConfiguration(IServiceProvider)` to swap in the DI resolver after the host builds. |
-| `EnvSecretProvider` / `ConfigurationSecretProvider` | Built-in providers that serve secrets from environment variables or the `Secrets:<scope>:<name>` configuration tree. |
-| `Initialization.KoanAutoRegistrar` | Auto-registers the runtime when the package is referenced and records resolver topology in the Koan boot report. |
+| Component                                           | Responsibility                                                                                                                                                                                              |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ServiceCollectionExtensions.AddKoanSecrets`        | Registers `SecretsOptions`, memory cache, default providers (`EnvSecretProvider`, `ConfigurationSecretProvider`), and the `ChainSecretResolver`; returns `ISecretsBuilder` so callers can append providers. |
+| `SecretsBuilder` / `ISecretsBuilder`                | Lightweight builder that adds additional `ISecretProvider` implementations to the chain.                                                                                                                    |
+| `SecretsOptions`                                    | Holds runtime defaults, currently `DefaultTtl`, used when providers omit TTL metadata.                                                                                                                      |
+| `ChainSecretResolver`                               | Core resolver that checks the cache, walks the provider chain, caches results per TTL, and expands placeholders within strings.                                                                             |
+| `SecretResolvingConfigurationSource`                | Wraps an existing `IConfiguration` provider, resolving `${secret://}` templates and whole-value URIs; supports upgrading from bootstrap to DI resolver.                                                     |
+| `SecretResolvingConfigurationExtensions`            | Adds bootstrap configuration providers and exposes `UpgradeSecretsConfiguration(IServiceProvider)` to swap in the DI resolver after the host builds.                                                        |
+| `EnvSecretProvider` / `ConfigurationSecretProvider` | Built-in providers that serve secrets from environment variables or the `Secrets:<scope>:<name>` configuration tree.                                                                                        |
+| `Initialization.KoanAutoRegistrar`                  | Auto-registers the runtime when the package is referenced and records resolver topology in the Koan boot report.                                                                                            |
 
 ## Runtime flow
 

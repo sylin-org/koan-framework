@@ -18,14 +18,14 @@ validation:
 
 ## Key components
 
-| Component | Responsibility |
-| --- | --- |
-| `Koan.Canon.Web.Initialization.KoanAutoRegistrar` | Registers MVC controllers, wires Canon entity/value-object controllers dynamically, and optionally calls `services.AddKoanCanon()`. Populates boot report with advertised routes. |
-| `Controllers.AdminController` | Provides `/admin/replay` and `/admin/reproject` endpoints over `ICanonRuntime` (async, returns `202 Accepted`). |
-| `Controllers.IntakeController` | Accepts ingestion records on `/intake/records`, persists them via `Record.Save(Constants.Sets.Intake, ct)` with generated ULIDs. |
-| `Controllers.ViewsController` | Serves canonical, lineage, and arbitrary projection views. Aggregates results across discovered Canon models using `Data<TEntity,TKey>` statics and returns paged envelopes. |
-| `Controllers.CanonEntityController<TModel>` / `GenericControllers` | Generic CRUD controllers routed under `/api/canon/{model}` (default prefix) and `/api/vo/{type}` for Canon value objects. |
-| `Controllers.PolicyController`, `ModelsController`, `LineageController` | Supplementary REST surfaces for policy listings, model discovery, and lineage graph inspection. |
+| Component                                                               | Responsibility                                                                                                                                                                    |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Koan.Canon.Web.Initialization.KoanAutoRegistrar`                       | Registers MVC controllers, wires Canon entity/value-object controllers dynamically, and optionally calls `services.AddKoanCanon()`. Populates boot report with advertised routes. |
+| `Controllers.AdminController`                                           | Provides `/admin/replay` and `/admin/reproject` endpoints over `ICanonRuntime` (async, returns `202 Accepted`).                                                                   |
+| `Controllers.IntakeController`                                          | Accepts ingestion records on `/intake/records`, persists them via `Record.Save(Constants.Sets.Intake, ct)` with generated ULIDs.                                                  |
+| `Controllers.ViewsController`                                           | Serves canonical, lineage, and arbitrary projection views. Aggregates results across discovered Canon models using `Data<TEntity,TKey>` statics and returns paged envelopes.      |
+| `Controllers.CanonEntityController<TModel>` / `GenericControllers`      | Generic CRUD controllers routed under `/api/canon/{model}` (default prefix) and `/api/vo/{type}` for Canon value objects.                                                         |
+| `Controllers.PolicyController`, `ModelsController`, `LineageController` | Supplementary REST surfaces for policy listings, model discovery, and lineage graph inspection.                                                                                   |
 
 ## Route map
 

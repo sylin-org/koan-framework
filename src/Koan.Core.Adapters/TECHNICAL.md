@@ -18,13 +18,13 @@ validation:
 
 ## Core abstractions
 
-| Component | Responsibility |
-| --- | --- |
-| `IKoanAdapter` | Contract for adapter identification, service type, bootstrap metadata, initialization, capability checks, and health status. |
-| `BaseKoanAdapter` | Partial implementation that injects `ILogger`/`IConfiguration`, provides option & connection helpers, wraps health checks, and routes capability probes to `AdapterCapabilities`. |
-| `AdapterCapabilities` DSL | Fluent API for declaring supported operations across categories (`Health`, `Configuration`, `Security`, `Messaging`, `Orchestration`, `Data`). |
-| `BootstrapReport` helpers | Convenience APIs to push adapter metadata into the Koan boot report. |
-| `OrchestrationRuntimeBridge` / `OrchestrationAware` | Provide no-op adapters with orchestration awareness hooks for CLI/recipe integration. |
+| Component                                           | Responsibility                                                                                                                                                                    |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IKoanAdapter`                                      | Contract for adapter identification, service type, bootstrap metadata, initialization, capability checks, and health status.                                                      |
+| `BaseKoanAdapter`                                   | Partial implementation that injects `ILogger`/`IConfiguration`, provides option & connection helpers, wraps health checks, and routes capability probes to `AdapterCapabilities`. |
+| `AdapterCapabilities` DSL                           | Fluent API for declaring supported operations across categories (`Health`, `Configuration`, `Security`, `Messaging`, `Orchestration`, `Data`).                                    |
+| `BootstrapReport` helpers                           | Convenience APIs to push adapter metadata into the Koan boot report.                                                                                                              |
+| `OrchestrationRuntimeBridge` / `OrchestrationAware` | Provide no-op adapters with orchestration awareness hooks for CLI/recipe integration.                                                                                             |
 
 ## Readiness pipeline
 

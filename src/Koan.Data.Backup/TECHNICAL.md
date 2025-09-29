@@ -19,14 +19,14 @@ validation:
 
 ## Key components
 
-| Area | Types | Notes |
-| --- | --- | --- |
-| Registration & DI | `Initialization.KoanAutoRegistrar`, `Extensions.ServiceCollectionExtensions` | Auto-wires services via `AddKoanBackupRestore*`, binds `BackupRestoreOptions`, and contributes capability notes to the boot report. |
-| Backup pipeline | `StreamingBackupService`, `IBackupService`, `EntityDiscoveryService`, `BackupDiscoveryService` | Discovers entity metadata, streams records with `Data<TEntity, TKey>.AllStream`, builds manifests, and tracks progress in-memory. |
-| Restore pipeline | `OptimizedRestoreService`, `IRestoreService`, `IRestoreOptimizedRepository` | Restores entities with optional adapter-specific preparation/cleanup, reflection fallbacks, and batch `UpsertManyAsync` calls. |
-| Storage integration | `BackupStorageService`, models under `Models/*` | Writes JSON Lines payloads into ZIP archives, stores manifests & verification metadata, uploads via `IStorageService`, and reads during restore. |
-| Background operations | `BackupMaintenanceService` | Optional hosted service that warms discovery, refreshes catalogs, validates samples, and surfaces retention candidates based on options. |
-| Models & options | `BackupManifest`, `BackupOptions`, `RestoreOptions`, `BackupRestoreOptions`, `BackupQuery` | Provide manifest schema, per-operation knobs, and module-wide defaults (batch sizes, profiles, retention). |
+| Area                  | Types                                                                                          | Notes                                                                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Registration & DI     | `Initialization.KoanAutoRegistrar`, `Extensions.ServiceCollectionExtensions`                   | Auto-wires services via `AddKoanBackupRestore*`, binds `BackupRestoreOptions`, and contributes capability notes to the boot report.              |
+| Backup pipeline       | `StreamingBackupService`, `IBackupService`, `EntityDiscoveryService`, `BackupDiscoveryService` | Discovers entity metadata, streams records with `Data<TEntity, TKey>.AllStream`, builds manifests, and tracks progress in-memory.                |
+| Restore pipeline      | `OptimizedRestoreService`, `IRestoreService`, `IRestoreOptimizedRepository`                    | Restores entities with optional adapter-specific preparation/cleanup, reflection fallbacks, and batch `UpsertManyAsync` calls.                   |
+| Storage integration   | `BackupStorageService`, models under `Models/*`                                                | Writes JSON Lines payloads into ZIP archives, stores manifests & verification metadata, uploads via `IStorageService`, and reads during restore. |
+| Background operations | `BackupMaintenanceService`                                                                     | Optional hosted service that warms discovery, refreshes catalogs, validates samples, and surfaces retention candidates based on options.         |
+| Models & options      | `BackupManifest`, `BackupOptions`, `RestoreOptions`, `BackupRestoreOptions`, `BackupQuery`     | Provide manifest schema, per-operation knobs, and module-wide defaults (batch sizes, profiles, retention).                                       |
 
 ## Backup workflow
 

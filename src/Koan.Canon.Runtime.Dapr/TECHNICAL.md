@@ -18,12 +18,12 @@ validation:
 
 ## Key components
 
-| Component | Responsibility |
-| --- | --- |
-| `DaprCanonRuntime` | Core runtime that implements `StartAsync`, `StopAsync`, `ReplayAsync`, and `ReprojectAsync`. Discovers Canon entities and enqueues `ProjectionTask<T>` items. |
-| `Koan.Canon.Runtime.Dapr.Initialization.KoanAutoRegistrar` | Replaces the default `ICanonRuntime` with `DaprCanonRuntime` via `services.Replace(...)` and reports module metadata to the boot report. |
-| `CanonOptions` (via `IOptionsMonitor`) | Supplies the default view name (`DefaultViewName`) used to namespace projection queues. |
-| `ReferenceItem<T>` / `ProjectionTask<T>` | Canon data entities read and written through `Koan.Data.Core.Data<TEntity,TKey>` static methods. |
+| Component                                                  | Responsibility                                                                                                                                                |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DaprCanonRuntime`                                         | Core runtime that implements `StartAsync`, `StopAsync`, `ReplayAsync`, and `ReprojectAsync`. Discovers Canon entities and enqueues `ProjectionTask<T>` items. |
+| `Koan.Canon.Runtime.Dapr.Initialization.KoanAutoRegistrar` | Replaces the default `ICanonRuntime` with `DaprCanonRuntime` via `services.Replace(...)` and reports module metadata to the boot report.                      |
+| `CanonOptions` (via `IOptionsMonitor`)                     | Supplies the default view name (`DefaultViewName`) used to namespace projection queues.                                                                       |
+| `ReferenceItem<T>` / `ProjectionTask<T>`                   | Canon data entities read and written through `Koan.Data.Core.Data<TEntity,TKey>` static methods.                                                              |
 
 ## Lifecycle and data flow
 

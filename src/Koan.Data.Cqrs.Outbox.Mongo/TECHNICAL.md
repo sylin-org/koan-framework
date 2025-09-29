@@ -19,14 +19,14 @@ validation:
 
 ## Key components
 
-| Component | Responsibility |
-| --- | --- |
-| `MongoOutboxOptions` | Holds connection information, database/collection names, lease horizon (`LeaseSeconds`), and retry ceiling (`MaxAttempts`). |
-| `MongoOutboxStore` | Implements `IOutboxStore` (append, dequeue with leasing, mark processed) and maintains the Mongo collection + indexes. |
-| `MongoOutboxRecord` | Internal persistence shape for outbox entries, including attempt counters, leasing fields, and optional deduplication tokens. |
-| `MongoOutboxFactory` | `IOutboxStoreFactory` implementation tagged with provider priority `20`, allowing Koan’s outbox selector to favour Mongo when multiple providers exist. |
-| `Initialization.KoanAutoRegistrar` | Binds options, registers the store/factory, and reports module metadata to the boot report without requiring inline service wiring. |
-| `MongoOutboxRegistration.AddMongoOutbox(...)` | Opt-in extension method for applications that prefer explicit registration or additional post-configuration of options. |
+| Component                                     | Responsibility                                                                                                                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MongoOutboxOptions`                          | Holds connection information, database/collection names, lease horizon (`LeaseSeconds`), and retry ceiling (`MaxAttempts`).                             |
+| `MongoOutboxStore`                            | Implements `IOutboxStore` (append, dequeue with leasing, mark processed) and maintains the Mongo collection + indexes.                                  |
+| `MongoOutboxRecord`                           | Internal persistence shape for outbox entries, including attempt counters, leasing fields, and optional deduplication tokens.                           |
+| `MongoOutboxFactory`                          | `IOutboxStoreFactory` implementation tagged with provider priority `20`, allowing Koan’s outbox selector to favour Mongo when multiple providers exist. |
+| `Initialization.KoanAutoRegistrar`            | Binds options, registers the store/factory, and reports module metadata to the boot report without requiring inline service wiring.                     |
+| `MongoOutboxRegistration.AddMongoOutbox(...)` | Opt-in extension method for applications that prefer explicit registration or additional post-configuration of options.                                 |
 
 ## Workflow
 

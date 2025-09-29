@@ -1,7 +1,7 @@
 ﻿# Koan.Secrets.Abstractions
 
 > ✅ Validated against `SecretId` parsing, `SecretValue` projections, and resolver template paths on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for full contract details and edge cases.
- 
+
 Shared primitives for expressing secret identifiers, payloads, and provider contracts. Concrete providers (`Koan.Secrets.Core`, Vault, environment-based resolvers) wire into these interfaces so apps can request secrets without binding to a specific backend.
 
 ## Quick start

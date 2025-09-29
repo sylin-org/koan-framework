@@ -27,15 +27,15 @@ validation:
 
 ## Type inventory
 
-| Type | Responsibility |
-| --- | --- |
-| `SecretId` | Canonical identifier with scope, name, optional version, and provider hint. Supports parsing from `secret://` and `secret+provider://` URIs and renders back to canonical strings. |
-| `SecretValue` | Holds the raw payload and metadata. Provides `AsBytes()`, `AsString()`, and `AsJson<T>()` projections (UTF-8 for textual forms). Never exposes the payload in `ToString()`. |
-| `SecretMetadata` | Optional details (version, creation timestamp, TTL, provider id) used by rotation tooling and health checks. |
-| `SecretContentType` | Enumerates payload shapes: `Text`, `Bytes`, `Json`. Governs projection behavior in `SecretValue`. |
-| `ISecretProvider` | Minimal contract for fetching a secret by `SecretId`. Providers implement retries, caching, or transport concerns. |
-| `ISecretResolver` | Extends provider capabilities with string templating (`ResolveAsync`) that can replace `{{secret://...}}` placeholders and fallback to raw strings when no markers are present. |
-| `SecretException` & friends | Shared base plus targeted exceptions for not-found, unauthorized, and provider-outage scenarios. Providers and resolvers throw these to steer caller retry / error handling. |
+| Type                        | Responsibility                                                                                                                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SecretId`                  | Canonical identifier with scope, name, optional version, and provider hint. Supports parsing from `secret://` and `secret+provider://` URIs and renders back to canonical strings. |
+| `SecretValue`               | Holds the raw payload and metadata. Provides `AsBytes()`, `AsString()`, and `AsJson<T>()` projections (UTF-8 for textual forms). Never exposes the payload in `ToString()`.        |
+| `SecretMetadata`            | Optional details (version, creation timestamp, TTL, provider id) used by rotation tooling and health checks.                                                                       |
+| `SecretContentType`         | Enumerates payload shapes: `Text`, `Bytes`, `Json`. Governs projection behavior in `SecretValue`.                                                                                  |
+| `ISecretProvider`           | Minimal contract for fetching a secret by `SecretId`. Providers implement retries, caching, or transport concerns.                                                                 |
+| `ISecretResolver`           | Extends provider capabilities with string templating (`ResolveAsync`) that can replace `{{secret://...}}` placeholders and fallback to raw strings when no markers are present.    |
+| `SecretException` & friends | Shared base plus targeted exceptions for not-found, unauthorized, and provider-outage scenarios. Providers and resolvers throw these to steer caller retry / error handling.       |
 
 ## Flow highlights
 

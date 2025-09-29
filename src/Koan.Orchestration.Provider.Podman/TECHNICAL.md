@@ -19,13 +19,13 @@ validation:
 
 ## Core components
 
-| Concern | Types | Notes |
-| --- | --- | --- |
-| Provider contract | `PodmanProvider : IHostingProvider` | `Id="podman"`, `Priority=50` (Docker retains precedence on Windows). Implements the full verb set used by the CLI. |
-| Process runner | `Run`, `Stream` | Invoke `podman` commands with redirected output; shared by availability, status, logs, and lifecycle operations. |
-| Readiness polling | `Up` + `ComposeStatusForFile` | After `podman compose up`, repeatedly calls `podman compose ps --format json` until all services report `running` and (if present) `healthy`, or the timeout expires. |
-| Status/ports parsing | `ParseComposePsJson`, `ParseComposePsPorts`, `ParsePortsString` | Translate JSON arrays of service entries and `Ports` strings (e.g., `0.0.0.0:8080->80/tcp`) into structured tuples. |
-| Engine metadata | `GetVersionSafe`, `GetEndpointSafe`, `EngineInfo()` | Extract version data from `podman version --format json` and default connection name from `podman system connection default`. |
+| Concern              | Types                                                           | Notes                                                                                                                                                                 |
+| -------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider contract    | `PodmanProvider : IHostingProvider`                             | `Id="podman"`, `Priority=50` (Docker retains precedence on Windows). Implements the full verb set used by the CLI.                                                    |
+| Process runner       | `Run`, `Stream`                                                 | Invoke `podman` commands with redirected output; shared by availability, status, logs, and lifecycle operations.                                                      |
+| Readiness polling    | `Up` + `ComposeStatusForFile`                                   | After `podman compose up`, repeatedly calls `podman compose ps --format json` until all services report `running` and (if present) `healthy`, or the timeout expires. |
+| Status/ports parsing | `ParseComposePsJson`, `ParseComposePsPorts`, `ParsePortsString` | Translate JSON arrays of service entries and `Ports` strings (e.g., `0.0.0.0:8080->80/tcp`) into structured tuples.                                                   |
+| Engine metadata      | `GetVersionSafe`, `GetEndpointSafe`, `EngineInfo()`             | Extract version data from `podman version --format json` and default connection name from `podman system connection default`.                                         |
 
 ## Provider workflow
 

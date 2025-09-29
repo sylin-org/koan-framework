@@ -19,14 +19,14 @@ validation:
 
 ## Core components
 
-| Area | Types | Notes |
-| --- | --- | --- |
-| Discovery & wiring | `KoanAspireExtensions`, `KoanAssemblyDiscovery`, `KoanDiscoveryResult` | Scans loaded assemblies, queues registrars by priority, handles logging, and returns resource names. |
-| Registrar contract | `IKoanAspireRegistrar` | Optional extension for `KoanAutoRegistrar` implementers to describe Aspire resources with `RegisterAspireResources`, `Priority`, and `ShouldRegister`. |
-| Orchestration auto-registration | `Initialization.KoanAutoRegistrar` | Detects `KoanEnv.OrchestrationMode`, injects matching config providers, registers self-orchestration hosted service in `SelfOrchestrating` mode, and contributes boot report notes. |
-| Self orchestration | `DockerContainerManager`, `KoanDependencyOrchestrator`, `KoanSelfOrchestrationService`, `SelfOrchestrationConfigurationProvider` | Spins up dependencies via Docker, waits for health, cleans orphaned containers, and synthesizes connection strings for local usage. |
-| Configuration adapters | `SelfOrchestrationConfigurationProvider`, `DockerComposeConfigurationProvider`, `KubernetesConfigurationProvider` | Inject connection strings + orchestration metadata per detected mode without forcing app code changes. |
-| Provider selection (placeholder) | `UseKoanProviderSelection` | Applies container runtime hints (`ASPIRE_CONTAINER_RUNTIME`) once Koan provider election logic is integrated. |
+| Area                             | Types                                                                                                                            | Notes                                                                                                                                                                               |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Discovery & wiring               | `KoanAspireExtensions`, `KoanAssemblyDiscovery`, `KoanDiscoveryResult`                                                           | Scans loaded assemblies, queues registrars by priority, handles logging, and returns resource names.                                                                                |
+| Registrar contract               | `IKoanAspireRegistrar`                                                                                                           | Optional extension for `KoanAutoRegistrar` implementers to describe Aspire resources with `RegisterAspireResources`, `Priority`, and `ShouldRegister`.                              |
+| Orchestration auto-registration  | `Initialization.KoanAutoRegistrar`                                                                                               | Detects `KoanEnv.OrchestrationMode`, injects matching config providers, registers self-orchestration hosted service in `SelfOrchestrating` mode, and contributes boot report notes. |
+| Self orchestration               | `DockerContainerManager`, `KoanDependencyOrchestrator`, `KoanSelfOrchestrationService`, `SelfOrchestrationConfigurationProvider` | Spins up dependencies via Docker, waits for health, cleans orphaned containers, and synthesizes connection strings for local usage.                                                 |
+| Configuration adapters           | `SelfOrchestrationConfigurationProvider`, `DockerComposeConfigurationProvider`, `KubernetesConfigurationProvider`                | Inject connection strings + orchestration metadata per detected mode without forcing app code changes.                                                                              |
+| Provider selection (placeholder) | `UseKoanProviderSelection`                                                                                                       | Applies container runtime hints (`ASPIRE_CONTAINER_RUNTIME`) once Koan provider election logic is integrated.                                                                       |
 
 ## Discovery & registration flow
 
