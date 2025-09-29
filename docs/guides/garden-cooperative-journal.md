@@ -79,6 +79,16 @@ var app = builder.Build();
 app.Run();
 ```
 
+Riley saves the file, runs the service, and watches Koan create `data/garden.db` on first boot. If you want to peek at the blank canvas, launch the slice once:
+
+```powershell
+# from the project root
+pwsh -File scripts/cli-build.ps1
+pwsh -File scripts/cli-run.ps1
+```
+
+Shut the app down after the adapters announce themselves in the logs—you only need the schema migration for now.
+
 ---
 
 ## 2. Model the Cooperative
@@ -161,6 +171,15 @@ var plots = await Plot.All(ct);
 var withMembers = await plots.Relatives<Plot, string>(ct);
 ```
 
+**Character cheat sheet**
+
+- `Plot` entries map the raised beds. Riley likes naming them after fruits.
+- `Member` records keep the stewards visible without extra join logic.
+- `Reading` snapshots arrive from the sensors and stay tied to a plot.
+- `Reminder` slips are the gentle nudges that let the co-op stay on schedule.
+
+> **Learning checkpoint** – Relationship helpers replace bespoke repositories. Spend a moment in your console and call `await member.GetChildren<Reminder>()` after seeding a few records; you’ll see the story graph form with no extra plumbing.
+
 ---
 
 ## 3. Accept Sensor Readings
@@ -184,6 +203,8 @@ Content-Type: application/json
   "sampledAt": "2025-09-28T09:15:00Z"
 }
 ```
+
+**Journal prompt** – Seed a plot (`plots/raspberry-bed`), add a member, and fire this request from your terminal. When the 201 response returns, flip open the SQLite file and check that Koan stamped the `Id` with a GUID v7 automatically.
 
 Use `Reading.Recent(plotId)` for dashboards or Flow jobs that need context around each sensor update.
 
@@ -252,6 +273,8 @@ public static class HydrationPipeline
 
 The pipeline batches readings every 15 minutes, checks moisture averages, and activates a reminder when soil is too dry. All adapters are accessed through entity statics so swapping providers later is low-risk.
 
+> **Learning checkpoint** – Watch the timeline unfold by logging `average` inside the loop and running a quick CLI replay. Flow batches hand you the context (`batch`) so you never reach for a custom scheduler.
+
 ---
 
 ## 5. React to Reminder Status Changes
@@ -297,6 +320,8 @@ The hook compares the previous and current status, emits an event when a reminde
 
 > **Optional extension** – Add a background worker that listens for `ReminderActivated` events and sends a daily digest email. Keep it disabled by default so the how-to remains focused.
 
+**Knowledge handoff** – The lifecycle pipeline does the storytelling for you. Run a quick patch request that flips `Status` to `Active` and inspect the emitted event; you’ll see the journal and analytics stay in sync without separate save hooks.
+
 ---
 
 ## 6. Journal-Friendly APIs
@@ -320,7 +345,7 @@ curl -X PATCH https://localhost:5001/api/garden/reminders/reminders/42 ^
   -d '{"status":"Acknowledged","notes":"Evening watering complete"}'
 ```
 
-### Enriching responses on the fly
+### Enrich the nightly journal
 
 `EntityController<T>` already speaks the relationship enrichment dialect: append `?with=` to any GET and Koan will invoke `GetRelatives()` internally.
 
@@ -336,6 +361,8 @@ curl "https://localhost:5001/api/garden/reminders?status=Active&page=1&pageSize=
 ```
 
 Use targeted lists (`with=plot,member`) when the UI only needs specific relatives; reach for `with=all` during diagnostics or when previewing the full relationship graph. Because the controller delegates to the same relationship helpers we outlined earlier, you can mix `with=` with streaming endpoints or paging without crafting bespoke transformers.
+
+Mara usually starts with `with=plot,member` while writing the co-op recap, then switches to `with=all` when debugging sensors. Follow her lead and you’ll rarely need custom DTO projects.
 
 Use transformers (see the [API Delivery Playbook](./building-apis.md)) if you need to enrich reminder responses with plot or member metadata before rendering the journal UI.
 
