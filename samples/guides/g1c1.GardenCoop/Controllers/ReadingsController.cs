@@ -1,34 +1,25 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using g1c1.GardenCoop.Models;
-using Koan.Data.Core;
+using Koan.Web.Controllers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace g1c1.GardenCoop.Controllers;
 
-[ApiController]
+// EntityController<Reading> gives us GET, POST, PATCH, DELETE for free - no manual wiring!
 [Route("api/garden/readings")]
-public sealed class ReadingsController : ControllerBase
+public sealed class ReadingsController : EntityController<Reading>
 {
-	[HttpGet]
-	public async Task<IActionResult> Get([FromQuery] int take = 50, CancellationToken cancellationToken = default)
-	{
-		if (take <= 0)
-		{
-			take = 50;
-		}
+	// EntityController already handles:
+	// - GET /api/garden/readings (all)
+	// - GET /api/garden/readings/{id} (by id)
+	// - POST /api/garden/readings (create - the Pi uses this!)
+	// - PATCH /api/garden/readings/{id} (update)
+	// - DELETE /api/garden/readings/{id} (delete)
 
-		var items = await Reading.Query(_ => true, cancellationToken);
-		var recent = items
-			.OrderByDescending(r => r.SampledAt)
-			.Take(Math.Min(take, 200))
-			.ToArray();
-		return Ok(recent);
-	}
-
+	// just adding a helper endpoint for recent readings by plot
 	[HttpGet("recent/{plotId}")]
 	public async Task<IActionResult> GetRecent(string plotId, [FromQuery] int take = 8, CancellationToken cancellationToken = default)
 	{
@@ -37,62 +28,17 @@ public sealed class ReadingsController : ControllerBase
 			return BadRequest("plotId is required.");
 		}
 
+		// using the static helper from Reading model
 		var readings = await Reading.Recent(plotId, take, cancellationToken);
 		return Ok(readings);
 	}
 
-	[HttpPost]
-	public async Task<IActionResult> Post([FromBody] SensorReadingInput input, CancellationToken cancellationToken = default)
-	{
-		if (input is null)
-		{
-			return BadRequest("Payload is required.");
-		}
-
-		var serial = (input.SensorSerial ?? string.Empty).Trim();
-		if (string.IsNullOrEmpty(serial))
-		{
-			return BadRequest("sensorSerial is required.");
-		}
-
-		if (!ModelState.IsValid)
-		{
-			return ValidationProblem(ModelState);
-		}
-
-		var sampleTime = input.SampledAt ?? DateTimeOffset.UtcNow;
-		var sensor = await Sensor.GetBySerial(serial, cancellationToken) ?? await new Sensor
-		{
-			Serial = serial,
-			DisplayName = serial
-		}.Save(cancellationToken);
-
-		sensor.LastSeenAt = sampleTime;
-		sensor.Capabilities |= SensorCapabilities.SoilHumidity | SensorCapabilities.Temperature;
-		sensor = await sensor.Save(cancellationToken);
-
-		var reading = await new Reading
-		{
-			SensorId = sensor.Id,
-			PlotId = sensor.PlotId,
-			SoilHumidity = input.SoilHumidity,
-			TemperatureC = input.TemperatureC,
-			SampledAt = sampleTime
-		}.Save(cancellationToken);
-
-		return Ok(reading);
-	}
-
-	public sealed class SensorReadingInput
-	{
-		[Required]
-		public string SensorSerial { get; set; } = string.Empty;
-
-		[Range(0, 100)]
-		public double SoilHumidity { get; set; }
-
-		public double? TemperatureC { get; set; }
-
-		public DateTimeOffset? SampledAt { get; set; }
-	}
+	// Note: Pi POSTs to /api/garden/readings with JSON like:
+	// {
+	//   "sensorSerial": "gc-013-alfalfa",
+	//   "soilHumidity": 18.6,
+	//   "temperatureC": 26.1,
+	//   "sampledAt": "2025-09-28T09:15:00Z"
+	// }
+	// The Reading.BeforeUpsert lifecycle handles sensor lookup and binding!
 }

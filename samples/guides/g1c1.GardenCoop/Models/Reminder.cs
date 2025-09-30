@@ -8,9 +8,9 @@ namespace g1c1.GardenCoop.Models;
 
 public enum ReminderStatus
 {
-    Idle,
-    Active,
-    Acknowledged
+    Idle,           // no action needed
+    Active,         // hey, water this!
+    Acknowledged    // got it, we watered
 }
 
 public class Reminder : Entity<Reminder>
@@ -19,7 +19,7 @@ public class Reminder : Entity<Reminder>
     public string PlotId { get; set; } = string.Empty;
 
     [Parent(typeof(Member))]
-    public string? MemberId { get; set; }
+    public string? MemberId { get; set; }  // who should we nudge?
 
     public ReminderStatus Status { get; set; } = ReminderStatus.Idle;
 
@@ -27,12 +27,14 @@ public class Reminder : Entity<Reminder>
 
     public static async Task<Reminder?> ActiveForPlot(string plotId, CancellationToken ct = default)
     {
+        // check if this plot already has an active reminder - keep it to one per plot
         var reminders = await Reminder.Query(r => r.PlotId == plotId && r.Status == ReminderStatus.Active, ct);
         return reminders.FirstOrDefault();
     }
 
     public Task<Reminder> ActivateAsync(string notes, CancellationToken ct = default)
     {
+        // turn on the reminder
         Status = ReminderStatus.Active;
         Notes = notes;
         return this.Save(ct);
@@ -40,6 +42,7 @@ public class Reminder : Entity<Reminder>
 
     public Task<Reminder> AcknowledgeAsync(string notes, CancellationToken ct = default)
     {
+        // mark it done
         Status = ReminderStatus.Acknowledged;
         Notes = notes;
         return this.Save(ct);
