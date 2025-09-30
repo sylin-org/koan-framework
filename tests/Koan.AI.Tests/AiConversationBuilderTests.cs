@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -89,7 +90,7 @@ public sealed class AiConversationBuilderTests
         public IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, CancellationToken ct = default)
         {
             LastRequest = request;
-            return AsyncEnumerable.Empty<AiChatChunk>();
+            return EmptyStream(ct);
         }
 
         public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
@@ -99,6 +100,12 @@ public sealed class AiConversationBuilderTests
             => Task.FromResult("ok");
 
         public IAsyncEnumerable<AiChatChunk> StreamAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
-            => AsyncEnumerable.Empty<AiChatChunk>();
+            => EmptyStream(ct);
+
+        private static async IAsyncEnumerable<AiChatChunk> EmptyStream([EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
     }
 }

@@ -41,9 +41,9 @@ public class CanonActionsTests
         var cfg = new ConfigurationBuilder().AddInMemoryCollection(cfgDict!).Build();
         var sc = new ServiceCollection();
         sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddKoanDataCore();
-        sc.AddKoanCanon();
-        sc.AddMessagingCore();
+    sc.AddKoanDataCore();
+    sc.AddKoanCanon();
+    sc.AddKoanMessaging();
         // Override messaging selector to use a fake in-memory bus
         var fakeBus = new FakeBus();
         sc.AddSingleton(fakeBus);
@@ -99,7 +99,7 @@ public class CanonActionsTests
 
         await bus.WaitUntilAsync(() => bus.Sent.OfType<CanonReport>().Any(r => r.Model == model), TimeSpan.FromSeconds(5));
         var report = bus.Sent.OfType<CanonReport>().Last(r => r.Model == model);
-    var stats = report.Stats as IDictionary<string, object> ?? report.Stats as IDictionary<string, object?>;
+    var stats = report.Stats as IDictionary<string, object?>;
     stats.Should().NotBeNull();
     stats!.Keys.Should().Contain(new[] { "intake", "standardized", "keyed", "Canonical", "lineage", "roots", "policies" });
     }
@@ -119,29 +119,105 @@ public class CanonActionsTests
         bus.Sent.OfType<CanonAck>().Should().Contain(a => a.Model == model && a.Status == "ok");
     }
 
-    // Fake bus that dispatches CanonAction to the registered handler and captures outgoing messages
+    // Fake bus that captures outgoing messages and replays consumers the way the modern messaging stack expects
     public sealed class FakeBus : IMessageBus
     {
         private readonly ConcurrentQueue<object> _sent = new();
+        private readonly ConcurrentDictionary<Type, List<FakeConsumer>> _consumers = new();
+        private readonly ConcurrentDictionary<Type, ConcurrentQueue<object>> _pending = new();
+
         public IReadOnlyCollection<object> Sent => _sent.ToArray();
 
-        public Task SendAsync(object message, CancellationToken ct = default)
+        public Task SendAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
         {
-            if (message is CanonAction fa)
+            if (message is null) throw new ArgumentNullException(nameof(message));
+
+            if (TryDispatch(typeof(T), message, out var dispatchTask))
             {
-                var sp = Koan.Core.Hosting.App.AppHost.Current ?? throw new InvalidOperationException("AppHost.Current not set");
-                var handler = sp.GetRequiredService<IMessageHandler<CanonAction>>();
-                var env = new MessageEnvelope(Guid.NewGuid().ToString("n"), typeof(CanonAction).FullName!, fa.CorrelationId, null, new Dictionary<string, string>(), 1, DateTimeOffset.UtcNow);
-                return handler.HandleAsync(env, fa, ct);
+                return dispatchTask;
             }
-            _sent.Enqueue(message);
+
+            _pending.GetOrAdd(typeof(T), _ => new ConcurrentQueue<object>()).Enqueue(message);
+
+            if (message is not CanonAction)
+            {
+                _sent.Enqueue(message);
+            }
+
             return Task.CompletedTask;
         }
 
-        public Task SendManyAsync(IEnumerable<object> messages, CancellationToken ct = default)
+        public async Task<IMessageConsumer> CreateConsumerAsync<T>(Func<T, Task> handler, CancellationToken cancellationToken = default) where T : class
         {
-            var tasks = messages.Select(m => SendAsync(m, ct));
-            return Task.WhenAll(tasks);
+            if (handler is null) throw new ArgumentNullException(nameof(handler));
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var messageType = typeof(T);
+            var consumer = new FakeConsumer(messageType, obj => handler((T)obj), this);
+
+            var list = _consumers.GetOrAdd(messageType, _ => new List<FakeConsumer>());
+            lock (list)
+            {
+                list.Add(consumer);
+            }
+
+            if (_pending.TryRemove(messageType, out var queue))
+            {
+                while (queue.TryDequeue(out var pending))
+                {
+                    if (TryDispatch(messageType, pending, out var replayTask))
+                    {
+                        await replayTask.ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // No active consumer (all paused). Requeue for later delivery.
+                        _pending.GetOrAdd(messageType, _ => new ConcurrentQueue<object>()).Enqueue(pending);
+                    }
+                }
+            }
+
+            return consumer;
+        }
+
+        public Task<bool> IsHealthyAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
+
+    private void RemoveConsumer(FakeConsumer consumer)
+        {
+            if (_consumers.TryGetValue(consumer.MessageType, out var list))
+            {
+                lock (list)
+                {
+                    list.Remove(consumer);
+                    if (list.Count == 0)
+                    {
+                        _consumers.TryRemove(consumer.MessageType, out _);
+                    }
+                }
+            }
+        }
+
+        private bool TryDispatch(Type messageType, object message, out Task dispatchTask)
+        {
+            if (_consumers.TryGetValue(messageType, out var list))
+            {
+                FakeConsumer[] snapshot;
+                lock (list)
+                {
+                    snapshot = list.ToArray();
+                }
+
+                var tasks = snapshot.Where(c => c.IsActive).Select(c => c.ProcessAsync(message)).ToList();
+                if (tasks.Count > 0)
+                {
+                    dispatchTask = Task.WhenAll(tasks);
+                    return true;
+                }
+            }
+
+            dispatchTask = Task.CompletedTask;
+            return false;
         }
 
         // Helper to await a condition on captured messages
@@ -155,6 +231,54 @@ public class CanonActionsTests
                 await Task.Delay(interval);
             }
             predicate();
+        }
+
+        private sealed class FakeConsumer : IMessageConsumer
+        {
+            private readonly Func<object, Task> _handler;
+            private readonly FakeBus _bus;
+            private volatile bool _active = true;
+
+            public FakeConsumer(Type messageType, Func<object, Task> handler, FakeBus bus)
+            {
+                MessageType = messageType;
+                Destination = messageType.FullName ?? messageType.Name;
+                _handler = handler;
+                _bus = bus;
+            }
+
+            public Type MessageType { get; }
+            public string Destination { get; }
+            public bool IsActive => _active;
+
+            public Task PauseAsync()
+            {
+                _active = false;
+                return Task.CompletedTask;
+            }
+
+            public Task ResumeAsync()
+            {
+                _active = true;
+                return Task.CompletedTask;
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                _active = false;
+                _bus.RemoveConsumer(this);
+                return ValueTask.CompletedTask;
+            }
+
+            public Task ProcessAsync(object message)
+            {
+                if (!_active)
+                {
+                    return Task.CompletedTask;
+                }
+
+                return _handler(message);
+            }
         }
     }
 

@@ -1,24 +1,25 @@
 ﻿# Logging visual standardization
 
 ## Contract
+
 - **Scope**: Framework-emitted logs across Koan core, adapters, service orchestration, and hosting.
- - **Inputs**: `AddKoanCore` logging defaults (Koan console formatter, Koan category filters), adapter lifecycle events, environment snapshots, and health probes.
+- **Inputs**: `AddKoanCore` logging defaults (Koan console formatter, Koan category filters), adapter lifecycle events, environment snapshots, and health probes.
 - **Outputs**: Stage-tagged log lines, structured decision summaries, and consistent block formats for rich snapshots.
 - **Failure modes**: Verbose debug chatter at default levels, mismatched formatting between modules, ASCII banners that break parsing, and missing cues for lifecycle transitions.
 - **Success criteria**: Operators can follow startup and runtime stages at a glance, structured log sinks receive uniform payloads, and developers have ready-made samples for extending modules.
 
 ## Lifecycle map
 
-| Stage tag | Purpose | Typical emitters | Default severity |
-| --- | --- | --- | --- |
-| `[K:BLDG]` | Compiler and build diagnostics surfacing before host start. | `dotnet` build output, Roslyn diagnostics. | `warning` / `error` as produced. |
-| `[K:BOOT]` | Module discovery and registrar execution. | `KoanAutoRegistrar`, module auto-loaders. | `info` (success), `warn` on fallback. |
-| `[K:CNFG]` | Configuration and orchestration decisions. | `ServiceDiscoveryCoordinator`, adapter configurators. | `info` with key/value context, `warn` on fallback. |
-| `[K:SNAP]` | Rich blocks summarizing environment or version state. | `KoanEnv`, version inventory. | `info` block with ruler. |
-| `[K:DATA]` | Data surface readiness and schema guard activity. | `SqliteRepository`, `EntitySchemaGuard`. | `info` condensed summaries, promote table/optimization decisions. |
-| `[K:SRVC]` | Background services orchestration lifecycle. | `KoanBackgroundServiceOrchestrator`. | `info`; `warn` when a service fails to start. |
-| `[K:HLTH]` | Probes and schedulers reporting status. | `HealthProbeScheduler`, `StartupProbeService`. | `info` for aggregated status, `debug` for per-contributor details. |
-| `[K:HOST]` | ASP.NET hosting lifecycle messages. | `Microsoft.Hosting.Lifetime`, slice banners. | `info`. |
+| Stage tag  | Purpose                                                     | Typical emitters                                      | Default severity                                                   |
+| ---------- | ----------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------ |
+| `[K:BLDG]` | Compiler and build diagnostics surfacing before host start. | `dotnet` build output, Roslyn diagnostics.            | `warning` / `error` as produced.                                   |
+| `[K:BOOT]` | Module discovery and registrar execution.                   | `KoanAutoRegistrar`, module auto-loaders.             | `info` (success), `warn` on fallback.                              |
+| `[K:CNFG]` | Configuration and orchestration decisions.                  | `ServiceDiscoveryCoordinator`, adapter configurators. | `info` with key/value context, `warn` on fallback.                 |
+| `[K:SNAP]` | Rich blocks summarizing environment or version state.       | `KoanEnv`, version inventory.                         | `info` block with ruler.                                           |
+| `[K:DATA]` | Data surface readiness and schema guard activity.           | `SqliteRepository`, `EntitySchemaGuard`.              | `info` condensed summaries, promote table/optimization decisions.  |
+| `[K:SRVC]` | Background services orchestration lifecycle.                | `KoanBackgroundServiceOrchestrator`.                  | `info`; `warn` when a service fails to start.                      |
+| `[K:HLTH]` | Probes and schedulers reporting status.                     | `HealthProbeScheduler`, `StartupProbeService`.        | `info` for aggregated status, `debug` for per-contributor details. |
+| `[K:HOST]` | ASP.NET hosting lifecycle messages.                         | `Microsoft.Hosting.Lifetime`, slice banners.          | `info`.                                                            |
 
 ## Formatting patterns
 

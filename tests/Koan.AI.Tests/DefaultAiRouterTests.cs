@@ -2,11 +2,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 using FluentAssertions;
 using Koan.AI;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Options;
+using Koan.AI.Contracts.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -193,8 +195,12 @@ public sealed class DefaultAiRouterTests
         public Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiChatResponse { Text = Id });
 
-        public IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, CancellationToken ct = default)
-            => AsyncEnumerable.Empty<AiChatChunk>();
+        public async IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.CompletedTask;
+            yield break;
+        }
 
         public Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
             => Task.FromResult(new AiEmbeddingsResponse { Model = Id });

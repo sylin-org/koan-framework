@@ -34,10 +34,10 @@ internal sealed class AppRuntime : IAppRuntime
         {
             var report = new BootReport();
             var cfg = _sp.GetService<IConfiguration>();
-            
+
             // Collect module information from all KoanAutoRegistrars
             CollectBootReport(report, cfg);
-            
+
             var modules = report.GetModules();
             var modulePairs = modules
                 .Select(m => (m.Name, m.Version ?? "unknown"))
@@ -62,7 +62,7 @@ internal sealed class AppRuntime : IAppRuntime
             var obs = _sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.Core.Observability.ObservabilityOptions>>();
             if (!show)
                 show = obs?.Value?.Enabled == true && obs.Value?.Traces?.Enabled == true;
-                
+
             if (show && cfg != null && _logger is null)
             {
                 var options = GetBootReportOptions(cfg);
@@ -75,9 +75,9 @@ internal sealed class AppRuntime : IAppRuntime
     private void CollectBootReport(BootReport report, IConfiguration? cfg)
     {
         if (cfg == null) return;
-        
+
         var env = _sp.GetService<IHostEnvironment>();
-        
+
         // Find and invoke all KoanAutoRegistrars to collect their reports
         // Use cached assemblies instead of bespoke AppDomain scanning
         var assemblies = AssemblyCache.Instance.GetAllAssemblies();
@@ -86,7 +86,7 @@ internal sealed class AppRuntime : IAppRuntime
             Type[] types;
             try { types = asm.GetTypes(); }
             catch { continue; }
-            
+
             foreach (var t in types)
             {
                 if (t.IsAbstract || !typeof(IKoanAutoRegistrar).IsAssignableFrom(t)) continue;
@@ -134,7 +134,7 @@ internal sealed class AppRuntime : IAppRuntime
         return new BootReportOptions
         {
             ShowDecisions = section.GetValue("ShowDecisions", !KoanEnv.IsProduction),
-            ShowConnectionAttempts = section.GetValue("ShowConnectionAttempts", !KoanEnv.IsProduction), 
+            ShowConnectionAttempts = section.GetValue("ShowConnectionAttempts", !KoanEnv.IsProduction),
             ShowDiscovery = section.GetValue("ShowDiscovery", !KoanEnv.IsProduction),
             CompactMode = section.GetValue("CompactMode", KoanEnv.IsProduction)
         };

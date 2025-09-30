@@ -106,7 +106,7 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
                     _agg.RequestProbe(ProbeReason.TtlExpiry, component: null, stoppingToken);
                     KoanLog.HealthDebug(Logger, LogActions.Scheduler, "broadcast",
                         ("count", dueComponents.Count));
-                    
+
                     await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Health.ProbeBroadcast, new ProbeBroadcastEventArgs
                     {
                         ComponentCount = dueComponents.Count,
@@ -118,7 +118,7 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
                     foreach (var component in dueComponents)
                     {
                         _agg.RequestProbe(ProbeReason.TtlExpiry, component, stoppingToken);
-                        
+
                         await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Health.ProbeScheduled, new ProbeScheduledEventArgs
                         {
                             Component = component,

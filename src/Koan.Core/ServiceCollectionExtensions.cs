@@ -39,10 +39,10 @@ public static class ServiceCollectionExtensions
             logging.AddFilter("Koan", KoanEnv.IsProduction ? LogLevel.Information : LogLevel.Debug);
         });
 
-    // Bind KoanLog to the ambient logger factory once the host starts up
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, KoanLogFactoryBridge>());
+        // Bind KoanLog to the ambient logger factory once the host starts up
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, KoanLogFactoryBridge>());
 
-    // Best-effort early initialization when provider is built later
+        // Best-effort early initialization when provider is built later
 
         // Legacy health registry removed in greenfield; aggregator is the single source of truth
         // Health Aggregator (push-first)
@@ -60,8 +60,8 @@ public static class ServiceCollectionExtensions
         if (!services.Any(d => d.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)))
             services.AddSingleton<Koan.Core.Hosting.Runtime.IAppRuntime, Koan.Core.Hosting.Runtime.AppRuntime>();
 
-    // Ensure ambient host is set in generic hosts (web apps do this via startup filter)
-    services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, Koan.Core.Hosting.App.AppHostBinderHostedService>());
+        // Ensure ambient host is set in generic hosts (web apps do this via startup filter)
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, Koan.Core.Hosting.App.AppHostBinderHostedService>());
         return services;
     }
 }

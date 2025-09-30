@@ -164,9 +164,9 @@ internal sealed class KoanConsoleBlockBuilder
         var headerPad = Math.Max(0, _width - headerPrefix.Length);
         var header = headerPrefix + new string('─', headerPad);
 
-    var builder = new StringBuilder();
-    builder.AppendLine();
-    builder.AppendLine(header);
+        var builder = new StringBuilder();
+        builder.AppendLine();
+        builder.AppendLine(header);
 
         foreach (var line in _lines)
         {

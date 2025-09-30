@@ -16,7 +16,7 @@ public static class KoanEnv
     public static void DumpSnapshot(ILogger? logger = null)
     {
         var snap = Current;
-        
+
         if (logger != null)
         {
             KoanLog.SnapshotInfo(logger, "env.snapshot", null,

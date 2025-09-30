@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,17 +22,102 @@ using Xunit;
 namespace Koan.Canon.Core.Tests;
 
 // Minimal typed model used for discovery in tests
-public sealed class TestModel : CanonEntity<TestModel>
+public sealed class TestModel : CanonEntity<TestModel>, IDictionary<string, object?>
 {
+    private readonly Dictionary<string, object?> _values = new(StringComparer.OrdinalIgnoreCase);
+
     // Presence of at least one aggregation key avoids early NO_KEYS gate due to zero keys
     [AggregationKey]
-    public string? Dummy { get; set; }
+    public string? Dummy
+    {
+        get => TryGetValue("dummy", out var value) ? value?.ToString() : null;
+        set => _values["dummy"] = value;
+    }
+
+    public object? this[string key]
+    {
+        get => _values.TryGetValue(key, out var value) ? value : null;
+        set => _values[key] = value;
+    }
+
+    public ICollection<string> Keys => _values.Keys;
+
+    public ICollection<object?> Values => _values.Values;
+
+    public new int Count => _values.Count;
+
+    public bool IsReadOnly => false;
+
+    public void Add(string key, object? value) => _values.Add(key, value);
+
+    public bool ContainsKey(string key) => _values.ContainsKey(key);
+
+    public bool Remove(string key) => _values.Remove(key);
+
+    public bool TryGetValue(string key, out object? value) => _values.TryGetValue(key, out value);
+
+    public void Add(KeyValuePair<string, object?> item) => ((IDictionary<string, object?>)_values).Add(item);
+
+    public void Clear() => _values.Clear();
+
+    public bool Contains(KeyValuePair<string, object?> item) => ((IDictionary<string, object?>)_values).Contains(item);
+
+    public void CopyTo(KeyValuePair<string, object?>[] array, int arrayIndex) => ((IDictionary<string, object?>)_values).CopyTo(array, arrayIndex);
+
+    public bool Remove(KeyValuePair<string, object?> item) => ((IDictionary<string, object?>)_values).Remove(item);
+
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => _values.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => _values.GetEnumerator();
 }
 
 // Separate model for identity tests to avoid cross-test state
-public sealed class IdentityModel : CanonEntity<IdentityModel>
+public sealed class IdentityModel : CanonEntity<IdentityModel>, IDictionary<string, object?>
 {
-    [AggregationKey] public string? Dummy { get; set; }
+    private readonly Dictionary<string, object?> _values = new(StringComparer.OrdinalIgnoreCase);
+
+    [AggregationKey]
+    public string? Dummy
+    {
+        get => TryGetValue("dummy", out var value) ? value?.ToString() : null;
+        set => _values["dummy"] = value;
+    }
+
+    public object? this[string key]
+    {
+        get => _values.TryGetValue(key, out var value) ? value : null;
+        set => _values[key] = value;
+    }
+
+    public ICollection<string> Keys => _values.Keys;
+
+    public ICollection<object?> Values => _values.Values;
+
+    public new int Count => _values.Count;
+
+    public bool IsReadOnly => false;
+
+    public void Add(string key, object? value) => _values.Add(key, value);
+
+    public bool ContainsKey(string key) => _values.ContainsKey(key);
+
+    public bool Remove(string key) => _values.Remove(key);
+
+    public bool TryGetValue(string key, out object? value) => _values.TryGetValue(key, out value);
+
+    public void Add(KeyValuePair<string, object?> item) => ((IDictionary<string, object?>)_values).Add(item);
+
+    public void Clear() => _values.Clear();
+
+    public bool Contains(KeyValuePair<string, object?> item) => ((IDictionary<string, object?>)_values).Contains(item);
+
+    public void CopyTo(KeyValuePair<string, object?>[] array, int arrayIndex) => ((IDictionary<string, object?>)_values).CopyTo(array, arrayIndex);
+
+    public bool Remove(KeyValuePair<string, object?> item) => ((IDictionary<string, object?>)_values).Remove(item);
+
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => _values.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => _values.GetEnumerator();
 }
 
 // Envelope declaring an external-id for IdentityModel via reserved identifier.external.* key
@@ -113,7 +199,7 @@ public class TypedCanonTests
             Id = Guid.CreateVersion7().ToString("n"),
             SourceId = "src-proj-1",
             OccurredAt = DateTimeOffset.UtcNow,
-            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new TestModel
             {
                 ["dummy"] = "alpha",
                 ["name.first"] = "Ann",
@@ -125,7 +211,7 @@ public class TypedCanonTests
             Id = Guid.CreateVersion7().ToString("n"),
             SourceId = "src-proj-2",
             OccurredAt = DateTimeOffset.UtcNow,
-            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new TestModel
             {
                 ["dummy"] = "alpha",
                 ["name.first"] = "Ann",
@@ -231,7 +317,7 @@ public class TypedCanonTests
             Id = Guid.CreateVersion7().ToString("n"),
             SourceId = "src-no-keys",
             OccurredAt = DateTimeOffset.UtcNow,
-            Data = new Dictionary<string, object?> { { "foo", "bar" } }
+            Data = new TestModel { ["foo"] = "bar" }
         };
         using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
         {
@@ -285,7 +371,7 @@ public class TypedCanonTests
             Id = Guid.CreateVersion7().ToString("n"),
             SourceId = "src-exclude-1",
             OccurredAt = DateTimeOffset.UtcNow,
-            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new TestModel
             {
                 ["dummy"] = "k1",
                 ["name.first"] = "Ann",
@@ -355,7 +441,7 @@ public class TypedCanonTests
             Id = Guid.CreateVersion7().ToString("n"),
             SourceId = "src-projtask-1",
             OccurredAt = DateTimeOffset.UtcNow,
-            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new TestModel
             {
                 ["dummy"] = "z1",
                 ["city"] = "Paris"
@@ -411,7 +497,7 @@ public class TypedCanonTests
 
         // Prepare a payload with envelope + discovered external id; skip tag values to force identity path
         var env = new IdentityEnvelope { System = "sysA", Adapter = "adp1", ExternalRef = "ext-123" };
-        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        var payload = new IdentityModel
         {
             [Constants.Envelope.System] = env.System,
             [Constants.Envelope.Adapter] = env.Adapter,
@@ -477,14 +563,14 @@ public class TypedCanonTests
             Id = Guid.CreateVersion7().ToString("n"),
             SourceId = "seed-1",
             OccurredAt = DateTimeOffset.UtcNow,
-            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["dummy"] = "ka" }
+            Data = new TestModel { ["dummy"] = "ka" }
         };
         var r2 = new StageRecord<TestModel>
         {
             Id = Guid.CreateVersion7().ToString("n"),
             SourceId = "seed-2",
             OccurredAt = DateTimeOffset.UtcNow,
-            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["dummy"] = "kb" }
+            Data = new TestModel { ["dummy"] = "kb" }
         };
         using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
         {
@@ -505,7 +591,7 @@ public class TypedCanonTests
             Id = Guid.CreateVersion7().ToString("n"),
             SourceId = "src-collision",
             OccurredAt = DateTimeOffset.UtcNow,
-            Data = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            Data = new TestModel
             {
                 ["dummy"] = new[] { "ka", "kb" }
             }
