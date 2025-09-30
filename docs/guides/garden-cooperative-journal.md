@@ -28,6 +28,15 @@ This chapter walks from **no tech** to **one Koan slice** using **only the data 
 - **Dumb sensors, honest write path**: Pis `POST`; the service decides—immediately—whether a bed is dry enough to nudge.
 - **Three member moves**: see what’s dry, water it, mark it done.
 
+> Companion sample: `samples/guides/g1c1.GardenCoop/`
+>
+> ```pwsh
+> cd samples/guides/g1c1.GardenCoop
+> dotnet run
+> ```
+>
+> The console host launches Koan.Web and serves the AngularJS dashboard straight from `wwwroot/`—no extra scaffolding. Flip the “sensor loop” toggle to let the Pi simulator post readings while you watch reminders light up.
+
 ### Before you start (truthfully low-tech)
 
 - People with watering cans.
