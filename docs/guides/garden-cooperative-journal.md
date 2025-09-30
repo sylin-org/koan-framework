@@ -362,4 +362,3 @@ You began with pencils and habit. You now have a tiny web API, dumb Pis that say
 ---
 
 Want me to append a tiny Pi script (Python) that posts readings and clamps duplicate timestamps so teams can copy-paste and be done?
-
