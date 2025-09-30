@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koan Adapter Benchmark</title>
+    <link rel="stylesheet" href="css/benchmark.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Koan Adapter Benchmark</h1>
+            <p class="subtitle">Compare performance across SQLite, PostgreSQL, MongoDB, and Redis</p>
+        </header>
+
+        <div class="config-panel">
+            <h2>Benchmark Configuration</h2>
+
+            <div class="config-row">
+                <div class="config-group">
+                    <label>Mode</label>
+                    <div class="mode-toggle">
+                        <button id="sequentialBtn" class="mode-btn active">Sequential</button>
+                        <button id="parallelBtn" class="mode-btn">Parallel</button>
+                    </div>
+                    <small class="help-text">
+                        Sequential: Test providers one at a time<br>
+                        Parallel: Test all providers simultaneously
+                    </small>
+                </div>
+
+                <div class="config-group">
+                    <label>Scale</label>
+                    <select id="scaleSelect" class="form-control">
+                        <option value="Quick">Quick (1,000 entities)</option>
+                        <option value="Standard" selected>Standard (5,000 entities)</option>
+                        <option value="Full">Full (10,000 entities)</option>
+                    </select>
+                    <small class="help-text">Number of entities to create and test</small>
+                </div>
+            </div>
+
+            <div class="config-row">
+                <div class="config-group">
+                    <label>Providers</label>
+                    <div id="providerCheckboxes" class="checkbox-group">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="config-group">
+                    <label>Entity Tiers</label>
+                    <div id="tierCheckboxes" class="checkbox-group">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-row">
+                <button id="runBenchmarkBtn" class="btn-primary">Run Benchmark</button>
+                <button id="stopBenchmarkBtn" class="btn-secondary" style="display:none;">Stop</button>
+            </div>
+        </div>
+
+        <div id="progressPanel" class="progress-panel" style="display:none;">
+            <h2>Running Tests...</h2>
+
+            <div class="progress-header">
+                <div>
+                    <strong>Mode:</strong> <span id="currentMode">Sequential</span> |
+                    <strong>Provider:</strong> <span id="currentProvider">-</span>
+                </div>
+                <div>
+                    <strong>Progress:</strong> <span id="progressPercent">0</span>%
+                </div>
+            </div>
+
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+
+            <div class="current-test">
+                <div><strong>Current Test:</strong> <span id="currentTest">-</span></div>
+                <div><strong>Operations:</strong> <span id="currentOps">0</span> / <span id="totalOps">0</span></div>
+                <div><strong>Speed:</strong> <span id="currentSpeed">0</span> ops/sec</div>
+            </div>
+
+            <div class="test-log">
+                <div id="testLog"></div>
+            </div>
+        </div>
+
+        <div id="resultsPanel" class="results-panel" style="display:none;">
+            <h2>Benchmark Results</h2>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="overview">Overview</button>
+                <button class="tab-btn" data-tab="writes">Write Performance</button>
+                <button class="tab-btn" data-tab="reads">Read Performance</button>
+                <button class="tab-btn" data-tab="details">Detailed Results</button>
+            </div>
+
+            <div class="tab-content">
+                <div id="overviewTab" class="tab-pane active">
+                    <div class="overview-grid">
+                        <div class="stat-card">
+                            <h3>Total Duration</h3>
+                            <div id="totalDuration" class="stat-value">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Entities Tested</h3>
+                            <div id="entitiesTested" class="stat-value">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Providers</h3>
+                            <div id="providersCount" class="stat-value">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Tests Completed</h3>
+                            <div id="testsCompleted" class="stat-value">-</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Overall Performance Comparison</h3>
+                        <canvas id="overviewChart"></canvas>
+                    </div>
+
+                    <div class="recommendations">
+                        <h3>📊 Use Case Recommendations</h3>
+                        <div id="recommendations"></div>
+                    </div>
+                </div>
+
+                <div id="writesTab" class="tab-pane">
+                    <div class="chart-container">
+                        <h3>Single Write Performance</h3>
+                        <canvas id="singleWriteChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Batch Write Performance</h3>
+                        <canvas id="batchWriteChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="readsTab" class="tab-pane">
+                    <div class="chart-container">
+                        <h3>Read By ID Performance</h3>
+                        <canvas id="readByIdChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="detailsTab" class="tab-pane">
+                    <div id="detailedResults"></div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>
+                <strong>Note:</strong> PostgreSQL, MongoDB, and Redis run in Docker containers
+                (networked), while SQLite is in-process. Performance differences reflect both
+                provider characteristics and deployment architecture.
+            </p>
+        </footer>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- SignalR -->
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+
+    <!-- Application Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/progress.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/results.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

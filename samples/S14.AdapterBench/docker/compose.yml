@@ -1,0 +1,71 @@
+name: koan-s14-adapterbench
+services:
+  api:
+    build:
+      context: ../../..
+      dockerfile: samples/S14.AdapterBench/Dockerfile
+    image: koan-s14-adapterbench:dev
+    ports:
+      - "5174:5174"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5174"
+      # SQLite (in-process, uses local file)
+      Koan__Data__Sqlite__ConnectionString: "Data Source=/app/data/benchmark.db"
+      # PostgreSQL
+      Koan__Data__Postgres__ConnectionString: "Host=postgres;Port=5432;Database=benchmark;Username=koan;Password=koan_dev"
+      # MongoDB
+      Koan__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
+      Koan__Data__Mongo__Database: "benchmark"
+      # Redis
+      Koan__Data__Redis__ConnectionString: "redis:6379"
+    volumes:
+      - ../data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: s14-postgres
+    environment:
+      POSTGRES_DB: benchmark
+      POSTGRES_USER: koan
+      POSTGRES_PASSWORD: koan_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U koan -d benchmark"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ../data/postgres:/var/lib/postgresql/data
+    ports:
+      - "5175:5432"
+
+  mongo:
+    image: mongo:latest
+    container_name: s14-mongo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ../data/mongo:/data/db
+    ports:
+      - "5176:27017"
+
+  redis:
+    image: redis:7-alpine
+    container_name: s14-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - ../data/redis:/data
+    ports:
+      - "5177:6379"
+
+volumes: {}
