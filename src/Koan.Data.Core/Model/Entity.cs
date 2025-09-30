@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -77,6 +78,15 @@ namespace Koan.Data.Core.Model
             => Data<TEntity, TKey>.AllWithCount(options, ct);
         public static Task<IReadOnlyList<TEntity>> All(string set, CancellationToken ct = default)
             => Data<TEntity, TKey>.All(set, ct);
+        public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(predicate, ct);
+
+        public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(predicate, options, ct);
+
+        public static Task<QueryResult<TEntity>> QueryWithCount(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryWithCount(predicate, options, ct);
+
         public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
             => Data<TEntity, TKey>.Query(query, ct);
 
