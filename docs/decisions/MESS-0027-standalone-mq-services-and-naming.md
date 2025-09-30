@@ -16,7 +16,7 @@ True Outbox requires atomic write with the app’s domain database. A remote “
 - Provide a Redis-backed service exposing:
   - GET /v1/inbox/{key}
   - POST /v1/inbox/mark-processed
-- Ship a thin client (already: `Koan.Messaging.Inbox.Http`).
+- Ship a thin client (already: `Koan.Messaging.Inbox.Connector.Http`).
 - Announce presence over MQ for auto-discovery.
 
 2) Do not build a remote “Outbox service.”
@@ -31,8 +31,8 @@ True Outbox requires atomic write with the app’s domain database. A remote “
   - Inbox service: `Koan-service-inbox-redis`
   - Publisher relay: `Koan-service-mq-gateway`
 - Repo/projects:
-  - Service: `Koan.Service.Inbox.Redis` (service runtime/images)
-  - Client: `Koan.Messaging.Inbox.Http` (already exists)
+  - Service: `Koan.Service.Inbox.Connector.Redis` (service runtime/images)
+  - Client: `Koan.Messaging.Inbox.Connector.Http` (already exists)
   - Optional client: `Koan.Messaging.Publisher.Http`
 - HTTP routes:
   - Base: `/v1/inbox` for inbox; `/v1` for relay publish.
@@ -63,6 +63,7 @@ True Outbox requires atomic write with the app’s domain database. A remote “
 ## Follow-ups
 
 - Add discovery client tests validating announce/ping roundtrip and auto-wiring of `HttpInboxStore`. Implemented in `tests/Koan.Mq.RabbitMq.IntegrationTests/DiscoveryE2ETests.cs`.
-- Service announce responder implemented in `Koan.Service.Inbox.Redis`: listens to `Koan.discovery.ping.{bus}.{group}` and replies with `{ endpoint }`. Configure via `Koan:Messaging:Buses:rabbit:*` and optional `Koan:Messaging:DefaultGroup`.
+- Service announce responder implemented in `Koan.Service.Inbox.Connector.Redis`: listens to `Koan.discovery.ping.{bus}.{group}` and replies with `{ endpoint }`. Configure via `Koan:Messaging:Buses:rabbit:*` and optional `Koan:Messaging:DefaultGroup`.
 - Add docs for the Inbox service API and deployment examples (Docker Compose, K8s).
 - Evaluate adding selection strategy (priority/name) and caching policy tuning.
+

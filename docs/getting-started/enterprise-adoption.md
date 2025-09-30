@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: core
 title: "Enterprise Adoption Guide"
@@ -54,7 +54,7 @@ Koan lets small teams ship sophisticated, AI-native services with governance int
 ### Greenfield Build
 
 - Use `Entity<T>` for every domain aggregate from day one.
-- Declare dependencies through package references (`Koan.Data.Postgres`, `Koan.AI.OpenAI`, etc.) to maintain "Reference = Intent" auditability.
+- Declare dependencies through package references (`Koan.Data.Connector.Postgres`, `Koan.AI.OpenAI`, etc.) to maintain "Reference = Intent" auditability.
 - Keep provider selection per environment in configuration; the code remains unchanged across dev/stage/prod.
 
 ### Brownfield Enhancement
@@ -131,3 +131,4 @@ Create a guild of "Koan champions" who review architecture proposals, run office
 ---
 
 **With Koan, enterprise ambition no longer demands enterprise headcount—deliver more by standardizing on the patterns that scale.**
+

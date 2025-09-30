@@ -14,7 +14,7 @@ Context
 
 Decision
 - Ship two meta packages (NuGet IDs published as Sylin.Koan and Sylin.Koan.App):
-  - Koan (NuGet: Sylin.Koan): depends on Sylin.Koan.Core, Sylin.Koan.Data.Core, Sylin.Koan.Data.Abstractions, Sylin.Koan.Data.Json
+  - Koan (NuGet: Sylin.Koan): depends on Sylin.Koan.Core, Sylin.Koan.Data.Core, Sylin.Koan.Data.Abstractions, Sylin.Koan.Data.Connector.Json
   - Koan.App (NuGet: Sylin.Koan.App): depends on Sylin.Koan and Sylin.Koan.Web
 - Keep assemblies modular; discovery continues to self-register when referenced.
 - JSON adapter retains lowest provider priority; explicit registrations always override.
@@ -26,3 +26,4 @@ Consequences
 
 See also
 - 0009: Unify on IEntity<TKey>
+

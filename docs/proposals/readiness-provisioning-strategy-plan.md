@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Koan's readiness pipeline currently hardcodes schema repair logic inside `AdapterReadinessExtensions.ExecuteWithSchemaProvisioningAsync`, relying on reflection to dispatch a `data.ensureCreated` instruction whenever a repository operation fails due to missing tables or collections.【F:src/Koan.Core.Adapters/Readiness/AdapterReadinessExtensions.cs†L103-L143】【F:docs/guides/deep-dive/auto-provisioning-system.md†L40-L107】 Data adapters such as the Mongo and Couchbase repositories opt-in by wrapping every command in `WithReadinessAsync`, which couples readiness gating with schema-specific heuristics.【F:src/Koan.Data.Mongo/MongoRepository.cs†L95-L103】【F:src/Koan.Data.Couchbase/CouchbaseRepository.cs†L107-L158】 At the same time, AI adapters like Ollama already route chat and embedding requests through the same helper but cannot reuse the provisioning path to pull models because the capability surface advertises only chat/stream/embed flags and lacks any model-management contract.【F:src/Koan.Ai.Provider.Ollama/OllamaAdapter.cs†L98-L220】【F:src/Koan.AI.Contracts/Models/AiCapabilities.cs†L3-L11】【F:src/Koan.AI.Contracts/Adapters/IAiAdapter.cs†L9-L27】 Ollama's discovery flow even performs ad-hoc model downloads during health validation, illustrating the need for first-class AI provisioning hooks.【F:src/Koan.Ai.Provider.Ollama/Discovery/OllamaDiscoveryAdapter.cs†L26-L161】 This plan proposes a break-and-rebuild refactor that generalizes readiness auto-provisioning into pluggable strategies and extends AI capabilities with model provisioning metadata and commands.
+Koan's readiness pipeline currently hardcodes schema repair logic inside `AdapterReadinessExtensions.ExecuteWithSchemaProvisioningAsync`, relying on reflection to dispatch a `data.ensureCreated` instruction whenever a repository operation fails due to missing tables or collections.【F:src/Koan.Core.Adapters/Readiness/AdapterReadinessExtensions.cs†L103-L143】【F:docs/guides/deep-dive/auto-provisioning-system.md†L40-L107】 Data adapters such as the Mongo and Couchbase repositories opt-in by wrapping every command in `WithReadinessAsync`, which couples readiness gating with schema-specific heuristics.【F:src/Koan.Data.Connector.Mongo/MongoRepository.cs†L95-L103】【F:src/Koan.Data.Connector.Couchbase/CouchbaseRepository.cs†L107-L158】 At the same time, AI adapters like Ollama already route chat and embedding requests through the same helper but cannot reuse the provisioning path to pull models because the capability surface advertises only chat/stream/embed flags and lacks any model-management contract.【F:src/Koan.AI.Connector.Ollama/OllamaAdapter.cs†L98-L220】【F:src/Koan.AI.Contracts/Models/AiCapabilities.cs†L3-L11】【F:src/Koan.AI.Contracts/Adapters/IAiAdapter.cs†L9-L27】 Ollama's discovery flow even performs ad-hoc model downloads during health validation, illustrating the need for first-class AI provisioning hooks.【F:src/Koan.AI.Connector.Ollama/Discovery/OllamaDiscoveryAdapter.cs†L26-L161】 This plan proposes a break-and-rebuild refactor that generalizes readiness auto-provisioning into pluggable strategies and extends AI capabilities with model provisioning metadata and commands.
 
 ## Goals
 
@@ -23,12 +23,12 @@ Koan's readiness pipeline currently hardcodes schema repair logic inside `Adapte
 - Documentation reinforces the schema-centric framing, emphasizing table/index provisioning without acknowledging other dependency classes.【F:docs/guides/deep-dive/auto-provisioning-system.md†L40-L130】
 
 ### Adapter Usage Patterns
-- Mongo and Couchbase repositories immediately wrap every command with `WithReadinessAsync`, inheriting the schema auto-provisioning behavior implicitly.【F:src/Koan.Data.Mongo/MongoRepository.cs†L95-L116】【F:src/Koan.Data.Couchbase/CouchbaseRepository.cs†L107-L158】
-- Ollama's adapter also uses readiness gating for chat and embeddings but implements custom streaming readiness checks, showcasing mixed usage and limited retry customization.【F:src/Koan.Ai.Provider.Ollama/OllamaAdapter.cs†L92-L191】
+- Mongo and Couchbase repositories immediately wrap every command with `WithReadinessAsync`, inheriting the schema auto-provisioning behavior implicitly.【F:src/Koan.Data.Connector.Mongo/MongoRepository.cs†L95-L116】【F:src/Koan.Data.Connector.Couchbase/CouchbaseRepository.cs†L107-L158】
+- Ollama's adapter also uses readiness gating for chat and embeddings but implements custom streaming readiness checks, showcasing mixed usage and limited retry customization.【F:src/Koan.AI.Connector.Ollama/OllamaAdapter.cs†L92-L191】
 
 ### AI Model Management Gap
 - `AiCapabilities` only reports service type and high-level feature booleans; `IAiAdapter` exposes no model-management methods.【F:src/Koan.AI.Contracts/Models/AiCapabilities.cs†L3-L11】【F:src/Koan.AI.Contracts/Adapters/IAiAdapter.cs†L9-L27】
-- Ollama's discovery adapter attempts to download required models during health validation via direct HTTP calls, with logging but no provenance or capability metadata.【F:src/Koan.Ai.Provider.Ollama/Discovery/OllamaDiscoveryAdapter.cs†L26-L200】
+- Ollama's discovery adapter attempts to download required models during health validation via direct HTTP calls, with logging but no provenance or capability metadata.【F:src/Koan.AI.Connector.Ollama/Discovery/OllamaDiscoveryAdapter.cs†L26-L200】
 - Because readiness provisioning is schema-only, AI adapters cannot plug their remediation logic into the existing retry pipeline.
 
 ## Target Architecture
@@ -95,4 +95,5 @@ Koan's readiness pipeline currently hardcodes schema repair logic inside `Adapte
 - Refresh `docs/guides/deep-dive/auto-provisioning-system.md` to describe strategy-based provisioning, new AI model flows, and orchestration alignment.
 - Add API documentation for `ModelManagement` capabilities and `IAiModelManager` usage examples.
 - Provide a migration guide for adapter authors adopting provisioning contributors.
+
 

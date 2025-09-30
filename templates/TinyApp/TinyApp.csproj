@@ -6,7 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Sylin.Koan.App" Version="0.1.0-preview" />
-    <PackageReference Include="Sylin.Koan.Web.Swagger" Version="0.1.0-preview" />
-    <PackageReference Include="Sylin.Koan.Data.Sqlite" Version="0.1.0-preview" />
+    <PackageReference Include="Sylin.Koan.Web.Connector.Swagger" Version="0.1.0-preview" />
+    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="0.1.0-preview" />
   </ItemGroup>
 </Project>
+

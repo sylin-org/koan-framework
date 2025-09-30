@@ -5,7 +5,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using S0.ConsoleJsonRepo;
 using Koan.Data.Core;
-using Koan.Data.Json;
+using Koan.Data.Connector.Json;
 using Koan.Core.Pipelines;
 
 var services = new ServiceCollection();

@@ -10,7 +10,7 @@ Contract
 Architecture and flow
 
 - Controllers, not inline endpoints: Expose challenge and callback via attribute-routed controllers for testability.
-- Providers are separate modules (e.g., Koan.Web.Auth.Oidc, Discord, Google). This package supplies shared primitives and policies.
+- Providers are separate modules (e.g., Koan.Web.Auth.Connector.Oidc, Discord, Google). This package supplies shared primitives and policies.
 - Options-centric: Bind provider options from configuration; no magic strings in code-use constants/options.
 
 Schemes and cookies
@@ -139,3 +139,4 @@ References
 - Controllers only (no inline endpoints): `/docs/decisions/WEB-0035-entitycontroller-transformers.md`
 - Config and constants: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`
 - Per-project docs pattern: `/docs/decisions/ARCH-0042-per-project-companion-docs.md`
+

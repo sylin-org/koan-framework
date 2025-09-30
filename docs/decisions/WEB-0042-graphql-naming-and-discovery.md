@@ -11,7 +11,7 @@ title: GraphQL naming & discovery policy - storage-based names, IEntity-only, co
 
 ## Context
 
-During the implementation of `Koan.Web.GraphQl` (ADR-0041), we encountered schema initialization issues in Hot Chocolate caused by duplicate/ambiguous CLR type names and inconsistent naming across payload/input types. The runtime errors included:
+During the implementation of `Koan.Web.Connector.GraphQl` (ADR-0041), we encountered schema initialization issues in Hot Chocolate caused by duplicate/ambiguous CLR type names and inconsistent naming across payload/input types. The runtime errors included:
 
 - "The name becomes immutable once it was assigned" when type names clashed across registrations
 - "The type definition is null" from broken cross-references when reusing names
@@ -91,3 +91,4 @@ Adopt a strict discovery + naming policy for GraphQL auto-generation:
 - ADR-0017: Storage naming conventions
 - ADR-0018: Centralized naming registry and DX
 - ADR-0041: GraphQL module and controller
+

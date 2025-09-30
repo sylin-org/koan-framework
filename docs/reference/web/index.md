@@ -158,7 +158,7 @@ Attach transformers via configuration or attribute decoration depending on the s
 ### Provider Setup
 
 ```bash
-dotnet add package Koan.Web.Auth.Google
+dotnet add package Koan.Web.Auth.Connector.Google
 
 // Program.cs
 builder.Services.AddKoan();
@@ -280,3 +280,4 @@ query {
 
 **Last Validation**: 2025-01-17 by Framework Specialist
 **Framework Version Tested**: v0.2.18+
+

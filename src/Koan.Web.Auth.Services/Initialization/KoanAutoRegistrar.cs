@@ -11,7 +11,7 @@ using Koan.Web.Auth.Services.Authentication;
 using Koan.Web.Auth.Services.Discovery;
 using Koan.Web.Auth.Services.Http;
 using Koan.Web.Auth.Services.Options;
-using Koan.Web.Auth.TestProvider.Options;
+using Koan.Web.Auth.Connector.Test.Options;
 
 namespace Koan.Web.Auth.Services.Initialization;
 

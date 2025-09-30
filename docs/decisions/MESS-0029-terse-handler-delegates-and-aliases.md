@@ -51,7 +51,7 @@ Applies to Koan.Messaging.Core ergonomics. No changes to wire format or transpor
 
 - Implemented in `src/Koan.Messaging.Core/MessagingExtensions.cs` alongside existing helpers.
 - Aliases forward to On<T> and reuse DelegateMessageHandler<T> under the hood.
-- Docs updated: `src/Koan.Messaging.Core/README.md` and `src/Koan.Messaging.RabbitMq/README.md` now show concise examples first; `TECHNICAL.md` mentions the sugar.
+- Docs updated: `src/Koan.Messaging.Core/README.md` and `src/Koan.Messaging.Connector.RabbitMq/README.md` now show concise examples first; `TECHNICAL.md` mentions the sugar.
 
 ## Follow-ups
 
@@ -63,3 +63,4 @@ Applies to Koan.Messaging.Core ergonomics. No changes to wire format or transpor
 - MESS-0024 - Batch semantics, handlers, and aliasing
 - MESS-0022 - MQ provisioning defaults, type aliases/attributes, and dispatcher
 - ARCH-0042 - Per-project companion docs
+

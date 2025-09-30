@@ -50,7 +50,7 @@ The AI pillar stays stateless; combine with Flow/Background services for long-ru
 dotnet add package Koan.AI
 
 // Optional providers
-dotnet add package Koan.Ai.Provider.Ollama
+dotnet add package Koan.AI.Connector.Ollama
 dotnet add package Koan.Ai.Provider.OpenAi
 ```
 
@@ -715,3 +715,4 @@ validation guardrails that align with the new S12.MedTrials sample.
 
 **Last Validation**: 2025-01-17 by Framework Specialist
 **Framework Version Tested**: v0.2.18+
+

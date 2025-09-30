@@ -20,8 +20,8 @@
     <ProjectReference Include="..\KoanAspireIntegration\KoanAspireIntegration.csproj" />
     <ProjectReference Include="..\..\src\Koan.Orchestration.Aspire\Koan.Orchestration.Aspire.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\src\Koan.Data.Postgres\Koan.Data.Postgres.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\src\Koan.Data.Redis\Koan.Data.Redis.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\src\\Connectors\\Data\\Postgres\Koan.Data.Connector.Postgres.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\src\\Connectors\\Data\\Redis\Koan.Data.Connector.Redis.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 
 </Project>

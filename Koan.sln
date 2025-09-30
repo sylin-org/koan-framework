@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -11,7 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C3E7A8B9
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Storage", "src\Koan.Storage\Koan.Storage.csproj", "{9E8B7C6D-1234-4E5F-9A0B-ABCDEF123450}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Storage.Local", "src\Koan.Storage.Local\Koan.Storage.Local.csproj", "{9E8B7C6D-1234-4E5F-9A0B-ABCDEF123451}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Storage.Connector.Local", "src\\Connectors\\Storage\\Local\Koan.Storage.Connector.Local.csproj", "{9E8B7C6D-1234-4E5F-9A0B-ABCDEF123451}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Storage.Tests", "tests\Koan.Storage.Tests\Koan.Storage.Tests.csproj", "{9E8B7C6D-1234-4E5F-9A0B-ABCDEF123452}"
 EndProject
@@ -21,23 +21,23 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Vector.Abstractio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Vector", "src\Koan.Data.Vector\Koan.Data.Vector.csproj", "{A3E4B245-5C66-4F6F-A1B9-07B58A2D1C6A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Weaviate", "src\Koan.Data.Weaviate\Koan.Data.Weaviate.csproj", "{B3D5CFF3-2D8B-4C55-A2D8-0D9D5E3F7C0A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Vector.Connector.Weaviate", "src\\Connectors\\Data\\Vector\\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj", "{B3D5CFF3-2D8B-4C55-A2D8-0D9D5E3F7C0A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Weaviate.IntegrationTests", "tests\Koan.Data.Weaviate.IntegrationTests\Koan.Data.Weaviate.IntegrationTests.csproj", "{3F11A49F-8D41-4D47-9A99-29F8E33B9E56}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Vector.Connector.Weaviate.IntegrationTests", "tests\Koan.Data.Vector.Connector.Weaviate.IntegrationTests\Koan.Data.Vector.Connector.Weaviate.IntegrationTests.csproj", "{3F11A49F-8D41-4D47-9A99-29F8E33B9E56}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Postgres", "src\Koan.Data.Postgres\Koan.Data.Postgres.csproj", "{D6B0C1E2-ABCD-4F12-9E34-112233445566}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Postgres", "src\\Connectors\\Data\\Postgres\Koan.Data.Connector.Postgres.csproj", "{D6B0C1E2-ABCD-4F12-9E34-112233445566}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Direct", "src\Koan.Data.Direct\Koan.Data.Direct.csproj", "{4A4F5C3E-1D2B-4C6D-9A15-2F3B4C6D7E8F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Postgres.Tests", "tests\Koan.Data.Postgres.Tests\Koan.Data.Postgres.Tests.csproj", "{AABBCCDD-1122-3344-5566-77889900AABB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Postgres.Tests", "tests\Koan.Data.Connector.Postgres.Tests\Koan.Data.Connector.Postgres.Tests.csproj", "{AABBCCDD-1122-3344-5566-77889900AABB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.SqlServer", "src\Koan.Data.SqlServer\Koan.Data.SqlServer.csproj", "{2B2B6F6E-9E0C-4B42-9B3B-2C7B2C4E6D10}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.SqlServer", "src\\Connectors\\Data\\SqlServer\Koan.Data.Connector.SqlServer.csproj", "{2B2B6F6E-9E0C-4B42-9B3B-2C7B2C4E6D10}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.SqlServer.Tests", "tests\Koan.Data.SqlServer.Tests\Koan.Data.SqlServer.Tests.csproj", "{3C3C7E7F-AD21-4E50-9B69-6B1C6E8F7A21}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.SqlServer.Tests", "tests\Koan.Data.Connector.SqlServer.Tests\Koan.Data.Connector.SqlServer.Tests.csproj", "{3C3C7E7F-AD21-4E50-9B69-6B1C6E8F7A21}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Messaging.Core", "src\Koan.Messaging.Core\Koan.Messaging.Core.csproj", "{A1B2C3D4-0001-4000-8000-000000000002}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Messaging.RabbitMq", "src\Koan.Messaging.RabbitMq\Koan.Messaging.RabbitMq.csproj", "{A1B2C3D4-0001-4000-8000-000000000003}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Messaging.Connector.RabbitMq", "src\\Connectors\\Messaging\\RabbitMq\Koan.Messaging.Connector.RabbitMq.csproj", "{A1B2C3D4-0001-4000-8000-000000000003}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S3.Mq.Sample", "samples\S3.Mq.Sample\S3.Mq.Sample.csproj", "{A1B2C3D4-0001-4000-8000-000000000004}"
 EndProject
@@ -53,35 +53,35 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Core", "src\Koan.Core\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Abstractions", "src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj", "{6E8C2AC3-C3E2-476A-8F31-A727CD774AD9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Json", "src\Koan.Data.Json\Koan.Data.Json.csproj", "{897E7BA4-B952-4A05-9107-DBAD572F309D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Json", "src\\Connectors\\Data\\Json\Koan.Data.Connector.Json.csproj", "{897E7BA4-B952-4A05-9107-DBAD572F309D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Core", "src\Koan.Data.Core\Koan.Data.Core.csproj", "{7A9AF089-3E9A-4B13-9CE8-2E8C6EC48E46}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Json.Tests", "tests\Koan.Data.Json.Tests\Koan.Data.Json.Tests.csproj", "{B63A18EB-8B77-4A7B-B9D4-17CE478CF46D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Json.Tests", "tests\Koan.Data.Connector.Json.Tests\Koan.Data.Connector.Json.Tests.csproj", "{B63A18EB-8B77-4A7B-B9D4-17CE478CF46D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S0.ConsoleJsonRepo.Tests", "tests\S0.ConsoleJsonRepo.Tests\S0.ConsoleJsonRepo.Tests.csproj", "{9A1C2B4D-EB4F-48C6-83E4-9AE54429A4B8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Core.Tests", "tests\Koan.Data.Core.Tests\Koan.Data.Core.Tests.csproj", "{1C42FAD6-7B14-43F9-83C4-25B8F6C27B8B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Sqlite", "src\Koan.Data.Sqlite\Koan.Data.Sqlite.csproj", "{FEE3C69D-81C2-4F60-A7DD-89A848ABCA33}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Sqlite", "src\\Connectors\\Data\\Sqlite\Koan.Data.Connector.Sqlite.csproj", "{FEE3C69D-81C2-4F60-A7DD-89A848ABCA33}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Relational", "src\Koan.Data.Relational\Koan.Data.Relational.csproj", "{A0183773-0F7A-4F92-9310-83E51E4794BC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Relational.Tests", "tests\Koan.Data.Relational.Tests\Koan.Data.Relational.Tests.csproj", "{7B6A14C3-192F-4A96-8422-1BFBDE30B2B3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Sqlite.Tests", "tests\Koan.Data.Sqlite.Tests\Koan.Data.Sqlite.Tests.csproj", "{0C1B2611-CE11-4CE1-A49F-405DE5546040}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Sqlite.Tests", "tests\Koan.Data.Connector.Sqlite.Tests\Koan.Data.Connector.Sqlite.Tests.csproj", "{0C1B2611-CE11-4CE1-A49F-405DE5546040}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Mongo", "src\Koan.Data.Mongo\Koan.Data.Mongo.csproj", "{5D58B785-06F4-422A-902A-69D46C75AB10}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Mongo", "src\\Connectors\\Data\\Mongo\Koan.Data.Connector.Mongo.csproj", "{5D58B785-06F4-422A-902A-69D46C75AB10}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Couchbase", "src\Koan.Data.Couchbase\Koan.Data.Couchbase.csproj", "{B60C3FFC-0CD2-4CBD-8D1B-CB9E5F1259EB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Couchbase", "src\\Connectors\\Data\\Couchbase\Koan.Data.Connector.Couchbase.csproj", "{B60C3FFC-0CD2-4CBD-8D1B-CB9E5F1259EB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S2.Api", "samples\S2.Api\S2.Api.csproj", "{19EE4A19-9BD0-47D6-8314-28CFA63A2090}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Data.Cqrs.Outbox.Mongo", "src\Koan.Data.Cqrs.Outbox.Mongo\Koan.Data.Cqrs.Outbox.Mongo.csproj", "{8F1F0A3A-9B44-471A-8DC2-F78F77E538FC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Data.Cqrs.Outbox.Connector.Mongo", "src\\Connectors\\Data\\Cqrs\\Outbox\\Mongo\Koan.Data.Cqrs.Outbox.Connector.Mongo.csproj", "{8F1F0A3A-9B44-471A-8DC2-F78F77E538FC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Service.Inbox.Redis", "src\Koan.Service.Inbox.Redis\Koan.Service.Inbox.Redis.csproj", "{3B3105F2-3576-4B89-9E69-954AE2E26B63}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Service.Inbox.Connector.Redis", "src\\Connectors\\Service\\Inbox\\Redis\Koan.Service.Inbox.Connector.Redis.csproj", "{3B3105F2-3576-4B89-9E69-954AE2E26B63}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.GraphQl", "src\Koan.Web.GraphQl\Koan.Web.GraphQl.csproj", "{8B5D26DE-3D36-4B11-BCF5-FC30E6A68E5E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Connector.GraphQl", "src\\Connectors\\Web\\GraphQl\Koan.Web.Connector.GraphQl.csproj", "{8B5D26DE-3D36-4B11-BCF5-FC30E6A68E5E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S4.Web.IntegrationTests", "tests\S4.Web.IntegrationTests\S4.Web.IntegrationTests.csproj", "{E1BFC3C1-9F53-4A88-8B07-0E3F4E1E3F77}"
 EndProject
@@ -89,13 +89,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI.Contracts", "src\Ko
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI", "src\Koan.AI\Koan.AI.csproj", "{661803BD-E26C-4288-8783-7FB8049298B8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Ai.Provider.Ollama", "src\Koan.Ai.Provider.Ollama\Koan.Ai.Provider.Ollama.csproj", "{6EA98E0D-65CD-4C3B-90DB-7DC6309D73CF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI.Connector.Ollama", "src\\Connectors\\AI\\Ollama\Koan.AI.Connector.Ollama.csproj", "{6EA98E0D-65CD-4C3B-90DB-7DC6309D73CF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Redis", "src\Koan.Data.Redis\Koan.Data.Redis.csproj", "{22A2A0B9-87B3-4570-97AC-4EB37EED69CE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Redis", "src\\Connectors\\Data\\Redis\Koan.Data.Connector.Redis.csproj", "{22A2A0B9-87B3-4570-97AC-4EB37EED69CE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Redis.IntegrationTests", "tests\Koan.Data.Redis.IntegrationTests\Koan.Data.Redis.IntegrationTests.csproj", "{705D6AB1-D935-4F08-A8CD-84739093F1B4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.Redis.IntegrationTests", "tests\Koan.Data.Connector.Redis.IntegrationTests\Koan.Data.Connector.Redis.IntegrationTests.csproj", "{705D6AB1-D935-4F08-A8CD-84739093F1B4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Web.Swagger", "src\Koan.Web.Swagger\Koan.Web.Swagger.csproj", "{D5A8AA11-3F4B-4D2E-BB22-1E2C3D4F5A60}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Web.Connector.Swagger", "src\\Connectors\\Web\\Swagger\Koan.Web.Connector.Swagger.csproj", "{D5A8AA11-3F4B-4D2E-BB22-1E2C3D4F5A60}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Web.Transformers", "src\Koan.Web.Transformers\Koan.Web.Transformers.csproj", "{AA12BB34-56CD-4789-AB12-3456CD78EF90}"
 EndProject
@@ -105,7 +105,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "S1.Web.IntegrationTests", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "S2.Api.IntegrationTests", "tests\S2.Api.IntegrationTests\S2.Api.IntegrationTests.csproj", "{A2B3C4D5-E6F7-4801-9A12-3B4C5D6E7F80}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Data.Mongo.Tests", "tests\Koan.Data.Mongo.Tests\Koan.Data.Mongo.Tests.csproj", "{A7B8C9D0-E1F2-43A4-95B6-17C28394D5E6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Koan.Data.Connector.Mongo.Tests", "tests\Koan.Data.Connector.Mongo.Tests\Koan.Data.Connector.Mongo.Tests.csproj", "{A7B8C9D0-E1F2-43A4-95B6-17C28394D5E6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S5.Recs", "samples\S5.Recs\S5.Recs.csproj", "{179A2BCA-03E4-CD52-43D5-7CEAF92B7BFB}"
 EndProject
@@ -129,15 +129,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Media.Web", "src\Koan.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI.Web", "src\Koan.AI.Web\Koan.AI.Web.csproj", "{BB7575E8-1B40-4FCD-AFB5-40AA473AF7C6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Discord", "src\Koan.Web.Auth.Discord\Koan.Web.Auth.Discord.csproj", "{3CBD4C6B-73C0-41DC-A51B-9FE52B2A832F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Connector.Discord", "src\\Connectors\\Web\\Auth\\Discord\Koan.Web.Auth.Connector.Discord.csproj", "{3CBD4C6B-73C0-41DC-A51B-9FE52B2A832F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Google", "src\Koan.Web.Auth.Google\Koan.Web.Auth.Google.csproj", "{250EC35C-E071-474E-8750-2D09BDBADB96}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Connector.Google", "src\\Connectors\\Web\\Auth\\Google\Koan.Web.Auth.Connector.Google.csproj", "{250EC35C-E071-474E-8750-2D09BDBADB96}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Microsoft", "src\Koan.Web.Auth.Microsoft\Koan.Web.Auth.Microsoft.csproj", "{9CD58409-58C4-4C17-A7C6-63C626214F11}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Connector.Microsoft", "src\\Connectors\\Web\\Auth\\Microsoft\Koan.Web.Auth.Connector.Microsoft.csproj", "{9CD58409-58C4-4C17-A7C6-63C626214F11}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Oidc", "src\Koan.Web.Auth.Oidc\Koan.Web.Auth.Oidc.csproj", "{FBF3DE5F-4D85-453E-BB51-8B2C6D37F44E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Connector.Oidc", "src\\Connectors\\Web\\Auth\\Oidc\Koan.Web.Auth.Connector.Oidc.csproj", "{FBF3DE5F-4D85-453E-BB51-8B2C6D37F44E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.TestProvider", "src\Koan.Web.Auth.TestProvider\Koan.Web.Auth.TestProvider.csproj", "{EADD6AF9-B989-4835-8E5D-07468E2B99FD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Connector.Test", "src\\Connectors\\Web\\Auth\\Test\Koan.Web.Auth.Connector.Test.csproj", "{EADD6AF9-B989-4835-8E5D-07468E2B99FD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Core.Tests", "tests\Koan.Core.Tests\Koan.Core.Tests.csproj", "{80522DD0-F5C7-469A-AF7E-2A8510838619}"
 EndProject
@@ -149,17 +149,17 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Abstractions", "src\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj", "{4F9E7ACB-27CD-4DDE-9FE1-603C5A4E1762}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Renderers.Compose", "src\Koan.Orchestration.Renderers.Compose\Koan.Orchestration.Renderers.Compose.csproj", "{C9C8F372-8EBD-466E-AD34-39F4CBB4F85C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Renderers.Connector.Compose", "src\\Connectors\\Orchestration\\Renderers\\Compose\Koan.Orchestration.Renderers.Connector.Compose.csproj", "{C9C8F372-8EBD-466E-AD34-39F4CBB4F85C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Renderers.Compose.Tests", "tests\Koan.Orchestration.Renderers.Compose.Tests\Koan.Orchestration.Renderers.Compose.Tests.csproj", "{9182177C-0F4D-4364-A6E1-5DB85F84B3E1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Renderers.Connector.Compose.Tests", "tests\Koan.Orchestration.Renderers.Connector.Compose.Tests\Koan.Orchestration.Renderers.Connector.Compose.Tests.csproj", "{9182177C-0F4D-4364-A6E1-5DB85F84B3E1}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Cli", "src\Koan.Orchestration.Cli\Koan.Orchestration.Cli.csproj", "{BC8106B1-AE34-4E2D-BA98-8FDFE965DA11}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Provider.Docker", "src\Koan.Orchestration.Provider.Docker\Koan.Orchestration.Provider.Docker.csproj", "{95917CF2-6A14-4F0E-9794-05622D89EF48}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Connector.Docker", "src\\Connectors\\Orchestration\\Docker\Koan.Orchestration.Connector.Docker.csproj", "{95917CF2-6A14-4F0E-9794-05622D89EF48}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Generators", "src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj", "{53DDB89A-929F-4C07-B8B4-5B638BD37B25}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Provider.Podman", "src\Koan.Orchestration.Provider.Podman\Koan.Orchestration.Provider.Podman.csproj", "{2A400E91-CAEC-483A-8CE0-91A2C0762C62}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Orchestration.Connector.Podman", "src\\Connectors\\Orchestration\\Podman\Koan.Orchestration.Connector.Podman.csproj", "{2A400E91-CAEC-483A-8CE0-91A2C0762C62}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Recipe.Abstractions", "src\Koan.Recipe.Abstractions\Koan.Recipe.Abstractions.csproj", "{A9F2816E-7C43-4F86-9672-9B3E63D8AE00}"
 EndProject
@@ -167,9 +167,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Recipe.Observability",
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CLI", "CLI", "{9A2E40EC-8ECB-425E-9106-4DD73037C695}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Secrets.Vault", "src\Koan.Secrets.Vault\Koan.Secrets.Vault.csproj", "{C0E40D3E-2026-4D4F-88DD-30B1770B46C6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Secrets.Connector.Vault", "src\\Connectors\\Secrets\\Vault\Koan.Secrets.Connector.Vault.csproj", "{C0E40D3E-2026-4D4F-88DD-30B1770B46C6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Secrets.Vault.Tests", "tests\Koan.Secrets.Vault.Tests\Koan.Secrets.Vault.Tests.csproj", "{B8EEA221-60F1-4CF4-9C5E-6ECB20B80B42}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Secrets.Connector.Vault.Tests", "tests\Koan.Secrets.Connector.Vault.Tests\Koan.Secrets.Connector.Vault.Tests.csproj", "{B8EEA221-60F1-4CF4-9C5E-6ECB20B80B42}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Extensions", "src\Koan.Web.Extensions\Koan.Web.Extensions.csproj", "{40A2DC22-BDDF-4A95-BCD1-6015B32D9545}"
 EndProject
@@ -185,7 +185,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Canon.Core", "src\Koan
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Canon.Web", "src\Koan.Canon.Web\Koan.Canon.Web.csproj", "{D9228411-D98B-46AD-9C25-C3173C59886C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Canon.Runtime.Dapr", "src\Koan.Canon.Runtime.Dapr\Koan.Canon.Runtime.Dapr.csproj", "{CF15EF5F-7B2D-4FAD-8DD4-3C16E83C5ECF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Canon.Runtime.Connector.Dapr", "src\\Connectors\\Canon\\Runtime\\Dapr\Koan.Canon.Runtime.Connector.Dapr.csproj", "{CF15EF5F-7B2D-4FAD-8DD4-3C16E83C5ECF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "S8.Canon", "S8.Canon", "{B31C479E-FAE6-62FF-1E7C-8A8FB8D50E89}"
 EndProject
@@ -237,11 +237,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S12.MedTrials.Core", "sampl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S12.MedTrials.McpService", "samples\S12.MedTrials.McpService\S12.MedTrials.McpService.csproj", "{B4F9E1FD-A995-425D-9B66-046550315483}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.ElasticSearch", "src\Koan.Data.ElasticSearch\Koan.Data.ElasticSearch.csproj", "{47CCCDE1-BD45-4649-BE3F-AC35C832ED50}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.ElasticSearch", "src\\Connectors\\Data\\ElasticSearch\Koan.Data.Connector.ElasticSearch.csproj", "{47CCCDE1-BD45-4649-BE3F-AC35C832ED50}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.OpenSearch", "src\Koan.Data.OpenSearch\Koan.Data.OpenSearch.csproj", "{FDD32230-28EB-4A5D-B24C-6C416159290B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.OpenSearch", "src\\Connectors\\Data\\OpenSearch\Koan.Data.Connector.OpenSearch.csproj", "{FDD32230-28EB-4A5D-B24C-6C416159290B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Milvus", "src\Koan.Data.Milvus\Koan.Data.Milvus.csproj", "{F42F0FDA-C993-4504-9F92-42BF94336535}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Vector.Connector.Milvus", "src\\Connectors\\Data\\Vector\\Milvus\Koan.Data.Vector.Connector.Milvus.csproj", "{F42F0FDA-C993-4504-9F92-42BF94336535}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "g1c1.GardenCoop", "samples\guides\g1c1.GardenCoop\g1c1.GardenCoop.csproj", "{8F136721-B2F9-2CB7-AF6D-9E91E1149D65}"
 EndProject
@@ -3764,3 +3764,4 @@ Global
 		SolutionGuid = {7E07C690-9590-4734-A33E-AC89EAABC366}
 	EndGlobalSection
 EndGlobal
+

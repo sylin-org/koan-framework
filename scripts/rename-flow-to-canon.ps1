@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Root = $null
 )
 
@@ -33,8 +33,8 @@ $excludeDirs = @(
 $pathMap = [ordered]@{
     'src/Koan.Canon.Core'         = 'src/Koan.Canon.Core'
     'src/Koan.Canon.Web'          = 'src/Koan.Canon.Web'
-    'src/Koan.Canon.Runtime.Dapr' = 'src/Koan.Canon.Runtime.Dapr'
-    'src/Koan.Canon.RabbitMq'     = 'src/Koan.Canon.RabbitMq'
+    'src/Koan.Canon.Runtime.Connector.Dapr' = 'src/Koan.Canon.Runtime.Connector.Dapr'
+    'src/Koan.Canon.Connector.RabbitMq'     = 'src/Koan.Canon.Connector.RabbitMq'
     'tests/Koan.Canon.Core.Tests' = 'tests/Koan.Canon.Core.Tests'
     'docs/reference/flow'         = 'docs/reference/canon'
     'samples/S8.Canon'            = 'samples/S8.Canon'
@@ -149,3 +149,4 @@ foreach ($file in $files) {
 }
 
 Write-Step "rename complete"
+

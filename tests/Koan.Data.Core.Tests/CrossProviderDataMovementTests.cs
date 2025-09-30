@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
-using Koan.Data.Json;
-using Koan.Data.Sqlite;
+using Koan.Data.Connector.Json;
+using Koan.Data.Connector.Sqlite;
 using Xunit;
 
 namespace Koan.Data.Core.Tests;

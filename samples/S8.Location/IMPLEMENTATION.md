@@ -1,4 +1,4 @@
-﻿# S8.Location Implementation Guide
+# S8.Location Implementation Guide
 
 **Zero to Completion Development Plan**
 
@@ -757,7 +757,7 @@ public record CreateLocationRequest(string Address, string? ExternalId = null);
 using S8.Location.Core.Models;
 using Koan.Data.Core;
 using Koan.Canon.Initialization;
-using Koan.Web.Swagger;
+using Koan.Web.Connector.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -1400,3 +1400,4 @@ public class LocationHealthContributor : IHealthContributor
 **Estimated Effort**: 8 development days  
 **Framework Dependencies**: ✅ All available in Koan Framework  
 **External Dependencies**: Google Maps API key (optional, has fallback)
+

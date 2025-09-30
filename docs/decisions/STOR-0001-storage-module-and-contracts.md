@@ -33,7 +33,7 @@ Decision
 
 Scope
 
-- In scope: entity contracts, provider contracts and capabilities, orchestrator/router/audit contracts, options, and module split. Include Koan.Storage.Local as the baseline provider in the first iteration.
+- In scope: entity contracts, provider contracts and capabilities, orchestrator/router/audit contracts, options, and module split. Include Koan.Storage.Connector.Local as the baseline provider in the first iteration.
 - Out of scope: specific cloud adapters (to be added as thin providers) and UI integrations.
 
 Contracts (indicative)
@@ -91,3 +91,4 @@ References
 - ARCH-0040 Config and constants naming
 - WEB-0035 EntityController transformers
 - DATA-0061 Data access pagination and streaming
+

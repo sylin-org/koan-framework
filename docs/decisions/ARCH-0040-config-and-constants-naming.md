@@ -13,7 +13,7 @@ KoanConfig provided resilient configuration access. Call sites were verbose (Koa
 
 ## Decision
 1) Rename KoanConfig to a static class named Configuration in the Koan.Core namespace. Call sites now use Koan.Core.Configuration.Read/ReadFirst, keeping names short, explicit, and discoverable.
-2) Standardize per-assembly constants type name to Constants, relying on namespaces for clarity (e.g., Koan.Web.Swagger.Infrastructure.Constants). No functional behavior changed.
+2) Standardize per-assembly constants type name to Constants, relying on namespaces for clarity (e.g., Koan.Web.Connector.Swagger.Infrastructure.Constants). No functional behavior changed.
 
 ## Consequences
 - Simpler call sites and consistent ergonomics across modules.
@@ -27,3 +27,4 @@ KoanConfig provided resilient configuration access. Call sites were verbose (Koa
 ## Migration notes
 - Fully-qualified calls updated from Koan.Core.Configuration.KoanConfig.Read to Koan.Core.Configuration.Read (and similar for ReadFirst and typed overloads).
 - Constants classes renamed in Web.Swagger, Web.Transformers, Messaging.Core.
+

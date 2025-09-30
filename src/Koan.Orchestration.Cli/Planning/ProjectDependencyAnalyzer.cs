@@ -284,7 +284,7 @@ internal static class ProjectDependencyAnalyzer
 
     /// <summary>
     /// Discover Koan.* assembly references for the current project (best-effort, read-only).
-    /// Returns simple assembly names (e.g., Koan.Data.Postgres, Koan.Web, Koan.Messaging.RabbitMq).
+    /// Returns simple assembly names (e.g., Koan.Data.Connector.Postgres, Koan.Web, Koan.Messaging.Connector.RabbitMq).
     /// </summary>
     public static List<string>? DiscoverKoanReferences()
     {
@@ -869,3 +869,4 @@ internal static class ProjectDependencyAnalyzer
         }
     }
 }
+

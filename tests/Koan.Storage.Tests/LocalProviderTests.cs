@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Storage;
 using Koan.Storage.Abstractions;
 using Koan.Storage.Extensions;
-using Koan.Storage.Local;
+using Koan.Storage.Connector.Local;
 using Koan.Storage.Options;
 using Xunit;
 
@@ -196,3 +196,4 @@ public class LocalProviderTests
         public void Dispose() { try { Directory.Delete(Path, true); } catch { } }
     }
 }
+

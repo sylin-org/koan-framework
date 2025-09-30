@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -16,7 +16,7 @@
     <!-- Core Koan Framework -->
     <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
+    <ProjectReference Include="..\..\..\src\\Connectors\\Web\\Swagger\Koan.Web.Connector.Swagger.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Web\Koan.Web.csproj" />
     
     <!-- Local project reference -->

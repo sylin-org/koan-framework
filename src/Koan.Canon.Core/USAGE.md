@@ -81,7 +81,7 @@ Add the Koan.Canon.Core package to your project:
 
 ```xml
 <PackageReference Include="Sylin.Koan.Canon.Core" Version="0.2.14" />
-<PackageReference Include="Sylin.Koan.Data.Json" Version="0.2.14" /> <!-- For file-based storage -->
+<PackageReference Include="Sylin.Koan.Data.Connector.Json" Version="0.2.14" /> <!-- For file-based storage -->
 ```
 
 ### 2. Basic Configuration
@@ -2040,16 +2040,17 @@ Keep these nearby patterns in mind when applying Flow in a broader app:
 
 - Messaging commands and retries: use IMessageHandler<T> and the message bus for reliable command delivery and idempotency. See Messaging reference and samples:
   - Reference: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/reference/messaging.md
-  - RabbitMQ adapter samples: https://github.com/sylin-labs/Koan-framework/tree/dev/src/Koan.Messaging.RabbitMq
+  - RabbitMQ adapter samples: https://github.com/sylin-labs/Koan-framework/tree/dev/src/Koan.Messaging.Connector.RabbitMq
 - HTTP APIs via controllers: expose routes with attribute-routed MVC controllers only; avoid inline MapGet/MapPost. Guidance and ADRs:
   - Engineering guidance: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/engineering/index.md
   - Web HTTP API: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/api/web-http-api.md
 - Data access at scale: prefer FirstPage/Page or streaming (AllStream/QueryStream) for large sets; avoid unbounded All/Query. Background:
   - Guide: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/guides/data/all-query-streaming-and-pager.md
   - ADR: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md
-- OpenAPI/Swagger: enable discoverability and client generation with Koan.Web.Swagger.
+- OpenAPI/Swagger: enable discoverability and client generation with Koan.Web.Connector.Swagger.
   - Reference: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/api/openapi-generation.md
 - Constants and options: centralize route keys, headers, and toggles; avoid magic values.
   - ADR: https://github.com/sylin-labs/Koan-framework/blob/dev/docs/decisions/ARCH-0040-config-and-constants-naming.md
+
 
 

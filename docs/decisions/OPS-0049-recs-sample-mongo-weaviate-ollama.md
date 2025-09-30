@@ -28,8 +28,8 @@ Operational UX:
 
 1. Storage choices
 
-- Document DB: MongoDB (Koan.Data.Mongo) for flexible metadata.
-- Vector DB: Weaviate (Koan.Data.Weaviate) with vectorizer = none. The app supplies embeddings.
+- Document DB: MongoDB (Koan.Data.Connector.Mongo) for flexible metadata.
+- Vector DB: Weaviate (Koan.Data.Vector.Connector.Weaviate) with vectorizer = none. The app supplies embeddings.
 
 2. Embeddings
 
@@ -114,3 +114,4 @@ Negative / Risks
 - End-to-end demo: seed → browse → rate → refreshed recs within seconds.
 - Idempotent reseed with high cache hit rate.
 - Admin diagnostics show selected Ollama endpoint and model, counts, and last run summary.
+

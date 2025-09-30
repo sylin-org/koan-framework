@@ -3,7 +3,7 @@ using Koan.Data.Core;
 using Koan.Messaging;
 using Koan.Web.Extensions;
 using Koan.Web.Extensions.GenericControllers;
-using Koan.Web.Swagger;
+using Koan.Web.Connector.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +14,7 @@ builder.Services.AddKoan()
 
 // Optional: enable OpenTelemetry based on config/env (Koan:Observability or OTEL_* env vars)
 builder.Services.AddKoanObservability();
-// Swagger/OpenAPI is auto-registered via Koan.Web.Swagger. Call AddKoanSwagger only for custom config.
+// Swagger/OpenAPI is auto-registered via Koan.Web.Connector.Swagger. Call AddKoanSwagger only for custom config.
 
 // Enable Mongo adapter via discovery or explicit registration (optional)
 // builder.Services.AddMongoAdapter();
@@ -38,3 +38,4 @@ namespace S2.Api
 {
     public partial class Program { }
 }
+

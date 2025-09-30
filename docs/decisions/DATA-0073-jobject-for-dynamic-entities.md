@@ -1,4 +1,4 @@
-﻿# DATA-0073: Use JObject for Dynamic Entity Models
+# DATA-0073: Use JObject for Dynamic Entity Models
 
 - Status: accepted
 - Date: 2025-09-10
@@ -28,7 +28,7 @@ Chosen option: "Switch to `Newtonsoft.Json.Linq.JObject`".
 
 This decision was implemented by:
 
-1.  **Creating a Custom `JObjectSerializer`**: A new serializer (`Koan.Data.Mongo.Initialization.JObjectSerializer`) was created to handle the serialization and deserialization of `JObject` to and from BSON. This serializer is designed to be robust, correctly handling both BSON documents and primitive types by wrapping primitives in a standard `{"value": ...}` structure.
+1.  **Creating a Custom `JObjectSerializer`**: A new serializer (`Koan.Data.Connector.Mongo.Initialization.JObjectSerializer`) was created to handle the serialization and deserialization of `JObject` to and from BSON. This serializer is designed to be robust, correctly handling both BSON documents and primitive types by wrapping primitives in a standard `{"value": ...}` structure.
 2.  **Creating a `JObjectSerializationProvider`**: A corresponding `IBsonSerializationProvider` was created to register the custom serializer with the MongoDB driver for types `JObject` and `object`.
 3.  **Refactoring Core Components**: All instances of `ExpandoObject` in `Koan.Canon.Core` were replaced with `JObject`. This included `IDynamicFlowEntity`, `DynamicFlowEntity<TModel>`, and various extension methods.
 4.  **Updating Orchestration Logic**: The `FlowOrchestratorBase` was updated to materialize incoming message payloads directly into `JObject`, ensuring that the model is treated consistently throughout the processing pipeline.
@@ -47,3 +47,4 @@ This decision was implemented by:
 ## ADR-0053: `Koan-flow` pillar, entity-first and auto-registrar
 
 This decision aligns with the principles of `ARCH-0053`, which emphasizes an entity-first approach. By choosing a robust representation for our dynamic entities (`JObject`), we ensure that the entity model is reliable and can be handled consistently by the underlying infrastructure, including the auto-registrar and persistence layers.
+

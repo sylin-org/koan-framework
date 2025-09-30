@@ -7,7 +7,7 @@
 
 ## Context
 
-Koan Framework previously only supported browser-based user authentication through cookies via `Koan.Web.Auth` and `Koan.Web.Auth.TestProvider`. This approach worked well for traditional web applications but created significant limitations for distributed microservices architectures:
+Koan Framework previously only supported browser-based user authentication through cookies via `Koan.Web.Auth` and `Koan.Web.Auth.Connector.Test`. This approach worked well for traditional web applications but created significant limitations for distributed microservices architectures:
 
 1. **No Service-to-Service Authentication**: Applications couldn't securely communicate with each other
 2. **JWT Token Consumption**: JWT tokens from TestProvider were consumed server-side and not propagated to downstream services

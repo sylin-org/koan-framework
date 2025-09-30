@@ -8,10 +8,10 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
-  <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="9.0.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Web.Auth.TestProvider\Koan.Web.Auth.TestProvider.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
   </ItemGroup>
 </Project>

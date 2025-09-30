@@ -41,12 +41,12 @@ Details
   - Output: a global result filter checks for [EnableEntityTransformers] on the controller, resolves the best transformer for the response model type and Accept header, transforms payload, and sets Content-Type.
   - Input: a custom input formatter participates for entity types and uses ResolveForInput based on the request Content-Type.
 - Swagger/OpenAPI
-  - In Koan.Web.Swagger, a reflection-based operation filter (added only when transformers are present) advertises alternate media types:
+  - In Koan.Web.Connector.Swagger, a reflection-based operation filter (added only when transformers are present) advertises alternate media types:
     - For 200 responses on entity-returning actions.
     - For request bodies on actions taking entity parameters.
 - Configuration
   - Koan:Web:Transformers:AutoDiscover (bool, default true): enable/disable transformer discovery.
-  - Swagger gating is handled by Koan.Web.Swagger (Dev on by default; in non-Dev require Koan__Web__Swagger__Enabled=true or Koan:AllowMagicInProduction=true).
+  - Swagger gating is handled by Koan.Web.Connector.Swagger (Dev on by default; in non-Dev require Koan__Web__Swagger__Enabled=true or Koan:AllowMagicInProduction=true).
 
 Consequences
 
@@ -78,3 +78,4 @@ Follow-ups
 
 - Add CSV and DTO projection sample transformers in samples.
 - Add q-value tests and Swagger coverage tests.
+

@@ -5,7 +5,7 @@ using Koan.Core;
 using Koan.Storage;
 using Koan.Storage.Abstractions;
 using Koan.Storage.Extensions;
-using Koan.Storage.Local;
+using Koan.Storage.Connector.Local;
 using Koan.Storage.Model;
 using Koan.Storage.Options;
 using System.Text;
@@ -145,3 +145,4 @@ public class ModelApiTests
         public void Dispose() { try { Directory.Delete(Path, true); } catch { } }
     }
 }
+

@@ -1,4 +1,4 @@
-﻿# Flow Framework-Level Implementation Plan
+# Flow Framework-Level Implementation Plan
 
 ## Executive Summary
 The Flow messaging architecture requires framework-level implementation at Koan.Messaging/Koan.Canon to provide a clean developer experience with dedicated queue routing and orchestrator pattern. This document outlines the comprehensive implementation plan for zero-config Flow messaging.
@@ -71,7 +71,7 @@ public static async Task Send<T>(this T message, ...) where T : class
 
 #### Task 1.3: RabbitMQ Provider Enhancement  
 ```csharp
-// File: src/Koan.Messaging.RabbitMq/RabbitMqProvider.cs
+// File: src/Koan.Messaging.Connector.RabbitMq/RabbitMqProvider.cs
 public async Task SendToQueueAsync<T>(string queueName, T message, CancellationToken ct)
 {
     // Direct queue routing implementation

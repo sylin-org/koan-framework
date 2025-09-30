@@ -1,4 +1,4 @@
-# Koan.Data.Couchbase – Capability Delta Assessment
+# Koan.Data.Connector.Couchbase – Capability Delta Assessment
 
 **Status**: Draft  \
 **Author**: Repo AI Assistant  \
@@ -9,7 +9,7 @@
 
 ## Overview
 
-Koan.Data.Couchbase v1.0 establishes core CRUD, bulk upsert/delete, and instruction execution across bucket/scope/collection contexts. This document evaluates the additional work required to reach the short-term v1.1 enhancement targets and the longer-term v2.0 vision.
+Koan.Data.Connector.Couchbase v1.0 establishes core CRUD, bulk upsert/delete, and instruction execution across bucket/scope/collection contexts. This document evaluates the additional work required to reach the short-term v1.1 enhancement targets and the longer-term v2.0 vision.
 
 For each goal we capture:
 
@@ -135,4 +135,5 @@ For each goal we capture:
 - **v2.0** expands the adapter into advanced analytics and query-building scenarios, preparing for emerging Couchbase features (vector search) and richer domain modeling support.
 
 Each item above should be tracked as its own backlog epic to allow iterative delivery while maintaining adapter stability.
+
 

@@ -2,9 +2,9 @@ using Koan.Orchestration;
 using Koan.Orchestration.Cli;
 using Koan.Orchestration.Cli.Formatting;
 using Koan.Orchestration.Cli.Planning;
-using Koan.Orchestration.Provider.Docker;
-using Koan.Orchestration.Provider.Podman;
-using Koan.Orchestration.Renderers.Compose;
+using Koan.Orchestration.Connector.Docker;
+using Koan.Orchestration.Connector.Podman;
+using Koan.Orchestration.Renderers.Connector.Compose;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -952,3 +952,4 @@ static Profile ResolveProfile(string? arg)
         _ => Profile.Local
     };
 }
+

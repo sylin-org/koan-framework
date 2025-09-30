@@ -66,7 +66,7 @@ References
   - Auto-registration: controllers/handlers wired via auto-registrar; first-class statics on entities and views for consistent data access.
 - Storage
   - Storage orchestrator (Koan.Storage) with profile-based routing to thin providers; capability-aware operations (seek/range, stat, server-side copy, presign when supported).
-  - Local filesystem provider (Koan.Storage.Local): safe-by-default (key sanitization, base path enforcement), atomic writes (temp+rename), range reads, lightweight Head, and server-side copy.
+  - Local filesystem provider (Koan.Storage.Connector.Local): safe-by-default (key sanitization, base path enforcement), atomic writes (temp+rename), range reads, lightweight Head, and server-side copy.
   - Routing defaults and fallbacks: DefaultProfile support; optional SingleProfileOnly fallback for minimal config with startup validation.
   - Developer experience:
     - Service helpers: Create/Onboard (text/json/bytes/stream/file/url), Read (full/range), Exists/Head, Transfer (Copy/Move), fluent InProfile.
@@ -93,7 +93,7 @@ References
 - Messaging
   - Capability-aware, cross-broker semantics (aliases, DLQ/retry, idempotency) with simple handler wiring.
   - RabbitMQ transport with resilient connection management and config-first options.
-  - Redis-based inbox service for message processing and deduplication (Koan.Service.Inbox.Redis):
+  - Redis-based inbox service for message processing and deduplication (Koan.Service.Inbox.Connector.Redis):
     - Endpoints: GET /v1/inbox/{key}, POST /v1/inbox/mark-processed
     - Config via Koan:Inbox:Redis:ConnectionString (or ConnectionStrings:InboxRedis)
     - Optional discovery announce on RabbitMQ (Koan:Messaging:Buses:rabbit:\*)
@@ -240,3 +240,4 @@ References
 ---
 
 See also: `docs/decisions/index.md` for architectural decisions and `docs/guides/*` for topic guides.
+

@@ -1,4 +1,4 @@
-﻿# Koan Framework Agent Guidelines
+# Koan Framework Agent Guidelines
 
 ## Core Principles
 
@@ -428,7 +428,7 @@ public class TodosController : EntityController<Todo>
 <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
 <!-- Now AI services are auto-registered via KoanAutoRegistrar -->
 
-<ProjectReference Include="..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+<ProjectReference Include="..\..\src\\Connectors\\Data\\Mongo\Koan.Data.Connector.Mongo.csproj" />
 <!-- Now MongoDB provider is available and auto-configured -->
 ```
 
@@ -512,3 +512,4 @@ Logger.LogInformation("Query capabilities: {Capabilities}",
 ---
 
 **Remember: The Koan Framework prioritizes minimal scaffolding, provider transparency, and entity-first development. When in doubt, favor framework patterns over custom implementations.**
+

@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Koan.Web.GraphQl.Infrastructure;
+using Koan.Web.Connector.GraphQl.Infrastructure;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -27,3 +27,4 @@ public class VariableNormalizerTests
         dict["d"].Should().Be("x");
     }
 }
+

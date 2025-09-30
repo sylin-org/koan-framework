@@ -1,7 +1,7 @@
 using System.Reflection;
 using FluentAssertions;
 using Koan.Web.Attributes;
-using Koan.Web.Swagger;
+using Koan.Web.Connector.Swagger;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.OpenApi.Models;
@@ -98,3 +98,4 @@ public class PaginationOperationFilterTests
         }
     }
 }
+

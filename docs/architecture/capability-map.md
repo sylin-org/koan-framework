@@ -1,4 +1,4 @@
-﻿---
+---
 type: ARCHITECTURE
 domain: framework
 title: "Koan Capability Map"
@@ -52,10 +52,10 @@ Below is a capability map that layers packages from foundational primitives thro
 | ----------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
 | Core runtime            | Configuration, environment, boot diagnostics, adapter auto-registration | `Koan.Core`, `Koan.Core.Adapters`, `Koan.Diagnostics.Tool`                                                                                                                   | –                       |
 | Data & storage          | Entity-first persistence, provider adapters, backups, object storage    | `Koan.Data.Core`, `Koan.Data.Abstractions`, `Koan.Data.*` providers, `Koan.Storage`, `Koan.Data.Backup`                                                                      | Core runtime            |
-| Web & surface area      | MVC controllers, response transformers, auth, diagnostics               | `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Auth.*`, `Koan.Web.Swagger`, `Koan.Web.GraphQl`, `Koan.Web.Backup`                                     | Core runtime + Data     |
-| Messaging & async       | Inbox/outbox patterns, background coordination, scheduling              | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.RabbitMq`, `Koan.Service.Inbox.Redis`, `Koan.Messaging.Inbox.*`, `Koan.Data.Cqrs.*`, `Koan.Scheduling` | Core + Data             |
-| AI, media & search      | Prompt routing, embeddings, media pipelines                             | `Koan.AI`, `Koan.AI.Contracts`, `Koan.Ai.Provider.Ollama`, `Koan.Media.Abstractions`, `Koan.Media.Core`, `Koan.Media.Web`, `Koan.Data.Vector.*`                              | Core + Data             |
-| Secrets & configuration | Unified secret resolution and config overlays                           | `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Vault`                                                                                                       | Core runtime            |
+| Web & surface area      | MVC controllers, response transformers, auth, diagnostics               | `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Auth.*`, `Koan.Web.Connector.Swagger`, `Koan.Web.Connector.GraphQl`, `Koan.Web.Backup`                                     | Core runtime + Data     |
+| Messaging & async       | Inbox/outbox patterns, background coordination, scheduling              | `Koan.Messaging.Core`, `Koan.Messaging.Abstractions`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Service.Inbox.Connector.Redis`, `Koan.Messaging.Inbox.*`, `Koan.Data.Cqrs.*`, `Koan.Scheduling` | Core + Data             |
+| AI, media & search      | Prompt routing, embeddings, media pipelines                             | `Koan.AI`, `Koan.AI.Contracts`, `Koan.AI.Connector.Ollama`, `Koan.Media.Abstractions`, `Koan.Media.Core`, `Koan.Media.Web`, `Koan.Data.Vector.*`                              | Core + Data             |
+| Secrets & configuration | Unified secret resolution and config overlays                           | `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Connector.Vault`                                                                                                       | Core runtime            |
 | Recipes & orchestration | Intent-driven operational wiring, container orchestration               | `Koan.Recipe.Abstractions`, `Koan.Recipe.Observability`, `Koan.Orchestration.*`, `Koan.Orchestration.Cli`                                                                    | Core + Secrets + Data   |
 | Domain pipelines        | Canonical data flows, Dapr runtime, MCP integration                     | `Koan.Canon.*`, `Koan.Mcp`                                                                                                                                                   | Core + Data + Messaging |
 
@@ -68,7 +68,7 @@ The remainder of this document drills into each layer and highlights first-class
 **Packages**: `Koan.Core`, `Koan.Core.Adapters`, `Koan.Diagnostics.Tool`
 
 - `Koan.Core` exposes the primitives every module depends on: `KoanEnv` for environment snapshots, configuration helpers (`Configuration.Read`), bootstrapping utilities, and common options/validation patterns.
-- `Koan.Core.Adapters` centralises adapter discovery. When you reference a provider (`Koan.Data.Postgres`, `Koan.Messaging.RabbitMq`, etc.), its registrar is loaded automatically and logged in the boot report.
+- `Koan.Core.Adapters` centralises adapter discovery. When you reference a provider (`Koan.Data.Connector.Postgres`, `Koan.Messaging.Connector.RabbitMq`, etc.), its registrar is loaded automatically and logged in the boot report.
 - `Koan.Diagnostics.Tool` surfaces diagnostics helpers (boot reports, capability snapshots) that feed the docs build and CLI tooling.
 
 **Developer benefit**: you write one line—`AddKoan()`—and the runtime stitches together every referenced capability with sane defaults and explicit logging.
@@ -81,15 +81,15 @@ The remainder of this document drills into each layer and highlights first-class
 
 **Providers**:
 
-- Relational: `Koan.Data.Postgres`, `Koan.Data.SqlServer`, `Koan.Data.Sqlite`, `Koan.Data.Relational` (shared tooling)
-- Document & key/value: `Koan.Data.Mongo`, `Koan.Data.Redis`, `Koan.Data.Couchbase`, `Koan.Data.Json`
-- Search & vector: `Koan.Data.Vector`, `Koan.Data.Vector.Abstractions`, `Koan.Data.Weaviate`, `Koan.Data.Milvus`, `Koan.Data.OpenSearch`, `Koan.Data.ElasticSearch`
-- Direct and composition helpers: `Koan.Data.Direct` for low-level commands, `Koan.Data.Cqrs`/`Koan.Data.Cqrs.Outbox.Mongo` for projections and outbox patterns.
+- Relational: `Koan.Data.Connector.Postgres`, `Koan.Data.Connector.SqlServer`, `Koan.Data.Connector.Sqlite`, `Koan.Data.Relational` (shared tooling)
+- Document & key/value: `Koan.Data.Connector.Mongo`, `Koan.Data.Connector.Redis`, `Koan.Data.Connector.Couchbase`, `Koan.Data.Connector.Json`
+- Search & vector: `Koan.Data.Vector`, `Koan.Data.Vector.Abstractions`, `Koan.Data.Vector.Connector.Weaviate`, `Koan.Data.Vector.Connector.Milvus`, `Koan.Data.Connector.OpenSearch`, `Koan.Data.Connector.ElasticSearch`
+- Direct and composition helpers: `Koan.Data.Direct` for low-level commands, `Koan.Data.Cqrs`/`Koan.Data.Cqrs.Outbox.Connector.Mongo` for projections and outbox patterns.
 
 **Adjacencies**:
 
 - `Koan.Data.Backup` enables typed backup/restore workflows that work across providers.
-- `Koan.Storage` (with `Koan.Storage.Local`) handles object storage with model-centric helpers.
+- `Koan.Storage` (with `Koan.Storage.Connector.Local`) handles object storage with model-centric helpers.
 
 **Developer benefit**: Define entities like `public sealed class Todo : Entity<Todo> { ... }`; the framework generates IDs, exposes CRUD statics, and streams data with provider-specific optimisations. Referencing a provider package immediately lights up the matching backend with discovery and health checks.
 
@@ -97,11 +97,11 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 3. Web surfaces & APIs
 
-**Packages**: `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Swagger`, `Koan.Web.GraphQl`, `Koan.Web.Backup`, `Koan.Web.Diagnostics`
+**Packages**: `Koan.Web`, `Koan.Web.Extensions`, `Koan.Web.Transformers`, `Koan.Web.Connector.Swagger`, `Koan.Web.Connector.GraphQl`, `Koan.Web.Backup`, `Koan.Web.Diagnostics`
 
 - `Koan.Web` enforces controller-first APIs using `EntityController<T>` and configures health/OpenAPI endpoints.
 - `Koan.Web.Extensions` offers middleware shortcuts (error handling, JSON options), while `Koan.Web.Transformers` shapes responses to match API contracts.
-- `Koan.Web.Swagger` integrates OpenAPI generation with the controller ecosystem; `Koan.Web.GraphQl` activates GraphQL endpoints backed by entities.
+- `Koan.Web.Connector.Swagger` integrates OpenAPI generation with the controller ecosystem; `Koan.Web.Connector.GraphQl` activates GraphQL endpoints backed by entities.
 - `Koan.Web.Backup` surfaces backup/restore operations via HTTP for high-trust maintenance scenarios.
 - `Koan.Web.Diagnostics` plugs diagnostic dashboards into the pipeline when needed.
 
@@ -113,11 +113,11 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 4. Messaging, async, and scheduling
 
-**Packages**: `Koan.Messaging.Abstractions`, `Koan.Messaging.Core`, `Koan.Messaging.RabbitMq`, `Koan.Messaging.Inbox.Http`, `Koan.Messaging.Inbox.InMemory`, `Koan.Service.Inbox.Redis`, `Koan.Scheduling`, `Koan.Data.Cqrs`, `Koan.Data.Cqrs.Outbox.Mongo`
+**Packages**: `Koan.Messaging.Abstractions`, `Koan.Messaging.Core`, `Koan.Messaging.Connector.RabbitMq`, `Koan.Messaging.Inbox.Connector.Http`, `Koan.Messaging.Inbox.Connector.InMemory`, `Koan.Service.Inbox.Connector.Redis`, `Koan.Scheduling`, `Koan.Data.Cqrs`, `Koan.Data.Cqrs.Outbox.Connector.Mongo`
 
 - `Koan.Messaging.Core` implements bus orchestration, retry policies, and diagnostics for message pipelines. Abstractions keeps contracts separate for consumers.
-- Provider packages like `Koan.Messaging.RabbitMq` plug into `Koan.Core.Adapters` to auto-register connections and health checks.
-- Inbox helpers (`Koan.Messaging.Inbox.*`, `Koan.Service.Inbox.Redis`) give you exactly-once semantics and idempotent reprocessing surfaces.
+- Provider packages like `Koan.Messaging.Connector.RabbitMq` plug into `Koan.Core.Adapters` to auto-register connections and health checks.
+- Inbox helpers (`Koan.Messaging.Inbox.*`, `Koan.Service.Inbox.Connector.Redis`) give you exactly-once semantics and idempotent reprocessing surfaces.
 - `Koan.Scheduling` introduces cron/interval-based job orchestration anchored in Koan’s background worker infrastructure.
 - CQRS support (`Koan.Data.Cqrs.*`) ties messaging back into the data plane with projection tasks and outbox helpers.
 
@@ -127,10 +127,10 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 5. AI, media, and rich content
 
-**Packages**: `Koan.AI`, `Koan.AI.Contracts`, `Koan.Ai.Provider.Ollama`, `Koan.AI.Web`, `Koan.Media.Abstractions`, `Koan.Media.Core`, `Koan.Media.Web`
+**Packages**: `Koan.AI`, `Koan.AI.Contracts`, `Koan.AI.Connector.Ollama`, `Koan.AI.Web`, `Koan.Media.Abstractions`, `Koan.Media.Core`, `Koan.Media.Web`
 
 - `Koan.AI` routes prompts and embeddings across registered adapters. Contracts define provider capabilities (completion, embedding, moderation).
-- `Koan.Ai.Provider.Ollama` adds a local-first large language model provider with discovery, health probes, and profile-aware configuration.
+- `Koan.AI.Connector.Ollama` adds a local-first large language model provider with discovery, health probes, and profile-aware configuration.
 - `Koan.AI.Web` offers controller helpers for AI endpoints (chat, embeddings) following Koan web guardrails.
 - The media stack (`Koan.Media.*`) handles ingestion, transformation, and delivery of media assets, with optional web surfaces for upload and streaming.
 - Vector database packages (under data) pair naturally with AI modules to deliver hybrid search.
@@ -141,7 +141,7 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 6. Secrets, configuration, and security posture
 
-**Packages**: `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Vault`
+**Packages**: `Koan.Secrets.Abstractions`, `Koan.Secrets.Core`, `Koan.Secrets.Connector.Vault`
 
 - Core library augments configuration with secret references (`secret://scope/name`) resolved lazily, ensuring rotation-friendly behavior.
 - Provider packages (Vault today) extend the resolver chain; additional providers can be dropped in later with zero code changes.
@@ -153,7 +153,7 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 7. Recipes, orchestration, and operational layers
 
-**Packages**: `Koan.Recipe.Abstractions`, `Koan.Recipe.Observability`, `Koan.Orchestration.Abstractions`, `Koan.Orchestration.Cli`, `Koan.Orchestration.Generators`, `Koan.Orchestration.Provider.Docker`, `Koan.Orchestration.Provider.Podman`, `Koan.Orchestration.Renderers.Compose`, `Koan.Orchestration.Aspire`
+**Packages**: `Koan.Recipe.Abstractions`, `Koan.Recipe.Observability`, `Koan.Orchestration.Abstractions`, `Koan.Orchestration.Cli`, `Koan.Orchestration.Generators`, `Koan.Orchestration.Connector.Docker`, `Koan.Orchestration.Connector.Podman`, `Koan.Orchestration.Renderers.Connector.Compose`, `Koan.Orchestration.Aspire`
 
 - Recipes encode opt-in operational bundles. `Koan.Recipe.Observability`, for example, wires OpenTelemetry, health checks, and resilient HTTP policies in one call.
 - The orchestration toolchain reads manifests generated at build time (`Koan.Orchestration.Generators`) to plan container stacks, export Compose manifests, and run local clusters.
@@ -165,11 +165,11 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 8. Domain pipelines & canonical data flows
 
-**Packages**: `Koan.Canon.Core`, `Koan.Canon.Web`, `Koan.Canon.Runtime.Dapr`, `Koan.Canon.RabbitMq`, `Koan.Mcp`
+**Packages**: `Koan.Canon.Core`, `Koan.Canon.Web`, `Koan.Canon.Runtime.Connector.Dapr`, `Koan.Canon.Connector.RabbitMq`, `Koan.Mcp`
 
 - Canon (Canonical data pipeline) modules standardize how domain models flow through stages, projections, and lineage tracking. The runtime builds on messaging, data, and storage primitives to deliver end-to-end, auditable pipelines.
-- `Koan.Canon.Runtime.Dapr` lights up Dapr-based execution models, and `Koan.Canon.Web` exposes surface APIs for pipeline control.
-- `Koan.Canon.RabbitMq` connects Canon flows to the messaging layer.
+- `Koan.Canon.Runtime.Connector.Dapr` lights up Dapr-based execution models, and `Koan.Canon.Web` exposes surface APIs for pipeline control.
+- `Koan.Canon.Connector.RabbitMq` connects Canon flows to the messaging layer.
 - `Koan.Mcp` provides Model Context Protocol integration if you need MCP-based agent connectivity.
 
 **Developer benefit**: When your domain needs complex pipelines or projections, the Canon stack gives you a tested blueprint built on top of the core Koan patterns.
@@ -178,7 +178,7 @@ The remainder of this document drills into each layer and highlights first-class
 
 ## 9. How the capabilities work together
 
-1. **Start with Core + Web + Data**: Most services begin by referencing `Koan.Core`, `Koan.Data.Core`, `Koan.Web`, and a storage provider (e.g., `Koan.Data.Postgres`). This combination yields CRUD-ready APIs with no custom scaffolding.
+1. **Start with Core + Web + Data**: Most services begin by referencing `Koan.Core`, `Koan.Data.Core`, `Koan.Web`, and a storage provider (e.g., `Koan.Data.Connector.Postgres`). This combination yields CRUD-ready APIs with no custom scaffolding.
 2. **Add async & scheduling** when you need eventual consistency or background work. `Koan.Messaging.*` and `Koan.Scheduling` reuse the data abstractions for persistence and the core runtime for configuration and logging.
 3. **Introduce AI or media** to augment your domain. Use the same entity-first approach to persist metadata while AI adapters handle external intelligence.
 4. **Secure & operationalise** by layering secrets (`Koan.Secrets.*`), recipes (`Koan.Recipe.*`), and orchestration (`Koan.Orchestration.*`). These modules read the same configuration sources and emit manifest metadata consumed by the CLI.
@@ -190,7 +190,7 @@ The map is intentionally composable: everything hinges on the core runtime’s a
 
 ## Suggested adoption path for new teams
 
-1. **Bootstrap**: `Koan.Core`, `Koan.Web`, `Koan.Data.Core`, plus one data provider (`Koan.Data.Postgres` or `Koan.Data.Mongo`). Use entity statics and controllers to ship value quickly.
+1. **Bootstrap**: `Koan.Core`, `Koan.Web`, `Koan.Data.Core`, plus one data provider (`Koan.Data.Connector.Postgres` or `Koan.Data.Connector.Mongo`). Use entity statics and controllers to ship value quickly.
 2. **Observability & resilience**: Reference `Koan.Recipe.Observability` and run the CLI’s `doctor` command to confirm telemetry endpoints, or export Compose manifests for local stacks.
 3. **Security posture**: Add `Koan.Secrets.Core` (and a provider like Vault) before production, ensuring configuration remains declarative.
 4. **Extended capabilities**: Pull in `Koan.Messaging.*`, `Koan.Scheduling`, and `Koan.Storage` as your domain evolves. Each package maintains a README/TECHNICAL pair for deep dives.
@@ -206,3 +206,4 @@ The map is intentionally composable: everything hinges on the core runtime’s a
 - Module inventory: [`docs/architecture/module-ledger.md`](module-ledger.md)
 - Packaging policy: [`docs/engineering/packaging.md`](../engineering/packaging.md)
 - Orchestration roadmap: [`docs/decisions/ARCH-0047-orchestration-hosting-and-exporters-as-pluggable-adapters.md`](../decisions/ARCH-0047-orchestration-hosting-and-exporters-as-pluggable-adapters.md)
+

@@ -16,7 +16,7 @@ validation:
 
 ## Contract
 
-- **Inputs**: Familiarity with Koan entities, dependency injection configured via `services.AddKoan()`, and at least one data adapter package (`Koan.Data.Sqlite`, `Koan.Data.Postgres`, etc.).
+- **Inputs**: Familiarity with Koan entities, dependency injection configured via `services.AddKoan()`, and at least one data adapter package (`Koan.Data.Connector.Sqlite`, `Koan.Data.Connector.Postgres`, etc.).
 - **Outputs**: Production-ready patterns for modeling entities, enforcing policy, streaming large datasets, and adding semantic/vector capabilities with minimal boilerplate.
 - **Error Modes**: Misaligned provider capabilities (e.g., using vector APIs with adapters that do not advertise `vector-search`), lifecycle hooks cancelling mutations, missing configuration values, or long-running streams without pagination.
 - **Success Criteria**: Entities handle CRUD, relationships, and business rules through static helpers; streaming and paging guardrails prevent memory pressure; vector workflows and direct SQL escape hatches co-exist without duplicated repositories.
@@ -35,7 +35,7 @@ validation:
 
 Koan’s Data pillar unifies persistence across SQL, NoSQL, JSON, and vector databases. Every entity is a rich domain object with first-class static helpers (`All`, `Query`, `AllStream`, `FirstPage`, etc.) and lifecycle hooks. Capabilities are discovered automatically from installed adapters.
 
-**Core packages**: `Koan.Data.Core`, adapter-specific packages (for example `Koan.Data.Postgres`, `Koan.Data.MongoDB`, `Koan.Data.Redis`, `Koan.Data.Vector.Redis`).
+**Core packages**: `Koan.Data.Core`, adapter-specific packages (for example `Koan.Data.Connector.Postgres`, `Koan.Data.Connector.MongoDB`, `Koan.Data.Connector.Redis`, `Koan.Data.Vector.Redis`).
 
 ---
 
@@ -294,12 +294,12 @@ All direct commands respect configured connections, logging, and retry policies.
 
 | Provider   | Package               | Primary Use Case                        |
 | ---------- | --------------------- | --------------------------------------- |
-| SQLite     | `Koan.Data.Sqlite`    | Local development, embedded deployments |
-| Postgres   | `Koan.Data.Postgres`  | Production relational workloads         |
-| SQL Server | `Koan.Data.SqlServer` | Legacy and enterprise relational        |
-| MongoDB    | `Koan.Data.MongoDB`   | Document storage                        |
-| Redis      | `Koan.Data.Redis`     | Caching, vector search                  |
-| JSON       | `Koan.Data.Json`      | File-based storage                      |
+| SQLite     | `Koan.Data.Connector.Sqlite`    | Local development, embedded deployments |
+| Postgres   | `Koan.Data.Connector.Postgres`  | Production relational workloads         |
+| SQL Server | `Koan.Data.Connector.SqlServer` | Legacy and enterprise relational        |
+| MongoDB    | `Koan.Data.Connector.MongoDB`   | Document storage                        |
+| Redis      | `Koan.Data.Connector.Redis`     | Caching, vector search                  |
+| JSON       | `Koan.Data.Connector.Json`      | File-based storage                      |
 
 Consult each adapter’s README for capability flags (bulk operations, vectors, transactions, etc.).
 
@@ -337,3 +337,4 @@ export Koan__Data__Postgres__ConnectionString="Host=prod;Database=app"
 - [Entity Lifecycle Events](./entity-lifecycle-events.md)
 - [Flow Pillar Reference](../flow/index.md) for ingestion pipelines and semantic augmentation
 - [AI Pillar Reference](../ai/index.md) for embedding generation and retrieval-augmented generation
+

@@ -317,9 +317,9 @@ public class KoanProviderException : Exception
         return attemptedProvider switch
         {
             "postgresql" when !available.Contains("postgresql") =>
-                "Install Koan.Data.Postgres package or configure connection string",
+                "Install Koan.Data.Connector.Postgres package or configure connection string",
             "mongodb" when !available.Contains("mongodb") =>
-                "Install Koan.Data.Mongo package or configure connection string",
+                "Install Koan.Data.Connector.Mongo package or configure connection string",
             _ => "Check configuration and available data provider packages"
         };
     }

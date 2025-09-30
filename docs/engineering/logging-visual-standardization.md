@@ -1,4 +1,4 @@
-﻿# Logging visual standardization
+# Logging visual standardization
 
 ## Contract
 
@@ -30,7 +30,7 @@ Each stage token is a fixed four-character code rendered inside the brackets so 
    ```text
    21:07:38 info [K:CNFG] sqlite.discovery -> success source=local candidate="Data Source=./data/app.db" latency=132ms src=SqliteDiscoveryAdapter
    21:07:37 warn [K:CNFG] sqlite.discovery -> fallback reason="health check timeout" fallback="Data Source=Data/Koan.sqlite" src=SqliteDiscoveryAdapter
-   21:07:38 info [K:BOOT] registrar.init -> loaded module=Koan.Data.Sqlite src=KoanAutoRegistrar
+   21:07:38 info [K:BOOT] registrar.init -> loaded module=Koan.Data.Connector.Sqlite src=KoanAutoRegistrar
    ```
 
 2. **Aggregated debug counts** – emit once per stage to replace repetitive debug spam.
@@ -170,7 +170,7 @@ Bootstrap telemetry should read as three clear steps: invite, inspect, and decla
 
 ```text
 21:07:36 info [K:BOOT] registrar.init -> loaded module=Koan.Core.Adapters src=KoanAutoRegistrar
-21:07:36 info [K:BOOT] registrar.init -> loaded module=Koan.Data.Sqlite src=KoanAutoRegistrar
+21:07:36 info [K:BOOT] registrar.init -> loaded module=Koan.Data.Connector.Sqlite src=KoanAutoRegistrar
 21:07:36 info [K:CNFG] sqlite.discovery -> delegating adapter="SqliteDiscoveryAdapter" src=ServiceDiscoveryCoordinator
 21:07:37 warn [K:CNFG] sqlite.discovery -> fallback reason="autonomous discovery failed" fallback="Data Source=Data/Koan.sqlite" src=SqliteDiscoveryAdapter
 21:07:37 info [K:DATA] schema.ensure -> create entity="g1c1.GardenCoop.Models.Plot" provider="sqlite" src=EntitySchemaGuard
@@ -184,3 +184,4 @@ Bootstrap telemetry should read as three clear steps: invite, inspect, and decla
 21:07:43 info [K:HLTH] probe.startup name="DatabaseMigrationService" status=Healthy duration=4.8s src=HealthProbeScheduler
 21:07:43 info [K:BOOT] startup.timeline -> summary boot=112ms config=486ms data=214ms services=430ms total=1.24s src=StartupProbeService
 ```
+

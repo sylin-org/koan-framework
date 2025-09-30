@@ -13,7 +13,7 @@ This guide covers how to use Koan's SQL Server data adapter. It mirrors the rela
 
 ## Package & registration
 
-The adapter lives in `src/Koan.Data.SqlServer`. To enable it in DI:
+The adapter lives in `src/Koan.Data.Connector.SqlServer`. To enable it in DI:
 
 ```csharp
 services.AddKoanCore();
@@ -111,7 +111,7 @@ See also:
 
 ## Testing
 
-The test project `tests/Koan.Data.SqlServer.Tests` uses Testcontainers to start SQL Server automatically if a connection string is not provided by environment variables.
+The test project `tests/Koan.Data.Connector.SqlServer.Tests` uses Testcontainers to start SQL Server automatically if a connection string is not provided by environment variables.
 
 - Env keys checked: `Koan_SQLSERVER__CONNECTION_STRING` or `ConnectionStrings__SqlServer`
 - Fallback container image: `mcr.microsoft.com/mssql/server:2022-latest` with password `yourStrong(!)Password` and host port 14333
@@ -120,14 +120,15 @@ Run tests:
 
 ```pwsh
 # Option A: Let tests start a container
-dotnet test tests/Koan.Data.SqlServer.Tests/Koan.Data.SqlServer.Tests.csproj -c Debug
+dotnet test tests/Koan.Data.Connector.SqlServer.Tests/Koan.Data.Connector.SqlServer.Tests.csproj -c Debug
 
 # Option B: Use an existing SQL Server
 $env:Koan_SQLSERVER__CONNECTION_STRING = "Server=localhost,1433;User Id=sa;Password=yourStrong(!)Password;TrustServerCertificate=True;Encrypt=False"
-dotnet test tests/Koan.Data.SqlServer.Tests/Koan.Data.SqlServer.Tests.csproj -c Debug
+dotnet test tests/Koan.Data.Connector.SqlServer.Tests/Koan.Data.Connector.SqlServer.Tests.csproj -c Debug
 ```
 
 ## Notes
 
 - Projection columns are added as computed columns via JSON_VALUE and indexed when `[Index]` markers are present.
 - DDL is disabled when `[ReadOnly]` is applied on the entity type or when policy forbids it; in production, DDL requires the magic flag.
+

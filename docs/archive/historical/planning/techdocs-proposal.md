@@ -25,7 +25,7 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koa
 - Not in scope (explicit exclusions):
   - Real-time collaboration (live co-editing, presence indicators, operational transforms, CRDTs).
   - Comments/annotations, complex multi-step approval workflows, WYSIWYG authoring.
-  - External identity providers (using Koan.Web.Auth.TestProvider only).
+  - External identity providers (using Koan.Web.Auth.Connector.Test only).
 
 ## Contract (service-level)
 
@@ -88,7 +88,7 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koa
     - audits(id, entity_type, entity_id, operation, snapshot_json, created_at, created_by)
     - embeddings(id, entity_type, entity_id, vector, dim, model, created_at)
     - users(id, username, email, roles[], created_at) -- roles: ["Reader"], ["Reader", "Author"], ["Reader", "Author", "Moderator"]
-    - user_sessions(id, user_id, token_hash, expires_at, created_at) -- managed by Koan.Web.Auth.TestProvider
+    - user_sessions(id, user_id, token_hash, expires_at, created_at) -- managed by Koan.Web.Auth.Connector.Test
   - Views/materializations
     - latest_item_versions view for fast “current content” reads.
   - Indexing
@@ -130,7 +130,7 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koa
 
 - Security
 
-  - Auth: Koan.Web.Auth.TestProvider (as used in S5) for demo authentication with role-based claims.
+  - Auth: Koan.Web.Auth.Connector.Test (as used in S5) for demo authentication with role-based claims.
   - Role hierarchy: Reader (baseline) ⊆ Author ⊆ Moderator (additive permissions).
   - Content ownership: Authors can edit their own drafts; Moderators can edit any content.
   - Capability enforcement: publish/approve restricted to Moderators; draft creation/editing to Authors+; viewing to all Readers.
@@ -175,7 +175,7 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koa
 
 - Phase 0: Foundations (1–2 days)
   - Postgres schema and extensions provisioned; migrations committed.
-  - Koan.Web.Auth.TestProvider integration (following S5 pattern); role-based claims.
+  - Koan.Web.Auth.Connector.Test integration (following S5 pattern); role-based claims.
   - Constants/options scaffolding; health endpoints; deny-by-default capabilities wired.
 - Phase 1: MVP (3–5 days)
   - CRUD for collections/items/versions; draft → submit → approve → publish flow.
@@ -212,4 +212,5 @@ S7 TechDocs is a lightweight documentation/knowledge hub that showcases core Koa
 - Data access patterns: /docs/guides/data/all-query-streaming-and-pager.md, /docs/decisions/DATA-0061-data-access-pagination-and-streaming.md
 - Web API conventions: /docs/api/web-http-api.md, /docs/decisions/WEB-0035-entitycontroller-transformers.md
 - Storage reference: /docs/reference/storage.md; AI reference: /docs/reference/ai.md
-- Authentication pattern: samples/S5.Recs (Koan.Web.Auth.TestProvider usage example)
+- Authentication pattern: samples/S5.Recs (Koan.Web.Auth.Connector.Test usage example)
+

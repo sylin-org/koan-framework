@@ -39,7 +39,7 @@ Canon (formerly the Flow pillar) orchestrates inbound data, enrichment, and publ
 
 - `Koan.Canon` – runtime, entities, stages, interceptors, controllers.
 - `Koan.Canon.Semantic` – semantic streaming pipeline operators.
-- Adapter packages (`Koan.Data.Postgres`, `Koan.Data.Vector.Redis`, `Koan.Data.Mongo`, etc.) wired through Koan’s auto-registration.
+- Adapter packages (`Koan.Data.Connector.Postgres`, `Koan.Data.Vector.Redis`, `Koan.Data.Connector.Mongo`, etc.) wired through Koan’s auto-registration.
 
 ---
 
@@ -461,3 +461,4 @@ public async Task DevicePipeline_ShouldPersistProjection()
 - [Messaging Reference](../messaging/index.md)
 - [Semantic Pipelines Playbook](../../guides/semantic-pipelines.md)
 - [DX-0041 Consolidation ADR](../../decisions/DX-0041-docs-consolidation.md)
+

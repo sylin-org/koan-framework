@@ -10,9 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Xunit;
-using Koan.Web.Auth.TestProvider.Infrastructure;
-using Koan.Web.Auth.TestProvider.Options;
-using Koan.Web.Auth.TestProvider.Extensions;
+using Koan.Web.Auth.Connector.Test.Infrastructure;
+using Koan.Web.Auth.Connector.Test.Options;
+using Koan.Web.Auth.Connector.Test.Extensions;
 
 namespace Koan.Web.Auth.Tests.Integration;
 
@@ -45,7 +45,7 @@ public class TestProviderAuthorizeSecurityTests
             })
             .ConfigureServices((ctx, s) =>
             {
-                var tp = Assembly.Load("Koan.Web.Auth.TestProvider");
+                var tp = Assembly.Load("Koan.Web.Auth.Connector.Test");
                 s.AddMvc().AddApplicationPart(tp);
                 s.AddSingleton<DevTokenStore>();
                 s.AddOptions();
@@ -123,3 +123,4 @@ public class TestProviderAuthorizeSecurityTests
         Assert.Contains("unsupported_code_challenge_method", text);
     }
 }
+

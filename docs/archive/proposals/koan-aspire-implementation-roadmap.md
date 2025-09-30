@@ -66,13 +66,13 @@ public interface IKoanAspireRegistrar
 
 #### Week 2-3: Core Module Implementation
 **Task 1.4: Implement Postgres Module Integration**
-- [ ] Extend `Koan.Data.Postgres` KoanAutoRegistrar with IKoanAspireRegistrar
+- [ ] Extend `Koan.Data.Connector.Postgres` KoanAutoRegistrar with IKoanAspireRegistrar
 - [ ] Map PostgresOptions to Aspire postgres resource configuration
 - [ ] Add conditional registration based on environment and configuration
 - [ ] Create integration tests for postgres resource registration
 
 **Task 1.5: Implement Redis Module Integration**
-- [ ] Extend `Koan.Data.Redis` KoanAutoRegistrar with IKoanAspireRegistrar
+- [ ] Extend `Koan.Data.Connector.Redis` KoanAutoRegistrar with IKoanAspireRegistrar
 - [ ] Map RedisOptions to Aspire redis resource configuration
 - [ ] Handle password and database configuration mapping
 - [ ] Add integration tests for redis resource registration
@@ -122,13 +122,13 @@ public interface IKoanAspireRegistrar
 
 #### Week 5-6: Additional Data Providers
 **Task 2.1: MongoDB Integration**
-- [ ] Implement IKoanAspireRegistrar for Koan.Data.Mongo
+- [ ] Implement IKoanAspireRegistrar for Koan.Data.Connector.Mongo
 - [ ] Map MongoDB configuration to Aspire MongoDB resource
 - [ ] Handle authentication and database initialization
 - [ ] Add integration tests and validation
 
 **Task 2.2: SQL Server Integration**
-- [ ] Implement IKoanAspireRegistrar for Koan.Data.SqlServer
+- [ ] Implement IKoanAspireRegistrar for Koan.Data.Connector.SqlServer
 - [ ] Map SQL Server options to Aspire SQL Server resource
 - [ ] Handle connection string generation and security
 - [ ] Add integration tests for SQL Server scenarios

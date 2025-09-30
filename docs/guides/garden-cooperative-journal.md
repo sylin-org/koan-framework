@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: data
 title: "Garden Cooperative Journal"
@@ -61,7 +61,7 @@ This chapter walks from **no tech** to **one Koan slice** using **only the data 
 _Morning: one laptop, one command. No servers to nurse._
 
 ```csharp
-using Koan.Data.Sqlite;
+using Koan.Data.Connector.Sqlite;
 using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -306,3 +306,4 @@ You began with pencils and habit. You now have a tiny web API, dumb Pis that say
 ---
 
 Want me to append a tiny Pi script (Python) that posts readings and clamps duplicate timestamps so teams can copy-paste and be done?
+

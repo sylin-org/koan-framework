@@ -89,7 +89,7 @@ public sealed class StorageOptimization
 **Purpose**: Transparent conversion in CRUD operations using `IOptimizedDataRepository`.
 
 ```csharp
-namespace Koan.Data.Postgres;
+namespace Koan.Data.Connector.Postgres;
 
 internal sealed class PostgresRepository<TEntity, TKey> :
     IOptimizedDataRepository<TEntity, TKey>,
@@ -284,3 +284,4 @@ internal static class ProviderTypeMapping
 ```
 
 This technical architecture provides the foundation for transparent, high-performance ID storage optimization while maintaining full compatibility with existing Koan patterns.
+

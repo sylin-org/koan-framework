@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Koan.Core;
 using Koan.Messaging;
-using Koan.Messaging.RabbitMq;
+using Koan.Messaging.Connector.RabbitMq;
 using S8.Canon.Shared;
 using Koan.Canon.Actions;
 using Koan.Canon.Extensions;
@@ -154,4 +154,5 @@ public sealed class BmsPublisher : BackgroundService
     }
 
 }
+
 

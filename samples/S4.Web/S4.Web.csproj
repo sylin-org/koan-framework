@@ -14,13 +14,14 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Web.GraphQl\Koan.Web.GraphQl.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
+  <ProjectReference Include="..\..\src\\Connectors\\Web\\GraphQl\Koan.Web.Connector.GraphQl.csproj" />
+    <ProjectReference Include="..\..\src\\Connectors\\Web\\Swagger\Koan.Web.Connector.Swagger.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\src\\Connectors\\Data\\Mongo\Koan.Data.Connector.Mongo.csproj" />
   <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
   </ItemGroup>
   <ItemGroup>
   <Content Include="wwwroot/**" CopyToPublishDirectory="Always" />
   </ItemGroup>
 </Project>
+

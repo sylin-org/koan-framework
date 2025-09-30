@@ -3,7 +3,7 @@ using Koan.Core.Modules;
 using Koan.Core.Observability;
 using Koan.Data.Core;
 using Koan.Web.Extensions;
-using Koan.Web.Swagger;
+using Koan.Web.Connector.Swagger;
 using Microsoft.AspNetCore.Authentication;
 using Koan.Web.Extensions.Authorization;
 
@@ -77,3 +77,4 @@ app.MapFallbackToFile("index.html");
 app.UseKoanSwagger();
 
 app.Run();
+

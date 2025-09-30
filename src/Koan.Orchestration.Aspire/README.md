@@ -138,10 +138,10 @@ Environment.SetEnvironmentVariable("ASPIRE_CONTAINER_RUNTIME", "docker");
 
 ### Infrastructure Modules (Priority 100-500)
 
-- **Koan.Data.Postgres**: PostgreSQL database with automatic schema management
-- **Koan.Data.Redis**: Redis cache with connection multiplexer
-- **Koan.Data.MongoDB**: MongoDB with authentication and database initialization
-- **Koan.Data.SqlServer**: SQL Server with connection string generation
+- **Koan.Data.Connector.Postgres**: PostgreSQL database with automatic schema management
+- **Koan.Data.Connector.Redis**: Redis cache with connection multiplexer
+- **Koan.Data.Connector.MongoDB**: MongoDB with authentication and database initialization
+- **Koan.Data.Connector.SqlServer**: SQL Server with connection string generation
 
 ### Application Modules (Priority 1000+)
 

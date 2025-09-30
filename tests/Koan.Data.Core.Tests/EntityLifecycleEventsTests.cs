@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,7 +10,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Events;
 using Koan.Data.Core.Model;
-using Koan.Data.Json;
+using Koan.Data.Connector.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -284,3 +284,4 @@ public sealed class EntityLifecycleEventsTests : IDisposable
         public bool IsPublished { get; set; }
     }
 }
+

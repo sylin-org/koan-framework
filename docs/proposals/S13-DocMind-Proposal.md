@@ -1,4 +1,4 @@
-﻿# **S13.DocMind: AI-Native Document Intelligence Platform**
+# **S13.DocMind: AI-Native Document Intelligence Platform**
 
 ## **Executive Summary**
 
@@ -1316,10 +1316,10 @@ This architecture serves as a comprehensive reference implementation for buildin
     <PackageReference Include="Koan.Canon" Version="1.0.0" />
 
     <!-- Provider Packages - Auto-registered when referenced -->
-    <PackageReference Include="Koan.Data.MongoDB" Version="1.0.0" />
+    <PackageReference Include="Koan.Data.Connector.MongoDB" Version="1.0.0" />
     <PackageReference Include="Koan.Data.PostgreSQL" Version="1.0.0" />
-    <PackageReference Include="Koan.Data.Weaviate" Version="1.0.0" />
-    <PackageReference Include="Koan.Data.Redis" Version="1.0.0" />
+    <PackageReference Include="Koan.Data.Vector.Connector.Weaviate" Version="1.0.0" />
+    <PackageReference Include="Koan.Data.Connector.Redis" Version="1.0.0" />
 
     <!-- Document Processing -->
     <PackageReference Include="PdfPig" Version="0.1.9" />

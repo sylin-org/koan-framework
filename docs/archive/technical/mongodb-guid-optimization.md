@@ -80,7 +80,7 @@ private static StorageOptimizationInfo AnalyzeStringKeyedEntity<TEntity>(string 
 
 ### 2. Global BSON Configuration
 
-**File**: `src/Koan.Data.Mongo/Initialization/MongoOptimizationAutoRegistrar.cs`
+**File**: `src/Koan.Data.Connector.Mongo/Initialization/MongoOptimizationAutoRegistrar.cs`
 
 Bootstrap-time configuration that scans all assemblies and registers global MongoDB serializers:
 
@@ -124,7 +124,7 @@ public void Initialize(IServiceCollection services)
 
 ### 3. Smart String-GUID Serializer
 
-**File**: `src/Koan.Data.Mongo/Initialization/MongoOptimizationAutoRegistrar.cs`
+**File**: `src/Koan.Data.Connector.Mongo/Initialization/MongoOptimizationAutoRegistrar.cs`
 
 Intelligent BSON serializer that only converts valid GUIDs to BinData:
 

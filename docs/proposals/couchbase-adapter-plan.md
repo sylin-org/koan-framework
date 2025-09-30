@@ -1,4 +1,4 @@
-# Koan.Data.Mongo Assessment & Couchbase Adapter Implementation Plan
+# Koan.Data.Connector.Mongo Assessment & Couchbase Adapter Implementation Plan
 
 **Status**: Draft
 **Author**: Repo AI Assistant
@@ -9,20 +9,20 @@
 
 ## Executive Summary
 
-Koan.Data.Mongo delivers a production-ready document database adapter with first-class DX:
+Koan.Data.Connector.Mongo delivers a production-ready document database adapter with first-class DX:
 
 - Opinionated defaults with `auto` connection discovery, naming conventions, and paging guardrails.
 - Rich repository surface (`IDataRepository`, LINQ pushdowns, bulk operations, instruction execution) optimized for MongoDB.
 - Deep bootstrap integration: conventions and serializers, health contributor, telemetry, orchestration participation, and storage naming defaults.
 
-A Couchbase adapter must meet the same bar while leaning into Couchbase strengths (bucket/scope/collection hierarchy, fast key-value access, N1QL query pushdowns, durability). This document captures the Mongo implementation patterns and outlines a stepwise plan to ship `Koan.Data.Couchbase` with comparable capabilities and a clean developer experience.
+A Couchbase adapter must meet the same bar while leaning into Couchbase strengths (bucket/scope/collection hierarchy, fast key-value access, N1QL query pushdowns, durability). This document captures the Mongo implementation patterns and outlines a stepwise plan to ship `Koan.Data.Connector.Couchbase` with comparable capabilities and a clean developer experience.
 
 ---
 
-## 1. Assessment – Koan.Data.Mongo
+## 1. Assessment – Koan.Data.Connector.Mongo
 
 ### 1.1 Project layout & build surface
-- `Koan.Data.Mongo.csproj` targets `net9.0` and is packaged as `Sylin.Koan.Data.Mongo`.
+- `Koan.Data.Connector.Mongo.csproj` targets `net9.0` and is packaged as `Sylin.Koan.Data.Connector.Mongo`.
 - Entry points live alongside the root namespace (options, repository, registration, telemetry) with supporting folders:
   - `Infrastructure/` for shared constants.
   - `Initialization/` for bootstrap hooks (auto registrar, BSON optimization, custom serializers).
@@ -77,18 +77,18 @@ A Couchbase adapter must meet the same bar while leaning into Couchbase strength
 
 ## 2. Couchbase Adapter Goals
 
-- Provide `Koan.Data.Couchbase` with parity capabilities to Koan.Data.Mongo, tuned to Couchbase idioms (buckets/scopes/collections, key-value vs. query services, durability constraints).
+- Provide `Koan.Data.Connector.Couchbase` with parity capabilities to Koan.Data.Connector.Mongo, tuned to Couchbase idioms (buckets/scopes/collections, key-value vs. query services, durability constraints).
 - Preserve developer ergonomics: minimal configuration (auto discovery when possible), clear documentation, naming conventions, guardrails.
 - Integrate seamlessly with Koan bootstrap/orchestration, enabling Aspire Compose deployments and health visibility.
 - Optimize performance using Couchbase SDK best practices (cluster/bucket caching, scope-level collection handles, parameterized N1QL, mutation tokens for durability when available).
 
 ---
 
-## 3. Implementation Plan – Koan.Data.Couchbase
+## 3. Implementation Plan – Koan.Data.Connector.Couchbase
 
 ### Phase 0 – Foundations & dependencies
-1. Add new project `src/Koan.Data.Couchbase/Koan.Data.Couchbase.csproj` targeting `net9.0`, referencing `Couchbase.NetClient` (v3+), `Koan.Data.Core`, and required abstractions.
-2. Configure packaging metadata aligned with existing adapters (package id `Sylin.Koan.Data.Couchbase`).
+1. Add new project `src/Koan.Data.Connector.Couchbase/Koan.Data.Connector.Couchbase.csproj` targeting `net9.0`, referencing `Couchbase.NetClient` (v3+), `Koan.Data.Core`, and required abstractions.
+2. Configure packaging metadata aligned with existing adapters (package id `Sylin.Koan.Data.Connector.Couchbase`).
 3. Create README/TECHNICAL stubs mirroring Mongo docs with Couchbase-specific guidance.
 
 ### Phase 1 – Options & registration surface
@@ -131,7 +131,7 @@ A Couchbase adapter must meet the same bar while leaning into Couchbase strength
 4. Auto-create indexes: use Query Index Management to create primary/indexes based on `IndexMetadata` similar to Mongo. Provide best-effort error handling.
 
 ### Phase 4 – Observability & health
-1. Implement `CouchbaseTelemetry` with `ActivitySource` similar to Mongo naming (`"Koan.Data.Couchbase"`).
+1. Implement `CouchbaseTelemetry` with `ActivitySource` similar to Mongo naming (`"Koan.Data.Connector.Couchbase"`).
 2. Create `CouchbaseHealthContributor` performing cluster ping (`Cluster.PingAsync`) and returning health report with redacted connection info.
 3. Ensure repository methods wrap operations in telemetry spans and structured logging (mirror Mongo activity names: `couchbase.get`, `couchbase.query`, etc.).
 
@@ -173,3 +173,4 @@ A Couchbase adapter must meet the same bar while leaning into Couchbase strength
 1. Socialize this plan with the data platform team for validation, especially around Couchbase operational defaults.
 2. Spike a minimal cluster bootstrap + repository subset (Get/Upsert/Delete) to de-risk SDK integration and performance characteristics.
 3. Iterate on the remaining phases, tracking progress in project management tooling with milestones aligned to phases above.
+

@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: engineering
 title: "Auth Controller Discovery Regression"
@@ -32,7 +32,7 @@ validation:
 
 ## Summary
 
-The S5.Recs stack reported 404s from `/.well-known/auth/providers` despite loading `Koan.Web.Auth`, `Koan.Web.Auth.TestProvider`, and `Koan.Web.Auth.Services`. Investigation showed the auto-registrar never added its controller assembly to MVC's `ApplicationPartManager`, so the discovery controller failed to load.
+The S5.Recs stack reported 404s from `/.well-known/auth/providers` despite loading `Koan.Web.Auth`, `Koan.Web.Auth.Connector.Test`, and `Koan.Web.Auth.Services`. Investigation showed the auto-registrar never added its controller assembly to MVC's `ApplicationPartManager`, so the discovery controller failed to load.
 
 ## Resolution Steps
 
@@ -68,3 +68,4 @@ public void Initialize(IServiceCollection services)
 
 - Audit other Koan modules with controllers registered via auto-registrars to ensure they add their assemblies to MVC part managers.
 - Add a regression test that spins up a minimal host with `Koan.Web.Auth` and asserts discovery route availability.
+

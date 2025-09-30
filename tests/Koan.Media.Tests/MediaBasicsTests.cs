@@ -8,7 +8,7 @@ using Koan.Media.Core.Model;
 using Koan.Storage;
 using Koan.Storage.Abstractions;
 using Koan.Storage.Extensions;
-using Koan.Storage.Local;
+using Koan.Storage.Connector.Local;
 using Xunit;
 
 namespace Koan.Media.Tests;
@@ -105,3 +105,4 @@ public class MediaBasicsTests
         public void Dispose() { try { Directory.Delete(Path, true); } catch { } }
     }
 }
+

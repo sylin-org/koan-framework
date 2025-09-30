@@ -32,7 +32,7 @@ Relational adapters benefit from LINQ predicates for ergonomics, but full LINQ p
 - Dialect hooks: `ILinqSqlDialect` with `QuoteIdent`, `EscapeLike`, and `Parameter(index)`.
 - Translator: `LinqWhereTranslator<TEntity>` → returns (WHERE sql, parameter values list). Unsupported nodes throw `NotSupportedException`.
 - Cache: `RelationalCommandCache` for cached SELECT column lists per (entity,dialect).
-- Integration: `Koan.Data.Sqlite` implements `ILinqSqlDialect` on `SqliteDialect`; repository tries pushdown and falls back to in-memory filtering on unsupported predicates.
+- Integration: `Koan.Data.Connector.Sqlite` implements `ILinqSqlDialect` on `SqliteDialect`; repository tries pushdown and falls back to in-memory filtering on unsupported predicates.
 
 ## Implementation scenarios
 1) MVP (small, high-perf, cross-DB)
@@ -73,3 +73,4 @@ Relational adapters benefit from LINQ predicates for ergonomics, but full LINQ p
 ## See also
 
 - Data Adapter Acceptance Criteria: ../support/data-adapter-acceptance-criteria.md
+

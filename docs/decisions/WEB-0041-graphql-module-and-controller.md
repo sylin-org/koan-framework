@@ -4,10 +4,10 @@ slug: WEB-0041-graphql-module-and-controller
 domain: WEB
 status: Accepted
 date: 2025-08-19
-title: GraphQL module (Koan.Web.GraphQl) - controller-hosted schema from IEntity<>, typed filters/sorts, display field
+title: GraphQL module (Koan.Web.Connector.GraphQl) - controller-hosted schema from IEntity<>, typed filters/sorts, display field
 ---
 
-# ADR 0041: GraphQL module (Koan.Web.GraphQl) - controller-hosted schema from IEntity<>, typed filters/sorts, display field
+# ADR 0041: GraphQL module (Koan.Web.Connector.GraphQl) - controller-hosted schema from IEntity<>, typed filters/sorts, display field
 
 ## Context
 
@@ -22,7 +22,7 @@ title: GraphQL module (Koan.Web.GraphQl) - controller-hosted schema from IEntity
 
 ## Decision
 
-- Add a new module: `Koan.Web.GraphQl`.
+- Add a new module: `Koan.Web.Connector.GraphQl`.
 - Host via MVC controller: `GraphQlController` at `POST /graphql`. Avoid inline `MapGraphQL` endpoints.
 - Use Hot Chocolate as the GraphQL engine (code-first):
   - Packages: `HotChocolate`, `HotChocolate.AspNetCore`, `HotChocolate.Execution`, `HotChocolate.Types`, `HotChocolate.DataLoader`.
@@ -62,7 +62,7 @@ title: GraphQL module (Koan.Web.GraphQl) - controller-hosted schema from IEntity
 
 Phase 0: Module scaffold and bootstrapping
 
-- Project `Koan.Web.GraphQl` with folders: `Controllers`, `Types`, `Inputs`, `Resolvers`, `Dataloaders`, `Options`, `Infrastructure`.
+- Project `Koan.Web.Connector.GraphQl` with folders: `Controllers`, `Types`, `Inputs`, `Resolvers`, `Dataloaders`, `Options`, `Infrastructure`.
 - `Infrastructure/Constants.cs` (route "/graphql", default limits).
 - `ServiceCollectionExtensions.AddKoanGraphQl()`:
   - Scan for `IEntity<>` types (reuse Data.Core discovery pattern).
@@ -133,3 +133,4 @@ Phase 3: Dataloaders and polish
 
 - Add a sample enabling both `EntityController<Todo>` and GraphQL for `Todo`.
 - Docs for filter input syntax and examples per adapter.
+

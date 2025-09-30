@@ -1,4 +1,4 @@
-﻿---
+---
 name: Koan-developer-experience-enhancer
 description: Master of Koan Framework onboarding and developer productivity. Provides step-by-step learning paths, scaffolding templates, debugging guidance, and progressive complexity patterns. Ensures developers can go from zero to productive in minutes while mastering framework-specific patterns.
 model: inherit
@@ -284,7 +284,7 @@ if (KoanEnv.IsDevelopment) {
     // Output shows:
     // ┌─ Koan FRAMEWORK v0.2.18 ─────────────────
     // │ Core: 0.2.18
-    // │   ├─ Koan.Data.Mongo: 0.2.18
+    // │   ├─ Koan.Data.Connector.Mongo: 0.2.18
     // │   └─ MyApp.Notifications: 1.0.0
     // ├─ STARTUP ────────────────────────────────
     // │ I 10:30:15 Koan:discover  postgresql: server=localhost... ✓

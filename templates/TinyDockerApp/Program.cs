@@ -1,5 +1,5 @@
 using Koan.Data.Core;
-using Koan.Web.Swagger;
+using Koan.Web.Connector.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,3 +19,4 @@ var app = builder.Build();
 // Web pipeline is wired by Koan's startup filter (AddKoan().AsWebApi()).
 
 app.Run($"http://0.0.0.0:__PORT__");
+

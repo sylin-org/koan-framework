@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
 using Koan.Data.Abstractions;
-using Koan.Data.Json;
+using Koan.Data.Connector.Json;
 using Xunit;
 
 namespace Koan.Data.Core.Tests;
@@ -67,3 +67,4 @@ public class SetRoutingTests
         (await Data<Todo, string>.All("backup")).Should().BeEmpty();
     }
 }
+

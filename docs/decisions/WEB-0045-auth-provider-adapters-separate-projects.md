@@ -16,10 +16,10 @@ Context
 Decision
 
 - Extract each provider into its own project/package:
-  - Koan.Web.Auth.Google (OIDC)
-  - Koan.Web.Auth.Microsoft (OIDC)
-  - Koan.Web.Auth.Discord (OAuth2)
-  - Koan.Web.Auth.Oidc (generic handler; no defaults)
+  - Koan.Web.Auth.Connector.Google (OIDC)
+  - Koan.Web.Auth.Connector.Microsoft (OIDC)
+  - Koan.Web.Auth.Connector.Discord (OAuth2)
+  - Koan.Web.Auth.Connector.Oidc (generic handler; no defaults)
 - Each adapter self-registers via IKoanAutoRegistrar and contributes defaults through IAuthProviderContributor.
 - The core registry (Koan.Web.Auth) no longer carries any hard-coded defaults or brand knowledge.
 - Production gating: dynamic providers (those contributed by adapters without explicit appsettings) are disabled by default in Production unless either:
@@ -39,7 +39,7 @@ Consequences
 
 Dev-only provider
 
-- A separate adapter `Koan.Web.Auth.TestProvider` offers an in-process OAuth2 test IdP for local runs. It self-registers in Development (or when explicitly enabled via `Koan:Web:Auth:TestProvider:Enabled=true`) and contributes a `test` OAuth2 provider with built-in endpoints. No appsettings are necessary for local discovery; credentials default to `test-client` / `test-secret` and may be overridden. The adapter logs a warning if enabled outside Development.
+- A separate adapter `Koan.Web.Auth.Connector.Test` offers an in-process OAuth2 test IdP for local runs. It self-registers in Development (or when explicitly enabled via `Koan:Web:Auth:TestProvider:Enabled=true`) and contributes a `test` OAuth2 provider with built-in endpoints. No appsettings are necessary for local discovery; credentials default to `test-client` / `test-secret` and may be overridden. The adapter logs a warning if enabled outside Development.
 
 Implementation notes
 
@@ -57,3 +57,4 @@ References
 - ARCH-0040 config and constants naming
 - WEB-0043 auth multi-protocol
 - WEB-0044 web auth discovery and health
+

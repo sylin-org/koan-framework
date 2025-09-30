@@ -22,8 +22,8 @@ Modern apps need first-class social and enterprise sign-in. Requirements:
 
 Adopt a new module, Koan.Web.Auth (core), with adapter packages:
 
-- Koan.Web.Auth.Oidc (generic OIDC)
-- Koan.Web.Auth.Google, Koan.Web.Auth.Microsoft, Koan.Web.Auth.Discord (thin wrappers)
+- Koan.Web.Auth.Connector.Oidc (generic OIDC)
+- Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Discord (thin wrappers)
 - Koan.Web.Auth.Saml2 (SAML 2.0 SP)
 
 Expose controller-routed HTTP endpoints only:
@@ -121,3 +121,4 @@ Trade-offs:
 - ARCH-0040 - Config and constants naming
 - ARCH-0041 - Docs posture (instructions over tutorials)
 - OPS-0015 - Default configuration fallback
+

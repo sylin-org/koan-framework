@@ -1,10 +1,10 @@
-﻿using S8.Location.Core.Models;
+using S8.Location.Core.Models;
 using S8.Location.Core.Interceptors;
 using S8.Location.Core.Orchestration;
 using S8.Location.Core.Services;
 using Koan.Data.Core;
 using Koan.Canon;
-using Koan.Web.Swagger;
+using Koan.Web.Connector.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 

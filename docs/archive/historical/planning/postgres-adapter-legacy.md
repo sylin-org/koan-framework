@@ -12,7 +12,7 @@ This guide covers Koan's PostgreSQL data adapter. It mirrors relational semantic
 
 ## Package & registration
 
-Namespace: `Koan.Data.Postgres`
+Namespace: `Koan.Data.Connector.Postgres`
 
 ```csharp
 services.AddKoanCore();
@@ -97,3 +97,4 @@ $env:DOCKER_HOST = "npipe://./pipe/docker_engine"
 
 - Complex properties are stored in `Json` JSONB column; projections use expression indexes on extraction `(Json #>> '{Prop}')`.
 - Paging guardrails enforced with DefaultPageSize/MaxPageSize; fallbacks remain bounded.
+

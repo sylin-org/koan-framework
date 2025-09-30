@@ -141,14 +141,14 @@ src/Koan.Orchestration.Aspire/
 **Dependencies**: Task 1.3 (Orchestration.Aspire package)
 
 **Deliverables**:
-- [ ] Extend `Koan.Data.Postgres` KoanAutoRegistrar with `IKoanAspireRegistrar`
+- [ ] Extend `Koan.Data.Connector.Postgres` KoanAutoRegistrar with `IKoanAspireRegistrar`
 - [ ] Map PostgresOptions to Aspire postgres resource configuration
 - [ ] Add conditional registration based on environment and configuration
 - [ ] Create integration tests for postgres resource registration
 
 **Implementation**:
 ```csharp
-// In Koan.Data.Postgres/Initialization/KoanAutoRegistrar.cs
+// In Koan.Data.Connector.Postgres/Initialization/KoanAutoRegistrar.cs
 public void RegisterAspireResources(IDistributedApplicationBuilder builder, IConfiguration cfg, IHostEnvironment env)
 {
     var options = new PostgresOptions();
@@ -173,14 +173,14 @@ public void RegisterAspireResources(IDistributedApplicationBuilder builder, ICon
 **Dependencies**: Task 1.4 (Postgres implementation pattern)
 
 **Deliverables**:
-- [ ] Extend `Koan.Data.Redis` KoanAutoRegistrar with `IKoanAspireRegistrar`
+- [ ] Extend `Koan.Data.Connector.Redis` KoanAutoRegistrar with `IKoanAspireRegistrar`
 - [ ] Map RedisOptions to Aspire redis resource configuration
 - [ ] Handle password and database configuration mapping
 - [ ] Add integration tests for redis resource registration
 
 **Implementation**:
 ```csharp
-// In Koan.Data.Redis/Initialization/KoanAutoRegistrar.cs
+// In Koan.Data.Connector.Redis/Initialization/KoanAutoRegistrar.cs
 public void RegisterAspireResources(IDistributedApplicationBuilder builder, IConfiguration cfg, IHostEnvironment env)
 {
     var options = new RedisOptions();

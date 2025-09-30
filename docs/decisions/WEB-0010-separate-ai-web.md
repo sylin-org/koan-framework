@@ -19,9 +19,10 @@ Accepted
 ## Consequences
 
 - Breaking change: apps that previously got AI endpoints from `Koan.Web` must add a reference to `Koan.AI.Web`.
-- Clearer composition: AI becomes an opt-in capability mirroring other optional web modules (e.g., `Koan.Web.Swagger`, `Koan.Web.GraphQl`).
+- Clearer composition: AI becomes an opt-in capability mirroring other optional web modules (e.g., `Koan.Web.Connector.Swagger`, `Koan.Web.Connector.GraphQl`).
 - Reduced coupling: consumers of `Koan.Web` no longer pull transitively from AI packages.
 
 ## Migration
 
 Add a package/project reference to `Koan.AI.Web` where AI endpoints are desired. No code changes required if consumers were using the conventional routes from `Koan.AI.Contracts.Routing`.
+

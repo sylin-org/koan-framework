@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
 using Xunit;
-using Koan.Web.Auth.TestProvider.Extensions;
+using Koan.Web.Auth.Connector.Test.Extensions;
 
 namespace Koan.Web.Auth.Tests.Integration;
 
@@ -21,7 +21,7 @@ public class TestProviderLoginPageTests
             .ConfigureServices(s =>
             {
                 // Reference the TestProvider assembly so its routes are lit up
-                var tp = Assembly.Load("Koan.Web.Auth.TestProvider");
+                var tp = Assembly.Load("Koan.Web.Auth.Connector.Test");
                 s.AddMvc().AddApplicationPart(tp);
             })
             .Configure(app =>
@@ -39,3 +39,4 @@ public class TestProviderLoginPageTests
         Assert.Contains("Koan TestProvider - Sign in", html);
     }
 }
+

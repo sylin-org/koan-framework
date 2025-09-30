@@ -280,6 +280,8 @@
       href: DX-0041-docs-pillar-consolidation.md
     - name: DX-0042 Narrative sample entity naming simplification
       href: DX-0042-narrative-samples-simple-entity-names.md
+    - name: DX-0043 Connector naming for external integrations
+      href: DX-0043-connector-naming-for-external-integrations.md
 - name: Security (DEC)
   items:
     - name: DEC-0053 Service-to-service authentication

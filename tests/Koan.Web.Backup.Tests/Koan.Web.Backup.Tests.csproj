@@ -24,9 +24,9 @@
     <ProjectReference Include="..\..\src\Koan.Data.Backup\Koan.Data.Backup.csproj" />
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Postgres\Koan.Data.Postgres.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Data\Postgres\Koan.Data.Connector.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
     <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Storage.Local\Koan.Storage.Local.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
   </ItemGroup>
 </Project>

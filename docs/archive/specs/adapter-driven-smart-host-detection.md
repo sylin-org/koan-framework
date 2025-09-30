@@ -385,7 +385,7 @@ public abstract class BaseOrchestrationEvaluator : IKoanOrchestrationEvaluator
 ### MongoDB Adapter
 
 ```csharp
-namespace Koan.Data.Mongo.Orchestration;
+namespace Koan.Data.Connector.Mongo.Orchestration;
 
 public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
 {
@@ -534,7 +534,7 @@ public record CredentialSet(string? Username, string? Password);
 ### Weaviate Adapter (No Authentication)
 
 ```csharp
-namespace Koan.Data.Weaviate.Orchestration;
+namespace Koan.Data.Vector.Connector.Weaviate.Orchestration;
 
 public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
 {
@@ -618,7 +618,7 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
 ### Vault Adapter (Token Authentication)
 
 ```csharp
-namespace Koan.Secrets.Vault.Orchestration;
+namespace Koan.Secrets.Connector.Vault.Orchestration;
 
 public class VaultOrchestrationEvaluator : BaseOrchestrationEvaluator
 {

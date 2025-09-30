@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: core
 title: "Koan Getting Started Hub"
@@ -53,7 +53,7 @@ Everything starts minimal and grows by intent—add packages, not boilerplate.
    mkdir my-koan-app
    cd my-koan-app
    dotnet new web
-   dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+   dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
    ```
 2. **Model the entity**
    ```csharp
@@ -177,7 +177,7 @@ You now have REST CRUD, health checks, telemetry, and SQLite storage without con
   ```
 - Swap providers by intent:
   ```powershell
-  dotnet add package Koan.Data.Postgres Koan.Data.Vector
+  dotnet add package Koan.Data.Connector.Postgres Koan.Data.Vector
   ```
 
 Flow pipelines unify intake, AI enrichment, and messaging without bespoke orchestration.
@@ -211,3 +211,4 @@ Flow pipelines unify intake, AI enrichment, and messaging without bespoke orches
 - Tooling: [ASPIRE Integration](../ASPIRE-INTEGRATION.md), Koan CLI (`scripts/` & `packaging/Koan-cli`).
 
 Keep iterating—Koan grows with your intent, not against it.
+

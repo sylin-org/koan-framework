@@ -1,4 +1,4 @@
-﻿---
+---
 type: ARCHITECTURE
 domain: framework
 title: "Koan Module Ledger"
@@ -49,10 +49,10 @@ validation:
 ### Koan.AI.Contracts
 
 - Depends on: Koan.Core
-- Depended by: Koan.AI, Koan.Ai.Provider.Ollama, Koan.AI.Web
+- Depended by: Koan.AI, Koan.AI.Connector.Ollama, Koan.AI.Web
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Ai.Provider.Ollama
+### Koan.AI.Connector.Ollama
 
 - Depends on: Koan.AI.Contracts, Koan.Core, Koan.Core.Adapters, Koan.Orchestration.Abstractions
 - Depended by: –
@@ -67,17 +67,17 @@ validation:
 ### Koan.Canon.Core
 
 - Depends on: Koan.Core, Koan.Data.Core, Koan.Messaging.Core
-- Depended by: Koan.Canon.Runtime.Dapr, Koan.Canon.Web
+- Depended by: Koan.Canon.Runtime.Connector.Dapr, Koan.Canon.Web
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Canon.Runtime.Dapr
+### Koan.Canon.Runtime.Connector.Dapr
 
 - Depends on: Koan.Canon.Core
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Data.Redis
+### Koan.Data.Connector.Redis
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Orchestration.Abstractions, Koan.Orchestration.Aspire
 - Depended by: –
@@ -86,16 +86,16 @@ validation:
 ### Koan.Data.Relational
 
 - Depends on: Koan.Data.Abstractions, Koan.Data.Core
-- Depended by: Koan.Data.Postgres, Koan.Data.Sqlite, Koan.Data.SqlServer
+- Depended by: Koan.Data.Connector.Postgres, Koan.Data.Connector.Sqlite, Koan.Data.Connector.SqlServer
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Data.Sqlite
+### Koan.Data.Connector.Sqlite
 
 - Depends on: Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Relational
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Data.SqlServer
+### Koan.Data.Connector.SqlServer
 
 - Depends on: Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Relational, Koan.Orchestration.Abstractions
 - Depended by: –
@@ -110,10 +110,10 @@ validation:
 ### Koan.Data.Vector.Abstractions
 
 - Depends on: Koan.Data.Abstractions
-- Depended by: Koan.Data.Core, Koan.Data.ElasticSearch, Koan.Data.Milvus, Koan.Data.OpenSearch, Koan.Data.Vector, Koan.Data.Weaviate
+- Depended by: Koan.Data.Core, Koan.Data.Connector.ElasticSearch, Koan.Data.Vector.Connector.Milvus, Koan.Data.Connector.OpenSearch, Koan.Data.Vector, Koan.Data.Vector.Connector.Weaviate
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Data.Weaviate
+### Koan.Data.Vector.Connector.Weaviate
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Data.Vector.Abstractions, Koan.Orchestration.Abstractions
 - Depended by: –
@@ -146,10 +146,10 @@ validation:
 ### Koan.Messaging.Core
 
 - Depends on: Koan.Core
-- Depended by: Koan.Canon.Core, Koan.Messaging.RabbitMq
+- Depended by: Koan.Canon.Core, Koan.Messaging.Connector.RabbitMq
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Messaging.RabbitMq
+### Koan.Messaging.Connector.RabbitMq
 
 - Depends on: Koan.Core, Koan.Messaging.Core
 - Depended by: –
@@ -158,18 +158,18 @@ validation:
 ### Koan.Orchestration.Abstractions
 
 - Depends on: –
-- Depended by: Koan.Ai.Provider.Ollama, Koan.Core, Koan.Core.Adapters, Koan.Data.Couchbase, Koan.Data.ElasticSearch, Koan.Data.Milvus, Koan.Data.Mongo, Koan.Data.OpenSearch, Koan.Data.Postgres, Koan.Data.Redis, Koan.Data.SqlServer, Koan.Data.Weaviate, Koan.Orchestration.Cli, Koan.Orchestration.Provider.Docker, Koan.Orchestration.Provider.Podman, Koan.Orchestration.Renderers.Compose, Koan.Secrets.Vault
+- Depended by: Koan.AI.Connector.Ollama, Koan.Core, Koan.Core.Adapters, Koan.Data.Connector.Couchbase, Koan.Data.Connector.ElasticSearch, Koan.Data.Vector.Connector.Milvus, Koan.Data.Connector.Mongo, Koan.Data.Connector.OpenSearch, Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis, Koan.Data.Connector.SqlServer, Koan.Data.Vector.Connector.Weaviate, Koan.Orchestration.Cli, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose, Koan.Secrets.Connector.Vault
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Orchestration.Aspire
 
 - Depends on: Koan.Core
-- Depended by: Koan.Data.Postgres, Koan.Data.Redis
+- Depended by: Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Orchestration.Cli
 
-- Depends on: Koan.Orchestration.Abstractions, Koan.Orchestration.Provider.Docker, Koan.Orchestration.Provider.Podman, Koan.Orchestration.Renderers.Compose
+- Depends on: Koan.Orchestration.Abstractions, Koan.Orchestration.Connector.Docker, Koan.Orchestration.Connector.Podman, Koan.Orchestration.Renderers.Connector.Compose
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
@@ -179,19 +179,19 @@ validation:
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Orchestration.Provider.Docker
+### Koan.Orchestration.Connector.Docker
 
 - Depends on: Koan.Orchestration.Abstractions
 - Depended by: Koan.Orchestration.Cli
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Orchestration.Provider.Podman
+### Koan.Orchestration.Connector.Podman
 
 - Depends on: Koan.Orchestration.Abstractions
 - Depended by: Koan.Orchestration.Cli
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Orchestration.Renderers.Compose
+### Koan.Orchestration.Renderers.Connector.Compose
 
 - Depends on: Koan.Orchestration.Abstractions
 - Depended by: Koan.Orchestration.Cli
@@ -218,7 +218,7 @@ validation:
 ### Koan.Secrets.Abstractions
 
 - Depends on: –
-- Depended by: Koan.Secrets.Core, Koan.Secrets.Vault
+- Depended by: Koan.Secrets.Core, Koan.Secrets.Connector.Vault
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Secrets.Core
@@ -227,13 +227,13 @@ validation:
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Secrets.Vault
+### Koan.Secrets.Connector.Vault
 
 - Depends on: Koan.Core, Koan.Orchestration.Abstractions, Koan.Secrets.Abstractions
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Service.Inbox.Redis
+### Koan.Service.Inbox.Connector.Redis
 
 - Depends on: –
 - Depended by: –
@@ -242,10 +242,10 @@ validation:
 ### Koan.Storage
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
-- Depended by: Koan.Data.Backup, Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, Koan.Storage.Local
+- Depended by: Koan.Data.Backup, Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, Koan.Storage.Connector.Local
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Storage.Local
+### Koan.Storage.Connector.Local
 
 - Depends on: Koan.Storage
 - Depended by: –
@@ -254,34 +254,34 @@ validation:
 ### Koan.Web
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Scheduling
-- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.GraphQl, Koan.Web.Swagger, Koan.Web.Transformers
+- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.GraphQl, Koan.Web.Connector.Swagger, Koan.Web.Transformers
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth
 
 - Depends on: Koan.Core
-- Depended by: Koan.Web.Auth.Discord, Koan.Web.Auth.Google, Koan.Web.Auth.Microsoft, Koan.Web.Auth.Oidc, Koan.Web.Auth.Services, Koan.Web.Auth.TestProvider
+- Depended by: Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Oidc, Koan.Web.Auth.Services, Koan.Web.Auth.Connector.Test
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.Discord
+### Koan.Web.Auth.Connector.Discord
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.Google
+### Koan.Web.Auth.Connector.Google
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.Microsoft
+### Koan.Web.Auth.Connector.Microsoft
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.Oidc
+### Koan.Web.Auth.Connector.Oidc
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: –
@@ -295,11 +295,11 @@ validation:
 
 ### Koan.Web.Auth.Services
 
-- Depends on: Koan.Core, Koan.Web.Auth, Koan.Web.Auth.TestProvider
+- Depends on: Koan.Core, Koan.Web.Auth, Koan.Web.Auth.Connector.Test
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.TestProvider
+### Koan.Web.Auth.Connector.Test
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: Koan.Web.Auth.Services
@@ -317,13 +317,13 @@ validation:
 - Depended by: Koan.Canon.Web, Koan.Web.Auth.Roles
 - Documentation: README ✅ · TECHNICAL ❌
 
-### Koan.Web.GraphQl
+### Koan.Web.Connector.GraphQl
 
 - Depends on: Koan.Core, Koan.Data.Core, Koan.Web
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Swagger
+### Koan.Web.Connector.Swagger
 
 - Depends on: Koan.Web
 - Depended by: –
@@ -335,10 +335,10 @@ validation:
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core
-- Depended by: Koan.Data.Backup, Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, Koan.Storage.Local
+- Depended by: Koan.Data.Backup, Koan.Media.Abstractions, Koan.Media.Core, Koan.Media.Web, Koan.Storage.Connector.Local
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Storage.Local
+### Koan.Storage.Connector.Local
 
 - Depends on: Koan.Storage
 - Depended by: –
@@ -347,34 +347,34 @@ validation:
 ### Koan.Web
 
 - Depends on: Koan.Core, Koan.Data.Abstractions, Koan.Data.Core, Koan.Scheduling
-- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.GraphQl, Koan.Web.Swagger, Koan.Web.Transformers
+- Depended by: Koan.Canon.Web, Koan.Mcp, Koan.Media.Core, Koan.Recipe.Observability, Koan.Web.Backup, Koan.Web.Extensions, Koan.Web.Connector.GraphQl, Koan.Web.Connector.Swagger, Koan.Web.Transformers
 - Documentation: README ✅ · TECHNICAL ✅
 
 ### Koan.Web.Auth
 
 - Depends on: Koan.Core
-- Depended by: Koan.Web.Auth.Discord, Koan.Web.Auth.Google, Koan.Web.Auth.Microsoft, Koan.Web.Auth.Oidc, Koan.Web.Auth.Services, Koan.Web.Auth.TestProvider
+- Depended by: Koan.Web.Auth.Connector.Discord, Koan.Web.Auth.Connector.Google, Koan.Web.Auth.Connector.Microsoft, Koan.Web.Auth.Connector.Oidc, Koan.Web.Auth.Services, Koan.Web.Auth.Connector.Test
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.Discord
+### Koan.Web.Auth.Connector.Discord
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.Google
+### Koan.Web.Auth.Connector.Google
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.Microsoft
+### Koan.Web.Auth.Connector.Microsoft
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.Oidc
+### Koan.Web.Auth.Connector.Oidc
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: –
@@ -388,11 +388,11 @@ validation:
 
 ### Koan.Web.Auth.Services
 
-- Depends on: Koan.Core, Koan.Web.Auth, Koan.Web.Auth.TestProvider
+- Depends on: Koan.Core, Koan.Web.Auth, Koan.Web.Auth.Connector.Test
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Auth.TestProvider
+### Koan.Web.Auth.Connector.Test
 
 - Depends on: Koan.Core, Koan.Web.Auth
 - Depended by: Koan.Web.Auth.Services
@@ -410,13 +410,13 @@ validation:
 - Depended by: Koan.Canon.Web, Koan.Web.Auth.Roles
 - Documentation: README ✅ · TECHNICAL ❌
 
-### Koan.Web.GraphQl
+### Koan.Web.Connector.GraphQl
 
 - Depends on: Koan.Core, Koan.Data.Core, Koan.Web
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
 
-### Koan.Web.Swagger
+### Koan.Web.Connector.Swagger
 
 - Depends on: Koan.Web
 - Depended by: –
@@ -427,3 +427,4 @@ validation:
 - Depends on: Koan.Core, Koan.Web
 - Depended by: –
 - Documentation: README ✅ · TECHNICAL ✅
+

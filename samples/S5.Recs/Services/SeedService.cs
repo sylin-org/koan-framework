@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
-using Koan.Ai.Provider.Ollama;
+using Koan.AI.Connector.Ollama;
 using S5.Recs.Providers;
 using Koan.AI;
 using Koan.AI.Contracts;

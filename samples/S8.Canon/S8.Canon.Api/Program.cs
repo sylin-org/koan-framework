@@ -5,7 +5,7 @@ using Koan.Canon.Options;
 using S8.Canon.Shared;
 using Koan.Messaging;
 using S8.Canon.Api.Adapters;
-using Koan.Web.Swagger;
+using Koan.Web.Connector.Swagger;
 using Koan.Canon.Attributes;
 using Koan.Canon.Core.Orchestration;
 using Microsoft.Extensions.Logging;
@@ -112,4 +112,5 @@ public class S8CanonOrchestrator : CanonOrchestratorBase
     // Inherits all processing logic from CanonOrchestratorBase
     // Can override methods here for custom S8.Canon-specific processing if needed
 }
+
 

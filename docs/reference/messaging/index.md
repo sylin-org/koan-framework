@@ -25,7 +25,7 @@ validation:
 
 ```bash
 dotnet add package Koan.Messaging
-dotnet add package Koan.Messaging.RabbitMq
+dotnet add package Koan.Messaging.Connector.RabbitMq
 ```
 
 ```csharp
@@ -640,3 +640,4 @@ services.OnBatch<OrderItem>(async (messages, sp, ct) =>
 
 **Last Validation**: 2025-01-17 by Framework Specialist
 **Framework Version Tested**: v0.2.18+
+

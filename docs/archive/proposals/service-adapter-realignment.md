@@ -62,7 +62,7 @@ OllamaAdapter: "I found myself at http://ollama:11434, validated all required mo
 
 ### 3. Framework Compliance
 
-- **Reference = Intent**: Adding `Koan.Data.Mongo` automatically enables MongoDB discovery
+- **Reference = Intent**: Adding `Koan.Data.Connector.Mongo` automatically enables MongoDB discovery
 - **Auto-Registration**: `KoanAutoRegistrar` registers both data and discovery capabilities
 - **Attribute-Driven**: `KoanServiceAttribute` provides orchestration hints
 - **Environment-Aware**: Adapters respect `OrchestrationMode` for discovery strategies
@@ -385,8 +385,8 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
 ### MongoDB Discovery Adapter
 
 ```csharp
-// File: src/Koan.Data.Mongo/Discovery/MongoDiscoveryAdapter.cs
-namespace Koan.Data.Mongo.Discovery;
+// File: src/Koan.Data.Connector.Mongo/Discovery/MongoDiscoveryAdapter.cs
+namespace Koan.Data.Connector.Mongo.Discovery;
 
 /// <summary>
 /// MongoDB autonomous discovery adapter.
@@ -476,7 +476,7 @@ internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
     }
 }
 
-// File: src/Koan.Data.Mongo/Initialization/KoanAutoRegistrar.cs
+// File: src/Koan.Data.Connector.Mongo/Initialization/KoanAutoRegistrar.cs
 public sealed class KoanAutoRegistrar : IKoanInitializer
 {
     public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
@@ -495,8 +495,8 @@ public sealed class KoanAutoRegistrar : IKoanInitializer
 ### Ollama Discovery Adapter
 
 ```csharp
-// File: src/Koan.Ai.Provider.Ollama/Discovery/OllamaDiscoveryAdapter.cs
-namespace Koan.Ai.Provider.Ollama.Discovery;
+// File: src/Koan.AI.Connector.Ollama/Discovery/OllamaDiscoveryAdapter.cs
+namespace Koan.AI.Connector.Ollama.Discovery;
 
 /// <summary>
 /// Ollama autonomous discovery adapter with model validation.
@@ -571,8 +571,8 @@ internal sealed class OllamaDiscoveryAdapter : ServiceDiscoveryAdapterBase
 ### PostgreSQL Discovery Adapter
 
 ```csharp
-// File: src/Koan.Data.Postgres/Discovery/PostgresDiscoveryAdapter.cs
-namespace Koan.Data.Postgres.Discovery;
+// File: src/Koan.Data.Connector.Postgres/Discovery/PostgresDiscoveryAdapter.cs
+namespace Koan.Data.Connector.Postgres.Discovery;
 
 /// <summary>
 /// PostgreSQL autonomous discovery adapter.
@@ -868,8 +868,8 @@ src/Koan.Core/Orchestration/Models/DiscoveryCandidate.cs
 ```
 src/Koan.Core/Orchestration/ServiceDiscoveryExtensions.cs (major cleanup)
 src/Koan.Core/Orchestration/OrchestrationAwareServiceDiscovery.cs (delegation)
-src/Koan.Data.Mongo/MongoOptionsConfigurator.cs (use coordinator)
-src/Koan.Data.Postgres/PostgresOptionsConfigurator.cs (use coordinator)
+src/Koan.Data.Connector.Mongo/MongoOptionsConfigurator.cs (use coordinator)
+src/Koan.Data.Connector.Postgres/PostgresOptionsConfigurator.cs (use coordinator)
 ```
 
 #### Agent Assignments:
@@ -1484,3 +1484,4 @@ Implement autonomous adapter pattern where:
 ---
 
 This proposal establishes a foundation for true service adapter autonomy while maintaining the Koan Framework's core principles of simplicity, extensibility, and developer experience. The phased approach ensures minimal disruption while achieving architectural excellence.
+

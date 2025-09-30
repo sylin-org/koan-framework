@@ -63,11 +63,11 @@ public interface IKoanAspireRegistrar
 ### Extended KoanAutoRegistrar Pattern
 
 ```csharp
-namespace Koan.Data.Postgres.Initialization;
+namespace Koan.Data.Connector.Postgres.Initialization;
 
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
 {
-    public string ModuleName => "Koan.Data.Postgres";
+    public string ModuleName => "Koan.Data.Connector.Postgres";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     // Existing DI registration - UNCHANGED

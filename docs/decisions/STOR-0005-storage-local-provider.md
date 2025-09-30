@@ -14,7 +14,7 @@ Context
 
 Decision
 
-- Implement Koan.Storage.Local (LocalStorageProvider) as part of the initial release.
+- Implement Koan.Storage.Connector.Local (LocalStorageProvider) as part of the initial release.
 - Capabilities
   - SupportsSequentialStream = true
   - SupportsSeek/Range = true (for regular files)
@@ -50,3 +50,4 @@ References
 
 - STOR-0001 module and contracts
 - STOR-0002 HTTP endpoints
+

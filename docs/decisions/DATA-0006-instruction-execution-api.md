@@ -95,7 +95,7 @@ This preserves SoC: the entity stays a POCO; the execution capability is optiona
       public static Task<TResult> Execute<TEntity, TResult>(this IDataService data, Instruction instruction, CancellationToken ct = default) where TEntity : class;
     }
 
-- Provider opt-in (e.g., Koan.Data.Sqlite)
+- Provider opt-in (e.g., Koan.Data.Connector.Sqlite)
   - SqliteRepository<TEntity,TKey> : IInstructionExecutor<TEntity>
     - Supports relational.* instruction names; throws for unknown names.
 
@@ -131,3 +131,4 @@ This preserves SoC: the entity stays a POCO; the execution capability is optiona
 ## Summary
 
 A minimal, optional instruction execution capability provides a safe, typed escape hatch to provider-specific features. It maintains POCO purity, keeps adapters in control, and scales across relational, document, and vector models via namespaced instruction contracts.
+

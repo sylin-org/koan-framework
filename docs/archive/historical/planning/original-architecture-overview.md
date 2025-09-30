@@ -10,7 +10,7 @@ Koan is modular and provider-agnostic. Core principles:
 
 - Koan.Data.Abstractions - attributes, capabilities, instruction envelope.
 - Koan.Data.Core - DataService, repository façade, static facades (Data<T,..>).
-- Provider packages (e.g., Koan.Data.Sqlite) - concrete repositories/dialects.
+- Provider packages (e.g., Koan.Data.Connector.Sqlite) - concrete repositories/dialects.
 - Optional toolkits (e.g., Relational) - shared model/diff, not tied to core.
 
 ## Key design choices
@@ -33,3 +33,4 @@ Koan.Web is organized for clarity:
 - Infrastructure - small helpers used by controllers/hosting only.
 
 This keeps endpoints out of startup code and avoids "god classes" while making discovery predictable.
+

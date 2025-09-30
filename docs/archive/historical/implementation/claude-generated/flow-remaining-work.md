@@ -1,4 +1,4 @@
-﻿# Flow Framework - Remaining Work
+# Flow Framework - Remaining Work
 
 ## Status as of 2025-01-07
 
@@ -66,7 +66,7 @@ public static async Task Send<T>(this T message, ...) where T : class
 ```
 
 ### 1.3 RabbitMQ Provider Enhancement (CRITICAL)
-**Location**: `src/Koan.Messaging.RabbitMq/RabbitMqProvider.cs`
+**Location**: `src/Koan.Messaging.Connector.RabbitMq/RabbitMqProvider.cs`
 **Status**: Missing SendToQueueAsync method
 **Required Implementation**:
 ```csharp

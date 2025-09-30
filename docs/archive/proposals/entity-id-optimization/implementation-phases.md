@@ -136,7 +136,7 @@ public interface IOptimizedDataRepository<TEntity, TKey> : IDataRepository<TEnti
 
 #### 2.1 PostgreSQL Repository - COMPLETED
 
-**File**: `src/Koan.Data.Postgres/PostgresRepository.cs`
+**File**: `src/Koan.Data.Connector.Postgres/PostgresRepository.cs`
 
 **Implemented**:
 - ✅ StorageOptimizationExtensions integration
@@ -149,7 +149,7 @@ public interface IOptimizedDataRepository<TEntity, TKey> : IDataRepository<TEnti
 
 #### 2.2 SQL Server Repository - COMPLETED
 
-**File**: `src/Koan.Data.SqlServer/SqlServerRepository.cs`
+**File**: `src/Koan.Data.Connector.SqlServer/SqlServerRepository.cs`
 
 **Implemented**:
 - ✅ UNIQUEIDENTIFIER native type optimization
@@ -160,7 +160,7 @@ public interface IOptimizedDataRepository<TEntity, TKey> : IDataRepository<TEnti
 
 #### 2.3 SQLite Repository - COMPLETED
 
-**File**: `src/Koan.Data.Sqlite/SqliteRepository.cs`
+**File**: `src/Koan.Data.Connector.Sqlite/SqliteRepository.cs`
 
 **Implemented**:
 - ✅ GUID normalization for string storage
@@ -169,7 +169,7 @@ public interface IOptimizedDataRepository<TEntity, TKey> : IDataRepository<TEnti
 
 #### 2.4 MongoDB Repository - COMPLETED
 
-**File**: `src/Koan.Data.Mongo/MongoRepository.cs`
+**File**: `src/Koan.Data.Connector.Mongo/MongoRepository.cs`
 
 **Implemented**:
 - ✅ Clean pre-write transformation approach
@@ -269,8 +269,8 @@ public interface IOptimizedDataRepository<TEntity, TKey> : IDataRepository<TEnti
    **Files**:
 
 - `tests/Koan.Data.Core.Tests/Optimization/`
-- `tests/Koan.Data.Postgres.Tests/OptimizationTests.cs`
-- `tests/Koan.Data.SqlServer.Tests/OptimizationTests.cs`
+- `tests/Koan.Data.Connector.Postgres.Tests/OptimizationTests.cs`
+- `tests/Koan.Data.Connector.SqlServer.Tests/OptimizationTests.cs`
 
 #### 4.2 Performance Benchmarking
 
@@ -411,3 +411,4 @@ This phased approach ensures systematic progress while maintaining system stabil
 - ✅ **Smart Defaults**: Entity<> pattern automatically optimized
 - ✅ **Universal Support**: All major data providers supported
 - ✅ **Clean Architecture**: AggregateBag integration, SoC compliance
+

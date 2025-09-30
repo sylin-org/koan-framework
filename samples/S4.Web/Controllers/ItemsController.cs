@@ -26,4 +26,4 @@ public sealed class ItemsController : EntityController<Item>
     }
 }
 
-// GraphQL endpoint is provided by Koan.Web.GraphQl's centralized controller (/graphql).
+// GraphQL endpoint is provided by Koan.Web.Connector.GraphQl's centralized controller (/graphql).

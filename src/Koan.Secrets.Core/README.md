@@ -1,4 +1,4 @@
-﻿# Koan.Secrets.Core
+# Koan.Secrets.Core
 
 > ✅ Validated against configuration bootstrap upgrades, provider chaining, and cache expiry refresh on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for runtime architecture and edge-case coverage.
 
@@ -60,5 +60,6 @@ sealed class VaultSecretProvider : ISecretProvider
 ## Related docs
 
 - [`Koan.Secrets.Abstractions`](../Koan.Secrets.Abstractions/README.md) – identifier and payload contracts.
-- [`Koan.Secrets.Vault`](../Koan.Secrets.Vault/README.md) – concrete provider leveraging Vault.
+- [`Koan.Secrets.Connector.Vault`](../Koan.Secrets.Connector.Vault/README.md) – concrete provider leveraging Vault.
 - [`docs/architecture/capability-map.md`](../../docs/architecture/capability-map.md) – high-level capability overview including the secrets stack.
+

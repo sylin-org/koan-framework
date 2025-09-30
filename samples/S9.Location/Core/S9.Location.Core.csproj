@@ -1,15 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\..\src\\Connectors\\Data\\Mongo\Koan.Data.Connector.Mongo.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Koan.Messaging.RabbitMq\Koan.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\..\src\\Connectors\\Messaging\\RabbitMq\Koan.Messaging.Connector.RabbitMq.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.AI\Koan.AI.csproj" />
-    <ProjectReference Include="..\..\..\src\Koan.Ai.Provider.Ollama\Koan.Ai.Provider.Ollama.csproj" />
+    <ProjectReference Include="..\..\..\src\\Connectors\\AI\\Ollama\Koan.AI.Connector.Ollama.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -25,3 +25,4 @@
   </ItemGroup>
 
 </Project>
+

@@ -20,7 +20,7 @@
 ```bash
 # 2 minutes to working API
 dotnet new web -n MyApp && cd MyApp
-dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
 ```
 
 ```csharp
@@ -65,7 +65,7 @@ public class TodoCompleted : Entity<TodoCompleted>
 }
 
 // Reference = Intent (no configuration ceremony)
-// dotnet add package Koan.Messaging.RabbitMq
+// dotnet add package Koan.Messaging.Connector.RabbitMq
 
 await new TodoCompleted { TodoId = todo.Id }.Send();  // Same pattern extends
 ```
@@ -212,7 +212,7 @@ cd quickstart && dotnet run
 
 # Create your first app
 dotnet new web -n MyApp
-dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
 ```
 
 ### **For Teams & Architects**
@@ -294,7 +294,7 @@ cd quickstart && dotnet run
 
 # Option 2: Start from scratch
 dotnet new web -n MyKoanApp
-dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
 # Add your Entity<> models and EntityController<> endpoints
 dotnet run
 ```
@@ -323,3 +323,4 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 **Koan Framework: Build sophisticated apps with simple patterns.**
 
 _A .NET framework that makes small teams capable of sophisticated solutions._
+

@@ -18,11 +18,11 @@ The Koan Framework currently lacks a systematic way to handle adapter readiness 
 - **Poor Developer Experience**: Developers must implement custom retry logic or ignore startup errors
 
 ### Affected Adapters (Priority Order)
-- **Koan.Data.Couchbase**: Cluster initialization, bucket creation, collection provisioning
-- **Koan.Ai.Provider.Ollama**: Model downloading, service availability
-- **Koan.Data.Mongo**: Connection establishment, database/collection creation
-- **Koan.Data.Weaviate**: Schema provisioning, connectivity verification
-- **Koan.Storage.Local**: Directory creation, permission verification
+- **Koan.Data.Connector.Couchbase**: Cluster initialization, bucket creation, collection provisioning
+- **Koan.AI.Connector.Ollama**: Model downloading, service availability
+- **Koan.Data.Connector.Mongo**: Connection establishment, database/collection creation
+- **Koan.Data.Vector.Connector.Weaviate**: Schema provisioning, connectivity verification
+- **Koan.Storage.Connector.Local**: Directory creation, permission verification
 - **Future Adapters**: Any adapter requiring async initialization of external resources
 
 ## Root Cause Analysis
@@ -789,10 +789,10 @@ public class OllamaAdapter : IAdapterReadiness, IAsyncAdapterInitializer
 
 ### Key Files to Modify
 - `src/Koan.Core.Adapters/` (new namespace for readiness capabilities)
-- `src/Koan.Data.Couchbase/CouchbaseRepository.cs` (add readiness implementation)
-- `src/Koan.Data.Couchbase/CouchbaseClusterProvider.cs` (add async initialization)
-- `src/Koan.Ai.Provider.Ollama/OllamaAdapter.cs` (add model readiness)
-- `src/Koan.Data.Mongo/MongoRepository.cs` (add connection readiness)
+- `src/Koan.Data.Connector.Couchbase/CouchbaseRepository.cs` (add readiness implementation)
+- `src/Koan.Data.Connector.Couchbase/CouchbaseClusterProvider.cs` (add async initialization)
+- `src/Koan.AI.Connector.Ollama/OllamaAdapter.cs` (add model readiness)
+- `src/Koan.Data.Connector.Mongo/MongoRepository.cs` (add connection readiness)
 
 ### Success Criteria Verification
 Test with `samples/S5.Recs` Docker environment:
@@ -807,3 +807,4 @@ cd samples/S5.Recs
 - **Entity-First Development**: `Data<T>.All()` API remains the same
 - **Provider Transparency**: Same code works across all storage backends
 - **Capability-Based**: Use interfaces, not inheritance hierarchies
+

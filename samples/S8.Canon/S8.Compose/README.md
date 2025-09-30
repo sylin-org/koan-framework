@@ -1,4 +1,4 @@
-﻿# S8 Compose (Flow API + Mongo + RabbitMQ + Adapters)
+# S8 Compose (Flow API + Mongo + RabbitMQ + Adapters)
 
 Prereqs: Docker Desktop
 Start the stack (container-only sample):
@@ -18,6 +18,6 @@ Services:
   - Static monitor: http://localhost:4903/
 
 Notes:
-- API uses Koan.Data.Mongo in containers (no filesystem JSON store).
+- API uses Koan.Data.Connector.Mongo in containers (no filesystem JSON store).
 - Two adapter containers publish TelemetryEvent messages via RabbitMQ; the API consumes and persists intake for Flow processing.
 - Stop stack: docker compose down

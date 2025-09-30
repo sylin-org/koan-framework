@@ -16,7 +16,7 @@
     <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Web\Koan.Web.csproj" />
-    <ProjectReference Include="..\..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
+    <ProjectReference Include="..\..\..\src\\Connectors\\Web\\Swagger\Koan.Web.Connector.Swagger.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,3 +24,4 @@
   </ItemGroup>
 
 </Project>
+

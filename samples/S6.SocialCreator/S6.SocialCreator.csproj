@@ -18,9 +18,10 @@
     <ProjectReference Include="..\..\src\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
   <ProjectReference Include="..\..\src\Koan.Media.Web\Koan.Media.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Storage.Local\Koan.Storage.Local.csproj" />
+    <ProjectReference Include="..\..\src\\Connectors\\Storage\\Local\Koan.Storage.Connector.Local.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="wwwroot/**" CopyToPublishDirectory="Always" />
   </ItemGroup>
 </Project>
+

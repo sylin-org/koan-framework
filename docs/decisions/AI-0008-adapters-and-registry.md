@@ -10,7 +10,7 @@ We want a pluggable AI adapter abstraction so Koan can connect to different yet 
 
 ## Decision
 
-First-party adapters: Koan.Ai.Provider.Ollama (first), Koan.AI.Adapter.OpenAI (subset). Others can be community.
+First-party adapters: Koan.AI.Connector.Ollama (first), Koan.AI.Adapter.OpenAI (subset). Others can be community.
 
 ### Adapter identity and capabilities (contract)
 
@@ -208,3 +208,4 @@ The AI runtime may persist internal state using Koan’s Entity patterns on the 
 - Entities (examples): AiServiceState (health snapshots), AiCallRecord (request/response metadata), AiBudget (quota usage), AiRouteDecision (audit)
 - Options: Koan:Ai:Persistence { Enabled: false, ConnectionName: null, Schema/TablePrefix: "Ai" }
 - Persistence is off by default; when enabled, it augments telemetry with durable audit trails and quota enforcement.
+

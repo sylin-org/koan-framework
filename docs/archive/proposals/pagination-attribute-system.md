@@ -632,7 +632,7 @@ public sealed class PaginationOperationFilter : IOperationFilter
 }
 ```
 
-The concrete implementation (now shipping as `Koan.Web.Swagger.PaginationOperationFilter`) mirrors this pseudocode: it inspects `[Pagination]` metadata, adds `page`/`pageSize`/`all` query parameters as appropriate, documents the `X-Page`/`X-Page-Size`/`X-Total-Count` headers when totals are emitted, and registers a canonical `413 Payload Too Large` response for Optional/Off flows that exceed the absolute record cap.
+The concrete implementation (now shipping as `Koan.Web.Connector.Swagger.PaginationOperationFilter`) mirrors this pseudocode: it inspects `[Pagination]` metadata, adds `page`/`pageSize`/`all` query parameters as appropriate, documents the `X-Page`/`X-Page-Size`/`X-Total-Count` headers when totals are emitted, and registers a canonical `413 Payload Too Large` response for Optional/Off flows that exceed the absolute record cap.
 
 ## Feasibility & Risk Assessment
 

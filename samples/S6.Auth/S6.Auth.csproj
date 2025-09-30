@@ -12,12 +12,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Web.Auth.Google\Koan.Web.Auth.Google.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Web.Auth.Microsoft\Koan.Web.Auth.Microsoft.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Web.Auth.Discord\Koan.Web.Auth.Discord.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Web.Auth.Oidc\Koan.Web.Auth.Oidc.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Web.Auth.TestProvider\Koan.Web.Auth.TestProvider.csproj" />
+  <ProjectReference Include="..\..\src\\Connectors\\Web\\Auth\\Google\Koan.Web.Auth.Connector.Google.csproj" />
+  <ProjectReference Include="..\..\src\\Connectors\\Web\\Auth\\Microsoft\Koan.Web.Auth.Connector.Microsoft.csproj" />
+  <ProjectReference Include="..\..\src\\Connectors\\Web\\Auth\\Discord\Koan.Web.Auth.Connector.Discord.csproj" />
+  <ProjectReference Include="..\..\src\\Connectors\\Web\\Auth\\Oidc\Koan.Web.Auth.Connector.Oidc.csproj" />
+  <ProjectReference Include="..\..\src\\Connectors\\Web\\Auth\\Test\Koan.Web.Auth.Connector.Test.csproj" />
   <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
   </ItemGroup>
 </Project>
+
 

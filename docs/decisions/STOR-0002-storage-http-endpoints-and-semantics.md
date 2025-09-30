@@ -51,7 +51,7 @@ Consequences
 
 Follow-ups
 
-- Wire Swagger annotations in Koan.Web.Swagger when Koan.Web.Storage is present.
+- Wire Swagger annotations in Koan.Web.Connector.Swagger when Koan.Web.Storage is present.
 - Provide small examples in src/Koan.Web.Storage/README.md.
 
 References
@@ -59,3 +59,4 @@ References
 - ARCH-0040 Config and constants naming
 - WEB-0035 EntityController transformers
 - STOR-0001 Storage module and contracts
+

@@ -69,7 +69,7 @@ Applies to all messaging providers; first delivery in RabbitMQ. Does not redesig
 
 ## Implementation notes
 
-- Contracts live in Koan.Messaging.Core.Abstractions; provider-specific Applier/Inspector live with the provider (e.g., Koan.Messaging.RabbitMq).
+- Contracts live in Koan.Messaging.Core.Abstractions; provider-specific Applier/Inspector live with the provider (e.g., Koan.Messaging.Connector.RabbitMq).
 - Inspector may use management APIs when available; otherwise rely on AMQP declaration pass to infer existence and arguments.
 - Emit concise, stable names; reuse alias registry from MESS-0022 for routing keys and exchange names.
 - Log a single-line summary per bus: mode, adds/updates/removals counts, and any blocked destructive ops.
@@ -87,3 +87,4 @@ Applies to all messaging providers; first delivery in RabbitMQ. Does not redesig
 - MESS-0027 - Standalone MQ services and naming
 - DATA-0019 - Outbox helper and defaults
 - ARCH-0042 - Per-project companion docs
+

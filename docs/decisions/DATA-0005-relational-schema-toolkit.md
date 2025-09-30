@@ -27,4 +27,5 @@ date: 2025-08-16
 ## Implementation notes
 - Koan.Data.Relational provides the contracts and a simple synchronizer.
 - SQLite adapter consumes the toolkit now; others can follow with their dialects.
-- Provider-specific dialect implementations live in the provider packages (e.g., `Koan.Data.Sqlite.SqliteDialect`). The relational toolkit must remain adapter-agnostic.
+- Provider-specific dialect implementations live in the provider packages (e.g., `Koan.Data.Connector.Sqlite.SqliteDialect`). The relational toolkit must remain adapter-agnostic.
+
