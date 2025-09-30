@@ -70,4 +70,18 @@ public sealed class Media : Entity<Media>
     }
 
     // ID generation handled by MakeId method when needed
+
+    /// <summary>
+    /// Computed year from StartDate for filtering and display
+    /// </summary>
+    public int? Year => StartDate?.Year;
+
+    /// <summary>
+    /// Blended rating: 80% AverageScore + 20% Popularity (scaled to 5★)
+    /// Formula: (AverageScore × 0.8) + (Popularity × 1)
+    /// Range: ~3.5-4.6★ for typical content
+    /// </summary>
+    public double? Rating => AverageScore.HasValue
+        ? Math.Round((AverageScore.Value * 0.8) + Popularity, 2)
+        : null;
 }

@@ -14,16 +14,35 @@
   <header>
     <h1>Garden Cooperative Journal</h1>
     <p>Koan slice • entity statics, write-path automation, and a tiny AngularJS dashboard.</p>
+    <nav class="view-tabs" aria-label="View toggle">
+      <button type="button" ng-class="{ 'active': vm.view === 'dashboard' }" ng-click="vm.setView('dashboard')">
+        Dashboard
+      </button>
+      <button type="button" ng-class="{ 'active': vm.view === 'admin' }" ng-click="vm.setView('admin')">
+        Admin
+      </button>
+    </nav>
   </header>
 
+  <div ng-if="vm.view === 'dashboard'" class="view-panel">
   <section>
     <h2>Post a reading</h2>
     <div class="form-grid">
-      <label for="plot">Plot</label>
-      <select id="plot" ng-model="vm.form.plotId" ng-options="p.id as p.name for p in vm.plots" ng-change="vm.loadRecent(vm.form.plotId)" required></select>
+      <label for="sensor">Sensor</label>
+      <select id="sensor" ng-model="vm.form.sensorSerial" ng-options="s.serial as vm.sensorLabel(s) for s in vm.sensors" ng-change="vm.onSensorChange()" required></select>
 
-      <label for="moisture">Moisture</label>
-      <input id="moisture" type="number" ng-model="vm.form.moisture" min="0" max="100" step="0.1" placeholder="18.2" required>
+      <div class="bound-plot span-2">
+        <span class="muted caption">Bound plot</span>
+        <strong>{{vm.boundPlotName()}}</strong>
+        <small class="muted" ng-if="vm.boundPlotId()">Mapped in the service—serials stay stable even when the Pi moves.</small>
+        <small class="muted" ng-if="!vm.boundPlotId()">Unassigned — readings queue until someone binds this sensor.</small>
+      </div>
+
+      <label for="soilHumidity">Soil humidity (%)</label>
+      <input id="soilHumidity" type="number" ng-model="vm.form.soilHumidity" min="0" max="100" step="0.1" placeholder="18.2" required>
+
+      <label for="temperature">Temperature (°C)</label>
+      <input id="temperature" type="number" ng-model="vm.form.temperatureC" min="-20" max="60" step="0.1" placeholder="26.0">
 
       <div class="toggle">
         <input id="auto" type="checkbox" ng-model="vm.auto.enabled" ng-change="vm.toggleAuto()" aria-label="Toggle sensor simulation">
@@ -32,7 +51,7 @@
 
       <button class="primary" ng-click="vm.submitReading()" ng-disabled="vm.posting">Send reading</button>
     </div>
-    <p class="muted" style="margin-top:0.75rem">Sensors stay dumb: one POST with plot, moisture, and timestamp. We decide “dry” during the write.</p>
+    <p class="muted" style="margin-top:0.75rem">Sensors speak in serial numbers; the service binds them to plots and decides “dry” the moment readings land. Chapter 1 uses soil humidity and temperature—air humidity and GPS wait for later lessons.</p>
   </section>
 
   <section>
@@ -69,11 +88,11 @@
   </section>
 
   <section>
-    <h2>Recent readings</h2>
-    <p class="muted" ng-if="!vm.currentReadings.length">Select a plot to see its latest samples.</p>
+  <h2>Recent readings</h2>
+  <p class="muted" ng-if="!vm.currentReadings.length">Pick a sensor with a bound plot to see its latest samples.</p>
     <ul class="muted" ng-if="vm.currentReadings.length" style="padding-left:1.2rem">
       <li ng-repeat="reading in vm.currentReadings track by reading.id">
-        {{reading.sampledAt | date:'HH:mm:ss'}} → {{reading.moisture | number:1}}%
+        {{reading.sampledAt | date:'HH:mm:ss'}} → {{reading.soilHumidity | number:1}}% soil humidity<span ng-if="reading.temperatureC !== null && reading.temperatureC !== undefined">, {{reading.temperatureC | number:1}}°C</span>
       </li>
     </ul>
   </section>
@@ -85,22 +104,184 @@
       <p ng-if="!vm.consoleLog.length" class="muted">Logs appear here as you interact—post a reading or let the simulator run.</p>
     </div>
   </section>
+  </div>
+
+  <div ng-if="vm.view === 'admin'" class="view-panel admin-view">
+    <section>
+      <h2>Sensor roster</h2>
+      <p class="muted">See every sensor’s raw identifiers, capability flags, and current plot binding. Adjust bindings here without touching firmware.</p>
+      <div class="table-wrapper">
+        <table aria-label="Sensor roster">
+          <thead>
+            <tr>
+              <th scope="col">Serial</th>
+              <th scope="col">Display name</th>
+              <th scope="col">Bound plot</th>
+              <th scope="col">Capabilities</th>
+              <th scope="col">Last seen</th>
+              <th scope="col" style="width:140px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="sensor in vm.sensors track by sensor.id">
+              <td>
+                <code>{{sensor.serial}}</code>
+                <div class="muted tiny">Id: {{sensor.id}}</div>
+              </td>
+              <td>
+                <input type="text" ng-model="sensor._editDisplayName" placeholder="Sensor label" class="inline-input">
+              </td>
+              <td>
+                <select ng-model="sensor._editPlotId" ng-options="p.id as p.name for p in vm.plots">
+                  <option value="">Unassigned</option>
+                </select>
+              </td>
+              <td>
+                <span class="badge capability" ng-repeat="label in vm.capabilityBadges(sensor) track by $index">{{label}}</span>
+              </td>
+              <td>
+                <span ng-if="sensor.lastSeenAt">{{sensor.lastSeenAt | date:'MMM d, HH:mm:ss'}}</span>
+                <span class="muted" ng-if="!sensor.lastSeenAt">Never</span>
+              </td>
+              <td class="actions">
+                <button type="button" class="secondary" ng-click="vm.unassignSensor(sensor)" ng-disabled="!sensor._editPlotId">Unassign</button>
+                <button type="button" class="primary" ng-click="vm.saveSensor(sensor)" ng-disabled="!vm.isSensorDirty(sensor) || vm.savingSensor === sensor.id">
+                  <span ng-if="vm.savingSensor !== sensor.id">Save</span>
+                  <span ng-if="vm.savingSensor === sensor.id">Saving…</span>
+                </button>
+              </td>
+            </tr>
+            <tr ng-if="!vm.sensors.length">
+              <td colspan="6" class="muted">No sensors registered yet—post a reading to let a new serial appear.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Bed management</h2>
+      <p class="muted">Create beds, assign stewards, and jot context without touching the seeder.</p>
+      <div class="card bed-form">
+        <div class="form-grid">
+          <label for="newBedName">Name</label>
+          <input id="newBedName" type="text" ng-model="vm.newBed.name" placeholder="Bed name" required>
+
+          <label for="newBedSteward">Steward</label>
+          <select id="newBedSteward" ng-model="vm.newBed.memberId" ng-options="member.id as member.displayName for member in vm.members">
+            <option value="">Unassigned</option>
+          </select>
+
+          <label for="newBedNotes">Notes</label>
+          <textarea id="newBedNotes" ng-model="vm.newBed.notes" rows="2" placeholder="Context for the next steward"></textarea>
+
+          <div class="actions span-2">
+            <button type="button" class="primary" ng-click="vm.createBed()" ng-disabled="!vm.canCreateBed()">
+              <span ng-if="!vm.newBedSaving">Add bed</span>
+              <span ng-if="vm.newBedSaving">Saving…</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrapper" style="margin-top:1rem">
+        <table aria-label="Beds roster">
+          <thead>
+            <tr>
+              <th scope="col">Bed</th>
+              <th scope="col">Steward</th>
+              <th scope="col">Notes</th>
+              <th scope="col" style="width:180px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="plot in vm.plots track by plot.id">
+              <td>
+                <div ng-if="!plot._editing">{{plot.name}}</div>
+                <div ng-if="plot._editing">
+                  <input type="text" ng-model="plot._editName" required>
+                </div>
+              </td>
+              <td>
+                <div ng-if="!plot._editing">{{vm.memberName(plot.memberId)}}</div>
+                <div ng-if="plot._editing">
+                  <select ng-model="plot._editMemberId" ng-options="member.id as member.displayName for member in vm.members">
+                    <option value="">Unassigned</option>
+                  </select>
+                </div>
+              </td>
+              <td>
+                <div ng-if="!plot._editing">{{plot.notes || '\u00A0'}}</div>
+                <div ng-if="plot._editing">
+                  <textarea ng-model="plot._editNotes" rows="2"></textarea>
+                </div>
+              </td>
+              <td class="actions">
+                <div ng-if="!plot._editing">
+                  <button type="button" class="secondary" ng-click="vm.startPlotEdit(plot)">Edit</button>
+                  <button type="button" class="danger" ng-click="vm.deletePlot(plot)" ng-disabled="vm.deletingPlotId === plot.id">
+                    <span ng-if="vm.deletingPlotId !== plot.id">Delete</span>
+                    <span ng-if="vm.deletingPlotId === plot.id">Deleting…</span>
+                  </button>
+                </div>
+                <div ng-if="plot._editing">
+                  <button type="button" class="secondary" ng-click="vm.cancelPlotEdit(plot)" ng-disabled="vm.savingPlotId === plot.id">Cancel</button>
+                  <button type="button" class="primary" ng-click="vm.savePlot(plot)" ng-disabled="!vm.isPlotDirty(plot) || vm.savingPlotId === plot.id">
+                    <span ng-if="vm.savingPlotId !== plot.id">Save</span>
+                    <span ng-if="vm.savingPlotId === plot.id">Saving…</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr ng-if="!vm.plots.length">
+              <td colspan="4" class="muted">No beds yet—add one above to start the journal.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 </main>
 
 <script>
 angular.module('gardenApp', [])
-.controller('GardenController', function($http, $interval, $filter, $window) {
+.controller('GardenController', function($http, $interval, $filter) {
   const vm = this;
   const apiRoot = '/api/garden';
   let autoTimer = null;
   let autoIndex = 0;
+  const capabilityLabels = [
+    { flag: 1, label: 'Soil humidity' },
+    { flag: 2, label: 'Air humidity' },
+    { flag: 4, label: 'Temperature' },
+    { flag: 8, label: 'GPS location' }
+  ];
 
   vm.plots = [];
+  vm.members = [];
+  vm.sensors = [];
   vm.reminders = [];
   vm.currentReadings = [];
   vm.consoleLog = [];
-  vm.form = { plotId: null, moisture: 18.0 };
+  vm.form = { sensorSerial: null, soilHumidity: 18.0, temperatureC: 26.0 };
   vm.auto = { enabled: false };
+  vm.view = 'dashboard';
+  vm.savingSensor = null;
+  vm.savingPlotId = null;
+  vm.deletingPlotId = null;
+  vm.newBed = { name: '', memberId: null, notes: '' };
+  vm.newBedSaving = false;
+
+  vm.setView = function(view) {
+    vm.view = view;
+    if (view === 'admin') {
+      vm.refreshAdmin();
+    }
+  };
+
+  vm.refreshAdmin = function() {
+    return vm.loadMembers()
+      .then(function() { return vm.loadPlots(); })
+      .then(function() { return vm.loadSensors(); });
+  };
 
   vm.statusClass = function(status) {
     if (!status) return 'badge';
@@ -124,13 +305,295 @@ angular.module('gardenApp', [])
     }
   };
 
+  vm.capabilityBadges = function(sensor) {
+    if (!sensor) return [];
+    const value = sensor.capabilities || 0;
+    const labels = capabilityLabels
+      .filter(function(entry) { return (value & entry.flag) === entry.flag; })
+      .map(function(entry) { return entry.label; });
+    return labels.length ? labels : ['None'];
+  };
+
+  vm.findPlotById = function(id) {
+    if (!id) return null;
+    return vm.plots.find(function(p) { return p.id === id; }) || null;
+  };
+
+  vm.memberName = function(memberId) {
+    if (!memberId) return 'Unassigned';
+    var match = vm.members.find(function(member) { return member.id === memberId; });
+    return match ? match.displayName : memberId;
+  };
+
+  vm.boundPlotForSensor = function(sensor) {
+    if (!sensor) return null;
+    const rel = vm.relation(sensor, 'plot');
+    if (rel && rel.name) {
+      return { id: sensor.plotId, name: rel.name };
+    }
+    const fallback = vm.findPlotById(sensor.plotId);
+    if (fallback) {
+      return { id: fallback.id, name: fallback.name };
+    }
+    return sensor.plotId ? { id: sensor.plotId, name: '' } : null;
+  };
+
+  vm.boundPlotId = function() {
+    const plot = vm.boundPlotForSensor(vm.selectedSensor());
+    return plot ? plot.id : null;
+  };
+
+  vm.boundPlotName = function() {
+    const plot = vm.boundPlotForSensor(vm.selectedSensor());
+    if (!plot) return 'Unassigned';
+    return plot.name || 'Unnamed plot';
+  };
+
+  vm.sensorLabel = function(sensor) {
+    if (!sensor) return '';
+    const name = sensor.displayName || sensor.serial;
+    const plot = vm.boundPlotForSensor(sensor);
+    const suffix = plot && plot.name ? ' • ' + plot.name : '';
+    return name + suffix;
+  };
+
+  vm.selectedSensor = function() {
+    if (!vm.form.sensorSerial) return null;
+    return vm.sensors.find(function(sensor) { return sensor.serial === vm.form.sensorSerial; }) || null;
+  };
+
+  vm.applySensorDraft = function(sensor) {
+    if (!sensor) return;
+    sensor._editDisplayName = (sensor.displayName && sensor.displayName.trim()) || sensor.serial;
+    sensor._editPlotId = sensor.plotId || null;
+  };
+
+  vm.resetPlotDraft = function(plot) {
+    if (!plot) return;
+    plot._editing = false;
+    plot._editName = plot.name || '';
+    plot._editMemberId = plot.memberId || null;
+    plot._editNotes = plot.notes || '';
+  };
+
+  vm.startPlotEdit = function(plot) {
+    if (!plot) return;
+    vm.resetPlotDraft(plot);
+    plot._editing = true;
+  };
+
+  vm.cancelPlotEdit = function(plot) {
+    if (!plot) return;
+    vm.resetPlotDraft(plot);
+  };
+
+  vm.isPlotDirty = function(plot) {
+    if (!plot) return false;
+    var originalName = (plot.name || '').trim();
+    var draftName = (plot._editName || '').trim();
+    var originalMember = plot.memberId || null;
+    var draftMember = plot._editMemberId || null;
+    var originalNotes = (plot.notes || '').trim();
+    var draftNotes = (plot._editNotes || '').trim();
+    return originalName !== draftName || originalMember !== draftMember || originalNotes !== draftNotes;
+  };
+
+  vm.canCreateBed = function() {
+    if (vm.newBedSaving) return false;
+    if (!vm.newBed || !vm.newBed.name) return false;
+    return vm.newBed.name.trim().length > 0;
+  };
+
+  vm.isSensorDirty = function(sensor) {
+    if (!sensor) return false;
+    const originalName = (sensor.displayName && sensor.displayName.trim()) || sensor.serial;
+    const draftName = (sensor._editDisplayName && sensor._editDisplayName.trim()) || sensor.serial;
+    const originalPlot = sensor.plotId || null;
+    const draftPlot = sensor._editPlotId || null;
+    return draftName !== originalName || draftPlot !== originalPlot;
+  };
+
+  vm.saveSensor = function(sensor) {
+    if (!sensor || !vm.isSensorDirty(sensor)) return;
+
+    const payload = {
+      id: sensor.id,
+      serial: sensor.serial,
+      displayName: (sensor._editDisplayName && sensor._editDisplayName.trim()) || sensor.serial,
+      plotId: sensor._editPlotId || null,
+      capabilities: sensor.capabilities,
+      lastSeenAt: sensor.lastSeenAt
+    };
+
+    vm.savingSensor = sensor.id;
+
+    $http.post(apiRoot + '/sensors', payload)
+      .then(function() {
+        const binding = payload.plotId ? payload.plotId : 'no plot';
+        vm.log('Sensor ' + sensor.serial + ' saved (binding: ' + binding + ').');
+        return vm.loadSensors();
+      })
+      .then(function() {
+        vm.loadReminders();
+        const plotId = vm.boundPlotId();
+        if (plotId) {
+          vm.loadRecent(plotId);
+        } else {
+          vm.currentReadings = [];
+        }
+      })
+      .catch(function(err) {
+        vm.log('Sensor save failed: ' + (err && err.status));
+      })
+      .finally(function() {
+        vm.savingSensor = null;
+      });
+  };
+
+  vm.createBed = function() {
+    if (!vm.canCreateBed()) return;
+
+    var payload = {
+      name: vm.newBed.name.trim(),
+      memberId: vm.newBed.memberId || null,
+      notes: (vm.newBed.notes || '').trim()
+    };
+
+    if (!payload.notes) {
+      payload.notes = '';
+    }
+
+    vm.newBedSaving = true;
+
+    $http.post(apiRoot + '/plots', payload)
+      .then(function() {
+        vm.log('Bed ' + payload.name + ' created.');
+        vm.newBed = { name: '', memberId: null, notes: '' };
+        return vm.loadPlots();
+      })
+      .then(function() { return vm.loadSensors(); })
+      .then(function() { return vm.loadReminders(); })
+      .catch(function(err) {
+        vm.log('Bed create failed: ' + (err && err.status));
+      })
+      .finally(function() {
+        vm.newBedSaving = false;
+      });
+  };
+
+  vm.savePlot = function(plot) {
+    if (!plot) return;
+    if (!vm.isPlotDirty(plot)) {
+      vm.resetPlotDraft(plot);
+      return;
+    }
+
+    var payload = {
+      id: plot.id,
+      name: (plot._editName || '').trim(),
+      memberId: plot._editMemberId || null,
+      notes: (plot._editNotes || '').trim()
+    };
+
+    if (!payload.name) {
+      vm.log('Bed name is required.');
+      return;
+    }
+
+    if (!payload.notes) {
+      payload.notes = '';
+    }
+
+    vm.savingPlotId = plot.id;
+
+    $http.post(apiRoot + '/plots', payload)
+      .then(function() {
+        vm.log('Bed ' + payload.name + ' updated.');
+        return vm.loadPlots();
+      })
+      .then(function() { return vm.loadSensors(); })
+      .then(function() { return vm.loadReminders(); })
+      .catch(function(err) {
+        vm.log('Bed update failed: ' + (err && err.status));
+      })
+      .finally(function() {
+        vm.savingPlotId = null;
+      });
+  };
+
+  vm.deletePlot = function(plot) {
+    if (!plot) return;
+    var boundSensor = vm.sensors.find(function(sensor) { return sensor.plotId === plot.id; });
+    if (boundSensor) {
+      vm.log('Unassign sensor ' + boundSensor.serial + ' before deleting bed ' + (plot.name || plot.id) + '.');
+      return;
+    }
+
+    vm.deletingPlotId = plot.id;
+
+    $http.delete(apiRoot + '/plots/' + encodeURIComponent(plot.id))
+      .then(function() {
+        vm.log('Bed ' + (plot.name || plot.id) + ' deleted.');
+        return vm.loadPlots();
+      })
+      .then(function() { return vm.loadSensors(); })
+      .then(function() { return vm.loadReminders(); })
+      .catch(function(err) {
+        vm.log('Bed delete failed: ' + (err && err.status));
+      })
+      .finally(function() {
+        vm.deletingPlotId = null;
+      });
+  };
+
+  vm.unassignSensor = function(sensor) {
+    if (!sensor) return;
+    sensor._editPlotId = null;
+  };
+
+  vm.onSensorChange = function() {
+    const plotId = vm.boundPlotId();
+    if (plotId) {
+      vm.loadRecent(plotId);
+    } else {
+      vm.currentReadings = [];
+    }
+  };
+
+  vm.loadMembers = function() {
+    return $http.get(apiRoot + '/members?sort=displayName').then(function(res) {
+      vm.members = res.data || [];
+    });
+  };
+
   vm.loadPlots = function() {
-    return $http.get(apiRoot + '/plots?sort=name').then(function(res) {
-      vm.plots = res.data || [];
-      if (!vm.form.plotId && vm.plots.length) {
-        vm.form.plotId = vm.plots[0].id;
-        vm.loadRecent(vm.form.plotId);
+    const url = apiRoot + '/plots?with=member&sort=name';
+    return $http.get(url).then(function(res) {
+      vm.plots = (res.data || []).map(function(plot) {
+        vm.resetPlotDraft(plot);
+        return plot;
+      });
+    });
+  };
+
+  vm.loadSensors = function() {
+    const url = apiRoot + '/sensors?with=plot&sort=serial';
+    return $http.get(url).then(function(res) {
+      vm.sensors = (res.data || []).map(function(sensor) {
+        vm.applySensorDraft(sensor);
+        return sensor;
+      });
+
+      if (!vm.form.sensorSerial && vm.sensors.length) {
+        vm.form.sensorSerial = vm.sensors[0].serial;
       }
+
+      if (vm.form.sensorSerial && !vm.sensors.some(function(sensor) { return sensor.serial === vm.form.sensorSerial; })) {
+        vm.form.sensorSerial = vm.sensors.length ? vm.sensors[0].serial : null;
+      }
+
+      vm.onSensorChange();
+      return vm.sensors;
     });
   };
 
@@ -153,18 +616,24 @@ angular.module('gardenApp', [])
   };
 
   vm.submitReading = function() {
-    if (!vm.form.plotId) return;
+    if (!vm.form.sensorSerial) return;
     vm.posting = true;
     const payload = {
-      plotId: vm.form.plotId,
-      moisture: vm.form.moisture,
+      sensorSerial: vm.form.sensorSerial,
+      soilHumidity: vm.form.soilHumidity,
+      temperatureC: vm.form.temperatureC,
       sampledAt: new Date().toISOString()
     };
     $http.post(apiRoot + '/readings', payload)
       .then(function() {
-        vm.log('Reading posted for ' + vm.form.plotId + ' → ' + payload.moisture.toFixed(1) + '%');
+        const plot = vm.boundPlotForSensor(vm.selectedSensor());
+        const plotLabel = plot && plot.name ? plot.name : 'unassigned';
+        vm.log('Reading posted for ' + payload.sensorSerial + ' (' + plotLabel + ') → ' + payload.soilHumidity.toFixed(1) + '%');
         vm.loadReminders();
-        vm.loadRecent(vm.form.plotId);
+        const plotId = vm.boundPlotId();
+        if (plotId) {
+          vm.loadRecent(plotId);
+        }
       })
       .catch(function(err) {
         vm.log('Reading failed: ' + (err && err.status));
@@ -191,6 +660,11 @@ angular.module('gardenApp', [])
 
   vm.toggleAuto = function() {
     if (vm.auto.enabled) {
+      if (!vm.sensors.length) {
+        vm.auto.enabled = false;
+        vm.log('No sensors bound yet; start the loop after seeding.');
+        return;
+      }
       if (!autoTimer) {
         autoTimer = $interval(vm.simulateSensor, 8000);
         vm.simulateSensor();
@@ -206,22 +680,30 @@ angular.module('gardenApp', [])
   };
 
   vm.simulateSensor = function() {
-    if (!vm.plots.length) return;
-    const plot = vm.plots[autoIndex % vm.plots.length];
-    autoIndex = (autoIndex + 1) % vm.plots.length;
-    const dryBias = plot.name && plot.name.toLowerCase().includes('3');
+    if (!vm.sensors.length) return;
+    const sensor = vm.sensors[autoIndex % vm.sensors.length];
+    autoIndex = (autoIndex + 1) % vm.sensors.length;
+    const plot = vm.boundPlotForSensor(sensor);
+    if (!plot || !plot.id) {
+      vm.log('Sensor ' + sensor.serial + ' is unassigned—skipping simulated reading.');
+      return;
+    }
+    const plotName = plot.name || ('plot ' + plot.id);
+    const dryBias = plotName.toLowerCase().includes('3');
     const moisture = dryBias ? 14 + Math.random() * 4 : 24 + Math.random() * 8;
+    const temperature = 24 + Math.random() * 6;
     const payload = {
-      plotId: plot.id,
-      moisture: parseFloat(moisture.toFixed(1)),
+      sensorSerial: sensor.serial,
+      soilHumidity: parseFloat(moisture.toFixed(1)),
+      temperatureC: parseFloat(temperature.toFixed(1)),
       sampledAt: new Date().toISOString()
     };
     $http.post(apiRoot + '/readings', payload)
       .then(function() {
-        vm.log('Pi posted ' + payload.moisture.toFixed(1) + '% for ' + plot.name);
+        vm.log('Sensor ' + sensor.serial + ' (' + plotName + ') posted ' + payload.soilHumidity.toFixed(1) + '%');
         vm.loadReminders();
-        if (vm.form.plotId === plot.id) {
-          vm.loadRecent(plot.id);
+        if (vm.form.sensorSerial === sensor.serial && vm.boundPlotId()) {
+          vm.loadRecent(vm.boundPlotId());
         }
       })
       .catch(function(err) {
@@ -230,9 +712,8 @@ angular.module('gardenApp', [])
   };
 
   vm.init = function() {
-    vm.loadPlots().then(function() {
-      vm.loadReminders();
-    });
+    vm.refreshAdmin()
+      .then(function() { return vm.loadReminders(); });
   };
 
   vm.$onDestroy = function() {

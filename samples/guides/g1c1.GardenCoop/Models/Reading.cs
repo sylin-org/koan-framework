@@ -7,10 +7,15 @@ namespace g1c1.GardenCoop.Models;
 
 public class Reading : Entity<Reading>
 {
-    [Parent(typeof(Plot))]
-    public string PlotId { get; set; } = string.Empty;
+    [Parent(typeof(Sensor))]
+    public string SensorId { get; set; } = string.Empty;
 
-    public double Moisture { get; set; }
+    [Parent(typeof(Plot))]
+    public string? PlotId { get; set; }
+
+    public double SoilHumidity { get; set; }
+
+    public double? TemperatureC { get; set; }
 
     public DateTimeOffset SampledAt { get; set; } = DateTimeOffset.UtcNow;
 

@@ -33,6 +33,47 @@ header p {
   color: var(--muted);
 }
 
+.view-tabs {
+  display: inline-flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  background: rgba(58, 125, 68, 0.06);
+  padding: 0.4rem;
+  border-radius: 999px;
+}
+
+.view-tabs button {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.4rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.view-tabs button:hover {
+  color: var(--accent);
+}
+
+.view-tabs button.active {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: 0 4px 12px rgba(58, 125, 68, 0.12);
+}
+
+.view-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.admin-view .table-wrapper {
+  margin-top: 1rem;
+}
+
 section {
   background: #fff;
   border-radius: 12px;
@@ -51,6 +92,10 @@ section h2 {
   gap: 1rem;
 }
 
+.form-grid .span-2 {
+  grid-column: 1 / span 2;
+}
+
 .form-grid label {
   font-weight: 600;
 }
@@ -63,6 +108,34 @@ section h2 {
   border: 1px solid #ccd5c7;
   border-radius: 8px;
   font-size: 1rem;
+}
+
+.inline-input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #ccd5c7;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.bound-plot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border: 1px dashed rgba(58, 125, 68, 0.35);
+  border-radius: 10px;
+  background: rgba(232, 245, 233, 0.4);
+}
+
+.bound-plot strong {
+  font-size: 1.05rem;
+}
+
+.bound-plot .caption {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 button.primary {
@@ -179,6 +252,14 @@ tbody td {
   color: #196f3d;
 }
 
+.badge.capability {
+  background: rgba(58, 125, 68, 0.12);
+  color: var(--accent);
+  font-size: 0.75rem;
+  margin-right: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
 .log-panel {
   font-family: "JetBrains Mono", "SFMono-Regular", "Menlo", monospace;
   background: #111917;
@@ -192,6 +273,17 @@ tbody td {
 .log-panel p {
   margin: 0 0 0.35rem;
   white-space: pre-wrap;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tiny {
+  font-size: 0.75rem;
 }
 
 @media (max-width: 720px) {

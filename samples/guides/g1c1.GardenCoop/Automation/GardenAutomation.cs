@@ -1,7 +1,8 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using g1c1.GardenCoop.Models;
 using Koan.Data.Core.Events;
-using System.Linq;
 
 namespace g1c1.GardenCoop.Automation;
 
@@ -26,21 +27,30 @@ public static class GardenAutomation
                 var reading = ctx.Current;
                 var ct = ctx.CancellationToken;
 
-                var recent = await Reading.Recent(reading.PlotId, WindowSize, ct);
+                var plotId = reading.PlotId;
+                if (string.IsNullOrWhiteSpace(plotId))
+                {
+                    var sensor = await Sensor.Get(reading.SensorId, ct);
+                    var serial = sensor?.Serial ?? "unknown";
+                    Console.WriteLine($"[Journal] Reading {reading.Id} arrived for sensor {serial}, but no plot binding exists yet.");
+                    return;
+                }
+
+                var recent = await Reading.Recent(plotId, WindowSize, ct);
                 if (recent.Length == 0)
                 {
                     return;
                 }
 
-                var average = recent.Average(r => r.Moisture);
+                var average = recent.Average(r => r.SoilHumidity);
 
-                var active = await Reminder.ActiveForPlot(reading.PlotId, ct);
+                var active = await Reminder.ActiveForPlot(plotId, ct);
 
                 if (average < DryThreshold)
                 {
                     if (active is null)
                     {
-                        var plot = await Plot.Get(reading.PlotId, ct);
+                        var plot = await Plot.Get(plotId, ct);
                         if (plot is null)
                         {
                             return;
@@ -48,14 +58,14 @@ public static class GardenAutomation
 
                         await new Reminder
                         {
-                            PlotId = reading.PlotId,
+                            PlotId = plotId,
                             MemberId = plot.MemberId
-                        }.ActivateAsync($"Low moisture (avg={average:F1}) – consider watering today.", ct);
+                        }.ActivateAsync($"Low soil humidity (avg={average:F1}) – consider watering today.", ct);
                     }
                 }
                 else if (active is not null)
                 {
-                    await active.AcknowledgeAsync("Moisture back above threshold.", ct);
+                    await active.AcknowledgeAsync("Soil humidity back above threshold.", ct);
                 }
             });
     }
@@ -77,7 +87,7 @@ public static class GardenAutomation
 
                 if (was != ReminderStatus.Active && now == ReminderStatus.Active)
                 {
-                    Console.WriteLine($"[Journal] Sending email (fake) to steward of {ctx.Current.PlotId} about low moisture.");
+                    Console.WriteLine($"[Journal] Sending email (fake) to steward of {ctx.Current.PlotId} about low soil humidity.");
                 }
             });
     }

@@ -19,7 +19,7 @@ public class Reminder : Entity<Reminder>
     public string PlotId { get; set; } = string.Empty;
 
     [Parent(typeof(Member))]
-    public string MemberId { get; set; } = string.Empty;
+    public string? MemberId { get; set; }
 
     public ReminderStatus Status { get; set; } = ReminderStatus.Idle;
 

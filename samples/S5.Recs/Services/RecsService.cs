@@ -84,6 +84,10 @@ internal sealed class RecsService : IRecsService
         double? preferWeight,
         string? sort,
         string? mediaTypeFilter,
+        double? ratingMin,
+        double? ratingMax,
+        int? yearMin,
+        int? yearMax,
         CancellationToken ct)
     {
         // Guardrails
@@ -115,7 +119,7 @@ internal sealed class RecsService : IRecsService
                     }
 
                     // Apply filters
-                    var filteredMedia = await ApplyFilters(mediaItems, genres, episodesMax, mediaTypeFilter, userId, ct);
+                    var filteredMedia = await ApplyFilters(mediaItems, genres, episodesMax, mediaTypeFilter, userId, ratingMin, ratingMax, yearMin, yearMax, ct);
 
                     // Apply personalization and scoring
                     var recommendations = await ScoreAndPersonalize(filteredMedia, idToScore, userId, preferTags, preferWeight, spoilerSafe, ct);
@@ -138,7 +142,7 @@ internal sealed class RecsService : IRecsService
         try
         {
             var allMedia = await Media.All(ct);
-            var filteredMedia = await ApplyFilters(allMedia, genres, episodesMax, mediaTypeFilter, userId, ct);
+            var filteredMedia = await ApplyFilters(allMedia, genres, episodesMax, mediaTypeFilter, userId, ratingMin, ratingMax, yearMin, yearMax, ct);
 
             var fallbackRecommendations = filteredMedia.Select(media => new Recommendation
             {
@@ -283,7 +287,17 @@ internal sealed class RecsService : IRecsService
         }
     }
 
-    private async Task<List<Media>> ApplyFilters(IEnumerable<Media> media, string[]? genres, int? episodesMax, string? mediaTypeFilter, string? userId, CancellationToken ct)
+    private async Task<List<Media>> ApplyFilters(
+        IEnumerable<Media> media,
+        string[]? genres,
+        int? episodesMax,
+        string? mediaTypeFilter,
+        string? userId,
+        double? ratingMin,
+        double? ratingMax,
+        int? yearMin,
+        int? yearMax,
+        CancellationToken ct)
     {
         var filtered = media.AsEnumerable();
 
@@ -303,6 +317,36 @@ internal sealed class RecsService : IRecsService
         if (episodesMax is int emax)
         {
             filtered = filtered.Where(m => m.Episodes is null || m.Episodes <= emax);
+        }
+
+        // Rating filter (blended 80/20 score)
+        if (ratingMin.HasValue || ratingMax.HasValue)
+        {
+            filtered = filtered.Where(m => {
+                var rating = m.Rating; // Uses computed property: (AverageScore × 0.8) + Popularity
+                if (!rating.HasValue) return false; // Exclude items without ratings
+
+                if (ratingMin.HasValue && rating.Value < ratingMin.Value)
+                    return false;
+                if (ratingMax.HasValue && rating.Value > ratingMax.Value)
+                    return false;
+                return true;
+            });
+        }
+
+        // Year filter
+        if (yearMin.HasValue || yearMax.HasValue)
+        {
+            filtered = filtered.Where(m => {
+                var year = m.Year; // Uses computed property: StartDate?.Year
+                if (!year.HasValue) return false; // Exclude items without year
+
+                if (yearMin.HasValue && year.Value < yearMin.Value)
+                    return false;
+                if (yearMax.HasValue && year.Value > yearMax.Value)
+                    return false;
+                return true;
+            });
         }
 
         // Exclude items already in user's library
