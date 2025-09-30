@@ -142,6 +142,8 @@
       href: DATA-0074-entity-lifecycle-event-pipeline.md
     - name: DATA-0075 Entity schema guard and provisioning reset
       href: DATA-0075-entity-schema-guard-and-provisioning-reset.md
+    - name: DATA-0076 Mongo `_id` index governance
+      href: DATA-0076-mongo-id-index-governance.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

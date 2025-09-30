@@ -224,13 +224,6 @@ internal sealed class MongoRepository<TEntity, TKey> :
     {
         var models = new List<CreateIndexModel<TEntity>>();
 
-        var idKeys = Builders<TEntity>.IndexKeys.Ascending(e => e.Id);
-        models.Add(new CreateIndexModel<TEntity>(idKeys, new CreateIndexOptions
-        {
-            Unique = true,
-            Name = "_id_unique"
-        }));
-
         var indexSpecs = IndexMetadata.GetIndexes(typeof(TEntity));
         var keysBuilder = Builders<TEntity>.IndexKeys;
 
