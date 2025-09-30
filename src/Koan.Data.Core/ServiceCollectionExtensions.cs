@@ -5,6 +5,7 @@ using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
+using Koan.Data.Core.Schema;
 
 namespace Koan.Data.Core;
 
@@ -49,12 +50,14 @@ public static class ServiceCollectionExtensions
         services.AddKoanOptions<DataRuntimeOptions>();
         services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
         services.AddSingleton<IDataService, DataService>();
+        services.TryAddSingleton(typeof(EntitySchemaGuard<,>));
+        services.TryAddSingleton(typeof(ISchemaHealthContributor<,>), typeof(AggregateSchemaHealthContributor<,>));
         services.AddSingleton<IDataDiagnostics, DataDiagnostics>();
         // Decorate repositories registered as IDataRepository<,>
         services.TryDecorate(typeof(IDataRepository<,>), typeof(RepositoryFacade<,>));
-    // Relationship metadata scanning (ParentAttribute, etc.)
-    services.TryAddSingleton<Koan.Data.Core.Relationships.IRelationshipMetadata, Koan.Data.Core.Relationships.RelationshipMetadataService>();
-    Koan.Data.Core.Model.EntityMetadataProvider.RelationshipMetadataAccessor = sp => sp.GetRequiredService<Koan.Data.Core.Relationships.IRelationshipMetadata>();
+        // Relationship metadata scanning (ParentAttribute, etc.)
+        services.TryAddSingleton<Koan.Data.Core.Relationships.IRelationshipMetadata, Koan.Data.Core.Relationships.RelationshipMetadataService>();
+        Koan.Data.Core.Model.EntityMetadataProvider.RelationshipMetadataAccessor = sp => sp.GetRequiredService<Koan.Data.Core.Relationships.IRelationshipMetadata>();
         return services;
     }
 
