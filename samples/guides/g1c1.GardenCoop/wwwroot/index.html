@@ -1,0 +1,248 @@
+﻿<!doctype html>
+<html lang="en" ng-app="gardenApp">
+<head>
+  <meta charset="utf-8">
+  <title>Garden Cooperative Journal • g1c1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-normalize@2/modern-normalize.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chota@0.9.2/dist/chota.min.css">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+</head>
+<body ng-controller="GardenController as vm">
+<main>
+  <header>
+    <h1>Garden Cooperative Journal</h1>
+    <p>Koan slice • entity statics, write-path automation, and a tiny AngularJS dashboard.</p>
+  </header>
+
+  <section>
+    <h2>Post a reading</h2>
+    <div class="form-grid">
+      <label for="plot">Plot</label>
+      <select id="plot" ng-model="vm.form.plotId" ng-options="p.id as p.name for p in vm.plots" ng-change="vm.loadRecent(vm.form.plotId)" required></select>
+
+      <label for="moisture">Moisture</label>
+      <input id="moisture" type="number" ng-model="vm.form.moisture" min="0" max="100" step="0.1" placeholder="18.2" required>
+
+      <div class="toggle">
+        <input id="auto" type="checkbox" ng-model="vm.auto.enabled" ng-change="vm.toggleAuto()" aria-label="Toggle sensor simulation">
+        <label for="auto">Simulate sensor loop</label>
+      </div>
+
+      <button class="primary" ng-click="vm.submitReading()" ng-disabled="vm.posting">Send reading</button>
+    </div>
+    <p class="muted" style="margin-top:0.75rem">Sensors stay dumb: one POST with plot, moisture, and timestamp. We decide “dry” during the write.</p>
+  </section>
+
+  <section>
+    <h2>Reminder board</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Plot</th>
+            <th>Steward</th>
+            <th>Status</th>
+            <th>Notes</th>
+            <th style="width:160px">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="reminder in vm.reminders track by reminder.id">
+            <td>{{vm.relation(reminder, 'plot').name || reminder.plotId}}</td>
+            <td>{{vm.relation(reminder, 'member').displayName || reminder.memberId}}</td>
+            <td>
+              <span class="badge" ng-class="vm.statusClass(reminder.status)">{{reminder.status}}</span>
+            </td>
+            <td>{{reminder.notes || '\u00A0'}}</td>
+            <td>
+              <button class="secondary" ng-click="vm.acknowledge(reminder)" ng-disabled="reminder.status !== 'Active'">Mark watered</button>
+            </td>
+          </tr>
+          <tr ng-if="!vm.reminders.length">
+            <td colspan="5" class="muted">No reminders yet. Watering rhythm is calm.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Recent readings</h2>
+    <p class="muted" ng-if="!vm.currentReadings.length">Select a plot to see its latest samples.</p>
+    <ul class="muted" ng-if="vm.currentReadings.length" style="padding-left:1.2rem">
+      <li ng-repeat="reading in vm.currentReadings track by reading.id">
+        {{reading.sampledAt | date:'HH:mm:ss'}} → {{reading.moisture | number:1}}%
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Console echo</h2>
+    <div class="log-panel">
+      <p ng-repeat="entry in vm.consoleLog track by $index">{{entry}}</p>
+      <p ng-if="!vm.consoleLog.length" class="muted">Logs appear here as you interact—post a reading or let the simulator run.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+angular.module('gardenApp', [])
+.controller('GardenController', function($http, $interval, $filter, $window) {
+  const vm = this;
+  const apiRoot = '/api/garden';
+  let autoTimer = null;
+  let autoIndex = 0;
+
+  vm.plots = [];
+  vm.reminders = [];
+  vm.currentReadings = [];
+  vm.consoleLog = [];
+  vm.form = { plotId: null, moisture: 18.0 };
+  vm.auto = { enabled: false };
+
+  vm.statusClass = function(status) {
+    if (!status) return 'badge';
+    const key = status.toLowerCase();
+    if (key === 'active') return 'badge active';
+    if (key === 'acknowledged') return 'badge acknowledged';
+    return 'badge idle';
+  };
+
+  vm.relation = function(model, key) {
+    if (!model) return {};
+    return (model.relations && model.relations[key]) ||
+           (model._relations && model._relations[key]) || {};
+  };
+
+  vm.log = function(message) {
+    const stamp = $filter('date')(new Date(), 'HH:mm:ss');
+    vm.consoleLog.unshift(stamp + '  ' + message);
+    if (vm.consoleLog.length > 120) {
+      vm.consoleLog.length = 120;
+    }
+  };
+
+  vm.loadPlots = function() {
+    return $http.get(apiRoot + '/plots?sort=name').then(function(res) {
+      vm.plots = res.data || [];
+      if (!vm.form.plotId && vm.plots.length) {
+        vm.form.plotId = vm.plots[0].id;
+        vm.loadRecent(vm.form.plotId);
+      }
+    });
+  };
+
+  vm.loadReminders = function() {
+    const url = apiRoot + '/reminders?with=plot,member&sort=plotId';
+    return $http.get(url).then(function(res) {
+      vm.reminders = res.data || [];
+    });
+  };
+
+  vm.loadRecent = function(plotId) {
+    if (!plotId) {
+      vm.currentReadings = [];
+      return;
+    }
+    const url = apiRoot + '/readings/recent/' + encodeURIComponent(plotId) + '?take=6';
+    $http.get(url).then(function(res) {
+      vm.currentReadings = res.data || [];
+    });
+  };
+
+  vm.submitReading = function() {
+    if (!vm.form.plotId) return;
+    vm.posting = true;
+    const payload = {
+      plotId: vm.form.plotId,
+      moisture: vm.form.moisture,
+      sampledAt: new Date().toISOString()
+    };
+    $http.post(apiRoot + '/readings', payload)
+      .then(function() {
+        vm.log('Reading posted for ' + vm.form.plotId + ' → ' + payload.moisture.toFixed(1) + '%');
+        vm.loadReminders();
+        vm.loadRecent(vm.form.plotId);
+      })
+      .catch(function(err) {
+        vm.log('Reading failed: ' + (err && err.status));
+      })
+      .finally(function() {
+        vm.posting = false;
+      });
+  };
+
+  vm.acknowledge = function(reminder) {
+    if (!reminder || reminder.status !== 'Active') return;
+    const payload = {
+      id: reminder.id,
+      plotId: reminder.plotId,
+      memberId: reminder.memberId,
+      status: 'Acknowledged',
+      notes: 'Watering done by hand.'
+    };
+    $http.post(apiRoot + '/reminders', payload).then(function() {
+      vm.log('Reminder ' + reminder.id + ' acknowledged.');
+      vm.loadReminders();
+    });
+  };
+
+  vm.toggleAuto = function() {
+    if (vm.auto.enabled) {
+      if (!autoTimer) {
+        autoTimer = $interval(vm.simulateSensor, 8000);
+        vm.simulateSensor();
+        vm.log('Sensor loop started.');
+      }
+    } else {
+      if (autoTimer) {
+        $interval.cancel(autoTimer);
+        autoTimer = null;
+        vm.log('Sensor loop stopped.');
+      }
+    }
+  };
+
+  vm.simulateSensor = function() {
+    if (!vm.plots.length) return;
+    const plot = vm.plots[autoIndex % vm.plots.length];
+    autoIndex = (autoIndex + 1) % vm.plots.length;
+    const dryBias = plot.name && plot.name.toLowerCase().includes('3');
+    const moisture = dryBias ? 14 + Math.random() * 4 : 24 + Math.random() * 8;
+    const payload = {
+      plotId: plot.id,
+      moisture: parseFloat(moisture.toFixed(1)),
+      sampledAt: new Date().toISOString()
+    };
+    $http.post(apiRoot + '/readings', payload)
+      .then(function() {
+        vm.log('Pi posted ' + payload.moisture.toFixed(1) + '% for ' + plot.name);
+        vm.loadReminders();
+        if (vm.form.plotId === plot.id) {
+          vm.loadRecent(plot.id);
+        }
+      })
+      .catch(function(err) {
+        vm.log('Sensor error: ' + (err && err.status));
+      });
+  };
+
+  vm.init = function() {
+    vm.loadPlots().then(function() {
+      vm.loadReminders();
+    });
+  };
+
+  vm.$onDestroy = function() {
+    if (autoTimer) {
+      $interval.cancel(autoTimer);
+    }
+  };
+
+  vm.init();
+});
+</script>
+</body>
+</html>
