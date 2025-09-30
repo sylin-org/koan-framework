@@ -1,6 +1,7 @@
 ﻿# DATA-0075: Entity-level schema guard and adapter provisioning reset
 
 **Contract**
+
 - **Inputs:** `Entity<TEntity,TKey>` static calls, `Data<TEntity,TKey>` facade operations, orchestrator capabilities, adapter health telemetry.
 - **Outputs:** Deterministic one-time schema ensure per entity per dataset, shared health cache with invalidation hooks, structured events for ensure/repair outcomes.
 - **Error modes:** Orchestrator unreachable, schema mismatch, provider-specific missing-table/collection faults; guard escalates via `SchemaUnhealthyException` after single retry.
