@@ -1,4 +1,5 @@
 ﻿using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
 using System.Linq;
@@ -12,7 +13,6 @@ public enum ReminderStatus
     Acknowledged
 }
 
-[DataAdapter("sqlite")]
 public class Reminder : Entity<Reminder>
 {
     [Parent(typeof(Plot))]
