@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Configuration;
+using Koan.Data.Core.Schema;
 using Koan.Data.Vector.Abstractions;
 using System.Collections.Concurrent;
 
@@ -9,33 +10,55 @@ namespace Koan.Data.Core;
 
 /// <summary>
 /// Default <see cref="IDataService"/> implementation.
-/// Uses <see cref="AggregateConfigs"/> to resolve and cache repositories per (entity,key) pair.
+/// Uses multi-dimensional caching per (entity, key, adapter, source) combination.
 /// </summary>
 public sealed class DataService(IServiceProvider sp) : IDataService
 {
-    private readonly ConcurrentDictionary<(Type, Type), object> _cache = new();
+    private readonly ConcurrentDictionary<CacheKey, object> _cache = new();
     private readonly ConcurrentDictionary<(Type, Type), object> _vecCache = new();
+
+    private record CacheKey(
+        Type EntityType,
+        Type KeyType,
+        string Adapter,
+        string Source);
 
     /// <inheritdoc />
     public IDataRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var key = (typeof(TEntity), typeof(TKey));
-        if (_cache.TryGetValue(key, out var existing)) return (IDataRepository<TEntity, TKey>)existing;
+        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
+        var (adapter, source) = AdapterResolver.ResolveForEntity<TEntity>(sp, sourceRegistry);
 
-        var cfg = AggregateConfigs.Get<TEntity, TKey>(sp);
-        var repo = cfg.Repository;
-        _cache[key] = repo;
-        return repo;
+        var key = new CacheKey(typeof(TEntity), typeof(TKey), adapter, source);
+
+        if (_cache.TryGetValue(key, out var existing))
+            return (IDataRepository<TEntity, TKey>)existing;
+
+        // Find factory for adapter
+        var factories = sp.GetServices<IDataAdapterFactory>();
+        var factory = factories.FirstOrDefault(f => f.CanHandle(adapter))
+            ?? throw new InvalidOperationException($"No data adapter factory for provider '{adapter}'");
+
+        // Create repository with source context
+        var repo = factory.Create<TEntity, TKey>(sp, source);
+
+        // Wrap with facade for identity management and schema guard
+        var manager = sp.GetRequiredService<IAggregateIdentityManager>();
+        var guard = sp.GetRequiredService<EntitySchemaGuard<TEntity, TKey>>();
+        var facade = new RepositoryFacade<TEntity, TKey>(repo, manager, guard);
+
+        _cache[key] = facade;
+        return facade;
     }
 
     /// <inheritdoc />
-    public Direct.IDirectSession Direct(string sourceOrAdapter)
+    public Direct.IDirectSession Direct(string? source = null, string? adapter = null)
     {
         var svc = sp.GetService<Direct.IDirectDataService>()
             ?? throw new InvalidOperationException("IDirectDataService not registered. AddKoanDataDirect() required.");
-        return svc.Direct(sourceOrAdapter);
+        return svc.Direct(source, adapter);
     }
 
     public IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()

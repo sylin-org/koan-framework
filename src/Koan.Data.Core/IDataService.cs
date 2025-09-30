@@ -20,8 +20,9 @@ public interface IDataService
     /// <summary>
     /// Escape-hatch entry for direct commands against a named source or adapter.
     /// Returns a session for running ad-hoc queries/commands with optional connection override.
+    /// Specify either source OR adapter, not both (source XOR adapter constraint).
     /// </summary>
-    Direct.IDirectSession Direct(string sourceOrAdapter);
+    Direct.IDirectSession Direct(string? source = null, string? adapter = null);
 
     // Vector repository accessor (optional adapter). Returns null if no vector adapter is configured for the entity.
     IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()

@@ -23,13 +23,17 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
     public bool CanHandle(string provider)
         => string.Equals(provider, "couchbase", StringComparison.OrdinalIgnoreCase);
 
-    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
+        IServiceProvider sp,
+        string source = "Default")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
         var provider = sp.GetRequiredService<CouchbaseClusterProvider>();
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
         var options = sp.GetRequiredService<IOptions<CouchbaseOptions>>();
+        // Note: Couchbase cluster provider is typically shared; source-specific
+        // connections would require provider factory-level changes
         return new CouchbaseRepository<TEntity, TKey>(provider, resolver, sp, options);
     }
 }

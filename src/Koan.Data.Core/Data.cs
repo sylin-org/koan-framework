@@ -328,57 +328,57 @@ public static class Data<TEntity, TKey>
         return new BatchResult(up, 0, 0);
     }
 
-    // Set-scoped helpers (ambient via DataSetContext)
-    public static IDisposable WithSet(string? set) => DataSetContext.With(set);
+    // Partition-scoped helpers (ambient via EntityContext)
+    public static IDisposable WithPartition(string? partition) => EntityContext.Partition(partition);
 
-    public static Task<TEntity?> GetAsync(TKey id, string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.GetAsync(id, ct); }
+    public static Task<TEntity?> GetAsync(TKey id, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.GetAsync(id, ct); }
 
-    public static Task<IReadOnlyList<TEntity>> All(string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.QueryAsync(null, ct); }
-    public static Task<int> CountAllAsync(string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.CountAsync(null, ct); }
+    public static Task<IReadOnlyList<TEntity>> All(string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.QueryAsync(null, ct); }
+    public static Task<int> CountAllAsync(string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.CountAsync(null, ct); }
 
-    public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, string set, CancellationToken ct = default)
+    public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, string partition, CancellationToken ct = default)
     {
-        using var _ = WithSet(set); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.QueryAsync(predicate, ct)
+        using var _ = WithPartition(partition); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.QueryAsync(predicate, ct)
                                            ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
     }
-    public static Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, string set, CancellationToken ct = default)
+    public static Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, string partition, CancellationToken ct = default)
     {
-        using var _ = WithSet(set); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.CountAsync(predicate, ct)
+        using var _ = WithPartition(partition); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.CountAsync(predicate, ct)
                                            ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
     }
 
-    public static Task<IReadOnlyList<TEntity>> Query(string query, string set, CancellationToken ct = default)
+    public static Task<IReadOnlyList<TEntity>> Query(string query, string partition, CancellationToken ct = default)
     {
-        using var _ = WithSet(set); return (Repo as IStringQueryRepository<TEntity, TKey>)?.QueryAsync(query, ct)
+        using var _ = WithPartition(partition); return (Repo as IStringQueryRepository<TEntity, TKey>)?.QueryAsync(query, ct)
                                            ?? throw new System.NotSupportedException("String queries are not supported by this repository.");
     }
-    public static Task<int> CountAsync(string query, string set, CancellationToken ct = default)
+    public static Task<int> CountAsync(string query, string partition, CancellationToken ct = default)
     {
-        using var _ = WithSet(set); return (Repo as IStringQueryRepository<TEntity, TKey>)?.CountAsync(query, ct)
+        using var _ = WithPartition(partition); return (Repo as IStringQueryRepository<TEntity, TKey>)?.CountAsync(query, ct)
                                            ?? throw new System.NotSupportedException("String queries are not supported by this repository.");
     }
 
-    public static Task<TEntity> UpsertAsync(TEntity model, string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.UpsertAsync(model, ct); }
+    public static Task<TEntity> UpsertAsync(TEntity model, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.UpsertAsync(model, ct); }
 
-    public static Task<bool> DeleteAsync(TKey id, string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.DeleteAsync(id, ct); }
+    public static Task<bool> DeleteAsync(TKey id, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.DeleteAsync(id, ct); }
 
-    public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.UpsertManyAsync(models, ct); }
+    public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.UpsertManyAsync(models, ct); }
 
-    public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.DeleteManyAsync(ids, ct); }
+    public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.DeleteManyAsync(ids, ct); }
 
-    public static Task<int> DeleteAllAsync(string set, CancellationToken ct = default)
-    { using var _ = WithSet(set); return Repo.DeleteAllAsync(ct); }
+    public static Task<int> DeleteAllAsync(string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.DeleteAllAsync(ct); }
 
-    public static async Task<int> Delete(Expression<Func<TEntity, bool>> predicate, string set, CancellationToken ct = default)
+    public static async Task<int> Delete(Expression<Func<TEntity, bool>> predicate, string partition, CancellationToken ct = default)
     {
-        using var _ = WithSet(set);
+        using var _ = WithPartition(partition);
         if (Repo is ILinqQueryRepository<TEntity, TKey> linq)
         {
             var items = await linq.QueryAsync(predicate, ct).ConfigureAwait(false);
@@ -438,22 +438,22 @@ public static class Data<TEntity, TKey>
     private sealed record WriteCapsImpl(WriteCapabilities Val) : IWriteCapabilities { public WriteCapabilities Writes => Val; }
 
     // ------------------------------
-    // Set migration helpers (copy/move/clear/replace) + fluent builder
+    // Partition migration helpers (copy/move/clear/replace) + fluent builder
     // ------------------------------
 
-    public static Task<int> ClearSet(string set, CancellationToken ct = default)
-        => Delete(Expression.Lambda<Func<TEntity, bool>>(Expression.Constant(true), Expression.Parameter(typeof(TEntity), "_")), set, ct);
+    public static Task<int> ClearPartition(string partition, CancellationToken ct = default)
+        => Delete(Expression.Lambda<Func<TEntity, bool>>(Expression.Constant(true), Expression.Parameter(typeof(TEntity), "_")), partition, ct);
 
-    public static async Task<int> CopySet(
-        string fromSet,
-        string toSet,
+    public static async Task<int> CopyPartition(
+        string fromPartition,
+        string toPartition,
         Expression<Func<TEntity, bool>>? predicate = null,
         Func<TEntity, TEntity>? map = null,
         int batchSize = 500,
         CancellationToken ct = default)
     {
-        if (string.Equals(fromSet, toSet, StringComparison.Ordinal)) return 0;
-        using var _from = WithSet(fromSet);
+        if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
+        using var _from = WithPartition(fromPartition);
         var source = predicate is null
             ? await Repo.QueryAsync(null, ct).ConfigureAwait(false)
             : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct).ConfigureAwait(false);
@@ -463,22 +463,22 @@ public static class Data<TEntity, TKey>
         {
             ct.ThrowIfCancellationRequested();
             var items = map is null ? chunk : chunk.Select(map).ToArray();
-            using var _to = WithSet(toSet);
+            using var _to = WithPartition(toPartition);
             total += await Repo.UpsertManyAsync(items, ct).ConfigureAwait(false);
         }
         return total;
     }
 
-    public static async Task<int> MoveSet(
-        string fromSet,
-        string toSet,
+    public static async Task<int> MovePartition(
+        string fromPartition,
+        string toPartition,
         Expression<Func<TEntity, bool>>? predicate = null,
         Func<TEntity, TEntity>? map = null,
         int batchSize = 500,
         CancellationToken ct = default)
     {
-        if (string.Equals(fromSet, toSet, StringComparison.Ordinal)) return 0;
-        using var _from = WithSet(fromSet);
+        if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
+        using var _from = WithPartition(fromPartition);
         var source = predicate is null
             ? await Repo.QueryAsync(null, ct).ConfigureAwait(false)
             : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct).ConfigureAwait(false);
@@ -488,11 +488,11 @@ public static class Data<TEntity, TKey>
         {
             ct.ThrowIfCancellationRequested();
             var items = map is null ? chunk : chunk.Select(map).ToArray();
-            // Upsert into target set
-            using var _to = WithSet(toSet);
+            // Upsert into target partition
+            using var _to = WithPartition(toPartition);
             total += await Repo.UpsertManyAsync(items, ct).ConfigureAwait(false);
-            // Delete the moved ids from source set
-            using var _back = WithSet(fromSet);
+            // Delete the moved ids from source partition
+            using var _back = WithPartition(fromPartition);
             var ids = items.Select(e => e.Id);
             await Repo.DeleteManyAsync(ids, ct).ConfigureAwait(false);
         }

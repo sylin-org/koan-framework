@@ -1,7 +1,10 @@
+using System;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
 
@@ -25,13 +28,40 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
            || string.Equals(provider, "sqlserver", StringComparison.OrdinalIgnoreCase)
            || string.Equals(provider, "microsoft.sqlserver", StringComparison.OrdinalIgnoreCase);
 
-    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
+        IServiceProvider sp,
+        string source = "Default")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var opts = sp.GetRequiredService<IOptions<SqlServerOptions>>().Value;
+        var config = sp.GetRequiredService<IConfiguration>();
+        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
+        var baseOpts = sp.GetRequiredService<IOptions<SqlServerOptions>>().Value;
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
-        return new SqlServerRepository<TEntity, TKey>(sp, opts, resolver);
+
+        // Resolve source-specific connection string
+        var connectionString = AdapterConnectionResolver.ResolveConnectionString(
+            config,
+            sourceRegistry,
+            "SqlServer",
+            source);
+
+        // Create source-specific options
+        var sourceOpts = new SqlServerOptions
+        {
+            ConnectionString = connectionString,
+            DefaultPageSize = baseOpts.DefaultPageSize,
+            MaxPageSize = baseOpts.MaxPageSize,
+            CommandTimeoutSeconds = baseOpts.CommandTimeoutSeconds,
+            MaxRetryCount = baseOpts.MaxRetryCount,
+            MaxRetryDelaySeconds = baseOpts.MaxRetryDelaySeconds,
+            DdlPolicy = baseOpts.DdlPolicy,
+            SchemaMatchingMode = baseOpts.SchemaMatchingMode,
+            AllowProductionDdl = baseOpts.AllowProductionDdl,
+            Readiness = baseOpts.Readiness
+        };
+
+        return new SqlServerRepository<TEntity, TKey>(sp, sourceOpts, resolver);
     }
 }
 

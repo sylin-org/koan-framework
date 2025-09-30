@@ -49,6 +49,17 @@ public static class ServiceCollectionExtensions
         // Vector defaults now live in Koan.Data.Vector; apps should call AddKoanDataVector() to enable vector features.
         services.AddKoanOptions<DataRuntimeOptions>();
         services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
+
+        // Data source registry for source/adapter routing (DATA-0077)
+        services.AddSingleton<DataSourceRegistry>(sp =>
+        {
+            var registry = new DataSourceRegistry();
+            var config = sp.GetRequiredService<IConfiguration>();
+            var logger = sp.GetService<Microsoft.Extensions.Logging.ILogger<DataSourceRegistry>>();
+            registry.DiscoverFromConfiguration(config, logger);
+            return registry;
+        });
+
         services.AddSingleton<IDataService, DataService>();
         services.TryAddSingleton(typeof(EntitySchemaGuard<,>));
         services.TryAddSingleton(typeof(ISchemaHealthContributor<,>), typeof(AggregateSchemaHealthContributor<,>));
