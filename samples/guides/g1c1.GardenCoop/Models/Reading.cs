@@ -5,7 +5,6 @@ using System.Linq;
 
 namespace g1c1.GardenCoop.Models;
 
-[DataAdapter("sqlite")]
 public class Reading : Entity<Reading>
 {
     [Parent(typeof(Plot))]
