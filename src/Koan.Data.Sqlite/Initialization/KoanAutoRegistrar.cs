@@ -2,9 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Logging;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
@@ -15,13 +15,14 @@ namespace Koan.Data.Sqlite.Initialization;
 
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
+    private static readonly KoanLog.KoanLogScope Log = KoanLog.For<KoanAutoRegistrar>();
+
     public string ModuleName => "Koan.Data.Sqlite";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Sqlite.Initialization.KoanAutoRegistrar");
-    logger?.Log(LogLevel.Debug, "Koan.Data.Sqlite KoanAutoRegistrar loaded.");
+        Log.BootDebug(LogActions.Init, "loaded", ("module", ModuleName));
         services.AddKoanOptions<SqliteOptions>(Infrastructure.Constants.Configuration.Keys.Section);
         services.AddSingleton<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
@@ -38,6 +39,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, SqliteToRelationalBridgeConfigurator>());
 
         services.AddSingleton<IDataAdapterFactory, SqliteAdapterFactory>();
+
+        Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
@@ -61,5 +64,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
         report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defaultPageSize.ToString());
         report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, maxPageSize.ToString());
+    }
+
+    private static class LogActions
+    {
+        public const string Init = "registrar.init";
     }
 }

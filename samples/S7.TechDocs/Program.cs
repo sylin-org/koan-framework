@@ -4,10 +4,8 @@ using Koan.Core.Observability;
 using Koan.Data.Core;
 using Koan.Web.Extensions;
 using Koan.Web.Swagger;
-using Koan.Web.Auth.Extensions;
 using Microsoft.AspNetCore.Authentication;
 using Koan.Web.Extensions.Authorization;
-using Koan.Data.Mongo;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,9 +17,7 @@ builder.Services.AddKoan()
 builder.Services.AddKoanObservability();
 builder.Services.AddKoanSwagger(builder.Configuration);
 
-// Data layer - Single database (Mongo) across environments
-// Options auto-bind from configuration; defaults safe for Development
-builder.Services.AddMongoAdapter();
+// Data layer - defaults rely on adapter discovery via AddKoan(); Mongo adapter can be enabled via configuration.
 
 // Controllers; Koan auto-registrars wire authentication; TestProvider will attach itself in Development
 builder.Services.AddControllers();

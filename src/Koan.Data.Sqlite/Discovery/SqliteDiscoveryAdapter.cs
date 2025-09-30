@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.Sqlite;
 using Koan.Core;
+using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 
@@ -38,12 +39,15 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
             using var command = new SqliteCommand("SELECT 1", connection);
             await command.ExecuteScalarAsync(cancellationToken);
 
-            _logger.LogDebug("SQLite health check passed for {ConnectionString}", connectionString);
+            KoanLog.ConfigDebug(_logger, LogActions.Health, LogOutcomes.Success,
+                ("connection", connectionString));
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("SQLite health check failed for {ConnectionString}: {Error}", serviceUrl, ex.Message);
+            KoanLog.ConfigDebug(_logger, LogActions.Health, LogOutcomes.Failure,
+                ("connection", serviceUrl),
+                ("error", ex.Message));
             return false;
         }
     }
@@ -78,19 +82,25 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
             // In container: Try mounted volume path first, then local fallback
             var containerPath = "Data Source=/data/app.db";
             candidates.Add(new DiscoveryCandidate(containerPath, "container-volume", 2));
-            _logger.LogDebug("SQLite adapter: Added container volume candidate {ContainerPath} (in container environment)", containerPath);
+            KoanLog.ConfigDebug(_logger, LogActions.Candidate, LogOutcomes.Add,
+                ("kind", "container-volume"),
+                ("value", containerPath));
 
             // Local fallback when in container
             var localPath = "Data Source=./data/app.db";
             candidates.Add(new DiscoveryCandidate(localPath, "local-fallback", 3));
-            _logger.LogDebug("SQLite adapter: Added local fallback {LocalPath}", localPath);
+            KoanLog.ConfigDebug(_logger, LogActions.Candidate, LogOutcomes.Add,
+                ("kind", "local-fallback"),
+                ("value", localPath));
         }
         else
         {
             // Standalone (not in container): Local file path
             var localPath = "Data Source=./data/app.db";
             candidates.Add(new DiscoveryCandidate(localPath, "local", 2));
-            _logger.LogDebug("SQLite adapter: Added local candidate {LocalPath} (standalone environment)", localPath);
+            KoanLog.ConfigDebug(_logger, LogActions.Candidate, LogOutcomes.Add,
+                ("kind", "local"),
+                ("value", localPath));
         }
 
         // Apply SQLite-specific file path normalization
@@ -140,9 +150,25 @@ internal sealed class SqliteDiscoveryAdapter : ServiceDiscoveryAdapterBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Failed to normalize SQLite connection string from {Value}: {Error}", value, ex.Message);
+            KoanLog.ConfigDebug(_logger, LogActions.Normalize, LogOutcomes.Failure,
+                ("value", value),
+                ("error", ex.Message));
             return value; // Return original value if normalization fails
         }
+    }
+
+    private static class LogActions
+    {
+        public const string Health = "sqlite.health";
+        public const string Candidate = "sqlite.discovery.candidate";
+        public const string Normalize = "sqlite.discovery.normalize";
+    }
+
+    private static class LogOutcomes
+    {
+        public const string Success = "success";
+        public const string Failure = "failure";
+        public const string Add = "add";
     }
 
     /// <summary>SQLite adapter handles Aspire service discovery (not typically used for file-based databases)</summary>

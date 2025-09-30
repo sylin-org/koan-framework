@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using S8.Canon.Controllers;
-using Koan.Testing.Canon;
+using Koan.Testing.Flow;
 
 namespace S8.Canon.SampleData;
 
@@ -28,20 +28,20 @@ public class SampleDataController : ControllerBase
 
         // 1. Initial registration via web
         var webReg = await _ingestion.IngestCustomer(new CustomerRegistration(
-            Email: CanonTestConstants.Samples.EmailA,
+            Email: FlowTestConstants.Samples.EmailA,
             FirstName: "Alice",
             LastName: "Johnson",
-            Phone: CanonTestConstants.Samples.PhoneA,
+            Phone: FlowTestConstants.Samples.PhoneA,
             Company: "TechCorp"
         ), ct);
         results.Add(new { step = "web-registration", result = webReg });
 
         // 2. Social media interaction
         var socialPost = await _ingestion.IngestSocialInteraction(new SocialInteraction(
-            Handle: CanonTestConstants.Samples.HandleA,
+            Handle: FlowTestConstants.Samples.HandleA,
             Platform: "twitter",
             Type: "mention",
-            Email: CanonTestConstants.Samples.EmailA,
+            Email: FlowTestConstants.Samples.EmailA,
             Content: "Great experience with @company support!",
             Timestamp: DateTimeOffset.UtcNow.AddMinutes(-30)
         ), ct);
@@ -51,7 +51,7 @@ public class SampleDataController : ControllerBase
         var iotDevice = await _ingestion.IngestIoTEvent(new IoTEvent(
             DeviceId: "smart-thermostat-001",
             DeviceType: "thermostat",
-            OwnerPhone: CanonTestConstants.Samples.PhoneA,
+            OwnerPhone: FlowTestConstants.Samples.PhoneA,
             Reading: 72.5,
             Location: "Living Room",
             BatteryLevel: 85
@@ -77,7 +77,7 @@ public class SampleDataController : ControllerBase
 
         // Create two separate customer profiles first
         var customer1 = await _ingestion.IngestCustomer(new CustomerRegistration(
-            Email: CanonTestConstants.Samples.EmailA,
+            Email: FlowTestConstants.Samples.EmailA,
             FirstName: "Alice",
             LastName: "Smith",
             Phone: "+1-555-0001"
@@ -85,7 +85,7 @@ public class SampleDataController : ControllerBase
         results.Add(new { step = "customer1", result = customer1 });
 
         var customer2 = await _ingestion.IngestCustomer(new CustomerRegistration(
-            Email: CanonTestConstants.Samples.EmailB,
+            Email: FlowTestConstants.Samples.EmailB,
             FirstName: "Bob",
             LastName: "Jones",
             Phone: "+1-555-0002"
@@ -100,7 +100,7 @@ public class SampleDataController : ControllerBase
         {
             new BatchItem("collision-test", new Dictionary<string, object>
             {
-                [CanonTestConstants.Keys.Email] = new[] { CanonTestConstants.Samples.EmailA, CanonTestConstants.Samples.EmailB },
+                [FlowTestConstants.Keys.Email] = new[] { FlowTestConstants.Samples.EmailA, FlowTestConstants.Samples.EmailB },
                 ["eventType"] = "data-merge-attempt",
                 ["reason"] = "duplicate-account-cleanup"
             })

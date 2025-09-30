@@ -1,6 +1,7 @@
 using Koan.Core.Observability.Health;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Core.Adapters;
@@ -8,28 +9,28 @@ namespace Koan.Core.Adapters;
 internal sealed class AdapterReadinessMonitor : IHostedService
 {
     private readonly IEnumerable<IAdapterReadiness> _adapters;
-    private readonly IHealthAggregator _aggregator;
+    private readonly IHealthAggregator? _aggregator;
     private readonly ILogger<AdapterReadinessMonitor> _logger;
     private readonly List<(IAdapterReadiness Adapter, EventHandler<ReadinessStateChangedEventArgs> Handler)> _subscriptions = new();
     private readonly AdaptersReadinessOptions _options;
 
     public AdapterReadinessMonitor(
         IEnumerable<IAdapterReadiness> adapters,
-        IHealthAggregator aggregator,
-        ILogger<AdapterReadinessMonitor> logger,
+        IHealthAggregator? aggregator,
+        ILogger<AdapterReadinessMonitor>? logger,
         IOptions<AdaptersReadinessOptions> options)
     {
         _adapters = adapters;
         _aggregator = aggregator;
-        _logger = logger;
+        _logger = logger ?? NullLogger<AdapterReadinessMonitor>.Instance;
         _options = options.Value;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!_options.EnableMonitoring)
+        if (!_options.EnableMonitoring || _aggregator is null)
         {
-            _logger.LogDebug("Adapter readiness monitoring disabled via configuration");
+            _logger.LogDebug("Adapter readiness monitoring disabled");
             return Task.CompletedTask;
         }
 
@@ -57,6 +58,11 @@ internal sealed class AdapterReadinessMonitor : IHostedService
 
     private void Publish(IAdapterReadiness readiness, AdapterReadinessState state, DateTime timestamp)
     {
+        if (_aggregator is null)
+        {
+            return;
+        }
+
         var component = $"adapter:{readiness.GetType().Name}";
         var status = state switch
         {

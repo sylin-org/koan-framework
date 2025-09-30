@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Koan.Core.Logging;
 
 namespace Koan.Core.Adapters.Configuration;
 
@@ -34,7 +35,7 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
 
     public void Configure(TOptions options)
     {
-        Logger?.LogDebug("Configuring {Provider} adapter options", ProviderName);
+        KoanLog.ConfigDebug(Logger, LogActions.ConfigurationLifecycle, LogOutcomes.Start, ("provider", ProviderName));
 
         // Configure provider-specific settings first
         ConfigureProviderSpecific(options);
@@ -43,7 +44,7 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         ConfigureReadiness(options.Readiness);
         ConfigurePaging(options);
 
-        Logger?.LogDebug("{Provider} adapter configuration complete", ProviderName);
+        KoanLog.ConfigDebug(Logger, LogActions.ConfigurationLifecycle, LogOutcomes.Complete, ("provider", ProviderName));
     }
 
     /// <summary>
@@ -61,7 +62,9 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
         // Cast to concrete type to enable property setting
         if (readiness is not AdapterReadinessConfiguration config)
         {
-            Logger?.LogWarning("{Provider} readiness configuration skipped - not using AdapterReadinessConfiguration", ProviderName);
+            KoanLog.ConfigWarning(Logger, LogActions.ReadinessConfiguration, LogOutcomes.Skipped,
+                ("provider", ProviderName),
+                ("reason", "adapter-readiness-configuration-not-used"));
             return;
         }
 
@@ -95,8 +98,11 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
             $"Koan:Data:{ProviderName}:Readiness:EnableReadinessGating",
             config.EnableReadinessGating);
 
-        Logger?.LogDebug("{Provider} readiness: Policy={Policy}, Timeout={Timeout}s, Gating={Gating}",
-            ProviderName, config.Policy, config.Timeout.TotalSeconds, config.EnableReadinessGating);
+        KoanLog.ConfigDebug(Logger, LogActions.ReadinessConfiguration, LogOutcomes.Applied,
+            ("provider", ProviderName),
+            ("policy", config.Policy),
+            ("timeoutSeconds", config.Timeout.TotalSeconds),
+            ("gating", config.EnableReadinessGating));
     }
 
     /// <summary>
@@ -112,8 +118,10 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
             $"Koan:Data:{ProviderName}:MaxPageSize",
             "Koan:Data:MaxPageSize");
 
-        Logger?.LogDebug("{Provider} paging: Default={Default}, Max={Max}",
-            ProviderName, options.DefaultPageSize, options.MaxPageSize);
+        KoanLog.ConfigDebug(Logger, LogActions.PagingConfiguration, LogOutcomes.Applied,
+            ("provider", ProviderName),
+            ("defaultPageSize", options.DefaultPageSize),
+            ("maxPageSize", options.MaxPageSize));
     }
 
     /// <summary>
@@ -158,4 +166,20 @@ public abstract class AdapterOptionsConfigurator<TOptions> : IConfigureOptions<T
             }
         }
     }
+
+    private static class LogActions
+    {
+        public const string ConfigurationLifecycle = "adapter.config.lifecycle";
+        public const string ReadinessConfiguration = "adapter.config.readiness";
+        public const string PagingConfiguration = "adapter.config.paging";
+    }
+
+    protected static class LogOutcomes
+    {
+        public const string Start = "start";
+        public const string Complete = "complete";
+        public const string Applied = "applied";
+        public const string Skipped = "skipped";
+    }
+
 }

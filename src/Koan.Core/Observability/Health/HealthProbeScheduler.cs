@@ -1,9 +1,14 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Koan.Core.BackgroundServices;
+using Koan.Core.Logging;
 using Koan.Core.Observability.Probes;
-using System.Collections.Concurrent;
 
 namespace Koan.Core.Observability.Health;
 
@@ -39,14 +44,14 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
     {
         if (!_opt.Enabled)
         {
-            Logger.LogInformation("Health aggregator disabled; scheduler not running.");
+            KoanLog.HealthInfo(Logger, LogActions.Scheduler, LogOutcomes.Disabled);
             return;
         }
 
         // Defer scheduler start until the application has signaled ApplicationStarted
         if (!_lifetime.ApplicationStarted.IsCancellationRequested)
         {
-            Logger.LogDebug("Health aggregator scheduler waiting for application start...");
+            KoanLog.HealthDebug(Logger, LogActions.Scheduler, "waiting-start");
             try
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, _lifetime.ApplicationStarted);
@@ -56,64 +61,67 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
             catch (OperationCanceledException) { /* started */ }
         }
 
-        var win = _opt.Scheduler.QuantizationWindow;
-        if (win <= TimeSpan.Zero) win = TimeSpan.FromSeconds(2);
+        var window = _opt.Scheduler.QuantizationWindow;
+        if (window <= TimeSpan.Zero) window = TimeSpan.FromSeconds(2);
 
-        Logger.LogInformation("Health aggregator scheduler started. Window={Window} Jitter={Jitter}%", win, _opt.Scheduler.JitterPercent * 100);
+        KoanLog.HealthInfo(Logger, LogActions.Scheduler, "started",
+            ("window", window),
+            ("jitterPercent", _opt.Scheduler.JitterPercent * 100));
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(win, stoppingToken);
+                await Task.Delay(window, stoppingToken);
                 if (!_opt.Scheduler.EnableTtlScheduling) continue;
 
                 var now = DateTimeOffset.UtcNow;
-                var snap = _agg.GetSnapshot();
-                var due = new List<string>();
+                var snapshot = _agg.GetSnapshot();
+                var dueComponents = new List<string>();
 
-                foreach (var s in snap.Components)
+                foreach (var component in snapshot.Components)
                 {
-                    if (s.Ttl is null) continue; // only TTL-driven components are scheduled
+                    if (component.Ttl is null) continue; // only TTL-driven components are scheduled
 
-                    var ttl = s.Ttl.Value;
+                    var ttl = component.Ttl.Value;
                     var baseLead = ComputeRefreshLead(ttl, _opt);
                     var jitter = ComputeJitter(baseLead, _opt);
                     var offsetMs = (jitter.TotalMilliseconds <= 0) ? 0 : (_rng.NextDouble() * 2.0 - 1.0) * jitter.TotalMilliseconds; // [-jitter, +jitter]
-                    var inviteAt = s.TimestampUtc + ttl - baseLead + TimeSpan.FromMilliseconds(offsetMs);
+                    var inviteAt = component.TimestampUtc + ttl - baseLead + TimeSpan.FromMilliseconds(offsetMs);
 
                     // Quantize to window boundary (ceil)
-                    var bucketTime = QuantizeCeil(inviteAt, win);
+                    var bucketTime = QuantizeCeil(inviteAt, window);
 
-                    if (bucketTime <= now && AllowedByGap(s.Component, now))
+                    if (bucketTime <= now && AllowedByGap(component.Component, now))
                     {
-                        due.Add(s.Component);
+                        dueComponents.Add(component.Component);
                     }
                 }
 
-                if (due.Count == 0) continue;
+                if (dueComponents.Count == 0) continue;
 
                 // Coalesce
-                if (due.Count >= _opt.Scheduler.BroadcastThreshold)
+                if (dueComponents.Count >= _opt.Scheduler.BroadcastThreshold)
                 {
                     _agg.RequestProbe(ProbeReason.TtlExpiry, component: null, stoppingToken);
-                    Logger.LogDebug("Probe broadcast for {Count} components.", due.Count);
+                    KoanLog.HealthDebug(Logger, LogActions.Scheduler, "broadcast",
+                        ("count", dueComponents.Count));
                     
                     await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Health.ProbeBroadcast, new ProbeBroadcastEventArgs
                     {
-                        ComponentCount = due.Count,
+                        ComponentCount = dueComponents.Count,
                         BroadcastAt = DateTimeOffset.UtcNow
                     });
                 }
                 else
                 {
-                    foreach (var c in due)
+                    foreach (var component in dueComponents)
                     {
-                        _agg.RequestProbe(ProbeReason.TtlExpiry, component: c, stoppingToken);
+                        _agg.RequestProbe(ProbeReason.TtlExpiry, component, stoppingToken);
                         
                         await EmitEventAsync(Koan.Core.Events.KoanServiceEvents.Health.ProbeScheduled, new ProbeScheduledEventArgs
                         {
-                            Component = c,
+                            Component = component,
                             Reason = "TTL Expiry",
                             ScheduledAt = DateTimeOffset.UtcNow
                         });
@@ -121,10 +129,10 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
                 }
 
                 var stamp = DateTimeOffset.UtcNow;
-                foreach (var c in due) _lastInvited[c] = stamp;
+                foreach (var component in dueComponents) _lastInvited[component] = stamp;
 
                 // Backpressure: if too many, split over successive buckets by sleeping a minimal gap
-                if (due.Count > _opt.Scheduler.MaxComponentsPerBucket)
+                if (dueComponents.Count > _opt.Scheduler.MaxComponentsPerBucket)
                 {
                     await Task.Delay(_opt.Scheduler.MinInterBucketGap, stoppingToken);
                 }
@@ -132,17 +140,18 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "Health aggregator scheduler loop error");
+                KoanLog.HealthWarning(Logger, LogActions.Scheduler, "loop-error",
+                    ("error", ex.Message));
             }
         }
-
-        Logger.LogInformation("Health aggregator scheduler stopped");
+        KoanLog.HealthInfo(Logger, LogActions.Scheduler, "stopped");
     }
 
     [ServiceAction(Koan.Core.Actions.KoanServiceActions.Health.ForceProbe)]
     public async Task ForceProbeAction(string? component, CancellationToken cancellationToken)
     {
-        Logger.LogInformation("Manual health probe requested for component: {Component}", component ?? "ALL");
+        KoanLog.HealthInfo(Logger, LogActions.Scheduler, "manual-request",
+            ("component", component ?? "ALL"));
 
         _agg.RequestProbe(ProbeReason.Manual, component: component, cancellationToken);
 
@@ -167,7 +176,17 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
 
     private static TimeSpan ComputeRefreshLead(TimeSpan ttl, HealthAggregatorOptions opt)
     {
-        var percent = TimeSpan.FromMilliseconds(ttl.TotalMilliseconds * Math.Clamp(opt.Scheduler.RefreshLeadPercent, 0, 1));
+        var refreshPercent = opt.Scheduler.RefreshLeadPercent;
+        if (refreshPercent < 0)
+        {
+            refreshPercent = 0;
+        }
+        else if (refreshPercent > 1)
+        {
+            refreshPercent = 1;
+        }
+
+        var percent = TimeSpan.FromMilliseconds(ttl.TotalMilliseconds * refreshPercent);
         var lead = percent > opt.Scheduler.RefreshLeadAbsoluteMin ? percent : opt.Scheduler.RefreshLeadAbsoluteMin;
         // Don't exceed quantization window to keep batching effective
         if (opt.Scheduler.QuantizationWindow < lead) lead = opt.Scheduler.QuantizationWindow;
@@ -182,9 +201,9 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
         return jitter;
     }
 
-    private static DateTimeOffset QuantizeCeil(DateTimeOffset t, TimeSpan window)
+    private static DateTimeOffset QuantizeCeil(DateTimeOffset value, TimeSpan window)
     {
-        var ms = (t - Epoch).TotalMilliseconds / window.TotalMilliseconds;
+        var ms = (value - Epoch).TotalMilliseconds / window.TotalMilliseconds;
         var ceil = Math.Ceiling(ms);
         return Epoch + TimeSpan.FromMilliseconds(ceil * window.TotalMilliseconds);
     }
@@ -193,5 +212,16 @@ internal sealed class HealthProbeScheduler : KoanFluentServiceBase
     {
         if (!_lastInvited.TryGetValue(component, out var last)) return true;
         return (now - last) >= _opt.Scheduler.MinComponentGap;
+    }
+
+
+    private static class LogActions
+    {
+        public const string Scheduler = "health.scheduler";
+    }
+
+    private static class LogOutcomes
+    {
+        public const string Disabled = "disabled";
     }
 }

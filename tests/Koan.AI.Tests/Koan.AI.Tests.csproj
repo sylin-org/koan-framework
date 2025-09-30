@@ -10,8 +10,8 @@
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="FluentAssertions" Version="6.12.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
+  <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.8" />
+  <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.8" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />

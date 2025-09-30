@@ -1,8 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Logging;
 using Koan.Core.Observability;
 using Koan.Core;
 
@@ -11,12 +17,19 @@ namespace Koan.Core.Hosting.Runtime;
 internal sealed class AppRuntime : IAppRuntime
 {
     private readonly IServiceProvider _sp;
-    public AppRuntime(IServiceProvider sp) { _sp = sp; }
+    private readonly ILogger<AppRuntime>? _logger;
+
+    public AppRuntime(IServiceProvider sp, ILogger<AppRuntime>? logger = null)
+    {
+        _sp = sp;
+        _logger = logger;
+    }
 
     public void Discover()
     {
         // Initialize KoanEnv and print a bootstrap report if enabled
         try { KoanEnv.TryInitialize(_sp); } catch { }
+        KoanStartupTimeline.Mark(KoanStartupStage.BootstrapStart);
         try
         {
             var report = new BootReport();
@@ -25,12 +38,32 @@ internal sealed class AppRuntime : IAppRuntime
             // Collect module information from all KoanAutoRegistrars
             CollectBootReport(report, cfg);
             
+            var modules = report.GetModules();
+            var modulePairs = modules
+                .Select(m => (m.Name, m.Version ?? "unknown"))
+                .ToList();
+
+            var snapshot = KoanEnv.CurrentSnapshot;
+            var runtimeVersion = ResolveRuntimeVersion(modulePairs);
+
+            if (_logger is not null)
+            {
+                var hostDescription = DescribeHost();
+                var headerBlock = KoanConsoleBlocks.BuildBootstrapHeaderBlock(snapshot, hostDescription, modulePairs, runtimeVersion);
+                _logger.LogInformation("{Block}", headerBlock);
+
+                var inventoryBlock = KoanConsoleBlocks.BuildInventoryBlock(snapshot, modulePairs);
+                _logger.LogInformation("{Block}", inventoryBlock);
+            }
+
+            KoanStartupTimeline.Mark(KoanStartupStage.ConfigReady);
+
             var show = !KoanEnv.IsProduction;
             var obs = _sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.Core.Observability.ObservabilityOptions>>();
             if (!show)
                 show = obs?.Value?.Enabled == true && obs.Value?.Traces?.Enabled == true;
                 
-            if (show && cfg != null)
+            if (show && cfg != null && _logger is null)
             {
                 var options = GetBootReportOptions(cfg);
                 try { Console.Write(report.ToString(options)); } catch { }
@@ -68,6 +101,31 @@ internal sealed class AppRuntime : IAppRuntime
                 catch { /* best-effort */ }
             }
         }
+    }
+
+    private string ResolveRuntimeVersion(IReadOnlyList<(string Name, string Version)> modules)
+    {
+        var coreVersion = modules.FirstOrDefault(m => string.Equals(m.Name, "Koan.Core", StringComparison.OrdinalIgnoreCase)).Version;
+        if (!string.IsNullOrWhiteSpace(coreVersion) && !string.Equals(coreVersion, "unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            return coreVersion;
+        }
+
+        return typeof(AppRuntime).Assembly.GetName().Version?.ToString() ?? "unknown";
+    }
+
+    private string DescribeHost()
+    {
+        var hostEnv = _sp.GetService<IHostEnvironment>();
+        var applicationName = hostEnv?.ApplicationName ?? "Koan";
+
+        var webHostEnvType = Type.GetType("Microsoft.AspNetCore.Hosting.IWebHostEnvironment, Microsoft.AspNetCore.Hosting.Abstractions", throwOnError: false);
+        if (webHostEnvType is not null && _sp.GetService(webHostEnvType) is not null)
+        {
+            return $"ASP.NET Core ({applicationName})";
+        }
+
+        return $"Generic Host ({applicationName})";
     }
 
     private static BootReportOptions GetBootReportOptions(IConfiguration cfg)

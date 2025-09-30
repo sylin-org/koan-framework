@@ -8,6 +8,7 @@ using Koan.Core;
 using Koan.Core.Adapters;
 using Koan.Core.Adapters.Configuration;
 using Koan.Core.Infrastructure;
+using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 
@@ -43,11 +44,13 @@ internal sealed class OllamaOptionsConfigurator : AdapterOptionsConfigurator<Oll
 
     protected override void ConfigureProviderSpecific(OllamaOptions options)
     {
-        Logger?.LogInformation("Ollama Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}', BaseUrl: '{BaseUrl}'",
-            options.ConnectionString, options.BaseUrl);
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Start);
+        KoanLog.ConfigDebug(Logger, LogActions.Config, "context",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode));
+        KoanLog.ConfigDebug(Logger, LogActions.Config, "initial-options",
+            ("connection", options.ConnectionString ?? "(null)"),
+            ("baseUrl", options.BaseUrl ?? "(null)"));
 
         // Read Ollama-specific configuration
         var baseUrl = ReadProviderConfiguration(options.BaseUrl,
@@ -65,20 +68,20 @@ internal sealed class OllamaOptionsConfigurator : AdapterOptionsConfigurator<Oll
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-explicit", ("source", "configuration"));
             options.ConnectionString = explicitConnectionString;
             options.BaseUrl = explicitConnectionString; // For backward compatibility
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(defaultModel, options, Logger);
+            KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode", ("defaultModel", defaultModel ?? "(none)"));
+            options.ConnectionString = ResolveAutonomousConnection(defaultModel, options);
             options.BaseUrl = options.ConnectionString; // For backward compatibility
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-preconfigured");
             options.BaseUrl = options.ConnectionString; // For backward compatibility
         }
 
@@ -119,31 +122,32 @@ internal sealed class OllamaOptionsConfigurator : AdapterOptionsConfigurator<Oll
             }
         }
 
-        Logger?.LogInformation("Final Ollama Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("BaseUrl: {BaseUrl}", options.BaseUrl);
-        Logger?.LogInformation("DefaultModel: {DefaultModel}", options.DefaultModel);
-        Logger?.LogInformation("AutoDiscoveryEnabled: {AutoDiscoveryEnabled}", options.AutoDiscoveryEnabled);
-        Logger?.LogInformation("Ollama Orchestration-Aware Configuration Complete");
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
+            ("connection", options.ConnectionString ?? "(null)"),
+            ("baseUrl", options.BaseUrl ?? "(null)"),
+            ("defaultModel", options.DefaultModel ?? "(null)"),
+            ("autoDiscovery", options.AutoDiscoveryEnabled));
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Complete);
     }
 
     private string ResolveAutonomousConnection(
         string? defaultModel,
-        OllamaOptions options,
-        ILogger? logger)
+        OllamaOptions options)
     {
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
-                return $"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}";
+                var fallbackUrl = $"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}";
+                KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-disabled", ("fallback", fallbackUrl));
+                return fallbackUrl;
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
-                return $"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}";
+                var fallbackUrl = $"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}";
+                KoanLog.ConfigWarning(Logger, LogActions.Discovery, "coordinator-missing", ("fallback", fallbackUrl));
+                return fallbackUrl;
             }
 
             // Create discovery context with Ollama-specific parameters
@@ -159,30 +163,65 @@ internal sealed class OllamaOptionsConfigurator : AdapterOptionsConfigurator<Oll
 
             context.Parameters["autoDownloadModels"] = options.AutoDownloadModels;
 
+            var requiredModelParam = "(none)";
+            if (context.Parameters is { } parameters && parameters.TryGetValue("requiredModel", out var requiredModelValue))
+            {
+                requiredModelParam = requiredModelValue?.ToString() ?? "(null)";
+            }
+
+            KoanLog.ConfigDebug(Logger, LogActions.DiscoveryRequest, LogOutcomes.Start,
+                ("mode", context.OrchestrationMode.ToString()),
+                ("requiredModel", requiredModelParam),
+                ("autoDownload", options.AutoDownloadModels));
+
             // Use autonomous discovery coordinator
             var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("ollama", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("Ollama discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                KoanLog.ConfigInfo(Logger, LogActions.Discovery, LogOutcomeValues.Success,
+                    ("url", result.ServiceUrl),
+                    ("method", result.DiscoveryMethod),
+                    ("healthy", result.IsHealthy));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous Ollama discovery failed, falling back to localhost");
-                return $"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}";
+                var fallbackUrl = $"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}";
+                KoanLog.ConfigWarning(Logger, LogActions.Discovery, LogOutcomeValues.Failed,
+                    ("reason", result.ErrorMessage ?? "unknown"),
+                    ("fallback", fallbackUrl));
+                return fallbackUrl;
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous Ollama discovery, falling back to localhost");
-            return $"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}";
+            var fallbackUrl = $"http://localhost:{Infrastructure.Constants.Discovery.DefaultPort}";
+            KoanLog.ConfigWarning(Logger, LogActions.Discovery, "exception",
+                ("reason", ex.Message),
+                ("fallback", fallbackUrl));
+            KoanLog.ConfigDebug(Logger, LogActions.Discovery, "exception-detail", ("exception", ex.ToString()));
+            return fallbackUrl;
         }
     }
 
     private bool IsAutoDetectionDisabled()
     {
         return Koan.Core.Configuration.Read(Configuration, "Koan:Ai:Provider:Ollama:DisableAutoDetection", false);
+    }
+
+    private static class LogActions
+    {
+        public const string Config = "ollama.config";
+        public const string Discovery = "ollama.discovery";
+        public const string DiscoveryRequest = "ollama.discovery.request";
+    }
+
+    private static class LogOutcomeValues
+    {
+        public const string Final = "final";
+        public const string Success = "success";
+        public const string Failed = "failed";
     }
 }

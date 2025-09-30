@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 
 namespace Koan.Core.Hosting.Bootstrap;
@@ -24,6 +25,9 @@ public sealed class BootReport
         if (_modules.Count == 0) return;
         _modules[^1].Notes.Add(message);
     }
+
+    public IReadOnlyList<BootModule> GetModules()
+        => _modules.Select(m => new BootModule(m.Name, m.Version, m.Settings.AsReadOnly(), m.Notes.AsReadOnly())).ToList();
 
     // NEW: Decision logging methods
     public void AddDecision(string category, string decision, string reason, string[]? alternatives = null)
@@ -176,6 +180,12 @@ public class DecisionLogEntry
     public string[] Alternatives { get; set; } = Array.Empty<string>();
     public string? ConnectionString { get; set; }
 }
+
+public sealed record BootModule(
+    string Name,
+    string? Version,
+    IReadOnlyList<(string Key, string Value, bool Secret)> Settings,
+    IReadOnlyList<string> Notes);
 
 public class BootReportOptions
 {

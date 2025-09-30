@@ -1,7 +1,9 @@
 ﻿using Koan.Core.Infrastructure;
+using Koan.Core.Logging;
 using Koan.Data.Core.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,10 +24,10 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
     private ISchemaHealthContributor<TEntity, TKey>? _contributor;
     private bool _attempted;
 
-    public EntitySchemaGuard(IServiceProvider services, ILogger<EntitySchemaGuard<TEntity, TKey>> logger)
+    public EntitySchemaGuard(IServiceProvider services, ILogger<EntitySchemaGuard<TEntity, TKey>>? logger)
     {
         _services = services;
-        _logger = logger;
+        _logger = logger ?? NullLogger<EntitySchemaGuard<TEntity, TKey>>.Instance;
     }
 
     /// <summary>
@@ -56,7 +58,9 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
             {
                 await contributor.EnsureHealthyAsync(token).ConfigureAwait(false);
                 _healthy[storageKey] = true;
-                _logger.LogDebug("Schema guard ensured {Entity} storage {StorageKey}", typeof(TEntity).FullName, storageKey);
+                KoanLog.DataDebug(_logger, LogActions.SchemaEnsure, "healthy",
+                    ("entity", typeof(TEntity).FullName ?? typeof(TEntity).Name),
+                    ("storage", storageKey));
             }
             catch
             {
@@ -81,7 +85,9 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
         _healthy.TryRemove(storageKey, out _);
         contributor.InvalidateHealth();
         Singleflight.Invalidate(storageKey);
-        _logger.LogDebug("Schema guard invalidated {Entity} storage {StorageKey}", typeof(TEntity).FullName, storageKey);
+        KoanLog.DataDebug(_logger, LogActions.SchemaEnsure, "invalidated",
+            ("entity", typeof(TEntity).FullName ?? typeof(TEntity).Name),
+            ("storage", storageKey));
     }
 
     private ISchemaHealthContributor<TEntity, TKey>? GetContributor()
@@ -101,5 +107,10 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
         var cfg = AggregateConfigs.Get<TEntity, TKey>(_services);
         var storage = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
         return $"{cfg.Provider}:{storage}";
+    }
+
+    private static class LogActions
+    {
+        public const string SchemaEnsure = "schema.ensure";
     }
 }

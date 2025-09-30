@@ -8,14 +8,13 @@
     <license type="expression">Apache-2.0</license>
     <projectUrl>https://github.com/sylin-labs/Koan-framework</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>Project templates for Koan: TinyApi (JSON), TinyApp (SQLite), TinyDockerApp (Alpine.js + Mongo + Compose), TinyWorker.</description>
+  <description>Project templates for Koan: TinyApp (SQLite), TinyDockerApp (Alpine.js + Mongo + Compose), TinyWorker.</description>
     <packageTypes>
       <packageType name="Template" />
     </packageTypes>
-    <tags>dotnet-new Koan sylin templates tiny api web docker worker</tags>
+    <tags>dotnet-new Koan sylin templates tiny web docker worker</tags>
   </metadata>
   <files>
-    <file src="..\TinyApi\**\*" target="content\TinyApi" />
     <file src="..\TinyApp\**\*" target="content\TinyApp" />
     <file src="..\TinyDockerApp\**\*" target="content\TinyDockerApp" />
     <file src="..\TinyWorker\**\*" target="content\TinyWorker" />

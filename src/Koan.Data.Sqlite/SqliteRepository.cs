@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Infrastructure;
+using Koan.Core.Logging;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Instructions;
@@ -57,6 +58,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private static string BuildCacheKey(SqliteConnection conn, string table)
         => ($"{conn.DataSource}/{conn.Database}::{table}");
 
+    private static class LogActions
+    {
+        public const string RepositoryInit = "repository.init";
+        public const string Ensure = "ensure";
+    }
+
     private void InvalidateHealth(SqliteConnection conn, string table)
     {
         try { _healthyCache.TryRemove(BuildCacheKey(conn, table), out _); }
@@ -88,8 +95,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         // Get storage optimization info from AggregateBag
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
 
-        _logger.LogDebug("[SQLite] Repository initialized for {EntityType} with optimization: {OptimizationType}, IsOptimized: {IsOptimized}",
-            typeof(TEntity).Name, _optimizationInfo.OptimizationType, _optimizationInfo.IsOptimized);
+        KoanLog.DataDebug(_logger, LogActions.RepositoryInit, "ready",
+            ("entity", typeof(TEntity).FullName),
+            ("optimization", _optimizationInfo.OptimizationType.ToString()),
+            ("isOptimized", _optimizationInfo.IsOptimized));
     }
 
     // Use central registry so DataSetContext is honored (set-aware names)
@@ -150,7 +159,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var table = TableName;
         var cacheKey = BuildCacheKey(conn, table);
         if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy) return Task.CompletedTask;
-        _logger.LogDebug($"[EnsureOrchestrated] Called for table: {table} (ds={conn.DataSource})");
+        KoanLog.DataDebug(_logger, LogActions.Ensure, "requested",
+            ("table", table),
+            ("dataSource", conn.DataSource));
         // Singleflight: dedupe in-flight ensure per DataSource::Table
         return Singleflight.RunAsync(cacheKey, token => EnsureOrchestratedCoreAsync(conn, table, cacheKey, token), ct);
     }
@@ -195,7 +206,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         {
             try
             {
-                _logger.LogDebug($"[EnsureOrchestrated] Local fallback create table: {table}");
+                KoanLog.DataDebug(_logger, LogActions.Ensure, "fallback-create",
+                    ("table", table));
                 var projections = ProjectionResolver.Get(typeof(TEntity));
                 var allColumns = new List<(string Name, Type ClrType, bool Nullable, bool IsComputed, string? JsonPath, bool IsIndexed)>();
                 allColumns.Add(("Id", typeof(string), false, false, null, false));
@@ -222,7 +234,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         // Non-fail path: only ensure when DDL is allowed; otherwise just mark healthy if table exists
         if (vDdlAllowed)
         {
-            _logger.LogDebug($"[EnsureOrchestrated] Creating table: {table}");
+            KoanLog.DataDebug(_logger, LogActions.Ensure, "create",
+                ("table", table));
             try
             {
                 await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct).ConfigureAwait(false);

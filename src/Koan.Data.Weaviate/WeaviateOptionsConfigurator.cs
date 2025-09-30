@@ -8,6 +8,7 @@ using Koan.Core;
 using Koan.Core.Adapters;
 using Koan.Core.Adapters.Configuration;
 using Koan.Core.Infrastructure;
+using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 
@@ -25,7 +26,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
 
     public WeaviateOptionsConfigurator(
         IConfiguration config,
-        ILogger<WeaviateOptionsConfigurator> logger,
+        ILogger<WeaviateOptionsConfigurator>? logger,
         IOptions<AdaptersReadinessOptions> readinessOptions,
         IServiceDiscoveryCoordinator? discoveryCoordinator = null)
         : base(config, logger, readinessOptions)
@@ -43,11 +44,13 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
 
     protected override void ConfigureProviderSpecific(WeaviateOptions options)
     {
-        Logger?.LogInformation("Weaviate Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Endpoint: '{Endpoint}'",
-            options.ConnectionString, options.Endpoint);
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Start);
+        KoanLog.ConfigDebug(Logger, LogActions.Config, "context",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode));
+        KoanLog.ConfigDebug(Logger, LogActions.Config, "initial-options",
+            ("connection", options.ConnectionString ?? "(null)"),
+            ("endpoint", options.Endpoint ?? "(null)"));
 
         // Read Weaviate-specific configuration
         var endpoint = ReadProviderConfiguration(options.Endpoint,
@@ -66,20 +69,20 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-explicit", ("source", "configuration"));
             options.ConnectionString = explicitConnectionString;
             options.Endpoint = explicitConnectionString; // For backward compatibility
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(Logger);
+            KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode");
+            options.ConnectionString = ResolveAutonomousConnection();
             options.Endpoint = options.ConnectionString; // For backward compatibility
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-preconfigured");
             options.Endpoint = options.ConnectionString; // For backward compatibility
         }
 
@@ -106,26 +109,28 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
             options.DefaultTimeoutSeconds,
             "Koan:Data:Weaviate:TimeoutSeconds");
 
-        Logger?.LogInformation("Final Weaviate Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("Endpoint: {Endpoint}", options.Endpoint);
-        Logger?.LogInformation("Weaviate Orchestration-Aware Configuration Complete");
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
+            ("connection", options.ConnectionString ?? "(null)"),
+            ("endpoint", options.Endpoint ?? "(null)"),
+            ("metric", options.Metric ?? "(null)"));
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Complete);
     }
 
-    private string ResolveAutonomousConnection(ILogger? logger)
+    private string ResolveAutonomousConnection()
     {
+        const string fallback = "http://localhost:8080";
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
-                return "http://localhost:8080";
+                KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-disabled", ("fallback", fallback));
+                return fallback;
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
-                return "http://localhost:8080";
+                KoanLog.ConfigWarning(Logger, LogActions.Discovery, "coordinator-missing", ("fallback", fallback));
+                return fallback;
             }
 
             // Create discovery context with Weaviate-specific parameters
@@ -136,30 +141,55 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
                 Parameters = new Dictionary<string, object>()
             };
 
+            KoanLog.ConfigDebug(Logger, LogActions.DiscoveryRequest, LogOutcomes.Start,
+                ("mode", context.OrchestrationMode.ToString()));
+
             // Use autonomous discovery coordinator
             var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("weaviate", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("Weaviate discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                KoanLog.ConfigInfo(Logger, LogActions.Discovery, LogOutcomeValues.Success,
+                    ("url", result.ServiceUrl),
+                    ("method", result.DiscoveryMethod),
+                    ("healthy", result.IsHealthy));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous Weaviate discovery failed, falling back to localhost");
-                return "http://localhost:8080";
+                KoanLog.ConfigWarning(Logger, LogActions.Discovery, LogOutcomeValues.Failed,
+                    ("reason", result.ErrorMessage ?? "unknown"),
+                    ("fallback", fallback));
+                return fallback;
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous Weaviate discovery, falling back to localhost");
-            return "http://localhost:8080";
+            KoanLog.ConfigWarning(Logger, LogActions.Discovery, "exception",
+                ("reason", ex.Message),
+                ("fallback", fallback));
+            KoanLog.ConfigDebug(Logger, LogActions.Discovery, "exception-detail", ("exception", ex.ToString()));
+            return fallback;
         }
     }
 
     private bool IsAutoDetectionDisabled()
     {
         return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Weaviate:DisableAutoDetection", false);
+    }
+
+    private static class LogActions
+    {
+        public const string Config = "weaviate.config";
+        public const string Discovery = "weaviate.discovery";
+        public const string DiscoveryRequest = "weaviate.discovery.request";
+    }
+
+    private static class LogOutcomeValues
+    {
+        public const string Final = "final";
+        public const string Success = "success";
+        public const string Failed = "failed";
     }
 }

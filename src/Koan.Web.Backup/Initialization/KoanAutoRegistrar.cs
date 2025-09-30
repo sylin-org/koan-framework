@@ -1,10 +1,10 @@
 using Koan.Core;
+using Koan.Core.Logging;
 using Koan.Web.Backup.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace Koan.Web.Backup.Initialization;
 
@@ -13,13 +13,14 @@ namespace Koan.Web.Backup.Initialization;
 /// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
+    private static readonly KoanLog.KoanLogScope Log = KoanLog.For<KoanAutoRegistrar>();
+
     public string ModuleName => "Koan.Web.Backup";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<ILoggerFactory>()?.CreateLogger("Koan.Web.Backup.Initialization.KoanAutoRegistrar");
-        logger?.Log(LogLevel.Debug, "Koan.Web.Backup KoanAutoRegistrar loaded.");
+        Log.BootDebug(LogActions.Init, "loaded", ("module", ModuleName));
 
         // Register Web Backup services
         services.AddKoanWebBackup();
@@ -27,7 +28,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Add background cleanup services with default settings
         services.AddKoanWebBackupBackgroundServices();
 
-        logger?.Log(LogLevel.Debug, "Koan.Web.Backup services registered successfully.");
+        Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
@@ -50,6 +51,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         report.AddSetting("ProgressTracking", "Polling-based (REST endpoints)");
         report.AddSetting("SignalRSupport", "false");
         report.AddSetting("PollingInterval", "Client-controlled");
+    }
+
+    private static class LogActions
+    {
+        public const string Init = "registrar.init";
     }
 }
 

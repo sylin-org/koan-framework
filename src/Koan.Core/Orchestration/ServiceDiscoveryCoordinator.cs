@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Koan.Core.Logging;
 using Koan.Core.Orchestration.Abstractions;
 
 namespace Koan.Core.Orchestration;
@@ -28,29 +29,34 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
     {
         if (!_adapters.TryGetValue(serviceName.ToLowerInvariant(), out var adapter))
         {
-            _logger.LogWarning("No discovery adapter registered for service: {ServiceName}", serviceName);
+            KoanLog.ConfigWarning(_logger, LogActions.Lookup, "no-adapter", ("service", serviceName));
             return AdapterDiscoveryResult.NoAdapter(serviceName);
         }
 
         context ??= new DiscoveryContext();
 
-        _logger.LogDebug("Delegating discovery of {ServiceName} to {AdapterType}",
-            serviceName, adapter.GetType().Name);
+        KoanLog.ConfigDebug(_logger, LogActions.Delegate, null,
+            ("service", serviceName),
+            ("adapter", adapter.GetType().Name));
 
         try
         {
             // Pure delegation - "Adapter, discover yourself"
             var result = await adapter.DiscoverAsync(context, cancellationToken);
 
-            _logger.LogInformation("Service {ServiceName} discovery result: {IsSuccessful} -> {ServiceUrl}",
-                serviceName, result.IsSuccessful, result.ServiceUrl);
+            var outcome = result.IsSuccessful ? LogOutcomes.Success : LogOutcomes.Failure;
+            KoanLog.ConfigInfo(_logger, LogActions.Result, outcome,
+                ("service", serviceName),
+                ("url", result.ServiceUrl));
 
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Discovery adapter {AdapterType} failed for service {ServiceName}",
-                adapter.GetType().Name, serviceName);
+            KoanLog.ConfigError(_logger, LogActions.Result, "exception",
+                ("service", serviceName),
+                ("adapter", adapter.GetType().Name),
+                ("error", ex.Message));
             return AdapterDiscoveryResult.Failed(serviceName, $"Adapter exception: {ex.Message}");
         }
     }
@@ -76,8 +82,24 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
             _adapters.AddOrUpdate(key, adapter, (_, existing) =>
                 adapter.Priority > existing.Priority ? adapter : existing);
 
-            _logger.LogInformation("Registered discovery adapter: {ServiceName} -> {AdapterType} (priority: {Priority})",
-                serviceName, adapter.GetType().Name, adapter.Priority);
+            KoanLog.BootInfo(_logger, LogActions.Register, "adapter",
+                ("service", serviceName),
+                ("adapter", adapter.GetType().Name),
+                ("priority", adapter.Priority));
         }
+    }
+
+    private static class LogActions
+    {
+        public const string Lookup = "discovery.lookup";
+        public const string Delegate = "discovery.delegate";
+        public const string Result = "discovery.result";
+        public const string Register = "discovery.register";
+    }
+
+    private static class LogOutcomes
+    {
+        public const string Success = "success";
+        public const string Failure = "failure";
     }
 }

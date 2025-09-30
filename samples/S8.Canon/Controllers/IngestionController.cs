@@ -2,7 +2,7 @@
 using Koan.Data.Core;
 using Koan.Canon.Infrastructure;
 using Koan.Canon.Model;
-using Koan.Testing.Canon;
+using Koan.Testing.Flow;
 
 namespace S8.Canon.Controllers;
 
@@ -25,8 +25,8 @@ public class IngestionController : ControllerBase
             OccurredAt = DateTimeOffset.UtcNow,
             Data = new Dictionary<string, object>
             {
-                [CanonTestConstants.Keys.Email] = registration.Email,
-                [CanonTestConstants.Keys.Phone] = registration.Phone ?? string.Empty,
+                [FlowTestConstants.Keys.Email] = registration.Email,
+                [FlowTestConstants.Keys.Phone] = registration.Phone ?? string.Empty,
                 ["firstName"] = registration.FirstName,
                 ["lastName"] = registration.LastName,
                 ["company"] = registration.Company ?? string.Empty,
@@ -54,12 +54,12 @@ public class IngestionController : ControllerBase
             OccurredAt = DateTimeOffset.UtcNow,
             Data = new Dictionary<string, object>
             {
-                [CanonTestConstants.Keys.Handle] = interaction.Handle,
-                [CanonTestConstants.Keys.Email] = interaction.Email ?? string.Empty,
+                [FlowTestConstants.Keys.Handle] = interaction.Handle,
+                [FlowTestConstants.Keys.Email] = interaction.Email ?? string.Empty,
                 ["platform"] = interaction.Platform,
                 ["interactionType"] = interaction.Type,
                 ["content"] = interaction.Content ?? string.Empty,
-                ["timestamp"] = interaction.Timestamp
+                ["timestamp"] = interaction.Timestamp ?? DateTimeOffset.UtcNow
             }
         };
 
@@ -83,7 +83,7 @@ public class IngestionController : ControllerBase
             OccurredAt = DateTimeOffset.UtcNow,
             Data = new Dictionary<string, object>
             {
-                [CanonTestConstants.Keys.Phone] = iotEvent.OwnerPhone, // Phone as device owner identifier
+                [FlowTestConstants.Keys.Phone] = iotEvent.OwnerPhone, // Phone as device owner identifier
                 ["deviceId"] = iotEvent.DeviceId,
                 ["deviceType"] = iotEvent.DeviceType,
                 ["reading"] = iotEvent.Reading,

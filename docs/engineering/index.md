@@ -25,6 +25,7 @@ validation:
 ## Quick Links
 
 - [Packaging policy](packaging.md)
+- [Logging visual standardization](logging-visual-standardization.md)
 - [Architecture principles](../architecture/principles.md)
 - [Documentation posture (ARCH-0041)](../decisions/ARCH-0041-docs-posture-instructions-over-tutorials.md)
 - [Script-owned versioning (BUILD-0072)](../decisions/BUILD-0072-script-owned-versioning.md)

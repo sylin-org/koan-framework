@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Adapters;
 using Koan.Core.Adapters.Configuration;
+using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 
@@ -23,7 +24,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
     public MongoOptionsConfigurator(
         IConfiguration config,
-        ILogger<MongoOptionsConfigurator> logger,
+        ILogger<MongoOptionsConfigurator>? logger,
         IOptions<AdaptersReadinessOptions> readinessOptions,
         IServiceDiscoveryCoordinator? discoveryCoordinator = null)
         : base(config, logger, readinessOptions)
@@ -33,11 +34,13 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
     protected override void ConfigureProviderSpecific(MongoOptions options)
     {
-        Logger?.LogInformation("MongoDB Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}', Database: '{Database}'",
-            options.ConnectionString, options.Database);
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Start);
+        KoanLog.ConfigDebug(Logger, LogActions.Config, "context",
+            ("environment", KoanEnv.EnvironmentName),
+            ("orchestrationMode", KoanEnv.OrchestrationMode));
+        KoanLog.ConfigDebug(Logger, LogActions.Config, "initial-options",
+            ("connection", options.ConnectionString ?? "(null)"),
+            ("database", options.Database ?? "(null)"));
 
         // MongoDB-specific configuration
         var databaseName = ReadProviderConfiguration(options.Database,
@@ -61,48 +64,49 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-explicit", ("source", "configuration"));
             options.ConnectionString = explicitConnectionString;
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
-            options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password, Logger);
+            KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode",
+                ("database", databaseName ?? "(none)"));
+            options.ConnectionString = ResolveAutonomousConnection(databaseName, username, password);
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-preconfigured");
         }
 
         options.Database = ReadProviderConfiguration(options.Database,
             Infrastructure.Constants.Configuration.Keys.Database,
             Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
-        Logger?.LogInformation("Final MongoDB Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("Database: {Database}", options.Database);
-        Logger?.LogInformation("MongoDB Orchestration-Aware Configuration Complete");
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
+            ("connection", options.ConnectionString ?? "(null)"),
+            ("database", options.Database ?? "(null)"));
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Complete);
     }
 
     private string ResolveAutonomousConnection(
         string? databaseName,
         string? username,
-        string? password,
-        ILogger? logger)
+        string? password)
     {
+        var fallback = BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
         try
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using localhost");
-                return BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
+                KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-disabled", ("fallback", fallback));
+                return fallback;
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to localhost");
-                return BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
+                KoanLog.ConfigWarning(Logger, LogActions.Discovery, "coordinator-missing", ("fallback", fallback));
+                return fallback;
             }
 
             // Create discovery context with MongoDB-specific parameters
@@ -120,25 +124,38 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
             if (!string.IsNullOrWhiteSpace(password))
                 context.Parameters["password"] = password;
 
+            KoanLog.ConfigDebug(Logger, LogActions.DiscoveryRequest, LogOutcomes.Start,
+                ("mode", context.OrchestrationMode.ToString()),
+                ("database", databaseName ?? "(none)"),
+                ("user", username ?? "(none)"));
+
             // Use autonomous discovery coordinator
             var discoveryTask = _discoveryCoordinator.DiscoverServiceAsync("mongo", context);
             var result = discoveryTask.GetAwaiter().GetResult();
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("MongoDB discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                KoanLog.ConfigInfo(Logger, LogActions.Discovery, LogOutcomeValues.Success,
+                    ("url", result.ServiceUrl),
+                    ("method", result.DiscoveryMethod),
+                    ("healthy", result.IsHealthy));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous MongoDB discovery failed, falling back to localhost");
-                return BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
+                KoanLog.ConfigWarning(Logger, LogActions.Discovery, LogOutcomeValues.Failed,
+                    ("reason", result.ErrorMessage ?? "unknown"),
+                    ("fallback", fallback));
+                return fallback;
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous MongoDB discovery, falling back to localhost");
-            return BuildMongoConnectionString("localhost", 27017, databaseName, username, password);
+            KoanLog.ConfigWarning(Logger, LogActions.Discovery, "exception",
+                ("reason", ex.Message),
+                ("fallback", fallback));
+            KoanLog.ConfigDebug(Logger, LogActions.Discovery, "exception-detail", ("exception", ex.ToString()));
+            return fallback;
         }
     }
 
@@ -152,5 +169,18 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         var auth = string.IsNullOrEmpty(username) ? "" : $"{username}:{password ?? ""}@";
         var db = string.IsNullOrEmpty(database) ? "" : $"/{database}";
         return $"mongodb://{auth}{hostname}:{port}{db}";
+    }
+    private static class LogActions
+    {
+        public const string Config = "mongo.config";
+        public const string Discovery = "mongo.discovery";
+        public const string DiscoveryRequest = "mongo.discovery.request";
+    }
+
+    private static class LogOutcomeValues
+    {
+        public const string Final = "final";
+        public const string Success = "success";
+        public const string Failed = "failed";
     }
 }

@@ -1,7 +1,7 @@
 using Koan.Data.Core; // AddKoan()
 using Koan.Canon;      // Turnkey via Koan.Canon.Web (auto AddKoanCanon)
 using Koan.Canon.Options;
-using Koan.Testing.Canon;
+using Koan.Testing.Flow;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +11,7 @@ builder.Services.AddKoan();
 // Canon runtime is auto-registered by Koan.Canon.Web (turnkey ON by default). Set Koan:Canon:AutoRegister=false to opt out.
 builder.Services.Configure<CanonOptions>(o =>
 {
-    o.AggregationTags = CanonTestConstants.UbiquitousAggregationTags;
+    o.AggregationTags = FlowTestConstants.UbiquitousAggregationTags;
     o.BatchSize = 50;
     o.PurgeEnabled = true;
     o.PurgeInterval = TimeSpan.FromMinutes(30);

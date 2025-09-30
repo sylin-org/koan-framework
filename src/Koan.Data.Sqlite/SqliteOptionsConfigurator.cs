@@ -9,6 +9,7 @@ using Koan.Core;
 using Koan.Core.Adapters;
 using Koan.Core.Adapters.Configuration;
 using Koan.Core.Infrastructure;
+using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 
@@ -26,7 +27,7 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
 
     public SqliteOptionsConfigurator(
         IConfiguration config,
-        ILogger<SqliteOptionsConfigurator> logger,
+        ILogger<SqliteOptionsConfigurator>? logger,
         IOptions<AdaptersReadinessOptions> readinessOptions,
         IServiceDiscoveryCoordinator? discoveryCoordinator = null)
         : base(config, logger, readinessOptions)
@@ -44,11 +45,12 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
 
     protected override void ConfigureProviderSpecific(SqliteOptions options)
     {
-        Logger?.LogInformation("SQLite Orchestration-Aware Configuration Started");
-        Logger?.LogInformation("Environment: {Environment}, OrchestrationMode: {OrchestrationMode}",
-            KoanEnv.EnvironmentName, KoanEnv.OrchestrationMode);
-        Logger?.LogInformation("Initial options - ConnectionString: '{ConnectionString}'",
-            options.ConnectionString);
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Start);
+        KoanLog.ConfigInfo(Logger, LogActions.Config, "context",
+            ("environment", KoanEnv.EnvironmentName),
+            ("mode", KoanEnv.OrchestrationMode.ToString()));
+        KoanLog.ConfigDebug(Logger, LogActions.Config, "initial",
+            ("connection", options.ConnectionString));
 
         var explicitConnectionString = ReadProviderConfiguration("",
             Infrastructure.Constants.Configuration.Keys.ConnectionString,
@@ -58,18 +60,19 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
-            Logger?.LogInformation("Using explicit connection string from configuration");
+            KoanLog.ConfigInfo(Logger, LogActions.Config, "explicit",
+                ("source", "configuration"));
             options.ConnectionString = explicitConnectionString;
         }
         else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            Logger?.LogInformation("Auto-detection mode - using autonomous service discovery");
+            KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto");
             options.ConnectionString = ResolveAutonomousConnection(Logger);
         }
         else
         {
-            Logger?.LogInformation("Using pre-configured connection string");
+            KoanLog.ConfigInfo(Logger, LogActions.Config, "preconfigured");
         }
 
         // Configure other SQLite-specific options
@@ -98,9 +101,9 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             Constants.Configuration.Koan.AllowMagicInProduction,
             options.AllowProductionDdl);
 
-        Logger?.LogInformation("Final SQLite Configuration");
-        Logger?.LogInformation("Connection: {ConnectionString}", options.ConnectionString);
-        Logger?.LogInformation("SQLite Orchestration-Aware Configuration Complete");
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
+            ("connection", options.ConnectionString));
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Complete);
     }
 
     private string ResolveAutonomousConnection(ILogger? logger)
@@ -109,13 +112,15 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
         {
             if (IsAutoDetectionDisabled())
             {
-                logger?.LogInformation("Auto-detection disabled via configuration - using local database");
+                KoanLog.ConfigInfo(logger, LogActions.Discovery, "disabled",
+                    ("reason", "config"));
                 return BuildSqliteConnectionString("Data/Koan.sqlite");
             }
 
             if (_discoveryCoordinator == null)
             {
-                logger?.LogWarning("Service discovery coordinator not available, falling back to local database");
+                KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
+                    ("reason", "no-coordinator"));
                 return BuildSqliteConnectionString("Data/Koan.sqlite");
             }
 
@@ -133,18 +138,21 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
 
             if (result.IsSuccessful)
             {
-                logger?.LogInformation("SQLite discovered via autonomous discovery: {ServiceUrl}", result.ServiceUrl);
+                KoanLog.ConfigInfo(logger, LogActions.Discovery, LogOutcomeValues.Success,
+                    ("url", result.ServiceUrl));
                 return result.ServiceUrl;
             }
             else
             {
-                logger?.LogWarning("Autonomous SQLite discovery failed, falling back to local database");
+                KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
+                    ("reason", "no-candidate"));
                 return BuildSqliteConnectionString("Data/Koan.sqlite");
             }
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error in autonomous SQLite discovery, falling back to local database");
+            KoanLog.ConfigError(logger, LogActions.Discovery, "exception",
+                ("error", ex.Message));
             return BuildSqliteConnectionString("Data/Koan.sqlite");
         }
     }
@@ -164,5 +172,18 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
         }
 
         return $"Data Source={filePath}";
+    }
+
+    private static class LogActions
+    {
+        public const string Config = "sqlite.config";
+        public const string Discovery = "sqlite.discovery";
+    }
+
+    private static class LogOutcomeValues
+    {
+        public const string Final = "final";
+        public const string Success = "success";
+        public const string Fallback = "fallback";
     }
 }

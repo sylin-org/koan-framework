@@ -9,6 +9,7 @@ using Koan.AI.Contracts.Routing;
 using Koan.Core.Adapters;
 using Microsoft.Extensions.Options;
 using Koan.Core.Orchestration;
+using Koan.Core.Logging;
 
 namespace Koan.Ai.Provider.Ollama.Initialization;
 
@@ -38,37 +39,40 @@ internal sealed class OllamaDiscoveryService : IHostedService
     {
         try
         {
-            _logger.LogDebug("Ollama Orchestration-Aware Discovery starting...");
-            _logger.LogDebug("OrchestrationMode: {Mode}", _serviceDiscovery.CurrentMode);
+            KoanLog.BootInfo(_logger, LogActions.Discovery, "start");
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "context",
+                ("mode", _serviceDiscovery.CurrentMode));
 
             // Check if discovery should be enabled
             if (!ShouldPerformDiscovery())
             {
-                _logger.LogDebug("Auto-discovery disabled or not applicable, skipping");
+                KoanLog.BootDebug(_logger, LogActions.Discovery, "skip", ("reason", "auto-discovery-disabled"));
                 return;
             }
 
             // If explicit Ollama services are configured, skip auto-discovery
             if (HasExplicitConfiguration())
             {
-                _logger.LogDebug("Explicit Ollama services configured, skipping auto-discovery");
+                KoanLog.BootDebug(_logger, LogActions.Discovery, "skip", ("reason", "explicit-configuration"));
                 return;
             }
 
             // Get required model for validation
             var defaultModel = GetRequiredModel();
-            _logger.LogDebug("Default model for discovered adapters: {DefaultModel}", defaultModel ?? "none");
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "default-model", ("model", defaultModel ?? "(none)"));
 
             // Use centralized orchestration-aware service discovery
             var discoveryOptions = CreateOllamaDiscoveryOptions(defaultModel);
             var result = await _serviceDiscovery.DiscoverServiceAsync("ollama", discoveryOptions, cancellationToken);
 
-            _logger.LogInformation("Ollama discovered via {Method}: {ServiceUrl}",
-                result.DiscoveryMethod, result.ServiceUrl);
+            KoanLog.BootInfo(_logger, LogActions.Discovery, "result",
+                ("method", result.DiscoveryMethod),
+                ("url", result.ServiceUrl),
+                ("healthy", result.IsHealthy));
 
             if (!result.IsHealthy)
             {
-                _logger.LogWarning("Discovered Ollama service failed health check but proceeding anyway");
+                KoanLog.BootWarning(_logger, LogActions.Discovery, "health-check-failed", ("url", result.ServiceUrl));
             }
 
             // Create and register adapter
@@ -76,7 +80,8 @@ internal sealed class OllamaDiscoveryService : IHostedService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in Ollama orchestration-aware discovery");
+            KoanLog.BootWarning(_logger, LogActions.Discovery, "unexpected-error", ("reason", ex.Message));
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "error-detail", ("exception", ex.ToString()));
         }
     }
 
@@ -87,11 +92,22 @@ internal sealed class OllamaDiscoveryService : IHostedService
         var autoDiscovery = aiOpts?.AutoDiscoveryEnabled ?? envIsDev;
         var allowNonDev = aiOpts?.AllowDiscoveryInNonDev ?? true;
 
-        _logger.LogDebug("Discovery settings: envIsDev={EnvIsDev}, autoDiscovery={AutoDiscovery}, allowNonDev={AllowNonDev}",
-            envIsDev, autoDiscovery, allowNonDev);
+        KoanLog.BootDebug(_logger, LogActions.Discovery, "eligibility",
+            ("envIsDev", envIsDev),
+            ("autoDiscovery", autoDiscovery),
+            ("allowNonDev", allowNonDev));
 
-        if (!autoDiscovery) return false;
-        if (!envIsDev && !allowNonDev) return false;
+        if (!autoDiscovery)
+        {
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "eligibility-denied", ("reason", "autoDiscovery-disabled"));
+            return false;
+        }
+
+        if (!envIsDev && !allowNonDev)
+        {
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "eligibility-denied", ("reason", "non-dev-blocked"));
+            return false;
+        }
 
         return true;
     }
@@ -103,15 +119,17 @@ internal sealed class OllamaDiscoveryService : IHostedService
             var configured = _cfg.GetSection(Infrastructure.Constants.Configuration.ServicesRoot)
                 .Get<OllamaServiceOptions[]>() ?? Array.Empty<OllamaServiceOptions>();
 
-            _logger.LogDebug("Found {ConfigCount} configured Ollama services", configured.Length);
             var enabledCount = configured.Count(s => s.Enabled);
-            _logger.LogDebug("Found {EnabledCount} enabled configured Ollama services", enabledCount);
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "configured-services",
+                ("configured", configured.Length),
+                ("enabled", enabledCount));
 
             return configured.Any(s => s.Enabled);
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Error checking configured services, proceeding with discovery");
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "configuration-check-error", ("reason", ex.Message));
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "configuration-check-detail", ("exception", ex.ToString()));
             return false;
         }
     }
@@ -125,7 +143,7 @@ internal sealed class OllamaDiscoveryService : IHostedService
             var canonicalModel = _cfg["Koan:Ai:Ollama:DefaultModel"];
             if (!string.IsNullOrWhiteSpace(canonicalModel))
             {
-                _logger.LogDebug("Bootstrap model selection: canonical path 'Koan:Ai:Ollama:DefaultModel' = {Model}", canonicalModel);
+                KoanLog.BootDebug(_logger, LogActions.Discovery, "model-canonical", ("model", canonicalModel));
                 return canonicalModel;
             }
 
@@ -134,16 +152,17 @@ internal sealed class OllamaDiscoveryService : IHostedService
             var fallbackModel = requiredModels?.FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(fallbackModel))
             {
-                _logger.LogDebug("Bootstrap model selection: fallback to RequiredModels[0] = {Model}", fallbackModel);
+                KoanLog.BootDebug(_logger, LogActions.Discovery, "model-fallback", ("model", fallbackModel));
                 return fallbackModel;
             }
 
-            _logger.LogDebug("Bootstrap model selection: no default model configured, will use adapter defaults");
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-default", ("mode", "adapter"));
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Error reading default model configuration");
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-read-error", ("reason", ex.Message));
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-read-detail", ("exception", ex.ToString()));
             return null;
         }
     }
@@ -214,26 +233,31 @@ internal sealed class OllamaDiscoveryService : IHostedService
             var payload = await response.Content.ReadAsStringAsync(cts.Token);
             var hasModel = EndpointHasModel(payload, requiredModel);
 
-            _logger.LogDebug("Model validation for {ServiceUrl}: required '{Model}' = {HasModel}",
-                serviceUrl, requiredModel, hasModel);
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-validation",
+                ("service", serviceUrl),
+                ("model", requiredModel),
+                ("present", hasModel));
 
             // If model is missing, attempt to download it
             if (!hasModel)
             {
-                _logger.LogInformation("Required model '{Model}' not found at {ServiceUrl}, attempting to download...",
-                    requiredModel, serviceUrl);
+                KoanLog.BootInfo(_logger, LogActions.Discovery, "model-missing",
+                    ("service", serviceUrl),
+                    ("model", requiredModel));
 
                 var downloadSuccess = await PullModelAsync(serviceUrl, requiredModel, cancellationToken);
                 if (downloadSuccess)
                 {
-                    _logger.LogInformation("Successfully downloaded model '{Model}' at {ServiceUrl}",
-                        requiredModel, serviceUrl);
+                    KoanLog.BootInfo(_logger, LogActions.Discovery, "model-download-success",
+                        ("service", serviceUrl),
+                        ("model", requiredModel));
                     return true;
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to download required model '{Model}' at {ServiceUrl}",
-                        requiredModel, serviceUrl);
+                    KoanLog.BootWarning(_logger, LogActions.Discovery, "model-download-failed",
+                        ("service", serviceUrl),
+                        ("model", requiredModel));
                     return false;
                 }
             }
@@ -242,7 +266,10 @@ internal sealed class OllamaDiscoveryService : IHostedService
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Error validating model availability at {ServiceUrl}", serviceUrl);
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-validation-error",
+                ("service", serviceUrl),
+                ("reason", ex.Message));
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-validation-detail", ("exception", ex.ToString()));
             return false;
         }
     }
@@ -265,7 +292,9 @@ internal sealed class OllamaDiscoveryService : IHostedService
                 System.Text.Encoding.UTF8,
                 "application/json");
 
-            _logger.LogInformation("Initiating model download: {Model} from {ServiceUrl}", modelName, serviceUrl);
+            KoanLog.BootInfo(_logger, LogActions.Discovery, "model-download-start",
+                ("service", serviceUrl),
+                ("model", modelName));
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(TimeSpan.FromMinutes(10)); // Allow up to 10 minutes for download
@@ -274,13 +303,18 @@ internal sealed class OllamaDiscoveryService : IHostedService
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cts.Token);
-                _logger.LogWarning("Model pull failed ({StatusCode}): {Error}",
-                    response.StatusCode, errorContent);
+                KoanLog.BootWarning(_logger, LogActions.Discovery, "model-download-http-failed",
+                    ("service", serviceUrl),
+                    ("model", modelName),
+                    ("status", response.StatusCode),
+                    ("error", errorContent));
                 return false;
             }
 
             var responseContent = await response.Content.ReadAsStringAsync(cts.Token);
-            _logger.LogDebug("Model pull response: {Response}", responseContent);
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-download-response",
+                ("service", serviceUrl),
+                ("size", responseContent?.Length ?? 0));
 
             // Verify the model was actually downloaded by checking tags again
             await Task.Delay(1000, cancellationToken); // Brief delay for Ollama to index the model
@@ -288,12 +322,18 @@ internal sealed class OllamaDiscoveryService : IHostedService
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("Model download timed out for '{Model}' at {ServiceUrl}", modelName, serviceUrl);
+            KoanLog.BootWarning(_logger, LogActions.Discovery, "model-download-timeout",
+                ("service", serviceUrl),
+                ("model", modelName));
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error downloading model '{Model}' from {ServiceUrl}", modelName, serviceUrl);
+            KoanLog.BootWarning(_logger, LogActions.Discovery, "model-download-error",
+                ("service", serviceUrl),
+                ("model", modelName),
+                ("reason", ex.Message));
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-download-detail", ("exception", ex.ToString()));
             return false;
         }
     }
@@ -313,7 +353,11 @@ internal sealed class OllamaDiscoveryService : IHostedService
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Error verifying model download at {ServiceUrl}", serviceUrl);
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-verify-error",
+                ("service", serviceUrl),
+                ("model", modelName),
+                ("reason", ex.Message));
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "model-verify-detail", ("exception", ex.ToString()));
             return false;
         }
     }
@@ -339,7 +383,8 @@ internal sealed class OllamaDiscoveryService : IHostedService
                     ["Koan:Ai:Ollama:DefaultModel"] = defaultModel
                 };
                 configBuilder.AddInMemoryCollection(configData);
-                _logger.LogDebug("Preserving bootstrap model choice in adapter config: DefaultModel = {Model}", defaultModel);
+                KoanLog.BootDebug(_logger, LogActions.Discovery, "adapter-config",
+                    ("defaultModel", defaultModel));
             }
 
             // Chain with main configuration to inherit other settings
@@ -349,16 +394,27 @@ internal sealed class OllamaDiscoveryService : IHostedService
             var readinessDefaults = _sp.GetService<IOptions<AdaptersReadinessOptions>>()?.Value;
             var adapter = new OllamaAdapter(client, adapterLogger, adapterConfig, readinessDefaults);
 
-            _logger.LogDebug("Registering Ollama adapter: {AdapterId} at {Url}", id, serviceUrl);
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "adapter-register",
+                ("adapterId", id),
+                ("url", serviceUrl));
             _registry.Add(adapter);
-            _logger.LogInformation("Successfully registered Ollama adapter via orchestration-aware discovery");
+            KoanLog.BootInfo(_logger, LogActions.Discovery, "adapter-registered",
+                ("adapterId", id));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error registering Ollama adapter for {ServiceUrl}", serviceUrl);
+            KoanLog.BootWarning(_logger, LogActions.Discovery, "adapter-register-error",
+                ("service", serviceUrl),
+                ("reason", ex.Message));
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "adapter-register-detail", ("exception", ex.ToString()));
         }
 
         return Task.CompletedTask;
+    }
+
+    private static class LogActions
+    {
+        public const string Discovery = "ollama.discovery";
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Koan.Core.Logging;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Orchestration.Attributes;
 
@@ -29,7 +30,7 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
         DiscoveryContext context,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("{ServiceName} adapter starting autonomous discovery", ServiceName);
+        KoanLog.ConfigDebug(_logger, LogActions.Start, null, ("service", ServiceName));
 
         // Get our own KoanServiceAttribute
         var attribute = GetServiceAttribute();
@@ -44,19 +45,24 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
         // Try each candidate until one succeeds
         foreach (var candidate in candidates.OrderBy(c => c.Priority))
         {
-            _logger.LogDebug("{ServiceName} trying discovery method: {Method} -> {Url}",
-                ServiceName, candidate.Method, candidate.Url);
+            KoanLog.ConfigDebug(_logger, LogActions.Try, null,
+                ("service", ServiceName),
+                ("method", candidate.Method),
+                ("url", candidate.Url));
 
             if (await ValidateCandidate(candidate.Url, context, cancellationToken))
             {
-                _logger.LogInformation("{ServiceName} adapter decided: {Url} via {Method}",
-                    ServiceName, candidate.Url, candidate.Method);
+                KoanLog.ConfigInfo(_logger, LogActions.Decide, LogOutcomes.Success,
+                    ("service", ServiceName),
+                    ("method", candidate.Method),
+                    ("url", candidate.Url));
 
                 return AdapterDiscoveryResult.Success(ServiceName, candidate.Url, candidate.Method, true);
             }
         }
 
-        _logger.LogWarning("{ServiceName} adapter failed all discovery attempts", ServiceName);
+        KoanLog.ConfigWarning(_logger, LogActions.Decide, LogOutcomes.Failed,
+            ("service", ServiceName));
         return AdapterDiscoveryResult.Failed(ServiceName, "All discovery methods failed");
     }
 
@@ -123,12 +129,17 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
         }
         catch (OperationCanceledException)
         {
-            _logger.LogDebug("{ServiceName} health check timed out for {Url}", ServiceName, serviceUrl);
+            KoanLog.ConfigDebug(_logger, LogActions.Health, LogOutcomes.Timeout,
+                ("service", ServiceName),
+                ("url", serviceUrl));
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("{ServiceName} health check failed for {Url}: {Error}", ServiceName, serviceUrl, ex.Message);
+            KoanLog.ConfigDebug(_logger, LogActions.Health, LogOutcomes.Failure,
+                ("service", ServiceName),
+                ("url", serviceUrl),
+                ("error", ex.Message));
             return false;
         }
     }
@@ -138,4 +149,20 @@ public abstract class ServiceDiscoveryAdapterBase : IServiceDiscoveryAdapter
 
     /// <summary>Override to implement Aspire service discovery</summary>
     protected virtual string? ReadAspireServiceDiscovery() => null;
+
+    private static class LogActions
+    {
+        public const string Start = "discovery.start";
+        public const string Try = "discovery.try";
+        public const string Decide = "discovery.decide";
+        public const string Health = "discovery.health";
+    }
+
+    private static class LogOutcomes
+    {
+        public const string Success = "success";
+        public const string Failed = "failed";
+        public const string Timeout = "timeout";
+        public const string Failure = "failure";
+    }
 }
