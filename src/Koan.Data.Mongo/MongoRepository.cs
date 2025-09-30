@@ -13,9 +13,11 @@ using Koan.Data.Core;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Extensions;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Schema;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace Koan.Data.Mongo;
@@ -29,7 +31,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
     IBulkDelete<TKey>,
     IInstructionExecutor<TEntity>,
     IAdapterReadiness,
-    IAdapterReadinessConfiguration
+    IAdapterReadinessConfiguration,
+    ISchemaHealthContributor<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -41,7 +44,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
     private IMongoCollection<TEntity>? _collection;
     private string _collectionName;
 
-    private static readonly ConcurrentDictionary<Type, bool> IndexesInitialized = new();
+    private static readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, bool> _indexCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _schemaLocks = new(StringComparer.Ordinal);
 
     public MongoRepository(
         MongoClientProvider provider,
@@ -101,7 +106,69 @@ internal sealed class MongoRepository<TEntity, TKey> :
     internal Task<TResult> ExecuteWithinReadinessAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct)
         => ExecuteWithReadinessAsync(operation, ct);
 
+    public async Task EnsureHealthyAsync(CancellationToken ct)
+    {
+        var collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var collectionKey = BuildCollectionKey();
+        var schemaLock = GetSchemaLock(collectionKey);
+
+        await schemaLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_healthyCache.TryGetValue(collectionKey, out var cached) && cached)
+            {
+                return;
+            }
+
+            var database = await _provider.GetDatabaseAsync(ct).ConfigureAwait(false);
+            if (!await CollectionExistsAsync(database, collectionName, ct).ConfigureAwait(false))
+            {
+                await database.CreateCollectionAsync(collectionName, cancellationToken: ct).ConfigureAwait(false);
+            }
+
+            _collection = database.GetCollection<TEntity>(collectionName);
+            _collectionName = collectionName;
+
+            await EnsureIndexesAsync(_collection, ct).ConfigureAwait(false);
+            _healthyCache[collectionKey] = true;
+        }
+        catch (Exception ex)
+        {
+            _healthyCache[collectionKey] = false;
+            _indexCache.TryRemove(BuildIndexKey(collectionName), out _);
+            _logger?.LogWarning(ex, "Mongo schema health ensure failed for {Collection}", collectionName);
+            throw;
+        }
+        finally
+        {
+            schemaLock.Release();
+        }
+    }
+
+    public void InvalidateHealth()
+    {
+        var collectionName = _collectionName;
+        var collectionKey = BuildCollectionKey();
+        _healthyCache.TryRemove(collectionKey, out _);
+
+        if (!string.IsNullOrWhiteSpace(collectionName))
+        {
+            _indexCache.TryRemove(BuildIndexKey(collectionName), out _);
+        }
+    }
+
     private async Task<IMongoCollection<TEntity>> GetCollectionAsync(CancellationToken ct)
+    {
+        var key = BuildCollectionKey();
+        if (!_healthyCache.TryGetValue(key, out var healthy) || !healthy)
+        {
+            await EnsureHealthyAsync(ct).ConfigureAwait(false);
+        }
+
+        return await GetCollectionCoreAsync(ct).ConfigureAwait(false);
+    }
+
+    private async Task<IMongoCollection<TEntity>> GetCollectionCoreAsync(CancellationToken ct)
     {
         var desired = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         if (_collection is not null && string.Equals(desired, _collectionName, StringComparison.Ordinal))
@@ -112,63 +179,131 @@ internal sealed class MongoRepository<TEntity, TKey> :
         var database = await _provider.GetDatabaseAsync(ct).ConfigureAwait(false);
         _collection = database.GetCollection<TEntity>(desired);
         _collectionName = desired;
-        CreateIndexesIfNeeded(_collection);
         return _collection;
     }
 
-    private void CreateIndexesIfNeeded(IMongoCollection<TEntity> collection)
+    private static SemaphoreSlim GetSchemaLock(string key)
+        => _schemaLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+
+    private string BuildServerKey()
     {
-        if (!IndexesInitialized.TryAdd(typeof(TEntity), true))
+        var options = _options.CurrentValue;
+        if (string.IsNullOrWhiteSpace(options.ConnectionString))
         {
+            return $"(inproc)|{options.Database ?? string.Empty}";
+        }
+        try
+        {
+            var url = new MongoUrl(options.ConnectionString);
+            var servers = url.Servers
+                .Select(s => $"{s.Host}:{s.Port}")
+                .OrderBy(s => s, StringComparer.Ordinal)
+                .ToArray();
+            var hostSegment = servers.Length != 0 ? string.Join(',', servers) : url.Url;
+            var database = !string.IsNullOrWhiteSpace(url.DatabaseName)
+                ? url.DatabaseName
+                : options.Database ?? string.Empty;
+            return $"{hostSegment}|{database}";
+        }
+        catch
+        {
+            return $"{options.ConnectionString}|{options.Database}";
+        }
+    }
+
+    private string BuildCollectionKey()
+    {
+        var storage = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        return $"{BuildServerKey()}|{storage}";
+    }
+
+    private string BuildIndexKey(string collectionName)
+        => $"{BuildServerKey()}|{collectionName}|{typeof(TEntity).FullName}";
+
+    private static IReadOnlyList<CreateIndexModel<TEntity>> BuildIndexModels()
+    {
+        var models = new List<CreateIndexModel<TEntity>>();
+
+        var idKeys = Builders<TEntity>.IndexKeys.Ascending(e => e.Id);
+        models.Add(new CreateIndexModel<TEntity>(idKeys, new CreateIndexOptions
+        {
+            Unique = true,
+            Name = "_id_unique"
+        }));
+
+        var indexSpecs = IndexMetadata.GetIndexes(typeof(TEntity));
+        var keysBuilder = Builders<TEntity>.IndexKeys;
+
+        foreach (var idx in indexSpecs)
+        {
+            if (idx.IsPrimaryKey || idx.Properties.Count == 0)
+            {
+                continue;
+            }
+
+            IndexKeysDefinition<TEntity>? keys = null;
+            foreach (var property in idx.Properties)
+            {
+                var field = keysBuilder.Ascending(property.Name);
+                keys = keys is null ? field : keysBuilder.Combine(keys, field);
+            }
+
+            if (keys is null)
+            {
+                continue;
+            }
+
+            var name = !string.IsNullOrWhiteSpace(idx.Name)
+                ? idx.Name!
+                : $"ix_{string.Join("_", idx.Properties.Select(p => p.Name))}";
+
+            models.Add(new CreateIndexModel<TEntity>(keys, new CreateIndexOptions
+            {
+                Name = name,
+                Unique = idx.Unique
+            }));
+        }
+
+        return models;
+    }
+
+    private async Task EnsureIndexesAsync(IMongoCollection<TEntity> collection, CancellationToken ct)
+    {
+        var indexKey = BuildIndexKey(collection.CollectionNamespace.CollectionName);
+        if (_indexCache.TryGetValue(indexKey, out var cached) && cached)
+        {
+            return;
+        }
+
+        var models = BuildIndexModels();
+        if (models.Count == 0)
+        {
+            _indexCache[indexKey] = true;
             return;
         }
 
         try
         {
-            var keys = Builders<TEntity>.IndexKeys.Ascending(x => x.Id);
-            collection.Indexes.CreateOne(new CreateIndexModel<TEntity>(keys, new CreateIndexOptions
-            {
-                Unique = true,
-                Name = "_id_unique"
-            }));
-
-            var indexSpecs = IndexMetadata.GetIndexes(typeof(TEntity));
-            foreach (var idx in indexSpecs)
-            {
-                if (idx.IsPrimaryKey || idx.Properties.Count == 0)
-                {
-                    continue;
-                }
-
-                IndexKeysDefinition<TEntity>? definition = null;
-                foreach (var property in idx.Properties)
-                {
-                    var field = Builders<TEntity>.IndexKeys.Ascending(property.Name);
-                    definition = definition is null ? field : definition.Ascending(property.Name);
-                }
-
-                if (definition is null)
-                {
-                    continue;
-                }
-
-                var name = !string.IsNullOrWhiteSpace(idx.Name)
-                    ? idx.Name!
-                    : $"ix_{string.Join("_", idx.Properties.Select(p => p.Name))}";
-
-                var options = new CreateIndexOptions
-                {
-                    Name = name,
-                    Unique = idx.Unique
-                };
-
-                collection.Indexes.CreateOne(new CreateIndexModel<TEntity>(definition, options));
-            }
+            await collection.Indexes.CreateManyAsync(models, cancellationToken: ct).ConfigureAwait(false);
+            _indexCache[indexKey] = true;
         }
-        catch
+        catch (MongoCommandException ex) when (ex.CodeName is "IndexOptionsConflict" or "IndexKeySpecsConflict" or "IndexAlreadyExists")
         {
-            // Best-effort index creation; failures should not block readiness.
+            _indexCache[indexKey] = true;
         }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "Mongo index ensure failed for collection {Collection}", collection.CollectionNamespace.CollectionName);
+            _indexCache.TryRemove(indexKey, out _);
+        }
+    }
+
+    private static async Task<bool> CollectionExistsAsync(IMongoDatabase database, string collectionName, CancellationToken ct)
+    {
+        var filter = new BsonDocument("name", collectionName);
+        var options = new ListCollectionNamesOptions { Filter = filter };
+        using var cursor = await database.ListCollectionNamesAsync(options, ct).ConfigureAwait(false);
+        return await cursor.AnyAsync(ct).ConfigureAwait(false);
     }
 
 

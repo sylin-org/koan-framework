@@ -12,6 +12,7 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
+using Koan.Data.Core.Schema;
 using Koan.Data.Core.Optimization;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
@@ -34,7 +35,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     IWriteCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
-    IInstructionExecutor<TEntity>
+    IInstructionExecutor<TEntity>,
+    ISchemaHealthContributor<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -52,6 +54,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly RelationalMaterializationOptions _relOptions;
     private readonly StorageOptimizationInfo _optimizationInfo;
     private static readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
+    private static string BuildCacheKey(SqliteConnection conn, string table)
+        => ($"{conn.DataSource}/{conn.Database}::{table}");
+
+    private void InvalidateHealth(SqliteConnection conn, string table)
+    {
+        try { _healthyCache.TryRemove(BuildCacheKey(conn, table), out _); }
+        catch { }
+    }
 
     // Storage optimization support
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
@@ -85,7 +95,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     // Use central registry so DataSetContext is honored (set-aware names)
     private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
 
-    private IDbConnection Open()
+    private SqliteConnection CreateConnection()
     {
         var cs = _options.ConnectionString;
         try
@@ -104,6 +114,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         catch { /* non-fatal */ }
         var conn = new SqliteConnection(cs);
         conn.Open();
+        return conn;
+    }
+
+    private IDbConnection Open()
+    {
+        var conn = CreateConnection();
         EnsureOrchestrated(conn);
         // Extra barrier: ensure the table and projected columns are visible on this connection
         try
@@ -129,14 +145,36 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return conn;
     }
 
-    private void EnsureOrchestrated(SqliteConnection conn)
+    private Task EnsureOrchestratedAsync(SqliteConnection conn, CancellationToken ct)
     {
         var table = TableName;
-        var cacheKey = ($"{conn.DataSource}/{conn.Database}::{table}");
+        var cacheKey = BuildCacheKey(conn, table);
+        if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy) return Task.CompletedTask;
         _logger.LogDebug($"[EnsureOrchestrated] Called for table: {table} (ds={conn.DataSource})");
-        if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy) return;
         // Singleflight: dedupe in-flight ensure per DataSource::Table
-        Singleflight.RunAsync(cacheKey, ct => EnsureOrchestratedCoreAsync(conn, table, cacheKey, ct)).GetAwaiter().GetResult();
+        return Singleflight.RunAsync(cacheKey, token => EnsureOrchestratedCoreAsync(conn, table, cacheKey, token), ct);
+    }
+
+    private void EnsureOrchestrated(SqliteConnection conn)
+        => EnsureOrchestratedAsync(conn, CancellationToken.None).GetAwaiter().GetResult();
+
+    public async Task EnsureHealthyAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var conn = CreateConnection();
+        await EnsureOrchestratedAsync(conn, ct).ConfigureAwait(false);
+    }
+
+    public void InvalidateHealth()
+    {
+        var suffix = $"::{TableName}";
+        foreach (var key in _healthyCache.Keys)
+        {
+            if (key.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                _healthyCache.TryRemove(key, out _);
+            }
+        }
     }
 
     private async Task EnsureOrchestratedCoreAsync(SqliteConnection conn, string table, string cacheKey, CancellationToken ct)
@@ -428,7 +466,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
             {
                 Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                EnsureOrchestrated((SqliteConnection)conn);
+                var sqliteConn = (SqliteConnection)conn;
+                InvalidateHealth(sqliteConn, TableName);
+                EnsureOrchestrated(sqliteConn);
                 var rows = await conn.QueryAsync(rewritten);
                 return MapRowsToEntities(rows);
             }
@@ -444,7 +484,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
             {
                 Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                EnsureOrchestrated((SqliteConnection)conn);
+                var sqliteConn = (SqliteConnection)conn;
+                InvalidateHealth(sqliteConn, TableName);
+                EnsureOrchestrated(sqliteConn);
                 var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {_defaultPageSize}");
                 return rows.Select(FromRow).ToList();
             }
@@ -471,7 +513,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
             {
                 Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                EnsureOrchestrated((SqliteConnection)conn);
+                var sqliteConn = (SqliteConnection)conn;
+                InvalidateHealth(sqliteConn, TableName);
+                EnsureOrchestrated(sqliteConn);
                 var rows = await conn.QueryAsync(rewritten, parameters);
                 return MapRowsToEntities(rows);
             }
@@ -487,7 +531,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
             {
                 Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                EnsureOrchestrated((SqliteConnection)conn);
+                var sqliteConn = (SqliteConnection)conn;
+                InvalidateHealth(sqliteConn, TableName);
+                EnsureOrchestrated(sqliteConn);
                 var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {_defaultPageSize}", parameters);
                 return rows.Select(FromRow).ToList();
             }
@@ -521,7 +567,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
             {
                 Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                EnsureOrchestrated((SqliteConnection)conn);
+                var sqliteConn = (SqliteConnection)conn;
+                InvalidateHealth(sqliteConn, TableName);
+                EnsureOrchestrated(sqliteConn);
                 var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}");
                 return rows.Select(FromRow).ToList();
             }
@@ -555,7 +603,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
             {
                 Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                EnsureOrchestrated((SqliteConnection)conn);
+                var sqliteConn = (SqliteConnection)conn;
+                InvalidateHealth(sqliteConn, TableName);
+                EnsureOrchestrated(sqliteConn);
                 var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT Id, Json FROM [{TableName}] WHERE " + whereSql + $" LIMIT {limit} OFFSET {offset}", parameters);
                 return rows.Select(FromRow).ToList();
             }
@@ -576,7 +626,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
             Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-            EnsureOrchestrated((SqliteConnection)conn);
+            var sqliteConn = (SqliteConnection)conn;
+            InvalidateHealth(sqliteConn, TableName);
+            EnsureOrchestrated(sqliteConn);
             return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql);
         }
     }
@@ -595,7 +647,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
         {
             Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-            EnsureOrchestrated((SqliteConnection)conn);
+            var sqliteConn = (SqliteConnection)conn;
+            InvalidateHealth(sqliteConn, TableName);
+            EnsureOrchestrated(sqliteConn);
             return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql, parameters);
         }
     }
@@ -630,6 +684,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 if (conn is SqliteConnection sc)
                 {
                     Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                    InvalidateHealth(sc, TableName);
                     EnsureOrchestrated(sc);
                 }
                 await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json }, tx);
@@ -843,7 +898,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     var drop = $"DROP TABLE IF EXISTS \"{TableName}\";";
                     try { await conn.ExecuteAsync(drop); } catch { }
                     // Invalidate health cache so a subsequent operation will re-ensure the schema
-                    try { var cacheKey = ($"{conn.DataSource}/{conn.Database}::{TableName}"); _healthyCache.TryRemove(cacheKey, out _); } catch { }
+                    try { InvalidateHealth(conn, TableName); } catch { }
                     object res = 0; return (TResult)res;
                 }
             case DataInstructions.Clear:
@@ -871,6 +926,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
                     {
                         Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                        InvalidateHealth(conn, TableName);
                         EnsureOrchestrated(conn);
                         var result = await conn.ExecuteScalarAsync(sql, p);
                         return CastScalar<TResult>(result);
@@ -892,6 +948,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
                     {
                         Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                        InvalidateHealth(conn, TableName);
                         EnsureOrchestrated(conn);
                         var affected = await conn.ExecuteAsync(sql, p);
                         object res = affected;
@@ -913,6 +970,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
                     {
                         Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                        InvalidateHealth(conn, TableName);
                         EnsureOrchestrated(conn);
                         var rows = await conn.QueryAsync(sql, p);
                         var list = MapDynamicRows(rows);

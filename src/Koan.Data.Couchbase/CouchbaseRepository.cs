@@ -19,6 +19,7 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Data.Couchbase.Infrastructure;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Schema;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -37,7 +38,8 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     IBulkDelete<TKey>,
     IInstructionExecutor<TEntity>,
     IAdapterReadiness,
-    IAdapterReadinessConfiguration
+    IAdapterReadinessConfiguration,
+    ISchemaHealthContributor<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -117,6 +119,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         {
             _collectionName = desired;
         }
+
         return await _provider.GetCollectionContextAsync(_collectionName, ct).ConfigureAwait(false);
     }
 
@@ -391,10 +394,9 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
         }
 
-        var spec = new CollectionSpec(ctx.ScopeName, ctx.CollectionName);
         try
         {
-            await manager.CreateCollectionAsync(spec).ConfigureAwait(false);
+            await manager.CreateCollectionAsync(ctx.ScopeName, ctx.CollectionName, new CreateCollectionSettings()).ConfigureAwait(false);
             _logger?.LogInformation("Created Couchbase collection: {Collection} in scope {Scope}", ctx.CollectionName, ctx.ScopeName);
 
             // Wait for collection to be ready for N1QL queries
@@ -409,6 +411,19 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
     private static bool IsAlreadyExists(CouchbaseException ex)
         => ex.Context?.Message?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true;
+
+    public async Task EnsureHealthyAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+        var ctx = await _provider.GetCollectionContextAsync(collectionName, ct).ConfigureAwait(false);
+        await EnsureCollectionAsync(ctx, ct).ConfigureAwait(false);
+    }
+
+    public void InvalidateHealth()
+    {
+        // No-op: collection health is verified on demand via the provider.
+    }
 
     private async Task<IReadOnlyList<TEntity>> ExecuteQueryAsync(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, DataQueryOptions? options, CancellationToken ct)
     {
@@ -449,7 +464,8 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         {
             foreach (var parameter in definition.Parameters)
             {
-                queryOptions.Parameter(parameter.Key, parameter.Value);
+                var value = parameter.Value ?? DBNull.Value;
+                queryOptions.Parameter(parameter.Key, value);
             }
         }
 
@@ -655,6 +671,10 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                             var key = GetKey(id);
                             var current = await attempt.GetAsync(ctx.Collection, key).ConfigureAwait(false);
                             var entity = current.ContentAs<TEntity>();
+                            if (entity is null)
+                            {
+                                continue;
+                            }
                             mutate(entity);
                             _repo.PrepareEntityForStorage(entity);
                             await attempt.ReplaceAsync(current, entity).ConfigureAwait(false);

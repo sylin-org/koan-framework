@@ -11,6 +11,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Schema;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Linq.Expressions;
@@ -29,7 +30,8 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     IQueryCapabilities,
     IWriteCapabilities,
     IBulkDelete<TKey>,
-    IInstructionExecutor<TEntity>
+    IInstructionExecutor<TEntity>,
+    ISchemaHealthContributor<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -127,31 +129,104 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         return conn;
     }
 
+    private static string BuildCacheKey(NpgsqlConnection conn, string table)
+    {
+        try
+        {
+            return $"{conn.Host}/{conn.Database}::{table}";
+        }
+        catch
+        {
+            return $"{conn.ConnectionString}::{table}";
+        }
+    }
+
     private void EnsureOrchestrated(NpgsqlConnection conn)
     {
         var table = TableName;
-        var key = $"{conn.Host}/{conn.Database}::{table}";
+        var cacheKey = BuildCacheKey(conn, table);
         try
         {
-            if (_healthyCache.TryGetValue(key, out var healthy) && healthy) return;
-            Singleflight.RunAsync(key, async ct =>
+            EnsureOrchestratedAsync(conn, cacheKey, CancellationToken.None).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // best effort; let downstream operations surface errors if schema is missing
+        }
+    }
+
+    private Task EnsureOrchestratedAsync(NpgsqlConnection conn, string cacheKey, CancellationToken ct)
+    {
+        var table = TableName;
+        if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy)
+        {
+            return Task.CompletedTask;
+        }
+
+        return Singleflight.RunAsync(cacheKey, async runCt =>
+        {
+            if (_healthyCache.TryGetValue(cacheKey, out var cached) && cached)
             {
-                if (_healthyCache.TryGetValue(key, out var healthy2) && healthy2) return;
+                return;
+            }
+
+            try
+            {
                 var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                 var ddl = new PgDdlExecutor(conn, _options.SearchPath);
                 var feats = new PostgresStoreFeatures();
-                var vReport = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
-                var ddlAllowed = vReport.TryGetValue("DdlAllowed", out var da) && da is bool db && db;
-                var tableExists = vReport.TryGetValue("TableExists", out var te) && te is bool tb && tb;
+                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, runCt).ConfigureAwait(false);
+                var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is bool allowed && allowed;
+                var tableExists = report.TryGetValue("TableExists", out var te) && te is bool exists && exists;
                 if (ddlAllowed)
                 {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
-                    _healthyCache[key] = true; return;
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, runCt).ConfigureAwait(false);
+                    _healthyCache[cacheKey] = true;
+                    return;
                 }
-                if (tableExists) { _healthyCache[key] = true; }
-            }).GetAwaiter().GetResult();
+
+                if (tableExists)
+                {
+                    _healthyCache[cacheKey] = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Postgres schema ensure failed for {Table}", table);
+                _healthyCache.TryRemove(cacheKey, out _);
+                throw;
+            }
+        }, ct);
+    }
+
+    public async Task EnsureHealthyAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var table = TableName;
+        await using var conn = new NpgsqlConnection(_options.ConnectionString);
+        await conn.OpenAsync(ct).ConfigureAwait(false);
+        var cacheKey = BuildCacheKey(conn, table);
+        try
+        {
+            await EnsureOrchestratedAsync(conn, cacheKey, ct).ConfigureAwait(false);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Postgres ensure healthy failed for {Table}", table);
+            throw;
+        }
+    }
+
+    public void InvalidateHealth()
+    {
+        var suffix = $"::{TableName}";
+        foreach (var key in _healthyCache.Keys)
+        {
+            if (key.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                _healthyCache.TryRemove(key, out _);
+            }
+        }
     }
 
     private void EnsureTable(NpgsqlConnection conn)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Koan.Data.Abstractions;
 
 namespace Koan.Data.Couchbase;
 

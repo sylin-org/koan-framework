@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Couchbase;
 using Couchbase.KeyValue;
+using Couchbase.Management.Collections;
 using Koan.Core;
 using Koan.Core.Adapters;
 using Microsoft.Extensions.Logging;
@@ -546,8 +547,8 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             }
 
             // Create the collection
-            var spec = new global::Couchbase.Management.Collections.CollectionSpec(scopeName, collectionName);
-            await collectionManager.CreateCollectionAsync(spec).ConfigureAwait(false);
+            var settings = new CreateCollectionSettings();
+            await collectionManager.CreateCollectionAsync(scopeName, collectionName, settings).ConfigureAwait(false);
             _logger?.LogInformation("Created Couchbase collection {ScopeName}.{CollectionName}", scopeName, collectionName);
         }
         catch (global::Couchbase.CouchbaseException ex) when (IsAlreadyExists(ex))

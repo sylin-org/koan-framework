@@ -12,6 +12,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Schema;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Linq.Expressions;
@@ -31,7 +32,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     IWriteCapabilities,
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
-    IInstructionExecutor<TEntity>
+    IInstructionExecutor<TEntity>,
+    ISchemaHealthContributor<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -121,6 +123,9 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         }
     }
 
+    private static string BuildCacheKey(SqlConnection conn, string table)
+        => $"{conn.DataSource}/{conn.Database}::{table}";
+
     private SqlConnection Open()
     {
         var conn = new SqlConnection(_options.ConnectionString);
@@ -135,31 +140,86 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private void EnsureOrchestrated(SqlConnection conn)
     {
         var table = TableName;
-        var key = $"{conn.DataSource}/{conn.Database}::{table}";
-        // Use the shared relational orchestrator to validate and, if allowed, create schema.
+        var cacheKey = BuildCacheKey(conn, table);
         try
         {
-            if (_healthyCache.TryGetValue(key, out var healthy) && healthy) return;
-            Singleflight.RunAsync(key, async ct =>
-            {
-                if (_healthyCache.TryGetValue(key, out var healthy2) && healthy2) return;
-                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                var ddl = new MsSqlDdlExecutor(conn);
-                var feats = new MsSqlStoreFeatures();
-                var vReport = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
-                var ddlAllowed = vReport.TryGetValue("DdlAllowed", out var da) && da is bool db && db;
-                var tableExists = vReport.TryGetValue("TableExists", out var te) && te is bool tb && tb;
-                if (ddlAllowed)
-                {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
-                    _healthyCache[key] = true; return;
-                }
-                if (tableExists) { _healthyCache[key] = true; }
-            }).GetAwaiter().GetResult();
+            EnsureOrchestratedAsync(conn, cacheKey, CancellationToken.None).GetAwaiter().GetResult();
         }
         catch
         {
             // best effort: do not fail repository open if orchestration isn't available; let operations surface errors
+        }
+    }
+
+    private Task EnsureOrchestratedAsync(SqlConnection conn, string cacheKey, CancellationToken ct)
+    {
+        if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy)
+        {
+            return Task.CompletedTask;
+        }
+
+        return Singleflight.RunAsync(cacheKey, async runCt =>
+        {
+            if (_healthyCache.TryGetValue(cacheKey, out var cached) && cached)
+            {
+                return;
+            }
+
+            try
+            {
+                var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
+                var ddl = new MsSqlDdlExecutor(conn);
+                var feats = new MsSqlStoreFeatures();
+                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, runCt).ConfigureAwait(false);
+                var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is bool allowed && allowed;
+                var tableExists = report.TryGetValue("TableExists", out var te) && te is bool exists && exists;
+                if (ddlAllowed)
+                {
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, runCt).ConfigureAwait(false);
+                    _healthyCache[cacheKey] = true;
+                    return;
+                }
+
+                if (tableExists)
+                {
+                    _healthyCache[cacheKey] = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "SQL Server schema ensure failed for {Table}", TableName);
+                _healthyCache.TryRemove(cacheKey, out _);
+                throw;
+            }
+        }, ct);
+    }
+
+    public async Task EnsureHealthyAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        await using var conn = new SqlConnection(_options.ConnectionString);
+        await conn.OpenAsync(ct).ConfigureAwait(false);
+        var cacheKey = BuildCacheKey(conn, TableName);
+        try
+        {
+            await EnsureOrchestratedAsync(conn, cacheKey, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SQL Server ensure healthy failed for {Table}", TableName);
+            throw;
+        }
+    }
+
+    public void InvalidateHealth()
+    {
+        var suffix = $"::{TableName}";
+        foreach (var key in _healthyCache.Keys)
+        {
+            if (key.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                _healthyCache.TryRemove(key, out _);
+            }
         }
     }
 
