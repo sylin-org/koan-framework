@@ -499,22 +499,22 @@ public static class Data<TEntity, TKey>
         return total;
     }
 
-    public static async Task<int> ReplaceSet(
-        string targetSet,
+    public static async Task<int> ReplacePartition(
+        string targetPartition,
         IEnumerable<TEntity> items,
         int batchSize = 500,
         CancellationToken ct = default)
     {
-        await ClearSet(targetSet, ct).ConfigureAwait(false);
+        await ClearPartition(targetPartition, ct).ConfigureAwait(false);
         var total = 0;
         foreach (var chunk in items.Chunk(Math.Max(1, batchSize)))
         {
-            using var _ = WithSet(targetSet);
+            using var _ = WithPartition(targetPartition);
             total += await Repo.UpsertManyAsync(chunk, ct).ConfigureAwait(false);
         }
         return total;
     }
 
     // Fluent builder: Data<TEntity,TKey>.MoveFrom("backup").Where(...).Map(...).Copy().BatchSize(1000).To("root");
-    public static SetMoveBuilder<TEntity, TKey> MoveFrom(string fromSet) => new(fromSet);
+    public static PartitionMoveBuilder<TEntity, TKey> MoveFrom(string fromPartition) => new(fromPartition);
 }

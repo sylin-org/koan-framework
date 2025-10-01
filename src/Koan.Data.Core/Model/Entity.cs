@@ -64,9 +64,9 @@ namespace Koan.Data.Core.Model
         // Static conveniences forward to the data facade without exposing its namespace in domain types
         public static Task<TEntity?> Get(TKey id, CancellationToken ct = default)
             => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, token), ct);
-        // Set-aware variants
-        public static Task<TEntity?> Get(TKey id, string set, CancellationToken ct = default)
-            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, set, token), ct);
+        // Partition-aware variants
+        public static Task<TEntity?> Get(TKey id, string partition, CancellationToken ct = default)
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, partition, token), ct);
 
         public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
             => Data<TEntity, TKey>.All(ct);
@@ -76,8 +76,8 @@ namespace Koan.Data.Core.Model
 
         public static Task<QueryResult<TEntity>> AllWithCount(DataQueryOptions? options = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.AllWithCount(options, ct);
-        public static Task<IReadOnlyList<TEntity>> All(string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.All(set, ct);
+        public static Task<IReadOnlyList<TEntity>> All(string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.All(partition, ct);
         public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
             => Data<TEntity, TKey>.Query(predicate, ct);
 
@@ -95,8 +95,8 @@ namespace Koan.Data.Core.Model
 
         public static Task<QueryResult<TEntity>> QueryWithCount(string query, DataQueryOptions? options = null, CancellationToken ct = default)
             => Data<TEntity, TKey>.QueryWithCount(query, options, ct);
-        public static Task<IReadOnlyList<TEntity>> Query(string query, string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.Query(query, set, ct);
+        public static Task<IReadOnlyList<TEntity>> Query(string query, string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(query, partition, ct);
 
         // Streaming (IAsyncEnumerable)
         public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
@@ -115,10 +115,10 @@ namespace Koan.Data.Core.Model
             => Data<TEntity, TKey>.CountAllAsync(ct);
         public static Task<int> Count(string query, CancellationToken ct = default)
             => Data<TEntity, TKey>.CountAsync(query, ct);
-        public static Task<int> CountAll(string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAllAsync(set, ct);
-        public static Task<int> Count(string query, string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAsync(query, set, ct);
+        public static Task<int> CountAll(string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.CountAllAsync(partition, ct);
+        public static Task<int> Count(string query, string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.CountAsync(query, partition, ct);
 
         public static IBatchSet<TEntity, TKey> Batch() => Data<TEntity, TKey>.Batch();
 
@@ -133,15 +133,15 @@ namespace Koan.Data.Core.Model
                 ct);
         }
 
-        public static Task<TEntity> UpsertAsync(TEntity model, string set, CancellationToken ct = default)
+        public static Task<TEntity> UpsertAsync(TEntity model, string partition, CancellationToken ct = default)
         {
             if (model is null) throw new ArgumentNullException(nameof(model));
-            if (string.IsNullOrWhiteSpace(set)) throw new ArgumentException("Set must be provided.", nameof(set));
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
             return EntityEventExecutor<TEntity, TKey>.ExecuteUpsertAsync(
                 model,
-                (entity, token) => Data<TEntity, TKey>.UpsertAsync(entity, set, token),
-                token => LoadPriorSnapshotAsync(model, token, set),
+                (entity, token) => Data<TEntity, TKey>.UpsertAsync(entity, partition, token),
+                token => LoadPriorSnapshotAsync(model, token, partition),
                 ct);
         }
 
@@ -158,16 +158,16 @@ namespace Koan.Data.Core.Model
                 .ConfigureAwait(false);
         }
 
-        public static async Task<int> UpsertMany(IEnumerable<TEntity> models, string set, CancellationToken ct = default)
+        public static async Task<int> UpsertMany(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
         {
             if (models is null) throw new ArgumentNullException(nameof(models));
-            if (string.IsNullOrWhiteSpace(set)) throw new ArgumentException("Set must be provided.", nameof(set));
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
             var list = models as IReadOnlyList<TEntity> ?? models.ToList();
             return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertManyAsync(
                 list,
-                (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, set, token),
-                (entity, token) => LoadPriorSnapshotAsync(entity, token, set),
+                (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, partition, token),
+                (entity, token) => LoadPriorSnapshotAsync(entity, token, partition),
                 ct)
             .ConfigureAwait(false);
         }
@@ -182,9 +182,9 @@ namespace Koan.Data.Core.Model
 
         public static Task<bool> Remove(TKey id, DataQueryOptions? options, CancellationToken ct = default)
         {
-            if (options?.Set is string set && !string.IsNullOrWhiteSpace(set))
+            if (options?.Partition is string partition && !string.IsNullOrWhiteSpace(partition))
             {
-                return Remove(id, set, ct);
+                return Remove(id, partition, ct);
             }
 
             return Remove(id, ct);
@@ -215,38 +215,38 @@ namespace Koan.Data.Core.Model
 
         public static Task<int> Remove(IEnumerable<TKey> ids, DataQueryOptions? options, CancellationToken ct = default)
         {
-            if (options?.Set is string set && !string.IsNullOrWhiteSpace(set))
+            if (options?.Partition is string partition && !string.IsNullOrWhiteSpace(partition))
             {
-                return Remove(ids, set, ct);
+                return Remove(ids, partition, ct);
             }
 
             return Remove(ids, ct);
         }
 
-        // Set-aware removal helpers
-        public static Task<bool> Remove(TKey id, string set, CancellationToken ct = default)
+        // Partition-aware removal helpers
+        public static Task<bool> Remove(TKey id, string partition, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(set)) throw new ArgumentException("Set must be provided.", nameof(set));
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
             return EntityEventExecutor<TEntity, TKey>.ExecuteRemoveAsync(
                 id,
-                token => Data<TEntity, TKey>.GetAsync(id, set, token),
-                (entity, token) => Data<TEntity, TKey>.DeleteAsync(entity.Id, set, token),
+                token => Data<TEntity, TKey>.GetAsync(id, partition, token),
+                (entity, token) => Data<TEntity, TKey>.DeleteAsync(entity.Id, partition, token),
                 ct);
         }
 
-        public static async Task<int> Remove(IEnumerable<TKey> ids, string set, CancellationToken ct = default)
+        public static async Task<int> Remove(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
         {
             if (ids is null) throw new ArgumentNullException(nameof(ids));
-            if (string.IsNullOrWhiteSpace(set)) throw new ArgumentException("Set must be provided.", nameof(set));
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
 
             var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(list, set, ct).ConfigureAwait(false);
+                return await Data<TEntity, TKey>.DeleteManyAsync(list, partition, ct).ConfigureAwait(false);
             }
 
-            var entities = await LoadEntitiesAsync(list, set, ct).ConfigureAwait(false);
+            var entities = await LoadEntitiesAsync(list, partition, ct).ConfigureAwait(false);
             if (entities.Count == 0)
             {
                 return 0;
@@ -254,12 +254,12 @@ namespace Koan.Data.Core.Model
 
             return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
                     entities,
-                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), set, token),
+                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), partition, token),
                     ct)
                 .ConfigureAwait(false);
         }
 
-        private static ValueTask<TEntity?> LoadPriorSnapshotAsync(TEntity entity, CancellationToken cancellationToken, string? set = null)
+        private static ValueTask<TEntity?> LoadPriorSnapshotAsync(TEntity entity, CancellationToken cancellationToken, string? partition = null)
         {
             if (entity is null) throw new ArgumentNullException(nameof(entity));
 
@@ -269,19 +269,19 @@ namespace Koan.Data.Core.Model
                 return new ValueTask<TEntity?>((TEntity?)null);
             }
 
-            return set is null
+            return partition is null
                 ? new ValueTask<TEntity?>(Data<TEntity, TKey>.GetAsync(key, cancellationToken))
-                : new ValueTask<TEntity?>(Data<TEntity, TKey>.GetAsync(key, set, cancellationToken));
+                : new ValueTask<TEntity?>(Data<TEntity, TKey>.GetAsync(key, partition, cancellationToken));
         }
 
-        private static async Task<IReadOnlyList<TEntity>> LoadEntitiesAsync(IReadOnlyList<TKey> ids, string? set, CancellationToken cancellationToken)
+        private static async Task<IReadOnlyList<TEntity>> LoadEntitiesAsync(IReadOnlyList<TKey> ids, string? partition, CancellationToken cancellationToken)
         {
             var results = new List<TEntity>(ids.Count);
             foreach (var id in ids)
             {
-                var entity = set is null
+                var entity = partition is null
                     ? await Data<TEntity, TKey>.GetAsync(id, cancellationToken).ConfigureAwait(false)
-                    : await Data<TEntity, TKey>.GetAsync(id, set, cancellationToken).ConfigureAwait(false);
+                    : await Data<TEntity, TKey>.GetAsync(id, partition, cancellationToken).ConfigureAwait(false);
 
                 if (entity != null)
                 {
@@ -320,12 +320,12 @@ namespace Koan.Data.Core.Model
                 .ConfigureAwait(false);
         }
 
-        public static async Task<int> Remove(string query, string set, CancellationToken ct = default)
+        public static async Task<int> Remove(string query, string partition, CancellationToken ct = default)
         {
-            var items = await Data<TEntity, TKey>.Query(query, set, ct).ConfigureAwait(false);
+            var items = await Data<TEntity, TKey>.Query(query, partition, ct).ConfigureAwait(false);
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), set, ct).ConfigureAwait(false);
+                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), partition, ct).ConfigureAwait(false);
             }
 
             if (items.Count == 0)
