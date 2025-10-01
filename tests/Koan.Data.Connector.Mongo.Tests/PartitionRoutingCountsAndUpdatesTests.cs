@@ -1,13 +1,15 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Xunit;
 
-namespace Koan.Data.Connector.Sqlite.Tests;
+namespace Koan.Data.Connector.Mongo.Tests;
 
-public class SqliteSetRoutingCountsAndUpdatesTests
+public class PartitionRoutingCountsAndUpdatesTests
 {
     public class Todo : IEntity<string>
     {
@@ -16,84 +18,86 @@ public class SqliteSetRoutingCountsAndUpdatesTests
         public string Title { get; set; } = string.Empty;
     }
 
-    private static IServiceProvider BuildServices(string file)
+    private static IServiceProvider BuildServices()
     {
         var sc = new ServiceCollection();
         var cfg = new ConfigurationBuilder()
             .AddInMemoryCollection(new[] {
-                new KeyValuePair<string,string?>("Koan:Data:Sqlite:ConnectionString", $"Data Source={file}"),
-                new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite")
+                new KeyValuePair<string,string?>("Koan:Data:Mongo:ConnectionString", "mongodb://localhost:27017"),
+                new KeyValuePair<string,string?>("Koan:Data:Mongo:Database", "Koan-test-" + Guid.NewGuid().ToString("n"))
             })
             .Build();
         sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={file}");
         sc.AddKoanDataCore();
-        sc.AddSingleton<IDataService, DataService>();
+        sc.AddMongoAdapter();
+        // Provide naming resolver for StorageNameRegistry
+        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
         return sc.BuildServiceProvider();
     }
 
-    private static string TempFile()
+    private static async Task<bool> EnsureMongoAvailableAsync(IServiceProvider sp)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "Koan-sqlite-set-tests");
-        Directory.CreateDirectory(dir);
-        return Path.Combine(dir, Guid.NewGuid().ToString("n") + ".db");
+        var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MongoOptions>>().Value;
+        try
+        {
+            var client = new MongoClient(opts.ConnectionString);
+            var db = client.GetDatabase(opts.Database);
+            await db.RunCommandAsync((Command<BsonDocument>)new BsonDocument("ping", 1));
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     [Fact]
     public async Task Counts_Clear_Update_Isolation_Across_Sets()
     {
-        var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildServices();
+        if (!await EnsureMongoAvailableAsync(sp)) return; // skip when Mongo isn't available
+
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
-        // Seed different counts per set
-        int rootCount = 3, backupCount = 5;
+        int rootCount = 2, backupCount = 3;
         for (int i = 0; i < rootCount; i++) await repo.UpsertAsync(new Todo { Title = $"root-{i}" });
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             for (int i = 0; i < backupCount; i++) await repo.UpsertAsync(new Todo { Title = $"backup-{i}" });
         }
 
-        // Insert a shared-id record into both sets to verify cross-set update isolation
-        var sharedId = "shared-1";
+        var sharedId = "shared-mongo";
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared" });
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             await repo.UpsertAsync(new Todo { Id = sharedId, Title = "backup-shared" });
         }
 
-        // Verify counts
         (await repo.QueryAsync(null)).Count.Should().Be(rootCount + 1);
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             (await repo.QueryAsync(null)).Count.Should().Be(backupCount + 1);
         }
 
-        // Update shared record only in root
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared-updated" });
-        // Check update is visible in root
         var rootItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
         rootItems.Should().ContainSingle(x => x.Title == "root-shared-updated");
-        // And not in backup
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             var backupItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
             backupItems.Should().ContainSingle(x => x.Title == "backup-shared");
         }
 
-        // Clear backup set
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
-            var allBackup = await repo.QueryAsync(null);
-            await repo.DeleteManyAsync(allBackup.Select(i => i.Id));
+            var all = await repo.QueryAsync(null);
+            await repo.DeleteManyAsync(all.Select(i => i.Id));
             (await repo.QueryAsync(null)).Should().BeEmpty();
         }
 
-        // Root remains populated with expected count
-        (await repo.QueryAsync(null)).Count.Should().Be(rootCount + 1);
-        // And the shared updated record still reflects the update in root
-        var again = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
-        again.Should().ContainSingle(x => x.Title == "root-shared-updated");
+    (await repo.QueryAsync(null)).Count.Should().Be(rootCount + 1);
+        await TestMongoTeardown.DropDatabaseAsync(sp);
     }
 }
+

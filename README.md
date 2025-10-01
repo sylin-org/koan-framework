@@ -3,8 +3,8 @@
 **Try it. Be delighted. Build sophisticated apps with simple patterns.**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/sylin-org/koan-framework/blob/dev/LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/download)
-[![Framework Version](https://img.shields.io/badge/Version-v0.2.18-green.svg)](https://github.com/sylin-org/koan-framework/releases)
+[![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/download)
+[![Framework Version](https://img.shields.io/badge/Version-v0.6.3-green.svg)](https://github.com/sylin-org/koan-framework/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/sylin-org/koan-framework)](https://github.com/sylin-org/koan-framework/stargazers)
 
 > **The .NET framework that makes small teams capable of sophisticated solutions through intelligent automation, AI-native patterns, and elegant scaling.**
@@ -281,7 +281,7 @@ Feedback and contributions help improve the framework.
 
 ## Requirements & Getting Started
 
-- **.NET 9 SDK** or later
+- **.NET 10 SDK** or later
 - **Docker** or **Podman** (for container features)
 - **5 minutes** to get started
 

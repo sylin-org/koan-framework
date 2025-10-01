@@ -46,7 +46,7 @@ public class BackupDiscoveryServiceTests : IClassFixture<BackupTestFixture>
         // Assert
         catalog.Should().NotBeNull();
         catalog.Backups.Should().NotBeEmpty();
-        catalog.TotalCount.Should().BeGreaterOrEqualTo(2);
+        catalog.TotalCount.Should().BeGreaterThanOrEqualTo(2);
         catalog.Stats.Should().NotBeNull();
 
         var backupNames = catalog.Backups.Select(b => b.Name).ToList();
@@ -306,8 +306,8 @@ public class BackupDiscoveryServiceTests : IClassFixture<BackupTestFixture>
 
         // Assert
         stats.Should().NotBeNull();
-        stats.TotalBackups.Should().BeGreaterOrEqualTo(1);
-        stats.TotalSizeBytes.Should().BeGreaterOrEqualTo(0);
+        stats.TotalBackups.Should().BeGreaterThanOrEqualTo(1);
+        stats.TotalSizeBytes.Should().BeGreaterThanOrEqualTo(0);
         stats.BackupsByStatus.Should().NotBeEmpty();
     }
 }

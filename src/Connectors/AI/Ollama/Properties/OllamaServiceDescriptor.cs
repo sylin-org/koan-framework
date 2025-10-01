@@ -15,7 +15,7 @@ namespace Koan.AI.Connector.Ollama;
     {
         "Koan__Ai__AutoDiscoveryEnabled=true",
         "Koan__Ai__AllowDiscoveryInNonDev=true",
-        "Koan_AI_OLLAMA_URLS=http://{serviceId}:{port}"
+        "Koan_AI_OLLAMA_URLS=http://host.docker.internal:{port};http://{serviceId}:{port}"
     },
     HealthEndpoint = "/api/tags",
     HealthIntervalSeconds = 5,

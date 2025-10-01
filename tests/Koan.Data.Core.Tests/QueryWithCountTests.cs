@@ -107,7 +107,7 @@ public class QueryWithCountTests
             return (IDataRepository<TEntity, TKey>)(object)_repository;
         }
 
-        public Direct.IDirectSession Direct(string sourceOrAdapter) => throw new NotImplementedException();
+        public Direct.IDirectSession Direct(string? source = null, string? adapter = null) => throw new NotImplementedException();
 
         public Koan.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
             where TEntity : class, IEntity<TKey>

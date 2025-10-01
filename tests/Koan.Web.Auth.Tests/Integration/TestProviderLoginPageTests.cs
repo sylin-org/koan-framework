@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using System.Threading.Tasks;
 using Xunit;
 using Koan.Web.Auth.Connector.Test.Extensions;
@@ -15,28 +16,28 @@ public class TestProviderLoginPageTests
     [Fact]
     public async Task LoginHtml_IsReachable_And_HasTitle()
     {
-        var builder = new WebHostBuilder()
-            .UseEnvironment("Development")
-            .UseTestServer()
-            .ConfigureServices(s =>
-            {
-                // Reference the TestProvider assembly so its routes are lit up
-                var tp = Assembly.Load("Koan.Web.Auth.Connector.Test");
-                s.AddMvc().AddApplicationPart(tp);
-            })
-            .Configure(app =>
-            {
-                app.UseRouting();
-                app.UseEndpoints(e => e.MapKoanTestProviderEndpoints());
-            });
+        var builder = WebApplication.CreateBuilder();
+        builder.Environment.EnvironmentName = "Development";
+        builder.WebHost.UseTestServer();
 
-        using var server = new TestServer(builder);
-        var client = server.CreateClient();
+        // Reference the TestProvider assembly so its routes are lit up
+        var tp = Assembly.Load("Koan.Web.Auth.Connector.Test");
+        builder.Services.AddMvc().AddApplicationPart(tp);
+
+        var app = builder.Build();
+        app.UseRouting();
+        app.MapKoanTestProviderEndpoints();
+
+        await app.StartAsync();
+
+        var client = app.GetTestClient();
         var resp = await client.GetAsync("/.testoauth/login.html");
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         Assert.StartsWith("text/html", resp.Content.Headers.ContentType?.MediaType);
         var html = await resp.Content.ReadAsStringAsync();
         Assert.Contains("Koan TestProvider - Sign in", html);
+
+        await app.DisposeAsync();
     }
 }
 

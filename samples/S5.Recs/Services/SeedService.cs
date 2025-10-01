@@ -310,7 +310,7 @@ internal sealed class SeedService : ISeedService
 
         try
         {
-            using (DataSetContext.With(null))
+            using (EntityContext.Partition(null))
             {
                 var repo = dataSvc.GetRepository<Media, string>();
                 mediaCount = await repo.CountAsync(query: null, ct);
@@ -323,7 +323,7 @@ internal sealed class SeedService : ISeedService
 
         try
         {
-            using (DataSetContext.With(null))
+            using (EntityContext.Partition(null))
             {
                 if (Vector<Media>.IsAvailable)
                 {

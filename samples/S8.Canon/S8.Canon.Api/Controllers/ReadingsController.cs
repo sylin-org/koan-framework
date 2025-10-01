@@ -18,7 +18,7 @@ public sealed class ReadingsController : ControllerBase
         var items = new List<StageRecord<Reading>>(capacity: size);
 
         // Prefer Keyed stage for stabilized, correlated readings
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed)))
+        using (EntityContext.With(CanonSets.StageShort(CanonSets.Keyed)))
         {
             var page1 = await StageRecord<Reading>.FirstPage(size, ct);
             items.AddRange(page1);
@@ -27,7 +27,7 @@ public sealed class ReadingsController : ControllerBase
         // Fallback to Intake if nothing in Keyed yet
         if (items.Count == 0)
         {
-            using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+            using (EntityContext.With(CanonSets.StageShort(CanonSets.Intake)))
             {
                 var page1 = await StageRecord<Reading>.FirstPage(size, ct);
                 items.AddRange(page1);
@@ -56,7 +56,7 @@ public sealed class ReadingsController : ControllerBase
         if (page < 1) page = 1; if (size < 1) size = 200; if (size > 1000) size = 1000;
         var items = new List<StageRecord<Reading>>(capacity: size);
         // Try Keyed with simple paged scan + filter
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed)))
+        using (EntityContext.With(CanonSets.StageShort(CanonSets.Keyed)))
         {
             var page1 = await StageRecord<Reading>.FirstPage(size, ct);
             foreach (var r in page1)
@@ -65,7 +65,7 @@ public sealed class ReadingsController : ControllerBase
         // Fallback: Intake
         if (items.Count == 0)
         {
-            using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+            using (EntityContext.With(CanonSets.StageShort(CanonSets.Intake)))
             {
                 var page1 = await StageRecord<Reading>.FirstPage(size, ct);
                 foreach (var r in page1)
@@ -75,7 +75,7 @@ public sealed class ReadingsController : ControllerBase
         // Fallback: stream Keyed
         if (items.Count == 0)
         {
-            using (DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed)))
+            using (EntityContext.With(CanonSets.StageShort(CanonSets.Keyed)))
             {
                 var stream = StageRecord<Reading>.AllStream(size, ct);
                 await foreach (var r in stream.WithCancellation(ct))
@@ -128,7 +128,7 @@ public sealed class ReadingsController : ControllerBase
             CorrelationId = reading.SensorId
         };
         var setName = CanonSets.StageShort(CanonSets.Intake);
-        using (DataSetContext.With(setName))
+        using (EntityContext.With(setName))
         {
             await Data<StageRecord<Reading>, string>.UpsertAsync(typed, ct);
         }

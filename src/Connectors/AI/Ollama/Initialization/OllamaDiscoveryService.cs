@@ -57,11 +57,33 @@ internal sealed class OllamaDiscoveryService : IHostedService
                 return;
             }
 
+            // Check if an adapter is already registered (from OllamaOptionsConfigurator)
+            if (HasExistingAdapter())
+            {
+                KoanLog.BootDebug(_logger, LogActions.Discovery, "skip", ("reason", "adapter-already-registered"));
+                return;
+            }
+
             // Get required model for validation
             var defaultModel = GetRequiredModel();
             KoanLog.BootDebug(_logger, LogActions.Discovery, "default-model", ("model", defaultModel ?? "(none)"));
 
-            // Use centralized orchestration-aware service discovery
+            // Check if OllamaOptionsConfigurator already discovered a connection string
+            var ollamaOptions = _sp.GetService<IOptions<OllamaOptions>>()?.Value;
+            if (ollamaOptions != null && !string.IsNullOrWhiteSpace(ollamaOptions.ConnectionString) &&
+                !string.Equals(ollamaOptions.ConnectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                // Use the connection string that was already discovered by OllamaOptionsConfigurator
+                KoanLog.BootInfo(_logger, LogActions.Discovery, "result",
+                    ("method", "OllamaOptionsConfigurator"),
+                    ("url", ollamaOptions.ConnectionString),
+                    ("healthy", "unknown"));
+
+                await RegisterOllamaAdapter(ollamaOptions.ConnectionString, defaultModel, cancellationToken);
+                return;
+            }
+
+            // Fallback: Use centralized orchestration-aware service discovery
             var discoveryOptions = CreateOllamaDiscoveryOptions(defaultModel);
             var result = await _serviceDiscovery.DiscoverServiceAsync("ollama", discoveryOptions, cancellationToken);
 
@@ -130,6 +152,23 @@ internal sealed class OllamaDiscoveryService : IHostedService
         {
             KoanLog.BootDebug(_logger, LogActions.Discovery, "configuration-check-error", ("reason", ex.Message));
             KoanLog.BootDebug(_logger, LogActions.Discovery, "configuration-check-detail", ("exception", ex.ToString()));
+            return false;
+        }
+    }
+
+    private bool HasExistingAdapter()
+    {
+        try
+        {
+            var adapters = _registry.All;
+            var ollamaAdapterCount = adapters.Count;
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "existing-adapters",
+                ("count", ollamaAdapterCount));
+            return ollamaAdapterCount > 0;
+        }
+        catch (Exception ex)
+        {
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "adapter-check-error", ("reason", ex.Message));
             return false;
         }
     }

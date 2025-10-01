@@ -101,7 +101,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             ("isOptimized", _optimizationInfo.IsOptimized));
     }
 
-    // Use central registry so DataSetContext is honored (set-aware names)
+    // Use central registry so EntityContext is honored (set-aware names)
     private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
 
     private SqliteConnection CreateConnection()

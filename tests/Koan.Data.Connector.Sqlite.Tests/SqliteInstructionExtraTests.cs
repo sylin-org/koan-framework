@@ -54,7 +54,7 @@ public class SqliteInstructionExtraTests
         (await repo.CountAsync(null)).Should().BeGreaterThan(0);
 
         var cleared = await data.Execute<Todo, int>(new Instruction("data.clear"));
-        cleared.Should().BeGreaterOrEqualTo(1);
+        cleared.Should().BeGreaterThanOrEqualTo(1);
         (await repo.CountAsync(null)).Should().Be(0);
     }
 }

@@ -237,7 +237,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return ModelShortCircuit(context, hookContext);
         }
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
         await _hookPipeline.AfterModelFetchAsync(hookContext, model);
         if (model is null)
@@ -274,7 +274,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         TEntity saved;
         if (!string.IsNullOrWhiteSpace(request.Set))
         {
-            using var _ = DataSetContext.With(request.Set);
+            using var _ = EntityContext.Partition(request.Set);
             saved = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
         }
         else
@@ -314,7 +314,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             await _hookPipeline.BeforeSaveAsync(hookContext, model);
         }
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var upserted = await Data<TEntity, TKey>.UpsertManyAsync(list, context.CancellationToken);
 
         foreach (var model in list)
@@ -336,7 +336,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var hookContext = _hookPipeline.CreateContext(context);
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.GetAsync(request.Id, context.CancellationToken);
         if (model is null)
         {
@@ -364,7 +364,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         var writes = WriteCaps(repo);
         context.Headers["Koan-Write-Capabilities"] = writes.Writes.ToString();
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var deleted = await Data<TEntity, TKey>.DeleteManyAsync(request.Ids ?? Array.Empty<TKey>(), context.CancellationToken);
         return new EntityEndpointResult(context, new { deleted });
     }
@@ -376,14 +376,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityEndpointResult(request.Context, null, new BadRequestResult());
         }
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var removed = await Entity<TEntity, TKey>.Remove(request.Query!, request.Context.CancellationToken);
         return new EntityEndpointResult(request.Context, new { deleted = removed });
     }
 
     public async Task<EntityEndpointResult> DeleteAllAsync(EntityDeleteAllRequest request)
     {
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var deleted = await Entity<TEntity, TKey>.RemoveAll(request.Context.CancellationToken);
         return new EntityEndpointResult(request.Context, new { deleted });
     }
@@ -398,7 +398,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         await _hookPipeline.BeforePatchAsync(hookContext, request.Id?.ToString() ?? string.Empty, request.Patch);
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var original = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
         if (original is null)
         {
@@ -542,7 +542,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         QueryOptions options,
         CancellationToken cancellationToken)
     {
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
         object? queryPayload = null;
         if (!string.IsNullOrWhiteSpace(request.FilterJson))
@@ -579,7 +579,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         if (!string.IsNullOrWhiteSpace(request.Set))
         {
-            queryOptions = queryOptions.ForSet(request.Set);
+            queryOptions = queryOptions.ForPartition(request.Set);
         }
 
         if (options.Sort.Count > 0)
@@ -607,7 +607,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         QueryOptions options,
         CancellationToken cancellationToken)
     {
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         if (!string.IsNullOrWhiteSpace(request.FilterJson) && repo is ILinqQueryRepository<TEntity, TKey> lrepo)
         {
             if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))

@@ -119,7 +119,7 @@ public sealed class CanonActionHandler
     {
         var dataType = typeof(Data<,>).MakeGenericType(entityType, typeof(string));
         var page = dataType.GetMethod("FirstPage", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
-        using (DataSetContext.With(set))
+        using (EntityContext.Partition(set))
         {
             var t = (Task)page.Invoke(null, new object?[] { 1, ct })!; await t.ConfigureAwait(false);
             var res = GetResult(t);

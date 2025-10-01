@@ -21,12 +21,17 @@ namespace Koan.Data.Connector.Redis;
 public sealed class RedisAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider) => string.Equals(provider, "redis", StringComparison.OrdinalIgnoreCase);
-    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+
+    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
+        IServiceProvider sp,
+        string source = "Default")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
         var opts = sp.GetRequiredService<IOptions<RedisOptions>>();
         var muxer = sp.GetRequiredService<IConnectionMultiplexer>();
+        // Note: Redis connection multiplexer is typically shared; source-specific
+        // connections would require factory-level changes to support multiple IConnectionMultiplexer instances
         return new RedisRepository<TEntity, TKey>(opts, muxer, sp.GetService<ILoggerFactory>());
     }
 }

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -18,7 +18,7 @@
   <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
   <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
   <ProjectReference Include="..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 </Project>

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Recipe;
+using Koan.Recipe.Abstractions;
 using Koan.Core.Modules;
 
 namespace Koan.Recipe.Tests;

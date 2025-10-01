@@ -193,7 +193,7 @@ public class RealBackupRestoreTests : IDisposable
 
         // Assert
         catalog.Should().NotBeNull();
-        catalog.Backups.Should().HaveCountGreaterOrEqualTo(3);
+        catalog.Backups.Should().HaveCountGreaterThanOrEqualTo(3);
 
         var discoveredNames = catalog.Backups.Select(b => b.Name).ToList();
         foreach (var expectedName in backupNames)

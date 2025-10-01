@@ -31,7 +31,7 @@ public sealed class LocationMetricsService : ILocationMetricsService
         var cacheCount = await ResolutionCache.Count(ct);
         var parkedCount = 0;
 
-        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
+        using (EntityContext.With(CanonSets.StageShort(CanonSets.Parked)))
         {
             parkedCount = await ParkedRecord<RawLocation>.Count(ct);
         }

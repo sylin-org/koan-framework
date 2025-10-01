@@ -11,7 +11,7 @@ using Xunit;
 namespace Koan.Data.Core.Tests;
 
 /// <summary>
-/// Tests whether DataSetContext.With("provider") actually switches between providers
+/// Tests whether EntityContext.Partition("provider") actually switches between providers
 /// or just creates logical sets within the same provider
 /// </summary>
 public class CrossProviderDataMovementTests : IDisposable
@@ -68,7 +68,7 @@ public class CrossProviderDataMovementTests : IDisposable
 
         // Save to "json" provider using DataSetContext
         string jsonId;
-        using (var jsonContext = DataSetContext.With("json"))
+        using (var jsonContext = EntityContext.Partition("json"))
         {
             var saved = await Data<TestEntity, string>.UpsertAsync(testEntity);
             jsonId = saved.Id;
@@ -77,7 +77,7 @@ public class CrossProviderDataMovementTests : IDisposable
 
         // Save to "sqlite" provider using DataSetContext
         string sqliteId;
-        using (var sqliteContext = DataSetContext.With("sqlite"))
+        using (var sqliteContext = EntityContext.Partition("sqlite"))
         {
             var saved = await Data<TestEntity, string>.UpsertAsync(testEntity);
             sqliteId = saved.Id;
@@ -85,7 +85,7 @@ public class CrossProviderDataMovementTests : IDisposable
         }
 
         // Verify data exists in JSON context
-        using (var jsonContext = DataSetContext.With("json"))
+        using (var jsonContext = EntityContext.Partition("json"))
         {
             var jsonData = await Data<TestEntity, string>.All();
             jsonData.Should().ContainSingle();
@@ -93,7 +93,7 @@ public class CrossProviderDataMovementTests : IDisposable
         }
 
         // Verify data exists in SQLite context
-        using (var sqliteContext = DataSetContext.With("sqlite"))
+        using (var sqliteContext = EntityContext.Partition("sqlite"))
         {
             var sqliteData = await Data<TestEntity, string>.All();
             sqliteData.Should().ContainSingle();

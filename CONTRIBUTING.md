@@ -14,7 +14,7 @@ Quick checklist:
 
 ## Local setup
 
-- .NET 9 SDK
+- .NET 10 SDK
 - Run: `dotnet build` then `dotnet test` (solution or project-level).
 
 ## Code style

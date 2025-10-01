@@ -38,7 +38,7 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
         var json = System.Text.Json.JsonSerializer.Serialize(current);
         var clone = System.Text.Json.JsonSerializer.Deserialize<TEntity>(json)!;
         SetEntityId(clone, snapshotId);
-        using var _ = Data<TEntity, string>.WithSet(AuditSet);
+        using var _ = Data<TEntity, string>.WithPartition(AuditSet);
         await Data<TEntity, string>.UpsertAsync(clone, ct);
         return NoContent();
     }
@@ -58,7 +58,7 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
     [HttpGet("{id}/audit")]
     public virtual async Task<ActionResult<IReadOnlyList<TEntity>>> ListSnapshots([FromRoute] string id, CancellationToken ct)
     {
-        using var _ = Data<TEntity, string>.WithSet(AuditSet);
+        using var _ = Data<TEntity, string>.WithPartition(AuditSet);
         var all = await Data<TEntity, string>.All(ct);
         var prefix = id + "#v";
         var items = all.Where(e => (e.Id ?? string.Empty).StartsWith(prefix, StringComparison.Ordinal)).ToList();
@@ -86,13 +86,13 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
     {
         if (body is null) return BadRequest(new { error = "body is required" });
         var snapshotId = ComposeSnapshotId(id, body.Version);
-        using var _ = Data<TEntity, string>.WithSet(AuditSet);
+        using var _ = Data<TEntity, string>.WithPartition(AuditSet);
         var snapshot = await Data<TEntity, string>.GetAsync(snapshotId, ct);
         if (snapshot is null) return NotFound();
         SetEntityId(snapshot, id);
         if (!string.IsNullOrWhiteSpace(body.TargetSet))
         {
-            using var _t = Data<TEntity, string>.WithSet(body.TargetSet);
+            using var _t = Data<TEntity, string>.WithPartition(body.TargetSet);
             await Data<TEntity, string>.UpsertAsync(snapshot, ct);
         }
         else
@@ -112,7 +112,7 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
 
     protected virtual async Task<int> GetNextVersion(string id, CancellationToken ct)
     {
-        using var _ = Data<TEntity, string>.WithSet(AuditSet);
+        using var _ = Data<TEntity, string>.WithPartition(AuditSet);
         var all = await Data<TEntity, string>.All(ct);
         var prefix = id + "#v";
         var max = 0;

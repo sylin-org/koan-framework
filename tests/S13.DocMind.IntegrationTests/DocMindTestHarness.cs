@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using S13.DocMind.Contracts;
 using S13.DocMind.Infrastructure;
 using S13.DocMind.Models;
 using S13.DocMind.Services;
@@ -134,7 +135,7 @@ public sealed class DocMindTestHarness : IAsyncDisposable
     }
 }
 
-internal sealed class FakeDocumentStorage : IDocumentStorage
+public sealed class FakeDocumentStorage : IDocumentStorage
 {
     private readonly string _storageRoot;
     private readonly ConcurrentDictionary<string, string> _paths = new(StringComparer.OrdinalIgnoreCase);
@@ -248,7 +249,7 @@ internal sealed class FakeVisionInsightService : IVisionInsightService
         => Task.FromResult<VisionInsightResult?>(null);
 }
 
-internal sealed class FakeInsightSynthesisService : IInsightSynthesisService
+public sealed class FakeInsightSynthesisService : IInsightSynthesisService
 {
     public Task<InsightSynthesisResult> GenerateAsync(SourceDocument document, DocumentExtractionResult extraction, IReadOnlyList<DocumentChunk> chunks, CancellationToken cancellationToken)
     {
@@ -284,9 +285,31 @@ internal sealed class FakeInsightSynthesisService : IInsightSynthesisService
 
         return Task.FromResult(new InsightSynthesisResult(new[] { insight }, metrics, context, 12, 6));
     }
+
+    public Task<ManualAnalysisSynthesisResult> GenerateManualSessionAsync(ManualAnalysisSession session, SemanticTypeProfile? profile, IReadOnlyList<SourceDocument> documents, CancellationToken cancellationToken)
+    {
+        var synthesis = new ManualAnalysisSynthesis
+        {
+            SessionId = Guid.Parse(session.Id),
+            Findings = "Fake harness findings",
+            Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["mode"] = "harness"
+            }
+        };
+
+        var runTelemetry = new ManualAnalysisRun
+        {
+            SessionId = Guid.Parse(session.Id),
+            Status = "completed",
+            DurationMs = 100
+        };
+
+        return Task.FromResult(new ManualAnalysisSynthesisResult(synthesis, runTelemetry));
+    }
 }
 
-internal sealed class FakeTemplateSuggestionService : ITemplateSuggestionService
+public sealed class FakeTemplateSuggestionService : ITemplateSuggestionService
 {
     public Task<SemanticTypeProfile> GenerateAsync(TemplateGenerationRequest request, CancellationToken cancellationToken)
         => Task.FromResult(new SemanticTypeProfile());
@@ -313,7 +336,7 @@ internal sealed class FakeTemplateSuggestionService : ITemplateSuggestionService
     }
 }
 
-internal sealed class FakeDiscoveryRefreshScheduler : IDocumentDiscoveryRefreshScheduler
+public sealed class FakeDiscoveryRefreshScheduler : IDocumentDiscoveryRefreshScheduler
 {
     private int _refreshCount;
 

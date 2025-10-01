@@ -1,12 +1,12 @@
 # S10.DevPortal Dockerfile - Multi-stage build for efficient container size
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 EXPOSE 5090
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chmod 755 /app/data
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
 WORKDIR /src
 
 # Copy project files first for better layer caching

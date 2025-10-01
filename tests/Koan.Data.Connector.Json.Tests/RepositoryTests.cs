@@ -132,7 +132,7 @@ public class RepositoryTests
         root!.Title.Should().Be("root");
 
         // Backup set should hold the alternate value
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             var backup = await repo.GetAsync(id);
             backup!.Title.Should().Be("backup");
@@ -210,7 +210,7 @@ public class RepositoryTests
         // Seed different counts per set
         int rootCount = 2, backupCount = 4;
         for (int i = 0; i < rootCount; i++) await repo.UpsertAsync(new Todo { Title = $"root-{i}" });
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             for (int i = 0; i < backupCount; i++) await repo.UpsertAsync(new Todo { Title = $"backup-{i}" });
         }
@@ -218,14 +218,14 @@ public class RepositoryTests
         // Insert a shared-id record into both sets
         var sharedId = "shared-json";
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared" });
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             await repo.UpsertAsync(new Todo { Id = sharedId, Title = "backup-shared" });
         }
 
     // Verify totals via CountAsync (QueryAsync applies default paging guardrail)
     (await repo.CountAsync(null)).Should().Be(rootCount + 1);
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             (await repo.CountAsync(null)).Should().Be(backupCount + 1);
         }
@@ -234,14 +234,14 @@ public class RepositoryTests
         await repo.UpsertAsync(new Todo { Id = sharedId, Title = "root-shared-updated" });
         var rootItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
         rootItems.Should().ContainSingle(x => x.Title == "root-shared-updated");
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             var backupItems = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Id == sharedId);
             backupItems.Should().ContainSingle(x => x.Title == "backup-shared");
         }
 
         // Clear backup set using adapter fast-path DeleteAllAsync
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             await repo.DeleteAllAsync();
             (await repo.CountAsync(null)).Should().Be(0);

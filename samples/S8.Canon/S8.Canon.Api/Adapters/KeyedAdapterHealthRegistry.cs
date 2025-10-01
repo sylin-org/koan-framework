@@ -15,7 +15,7 @@ internal sealed class KeyedAdapterHealthRegistry : IAdapterHealthRegistry
             IReadOnlyList<StageRecord<Reading>> list;
             // Inspect up to 500 recent Reading records using a synchronous async-enumerator loop
             var buf = new List<StageRecord<Reading>>(capacity: 500);
-            using (DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed)))
+            using (EntityContext.With(CanonSets.StageShort(CanonSets.Keyed)))
             {
                 var e = StageRecord<Reading>.AllStream(batchSize: 200).GetAsyncEnumerator();
                 try
@@ -29,7 +29,7 @@ internal sealed class KeyedAdapterHealthRegistry : IAdapterHealthRegistry
             }
             if (buf.Count == 0)
             {
-                using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+                using (EntityContext.With(CanonSets.StageShort(CanonSets.Intake)))
                 {
                     var e = StageRecord<Reading>.AllStream(batchSize: 200).GetAsyncEnumerator();
                     try

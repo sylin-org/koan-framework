@@ -43,7 +43,7 @@ public sealed class S1SmokeTests
         listResp.StatusCode.Should().Be(HttpStatusCode.OK);
     var body = JToken.Parse(await listResp.Content.ReadAsStringAsync());
     body.Type.Should().Be(JTokenType.Array);
-    ((JArray)body).Count.Should().BeGreaterOrEqualTo(1);
+    ((JArray)body).Count.Should().BeGreaterThanOrEqualTo(1);
     }
 
     [Fact]

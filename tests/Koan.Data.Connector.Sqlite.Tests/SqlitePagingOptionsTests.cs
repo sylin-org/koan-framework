@@ -44,7 +44,7 @@ public class SqlitePagingOptionsTests
     [Fact]
     public async Task Linq_With_Options_Paginates_And_Caps_By_MaxPageSize()
     {
-        using var _set = DataSetContext.With(Guid.NewGuid().ToString("n"));
+        using var _set = EntityContext.Partition(Guid.NewGuid().ToString("n"));
         var file = TempFile();
         var sp = BuildServices(file, defaultPageSize: 5, maxPageSize: 7);
         var data = sp.GetRequiredService<IDataService>();
@@ -66,7 +66,7 @@ public class SqlitePagingOptionsTests
     [Fact]
     public async Task StringWhere_With_Options_Paginates_And_Caps_By_MaxPageSize()
     {
-        using var _set = DataSetContext.With(Guid.NewGuid().ToString("n"));
+        using var _set = EntityContext.Partition(Guid.NewGuid().ToString("n"));
         var file = TempFile();
         var sp = BuildServices(file, defaultPageSize: 4, maxPageSize: 6);
         var data = sp.GetRequiredService<IDataService>();

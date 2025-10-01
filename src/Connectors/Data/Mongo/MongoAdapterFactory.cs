@@ -1,7 +1,11 @@
+using System;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
 
@@ -21,12 +25,51 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider) => string.Equals(provider, "mongo", StringComparison.OrdinalIgnoreCase) || string.Equals(provider, "mongodb", StringComparison.OrdinalIgnoreCase);
 
-    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp) where TEntity : class, IEntity<TKey> where TKey : notnull
+    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
+        IServiceProvider sp,
+        string source = "Default")
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
     {
-        var provider = sp.GetRequiredService<MongoClientProvider>();
-        var options = sp.GetRequiredService<IOptionsMonitor<MongoOptions>>();
+        var config = sp.GetRequiredService<IConfiguration>();
+        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
+        var baseOptions = sp.GetRequiredService<IOptionsMonitor<MongoOptions>>().CurrentValue;
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
-        return new MongoRepository<TEntity, TKey>(provider, options, resolver, sp);
+
+        // Resolve source-specific connection string
+        // If base options already have a connection (from discovery) and no specific source requested, use it
+        string connectionString;
+        if ((string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
+            && !string.IsNullOrWhiteSpace(baseOptions.ConnectionString))
+        {
+            connectionString = baseOptions.ConnectionString;
+        }
+        else
+        {
+            connectionString = AdapterConnectionResolver.ResolveConnectionString(
+                config,
+                sourceRegistry,
+                "Mongo",
+                source);
+        }
+
+        // Create source-specific options
+        var sourceOptions = new MongoOptions
+        {
+            ConnectionString = connectionString,
+            Database = AdapterConnectionResolver.GetSourceSetting(config, sourceRegistry, "Mongo", source, "Database", baseOptions.Database),
+            DefaultPageSize = baseOptions.DefaultPageSize,
+            MaxPageSize = baseOptions.MaxPageSize,
+            Readiness = baseOptions.Readiness
+        };
+
+        var optionsMonitor = new SimpleOptionsMonitor<MongoOptions>(sourceOptions);
+
+        // Create source-specific client provider with options monitor
+        var logger = sp.GetService<ILogger<MongoClientProvider>>();
+        var clientProvider = new MongoClientProvider(optionsMonitor, logger);
+
+        return new MongoRepository<TEntity, TKey>(clientProvider, optionsMonitor, resolver, sp);
     }
 }
 

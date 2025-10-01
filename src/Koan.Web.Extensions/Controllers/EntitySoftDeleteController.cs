@@ -36,7 +36,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
     [HttpGet("soft-delete/deleted")]
     public virtual async Task<ActionResult<IReadOnlyList<TEntity>>> GetDeleted([FromQuery] int page = 1, [FromQuery] int size = KoanWebConstants.Defaults.DefaultPageSize, CancellationToken ct = default)
     {
-        using var _ = Data<TEntity, TKey>.WithSet(DeletedSet);
+        using var _ = Data<TEntity, TKey>.WithPartition(DeletedSet);
         var items = await Data<TEntity, TKey>.Page(page <= 0 ? 1 : page, size <= 0 ? KoanWebConstants.Defaults.DefaultPageSize : Math.Min(size, KoanWebConstants.Defaults.MaxPageSize), ct);
         try
         {
@@ -71,11 +71,11 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
     {
         var from = string.IsNullOrWhiteSpace(options?.FromSet) ? null : options!.FromSet;
         TEntity? model;
-        if (!string.IsNullOrWhiteSpace(from)) { using var _ = Data<TEntity, TKey>.WithSet(from); model = await Data<TEntity, TKey>.GetAsync(id!, ct); }
+        if (!string.IsNullOrWhiteSpace(from)) { using var _ = Data<TEntity, TKey>.WithPartition(from); model = await Data<TEntity, TKey>.GetAsync(id!, ct); }
         else { model = await Data<TEntity, TKey>.GetAsync(id!, ct); }
         if (model is null) return NotFound();
-        using (var _to = Data<TEntity, TKey>.WithSet(DeletedSet)) { await Data<TEntity, TKey>.UpsertAsync(model, ct); }
-        if (!string.IsNullOrWhiteSpace(from)) { using var _ = Data<TEntity, TKey>.WithSet(from); await Data<TEntity, TKey>.DeleteAsync(id!, ct); }
+        using (var _to = Data<TEntity, TKey>.WithPartition(DeletedSet)) { await Data<TEntity, TKey>.UpsertAsync(model, ct); }
+        if (!string.IsNullOrWhiteSpace(from)) { using var _ = Data<TEntity, TKey>.WithPartition(from); await Data<TEntity, TKey>.DeleteAsync(id!, ct); }
         else { await Data<TEntity, TKey>.DeleteAsync(id!, ct); }
         return NoContent();
     }
@@ -105,7 +105,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
         {
             if (!string.IsNullOrWhiteSpace(from))
             {
-                _ = await Data<TEntity, TKey>.MoveSet(from!, DeletedSet, e => ids.Contains(e.Id), null, 500, ct);
+                _ = await Data<TEntity, TKey>.MovePartition(from!, DeletedSet, e => ids.Contains(e.Id), null, 500, ct);
             }
             else
             {
@@ -117,7 +117,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
                 }
                 if (found.Count > 0)
                 {
-                    using (var _to = Data<TEntity, TKey>.WithSet(DeletedSet))
+                    using (var _to = Data<TEntity, TKey>.WithPartition(DeletedSet))
                     {
                         await Data<TEntity, TKey>.UpsertManyAsync(found, ct);
                     }
@@ -133,12 +133,12 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
             {
                 if (!string.IsNullOrWhiteSpace(from))
                 {
-                    using var _from = Data<TEntity, TKey>.WithSet(from);
+                    using var _from = Data<TEntity, TKey>.WithPartition(from);
                     var items = await Data<TEntity, TKey>.Query(filter!, ct);
                     var idList = items.Select(i => i.Id).ToArray();
                     if (idList.Length > 0)
                     {
-                        _ = await Data<TEntity, TKey>.MoveSet(from!, DeletedSet, e => idList.Contains(e.Id), null, 500, ct);
+                        _ = await Data<TEntity, TKey>.MovePartition(from!, DeletedSet, e => idList.Contains(e.Id), null, 500, ct);
                     }
                     return NoContent();
                 }
@@ -148,7 +148,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
                     var list = items.ToList();
                     if (list.Count > 0)
                     {
-                        using (var _to = Data<TEntity, TKey>.WithSet(DeletedSet))
+                        using (var _to = Data<TEntity, TKey>.WithPartition(DeletedSet))
                         {
                             await Data<TEntity, TKey>.UpsertManyAsync(list, ct);
                         }
@@ -182,12 +182,12 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> Restore([FromRoute] TKey id, [FromBody] RestoreOptions? options, CancellationToken ct)
     {
         var target = string.IsNullOrWhiteSpace(options?.TargetSet) ? null : options!.TargetSet;
-        using var _from = Data<TEntity, TKey>.WithSet(DeletedSet);
+        using var _from = Data<TEntity, TKey>.WithPartition(DeletedSet);
         var model = await Data<TEntity, TKey>.GetAsync(id!, ct);
         if (model is null) return NotFound();
-        if (!string.IsNullOrWhiteSpace(target)) { using var _t = Data<TEntity, TKey>.WithSet(target); await Data<TEntity, TKey>.UpsertAsync(model, ct); }
+        if (!string.IsNullOrWhiteSpace(target)) { using var _t = Data<TEntity, TKey>.WithPartition(target); await Data<TEntity, TKey>.UpsertAsync(model, ct); }
         else { await Data<TEntity, TKey>.UpsertAsync(model, ct); }
-        using var _del = Data<TEntity, TKey>.WithSet(DeletedSet);
+        using var _del = Data<TEntity, TKey>.WithPartition(DeletedSet);
         await Data<TEntity, TKey>.DeleteAsync(id!, ct);
         return NoContent();
     }
@@ -212,7 +212,7 @@ public abstract class EntitySoftDeleteController<TEntity, TKey> : ControllerBase
         var ids = op?.Ids ?? Array.Empty<TKey>();
         var target = (op?.Options as RestoreOptions)?.TargetSet;
         if (ids.Count == 0) return BadRequest(new { error = "ids are required for bulk restore" });
-        _ = await Data<TEntity, TKey>.MoveSet(DeletedSet, string.IsNullOrWhiteSpace(target) ? "" : target!, e => ids.Contains(e.Id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.MovePartition(DeletedSet, string.IsNullOrWhiteSpace(target) ? "" : target!, e => ids.Contains(e.Id), null, 500, ct);
         return StatusCode(204);
     }
 }

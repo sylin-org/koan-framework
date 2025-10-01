@@ -42,7 +42,7 @@ public class LocationController : ControllerBase
     [HttpGet("parked")]
     public async Task<ActionResult<IReadOnlyList<ParkedRecord<RawLocation>>>> GetParked([FromQuery] int pageSize = 25, CancellationToken ct = default)
     {
-        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
+        using (EntityContext.With(CanonSets.StageShort(CanonSets.Parked)))
         {
             var records = await ParkedRecord<RawLocation>.FirstPage(pageSize, ct);
             return Ok(records);

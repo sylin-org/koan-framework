@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Text.Json;
+using S13.DocMind.Models;
 using S13.DocMind.Services;
 
 namespace S13.DocMind.Tools;
@@ -35,20 +36,24 @@ public static class Program
             Console.WriteLine(JsonSerializer.Serialize(config, SerializerOptions));
         });
 
+        var documentOption = new Option<string>("--document", "Document identifier to replay") { IsRequired = true };
+        var stageOption = new Option<string?>("--stage", () => DocumentProcessingStage.ExtractText.ToString(), "Stage to enqueue");
+        var resetOption = new Option<bool>("--reset", "Reset document state before replay");
+
         var replayCommand = new Command("replay", "Replay a document at a specific stage")
         {
             baseOption,
-            new Option<string>("--document", "Document identifier to replay") { IsRequired = true },
-            new Option<string?>("--stage", () => DocumentProcessingStage.ExtractText.ToString(), "Stage to enqueue"),
-            new Option<bool>("--reset", "Reset document state before replay")
+            documentOption,
+            stageOption,
+            resetOption
         };
         replayCommand.SetHandler(async (InvocationContext context) =>
         {
             var cancellationToken = context.GetCancellationToken();
             var baseUrl = ResolveBaseUrl(context.ParseResult.GetValueForOption(baseOption));
-            var document = context.ParseResult.GetValueForOption<string>("--document");
-            var stageRaw = context.ParseResult.GetValueForOption<string?>("--stage");
-            var reset = context.ParseResult.GetValueForOption<bool>("--reset");
+            var document = context.ParseResult.GetValueForOption(documentOption);
+            var stageRaw = context.ParseResult.GetValueForOption(stageOption);
+            var reset = context.ParseResult.GetValueForOption(resetOption);
             var stage = ParseStage(stageRaw);
 
             using var client = new DocMindProcessingClient(baseUrl);
@@ -62,14 +67,20 @@ public static class Program
             Console.WriteLine(JsonSerializer.Serialize(result, SerializerOptions));
         });
 
+        var forceOption = new Option<bool>("--force", "Force a projection rebuild before validation");
+        var staleMinutesOption = new Option<int?>("--stale-minutes", () => 10, "Rebuild if projection is older than N minutes");
+        var includeOverviewOption = new Option<bool>("--include-overview", "Include overview summary in the response");
+        var includeCollectionsOption = new Option<bool>("--include-collections", "Include profile collection summaries");
+        var includeQueueOption = new Option<bool>("--include-queue", "Include queue snapshot entries");
+
         var validateCommand = new Command("validate", "Validate the discovery projection against the current corpus")
         {
             baseOption,
-            new Option<bool>("--force", "Force a projection rebuild before validation"),
-            new Option<int?>("--stale-minutes", () => 10, "Rebuild if projection is older than N minutes"),
-            new Option<bool>("--include-overview", "Include overview summary in the response"),
-            new Option<bool>("--include-collections", "Include profile collection summaries"),
-            new Option<bool>("--include-queue", "Include queue snapshot entries")
+            forceOption,
+            staleMinutesOption,
+            includeOverviewOption,
+            includeCollectionsOption,
+            includeQueueOption
         };
         validateCommand.SetHandler(async (InvocationContext context) =>
         {
@@ -78,11 +89,11 @@ public static class Program
             using var client = new DocMindProcessingClient(baseUrl);
             var request = new DocumentDiscoveryValidationRequest
             {
-                ForceRefresh = context.ParseResult.GetValueForOption<bool>("--force"),
-                RefreshIfOlderThanMinutes = context.ParseResult.GetValueForOption<int?>("--stale-minutes"),
-                IncludeOverview = context.ParseResult.GetValueForOption<bool>("--include-overview"),
-                IncludeCollections = context.ParseResult.GetValueForOption<bool>("--include-collections"),
-                IncludeQueueEntries = context.ParseResult.GetValueForOption<bool>("--include-queue")
+                ForceRefresh = context.ParseResult.GetValueForOption(forceOption),
+                RefreshIfOlderThanMinutes = context.ParseResult.GetValueForOption(staleMinutesOption),
+                IncludeOverview = context.ParseResult.GetValueForOption(includeOverviewOption),
+                IncludeCollections = context.ParseResult.GetValueForOption(includeCollectionsOption),
+                IncludeQueueEntries = context.ParseResult.GetValueForOption(includeQueueOption)
             };
 
             var result = await client.ValidateDiscoveryAsync(request, cancellationToken).ConfigureAwait(false);

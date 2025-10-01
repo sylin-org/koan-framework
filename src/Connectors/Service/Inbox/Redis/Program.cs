@@ -25,7 +25,7 @@ string ResolveEndpoint()
 }
 
 // Optional RabbitMQ announce: reply to discovery pings with our endpoint
-void TryStartAnnouncer()
+async Task TryStartAnnouncerAsync()
 {
     try
     {
@@ -40,16 +40,16 @@ void TryStartAnnouncer()
         var group = cfg["Koan:Messaging:DefaultGroup"] ?? "workers";
         var busCode = cfg["Koan:Messaging:DefaultBus"] ?? "rabbit";
 
-        var factory = new ConnectionFactory { Uri = new Uri(connStr!), DispatchConsumersAsync = true, AutomaticRecoveryEnabled = true, TopologyRecoveryEnabled = true };
-        var connection = factory.CreateConnection("Koan-inbox-redis");
-        var channel = connection.CreateModel();
-        channel.ExchangeDeclare(exchange: exchange, type: "topic", durable: true, autoDelete: false, arguments: null);
-        var queue = channel.QueueDeclare(queue: string.Empty, durable: false, exclusive: true, autoDelete: true, arguments: null).QueueName;
+        var factory = new ConnectionFactory { Uri = new Uri(connStr!), AutomaticRecoveryEnabled = true, TopologyRecoveryEnabled = true };
+        var connection = await factory.CreateConnectionAsync();
+        var channel = await connection.CreateChannelAsync();
+        await channel.ExchangeDeclareAsync(exchange: exchange, type: "topic", durable: true, autoDelete: false, arguments: null);
+        var queue = (await channel.QueueDeclareAsync(queue: string.Empty, durable: false, exclusive: true, autoDelete: true, arguments: null)).QueueName;
         var rk = $"Koan.discovery.ping.{busCode}.{group}";
-        channel.QueueBind(queue: queue, exchange: exchange, routingKey: rk);
+        await channel.QueueBindAsync(queue: queue, exchange: exchange, routingKey: rk);
 
         var consumer = new AsyncEventingBasicConsumer(channel);
-        consumer.Received += async (sender, ea) =>
+        consumer.ReceivedAsync += async (sender, ea) =>
         {
             try
             {
@@ -59,30 +59,29 @@ void TryStartAnnouncer()
                 {
                     var payloadJson = JsonConvert.SerializeObject(new { endpoint = ResolveEndpoint(), kind = "inbox", name = "redis", version = "v1" });
                     var payload = System.Text.Encoding.UTF8.GetBytes(payloadJson);
-                    var props = channel.CreateBasicProperties();
-                    props.CorrelationId = corr;
-                    props.ContentType = "application/json";
-                    channel.BasicPublish(exchange: exchange, routingKey: replyTo!, mandatory: false, basicProperties: props, body: payload);
+                    var props = new BasicProperties
+                    {
+                        CorrelationId = corr,
+                        ContentType = "application/json"
+                    };
+                    await channel.BasicPublishAsync(exchange: exchange, routingKey: replyTo!, mandatory: false, basicProperties: props, body: payload);
                 }
-                channel.BasicAck(ea.DeliveryTag, false);
+                await channel.BasicAckAsync(ea.DeliveryTag, false);
             }
-            catch { try { channel.BasicAck(ea.DeliveryTag, false); } catch { } }
-            await Task.CompletedTask;
+            catch { try { await channel.BasicAckAsync(ea.DeliveryTag, false); } catch { } }
         };
-        channel.BasicConsume(queue: queue, autoAck: false, consumer: consumer);
+        await channel.BasicConsumeAsync(queue: queue, autoAck: false, consumer: consumer);
 
         app.Lifetime.ApplicationStopping.Register(() =>
         {
-            try { channel.Close(); } catch { }
             try { channel.Dispose(); } catch { }
-            try { connection.Close(); } catch { }
             try { connection.Dispose(); } catch { }
         });
     }
     catch { /* swallow in dev */ }
 }
 
-TryStartAnnouncer();
+await TryStartAnnouncerAsync();
 
 app.MapControllers();
 

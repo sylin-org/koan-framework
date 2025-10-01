@@ -4,10 +4,10 @@ domain: core
 title: "Koan Framework documentation"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-09-28
-framework_version: v0.6.2
+last_updated: 2025-10-01
+framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-09-28
+  date_last_tested: 2025-10-01
   status: verified
   scope: docs/index.md
 ---
@@ -106,9 +106,9 @@ var products = await Product.All();  // Works with SQLite, PostgreSQL, MongoDB, 
 
 ## Current Status
 
-- **Version**: v0.2.18 (Early Development)
+- **Version**: v0.6.3 (Early Development)
 - **License**: Apache 2.0
-- **Target Framework**: .NET 9.0
+- **Target Framework**: .NET 10.0
 - **Contributors**: 2 active developers
 
 ## Contributing

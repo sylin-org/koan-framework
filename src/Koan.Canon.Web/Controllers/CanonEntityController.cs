@@ -40,7 +40,7 @@ public class CanonEntityController<TModel> : EntityController<DynamicCanonEntity
         // Prefer scoped set when provided
         if (!string.IsNullOrWhiteSpace(set))
         {
-            using (DataSetContext.With(set))
+            using (EntityContext.Partition(set))
             {
                 var getM = dataType.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) });
                 if (getM is null) return null;
