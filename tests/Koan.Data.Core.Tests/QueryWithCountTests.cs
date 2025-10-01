@@ -95,18 +95,6 @@ public class QueryWithCountTests
             _repository = repository;
         }
 
-        public IDataRepository<TEntity, TKey> Direct<TEntity, TKey>(string? source = null, string? adapter = null)
-            where TEntity : class, IEntity<TKey>
-            where TKey : notnull
-        {
-            if (typeof(TEntity) != typeof(StubEntity))
-            {
-                throw new InvalidOperationException($"Unknown entity {typeof(TEntity).Name}");
-            }
-
-            return (IDataRepository<TEntity, TKey>)_repository;
-        }
-
         public IDataRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
             where TEntity : class, IEntity<TKey>
             where TKey : notnull
@@ -119,7 +107,7 @@ public class QueryWithCountTests
             return (IDataRepository<TEntity, TKey>)(object)_repository;
         }
 
-        public Direct.IDirectSession Direct(string sourceOrAdapter) => throw new NotImplementedException();
+        public Direct.IDirectSession Direct(string? source = null, string? adapter = null) => throw new NotImplementedException();
 
         public Koan.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
             where TEntity : class, IEntity<TKey>

@@ -75,7 +75,7 @@ public class BackgroundResolutionService : BackgroundService
         try
         {
             // Query Canon's native parked collection for locations waiting for address resolution
-            using var context = DataSetContext.With(CanonSets.StageShort(CanonSets.Parked));
+            using var context = EntityContext.Partition(CanonSets.StageShort(CanonSets.Parked));
             var parkedRecords = await Data<ParkedRecord<Models.Location>, string>.FirstPage(100, ct);
             var waitingRecords = parkedRecords.Where(pr => pr.ReasonCode == "WAITING_ADDRESS_RESOLVE").ToList();
 

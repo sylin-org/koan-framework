@@ -393,7 +393,7 @@ public class BackupController : ControllerBase
         {
             Description = request.Description,
             Tags = request.Tags,
-            Set = request.Partition,
+            Partition = request.Partition,
             StorageProfile = request.StorageProfile ?? string.Empty,
             CompressionLevel = request.CompressionLevel,
             VerificationEnabled = request.VerificationEnabled,
