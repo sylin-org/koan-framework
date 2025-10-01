@@ -335,7 +335,7 @@ namespace Koan.Data.Core.Model
 
             return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
                     items,
-                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), set, token),
+                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), partition, token),
                     ct)
                 .ConfigureAwait(false);
         }
