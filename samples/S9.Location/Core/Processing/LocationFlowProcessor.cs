@@ -65,11 +65,11 @@ public sealed class LocationFlowProcessor : BackgroundService
     private async Task ProcessPendingAsync(CancellationToken ct)
     {
         await using var scope = _serviceProvider.CreateAsyncScope();
-        var flowActions = scope.ServiceProvider.GetRequiredService<IFlowActions>();
+        var flowActions = scope.ServiceProvider.GetRequiredService<ICanonActions>();
         var pipeline = scope.ServiceProvider.GetRequiredService<IResolutionPipeline>();
 
         var processed = 0;
-        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
+        using (EntityContext.With(CanonSets.StageShort(CanonSets.Parked)))
         {
             while (!ct.IsCancellationRequested)
             {

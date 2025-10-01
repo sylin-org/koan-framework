@@ -14,8 +14,10 @@
     <!-- Core Koan Framework -->
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data\Koan.Data.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
 
     <!-- Provider Projects - Auto-registered when referenced -->
     <ProjectReference Include="..\..\src\\Connectors\\Data\\MongoDB\Koan.Data.Connector.MongoDB.csproj" />
