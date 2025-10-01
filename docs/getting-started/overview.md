@@ -4,10 +4,10 @@ domain: core
 title: "Koan Getting Started Hub"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-09-28
-framework_version: v0.6.2
+last_updated: 2025-10-01
+framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-09-28
+  date_last_tested: 2025-10-01
   status: verified
   scope: docs/getting-started/overview.md
 nav: true
@@ -17,7 +17,7 @@ nav: true
 
 ## Contract
 
-- **Inputs**: .NET 9 SDK+, a terminal or IDE, and basic familiarity with C# web projects.
+- **Inputs**: .NET 10 SDK+, a terminal or IDE, and basic familiarity with C# web projects.
 - **Outputs**: Running Koan service with REST CRUD, messaging hooks, AI integration options, and pointers for production rollout.
 - **Error Modes**: Missing Koan packages, disabled container runtime (for optional steps), or adapters lacking advertised capabilities.
 - **Success Criteria**: `dotnet run` serves `/api/todos`, events and Flow hooks execute, optional AI endpoints respond once a provider is configured, and you know the next docs to visit.
