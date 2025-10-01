@@ -220,7 +220,7 @@ public class ParentKeyResolutionService : BackgroundService
         var parkedRecordType = typeof(ParkedRecord<>).MakeGenericType(modelType);
         var dataType = typeof(Data<,>).MakeGenericType(parkedRecordType, typeof(string));
 
-        using var context = DataSetContext.With(CanonSets.StageShort(CanonSets.Parked));
+        using var context = EntityContext.Partition(CanonSets.StageShort(CanonSets.Parked));
 
         var pageMethod = dataType.GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static,
             new[] { typeof(int), typeof(CancellationToken) });

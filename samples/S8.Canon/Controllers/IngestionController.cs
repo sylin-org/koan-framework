@@ -34,7 +34,7 @@ public class IngestionController : ControllerBase
             }
         };
 
-        using (DataSetContext.With(Constants.Sets.Intake))
+        using (EntityContext.With(Constants.Sets.Intake))
         {
             await record.Save(ct);
         }
@@ -63,7 +63,7 @@ public class IngestionController : ControllerBase
             }
         };
 
-        using (DataSetContext.With(Constants.Sets.Intake))
+        using (EntityContext.With(Constants.Sets.Intake))
         {
             await record.Save(ct);
         }
@@ -92,7 +92,7 @@ public class IngestionController : ControllerBase
             }
         };
 
-        using (DataSetContext.With(Constants.Sets.Intake))
+        using (EntityContext.With(Constants.Sets.Intake))
         {
             await record.Save(ct);
         }
@@ -117,7 +117,7 @@ public class IngestionController : ControllerBase
                 Data = item.Payload
             };
 
-            using (DataSetContext.With(Constants.Sets.Intake))
+            using (EntityContext.With(Constants.Sets.Intake))
             {
                 await record.Save(ct);
             }

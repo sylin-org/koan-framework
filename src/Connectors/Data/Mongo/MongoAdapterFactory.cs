@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
@@ -42,10 +43,7 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
             "Mongo",
             source);
 
-        // Create source-specific client provider with connection string
-        var clientProvider = new MongoClientProvider(connectionString);
-
-        // Create source-specific options monitor
+        // Create source-specific options
         var sourceOptions = new MongoOptions
         {
             ConnectionString = connectionString,
@@ -55,7 +53,11 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
             Readiness = baseOptions.Readiness
         };
 
-        var optionsMonitor = Microsoft.Extensions.Options.Options.Create(sourceOptions);
+        var optionsMonitor = new SimpleOptionsMonitor<MongoOptions>(sourceOptions);
+
+        // Create source-specific client provider with options monitor
+        var logger = sp.GetService<ILogger<MongoClientProvider>>();
+        var clientProvider = new MongoClientProvider(optionsMonitor, logger);
 
         return new MongoRepository<TEntity, TKey>(clientProvider, optionsMonitor, resolver, sp);
     }

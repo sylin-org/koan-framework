@@ -25,7 +25,7 @@ public sealed class LatestReadingProjector : BackgroundService
             {
                 using var scope = _sp.CreateScope();
                 // Pull a small page of keyed Sensor records and compute latest per ReferenceId
-                using (DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed)))
+                using (EntityContext.With(CanonSets.StageShort(CanonSets.Keyed)))
                 {
                     var page = await StageRecord<Sensor>.FirstPage(500, stoppingToken);
                     if (page.Count > 0)
@@ -50,7 +50,7 @@ public sealed class LatestReadingProjector : BackgroundService
                                     [Keys.Sensor.Code] = payload.TryGetValue(Keys.Sensor.Code, out var code) ? code : string.Empty,
                                 }
                             };
-                            await Data<SensorLatestReading, string>.UpsertAsync(viewDoc, set: CanonSets.ViewShort(ViewName), ct: stoppingToken);
+                            await Data<SensorLatestReading, string>.UpsertAsync(viewDoc, partition: CanonSets.ViewShort(ViewName), ct: stoppingToken);
                         }
                     }
                 }

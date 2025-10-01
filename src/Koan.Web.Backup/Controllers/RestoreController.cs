@@ -242,7 +242,7 @@ public class RestoreController : ControllerBase
     {
         return new GlobalRestoreOptions
         {
-            TargetSet = request.TargetSet,
+            TargetSet = request.TargetPartition,
             StorageProfile = request.StorageProfile ?? string.Empty,
             ReplaceExisting = request.ReplaceExisting,
             DisableConstraints = request.DisableConstraints,
@@ -256,8 +256,8 @@ public class RestoreController : ControllerBase
             MaxConcurrency = request.MaxConcurrency,
             IncludeEntityTypes = request.IncludeEntityTypes,
             ExcludeEntityTypes = request.ExcludeEntityTypes,
-            EntitySetMapping = request.EntitySetMapping,
-            RestoreToOriginalSets = request.RestoreToOriginalSets,
+            EntitySetMapping = request.EntityPartitionMapping,
+            RestoreToOriginalSets = request.RestoreToOriginalPartitions,
             ValidateBeforeRestore = request.ValidateBeforeRestore
         };
     }

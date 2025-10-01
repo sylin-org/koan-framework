@@ -61,7 +61,7 @@ public sealed class ModelsController : ControllerBase
             return Ok(new { page = p, size = s, total, hasNext, items = pageItems });
         }
 
-        using (DataSetContext.With(set))
+        using (EntityContext.Partition(set))
         {
             var pageMethod = entityType.GetMethod("Page", BindingFlags.Public | BindingFlags.Static, new Type[] { typeof(int), typeof(int), typeof(CancellationToken) });
             if (pageMethod is null) return Problem("View entity doesn't expose Page");

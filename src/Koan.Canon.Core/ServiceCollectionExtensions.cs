@@ -185,7 +185,7 @@ public static class ServiceCollectionExtensions
             // Root container should be just the model name (no suffix)
             if (def == typeof(Koan.Canon.Model.DynamicCanonEntity<>)) return modelFull;
 
-            // Stage/View docs (set suffix appended via DataSetContext -> StorageNameRegistry)
+            // Stage/View docs (set suffix appended via EntityContext -> StorageNameRegistry)
             if (def == typeof(Koan.Canon.Model.StageRecord<>)) return modelFull;
             if (def == typeof(Koan.Canon.Model.ParkedRecord<>)) return modelFull;
             if (def == typeof(Koan.Canon.Model.CanonicalProjection<>)) return modelFull;
@@ -250,7 +250,7 @@ public static class ServiceCollectionExtensions
                                 var intakeSet = CanonSets.StageShort(CanonSets.Intake);
                                 var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
                                 var all = new List<object>();
-                                using (DataSetContext.With(keyedSet))
+                                using (EntityContext.Partition(keyedSet))
                                 {
                                     var firstPage = typeof(Data<,>).MakeGenericType(recordType, typeof(string))
                                         .GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
@@ -262,7 +262,7 @@ public static class ServiceCollectionExtensions
                                 }
                                 if (all.Count == 0)
                                 {
-                                    using (DataSetContext.With(intakeSet))
+                                    using (EntityContext.Partition(intakeSet))
                                     {
                                         var firstPage = typeof(Data<,>).MakeGenericType(recordType, typeof(string))
                                             .GetMethod("FirstPage", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(CancellationToken) })!;
@@ -471,7 +471,7 @@ public static class ServiceCollectionExtensions
                                     var monitorTask2 = (Task)m.Invoke(um, new object?[] { modelType, ctx, stoppingToken })!; await monitorTask2.ConfigureAwait(false);
                                 }
                                 // Upsert root entity with flat storage (no Model wrapper) in ROOT scope (no set)
-                                using (DataSetContext.With(null))
+                                using (EntityContext.Partition(null))
                                 {
                                     // For flat root storage, create instance of the actual modelType directly
                                     // This eliminates the Model wrapper for both CanonEntity<T> and DynamicCanonEntity<T>
@@ -605,7 +605,7 @@ public static class ServiceCollectionExtensions
                         var intakeSet = CanonSets.StageShort(CanonSets.Intake);
                         var recordType = typeof(StageRecord<>).MakeGenericType(modelType);
                         List<object> page;
-                        using (DataSetContext.With(intakeSet))
+                        using (EntityContext.Partition(intakeSet))
                         {
                             var dataType = typeof(Data<,>).MakeGenericType(recordType, typeof(string));
                             var pageM = dataType.GetMethod("Page", BindingFlags.Public | BindingFlags.Static, new[] { typeof(int), typeof(int), typeof(CancellationToken) })!;
@@ -629,7 +629,7 @@ public static class ServiceCollectionExtensions
                         if (!hasParentKey && tags.Length == 0) tags = _opts.CurrentValue.AggregationTags ?? Array.Empty<string>();
                         foreach (var rec in page)
                         {
-                            using var _root = DataSetContext.With(null);
+                            using var _root = EntityContext.Partition(null);
                             var dict = ExtractDict(rec.GetType().GetProperty("Data")!.GetValue(rec));
                             if (dict is null || (!hasParentKey && tags.Length == 0))
                             {
@@ -991,7 +991,7 @@ public static class ServiceCollectionExtensions
                 parkedType.GetProperty("Evidence")!.SetValue(parked, evidence);
 
                 var dataType = typeof(Data<,>).MakeGenericType(parkedType, typeof(string));
-                using (DataSetContext.With(CanonSets.StageShort(CanonSets.Parked)))
+                using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Parked)))
                 {
                     await (Task)dataType.GetMethod("UpsertAsync", BindingFlags.Public | BindingFlags.Static, new[] { parkedType, typeof(CancellationToken) })!
                         .Invoke(null, new object?[] { parked, ct })!;

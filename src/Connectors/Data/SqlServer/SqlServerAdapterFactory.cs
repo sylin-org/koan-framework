@@ -52,12 +52,14 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory
             ConnectionString = connectionString,
             DefaultPageSize = baseOpts.DefaultPageSize,
             MaxPageSize = baseOpts.MaxPageSize,
-            CommandTimeoutSeconds = baseOpts.CommandTimeoutSeconds,
-            MaxRetryCount = baseOpts.MaxRetryCount,
-            MaxRetryDelaySeconds = baseOpts.MaxRetryDelaySeconds,
+            JsonCaseInsensitive = baseOpts.JsonCaseInsensitive,
+            JsonWriteIndented = baseOpts.JsonWriteIndented,
+            JsonIgnoreNullValues = baseOpts.JsonIgnoreNullValues,
             DdlPolicy = baseOpts.DdlPolicy,
-            SchemaMatchingMode = baseOpts.SchemaMatchingMode,
+            SchemaMatching = baseOpts.SchemaMatching,
             AllowProductionDdl = baseOpts.AllowProductionDdl,
+            NamingStyle = baseOpts.NamingStyle,
+            Separator = baseOpts.Separator,
             Readiness = baseOpts.Readiness
         };
 

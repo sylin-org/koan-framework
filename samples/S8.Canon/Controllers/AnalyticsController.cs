@@ -23,11 +23,11 @@ public class AnalyticsController : ControllerBase
         // Get typed canonical and lineage views for Device
         CanonicalProjection<Device>? canonicalDoc;
         LineageProjection<Device>? lineageDoc;
-        using (DataSetContext.With(CanonSets.ViewShort(Constants.Views.Canonical)))
+        using (EntityContext.With(CanonSets.ViewShort(Constants.Views.Canonical)))
         {
             canonicalDoc = await Koan.Data.Core.Data<CanonicalProjection<Device>, string>.GetAsync($"{Constants.Views.Canonical}::{referenceId}", ct);
         }
-        using (DataSetContext.With(CanonSets.ViewShort(Constants.Views.Lineage)))
+        using (EntityContext.With(CanonSets.ViewShort(Constants.Views.Lineage)))
         {
             lineageDoc = await Koan.Data.Core.Data<LineageProjection<Device>, string>.GetAsync($"{Constants.Views.Lineage}::{referenceId}", ct);
         }
@@ -76,9 +76,9 @@ public class AnalyticsController : ControllerBase
     {
         CanonicalProjection<Sensor>? canonicalDoc;
         LineageProjection<Sensor>? lineageDoc;
-        using (DataSetContext.With(CanonSets.ViewShort(Constants.Views.Canonical)))
+        using (EntityContext.With(CanonSets.ViewShort(Constants.Views.Canonical)))
         { canonicalDoc = await Koan.Data.Core.Data<CanonicalProjection<Sensor>, string>.GetAsync($"{Constants.Views.Canonical}::{referenceId}", ct); }
-        using (DataSetContext.With(CanonSets.ViewShort(Constants.Views.Lineage)))
+        using (EntityContext.With(CanonSets.ViewShort(Constants.Views.Lineage)))
         { lineageDoc = await Koan.Data.Core.Data<LineageProjection<Sensor>, string>.GetAsync($"{Constants.Views.Lineage}::{referenceId}", ct); }
 
         var refItem = await Koan.Data.Core.Data<ReferenceItem<Sensor>, string>.GetAsync(referenceId, ct);
@@ -117,9 +117,9 @@ public class AnalyticsController : ControllerBase
     // Typed pipeline metrics for Sensor
     IReadOnlyList<StageRecord<Sensor>> intakeRecords;
     IReadOnlyList<StageRecord<Sensor>> keyedRecords;
-    using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+    using (EntityContext.With(CanonSets.StageShort(CanonSets.Intake)))
     { intakeRecords = await StageRecord<Sensor>.All(ct); }
-    using (DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed)))
+    using (EntityContext.With(CanonSets.StageShort(CanonSets.Keyed)))
     { keyedRecords = await StageRecord<Sensor>.All(ct); }
     var rejections = await RejectionReport.All(ct);
     var pendingTasks = await Koan.Data.Core.Data<ProjectionTask<Sensor>, string>.All(ct);

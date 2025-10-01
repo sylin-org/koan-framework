@@ -391,7 +391,7 @@ public sealed class McpEntityRegistryTests
     {
         public bool CanHandle(string provider) => string.Equals(provider, "stub", StringComparison.OrdinalIgnoreCase);
 
-        public Koan.Data.Abstractions.IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp)
+        public Koan.Data.Abstractions.IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
             where TEntity : class, Koan.Data.Abstractions.IEntity<TKey>
             where TKey : notnull
             => throw new NotSupportedException("Repository access is not expected in MCP tests.");

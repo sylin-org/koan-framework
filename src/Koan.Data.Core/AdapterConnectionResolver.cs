@@ -6,7 +6,7 @@ namespace Koan.Data.Core;
 /// <summary>
 /// Helper to resolve connection strings for adapters from sources.
 /// </summary>
-internal static class AdapterConnectionResolver
+public static class AdapterConnectionResolver
 {
     /// <summary>
     /// Resolve connection string for adapter and source combination.

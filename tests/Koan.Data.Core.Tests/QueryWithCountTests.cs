@@ -95,6 +95,18 @@ public class QueryWithCountTests
             _repository = repository;
         }
 
+        public IDataRepository<TEntity, TKey> Direct<TEntity, TKey>(string? source = null, string? adapter = null)
+            where TEntity : class, IEntity<TKey>
+            where TKey : notnull
+        {
+            if (typeof(TEntity) != typeof(StubEntity))
+            {
+                throw new InvalidOperationException($"Unknown entity {typeof(TEntity).Name}");
+            }
+
+            return (IDataRepository<TEntity, TKey>)_repository;
+        }
+
         public IDataRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
             where TEntity : class, IEntity<TKey>
             where TKey : notnull
