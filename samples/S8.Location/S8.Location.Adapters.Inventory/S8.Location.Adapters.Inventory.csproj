@@ -16,7 +16,7 @@
     <ProjectReference Include="..\S8.Location.Core\S8.Location.Core.csproj" />
     
     <!-- Hosting dependencies -->
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
   </ItemGroup>
 
 </Project>

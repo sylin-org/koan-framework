@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Data.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S13.DocMind.Contracts;

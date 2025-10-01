@@ -29,8 +29,8 @@ public class DemoController : ControllerBase
     {
         try
         {
-            // Use DataSetContext for scoped provider switching
-            using var context = DataSetContext.With(provider);
+            // Use EntityContext for scoped provider switching
+            using var context = EntityContext.With(provider);
 
             // Verify provider is working by counting existing records
             var articleCount = (await Article.All()).Count;
@@ -102,7 +102,7 @@ public class DemoController : ControllerBase
             try
             {
                 var start = DateTime.UtcNow;
-                using var context = DataSetContext.With(provider);
+                using var context = EntityContext.With(provider);
 
                 // Simple performance test - count all articles
                 var count = (await Article.All()).Count;

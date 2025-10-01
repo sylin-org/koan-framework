@@ -43,14 +43,14 @@ public sealed class McpEntityRegistryTests
 
         var collectionTool = registration.Tools.Single(t => t.Operation == EntityEndpointOperationKind.Collection);
         var properties = collectionTool.InputSchema["properties"]!.AsObject();
-        properties.Should().ContainKey("filter");
-        properties.Should().ContainKey("page");
-        properties.Should().ContainKey("pageSize");
+        ((IDictionary<string, System.Text.Json.Nodes.JsonNode?>)properties).Should().ContainKey("filter");
+        ((IDictionary<string, System.Text.Json.Nodes.JsonNode?>)properties).Should().ContainKey("page");
+        ((IDictionary<string, System.Text.Json.Nodes.JsonNode?>)properties).Should().ContainKey("pageSize");
 
         var upsertTool = registration.Tools.Single(t => t.Operation == EntityEndpointOperationKind.Upsert);
         var modelSchema = upsertTool.InputSchema["properties"]!["model"]!.AsObject();
         var modelProps = modelSchema["properties"]!.AsObject();
-        modelProps.Should().ContainKey(nameof(TestEntity.Name));
+        ((IDictionary<string, System.Text.Json.Nodes.JsonNode?>)modelProps).Should().ContainKey(nameof(TestEntity.Name));
         modelProps[nameof(TestEntity.Name)]!.AsObject()["description"]!.GetValue<string>().Should().Be("Display name");
         modelProps[nameof(TestEntity.Quantity)]!.AsObject()["description"]!.GetValue<string>().Should().Be("Units available for MCP upserts");
         modelSchema["required"]!.AsArray().Select(n => n!.GetValue<string>()).Should().Contain(nameof(TestEntity.Name));

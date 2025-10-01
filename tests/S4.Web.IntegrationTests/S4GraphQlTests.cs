@@ -59,9 +59,9 @@ public sealed class S4GraphQlTests : IClassFixture<WebApplicationFactory<Program
     var qDoc = JToken.Parse(await qResp.Content.ReadAsStringAsync());
     qDoc["errors"].Should().BeNull();
     var total = (int)qDoc["data"]!["items"]!["totalCount"]!;
-        total.Should().BeGreaterOrEqualTo(1);
+        total.Should().BeGreaterThanOrEqualTo(1);
     var arr = (JArray)qDoc["data"]!["items"]!["items"]!;
-    arr.Count.Should().BeGreaterOrEqualTo(1);
+    arr.Count.Should().BeGreaterThanOrEqualTo(1);
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class S4GraphQlTests : IClassFixture<WebApplicationFactory<Program
     var doc = JToken.Parse(await resp.Content.ReadAsStringAsync());
     doc["errors"].Should().BeNull();
     var data = doc["data"]!["items"]!;
-    ((int)data["totalCount"]!).Should().BeGreaterOrEqualTo(1);
+    ((int)data["totalCount"]!).Should().BeGreaterThanOrEqualTo(1);
     var arr = (JArray)data["items"]!;
     arr.All(e => e!["name"]!.Value<string>()!.Contains("1")).Should().BeTrue();
     }

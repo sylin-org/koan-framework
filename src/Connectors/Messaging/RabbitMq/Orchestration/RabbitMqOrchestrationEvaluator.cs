@@ -95,7 +95,7 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
             var connectionString = BuildRabbitMqConnectionString(hostResult.HostEndpoint!, username, password);
 
             // Try to connect with the configured credentials
-            var isValid = await Task.Run(() => TryRabbitMqConnection(connectionString));
+            var isValid = await TryRabbitMqConnectionAsync(connectionString);
 
             Logger?.LogDebug("[RabbitMQ] Credential validation result: {IsValid}", isValid);
             return isValid;
@@ -174,17 +174,17 @@ public class RabbitMqOrchestrationEvaluator : BaseOrchestrationEvaluator
         }
     }
 
-    private static bool TryRabbitMqConnection(string connectionString)
+    private static async Task<bool> TryRabbitMqConnectionAsync(string connectionString)
     {
         try
         {
             var factory = new ConnectionFactory { Uri = new Uri(connectionString) };
-            using var connection = factory.CreateConnection();
-            using var channel = connection.CreateModel();
+            await using var connection = await factory.CreateConnectionAsync();
+            await using var channel = await connection.CreateChannelAsync();
 
             // Verify we can actually do basic operations
-            channel.ExchangeDeclare("Koan.test", ExchangeType.Direct, durable: false, autoDelete: true);
-            channel.ExchangeDelete("Koan.test");
+            await channel.ExchangeDeclareAsync("Koan.test", ExchangeType.Direct, durable: false, autoDelete: true);
+            await channel.ExchangeDeleteAsync("Koan.test");
 
             return true;
         }

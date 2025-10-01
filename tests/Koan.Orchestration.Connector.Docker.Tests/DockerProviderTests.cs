@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Koan.Orchestration;
+using Koan.Orchestration.Abstractions;
 using Koan.Orchestration.Connector.Docker;
 using Xunit;
 

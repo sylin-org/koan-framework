@@ -225,7 +225,7 @@ public class BackupRestoreIntegrationTests : IClassFixture<BackupTestFixture>
             Take = 100
         });
 
-        importantBackups.Backups.Should().HaveCountGreaterOrEqualTo(2);
+        importantBackups.Backups.Should().HaveCountGreaterThanOrEqualTo(2);
         importantBackups.Backups.Should().OnlyContain(b => b.Tags.Contains("important"));
 
         // 2. Query by entity type
@@ -235,7 +235,7 @@ public class BackupRestoreIntegrationTests : IClassFixture<BackupTestFixture>
             Take = 100
         });
 
-        userBackups.Backups.Should().HaveCountGreaterOrEqualTo(1);
+        userBackups.Backups.Should().HaveCountGreaterThanOrEqualTo(1);
         userBackups.Backups.Should().OnlyContain(b =>
             b.EntityTypes != null && b.EntityTypes.Contains(nameof(TestUser)));
 
@@ -246,7 +246,7 @@ public class BackupRestoreIntegrationTests : IClassFixture<BackupTestFixture>
             Take = 100
         });
 
-        productSearchResults.Backups.Should().HaveCountGreaterOrEqualTo(1);
+        productSearchResults.Backups.Should().HaveCountGreaterThanOrEqualTo(1);
 
         // 4. Query with date range
         var recentBackups = await discoveryService.QueryBackupsAsync(new BackupQuery
@@ -256,7 +256,7 @@ public class BackupRestoreIntegrationTests : IClassFixture<BackupTestFixture>
             Take = 100
         });
 
-        recentBackups.Backups.Should().HaveCountGreaterOrEqualTo(3);
+        recentBackups.Backups.Should().HaveCountGreaterThanOrEqualTo(3);
 
         // 5. Test pagination
         var firstPage = await discoveryService.QueryBackupsAsync(new BackupQuery

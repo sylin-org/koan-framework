@@ -5,6 +5,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Koan.Data.Core;
 using Koan.Recipe;
+using Koan.Recipe.Abstractions;
 using Xunit;
 
 namespace Koan.Recipe.Tests;

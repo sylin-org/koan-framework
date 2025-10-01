@@ -240,7 +240,7 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
 
         manifest.Should().NotBeNull();
         manifest.Status.Should().Be(BackupStatus.Completed);
-        manifest.Entities.Should().HaveCountGreaterOrEqualTo(2, "Should backup at least 2 entity types");
+        manifest.Entities.Should().HaveCountGreaterThanOrEqualTo(2, "Should backup at least 2 entity types");
 
         _output.WriteLine($"Backup completed:");
         _output.WriteLine($"   Name: {manifest.Name}");

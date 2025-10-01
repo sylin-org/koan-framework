@@ -127,16 +127,13 @@ public class RabbitMqProvider : IMessagingProvider
     {
         try
         {
-            await Task.Run(() =>
-            {
-                var factory = new ConnectionFactory { Uri = new Uri(connectionString) };
-                using var connection = factory.CreateConnection();
-                using var channel = connection.CreateModel();
+            var factory = new ConnectionFactory { Uri = new Uri(connectionString) };
+            await using var connection = await factory.CreateConnectionAsync(cancellationToken);
+            await using var channel = await connection.CreateChannelAsync();
 
-                // Verify we can actually do basic operations
-                channel.ExchangeDeclare("Koan.test", ExchangeType.Direct, durable: false, autoDelete: true);
-                channel.ExchangeDelete("Koan.test");
-            }, cancellationToken);
+            // Verify we can actually do basic operations
+            await channel.ExchangeDeclareAsync("Koan.test", ExchangeType.Direct, durable: false, autoDelete: true, cancellationToken: cancellationToken);
+            await channel.ExchangeDeleteAsync("Koan.test", cancellationToken: cancellationToken);
 
             return true;
         }
@@ -184,40 +181,41 @@ internal class RabbitMqBus : IMessageBus
 
     public async Task SendAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
     {
-        await Task.Run(() =>
+        await EnsureConnectionAsync(cancellationToken);
+
+        await using var channel = await _connection!.CreateChannelAsync();
+        var queueName = GetQueueName<T>();
+
+        // Ensure queue exists
+        await channel.QueueDeclareAsync(queueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+
+        // Serialize message
+        var body = JsonSerializer.SerializeToUtf8Bytes(message);
+
+        // Debug: log payload shape and preview
+        var preview = body.Length > 256 ? System.Text.Encoding.UTF8.GetString(body, 0, 256) + "..." : System.Text.Encoding.UTF8.GetString(body);
+        _logger?.LogDebug("[RabbitMQ] Sending payload to {QueueName}: {Preview}", queueName, preview);
+
+        // Send message with persistence for guaranteed delivery
+        var properties = new BasicProperties
         {
-            EnsureConnection();
+            Persistent = true // Ensure message survives broker restarts
+        };
 
-            using var channel = _connection!.CreateModel();
-            var queueName = GetQueueName<T>();
+        await channel.BasicPublishAsync(
+            exchange: "", // Use default exchange for direct routing
+            routingKey: queueName,
+            mandatory: false,
+            basicProperties: properties,
+            body: body,
+            cancellationToken: cancellationToken);
 
-            // Ensure queue exists
-            var queueResult = channel.QueueDeclare(queueName, durable: true, exclusive: false, autoDelete: false);
-
-            // Serialize message
-            var body = JsonSerializer.SerializeToUtf8Bytes(message);
-
-            // Debug: log payload shape and preview
-            var preview = body.Length > 256 ? System.Text.Encoding.UTF8.GetString(body, 0, 256) + "..." : System.Text.Encoding.UTF8.GetString(body);
-            _logger?.LogDebug("[RabbitMQ] Sending payload to {QueueName}: {Preview}", queueName, preview);
-
-            // Send message with persistence for guaranteed delivery
-            var properties = channel.CreateBasicProperties();
-            properties.Persistent = true; // Ensure message survives broker restarts
-
-            channel.BasicPublish(
-                exchange: "", // Use default exchange for direct routing
-                routingKey: queueName,
-                basicProperties: properties,
-                body: body);
-
-            _logger?.LogTrace("[RabbitMQ] Sent {MessageType} to queue {QueueName}", typeof(T).Name, queueName);
-        }, cancellationToken);
+        _logger?.LogTrace("[RabbitMQ] Sent {MessageType} to queue {QueueName}", typeof(T).Name, queueName);
     }
 
     public async Task<IMessageConsumer> CreateConsumerAsync<T>(Func<T, Task> handler, CancellationToken cancellationToken = default) where T : class
     {
-        await Task.Run(() => EnsureConnection(), cancellationToken);
+        await EnsureConnectionAsync(cancellationToken);
 
         var queueName = GetQueueName<T>();
         var consumer = new RabbitMqConsumer(_connection!, queueName, handler, _logger);
@@ -235,7 +233,7 @@ internal class RabbitMqBus : IMessageBus
     {
         try
         {
-            await Task.Run(() => EnsureConnection(), cancellationToken);
+            await EnsureConnectionAsync(cancellationToken);
             return _connection?.IsOpen == true;
         }
         catch
@@ -244,14 +242,13 @@ internal class RabbitMqBus : IMessageBus
         }
     }
 
-    private void EnsureConnection()
+    private async Task EnsureConnectionAsync(CancellationToken cancellationToken = default)
     {
         if (_connection?.IsOpen == true)
             return;
 
         var factory = new ConnectionFactory { Uri = new Uri(_connectionString) };
-        _connection = factory.CreateConnection();
-
+        _connection = await factory.CreateConnectionAsync(cancellationToken);
     }
 
 
@@ -284,8 +281,8 @@ internal class RabbitMqConsumer : IMessageConsumer
     private readonly string _queueName;
     private readonly object _handler;
     private readonly ILogger? _logger;
-    private IModel? _channel;
-    private EventingBasicConsumer? _consumer;
+    private IChannel? _channel;
+    private AsyncEventingBasicConsumer? _consumer;
 
     public RabbitMqConsumer(IConnection connection, string queueName, object handler, ILogger? logger)
     {
@@ -302,24 +299,21 @@ internal class RabbitMqConsumer : IMessageConsumer
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await Task.Run(() =>
+        _channel = await _connection.CreateChannelAsync();
+
+        // Ensure queue exists
+        await _channel.QueueDeclareAsync(_queueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+
+        // Create consumer
+        _consumer = new AsyncEventingBasicConsumer(_channel);
+        _consumer.ReceivedAsync += async (sender, args) =>
         {
-            _channel = _connection.CreateModel();
+            await HandleMessageAsync(sender, args);
+        };
 
-            // Ensure queue exists
-            _channel.QueueDeclare(_queueName, durable: true, exclusive: false, autoDelete: false);
+        await _channel.BasicConsumeAsync(_queueName, autoAck: false, consumer: _consumer, cancellationToken: cancellationToken);
 
-            // Create consumer
-            _consumer = new EventingBasicConsumer(_channel);
-            _consumer.Received += (sender, args) =>
-            {
-                _ = Task.Run(async () => await HandleMessageAsync(sender, args));
-            };
-
-            _channel.BasicConsume(_queueName, autoAck: false, consumer: _consumer);
-
-            _logger?.LogDebug("RabbitMQ consumer started for queue {QueueName}", _queueName);
-        }, cancellationToken);
+        _logger?.LogDebug("RabbitMQ consumer started for queue {QueueName}", _queueName);
     }
 
     private async Task HandleMessageAsync(object? sender, BasicDeliverEventArgs args)
@@ -343,38 +337,40 @@ internal class RabbitMqConsumer : IMessageConsumer
             }
 
             // Acknowledge message
-            _channel!.BasicAck(args.DeliveryTag, multiple: false);
+            await _channel!.BasicAckAsync(args.DeliveryTag, multiple: false);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "[RabbitMQ] Failed to handle message in queue {QueueName}", _queueName);
 
             // Reject message (will go to DLQ if configured)
-            _channel!.BasicNack(args.DeliveryTag, multiple: false, requeue: false);
+            await _channel!.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: false);
         }
     }
 
-    public Task PauseAsync()
+    public async Task PauseAsync()
     {
         if (_channel != null && _consumer != null)
         {
-            _channel.BasicCancel(_consumer.ConsumerTags.FirstOrDefault());
+            var consumerTag = _consumer.ConsumerTags.FirstOrDefault();
+            if (consumerTag != null)
+            {
+                await _channel.BasicCancelAsync(consumerTag);
+            }
         }
-        return Task.CompletedTask;
     }
 
-    public Task ResumeAsync()
+    public async Task ResumeAsync()
     {
         if (_channel != null)
         {
-            _consumer = new EventingBasicConsumer(_channel);
-            _consumer.Received += (sender, args) =>
+            _consumer = new AsyncEventingBasicConsumer(_channel);
+            _consumer.ReceivedAsync += async (sender, args) =>
             {
-                _ = Task.Run(async () => await HandleMessageAsync(sender, args));
+                await HandleMessageAsync(sender, args);
             };
-            _channel.BasicConsume(_queueName, autoAck: false, consumer: _consumer);
+            await _channel.BasicConsumeAsync(_queueName, autoAck: false, consumer: _consumer);
         }
-        return Task.CompletedTask;
     }
 
     public ValueTask DisposeAsync()

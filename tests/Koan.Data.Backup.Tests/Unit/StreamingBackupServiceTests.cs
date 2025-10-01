@@ -45,7 +45,7 @@ public class StreamingBackupServiceTests : IClassFixture<BackupTestFixture>
         var entityInfo = manifest.Entities.First();
         entityInfo.EntityType.Should().Be(nameof(TestUser));
         entityInfo.KeyType.Should().Be(nameof(Guid));
-        entityInfo.ItemCount.Should().BeGreaterOrEqualTo(0);
+        entityInfo.ItemCount.Should().BeGreaterThanOrEqualTo(0);
         entityInfo.ContentHash.Should().NotBeNullOrEmpty();
         entityInfo.StorageFile.Should().NotBeNullOrEmpty();
     }

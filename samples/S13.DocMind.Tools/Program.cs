@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Text.Json;
+using S13.DocMind.Models;
 using S13.DocMind.Services;
 
 namespace S13.DocMind.Tools;
