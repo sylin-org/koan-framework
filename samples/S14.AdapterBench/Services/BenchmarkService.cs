@@ -139,11 +139,11 @@ public class BenchmarkService : IBenchmarkService
 
         overallStopwatch.Stop();
 
-        // Calculate individual provider durations
+        // In parallel mode, all providers run for the same wall-clock time (limited by slowest)
+        // Set each provider's TotalDuration to the overall elapsed time
         foreach (var providerResult in providerResults)
         {
-            providerResult.TotalDuration = TimeSpan.FromMilliseconds(
-                providerResult.Tests.Sum(t => t.Duration.TotalMilliseconds));
+            providerResult.TotalDuration = overallStopwatch.Elapsed;
         }
 
         result.ProviderResults.AddRange(providerResults);
