@@ -63,6 +63,10 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     {
         _http = http;
         _readinessDefaults = readinessDefaults ?? new AdaptersReadinessOptions();
+
+        Logger.LogDebug("Ollama adapter: Constructor called - HttpClient.BaseAddress={BaseAddress}",
+            http.BaseAddress?.ToString() ?? "(null)");
+
         var options = GetOptions<OllamaOptions>();
         var serviceDefault = GetServiceDefaultModel();
         _readiness = (AdapterReadinessConfiguration)(options.Readiness ?? new AdapterReadinessConfiguration());
@@ -73,6 +77,11 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
         _defaultModel = options.DefaultModel ?? serviceDefault ?? "all-minilm";
         _modelManager = new OllamaModelManager(_http, Logger, AdapterId, Type);
+
+        Logger.LogDebug("Ollama adapter: Configuration - BaseUrl={BaseUrl} DefaultModel={DefaultModel}",
+            options.BaseUrl ?? "(null)",
+            _defaultModel);
+
         Logger.LogInformation(
             "Ollama adapter '{AdapterId}' model resolution: options.DefaultModel='{OptionsDefault}', serviceDefault='{ServiceDefault}', final='{Final}'",
             Id,
@@ -341,10 +350,27 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
     protected override async Task InitializeAdapterAsync(CancellationToken cancellationToken = default)
     {
+        Logger.LogDebug("[{AdapterId}] InitializeAdapter: Start - CurrentBaseAddress={CurrentBaseAddress}",
+            AdapterId, _http.BaseAddress?.ToString() ?? "(null)");
+
         var baseUrl = GetConnectionString();
+        Logger.LogDebug("[{AdapterId}] InitializeAdapter: GetConnectionString returned {ConnectionString}",
+            AdapterId, baseUrl ?? "(null)");
+
         if (!string.IsNullOrEmpty(baseUrl) && _http.BaseAddress == null)
         {
             _http.BaseAddress = new Uri(baseUrl);
+            Logger.LogInformation("[{AdapterId}] InitializeAdapter: Set BaseAddress to {BaseUrl}", AdapterId, baseUrl);
+        }
+        else if (!string.IsNullOrEmpty(baseUrl))
+        {
+            Logger.LogDebug("[{AdapterId}] InitializeAdapter: BaseAddress already set to {Existing}, ignoring GetConnectionString result {New}",
+                AdapterId, _http.BaseAddress, baseUrl);
+        }
+        else
+        {
+            Logger.LogDebug("[{AdapterId}] InitializeAdapter: No connection string found, using existing BaseAddress {BaseAddress}",
+                AdapterId, _http.BaseAddress?.ToString() ?? "(null)");
         }
 
         _ = EnsureInitializationStarted();
@@ -352,11 +378,13 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         try
         {
             await WaitForReadinessAsync(ReadinessTimeout, cancellationToken).ConfigureAwait(false);
-            Logger.LogInformation("[{AdapterId}] Ollama connection established", AdapterId);
+            Logger.LogInformation("[{AdapterId}] Ollama connection established - FinalBaseUrl={BaseUrl}",
+                AdapterId, _http.BaseAddress);
         }
         catch (AdapterNotReadyException ex)
         {
-            Logger.LogWarning(ex, "[{AdapterId}] Ollama adapter not ready after initialization (state={State})", AdapterId, ReadinessState);
+            Logger.LogWarning(ex, "[{AdapterId}] Ollama adapter not ready after initialization (state={State}) - BaseUrl={BaseUrl}",
+                AdapterId, ReadinessState, _http.BaseAddress);
         }
     }
 
@@ -492,6 +520,9 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
     private async Task InitializeReadinessAsync()
     {
+        Logger.LogDebug("[{AdapterId}] InitializeReadiness: Starting - BaseUrl={BaseUrl} Timeout={Timeout}",
+            AdapterId, _http.BaseAddress?.ToString() ?? "(null)", ReadinessTimeout);
+
         try
         {
             using var timeoutCts = new CancellationTokenSource();
@@ -501,18 +532,26 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             }
 
             await TestConnectivityAsync(timeoutCts.Token).ConfigureAwait(false);
+            Logger.LogDebug("[{AdapterId}] InitializeReadiness: Connectivity test passed", AdapterId);
+
             var defaultReady = await EnsureDefaultModelAvailabilityAsync(timeoutCts.Token).ConfigureAwait(false);
-            _stateManager.TransitionTo(defaultReady ? AdapterReadinessState.Ready : AdapterReadinessState.Degraded);
+            var newState = defaultReady ? AdapterReadinessState.Ready : AdapterReadinessState.Degraded;
+            _stateManager.TransitionTo(newState);
+
+            Logger.LogInformation("[{AdapterId}] InitializeReadiness: Complete - State={State} BaseUrl={BaseUrl}",
+                AdapterId, newState, _http.BaseAddress);
         }
         catch (OperationCanceledException ex)
         {
             _stateManager.TransitionTo(AdapterReadinessState.Failed);
+            Logger.LogError(ex, "[{AdapterId}] InitializeReadiness: Timed out after {Timeout} - BaseUrl={BaseUrl}",
+                AdapterId, ReadinessTimeout, _http.BaseAddress);
             throw new InvalidOperationException($"Ollama readiness timed out after {ReadinessTimeout}.", ex);
         }
         catch (Exception ex)
         {
             _stateManager.TransitionTo(AdapterReadinessState.Failed);
-            Logger.LogError(ex, "[{AdapterId}] Failed to initialize Ollama readiness", AdapterId);
+            Logger.LogError(ex, "[{AdapterId}] InitializeReadiness: Failed - BaseUrl={BaseUrl}", AdapterId, _http.BaseAddress);
             throw;
         }
     }
@@ -751,8 +790,13 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
     private async Task TestConnectivityAsync(CancellationToken cancellationToken)
     {
+        Logger.LogDebug("[{AdapterId}] TestConnectivity: Testing connection to {BaseUrl}",
+            AdapterId, _http.BaseAddress?.ToString() ?? "(null)");
+
         using var response = await _http.GetAsync("/", cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
+
+        Logger.LogDebug("[{AdapterId}] TestConnectivity: Success - Status={Status}", AdapterId, response.StatusCode);
     }
 
     private async Task WaitForContainerReadiness(CancellationToken cancellationToken)
