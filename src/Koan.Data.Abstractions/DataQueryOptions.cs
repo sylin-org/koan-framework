@@ -38,9 +38,9 @@ public sealed class DataQueryOptions
     public string? Sort { get; init; }
 
     /// <summary>
-    /// Logical set or partition name for repositories that support sharding.
+    /// Logical partition name for repositories that support sharding.
     /// </summary>
-    public string? Set { get; init; }
+    public string? Partition { get; init; }
 
     public bool HasPagination => Page.HasValue && Page.Value > 0 && PageSize.HasValue && PageSize.Value > 0;
 
@@ -61,7 +61,7 @@ public sealed class DataQueryOptions
             PageSize = pageSize,
             Filter = Filter,
             Sort = Sort,
-            Set = Set
+            Partition = Partition
         };
     }
 
@@ -70,7 +70,7 @@ public sealed class DataQueryOptions
         {
             Filter = Filter,
             Sort = Sort,
-            Set = Set
+            Partition = Partition
         };
 
     public DataQueryOptions WithFilter(string? filter)
@@ -80,7 +80,7 @@ public sealed class DataQueryOptions
             PageSize = this.PageSize,
             Filter = filter,
             Sort = this.Sort,
-            Set = this.Set
+            Partition = this.Partition
         };
 
     public DataQueryOptions WithSort(string? sort)
@@ -90,17 +90,17 @@ public sealed class DataQueryOptions
             PageSize = this.PageSize,
             Filter = this.Filter,
             Sort = sort,
-            Set = this.Set
+            Partition = this.Partition
         };
 
-    public DataQueryOptions ForSet(string? set)
+    public DataQueryOptions ForPartition(string? partition)
         => new()
         {
             Page = this.Page,
             PageSize = this.PageSize,
             Filter = this.Filter,
             Sort = this.Sort,
-            Set = set
+            Partition = partition
         };
 }
 

@@ -35,24 +35,24 @@ public static class AggregateExtensions
         where TKey : notnull
         => model.Upsert<TEntity, TKey>(ct);
 
-    // Instance-level convenience: model.Upsert("set") (generic key)
+    // Instance-level convenience: model.Upsert("partition") (generic key)
     /// <summary>
-    /// Insert or update a model into a specific logical set for the aggregate using its configured repository.
-    /// Routes storage to BaseName#&lt;set&gt; via DataSetContext and StorageNameRegistry.
+    /// Insert or update a model into a specific logical partition for the aggregate using its configured repository.
+    /// Routes storage to BaseName#&lt;partition&gt; via EntityContext and StorageNameRegistry.
     /// </summary>
-    public static Task<TEntity> Upsert<TEntity, TKey>(this TEntity model, string set, CancellationToken ct = default)
+    public static Task<TEntity> Upsert<TEntity, TKey>(this TEntity model, string partition, CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => Model.Entity<TEntity, TKey>.UpsertAsync(model, set, ct);
+        => Model.Entity<TEntity, TKey>.UpsertAsync(model, partition, ct);
 
-    // Alias: model.Save("set") -> Upsert("set") (generic key)
+    // Alias: model.Save("partition") -> Upsert("partition") (generic key)
     /// <summary>
-    /// Alias for Upsert into a specific set for generic-key entities.
+    /// Alias for Upsert into a specific partition for generic-key entities.
     /// </summary>
-    public static Task<TEntity> Save<TEntity, TKey>(this TEntity model, string set, CancellationToken ct = default)
+    public static Task<TEntity> Save<TEntity, TKey>(this TEntity model, string partition, CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => model.Upsert<TEntity, TKey>(set, ct);
+        => model.Upsert<TEntity, TKey>(partition, ct);
 
     // Non-generic convenience for the common string key case
     /// <summary>
@@ -70,21 +70,21 @@ public static class AggregateExtensions
         where TEntity : class, IEntity<string>
         => model.Upsert(ct);
 
-    // Non-generic convenience: model.Upsert("set") (string key)
+    // Non-generic convenience: model.Upsert("partition") (string key)
     /// <summary>
-    /// Upsert a string-keyed entity into a specific logical set.
+    /// Upsert a string-keyed entity into a specific logical partition.
     /// </summary>
-    public static Task<TEntity> Upsert<TEntity>(this TEntity model, string set, CancellationToken ct = default)
+    public static Task<TEntity> Upsert<TEntity>(this TEntity model, string partition, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
-        => Model.Entity<TEntity, string>.UpsertAsync(model, set, ct);
+        => Model.Entity<TEntity, string>.UpsertAsync(model, partition, ct);
 
-    // Alias: model.Save("set") -> Upsert("set") (string key)
+    // Alias: model.Save("partition") -> Upsert("partition") (string key)
     /// <summary>
-    /// Save alias for string-keyed entities into a specific set.
+    /// Save alias for string-keyed entities into a specific partition.
     /// </summary>
-    public static Task<TEntity> Save<TEntity>(this TEntity model, string set, CancellationToken ct = default)
+    public static Task<TEntity> Save<TEntity>(this TEntity model, string partition, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
-        => model.Upsert(set, ct);
+        => model.Upsert(partition, ct);
 
     // Return only the identifier after upsert (generic)
     /// <summary>
@@ -186,22 +186,22 @@ public static class AggregateExtensions
         where TEntity : class, IEntity<string>
         => Model.Entity<TEntity, string>.UpsertMany(models, ct);
 
-    // Bulk upsert into a specific set (generic key)
+    // Bulk upsert into a specific partition (generic key)
     /// <summary>
-    /// Bulk upsert into a specific logical set for the aggregate (generic key).
+    /// Bulk upsert into a specific logical partition for the aggregate (generic key).
     /// </summary>
-    public static Task<int> Save<TEntity, TKey>(this IEnumerable<TEntity> models, string set, CancellationToken ct = default)
+    public static Task<int> Save<TEntity, TKey>(this IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => Model.Entity<TEntity, TKey>.UpsertMany(models, set, ct);
+        => Model.Entity<TEntity, TKey>.UpsertMany(models, partition, ct);
 
-    // Bulk upsert into a specific set (string key convenience)
+    // Bulk upsert into a specific partition (string key convenience)
     /// <summary>
-    /// Bulk upsert into a specific logical set (string key convenience).
+    /// Bulk upsert into a specific logical partition (string key convenience).
     /// </summary>
-    public static Task<int> Save<TEntity>(this IEnumerable<TEntity> models, string set, CancellationToken ct = default)
+    public static Task<int> Save<TEntity>(this IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
-        => Model.Entity<TEntity, string>.UpsertMany(models, set, ct);
+        => Model.Entity<TEntity, string>.UpsertMany(models, partition, ct);
 
     // Bulk remove (delete many) by models collection
     /// <summary>
@@ -222,7 +222,7 @@ public static class AggregateExtensions
 
     // Replace all contents with provided models
     /// <summary>
-    /// Replace the entire set with the provided models: delete all then upsert.
+    /// Replace the entire partition with the provided models: delete all then upsert.
     /// Intended for dev/test seeding and idempotent resets; avoid on large datasets.
     /// </summary>
     public static async Task<int> SaveReplacing<TEntity, TKey>(this IEnumerable<TEntity> models, CancellationToken ct = default)
@@ -288,4 +288,4 @@ public static class AggregateExtensions
 
 // Fluent move/copy builder
 
-// Instance-level sugar: model.MoveToSet("target", fromSet: null (ambient), copy: false)
+// Instance-level sugar: model.MoveToPartition("target", fromPartition: null (ambient), copy: false)
