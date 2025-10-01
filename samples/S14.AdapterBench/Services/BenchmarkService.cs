@@ -170,7 +170,7 @@ public class BenchmarkService : IBenchmarkService
         {
             var stopwatch = Stopwatch.StartNew();
 
-            using (DataSetContext.With(provider))
+            using (EntityContext.Adapter(provider))
             {
                 // Create and save entities one at a time
                 for (int i = 0; i < count; i++)
@@ -230,7 +230,7 @@ public class BenchmarkService : IBenchmarkService
             const int batchSize = 500;
             var stopwatch = Stopwatch.StartNew();
 
-            using (DataSetContext.With(provider))
+            using (EntityContext.Adapter(provider))
             {
                 for (int batchStart = 0; batchStart < count; batchStart += batchSize)
                 {
@@ -290,7 +290,7 @@ public class BenchmarkService : IBenchmarkService
             List<string> ids;
 
             // First, get the IDs from the entities we wrote
-            using (DataSetContext.With(provider))
+            using (EntityContext.Adapter(provider))
             {
                 ids = await GetEntityIdsAsync(tier, count);
             }
@@ -303,7 +303,7 @@ public class BenchmarkService : IBenchmarkService
 
             var stopwatch = Stopwatch.StartNew();
 
-            using (DataSetContext.With(provider))
+            using (EntityContext.Adapter(provider))
             {
                 for (int i = 0; i < Math.Min(count, ids.Count); i++)
                 {

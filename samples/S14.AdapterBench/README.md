@@ -44,7 +44,7 @@ Tests each provider independently, one at a time. Shows pure provider performanc
 **Use when:** You want to see individual provider characteristics and capabilities.
 
 ### Parallel Mode
-Simultaneously executes tests across all providers using `DataSetContext.With()`. Demonstrates Koan's multi-provider orchestration capability.
+Simultaneously executes tests across all providers using `EntityContext.Adapter()`. Demonstrates Koan's multi-provider orchestration capability.
 
 **Use when:** You want to understand bottlenecks in multi-provider scenarios or test real-world polyglot persistence patterns.
 
@@ -168,7 +168,7 @@ All provider data is stored in `./data/` for inspection and persistence across r
 ### For Framework Contributors
 - Validate Entity<T> abstraction overhead
 - Identify optimization opportunities
-- Test DataSetContext.With() performance
+- Test EntityContext.Adapter() performance for multi-provider routing
 - Regression detection for framework changes
 
 ## 🔧 Development

@@ -55,8 +55,8 @@ Create a new sample `SX.AdapterBench` (where X = next available sample number) t
 - Result: "Provider X completed in Y seconds"
 
 **Parallel Mode:**
-- Simultaneously write/read from all providers using `DataSetContext.With()`
-- Demonstrates multi-provider orchestration capability
+- Simultaneously write/read from all providers using `EntityContext.Adapter()`
+- Demonstrates multi-provider adapter switching capability
 - Shows bottleneck identification and framework coordination overhead
 - Result: "All providers completed in Y seconds (bottleneck: Provider X)"
 
@@ -147,7 +147,7 @@ Completed: 4,230 / 10,000 writes  |  1,850 writes/sec
 
 ### Framework Validation
 - Proves Entity<T> abstraction doesn't add prohibitive overhead
-- Validates DataSetContext.With() performance for multi-provider scenarios
+- Validates EntityContext.Adapter() performance for multi-provider routing
 - Identifies framework optimization opportunities
 
 ### User Decision Support
@@ -159,7 +159,7 @@ Completed: 4,230 / 10,000 writes  |  1,850 writes/sec
 - Uses Entity<T> exclusively (no manual repository pattern)
 - Leverages auto-registration via KoanAutoRegistrar
 - Demonstrates canonical controller patterns
-- Shows proper use of DataSetContext for provider switching
+- Shows proper use of EntityContext.Adapter() for provider switching
 
 ## Scope
 
