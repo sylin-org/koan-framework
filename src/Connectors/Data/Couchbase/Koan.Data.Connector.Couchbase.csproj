@@ -19,8 +19,8 @@
   <ItemGroup>
     <PackageReference Include="CouchbaseNetClient" Version="3.8.0" />
     <PackageReference Include="Couchbase.Transactions" Version="3.8.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0-rc.1.25451.107" />
   </ItemGroup>
 </Project>
