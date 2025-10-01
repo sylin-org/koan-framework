@@ -22,11 +22,11 @@ public sealed class ViewsController : ControllerBase
         // Ensure we target the correct per-model view set (Canon.views.<view>)
         var set = Koan.Canon.Infrastructure.CanonSets.ViewShort(view);
         // Prefer direct Get by document id to avoid dependency on string query support
-        static async Task<object?> TryGetByIdAsync(Type projectionType, string fullId, string set, CancellationToken ct)
+        static async Task<object?> TryGetByIdAsync(Type projectionType, string fullId, string partition, CancellationToken ct)
         {
             var dataType = typeof(Koan.Data.Core.Data<,>).MakeGenericType(projectionType, typeof(string));
             var getM = dataType.GetMethod("GetAsync", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
-            var t = (Task)getM.Invoke(null, new object?[] { fullId, set, ct })!;
+            var t = (Task)getM.Invoke(null, new object?[] { fullId, partition, ct })!;
             await t.ConfigureAwait(false);
             return t.GetType().GetProperty("Result")!.GetValue(t);
         }
@@ -205,7 +205,7 @@ public sealed class ViewsController : ControllerBase
         return result;
     }
 
-    private static async Task<List<CanonicalProjectionView>> QueryCanonicalAcrossModels(string? q, string set, CancellationToken ct)
+    private static async Task<List<CanonicalProjectionView>> QueryCanonicalAcrossModels(string? q, string partition, CancellationToken ct)
     {
         var acc = new List<CanonicalProjectionView>();
         foreach (var modelType in DiscoverModels())
@@ -216,12 +216,12 @@ public sealed class ViewsController : ControllerBase
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var qM = dataType.GetMethod("Query", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
-                task = (Task)qM.Invoke(null, new object?[] { q!, set, ct })!;
+                task = (Task)qM.Invoke(null, new object?[] { q!, partition, ct })!;
             }
             else
             {
                 var allM = dataType.GetMethod("All", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
-                task = (Task)allM.Invoke(null, new object?[] { set, ct })!;
+                task = (Task)allM.Invoke(null, new object?[] { partition, ct })!;
             }
             await task.ConfigureAwait(false);
             var result = (System.Collections.IEnumerable?)GetTaskResult(task);
@@ -241,7 +241,7 @@ public sealed class ViewsController : ControllerBase
         return acc;
     }
 
-    private static async Task<List<LineageProjectionView>> QueryLineageAcrossModels(string? q, string set, CancellationToken ct)
+    private static async Task<List<LineageProjectionView>> QueryLineageAcrossModels(string? q, string partition, CancellationToken ct)
     {
         var acc = new List<LineageProjectionView>();
         foreach (var modelType in DiscoverModels())
@@ -252,12 +252,12 @@ public sealed class ViewsController : ControllerBase
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var qM = dataType.GetMethod("Query", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
-                task = (Task)qM.Invoke(null, new object?[] { q!, set, ct })!;
+                task = (Task)qM.Invoke(null, new object?[] { q!, partition, ct })!;
             }
             else
             {
                 var allM = dataType.GetMethod("All", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
-                task = (Task)allM.Invoke(null, new object?[] { set, ct })!;
+                task = (Task)allM.Invoke(null, new object?[] { partition, ct })!;
             }
             await task.ConfigureAwait(false);
             var result = (System.Collections.IEnumerable?)GetTaskResult(task);
@@ -286,7 +286,7 @@ public sealed class ViewsController : ControllerBase
     }
 
     // Aggregate arbitrary projection views (ProjectionView<TModel, object>) across all discovered models
-    private static async Task<List<Koan.Canon.Model.ProjectionView<object>>> QueryGenericAcrossModels(string viewName, string? q, string set, CancellationToken ct)
+    private static async Task<List<Koan.Canon.Model.ProjectionView<object>>> QueryGenericAcrossModels(string viewName, string? q, string partition, CancellationToken ct)
     {
         var acc = new List<Koan.Canon.Model.ProjectionView<object>>();
         foreach (var modelType in DiscoverModels())
@@ -297,12 +297,12 @@ public sealed class ViewsController : ControllerBase
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var qM = dataType.GetMethod("Query", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(string), typeof(CancellationToken) })!;
-                task = (Task)qM.Invoke(null, new object?[] { q!, set, ct })!;
+                task = (Task)qM.Invoke(null, new object?[] { q!, partition, ct })!;
             }
             else
             {
                 var allM = dataType.GetMethod("All", BindingFlags.Public | BindingFlags.Static, new[] { typeof(string), typeof(CancellationToken) })!;
-                task = (Task)allM.Invoke(null, new object?[] { set, ct })!;
+                task = (Task)allM.Invoke(null, new object?[] { partition, ct })!;
             }
             await task.ConfigureAwait(false);
             var result = (System.Collections.IEnumerable?)GetTaskResult(task);

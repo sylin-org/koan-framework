@@ -81,7 +81,7 @@ public class StreamingBackupService : IBackupService
                 typeof(TKey).Name,
                 GetEntityProvider<TEntity, TKey>(),
                 entityStream,
-                options.Set ?? "root",
+                options.Partition ?? "root",
                 ct);
 
             entityInfo.BackupDuration = stopwatch.Elapsed;
