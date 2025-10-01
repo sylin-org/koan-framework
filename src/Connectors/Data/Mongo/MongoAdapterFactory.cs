@@ -37,9 +37,10 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
 
         // Resolve source-specific connection string
-        // If base options already have a connection (from discovery), use it for Default source
+        // If base options already have a connection (from discovery) and no specific source requested, use it
         string connectionString;
-        if (source == "Default" && !string.IsNullOrWhiteSpace(baseOptions.ConnectionString))
+        if ((string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
+            && !string.IsNullOrWhiteSpace(baseOptions.ConnectionString))
         {
             connectionString = baseOptions.ConnectionString;
         }
