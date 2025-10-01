@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <Description>Direct-access utilities for Koan Data: helpers for bypass scenarios and config-first resolution.</Description>
     <PackageTags>$(CommonPackageTags);data;direct;utilities</PackageTags>
