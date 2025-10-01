@@ -218,7 +218,7 @@ public class TypedCanonTests
                 ["name.last"] = "Lee"
             }
         };
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Intake)))
         {
             await Data<StageRecord<TestModel>, string>.UpsertAsync(rec1, CanonSets.StageShort(CanonSets.Intake), ct);
             await Data<StageRecord<TestModel>, string>.UpsertAsync(rec2, CanonSets.StageShort(CanonSets.Intake), ct);
@@ -228,7 +228,7 @@ public class TypedCanonTests
         string? refId = null;
         await WaitUntilAsync(async () =>
         {
-            using var _keyed = DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed));
+            using var _keyed = EntityContext.Partition(CanonSets.StageShort(CanonSets.Keyed));
             var page = await Data<StageRecord<TestModel>, string>.FirstPage(100, ct);
             var match = page.FirstOrDefault(p => p.SourceId == rec1.SourceId || p.SourceId == rec2.SourceId);
             refId = match?.CorrelationId;
@@ -319,7 +319,7 @@ public class TypedCanonTests
             OccurredAt = DateTimeOffset.UtcNow,
             Data = new TestModel { ["foo"] = "bar" }
         };
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Intake)))
         {
             await Data<StageRecord<TestModel>, string>.UpsertAsync(rec, CanonSets.StageShort(CanonSets.Intake), ct);
         }
@@ -330,7 +330,7 @@ public class TypedCanonTests
         rejects.Should().NotBeEmpty();
 
         // Assert parked copy exists
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Parked)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Parked)))
         {
             await WaitUntilAsync(async () => (await Data<ParkedRecord<TestModel>, string>.FirstPage(50, ct)).Any(), TimeSpan.FromSeconds(4));
             var parked = await Data<ParkedRecord<TestModel>, string>.FirstPage(50, ct);
@@ -338,7 +338,7 @@ public class TypedCanonTests
         }
 
         // After TTL elapses and with purge enabled, parked should be cleaned up
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Parked)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Parked)))
         {
             // Wait a bit longer than TTL to allow purge loop to catch up
             await WaitUntilAsync(async () =>
@@ -379,7 +379,7 @@ public class TypedCanonTests
                 ["age"] = "42"
             }
         };
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Intake)))
         {
             await Data<StageRecord<TestModel>, string>.UpsertAsync(rec, CanonSets.StageShort(CanonSets.Intake), ct);
         }
@@ -387,7 +387,7 @@ public class TypedCanonTests
         string? refId = null;
         await WaitUntilAsync(async () =>
         {
-            using var _keyed = DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed));
+            using var _keyed = EntityContext.Partition(CanonSets.StageShort(CanonSets.Keyed));
             var page = await Data<StageRecord<TestModel>, string>.FirstPage(50, ct);
             var matched = page.FirstOrDefault(p => p.SourceId == rec.SourceId);
             refId = matched?.CorrelationId;
@@ -447,7 +447,7 @@ public class TypedCanonTests
                 ["city"] = "Paris"
             }
         };
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Intake)))
         {
             await Data<StageRecord<TestModel>, string>.UpsertAsync(rec, CanonSets.StageShort(CanonSets.Intake), ct);
         }
@@ -455,7 +455,7 @@ public class TypedCanonTests
         string? refId = null;
         await WaitUntilAsync(async () =>
         {
-            using var _keyed = DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed));
+            using var _keyed = EntityContext.Partition(CanonSets.StageShort(CanonSets.Keyed));
             var page = await Data<StageRecord<TestModel>, string>.FirstPage(50, ct);
             var matched = page.FirstOrDefault(p => p.SourceId == rec.SourceId);
             refId = matched?.CorrelationId;
@@ -511,7 +511,7 @@ public class TypedCanonTests
             OccurredAt = DateTimeOffset.UtcNow,
             Data = payload
         };
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Intake)))
         {
             await Data<StageRecord<IdentityModel>, string>.UpsertAsync(rec, CanonSets.StageShort(CanonSets.Intake), ct);
         }
@@ -520,7 +520,7 @@ public class TypedCanonTests
         string? correlation = null;
         await WaitUntilAsync(async () =>
         {
-            using var _keyed = DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed));
+            using var _keyed = EntityContext.Partition(CanonSets.StageShort(CanonSets.Keyed));
             var page = await Data<StageRecord<IdentityModel>, string>.FirstPage(50, ct);
             var matched = page.FirstOrDefault(p => p.SourceId == rec.SourceId);
             correlation = matched?.CorrelationId;
@@ -572,7 +572,7 @@ public class TypedCanonTests
             OccurredAt = DateTimeOffset.UtcNow,
             Data = new TestModel { ["dummy"] = "kb" }
         };
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Intake)))
         {
             await Data<StageRecord<TestModel>, string>.UpsertAsync(r1, CanonSets.StageShort(CanonSets.Intake), ct);
             await Data<StageRecord<TestModel>, string>.UpsertAsync(r2, CanonSets.StageShort(CanonSets.Intake), ct);
@@ -580,7 +580,7 @@ public class TypedCanonTests
         // Wait both move to keyed
         await WaitUntilAsync(async () =>
         {
-            using var _keyed = DataSetContext.With(CanonSets.StageShort(CanonSets.Keyed));
+            using var _keyed = EntityContext.Partition(CanonSets.StageShort(CanonSets.Keyed));
             var page = await Data<StageRecord<TestModel>, string>.FirstPage(100, ct);
             return page.Any(p => p.SourceId == r1.SourceId) && page.Any(p => p.SourceId == r2.SourceId);
         }, TimeSpan.FromSeconds(8));
@@ -596,7 +596,7 @@ public class TypedCanonTests
                 ["dummy"] = new[] { "ka", "kb" }
             }
         };
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Intake)))
         {
             await Data<StageRecord<TestModel>, string>.UpsertAsync(rx, CanonSets.StageShort(CanonSets.Intake), ct);
         }
@@ -606,7 +606,7 @@ public class TypedCanonTests
         rejects.Should().Contain(r => r.ReasonCode == Constants.Rejections.MultiOwnerCollision);
 
         // Parked copy should exist and then eventually be purged by TTL if configured
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Parked)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Parked)))
         {
             await WaitUntilAsync(async () => (await Data<ParkedRecord<TestModel>, string>.FirstPage(50, ct)).Any(p => p.Id == rx.Id), TimeSpan.FromSeconds(8));
             var parked = await Data<ParkedRecord<TestModel>, string>.FirstPage(50, ct);

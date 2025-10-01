@@ -79,7 +79,7 @@ public class CanonActionsTests
         bus.Sent.OfType<CanonAck>().Should().Contain(a => a.Model == model && a.Status == "ok");
 
         // Verify a record exists in intake
-        using (DataSetContext.With(CanonSets.StageShort(CanonSets.Intake)))
+        using (EntityContext.Partition(CanonSets.StageShort(CanonSets.Intake)))
         {
             var page = await Data<StageRecord<TestModel>, string>.FirstPage(10, CancellationToken.None);
             page.Any(r => TryGetStageValue(r.Data, "dummy") == "a1").Should().BeTrue();

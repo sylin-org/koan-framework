@@ -49,7 +49,7 @@ public class SqliteCountAndSelectTests
     [Fact]
     public async Task Count_Pushdown_With_Parameters_Works()
     {
-        using var _set = DataSetContext.With(Guid.NewGuid().ToString("n"));
+        using var _set = EntityContext.Partition(Guid.NewGuid().ToString("n"));
         var file = TempFile();
         var sp = BuildServices(file);
         var data = sp.GetRequiredService<IDataService>();
@@ -69,7 +69,7 @@ public class SqliteCountAndSelectTests
     [Fact]
     public async Task FullSelect_Is_Not_Limited_By_DefaultPageSize()
     {
-        using var _set = DataSetContext.With(Guid.NewGuid().ToString("n"));
+        using var _set = EntityContext.Partition(Guid.NewGuid().ToString("n"));
         var file = TempFile();
         var sp = BuildServices(file, defaultPageSize: 3);
         var data = sp.GetRequiredService<IDataService>();

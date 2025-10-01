@@ -94,7 +94,7 @@ public sealed class EntityLifecycleEventsTests : IDisposable
         public SetScope(string name)
         {
             Name = name;
-            _lease = DataSetContext.With(name);
+            _lease = EntityContext.Partition(name);
         }
 
         public string Name { get; }

@@ -53,8 +53,8 @@ public class SetRoutingTests
         (await Data<Todo, string>.All()).Count.Should().Be(1);
 
         // backup set
-        await Data<Todo, string>.UpsertAsync(new Todo { Title = "backup-1" }, set: "backup");
-        var inBackup = await Data<Todo, string>.All(set: "backup");
+        await Data<Todo, string>.UpsertAsync(new Todo { Title = "backup-1" }, partition: "backup");
+        var inBackup = await Data<Todo, string>.All(partition: "backup");
         inBackup.Should().ContainSingle(x => x.Title == "backup-1");
 
         // ensure isolation between sets
@@ -62,7 +62,7 @@ public class SetRoutingTests
         inRoot.Should().OnlyContain(x => x.Title == "root-1");
 
         // delete by predicate in backup
-        var removed = await Data<Todo, string>.Delete(x => x.Title.StartsWith("backup"), set: "backup");
+        var removed = await Data<Todo, string>.Delete(x => x.Title.StartsWith("backup"), partition: "backup");
         removed.Should().Be(1);
         (await Data<Todo, string>.All("backup")).Should().BeEmpty();
     }

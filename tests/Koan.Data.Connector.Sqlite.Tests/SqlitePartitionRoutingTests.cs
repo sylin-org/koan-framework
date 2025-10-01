@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Koan.Data.Connector.Sqlite.Tests;
 
-public class SqliteSetRoutingTests
+public class SqlitePartitionRoutingTests
 {
     public class Todo : IEntity<string>
     {
@@ -54,7 +54,7 @@ public class SqliteSetRoutingTests
         (await repo.QueryAsync(null)).Should().ContainSingle(x => x.Title == "root-1");
 
         // backup set insert
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             await repo.UpsertAsync(new Todo { Title = "backup-1" });
             var inBackup = await ((ILinqQueryRepository<Todo, string>)repo).QueryAsync(x => x.Title.StartsWith("backup"));
@@ -63,13 +63,13 @@ public class SqliteSetRoutingTests
 
         // Validate isolation
         (await repo.QueryAsync(null)).Should().OnlyContain(x => x.Title == "root-1");
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             (await repo.QueryAsync(null)).Should().OnlyContain(x => x.Title == "backup-1");
         }
 
         // Delete by predicate within backup
-        using (DataSetContext.With("backup"))
+        using (EntityContext.Partition("backup"))
         {
             var lrepo = (ILinqQueryRepository<Todo, string>)repo;
             var items = await lrepo.QueryAsync(x => x.Title.StartsWith("backup"));
