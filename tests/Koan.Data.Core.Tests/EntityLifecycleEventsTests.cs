@@ -102,7 +102,7 @@ public sealed class EntityLifecycleEventsTests : IDisposable
         public void Dispose() => _lease.Dispose();
     }
 
-    private static SetScope UseUniqueSet() => new(Guid.NewGuid().ToString("n"));
+    private static SetScope UseUniqueSet() => new("test-" + Guid.NewGuid().ToString("n"));
 
     [Fact]
     public async Task BeforeUpsertCancellationPreventsPersistence()
