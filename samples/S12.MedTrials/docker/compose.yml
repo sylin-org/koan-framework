@@ -17,14 +17,6 @@ services:
       Koan__Ai__AutoDiscoveryEnabled: "true"
       Koan__Ai__AllowDiscoveryInNonDev: "true"
       Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
-      # Explicit Ollama service registration (Production-safe)
-      Koan__Ai__Services__Ollama__0__Id: "ollama"
-      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
-      Koan__Ai__Services__Ollama__0__DefaultModel: "all-minilm"
-      # Disable explicit registration in dev so discovery picks a single best endpoint (host-first)
-      Koan__Ai__Services__Ollama__0__Enabled: "false"
-      # Readiness: require the embedding model to be present
-      Koan__Ai__Ollama__RequiredModels__0: "all-minilm"
       # TestProvider JWT Configuration
       Koan__Web__Auth__TestProvider__UseJwtTokens: "true"
       Koan__Web__Auth__TestProvider__JwtIssuer: "koan-s12-medtrials-dev"
@@ -71,11 +63,6 @@ services:
       Koan__Ai__AutoDiscoveryEnabled: "true"
       Koan__Ai__AllowDiscoveryInNonDev: "true"
       Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
-      Koan__Ai__Services__Ollama__0__Id: "ollama"
-      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
-      Koan__Ai__Services__Ollama__0__DefaultModel: "all-minilm"
-      Koan__Ai__Services__Ollama__0__Enabled: "false"
-      Koan__Ai__Ollama__RequiredModels__0: "all-minilm"
       Koan__Web__Auth__TestProvider__UseJwtTokens: "true"
       Koan__Web__Auth__TestProvider__JwtIssuer: "koan-s12-medtrials-dev"
       Koan__Web__Auth__TestProvider__JwtAudience: "s12-medtrials-client"
