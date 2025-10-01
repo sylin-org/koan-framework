@@ -1,11 +1,11 @@
-﻿FROM mcr.microsoft.com/dotnet/sdk:10.0-rc AS build
+﻿FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
 WORKDIR /src
 COPY . .
 # Build whole repo (context at repo root) and publish target project
 RUN dotnet restore samples/S8.Canon/S8.Canon.Api/S8.Canon.Api.csproj
 RUN dotnet publish samples/S8.Canon/S8.Canon.Api/S8.Canon.Api.csproj -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-rc AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:5108
 EXPOSE 5108

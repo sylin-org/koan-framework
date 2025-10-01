@@ -1,12 +1,12 @@
 # S6.SocialCreator container (multi-stage)
-FROM mcr.microsoft.com/dotnet/sdk:10.0-rc AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
 WORKDIR /src
 # Copy entire repo to allow multi-project restore/publish
 COPY . .
 RUN dotnet restore Koan.sln
 RUN dotnet publish samples/S6.SocialCreator/S6.SocialCreator.csproj -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-rc AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 # App port

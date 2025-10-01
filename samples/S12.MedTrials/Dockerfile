@@ -1,11 +1,11 @@
 # Build
-FROM mcr.microsoft.com/dotnet/sdk:10.0-rc AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
 WORKDIR /src
 COPY . .
 RUN dotnet publish ./samples/S12.MedTrials/S12.MedTrials.csproj -c Release -o /out
 
 # Run
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-rc
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /out .
 ENV ASPNETCORE_URLS=http://+:5110
