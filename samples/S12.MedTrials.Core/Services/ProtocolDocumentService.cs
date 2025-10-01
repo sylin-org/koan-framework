@@ -52,20 +52,16 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
         bool degraded = false;
         string? model = null;
 
-        var ai = Ai.TryResolve();
-        if (ai is not null)
+        // ADR-0014: Use capability-first Embed API
+        try
         {
-            try
+            if (Vector<ProtocolDocument>.IsAvailable)
             {
                 var payload = BuildEmbeddingPayload(document);
-                var embeddingResponse = await ai.EmbedAsync(new AiEmbeddingsRequest
-                {
-                    Input = { payload }
-                }, ct).ConfigureAwait(false);
+                var vector = await Ai.Embed(payload, ct).ConfigureAwait(false);
 
-                if (embeddingResponse.Vectors.Count > 0 && Vector<ProtocolDocument>.IsAvailable)
+                if (vector.Length > 0)
                 {
-                    var vector = embeddingResponse.Vectors[0];
                     await Vector<ProtocolDocument>.Save((document.Id, vector, new
                     {
                         document.Id,
@@ -77,7 +73,6 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
                     document.LastEmbeddedAt = now;
                     document.VectorState = ProtocolVectorState.Indexed;
                     vectorized = true;
-                    model = embeddingResponse.Model;
                 }
                 else
                 {
@@ -88,23 +83,23 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
                         : "Vector store unavailable; stored document without embeddings.");
                 }
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
+            else
             {
                 degraded = true;
                 document.VectorState = ProtocolVectorState.Degraded;
-                warnings.Add("Failed to generate embeddings. Stored document for deterministic lookup only.");
-                _logger?.LogWarning(ex, "Protocol ingestion embedding failed for {Title}", document.Title);
+                warnings.Add("AI provider unavailable; stored document without embeddings.");
             }
         }
-        else
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
         {
             degraded = true;
             document.VectorState = ProtocolVectorState.Degraded;
-            warnings.Add("AI provider unavailable; stored document without embeddings.");
+            warnings.Add("Failed to generate embeddings. Stored document for deterministic lookup only.");
+            _logger?.LogWarning(ex, "Protocol ingestion embedding failed for {Title}", document.Title);
         }
 
         if (warnings.Count > 0)
@@ -145,19 +140,16 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
         bool degraded = false;
         string? model = null;
 
-        var ai = Ai.TryResolve();
-        if (ai is not null && Vector<ProtocolDocument>.IsAvailable)
+        // ADR-0014: Use capability-first Embed API
+        if (Vector<ProtocolDocument>.IsAvailable)
         {
             try
             {
-                var response = await ai.EmbedAsync(new AiEmbeddingsRequest
-                {
-                    Input = { request.Query }
-                }, ct).ConfigureAwait(false);
+                var vector = await Ai.Embed(request.Query, ct).ConfigureAwait(false);
 
-                if (response.Vectors.Count > 0)
+                if (vector.Length > 0)
                 {
-                    var vectorResult = await Vector<ProtocolDocument>.Search(response.Vectors[0], topK: request.TopK <= 0 ? 5 : Math.Min(request.TopK, 20), ct: ct).ConfigureAwait(false);
+                    var vectorResult = await Vector<ProtocolDocument>.Search(vector, topK: request.TopK <= 0 ? 5 : Math.Min(request.TopK, 20), ct: ct).ConfigureAwait(false);
                     foreach (var match in vectorResult.Matches)
                     {
                         var doc = await ProtocolDocument.Get(match.Id, ct).ConfigureAwait(false);
@@ -174,7 +166,8 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
                             doc));
                     }
 
-                    model = response.Model;
+                    // Note: With capability-first API, model info not directly available
+                    // Could be enhanced later with richer response objects
                 }
                 else
                 {
@@ -196,7 +189,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
         else
         {
             degraded = true;
-            if (ai is null)
+            if (!Ai.IsAvailable)
             {
                 warnings.Add("AI provider unavailable; using deterministic search.");
             }

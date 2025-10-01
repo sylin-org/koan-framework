@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using Koan.AI.Connector.Ollama.Options;
 using Koan.AI.Contracts.Routing;
+using Koan.AI.Contracts.Sources;
 using Koan.Core.Adapters;
 using Microsoft.Extensions.Options;
 using Koan.Core.Orchestration;
@@ -15,7 +16,11 @@ namespace Koan.AI.Connector.Ollama.Initialization;
 
 /// <summary>
 /// Orchestration-aware Ollama discovery service using centralized service discovery.
-/// Replaces hardcoded candidate logic with unified Koan orchestration patterns.
+/// Implements ADR-0014 multi-source discovery pattern:
+/// - ollama-auto-host (priority 100) - host.docker.internal
+/// - ollama-auto-linked (priority 75) - linked container
+/// - ollama-auto-container (priority 50) - localhost in container
+/// All auto-discovered sources join "ollama-auto" fallback group.
 /// </summary>
 internal sealed class OllamaDiscoveryService : IHostedService
 {
@@ -24,6 +29,8 @@ internal sealed class OllamaDiscoveryService : IHostedService
     private readonly IAiAdapterRegistry _registry;
     private readonly ILogger<OllamaDiscoveryService> _logger;
     private readonly IOrchestrationAwareServiceDiscovery _serviceDiscovery;
+    private readonly IAiSourceRegistry? _sourceRegistry;
+    private readonly IAiGroupRegistry? _groupRegistry;
 
     public OllamaDiscoveryService(IServiceProvider sp, IConfiguration cfg, IAiAdapterRegistry registry)
     {
@@ -33,6 +40,10 @@ internal sealed class OllamaDiscoveryService : IHostedService
         _logger = sp.GetService<ILogger<OllamaDiscoveryService>>()
                  ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<OllamaDiscoveryService>.Instance;
         _serviceDiscovery = new OrchestrationAwareServiceDiscovery(cfg, null);
+
+        // Optional: new source registry (ADR-0014)
+        _sourceRegistry = sp.GetService<IAiSourceRegistry>();
+        _groupRegistry = sp.GetService<IAiGroupRegistry>();
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -83,22 +94,30 @@ internal sealed class OllamaDiscoveryService : IHostedService
                 return;
             }
 
-            // Fallback: Use centralized orchestration-aware service discovery
-            var discoveryOptions = CreateOllamaDiscoveryOptions(defaultModel);
-            var result = await _serviceDiscovery.DiscoverServiceAsync("ollama", discoveryOptions, cancellationToken);
-
-            KoanLog.BootInfo(_logger, LogActions.Discovery, "result",
-                ("method", result.DiscoveryMethod),
-                ("url", result.ServiceUrl),
-                ("healthy", result.IsHealthy));
-
-            if (!result.IsHealthy)
+            // ADR-0014: Multi-source discovery if source registry available
+            if (_sourceRegistry != null && _groupRegistry != null)
             {
-                KoanLog.BootWarning(_logger, LogActions.Discovery, "health-check-failed", ("url", result.ServiceUrl));
+                await DiscoverAndRegisterMultipleSources(defaultModel, cancellationToken);
             }
+            else
+            {
+                // Fallback: Legacy single-adapter discovery
+                var discoveryOptions = CreateOllamaDiscoveryOptions(defaultModel);
+                var result = await _serviceDiscovery.DiscoverServiceAsync("ollama", discoveryOptions, cancellationToken);
 
-            // Create and register adapter
-            await RegisterOllamaAdapter(result.ServiceUrl, defaultModel, cancellationToken);
+                KoanLog.BootInfo(_logger, LogActions.Discovery, "result",
+                    ("method", result.DiscoveryMethod),
+                    ("url", result.ServiceUrl),
+                    ("healthy", result.IsHealthy));
+
+                if (!result.IsHealthy)
+                {
+                    KoanLog.BootWarning(_logger, LogActions.Discovery, "health-check-failed", ("url", result.ServiceUrl));
+                }
+
+                // Create and register adapter
+                await RegisterOllamaAdapter(result.ServiceUrl, defaultModel, cancellationToken);
+            }
         }
         catch (Exception ex)
         {
@@ -449,6 +468,209 @@ internal sealed class OllamaDiscoveryService : IHostedService
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// ADR-0014: Discover multiple Ollama instances and register as separate sources.
+    /// Creates ollama-auto-host, ollama-auto-linked, ollama-auto-container with priorities.
+    /// All join "ollama-auto" fallback group.
+    /// </summary>
+    private async Task DiscoverAndRegisterMultipleSources(string? defaultModel, CancellationToken cancellationToken)
+    {
+        var discoveredSources = new List<(string Name, string Url, int Priority, string Origin)>();
+
+        // Define discovery candidates (ADR-0014 naming convention)
+        var candidates = new[]
+        {
+            (Name: "ollama-auto-host", Url: "http://host.docker.internal:11434", Priority: 100, Origin: "host"),
+            (Name: "ollama-auto-linked", Url: "http://ollama:11434", Priority: 75, Origin: "linked-container"),
+            (Name: "ollama-auto-container", Url: "http://localhost:11434", Priority: 50, Origin: "localhost")
+        };
+
+        // Try all candidates in parallel
+        var discoveryTasks = candidates.Select(async candidate =>
+        {
+            try
+            {
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
+                var response = await httpClient.GetAsync($"{candidate.Url}/api/tags", cancellationToken);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    KoanLog.BootDebug(_logger, LogActions.Discovery, "candidate-success",
+                        ("name", candidate.Name),
+                        ("url", candidate.Url));
+                    return candidate;
+                }
+            }
+            catch (Exception ex)
+            {
+                KoanLog.BootDebug(_logger, LogActions.Discovery, "candidate-failed",
+                    ("name", candidate.Name),
+                    ("reason", ex.Message));
+            }
+
+            return ((string?)null, (string?)null, 0, (string?)null);
+        }).ToList();
+
+        var results = await Task.WhenAll(discoveryTasks);
+        discoveredSources.AddRange(results.Where(r => r.Item1 != null).Select(r => (r.Item1!, r.Item2!, r.Item3, r.Item4!)));
+
+        if (discoveredSources.Count == 0)
+        {
+            KoanLog.BootWarning(_logger, LogActions.Discovery, "no-sources-found",
+                ("reason", "all-candidates-failed"));
+            return;
+        }
+
+        KoanLog.BootInfo(_logger, LogActions.Discovery, "multi-source-found",
+            ("count", discoveredSources.Count));
+
+        // Ensure "ollama-auto" group exists
+        _groupRegistry!.EnsureGroup("ollama-auto");
+
+        // Create sources with capability introspection
+        foreach (var (name, url, priority, origin) in discoveredSources.OrderByDescending(s => s.Priority))
+        {
+            try
+            {
+                // Introspect models
+                var capabilities = await IntrospectCapabilities(url, defaultModel, cancellationToken);
+
+                // Register source
+                var source = new AiSourceDefinition
+                {
+                    Name = name,
+                    Provider = "ollama",
+                    ConnectionString = url,
+                    Group = "ollama-auto",
+                    Priority = priority,
+                    Capabilities = capabilities,
+                    Settings = new Dictionary<string, string>(),
+                    Origin = $"auto-discovery ({origin})",
+                    IsAutoDiscovered = true
+                };
+
+                _sourceRegistry!.RegisterSource(source);
+
+                KoanLog.BootInfo(_logger, LogActions.Discovery, "source-registered",
+                    ("name", name),
+                    ("url", url),
+                    ("priority", priority),
+                    ("capabilities", capabilities.Count));
+
+                // Also register adapter for backward compatibility
+                await RegisterOllamaAdapter(url, defaultModel, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                KoanLog.BootWarning(_logger, LogActions.Discovery, "source-registration-failed",
+                    ("name", name),
+                    ("reason", ex.Message));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Introspect Ollama instance to discover models and map to capabilities.
+    /// Uses preferred model lists for intelligent capability mapping.
+    /// </summary>
+    private async Task<Dictionary<string, AiCapabilityConfig>> IntrospectCapabilities(
+        string baseUrl,
+        string? defaultModel,
+        CancellationToken cancellationToken)
+    {
+        var capabilities = new Dictionary<string, AiCapabilityConfig>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var response = await httpClient.GetAsync($"{baseUrl}/api/tags", cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                // No models available - use default if provided
+                if (!string.IsNullOrWhiteSpace(defaultModel))
+                {
+                    capabilities["Chat"] = new AiCapabilityConfig { Model = defaultModel };
+                    capabilities["Embedding"] = new AiCapabilityConfig { Model = defaultModel };
+                }
+                return capabilities;
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            var doc = JToken.Parse(json);
+            var models = doc["models"] as JArray;
+
+            if (models == null || models.Count == 0)
+            {
+                return capabilities;
+            }
+
+            // Extract model names
+            var modelNames = models
+                .Select(m => m?["name"]?.ToString())
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!)
+                .ToList();
+
+            // Preferred models for each capability
+            var chatPreferred = new[] { "llama3.2", "llama3.1", "llama3", "llama2", "mistral", "qwen" };
+            var embedPreferred = new[] { "nomic-embed-text", "all-minilm", "bge-", "mxbai-embed" };
+            var visionPreferred = new[] { "llava", "bakllava", "vision" };
+
+            // Map capabilities intelligently
+            var chatModel = FindPreferredModel(modelNames, chatPreferred) ?? defaultModel ?? modelNames.FirstOrDefault();
+            var embedModel = FindPreferredModel(modelNames, embedPreferred) ?? defaultModel ?? modelNames.FirstOrDefault();
+            var visionModel = FindPreferredModel(modelNames, visionPreferred);
+
+            if (!string.IsNullOrWhiteSpace(chatModel))
+            {
+                capabilities["Chat"] = new AiCapabilityConfig { Model = chatModel };
+            }
+
+            if (!string.IsNullOrWhiteSpace(embedModel))
+            {
+                capabilities["Embedding"] = new AiCapabilityConfig { Model = embedModel };
+            }
+
+            if (!string.IsNullOrWhiteSpace(visionModel))
+            {
+                capabilities["Vision"] = new AiCapabilityConfig { Model = visionModel };
+            }
+        }
+        catch (Exception ex)
+        {
+            KoanLog.BootDebug(_logger, LogActions.Discovery, "introspection-failed",
+                ("url", baseUrl),
+                ("reason", ex.Message));
+
+            // Fallback to default if provided
+            if (!string.IsNullOrWhiteSpace(defaultModel))
+            {
+                capabilities["Chat"] = new AiCapabilityConfig { Model = defaultModel };
+            }
+        }
+
+        return capabilities;
+    }
+
+    /// <summary>
+    /// Find first model matching preferred patterns (prefix matching).
+    /// </summary>
+    private static string? FindPreferredModel(List<string> available, string[] preferred)
+    {
+        foreach (var pref in preferred)
+        {
+            var match = available.FirstOrDefault(m =>
+                m.StartsWith(pref, StringComparison.OrdinalIgnoreCase) ||
+                m.Split(':')[0].StartsWith(pref, StringComparison.OrdinalIgnoreCase));
+
+            if (match != null)
+                return match;
+        }
+
+        return null;
     }
 
     private static class LogActions
