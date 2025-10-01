@@ -35,11 +35,20 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
 
         // Resolve source-specific connection string
-        var connectionString = AdapterConnectionResolver.ResolveConnectionString(
-            config,
-            sourceRegistry,
-            "Sqlite",
-            source);
+        // If base options already have a connection (from discovery), use it for Default source
+        string connectionString;
+        if (source == "Default" && !string.IsNullOrWhiteSpace(baseOpts.ConnectionString))
+        {
+            connectionString = baseOpts.ConnectionString;
+        }
+        else
+        {
+            connectionString = AdapterConnectionResolver.ResolveConnectionString(
+                config,
+                sourceRegistry,
+                "Sqlite",
+                source);
+        }
 
         // Create source-specific options
         var sourceOpts = new SqliteOptions

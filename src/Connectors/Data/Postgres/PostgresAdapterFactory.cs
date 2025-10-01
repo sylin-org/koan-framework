@@ -40,11 +40,20 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
 
         // Resolve source-specific connection string
-        var connectionString = AdapterConnectionResolver.ResolveConnectionString(
-            config,
-            sourceRegistry,
-            "Postgres",
-            source);
+        // If base options already have a connection (from discovery), use it for Default source
+        string connectionString;
+        if (source == "Default" && !string.IsNullOrWhiteSpace(baseOpts.ConnectionString))
+        {
+            connectionString = baseOpts.ConnectionString;
+        }
+        else
+        {
+            connectionString = AdapterConnectionResolver.ResolveConnectionString(
+                config,
+                sourceRegistry,
+                "Postgres",
+                source);
+        }
 
         // Create source-specific options
         var sourceOpts = new PostgresOptions
