@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -10,6 +11,7 @@ using Koan.Core.Modules;
 using Koan.Web.Endpoints;
 using Koan.Web.Infrastructure;
 using Koan.Web.Options;
+using System.Reflection;
 
 namespace Koan.Web.Extensions;
 
@@ -107,4 +109,32 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection SuppressSecurityHeaders(this IServiceCollection services)
         => services.AsProxiedApi();
+
+    /// <summary>
+    /// Ensures the specified assembly is registered with MVC's ApplicationPartManager for controller discovery.
+    /// This is required for Koan modules with controllers to enable automatic endpoint registration.
+    /// Safe to call multiple times (idempotent).
+    /// </summary>
+    /// <param name="services">Service collection</param>
+    /// <param name="assembly">Assembly containing controllers to register</param>
+    /// <returns>IMvcBuilder for chaining</returns>
+    public static IMvcBuilder AddKoanControllersFrom(this IServiceCollection services, Assembly assembly)
+    {
+        var mvc = services.AddControllers();
+        if (!mvc.PartManager.ApplicationParts.OfType<AssemblyPart>().Any(p => p.Assembly == assembly))
+        {
+            mvc.PartManager.ApplicationParts.Add(new AssemblyPart(assembly));
+        }
+        return mvc;
+    }
+
+    /// <summary>
+    /// Ensures the assembly containing the specified type is registered with MVC's ApplicationPartManager.
+    /// Convenience overload for type-safe assembly registration.
+    /// </summary>
+    /// <typeparam name="TController">A type from the assembly containing controllers</typeparam>
+    /// <param name="services">Service collection</param>
+    /// <returns>IMvcBuilder for chaining</returns>
+    public static IMvcBuilder AddKoanControllersFrom<TController>(this IServiceCollection services)
+        => AddKoanControllersFrom(services, typeof(TController).Assembly);
 }

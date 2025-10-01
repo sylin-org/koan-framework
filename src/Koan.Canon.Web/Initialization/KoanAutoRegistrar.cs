@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -7,6 +6,7 @@ using Koan.Core;
 using Koan.Canon.Infrastructure;
 using Koan.Canon;
 using Koan.Canon.Materialization;
+using Koan.Web.Extensions;
 using System.Reflection;
 
 namespace Koan.Canon.Web.Initialization;
@@ -19,8 +19,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // Ensure MVC sees controllers from this assembly
-    var mvc = services.AddControllers();
-    mvc.AddApplicationPart(typeof(KoanAutoRegistrar).Assembly);
+        services.AddKoanControllersFrom<KoanAutoRegistrar>();
 
         // Discover Canon models and register CanonEntityController<TModel> under /api/Canon/{model}
         foreach (var modelType in DiscoverModels())

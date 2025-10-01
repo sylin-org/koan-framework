@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Koan.Web.Extensions;
 
 namespace Koan.Web.Backup.Initialization;
 
@@ -27,6 +28,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         // Add background cleanup services with default settings
         services.AddKoanWebBackupBackgroundServices();
+
+        // Ensure MVC discovers controllers from this assembly
+        services.AddKoanControllersFrom<Controllers.BackupController>();
 
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }

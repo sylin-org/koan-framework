@@ -10,6 +10,7 @@ using Koan.Web.Auth.Providers;
 using Koan.Web.Auth.Connector.Test.Infrastructure;
 using Koan.Web.Auth.Connector.Test.Options;
 using Koan.Web.Auth.Connector.Test.Controllers;
+using Koan.Web.Extensions;
 
 namespace Koan.Web.Auth.Connector.Test.Initialization;
 
@@ -32,7 +33,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         });
 
         // Ensure MVC discovers TestProvider controllers
-        services.AddControllers().AddApplicationPart(typeof(StaticController).Assembly);
+        services.AddKoanControllersFrom<StaticController>();
         // Map TestProvider endpoints during startup (honors RouteBase)
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IStartupFilter, Hosting.KoanTestProviderStartupFilter>());
     }

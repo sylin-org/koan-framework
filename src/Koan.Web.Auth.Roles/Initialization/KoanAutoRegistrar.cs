@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Web.Auth.Roles.Extensions;
 using Koan.Web.Auth.Roles.Options;
+using Koan.Web.Extensions;
 
 namespace Koan.Web.Auth.Roles.Initialization;
 
@@ -16,6 +17,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         services.AddKoanWebAuthRoles();
+
+        // Ensure MVC discovers controllers from this assembly
+        services.AddKoanControllersFrom<Controllers.RolesAdminController>();
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
