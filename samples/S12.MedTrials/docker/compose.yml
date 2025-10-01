@@ -11,12 +11,9 @@ services:
       ASPNETCORE_ENVIRONMENT: "Development"
       ASPNETCORE_URLS: "http://+:5110"
       Koan__Web__ExposeObservabilitySnapshot: "true"
-      Koan__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
       Koan__Data__Mongo__Database: "KoanS12"
-      Koan__Data__Weaviate__Endpoint: "http://weaviate:8080"
       Koan__Ai__AutoDiscoveryEnabled: "true"
       Koan__Ai__AllowDiscoveryInNonDev: "true"
-      Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
       # TestProvider JWT Configuration
       Koan__Web__Auth__TestProvider__UseJwtTokens: "true"
       Koan__Web__Auth__TestProvider__JwtIssuer: "koan-s12-medtrials-dev"
