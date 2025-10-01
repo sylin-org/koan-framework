@@ -343,10 +343,10 @@ public class Todo : Entity<Todo> { }
 #### Cross-Provider Consistency
 ```csharp
 // Test provider transparency with different backends
-using var sqliteContext = DataSetContext.With("sqlite-set");
+using var sqliteContext = EntityContext.With("sqlite-set");
 var sqliteTodos = await Todo.All();
 
-using var mongoContext = DataSetContext.With("mongo-set");
+using var mongoContext = EntityContext.With("mongo-set");
 var mongoTodos = await Todo.All();
 // Same API, different storage backends
 ```
