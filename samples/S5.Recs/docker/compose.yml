@@ -29,7 +29,7 @@ services:
       Koan__Web__Auth__TestProvider__JwtAudience: "s5-recs-client"
       Koan__Web__Auth__TestProvider__JwtExpirationMinutes: "120"
     volumes:
-      - ../data:/app/data
+      - ../.Koan/Data:/app/data
     depends_on:
       mongo:
         condition: service_healthy
@@ -46,7 +46,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - ../data/mongo:/data/db
+      - ../.Koan/Data/mongo:/data/db
     ports:
       - "4900:27017"
   weaviate:
@@ -65,13 +65,13 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - ../data/weaviate:/var/lib/weaviate
+      - ../.Koan/Data/weaviate:/var/lib/weaviate
     ports:
       - "5082:8080"
   ollama:
     image: ollama/ollama:latest
     volumes:
-      - ../data/ollama-models:/root/.ollama
+      - ../.Koan/Data/ollama-models:/root/.ollama
     ports:
       - "5083:11434"
 volumes: {}
