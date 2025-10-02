@@ -38,7 +38,7 @@ services:
       S12__MedTrials__Mcp__LogCapabilities: "true"
       S12__MedTrials__Planner__MaxVisitsPerDay: "12"
     volumes:
-      - ../data:/app/data
+      - ../.Koan/Data:/app/data
     depends_on:
       - mcp
       - mongo
@@ -86,14 +86,14 @@ services:
       Koan__Mcp__RequireAuthentication: "false"
       Koan__Mcp__MaxConcurrentConnections: "200"
     volumes:
-      - ../data:/app/data
+      - ../.Koan/Data:/app/data
     depends_on:
       - mongo
       - weaviate
   mongo:
     image: mongo:latest
     volumes:
-      - ../data/mongo:/data/db
+      - ../.Koan/Data/mongo:/data/db
     ports:
       - "5111:27017"
   weaviate:
@@ -107,13 +107,13 @@ services:
       CLUSTER_HOSTNAME: "node1"
       RAFT_BOOTSTRAP_EXPECT: "1"
     volumes:
-      - ../data/weaviate:/var/lib/weaviate
+      - ../.Koan/Data/weaviate:/var/lib/weaviate
     ports:
       - "5112:8080"
   ollama:
     image: ollama/ollama:latest
     volumes:
-      - ../data/ollama-models:/root/.ollama
+      - ../.Koan/Data/ollama-models:/root/.ollama
     ports:
       - "5113:11434"
 volumes: {}
