@@ -30,6 +30,7 @@ services:
       Koan__Web__Auth__TestProvider__JwtExpirationMinutes: "120"
     volumes:
       - ../.Koan/Data:/app/data
+      - ../.Koan/cache:/app/cache
     depends_on:
       mongo:
         condition: service_healthy

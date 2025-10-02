@@ -368,4 +368,171 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             await Task.Delay(1000, ct);
         }
     }
+
+    // Cache management endpoints
+
+    [HttpGet("cache/list")]
+    public async Task<IActionResult> ListCaches([FromServices] Services.IRawCacheService cache, CancellationToken ct)
+    {
+        var manifests = await cache.ListCachesAsync(ct);
+        return Ok(new { count = manifests.Count, caches = manifests });
+    }
+
+    public record RebuildFromCacheRequest(string Source, string MediaType, string? JobId = null);
+
+    [HttpPost("rebuild-db-from-cache")]
+    public async Task<IActionResult> RebuildFromCache(
+        [FromBody] RebuildFromCacheRequest req,
+        [FromServices] Services.IRawCacheService cache,
+        [FromServices] Services.IMediaParserRegistry parserRegistry,
+        CancellationToken ct)
+    {
+        // Get parser for this source
+        var parser = parserRegistry.GetParser(req.Source);
+        if (parser == null)
+        {
+            return BadRequest(new { error = $"No parser found for source '{req.Source}'" });
+        }
+
+        // Resolve MediaType
+        var mediaType = await Models.MediaType.All(ct)
+            .ContinueWith(t => t.Result.FirstOrDefault(mt => mt.Name.Equals(req.MediaType, StringComparison.OrdinalIgnoreCase)), ct);
+
+        if (mediaType == null)
+        {
+            return BadRequest(new { error = $"MediaType '{req.MediaType}' not found" });
+        }
+
+        // Determine which jobs to process
+        List<Services.CacheManifest> jobsToProcess;
+        if (!string.IsNullOrWhiteSpace(req.JobId))
+        {
+            // Process single specific job
+            var manifest = await cache.GetManifestAsync(req.Source, req.MediaType, req.JobId, ct);
+            if (manifest == null)
+            {
+                return NotFound(new { error = $"Cache not found: {req.Source}/{req.MediaType}/{req.JobId}" });
+            }
+            jobsToProcess = new List<Services.CacheManifest> { manifest };
+        }
+        else
+        {
+            // Process ALL jobs for this source/mediaType in chronological order (oldest first)
+            var allManifests = await cache.ListCachesAsync(ct);
+            jobsToProcess = allManifests
+                .Where(m => m.Source.Equals(req.Source, StringComparison.OrdinalIgnoreCase) &&
+                           m.MediaType.Equals(req.MediaType, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(m => m.FetchedAt) // OLDEST FIRST to preserve update order
+                .ToList();
+
+            if (jobsToProcess.Count == 0)
+            {
+                return NotFound(new { error = $"No caches found for {req.Source}/{req.MediaType}" });
+            }
+
+            _logger.LogInformation("Rebuild: processing {Count} cache jobs in chronological order for {Source}/{MediaType}",
+                jobsToProcess.Count, req.Source, req.MediaType);
+        }
+
+        // Parse all cached pages from all jobs (in order)
+        var allMedia = new List<Models.Media>();
+        int totalCached = 0;
+
+        foreach (var job in jobsToProcess)
+        {
+            _logger.LogInformation("Rebuild: processing job {JobId} (fetched {FetchedAt:u})",
+                job.JobId, job.FetchedAt);
+
+            await foreach (var (pageNum, rawJson) in cache.ReadPagesAsync(job.Source, job.MediaType, job.JobId, ct))
+            {
+                _logger.LogDebug("Rebuild: parsing page {Page} from {JobId}", pageNum, job.JobId);
+
+                var parsedMedia = await parser.ParsePageAsync(rawJson, mediaType, ct);
+                allMedia.AddRange(parsedMedia);
+            }
+
+            totalCached += job.TotalItems;
+        }
+
+        // Import the parsed data
+        var imported = await Models.Media.UpsertMany(allMedia, ct);
+
+        _logger.LogInformation("Rebuilt database from {JobCount} cache job(s): {Source}/{MediaType} - imported {Imported} items",
+            jobsToProcess.Count, req.Source, req.MediaType, imported);
+
+        return Ok(new {
+            source = req.Source,
+            mediaType = req.MediaType,
+            jobsProcessed = jobsToProcess.Count,
+            jobIds = jobsToProcess.Select(j => j.JobId).ToArray(),
+            imported = imported,
+            cached = totalCached
+        });
+    }
+
+    // Flush endpoints
+
+    [HttpPost("flush/cache")]
+    public async Task<IActionResult> FlushCache([FromServices] Services.IRawCacheService cache, CancellationToken ct)
+    {
+        var count = await cache.FlushAllAsync(ct);
+        return Ok(new { flushed = "cache", count });
+    }
+
+    [HttpPost("flush/vectors")]
+    public async Task<IActionResult> FlushVectors(CancellationToken ct)
+    {
+        // Delete all vector data
+        var count = 0;
+        if (Koan.Data.Vector.Vector<Models.Media>.IsAvailable)
+        {
+            await foreach (var media in Models.Media.AllStream(1000, ct))
+            {
+                await Koan.Data.Vector.Vector<Models.Media>.Delete(media.Id!, ct);
+                count++;
+            }
+        }
+        return Ok(new { flushed = "vectors", count });
+    }
+
+    [HttpPost("flush/tags")]
+    public async Task<IActionResult> FlushTags(CancellationToken ct)
+    {
+        var allTags = await Models.TagStatDoc.All(ct);
+        var count = allTags.Count();
+
+        foreach (var tag in allTags)
+        {
+            await Models.TagStatDoc.Remove(tag.Id!, ct);
+        }
+
+        return Ok(new { flushed = "tags", count });
+    }
+
+    [HttpPost("flush/genres")]
+    public async Task<IActionResult> FlushGenres(CancellationToken ct)
+    {
+        var allGenres = await Models.GenreStatDoc.All(ct);
+        var count = allGenres.Count();
+
+        foreach (var genre in allGenres)
+        {
+            await Models.GenreStatDoc.Remove(genre.Id!, ct);
+        }
+
+        return Ok(new { flushed = "genres", count });
+    }
+
+    [HttpPost("flush/media")]
+    public async Task<IActionResult> FlushMedia(CancellationToken ct)
+    {
+        var count = 0;
+        await foreach (var media in Models.Media.AllStream(1000, ct))
+        {
+            await Models.Media.Remove(media.Id!, ct);
+            count++;
+        }
+
+        return Ok(new { flushed = "media", count });
+    }
 }
