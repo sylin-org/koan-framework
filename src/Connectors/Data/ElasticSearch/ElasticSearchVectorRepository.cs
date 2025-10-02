@@ -288,6 +288,16 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             return default!;
         }
 
+        if (string.Equals(instruction.Name, VectorInstructions.IndexStats, StringComparison.OrdinalIgnoreCase))
+        {
+            await VectorEnsureCreatedAsync(ct);
+            var count = await GetCountAsync(ct);
+            if (typeof(TResult) == typeof(int))
+                return (TResult)(object)count;
+            object result = new { count };
+            return (TResult)result;
+        }
+
         throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Elasticsearch vector adapter.");
     }
 
@@ -344,6 +354,24 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
             var body = await resp.Content.ReadAsStringAsync(ct);
             throw new InvalidOperationException($"Elasticsearch clear failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
         }
+    }
+
+    private async Task<int> GetCountAsync(CancellationToken ct)
+    {
+        await EnsureIndexInitializedAsync(ct);
+        var url = $"/{Uri.EscapeDataString(IndexName)}/_count";
+
+        var resp = await _http.GetAsync(url, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Elasticsearch count failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+        }
+
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        var parsed = JObject.Parse(json);
+        var count = parsed["count"]?.Value<int>() ?? 0;
+        return count;
     }
 
     private async Task EnsureIndexInitializedAsync(CancellationToken ct)
