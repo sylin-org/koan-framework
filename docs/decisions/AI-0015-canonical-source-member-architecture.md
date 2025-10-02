@@ -1,6 +1,6 @@
 # AI-0015: Canonical Source-Member Architecture
 
-**Status:** Accepted (Canonical) - **IMPLEMENTATION IN PROGRESS**
+**Status:** Accepted (Canonical) - **PHASE 3 COMPLETE**
 **Date:** 2025-10-01
 **Supersedes:** AI-0014, AI-SOURCE-ROUTING-FIX, AI-SOURCE-MEMBER-IMPLEMENTATION-PLAN
 **Implementation Started:** 2025-10-01
@@ -35,15 +35,18 @@
   - Member selection (Fallback policy by Order)
   - Member pinning (`source::member` syntax) working
   - Fail-fast error handling with clear messages
-  - One-liner debug logging implemented
+  - **Simplified logging:** Single Info/Error line per request with full context
   - OllamaAdapter singleton pattern with URL injection
   - Request models updated (InternalConnectionString)
 
 **✅ VERIFIED IN S5.RECS:**
 ```
-Elected source 'ollama' (priority 50) for capability 'Embedding'
-Policy 'Fallback' selected member 'ollama::host' from source 'ollama' (order 0)
+AI route OK: ollama/qwen3-embedding:8b via ollama:ollama::host (embed 1 inputs)
 ```
+**Log Format:**
+- Success: `AI route OK: {Adapter}/{Model} via {Source}:{Member} [context]`
+- Failure: `AI route FAIL: {Adapter}/{Model} via {Source}:{Member} - {Error}`
+
 Embedding requests completing successfully - NO MORE EMPTY "Default" SOURCE ERRORS!
 
 ### ⏳ Pending (Advanced Features - Not Blocking)
@@ -628,13 +631,28 @@ public async Task<AiChatResponse> PromptAsync(AiChatRequest request, Cancellatio
     // 4. Inject member URL into request
     request.InternalConnectionString = member.ConnectionString;
 
-    // 5. Log one-liner
-    _logger?.LogDebug(
-        "Routing: source='{Source}' priority={Priority} policy='{Policy}' member='{Member}' url='{Url}' adapter='{Adapter}'",
-        source.Name, source.Priority, source.Policy, member.Name, member.ConnectionString, adapter.Id);
+    // 5. Get effective model
+    var effectiveModel = request.Model
+        ?? member.Capabilities?.GetValueOrDefault(capability)?.Model;
 
-    // 6. Execute request
-    return await adapter.ChatAsync(request, ct);
+    // 6. Execute request with logging
+    try
+    {
+        var response = await adapter.ChatAsync(request, ct);
+
+        _logger?.LogInformation(
+            "AI route OK: {Adapter}/{Model} via {Source}:{Member}",
+            adapter.Id, effectiveModel ?? "(default)", source.Name, member.Name);
+
+        return response;
+    }
+    catch (Exception ex)
+    {
+        _logger?.LogError(
+            "AI route FAIL: {Adapter}/{Model} via {Source}:{Member} - {Error}",
+            adapter.Id, effectiveModel ?? "(default)", source.Name, member.Name, ex.Message);
+        throw;
+    }
 }
 ```
 
@@ -1466,7 +1484,7 @@ public void Discovery_ExplicitUrls_SkipsDiscovery()
 
 ✅ **Boot report:** Hierarchical display shows sources → members → capabilities
 
-✅ **Logging:** One-liner debug logs show full routing decision
+✅ **Logging:** Single Info/Error logs show full routing decision with outcome
 
 ✅ **S5.Recs works:** Embedding requests complete successfully
 
