@@ -17,16 +17,4 @@ public sealed record LegacyAiGroupDefinition
     public bool StickySession { get; init; }
 }
 
-public sealed record AiHealthCheckConfig
-{
-    public bool Enabled { get; init; } = true;
-    public int IntervalSeconds { get; init; } = 30;
-    public int TimeoutSeconds { get; init; } = 5;
-}
-
-public sealed record AiCircuitBreakerConfig
-{
-    public int FailureThreshold { get; init; } = 3;
-    public int BreakDurationSeconds { get; init; } = 30;
-    public int RecoveryThreshold { get; init; } = 2;
-}
+// Note: AiHealthCheckConfig and AiCircuitBreakerConfig are defined in AiGroupDefinition.cs
