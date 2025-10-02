@@ -93,6 +93,35 @@ if (KoanEnv.AllowMagicInProduction) {
 }
 ```
 
+#### 5. Vector Export for Migration (DATA-0078)
+```csharp
+// Streaming vector export for provider migration or caching
+// Available in: ElasticSearch, Weaviate, Qdrant (planned), Milvus (planned)
+// Not available: Pinecone (throws NotSupportedException)
+
+// Use case: Migrate vectors between providers without regenerating via AI
+var vectorRepo = serviceProvider.GetRequiredService<IVectorSearchRepository<Media, string>>();
+
+await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
+{
+    // batch.Id: Entity identifier
+    // batch.Embedding: float[] vector
+    // batch.Metadata: Optional metadata
+
+    // Cache the embedding to avoid expensive AI regeneration
+    var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
+    await cache.SetAsync(contentHash, modelId, batch.Embedding, ct);
+}
+
+// Provider-specific implementations:
+// - ElasticSearch: Scroll API with match_all query (default batch: 1000)
+// - Weaviate: GraphQL offset pagination with _additional.vector (default batch: 100)
+// - Unsupported adapters: Throws NotSupportedException with helpful message
+
+// Common pattern: Export → Cache → Switch Provider → Import from Cache
+// This enables zero-cost vector DB migration without calling AI APIs again
+```
+
 ### Critical Anti-Patterns to Detect
 
 #### Manual Repository Pattern
