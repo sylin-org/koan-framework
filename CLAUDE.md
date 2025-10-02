@@ -519,3 +519,4 @@ ME: "Noted - enterprise requirements take precedence for this domain. I'll adjus
 - **Advisory improvement**: Become a more effective technical advisor through our collaboration
 
 This framework ensures productive architectural collaboration while maintaining clear authority and decision-making responsibility.
+- never use docker compose up or build if a start.bat script is available.
