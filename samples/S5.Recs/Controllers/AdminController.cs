@@ -378,40 +378,136 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         return Ok(new { count = manifests.Count, caches = manifests });
     }
 
-    public record RebuildFromCacheRequest(string Source, string MediaType, string? JobId = null);
+    public record RebuildFromCacheRequest(string? Source = null, string? MediaType = null, string? JobId = null);
 
     [HttpPost("rebuild-db-from-cache")]
     public async Task<IActionResult> RebuildFromCache(
-        [FromBody] RebuildFromCacheRequest req,
+        [FromBody] RebuildFromCacheRequest? req,
         [FromServices] Services.IRawCacheService cache,
         [FromServices] Services.IMediaParserRegistry parserRegistry,
         CancellationToken ct)
     {
+        req ??= new RebuildFromCacheRequest();
+
+        // If no source/mediaType specified, iterate through ALL unique combinations
+        if (string.IsNullOrWhiteSpace(req.Source) || string.IsNullOrWhiteSpace(req.MediaType))
+        {
+            var allManifests = await cache.ListCachesAsync(ct);
+            var uniqueCombinations = allManifests
+                .Select(m => new { m.Source, m.MediaType })
+                .Distinct()
+                .ToList();
+
+            if (uniqueCombinations.Count == 0)
+            {
+                return NotFound(new { error = "No caches found" });
+            }
+
+            _logger.LogInformation("Rebuild: processing ALL {Count} unique source/mediaType combinations from cache",
+                uniqueCombinations.Count);
+
+            int totalImportedAll = 0;
+            int totalCachedAll = 0;
+            var results = new List<object>();
+
+            foreach (var combo in uniqueCombinations)
+            {
+                // Process each combination
+                var comboResult = await ProcessSourceMediaTypeCombination(
+                    combo.Source,
+                    combo.MediaType,
+                    null, // Process all jobs for this combo
+                    cache,
+                    parserRegistry,
+                    ct);
+
+                if (comboResult != null)
+                {
+                    totalImportedAll += comboResult.Value.Imported;
+                    totalCachedAll += comboResult.Value.Cached;
+                    results.Add(new
+                    {
+                        source = combo.Source,
+                        mediaType = combo.MediaType,
+                        jobsProcessed = comboResult.Value.JobsProcessed,
+                        imported = comboResult.Value.Imported,
+                        cached = comboResult.Value.Cached
+                    });
+                }
+            }
+
+            _logger.LogInformation("Rebuild: completed ALL source/mediaType combinations - total imported {Total}",
+                totalImportedAll);
+
+            return Ok(new
+            {
+                combinations = results,
+                totalImported = totalImportedAll,
+                totalCached = totalCachedAll
+            });
+        }
+
+        // Process single source/mediaType combination
+        var result = await ProcessSourceMediaTypeCombination(
+            req.Source!,
+            req.MediaType!,
+            req.JobId,
+            cache,
+            parserRegistry,
+            ct);
+
+        if (result == null)
+        {
+            return BadRequest(new { error = "Failed to process cache" });
+        }
+
+        return Ok(new
+        {
+            source = req.Source,
+            mediaType = req.MediaType,
+            jobsProcessed = result.Value.JobsProcessed,
+            jobIds = result.Value.JobIds,
+            imported = result.Value.Imported,
+            cached = result.Value.Cached
+        });
+    }
+
+    private async Task<(int JobsProcessed, string[] JobIds, int Imported, int Cached)?> ProcessSourceMediaTypeCombination(
+        string source,
+        string mediaType,
+        string? specificJobId,
+        Services.IRawCacheService cache,
+        Services.IMediaParserRegistry parserRegistry,
+        CancellationToken ct)
+    {
         // Get parser for this source
-        var parser = parserRegistry.GetParser(req.Source);
+        var parser = parserRegistry.GetParser(source);
         if (parser == null)
         {
-            return BadRequest(new { error = $"No parser found for source '{req.Source}'" });
+            _logger.LogWarning("No parser found for source '{Source}'", source);
+            return null;
         }
 
         // Resolve MediaType (use request ct for validation only)
-        var mediaType = await Models.MediaType.All(ct)
-            .ContinueWith(t => t.Result.FirstOrDefault(mt => mt.Name.Equals(req.MediaType, StringComparison.OrdinalIgnoreCase)), ct);
+        var mediaTypeEntity = await Models.MediaType.All(ct)
+            .ContinueWith(t => t.Result.FirstOrDefault(mt => mt.Name.Equals(mediaType, StringComparison.OrdinalIgnoreCase)), ct);
 
-        if (mediaType == null)
+        if (mediaTypeEntity == null)
         {
-            return BadRequest(new { error = $"MediaType '{req.MediaType}' not found" });
+            _logger.LogWarning("MediaType '{MediaType}' not found", mediaType);
+            return null;
         }
 
         // Determine which jobs to process (use request ct for validation)
         List<Services.CacheManifest> jobsToProcess;
-        if (!string.IsNullOrWhiteSpace(req.JobId))
+        if (!string.IsNullOrWhiteSpace(specificJobId))
         {
             // Process single specific job
-            var manifest = await cache.GetManifestAsync(req.Source, req.MediaType, req.JobId, ct);
+            var manifest = await cache.GetManifestAsync(source, mediaType, specificJobId, ct);
             if (manifest == null)
             {
-                return NotFound(new { error = $"Cache not found: {req.Source}/{req.MediaType}/{req.JobId}" });
+                _logger.LogWarning("Cache not found: {Source}/{MediaType}/{JobId}", source, mediaType, specificJobId);
+                return null;
             }
             jobsToProcess = new List<Services.CacheManifest> { manifest };
         }
@@ -420,18 +516,19 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             // Process ALL jobs for this source/mediaType in chronological order (oldest first)
             var allManifests = await cache.ListCachesAsync(ct);
             jobsToProcess = allManifests
-                .Where(m => m.Source.Equals(req.Source, StringComparison.OrdinalIgnoreCase) &&
-                           m.MediaType.Equals(req.MediaType, StringComparison.OrdinalIgnoreCase))
+                .Where(m => m.Source.Equals(source, StringComparison.OrdinalIgnoreCase) &&
+                           m.MediaType.Equals(mediaType, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(m => m.FetchedAt) // OLDEST FIRST to preserve update order
                 .ToList();
 
             if (jobsToProcess.Count == 0)
             {
-                return NotFound(new { error = $"No caches found for {req.Source}/{req.MediaType}" });
+                _logger.LogWarning("No caches found for {Source}/{MediaType}", source, mediaType);
+                return null;
             }
 
             _logger.LogInformation("Rebuild: processing {Count} cache jobs in chronological order for {Source}/{MediaType}",
-                jobsToProcess.Count, req.Source, req.MediaType);
+                jobsToProcess.Count, source, mediaType);
         }
 
         // Long-running operation: use CancellationToken.None to prevent HTTP timeout cancellation
@@ -446,7 +543,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
 
             await foreach (var (pageNum, rawJson) in cache.ReadPagesAsync(job.Source, job.MediaType, job.JobId, CancellationToken.None))
             {
-                var parsedMedia = await parser.ParsePageAsync(rawJson, mediaType, CancellationToken.None);
+                var parsedMedia = await parser.ParsePageAsync(rawJson, mediaTypeEntity, CancellationToken.None);
 
                 if (parsedMedia.Count > 0)
                 {
@@ -465,16 +562,9 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         }
 
         _logger.LogInformation("Rebuilt database from {JobCount} cache job(s): {Source}/{MediaType} - imported {Imported} items",
-            jobsToProcess.Count, req.Source, req.MediaType, totalImported);
+            jobsToProcess.Count, source, mediaType, totalImported);
 
-        return Ok(new {
-            source = req.Source,
-            mediaType = req.MediaType,
-            jobsProcessed = jobsToProcess.Count,
-            jobIds = jobsToProcess.Select(j => j.JobId).ToArray(),
-            imported = totalImported,
-            cached = totalCached
-        });
+        return (jobsToProcess.Count, jobsToProcess.Select(j => j.JobId).ToArray(), totalImported, totalCached);
     }
 
     // Flush endpoints
