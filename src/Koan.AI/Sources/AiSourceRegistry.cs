@@ -9,13 +9,11 @@ using Koan.AI.Contracts.Sources;
 namespace Koan.AI.Sources;
 
 /// <summary>
-/// Registry for AI sources discovered from configuration or registered programmatically.
-/// Similar to Data.DataSourceRegistry but for AI providers.
+/// Registry for AI sources (collections of members).
+/// Sources are discovered from configuration or registered programmatically.
 ///
-/// Sources are discovered from:
-/// 1. "Koan:Ai:Sources:{name}" - Explicit source definitions
-/// 2. "Koan:Ai:Ollama" - Simple backward-compatible config (creates "Default" source)
-/// 3. Auto-discovery - Creates "ollama-auto-*" sources
+/// ADR-0015: Sources are collections with priority and policy. Members are endpoints within sources.
+/// No "Default" source is created - router elects highest-priority source with required capability.
 /// </summary>
 public sealed class AiSourceRegistry : IAiSourceRegistry
 {
@@ -24,34 +22,17 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
 
     /// <summary>
     /// Auto-discover sources from IConfiguration at "Koan:Ai:Sources:{name}".
-    /// Also handles backward-compatible "Koan:Ai:Ollama" simple config.
-    /// Always ensures "Default" source exists (even if empty).
+    /// NO "Default" source creation - router handles election.
     /// </summary>
-    /// <param name="config">Configuration to scan for sources</param>
-    /// <param name="logger">Optional logger for diagnostics</param>
     public void DiscoverFromConfiguration(IConfiguration config, ILogger? logger = null)
     {
         // 1. Discover explicit sources from Koan:Ai:Sources
         DiscoverExplicitSources(config, logger);
 
-        // 2. Handle backward-compatible Koan:Ai:Ollama config
+        // 2. Handle backward-compatible Koan:Ai:Ollama config (creates "Default" source if configured)
         DiscoverLegacyOllamaConfig(config, logger);
 
-        // 3. Always ensure "Default" source exists (may have empty provider → resolved by priority)
-        if (!_sources.ContainsKey("Default"))
-        {
-            RegisterSource(new AiSourceDefinition
-            {
-                Name = "Default",
-                Provider = "",
-                Capabilities = new Dictionary<string, AiCapabilityConfig>(),
-                Settings = new Dictionary<string, string>(),
-                Origin = "implicit",
-                IsAutoDiscovered = false
-            });
-
-            logger?.LogDebug("Created implicit 'Default' AI source with no provider (uses priority resolution)");
-        }
+        // NO implicit "Default" source creation - ADR-0015 requires election
     }
 
     private void DiscoverExplicitSources(IConfiguration config, ILogger? logger)
@@ -61,17 +42,24 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
         foreach (var sourceConfig in sourcesSection.GetChildren())
         {
             var sourceName = sourceConfig.Key;
-            var provider = sourceConfig["Provider"];
-            var connectionString = sourceConfig["ConnectionString"];
-            var group = sourceConfig["Group"];
-            var priority = sourceConfig.GetValue<int?>("Priority") ?? 50;
 
-            // Skip sources without explicit provider (unless it's Default)
-            if (string.IsNullOrWhiteSpace(provider) &&
-                !string.Equals(sourceName, "Default", StringComparison.OrdinalIgnoreCase))
+            // Validate source name doesn't contain :: (reserved for members)
+            if (sourceName.Contains("::"))
             {
                 logger?.LogWarning(
-                    "AI Source '{SourceName}' has no provider configured, skipping auto-discovery",
+                    "Source name '{SourceName}' contains '::' which is reserved for members - skipping",
+                    sourceName);
+                continue;
+            }
+
+            var provider = sourceConfig["Provider"];
+            var priority = sourceConfig.GetValue<int?>("Priority") ?? 100; // Explicit config defaults to high priority
+            var policy = sourceConfig["Policy"] ?? "Fallback";
+
+            if (string.IsNullOrWhiteSpace(provider))
+            {
+                logger?.LogWarning(
+                    "AI Source '{SourceName}' has no provider configured, skipping",
                     sourceName);
                 continue;
             }
@@ -79,36 +67,57 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
             // Parse capabilities
             var capabilities = ParseCapabilities(sourceConfig.GetSection("Capabilities"), logger);
 
-            // Extract all settings except known keys
-            var settings = sourceConfig.GetChildren()
-                .Where(c => c.Key != "Provider" &&
-                           c.Key != "ConnectionString" &&
-                           c.Key != "Group" &&
-                           c.Key != "Priority" &&
-                           c.Key != "Capabilities")
-                .ToDictionary(
-                    c => c.Key,
-                    c => c.Value ?? "",
-                    StringComparer.OrdinalIgnoreCase);
+            // Parse members from provider-specific configuration
+            // For now, we'll create empty members list - discovery service will populate
+            var members = new List<AiMemberDefinition>();
+
+            // Check if provider section has URLs
+            var providerSection = sourceConfig.GetSection(provider);
+            if (providerSection.Exists())
+            {
+                var urls = providerSection.GetSection("Urls").Get<string[]>();
+                if (urls != null && urls.Length > 0)
+                {
+                    for (int i = 0; i < urls.Length; i++)
+                    {
+                        members.Add(new AiMemberDefinition
+                        {
+                            Name = $"{sourceName}::explicit-{i + 1}",
+                            ConnectionString = urls[i],
+                            Order = i,
+                            Origin = "config-urls",
+                            IsAutoDiscovered = false
+                        });
+                    }
+                }
+            }
+
+            if (members.Count == 0)
+            {
+                logger?.LogWarning(
+                    "Source '{SourceName}' has no members configured - discovery service should populate",
+                    sourceName);
+                // Don't skip - discovery service may add members later
+            }
 
             RegisterSource(new AiSourceDefinition
             {
                 Name = sourceName,
-                Provider = provider ?? "",
-                ConnectionString = connectionString,
-                Group = group,
+                Provider = provider,
                 Priority = priority,
-                Capabilities = capabilities,
-                Settings = settings,
+                Policy = policy,
+                Members = members,
+                Capabilities = (IReadOnlyDictionary<string, AiCapabilityConfig>)capabilities,
                 Origin = "explicit-config",
                 IsAutoDiscovered = false
             });
 
             logger?.LogDebug(
-                "Discovered AI source '{SourceName}' with provider '{Provider}' and {CapabilityCount} capabilities",
+                "Discovered AI source '{SourceName}' with provider '{Provider}', priority {Priority}, {MemberCount} members",
                 sourceName,
-                provider ?? "(none)",
-                capabilities.Count);
+                provider,
+                priority,
+                members.Count);
         }
     }
 
@@ -123,10 +132,10 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
         var defaultModel = ollamaSection["DefaultModel"];
         var baseUrl = ollamaSection["BaseUrl"];
 
-        // Check if we already have a "Default" source from explicit config
-        if (_sources.ContainsKey("Default"))
+        // Check if we already have an "ollama" source from explicit config
+        if (_sources.ContainsKey("ollama"))
         {
-            logger?.LogDebug("Skipping legacy Ollama config - 'Default' source already exists");
+            logger?.LogDebug("Skipping legacy Ollama config - 'ollama' source already exists from explicit config");
             return;
         }
 
@@ -149,20 +158,38 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
             return;
         }
 
+        // Create legacy "Default" source only if user explicitly configured Ollama
+        // This maintains backward compatibility
+        var members = new List<AiMemberDefinition>();
+
+        if (!string.IsNullOrWhiteSpace(baseUrl))
+        {
+            members.Add(new AiMemberDefinition
+            {
+                Name = "Default::legacy",
+                ConnectionString = baseUrl,
+                Order = 0,
+                Origin = "legacy-config",
+                IsAutoDiscovered = false
+            });
+        }
+
         RegisterSource(new AiSourceDefinition
         {
-            Name = "Default",
+            Name = "Default", // Legacy name for backward compat
             Provider = "ollama",
-            ConnectionString = baseUrl,
-            Capabilities = capabilities,
-            Settings = new Dictionary<string, string>(),
+            Priority = 50,
+            Policy = "Fallback",
+            Members = members,
+            Capabilities = (IReadOnlyDictionary<string, AiCapabilityConfig>)capabilities,
             Origin = "legacy-config",
             IsAutoDiscovered = false
         });
 
         logger?.LogDebug(
-            "Created 'Default' AI source from legacy Koan:Ai:Ollama config with {CapabilityCount} capabilities",
-            capabilities.Count);
+            "Created 'Default' AI source from legacy Koan:Ai:Ollama config with {CapabilityCount} capabilities, {MemberCount} members",
+            capabilities.Count,
+            members.Count);
     }
 
     private static Dictionary<string, AiCapabilityConfig> ParseCapabilities(
@@ -226,56 +253,50 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
     }
 
     /// <summary>
-    /// Programmatically register a source (for runtime/testing scenarios or auto-discovery)
+    /// Programmatically register a source. Validates source name doesn't contain ::.
+    /// Throws if source name collides with existing source from different origin.
     /// </summary>
-    /// <param name="source">Source definition to register</param>
-    /// <exception cref="ArgumentException">Thrown when source name is empty</exception>
     public void RegisterSource(AiSourceDefinition source)
     {
         if (string.IsNullOrWhiteSpace(source.Name))
             throw new ArgumentException("Source name cannot be empty", nameof(source));
 
+        // Validate source name doesn't contain ::
+        if (source.Name.Contains("::"))
+            throw new ArgumentException(
+                $"Source name '{source.Name}' cannot contain '::' - this separator is reserved for members",
+                nameof(source));
+
+        // Check for collision
+        if (_sources.TryGetValue(source.Name, out var existing))
+        {
+            // Allow same-origin re-registration (e.g., discovery service updating members)
+            if (existing.Origin != source.Origin)
+            {
+                throw new InvalidOperationException(
+                    $"Source name collision detected: '{source.Name}' already registered by {existing.Origin}. " +
+                    $"Use a different name or remove conflicting configuration.");
+            }
+        }
+
         _sources[source.Name] = source;
     }
 
-    /// <summary>
-    /// Get source definition by name (case-insensitive)
-    /// </summary>
-    /// <param name="name">Source name</param>
-    /// <returns>Source definition or null if not found</returns>
     public AiSourceDefinition? GetSource(string name)
         => _sources.TryGetValue(name, out var source) ? source : null;
 
-    /// <summary>
-    /// Try to get source definition by name (case-insensitive)
-    /// </summary>
-    /// <param name="name">Source name</param>
-    /// <param name="source">Source definition if found</param>
-    /// <returns>True if source exists, false otherwise</returns>
     public bool TryGetSource(string name, out AiSourceDefinition? source)
         => _sources.TryGetValue(name, out source!);
 
-    /// <summary>
-    /// Get all registered source names
-    /// </summary>
     public IReadOnlyCollection<string> GetSourceNames() => _sources.Keys.ToArray();
 
-    /// <summary>
-    /// Get all registered sources
-    /// </summary>
     public IReadOnlyCollection<AiSourceDefinition> GetAllSources() => _sources.Values.ToArray();
 
-    /// <summary>
-    /// Check if source exists (case-insensitive)
-    /// </summary>
     public bool HasSource(string name) => _sources.ContainsKey(name);
 
-    /// <summary>
-    /// Get all sources in a specific group
-    /// </summary>
-    public IReadOnlyCollection<AiSourceDefinition> GetSourcesInGroup(string groupName)
+    public IReadOnlyCollection<AiSourceDefinition> GetSourcesWithCapability(string capabilityName)
         => _sources.Values
-            .Where(s => string.Equals(s.Group, groupName, StringComparison.OrdinalIgnoreCase))
+            .Where(s => s.Capabilities.ContainsKey(capabilityName))
             .OrderByDescending(s => s.Priority)
             .ToArray();
 }

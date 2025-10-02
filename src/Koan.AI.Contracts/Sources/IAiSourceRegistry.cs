@@ -3,8 +3,10 @@ using System.Collections.Generic;
 namespace Koan.AI.Contracts.Sources;
 
 /// <summary>
-/// Registry interface for AI sources.
+/// Registry interface for AI sources (collections of members).
 /// Implementation handles discovery from configuration and programmatic registration.
+///
+/// ADR-0015: Source = Collection of members with policy and priority.
 /// </summary>
 public interface IAiSourceRegistry
 {
@@ -39,7 +41,7 @@ public interface IAiSourceRegistry
     bool HasSource(string name);
 
     /// <summary>
-    /// Get all sources in a specific group
+    /// Get all sources with a specific capability
     /// </summary>
-    IReadOnlyCollection<AiSourceDefinition> GetSourcesInGroup(string groupName);
+    IReadOnlyCollection<AiSourceDefinition> GetSourcesWithCapability(string capabilityName);
 }

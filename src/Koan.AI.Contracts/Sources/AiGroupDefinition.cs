@@ -3,9 +3,11 @@ using System;
 namespace Koan.AI.Contracts.Sources;
 
 /// <summary>
-/// Definition of an AI source group with policy and health monitoring configuration.
-/// Groups enable fallback chains, round-robin load balancing, and automatic recovery.
+/// DEPRECATED: Use AiSourceDefinition instead.
+/// ADR-0015 corrected terminology: "Group" was actually "Source" (collection of members).
+/// This type is obsolete and will be removed.
 /// </summary>
+[System.Obsolete("Use AiSourceDefinition - terminology corrected per ADR-0015")]
 public sealed record AiGroupDefinition
 {
     /// <summary>

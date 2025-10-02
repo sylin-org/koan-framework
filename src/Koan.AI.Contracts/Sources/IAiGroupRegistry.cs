@@ -3,9 +3,11 @@ using System.Collections.Generic;
 namespace Koan.AI.Contracts.Sources;
 
 /// <summary>
-/// Registry interface for AI source groups.
-/// Implementation handles discovery from configuration and programmatic registration.
+/// DEPRECATED: Use IAiSourceRegistry instead.
+/// ADR-0015 corrected terminology: "Group" was actually "Source" (collection of members).
+/// This interface is obsolete and will be removed.
 /// </summary>
+[System.Obsolete("Use IAiSourceRegistry - terminology corrected per ADR-0015")]
 public interface IAiGroupRegistry
 {
     /// <summary>
