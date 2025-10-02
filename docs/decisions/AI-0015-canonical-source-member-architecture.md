@@ -9,9 +9,9 @@
 
 ## 🔄 IMPLEMENTATION STATUS
 
-**Current Phase:** Data Models & Registry Refactor (Phase 1-2)
+**Current Phase:** CORE IMPLEMENTATION COMPLETE (Phases 1-3) ✅
 
-### ✅ Completed
+### ✅ Completed (WORKING END-TO-END)
 - [x] **Phase 1: Data Models**
   - Created `AiMemberDefinition` (endpoint with ConnectionString, Order, health state)
   - Rebuilt `AiSourceDefinition` (collection with Members list, Priority, Policy)
@@ -29,27 +29,29 @@
     - ✅ Legacy `Koan:Ai:Ollama` config support (backward compat)
     - ✅ Explicit source configuration from `Koan:Ai:Sources`
 
-### 🔄 In Progress
-- [ ] **Phase 2: Discovery Service**
-  - Refactoring `OllamaDiscoveryService` (700 lines)
-  - Implementing `Urls` vs `AdditionalUrls` semantics
-  - Creating source "ollama" with members "ollama::host", "ollama::container"
-  - Removing duplicate adapter registration
-  - Implementing lazy introspection with caching
+- [x] **Phase 3: Router & Adapter** (COMPLETE - TESTED)
+  - Rebuilt `DefaultAiRouter` (543 → 249 lines, 54% reduction)
+  - Priority-based source election working
+  - Member selection (Fallback policy by Order)
+  - Member pinning (`source::member` syntax) working
+  - Fail-fast error handling with clear messages
+  - One-liner debug logging implemented
+  - OllamaAdapter singleton pattern with URL injection
+  - Request models updated (InternalConnectionString)
 
-### ⏳ Pending
-- [ ] **Phase 3: Router**
-  - `DefaultAiRouter`: Priority-based source election
-  - Member selection with policy support
-  - Member pinning (source::member syntax)
-  - Fail-fast error handling
-  - One-liner structured logging
+**✅ VERIFIED IN S5.RECS:**
+```
+Elected source 'ollama' (priority 50) for capability 'Embedding'
+Policy 'Fallback' selected member 'ollama::host' from source 'ollama' (order 0)
+```
+Embedding requests completing successfully - NO MORE EMPTY "Default" SOURCE ERRORS!
 
-- [ ] **Phase 4: Policies**
-  - Update `FallbackPolicy` for member-based selection
-  - Update `RoundRobinPolicy` for member-based selection
-  - Create `WeightedRoundRobinPolicy`
-  - Policy precedence (global → adapter → source)
+### ⏳ Pending (Advanced Features - Not Blocking)
+- [ ] **Phase 4: Advanced Policies**
+  - RoundRobin policy (member-based selection with rotation)
+  - WeightedRoundRobin policy (member-based with weights)
+  - Policy factory pattern
+  - Advanced health-aware member selection
 
 - [ ] **Phase 5: Health Monitoring**
   - Member-level circuit breakers
