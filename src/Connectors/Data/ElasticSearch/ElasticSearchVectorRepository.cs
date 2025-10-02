@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
+using System.Net.Http;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
@@ -290,7 +290,7 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
         if (string.Equals(instruction.Name, VectorInstructions.IndexStats, StringComparison.OrdinalIgnoreCase))
         {
-            await VectorEnsureCreatedAsync(ct);
+            // For stats, don't require dimension - just check if index exists
             var count = await GetCountAsync(ct);
             if (typeof(TResult) == typeof(int))
                 return (TResult)(object)count;
@@ -358,9 +358,17 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
 
     private async Task<int> GetCountAsync(CancellationToken ct)
     {
-        await EnsureIndexInitializedAsync(ct);
-        var url = $"/{Uri.EscapeDataString(IndexName)}/_count";
+        // Check if index exists first - don't require dimension for stats
+        var indexExistsUrl = $"/{Uri.EscapeDataString(IndexName)}";
+        var headResp = await _http.SendAsync(new HttpRequestMessage(HttpMethod.Head, indexExistsUrl), ct);
 
+        // If index doesn't exist (404), return 0
+        if (headResp.StatusCode == HttpStatusCode.NotFound)
+        {
+            return 0;
+        }
+
+        var url = $"/{Uri.EscapeDataString(IndexName)}/_count";
         var resp = await _http.GetAsync(url, ct);
         if (!resp.IsSuccessStatusCode)
         {
