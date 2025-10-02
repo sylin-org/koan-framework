@@ -34,7 +34,7 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-      weaviate:
+      elasticsearch:
         condition: service_healthy
       ollama:
         condition: service_started
@@ -75,4 +75,19 @@ services:
       - ../.Koan/Data/ollama-models:/root/.ollama
     ports:
       - "5083:11434"
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      discovery.type: "single-node"
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+    volumes:
+      - ../.Koan/Data/elasticsearch:/usr/share/elasticsearch/data
+    ports:
+      - "5085:9200"
 volumes: {}
