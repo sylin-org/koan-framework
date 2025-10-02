@@ -302,6 +302,6 @@
   document.addEventListener('DOMContentLoaded', () => {
   loadStats(); loadHealth(); loadTagsCount(); loadAggregates(); loadObservability(); bindSettings(); loadRecsSettings(); initCenKoandmin(); loadTagsForCensor(); initCensorTagsBrowser(); loadMediaTypes();
     // Expose actions for buttons with inline handlers
-  Object.assign(window, { seedDataFromForm, vectorUpsert, rebuildTags, rebuildGenres, rebuildFromCache, flushCache, flushMedia, flushVectors, flushTags, flushGenres, loadAggregates, loadObservability, loadMediaTypes });
+  Object.assign(window, { seedDataFromForm, vectorUpsert, rebuildTags, rebuildGenres, rebuildFromCache, flushCache, flushMedia, flushVectors, flushTags, flushGenres, flushEmbeddingsCache, exportEmbeddingsToCache, loadAggregates, loadObservability, loadMediaTypes });
   });
 })();
