@@ -814,7 +814,7 @@ internal sealed class SeedService : ISeedService
     }
 
 
-    private string BuildEmbeddingText(Media m)
+    public string BuildEmbeddingText(Media m)
     {
         var titles = new List<string>();
         if (!string.IsNullOrWhiteSpace(m.Title)) titles.Add(m.Title);

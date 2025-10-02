@@ -19,4 +19,9 @@ public interface ISeedService
     Task<(int media, int contentPieces, int vectors)> GetStatsAsync(CancellationToken ct);
     Task<int> RebuildTagCatalogAsync(CancellationToken ct);
     Task<int> RebuildGenreCatalogAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Builds the embedding text from a Media entity for content hashing and caching.
+    /// </summary>
+    string BuildEmbeddingText(Models.Media media);
 }

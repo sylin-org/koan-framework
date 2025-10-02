@@ -664,8 +664,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                     }
 
                     // Use SeedService's BuildEmbeddingText to get consistent hash
-                    // Since BuildEmbeddingText is private, we'll reconstruct the same logic
-                    var embeddingText = $"{media.Title}\n{media.Overview ?? ""}\n{string.Join(", ", media.Genres ?? Array.Empty<string>())}";
+                    var embeddingText = seedService.BuildEmbeddingText(media);
                     var contentHash = Services.EmbeddingCache.ComputeContentHash(embeddingText);
 
                     // Cache the existing embedding
