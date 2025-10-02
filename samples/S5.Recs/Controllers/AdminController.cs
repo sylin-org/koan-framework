@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using S5.Recs.Infrastructure;
 using S5.Recs.Services;
+using Koan.Data.Vector.Abstractions;
 
 namespace S5.Recs.Controllers;
 
@@ -635,13 +636,78 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     }
 
     [HttpPost("cache/embeddings/export")]
-    public async Task<IActionResult> ExportEmbeddingsToCache([FromServices] Services.ISeedService seedService, CancellationToken ct)
+    public async Task<IActionResult> ExportEmbeddingsToCache(
+        [FromServices] IVectorSearchRepository<Models.Media, string> vectorRepo,
+        [FromServices] Services.IEmbeddingCache embeddingCache,
+        [FromServices] Services.ISeedService seedService,
+        CancellationToken ct)
     {
-        // Export current vectors to cache by rebuilding them
-        // This will populate the cache with all current embeddings
-        var allMedia = await Models.Media.All(ct);
-        var jobId = await seedService.StartVectorUpsertAsync(allMedia, ct);
-        return Ok(new { operation = "export-embeddings-to-cache", jobId, message = "Exporting all vectors to embedding cache. This will populate cache for future adapter switches." });
+        try
+        {
+            var modelId = "default"; // TODO: Get from configuration
+            var count = 0;
+            var errors = 0;
+
+            _logger.LogInformation("Starting export of existing vectors to embedding cache...");
+
+            await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
+            {
+                try
+                {
+                    // Load the media entity to reconstruct the embedding text for content hashing
+                    var media = await Models.Media.Get(batch.Id, ct);
+                    if (media == null)
+                    {
+                        _logger.LogWarning("Media {Id} not found in database, skipping cache export", batch.Id);
+                        errors++;
+                        continue;
+                    }
+
+                    // Use SeedService's BuildEmbeddingText to get consistent hash
+                    // Since BuildEmbeddingText is private, we'll reconstruct the same logic
+                    var embeddingText = $"{media.Title}\n{media.Overview ?? ""}\n{string.Join(", ", media.Genres ?? Array.Empty<string>())}";
+                    var contentHash = Services.EmbeddingCache.ComputeContentHash(embeddingText);
+
+                    // Cache the existing embedding
+                    await embeddingCache.SetAsync(contentHash, modelId, batch.Embedding, ct);
+                    count++;
+
+                    if (count % 100 == 0)
+                    {
+                        _logger.LogInformation("Export progress: {Count} vectors cached...", count);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error exporting vector {Id} to cache", batch.Id);
+                    errors++;
+                }
+            }
+
+            _logger.LogInformation("Vector export completed: {Count} vectors cached, {Errors} errors", count, errors);
+            return Ok(new
+            {
+                operation = "export-embeddings-to-cache",
+                exported = count,
+                errors,
+                message = $"Exported {count} existing vectors to embedding cache for adapter portability"
+            });
+        }
+        catch (NotSupportedException ex)
+        {
+            _logger.LogWarning(ex, "Vector export not supported by current adapter");
+            return BadRequest(new
+            {
+                error = "Vector export not supported by current vector database adapter",
+                details = ex.Message,
+                suggestion = "Use ElasticSearch, Weaviate, or Qdrant for export functionality"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export vectors to cache");
+            return StatusCode(500, new { error = "Export failed", details = ex.Message });
+        }
     }
 
     [HttpPost("flush/media")]

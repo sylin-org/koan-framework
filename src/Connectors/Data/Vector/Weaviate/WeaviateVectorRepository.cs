@@ -305,6 +305,91 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         return new VectorQueryResult<TKey>(matches, ContinuationToken: null);
     }
 
+    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAllAsync(
+        int? batchSize = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        using var _ = WeaviateTelemetry.Activity.StartActivity("vector.export");
+
+        await EnsureSchemaAsync(ct);
+
+        var limit = batchSize ?? 100; // Weaviate cursor default
+        var offset = 0;
+        var totalExported = 0;
+
+        while (true)
+        {
+            // GraphQL query to fetch objects with vectors
+            var gql = new
+            {
+                query = $@"query {{
+                    Get {{
+                        {ClassName}(limit: {limit}, offset: {offset}) {{
+                            docId
+                            _additional {{
+                                id
+                                vector
+                            }}
+                        }}
+                    }}
+                }}"
+            };
+
+            var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
+            var resp = await _http.PostAsync("/v1/graphql", req, ct);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadAsStringAsync(ct);
+                throw new InvalidOperationException($"Weaviate export failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+            }
+
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            var parsed = JObject.Parse(json);
+            var objects = parsed["data"]?["Get"]?[ClassName] as JArray;
+
+            if (objects == null || objects.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var obj in objects.OfType<JObject>())
+            {
+                var docId = obj["docId"]?.Value<string>();
+                var additional = obj["_additional"] as JObject;
+                var vectorArray = additional?["vector"] as JArray;
+
+                if (docId != null && vectorArray != null)
+                {
+                    var embedding = vectorArray.Select(v => (float)(double)v).ToArray();
+
+                    // Build metadata from the object (excluding _additional and docId)
+                    var metadata = new JObject(obj);
+                    metadata.Remove("_additional");
+                    metadata.Remove("docId");
+
+                    yield return new VectorExportBatch<TKey>(ConvertId(docId), embedding, metadata.Count > 0 ? metadata.ToObject<object>() : null);
+                    totalExported++;
+                }
+            }
+
+            // Check if we've reached the end
+            if (objects.Count < limit)
+            {
+                break;
+            }
+
+            offset += limit;
+
+            if (totalExported % 1000 == 0)
+            {
+                _logger?.LogDebug("Weaviate export progress: {Count} vectors exported...", totalExported);
+            }
+        }
+
+        _logger?.LogInformation("Weaviate vector export completed: {Count} vectors exported", totalExported);
+    }
+
     // Translator helpers moved to WeaviateFilterTranslator
 
     private void ValidateEmbedding(float[] embedding)

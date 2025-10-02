@@ -272,6 +272,117 @@ internal sealed class ElasticSearchVectorRepository<TEntity, TKey> :
         return new VectorQueryResult<TKey>(matches, ContinuationToken: null, totalKind);
     }
 
+    public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAllAsync(
+        int? batchSize = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        using var _ = ElasticSearchTelemetry.Activity.StartActivity("vector.export");
+
+        var size = batchSize ?? 1000; // ElasticSearch scroll default
+        var scrollTime = "2m";
+
+        // Check if index exists first
+        var indexExistsUrl = $"/{Uri.EscapeDataString(IndexName)}";
+        var headResp = await _http.SendAsync(new HttpRequestMessage(HttpMethod.Head, indexExistsUrl), ct);
+
+        if (headResp.StatusCode == HttpStatusCode.NotFound)
+        {
+            _logger?.LogInformation("ElasticSearch index {IndexName} does not exist, export returns empty", IndexName);
+            yield break;
+        }
+
+        // Initial search with scroll
+        var initUrl = $"/{Uri.EscapeDataString(IndexName)}/_search?scroll={scrollTime}";
+        var initBody = new JObject
+        {
+            ["size"] = size,
+            ["query"] = new JObject { ["match_all"] = new JObject() },
+            ["_source"] = new JArray { _options.IdField, _options.VectorField, _options.MetadataField }
+        };
+
+        var resp = await _http.PostAsync(initUrl, new StringContent(initBody.ToString(Formatting.None), Encoding.UTF8, "application/json"), ct);
+        var respBody = await resp.Content.ReadAsStringAsync(ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"ElasticSearch export failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {respBody}");
+        }
+
+        var json = JObject.Parse(respBody);
+        var scrollId = json["_scroll_id"]?.Value<string>();
+        var totalExported = 0;
+
+        while (scrollId != null)
+        {
+            var hits = json["hits"]?["hits"] as JArray ?? new JArray();
+            if (hits.Count == 0) break;
+
+            foreach (var hit in hits.OfType<JObject>())
+            {
+                var source = hit["_source"] as JObject;
+                if (source == null) continue;
+
+                var id = source[_options.IdField]?.Value<string>();
+                var vectorArray = source[_options.VectorField] as JArray;
+
+                if (id != null && vectorArray != null)
+                {
+                    var embedding = vectorArray.Select(v => (float)(double)v).ToArray();
+                    var metadata = source[_options.MetadataField]?.ToObject<object>();
+
+                    yield return new VectorExportBatch<TKey>(ConvertId(id), embedding, metadata);
+                    totalExported++;
+                }
+            }
+
+            // Next scroll batch
+            var scrollUrl = "/_search/scroll";
+            var scrollBody = new JObject
+            {
+                ["scroll"] = scrollTime,
+                ["scroll_id"] = scrollId
+            };
+
+            resp = await _http.PostAsync(scrollUrl, new StringContent(scrollBody.ToString(Formatting.None), Encoding.UTF8, "application/json"), ct);
+            respBody = await resp.Content.ReadAsStringAsync(ct);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger?.LogWarning("ElasticSearch scroll continuation failed: {Status} {Reason}", resp.StatusCode, resp.ReasonPhrase);
+                break;
+            }
+
+            json = JObject.Parse(respBody);
+            var newScrollId = json["_scroll_id"]?.Value<string>();
+
+            // If scroll ID changed, update it
+            if (newScrollId != null && newScrollId != scrollId)
+            {
+                scrollId = newScrollId;
+            }
+            else if (hits.Count < size)
+            {
+                // Last batch
+                break;
+            }
+        }
+
+        // Clear scroll
+        if (scrollId != null)
+        {
+            try
+            {
+                await _http.DeleteAsync($"/_search/scroll/{Uri.EscapeDataString(scrollId)}", ct);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Failed to clear scroll context {ScrollId}", scrollId);
+            }
+        }
+
+        _logger?.LogInformation("ElasticSearch vector export completed: {Count} vectors exported", totalExported);
+    }
+
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(instruction);
