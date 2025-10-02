@@ -109,9 +109,25 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         return true;
     }
 
+    /// <summary>
+    /// ADR-0015: Get HttpClient for request - uses InternalConnectionString if set by router, otherwise default.
+    /// </summary>
+    private HttpClient GetHttpClientForRequest(string? connectionString)
+    {
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            // Router specified member URL - create client for it
+            return new HttpClient { BaseAddress = new Uri(connectionString), Timeout = TimeSpan.FromSeconds(60) };
+        }
+
+        // Use default HttpClient from DI
+        return _http;
+    }
+
     public async Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
         => await this.WithReadinessAsync(async () =>
         {
+            var http = GetHttpClientForRequest(request.InternalConnectionString);
             var model = request.Model ?? _defaultModel;
             if (string.IsNullOrWhiteSpace(model))
             {
@@ -134,7 +150,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
             Logger.LogDebug("Ollama: POST {Path} model={Model}", "/api/generate", model);
             var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-            using var resp = await _http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
+            using var resp = await http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode)
             {
                 var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -160,6 +176,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     {
         await WaitForReadinessAsync(null, ct).ConfigureAwait(false);
 
+        var http = GetHttpClientForRequest(request.InternalConnectionString);
         var model = request.Model ?? _defaultModel;
         if (string.IsNullOrWhiteSpace(model))
         {
@@ -187,7 +204,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         };
 
         Logger.LogDebug("Ollama: STREAM {Path} model={Model}", "/api/generate", model);
-        using var resp = await _http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        using var resp = await http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
 
         await foreach (var part in ReadJsonLinesAsync<OllamaGenerateResponse>(resp, ct).ConfigureAwait(false))
@@ -207,6 +224,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     public async Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
         => await this.WithReadinessAsync(async () =>
         {
+            var http = GetHttpClientForRequest(request.InternalConnectionString);
             var model = request.Model ?? _defaultModel;
             if (string.IsNullOrWhiteSpace(model))
             {
@@ -219,7 +237,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
                 var body = new { model, prompt = input };
                 var payload = JsonConvert.SerializeObject(body);
 
-                using var resp = await _http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
+                using var resp = await http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
                 if (!resp.IsSuccessStatusCode)
                 {
                     var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
