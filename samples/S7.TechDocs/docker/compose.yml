@@ -36,7 +36,7 @@ services:
     ports:
       - "5091:27017"
     volumes:
-      - ../data/mongo:/data/db
+      - ../.Koan/Data/mongo:/data/db
   weaviate:
     image: semitechnologies/weaviate:1.25.6
     environment:
@@ -49,11 +49,11 @@ services:
     ports:
       - "5092:8080"
     volumes:
-      - ../data/weaviate:/var/lib/weaviate
+      - ../.Koan/Data/weaviate:/var/lib/weaviate
   ollama:
     image: ollama/ollama:latest
     ports:
       - "5093:11434"
     volumes:
-      - ../data/ollama-models:/root/.ollama
+      - ../.Koan/Data/ollama-models:/root/.ollama
 volumes: {}
