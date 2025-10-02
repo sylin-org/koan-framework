@@ -1,6 +1,36 @@
 # AI-0014: AI Modernization - Source Abstraction, Capability Mapping, and Fallback Groups
 
 Status: Approved
+**Amendment:** 2025-10-01 - Terminology Correction (See Below)
+
+---
+
+## 🔴 TERMINOLOGY AMENDMENT (2025-10-01)
+
+**This ADR's original terminology has been corrected to match framework standards:**
+
+| Original Term (This Doc) | Correct Term | Definition |
+|-------------------------|--------------|------------|
+| "Source" | **Member** | Individual endpoint (e.g., `ollama::host`) |
+| "Group" | **Source** | Collection of members (e.g., `ollama`) |
+| "ollama-auto-host" | **ollama::host** | Member naming pattern |
+| "ollama-auto" group | **ollama** source | Source naming pattern |
+
+**Canonical Reference:** See [AI-SOURCE-MEMBER-ARCHITECTURE.md](../AI-SOURCE-MEMBER-ARCHITECTURE.md) for complete model.
+
+**Key Changes:**
+- **Source = Collection** with policy and multiple members
+- **Member = Endpoint** with URL and priority
+- **Default source = provider name** (e.g., "ollama" for Ollama adapter)
+- **Naming: `source::member`** pattern (e.g., "ollama::host", "enterprise::ollama-1")
+
+**Reading This Document:**
+- When you see "source" below, think "member" (endpoint)
+- When you see "group" below, think "source" (collection)
+- When you see "ollama-auto-host", think "ollama::host"
+- The architectural principles remain valid; only terminology changed
+
+---
 
 ## Context
 
