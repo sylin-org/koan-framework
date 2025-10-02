@@ -7,7 +7,7 @@ namespace S5.Recs.Services;
 
 /// <summary>
 /// File-based implementation of embedding cache.
-/// Stores embeddings in .Koan/cache/embeddings/{modelId}/{contentHash}.json
+/// Stores embeddings in .Koan/cache/embeddings/{entityTypeName}/{modelId}/{contentHash}.json
 /// </summary>
 public sealed class EmbeddingCache : IEmbeddingCache
 {
@@ -20,9 +20,9 @@ public sealed class EmbeddingCache : IEmbeddingCache
         _logger = logger;
     }
 
-    public async Task<CachedEmbedding?> GetAsync(string contentHash, string modelId, CancellationToken ct = default)
+    public async Task<CachedEmbedding?> GetAsync(string contentHash, string modelId, string entityTypeName, CancellationToken ct = default)
     {
-        var filePath = GetCacheFilePath(modelId, contentHash);
+        var filePath = GetCacheFilePath(entityTypeName, modelId, contentHash);
         if (!File.Exists(filePath))
         {
             return null;
@@ -48,7 +48,7 @@ public sealed class EmbeddingCache : IEmbeddingCache
         }
     }
 
-    public async Task SetAsync(string contentHash, string modelId, float[] embedding, CancellationToken ct = default)
+    public async Task SetAsync(string contentHash, string modelId, float[] embedding, string entityTypeName, CancellationToken ct = default)
     {
         var cached = new CachedEmbedding
         {
@@ -59,7 +59,7 @@ public sealed class EmbeddingCache : IEmbeddingCache
             CachedAt = DateTimeOffset.UtcNow
         };
 
-        var filePath = GetCacheFilePath(modelId, contentHash);
+        var filePath = GetCacheFilePath(entityTypeName, modelId, contentHash);
         var directory = Path.GetDirectoryName(filePath);
 
         if (!string.IsNullOrEmpty(directory))
@@ -164,11 +164,12 @@ public sealed class EmbeddingCache : IEmbeddingCache
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private string GetCacheFilePath(string modelId, string contentHash)
+    private string GetCacheFilePath(string entityTypeName, string modelId, string contentHash)
     {
-        // Sanitize model ID for file system
+        // Sanitize entity type and model ID for file system
+        var safeEntityType = SanitizeForFileSystem(entityTypeName);
         var safeModelId = SanitizeForFileSystem(modelId);
-        return Path.Combine(_basePath, safeModelId, $"{contentHash}.json");
+        return Path.Combine(_basePath, safeEntityType, safeModelId, $"{contentHash}.json");
     }
 
     private static string SanitizeForFileSystem(string input)

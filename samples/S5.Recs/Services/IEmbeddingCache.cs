@@ -8,12 +8,12 @@ public interface IEmbeddingCache
     /// <summary>
     /// Retrieve a cached embedding by content hash and model ID.
     /// </summary>
-    Task<CachedEmbedding?> GetAsync(string contentHash, string modelId, CancellationToken ct = default);
+    Task<CachedEmbedding?> GetAsync(string contentHash, string modelId, string entityTypeName, CancellationToken ct = default);
 
     /// <summary>
     /// Store an embedding in the cache.
     /// </summary>
-    Task SetAsync(string contentHash, string modelId, float[] embedding, CancellationToken ct = default);
+    Task SetAsync(string contentHash, string modelId, float[] embedding, string entityTypeName, CancellationToken ct = default);
 
     /// <summary>
     /// Flush all cached embeddings.

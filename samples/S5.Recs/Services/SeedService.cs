@@ -705,7 +705,7 @@ internal sealed class SeedService : ISeedService
         {
             var embeddingText = BuildEmbeddingText(media);
             var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
-            var cached = await _embeddingCache.GetAsync(contentHash, modelId, ct);
+            var cached = await _embeddingCache.GetAsync(contentHash, modelId, typeof(Media).FullName!, ct);
 
             if (cached != null)
             {
@@ -775,7 +775,7 @@ internal sealed class SeedService : ISeedService
                                     // Cache the embedding for future use
                                     var embeddingText = BuildEmbeddingText(envelope.Entity);
                                     var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
-                                    await _embeddingCache.SetAsync(contentHash, modelId, embedding, ct);
+                                    await _embeddingCache.SetAsync(contentHash, modelId, embedding, typeof(Media).FullName!, ct);
                                 }
                                 catch (InvalidOperationException ex)
                                 {

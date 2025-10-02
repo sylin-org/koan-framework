@@ -640,6 +640,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         [FromServices] Koan.Data.Vector.IVectorService vectorService,
         [FromServices] Services.IEmbeddingCache embeddingCache,
         [FromServices] Services.ISeedService seedService,
+        [FromQuery] string? entityType,
         CancellationToken ct)
     {
         try
@@ -678,7 +679,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                     var contentHash = Services.EmbeddingCache.ComputeContentHash(embeddingText);
 
                     // Cache the existing embedding
-                    await embeddingCache.SetAsync(contentHash, modelId, batch.Embedding, ct);
+                    await embeddingCache.SetAsync(contentHash, modelId, batch.Embedding, typeof(Models.Media).FullName!, ct);
                     count++;
 
                     if (count % 100 == 0)

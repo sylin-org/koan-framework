@@ -8,7 +8,6 @@ using S5.Recs.Infrastructure;
 
 namespace S5.Recs.Models;
 
-[VectorAdapter("weaviate")]
 [Storage(Name = "Media")]
 [OptimizeStorage(OptimizationType = StorageOptimizationType.None, Reason = "Uses SHA512-based deterministic string IDs, not GUIDs")]
 public sealed class Media : Entity<Media>
