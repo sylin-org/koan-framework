@@ -709,7 +709,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             {
                 error = "Vector export not supported by current vector database adapter",
                 details = ex.Message,
-                suggestion = "Use ElasticSearch, Weaviate, or Qdrant for export functionality"
+                suggestion = "Use a vector adapter with native export capabilities"
             });
         }
         catch (Exception ex)

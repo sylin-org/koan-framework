@@ -21,7 +21,7 @@ builder.Services.AddKoanObservability();
 Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.OfflineData))!);
 Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.SeedCache));
 
-// AI, Ollama, and Weaviate are auto-registered by their modules via Koan.Core discovery
+// AI, vector, and data adapters are auto-registered by their modules via Koan.Core discovery
 
 // Local services
 builder.Services.AddSingleton<IEmbeddingCache, EmbeddingCache>();

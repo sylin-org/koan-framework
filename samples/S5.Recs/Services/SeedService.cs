@@ -651,7 +651,7 @@ internal sealed class SeedService : ISeedService
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)
             {
-                //_logger?.LogWarning("Vector repository unavailable. Configure a vector engine (e.g., Weaviate) and set Koan:Data:Weaviate:Endpoint. In Docker compose, ensure service 'weaviate' is running and reachable.");
+                //_logger?.LogWarning("Vector repository unavailable. Configure a vector adapter and ensure the service is running and reachable.");
                 return 0;
             }
 
@@ -674,7 +674,7 @@ internal sealed class SeedService : ISeedService
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)
             {
-                //_logger?.LogWarning("Vector repository unavailable. Configure a vector engine (e.g., Weaviate) and set Koan:Data:Weaviate:Endpoint. In Docker compose, ensure service 'weaviate' is running and reachable.");
+                //_logger?.LogWarning("Vector repository unavailable. Configure a vector adapter and ensure the service is running and reachable.");
                 return 0;
             }
 
