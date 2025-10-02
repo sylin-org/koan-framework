@@ -620,6 +620,30 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         return Ok(new { flushed = "genres", count });
     }
 
+    [HttpPost("flush/embeddings")]
+    public async Task<IActionResult> FlushEmbeddingsCache([FromServices] Services.IEmbeddingCache embeddingCache, CancellationToken ct)
+    {
+        var count = await embeddingCache.FlushAsync(ct);
+        return Ok(new { flushed = "embeddings-cache", count });
+    }
+
+    [HttpGet("cache/embeddings/stats")]
+    public async Task<IActionResult> GetEmbeddingsCacheStats([FromServices] Services.IEmbeddingCache embeddingCache, CancellationToken ct)
+    {
+        var stats = await embeddingCache.GetStatsAsync(ct);
+        return Ok(stats);
+    }
+
+    [HttpPost("cache/embeddings/export")]
+    public async Task<IActionResult> ExportEmbeddingsToCache([FromServices] Services.ISeedService seedService, CancellationToken ct)
+    {
+        // Export current vectors to cache by rebuilding them
+        // This will populate the cache with all current embeddings
+        var allMedia = await Models.Media.All(ct);
+        var jobId = await seedService.StartVectorUpsertAsync(allMedia, ct);
+        return Ok(new { operation = "export-embeddings-to-cache", jobId, message = "Exporting all vectors to embedding cache. This will populate cache for future adapter switches." });
+    }
+
     [HttpPost("flush/media")]
     public async Task<IActionResult> FlushMedia(CancellationToken ct)
     {

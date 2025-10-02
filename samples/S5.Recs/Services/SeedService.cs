@@ -29,14 +29,18 @@ internal sealed class SeedService : ISeedService
     private readonly IServiceProvider _sp;
     private readonly ILogger<SeedService>? _logger;
     private readonly IReadOnlyDictionary<string, IMediaProvider> _providers;
+    private readonly IEmbeddingCache _embeddingCache;
     private static readonly object _importLock = new object();
     private static volatile bool _importInProgress = false;
+    private int _cacheHits = 0;
+    private int _cacheMisses = 0;
 
     public bool IsImportInProgress => _importInProgress;
 
-    public SeedService(IServiceProvider sp, ILogger<SeedService>? logger = null)
+    public SeedService(IServiceProvider sp, IEmbeddingCache embeddingCache, ILogger<SeedService>? logger = null)
     {
         _sp = sp;
+        _embeddingCache = embeddingCache;
         _logger = logger;
         // Discover providers via DI
         var provs = (IEnumerable<IMediaProvider>?)_sp.GetService(typeof(IEnumerable<IMediaProvider>)) ?? Array.Empty<IMediaProvider>();
@@ -689,70 +693,122 @@ internal sealed class SeedService : ISeedService
         var stored = 0;
         var failures = 0;
         var itemsList = items.ToList();
+        var modelId = model ?? "default";
 
-        _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, model ?? "(default)");
+        _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, modelId);
 
-        await itemsList
-            .ToAsyncEnumerable()
-            .Tokenize(m => BuildEmbeddingText(m), model != null ? new AiTokenizeOptions { Model = model } : new AiTokenizeOptions())
-            .Branch(branch => branch
-                .OnSuccess(success => success
-                    //.Tap(env => _logger?.LogDebug("Vector pipeline: tokenization success for media {Id}", env.Entity.Id))
-                    .Mutate(envelope =>
-                    {
-                        // Add metadata for vector storage before save (canonical pattern from PipelineDataExtensions)
-                        envelope.Features["vector:metadata"] = new { title = envelope.Entity.Title, genres = envelope.Entity.Genres, popularity = envelope.Entity.Popularity };
-                    })
-                    .Do(async (envelope, ct) =>
-                    {
-                        // Use canonical framework pattern from PipelineDataExtensions.cs
-                        if (envelope.Features.TryGetValue(PipelineFeatureKeys.Embedding, out var embeddingObj)
-                            && embeddingObj is float[] embedding)
+        // Step 1: Separate items into cached and uncached
+        var cachedItems = new List<(Media media, float[] embedding)>();
+        var uncachedItems = new List<Media>();
+
+        foreach (var media in itemsList)
+        {
+            var embeddingText = BuildEmbeddingText(media);
+            var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
+            var cached = await _embeddingCache.GetAsync(contentHash, modelId, ct);
+
+            if (cached != null)
+            {
+                cachedItems.Add((media, cached.Embedding));
+                Interlocked.Increment(ref _cacheHits);
+            }
+            else
+            {
+                uncachedItems.Add(media);
+                Interlocked.Increment(ref _cacheMisses);
+            }
+        }
+
+        _logger?.LogInformation("Embedding cache: {Hits} hits, {Misses} misses ({HitRate:P1} hit rate)",
+            cachedItems.Count, uncachedItems.Count,
+            itemsList.Count > 0 ? (double)cachedItems.Count / itemsList.Count : 0);
+
+        // Step 2: Process cached items (fast path - no AI calls)
+        foreach (var (media, embedding) in cachedItems)
+        {
+            try
+            {
+                var vectorMetadata = new Dictionary<string, object>
+                {
+                    ["title"] = media.Title,
+                    ["genres"] = media.Genres,
+                    ["popularity"] = media.Popularity
+                };
+
+                await Data<Media, string>.SaveWithVector(media, embedding, vectorMetadata, ct).ConfigureAwait(false);
+                Interlocked.Increment(ref stored);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Vector pipeline (cached): failed to save vector for media {Id}", media.Id);
+                Interlocked.Increment(ref failures);
+            }
+        }
+
+        // Step 3: Process uncached items (slow path - requires AI calls)
+        if (uncachedItems.Count > 0)
+        {
+            await uncachedItems
+                .ToAsyncEnumerable()
+                .Tokenize(m => BuildEmbeddingText(m), model != null ? new AiTokenizeOptions { Model = model } : new AiTokenizeOptions())
+                .Branch(branch => branch
+                    .OnSuccess(success => success
+                        .Mutate(envelope =>
                         {
-                            // Extract vector metadata if present
-                            var vectorMetadata = envelope.Features.TryGetValue("vector:metadata", out var metadataObj)
-                                               ? metadataObj as IReadOnlyDictionary<string, object>
-                                               : null;
-
-                            try
-                            {
-                                //_logger?.LogDebug("Vector pipeline: attempting SaveWithVector for media {Id} with embedding length {Length}", envelope.Entity.Id, embedding.Length);
-
-                                // Use the canonical SaveWithVector method that handles both entity and vector
-                                await Data<Media, string>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
-
-                                // Populate metadata to indicate vector was saved (canonical pattern)
-                                envelope.Metadata["vector:affected"] = 1;
-                                //_logger?.LogDebug("Vector pipeline: saved 1 vector for media {Id}", envelope.Entity.Id);
-                                Interlocked.Add(ref stored, 1);
-                            }
-                            catch (InvalidOperationException ex)
-                            {
-                                //_logger?.LogWarning("Vector pipeline: vector storage not available for media {Id}: {Error}", envelope.Entity.Id, ex.Message);
-                                envelope.Metadata["vector:affected"] = 0;
-                            }
-                            catch (Exception ex)
-                            {
-                                //_logger?.LogError(ex, "Vector pipeline: unexpected error saving vector for media {Id}: {Error}", envelope.Entity.Id, ex.Message);
-                                envelope.Metadata["vector:affected"] = 0;
-                            }
-                        }
-                        else
+                            envelope.Features["vector:metadata"] = new { title = envelope.Entity.Title, genres = envelope.Entity.Genres, popularity = envelope.Entity.Popularity };
+                        })
+                        .Do(async (envelope, ct) =>
                         {
-                            _logger?.LogWarning("Vector pipeline: no embeddings found for media {Id}", envelope.Entity.Id);
-                            envelope.Metadata["vector:affected"] = 0;
-                        }
-                    }))
-                .OnFailure(failure => failure
-                    .Tap(env => _logger?.LogWarning("Vector pipeline: tokenization failed for media {Id}: {Error}", env.Entity.Id, env.Error?.Message ?? "unknown"))
-                    .Tap(_ => Interlocked.Increment(ref failures))
-                    .Trace(env => $"Vector pipeline failed for media {env.Entity.Id}: {env.Error?.Message ?? "unknown"}")))
-            .ExecuteAsync(ct);
+                            if (envelope.Features.TryGetValue(PipelineFeatureKeys.Embedding, out var embeddingObj)
+                                && embeddingObj is float[] embedding)
+                            {
+                                var vectorMetadata = envelope.Features.TryGetValue("vector:metadata", out var metadataObj)
+                                                   ? metadataObj as IReadOnlyDictionary<string, object>
+                                                   : null;
+
+                                try
+                                {
+                                    await Data<Media, string>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
+                                    envelope.Metadata["vector:affected"] = 1;
+                                    Interlocked.Add(ref stored, 1);
+
+                                    // Cache the embedding for future use
+                                    var embeddingText = BuildEmbeddingText(envelope.Entity);
+                                    var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
+                                    await _embeddingCache.SetAsync(contentHash, modelId, embedding, ct);
+                                }
+                                catch (InvalidOperationException ex)
+                                {
+                                    envelope.Metadata["vector:affected"] = 0;
+                                    Interlocked.Increment(ref failures);
+                                }
+                                catch (Exception ex)
+                                {
+                                    envelope.Metadata["vector:affected"] = 0;
+                                    Interlocked.Increment(ref failures);
+                                }
+                            }
+                            else
+                            {
+                                _logger?.LogWarning("Vector pipeline: no embeddings found for media {Id}", envelope.Entity.Id);
+                                envelope.Metadata["vector:affected"] = 0;
+                                Interlocked.Increment(ref failures);
+                            }
+                        }))
+                    .OnFailure(failure => failure
+                        .Tap(env => _logger?.LogWarning("Vector pipeline: tokenization failed for media {Id}: {Error}", env.Entity.Id, env.Error?.Message ?? "unknown"))
+                        .Tap(_ => Interlocked.Increment(ref failures))
+                        .Trace(env => $"Vector pipeline failed for media {env.Entity.Id}: {env.Error?.Message ?? "unknown"}")))
+                .ExecuteAsync(ct);
+        }
 
         if (failures > 0)
         {
             _logger?.LogWarning("Vector pipeline encountered {Failures} failures", failures);
         }
+
+        _logger?.LogInformation("Vector pipeline completed: {Stored} vectors stored ({Cached} from cache, {Generated} newly generated)",
+            stored, cachedItems.Count, uncachedItems.Count - failures);
 
         return stored;
     }

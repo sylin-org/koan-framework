@@ -24,6 +24,7 @@ Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.R
 // AI, Ollama, and Weaviate are auto-registered by their modules via Koan.Core discovery
 
 // Local services
+builder.Services.AddSingleton<IEmbeddingCache, EmbeddingCache>();
 builder.Services.AddSingleton<ISeedService, SeedService>();
 builder.Services.AddSingleton<IRecsService, RecsService>();
 builder.Services.AddSingleton<IRecommendationSettingsProvider, RecommendationSettingsProvider>();
