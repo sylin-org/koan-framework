@@ -394,7 +394,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             return BadRequest(new { error = $"No parser found for source '{req.Source}'" });
         }
 
-        // Resolve MediaType
+        // Resolve MediaType (use request ct for validation only)
         var mediaType = await Models.MediaType.All(ct)
             .ContinueWith(t => t.Result.FirstOrDefault(mt => mt.Name.Equals(req.MediaType, StringComparison.OrdinalIgnoreCase)), ct);
 
@@ -403,7 +403,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             return BadRequest(new { error = $"MediaType '{req.MediaType}' not found" });
         }
 
-        // Determine which jobs to process
+        // Determine which jobs to process (use request ct for validation)
         List<Services.CacheManifest> jobsToProcess;
         if (!string.IsNullOrWhiteSpace(req.JobId))
         {
@@ -434,6 +434,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 jobsToProcess.Count, req.Source, req.MediaType);
         }
 
+        // Long-running operation: use CancellationToken.None to prevent HTTP timeout cancellation
         // Parse and import per page to avoid memory issues
         int totalImported = 0;
         int totalCached = 0;
@@ -443,13 +444,13 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             _logger.LogInformation("Rebuild: processing job {JobId} (fetched {FetchedAt:u})",
                 job.JobId, job.FetchedAt);
 
-            await foreach (var (pageNum, rawJson) in cache.ReadPagesAsync(job.Source, job.MediaType, job.JobId, ct))
+            await foreach (var (pageNum, rawJson) in cache.ReadPagesAsync(job.Source, job.MediaType, job.JobId, CancellationToken.None))
             {
-                var parsedMedia = await parser.ParsePageAsync(rawJson, mediaType, ct);
+                var parsedMedia = await parser.ParsePageAsync(rawJson, mediaType, CancellationToken.None);
 
                 if (parsedMedia.Count > 0)
                 {
-                    var imported = await Models.Media.UpsertMany(parsedMedia, ct);
+                    var imported = await Models.Media.UpsertMany(parsedMedia, CancellationToken.None);
                     totalImported += imported;
 
                     if (pageNum % 50 == 0) // Log every 50 pages
