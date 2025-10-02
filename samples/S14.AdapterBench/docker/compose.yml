@@ -20,7 +20,7 @@ services:
       # Redis
       Koan__Data__Redis__ConnectionString: "redis:6379"
     volumes:
-      - ../data:/app/data
+      - ../.Koan/Data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,7 +42,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - ../data/postgres:/var/lib/postgresql/data
+      - ../.Koan/Data/postgres:/var/lib/postgresql/data
     ports:
       - "5175:5432"
 
@@ -55,7 +55,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - ../data/mongo:/data/db
+      - ../.Koan/Data/mongo:/data/db
     ports:
       - "5176:27017"
 
@@ -64,7 +64,7 @@ services:
     container_name: s14-redis
     command: redis-server --appendonly yes
     volumes:
-      - ../data/redis:/data
+      - ../.Koan/Data/redis:/data
     ports:
       - "5177:6379"
 
