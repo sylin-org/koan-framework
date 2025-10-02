@@ -314,17 +314,19 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         await EnsureSchemaAsync(ct);
 
         var limit = batchSize ?? 100; // Weaviate cursor default
-        var offset = 0;
         var totalExported = 0;
+        string? afterCursor = null; // Cursor-based pagination (no 10k limit)
 
         while (true)
         {
-            // GraphQL query to fetch objects with vectors
+            // GraphQL query to fetch objects with vectors using cursor pagination
+            // Note: Weaviate limits offset pagination to 10,000 objects
+            var afterClause = afterCursor != null ? $", after: \"{afterCursor}\"" : "";
             var gql = new
             {
                 query = $@"query {{
                     Get {{
-                        {ClassName}(limit: {limit}, offset: {offset}) {{
+                        {ClassName}(limit: {limit}{afterClause}) {{
                             docId
                             _additional {{
                                 id
@@ -353,11 +355,13 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                 break;
             }
 
+            string? lastUuid = null;
             foreach (var obj in objects.OfType<JObject>())
             {
                 var docId = obj["docId"]?.Value<string>();
                 var additional = obj["_additional"] as JObject;
                 var vectorArray = additional?["vector"] as JArray;
+                var uuid = additional?["id"]?.Value<string>();
 
                 if (docId != null && vectorArray != null)
                 {
@@ -373,6 +377,11 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
                     yield return new VectorExportBatch<TKey>(id, embedding, metadata.Count > 0 ? metadata.ToObject<object>() : null);
                     totalExported++;
+
+                    if (uuid != null)
+                    {
+                        lastUuid = uuid;
+                    }
                 }
             }
 
@@ -382,7 +391,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                 break;
             }
 
-            offset += limit;
+            // Update cursor for next page
+            afterCursor = lastUuid;
 
             if (totalExported % 1000 == 0)
             {
