@@ -26,7 +26,7 @@ public static class ServiceCollectionExtensions
             services.AddKoanOptions<AiOptions>("Koan:Ai");
         }
 
-        // Register source and group registries (NEW - ADR-0014)
+        // Register source registry (ADR-0015: No group registry - sources contain members)
         services.TryAddSingleton<IAiSourceRegistry>(sp =>
         {
             var registry = new AiSourceRegistry();
@@ -36,38 +36,10 @@ public static class ServiceCollectionExtensions
             return registry;
         });
 
-        services.TryAddSingleton<IAiGroupRegistry>(sp =>
-        {
-            var registry = new AiGroupRegistry();
-            var configuration = sp.GetRequiredService<IConfiguration>();
-            var logger = sp.GetService<ILogger<AiGroupRegistry>>();
-            registry.DiscoverFromConfiguration(configuration, logger);
-            return registry;
-        });
-
-        // Register health monitoring infrastructure (ADR-0014 Phase 4)
-        services.TryAddSingleton<ISourceHealthRegistry>(sp =>
-        {
-            var healthRegistry = new SourceHealthRegistry(sp.GetService<ILogger<SourceHealthRegistry>>());
-
-            // Register circuit breaker configs for all groups
-            var groupRegistry = sp.GetRequiredService<IAiGroupRegistry>();
-            var sourceRegistry = sp.GetRequiredService<IAiSourceRegistry>();
-
-            foreach (var group in groupRegistry.GetAllGroups())
-            {
-                var sources = sourceRegistry.GetSourcesInGroup(group.Name);
-                foreach (var source in sources)
-                {
-                    healthRegistry.RegisterSource(source.Name, group.CircuitBreaker);
-                }
-            }
-
-            return healthRegistry;
-        });
-
-        // Register health monitor background service
-        services.AddHostedService<AiSourceHealthMonitor>();
+        // TODO: Implement health monitoring (ADR-0015 Phase 5)
+        // - Member-level circuit breakers
+        // - Source health aggregation
+        // - Background health monitor service
 
         // Register existing infrastructure
         services.TryAddSingleton<IAiAdapterRegistry, InMemoryAdapterRegistry>();
