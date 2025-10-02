@@ -44,13 +44,30 @@ internal sealed class DefaultAiRouter : IAiRouter
         // Inject member URL into request for adapter
         request.InternalConnectionString = member.ConnectionString;
 
-        // Log routing decision (one-liner)
-        _logger?.LogDebug(
-            "Routing: source='{Source}' priority={Priority} policy='{Policy}' member='{Member}' url='{Url}' adapter='{Adapter}'",
-            source.Name, source.Priority, source.Policy, member.Name, member.ConnectionString, adapter.Id);
+        // Get effective model (request model or member's capability model)
+        var effectiveModel = request.Model;
+        if (string.IsNullOrWhiteSpace(effectiveModel) && member.Capabilities?.TryGetValue("Chat", out var chatCap) == true)
+        {
+            effectiveModel = chatCap.Model;
+        }
 
-        var response = await adapter.ChatAsync(request, ct).ConfigureAwait(false);
-        return response with { AdapterId = adapter.Id };
+        try
+        {
+            var response = await adapter.ChatAsync(request, ct).ConfigureAwait(false);
+
+            _logger?.LogInformation(
+                "AI route OK: {Adapter}/{Model} via {Source}:{Member}",
+                adapter.Id, effectiveModel ?? "(default)", source.Name, member.Name);
+
+            return response with { AdapterId = adapter.Id };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(
+                "AI route FAIL: {Adapter}/{Model} via {Source}:{Member} - {Error}",
+                adapter.Id, effectiveModel ?? "(default)", source.Name, member.Name, ex.Message);
+            throw;
+        }
     }
 
     public async IAsyncEnumerable<AiChatChunk> StreamAsync(
@@ -61,13 +78,27 @@ internal sealed class DefaultAiRouter : IAiRouter
 
         request.InternalConnectionString = member.ConnectionString;
 
-        _logger?.LogDebug(
-            "Routing: source='{Source}' priority={Priority} policy='{Policy}' member='{Member}' url='{Url}' adapter='{Adapter}'",
-            source.Name, source.Priority, source.Policy, member.Name, member.ConnectionString, adapter.Id);
+        // Get effective model (request model or member's capability model)
+        var effectiveModel = request.Model;
+        if (string.IsNullOrWhiteSpace(effectiveModel) && member.Capabilities?.TryGetValue("Chat", out var chatCap) == true)
+        {
+            effectiveModel = chatCap.Model;
+        }
+
+        var chunkCount = 0;
+        Exception? streamError = null;
 
         await foreach (var chunk in adapter.StreamAsync(request, ct).ConfigureAwait(false))
         {
+            chunkCount++;
             yield return chunk with { AdapterId = adapter.Id };
+        }
+
+        if (streamError == null)
+        {
+            _logger?.LogInformation(
+                "AI route OK: {Adapter}/{Model} via {Source}:{Member} (stream {Chunks} chunks)",
+                adapter.Id, effectiveModel ?? "(default)", source.Name, member.Name, chunkCount);
         }
     }
 
@@ -77,11 +108,30 @@ internal sealed class DefaultAiRouter : IAiRouter
 
         request.InternalConnectionString = member.ConnectionString;
 
-        _logger?.LogDebug(
-            "Routing: source='{Source}' priority={Priority} policy='{Policy}' member='{Member}' url='{Url}' adapter='{Adapter}'",
-            source.Name, source.Priority, source.Policy, member.Name, member.ConnectionString, adapter.Id);
+        // Get effective model (request model or member's capability model)
+        var effectiveModel = request.Model;
+        if (string.IsNullOrWhiteSpace(effectiveModel) && member.Capabilities?.TryGetValue("Embedding", out var embCap) == true)
+        {
+            effectiveModel = embCap.Model;
+        }
 
-        return await adapter.EmbedAsync(request, ct).ConfigureAwait(false);
+        try
+        {
+            var response = await adapter.EmbedAsync(request, ct).ConfigureAwait(false);
+
+            _logger?.LogInformation(
+                "AI route OK: {Adapter}/{Model} via {Source}:{Member} (embed {Count} inputs)",
+                adapter.Id, effectiveModel ?? "(default)", source.Name, member.Name, request.Input?.Count ?? 0);
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(
+                "AI route FAIL: {Adapter}/{Model} via {Source}:{Member} - {Error}",
+                adapter.Id, effectiveModel ?? "(default)", source.Name, member.Name, ex.Message);
+            throw;
+        }
     }
 
     /// <summary>
@@ -133,10 +183,7 @@ internal sealed class DefaultAiRouter : IAiRouter
             // Try direct source lookup
             var source = _sourceRegistry.GetSource(sourceHint);
             if (source != null)
-            {
-                _logger?.LogDebug("Resolved hint '{Hint}' as source", sourceHint);
                 return source;
-            }
 
             // Check for member reference (contains ::)
             if (sourceHint.Contains("::"))
@@ -144,11 +191,7 @@ internal sealed class DefaultAiRouter : IAiRouter
                 var sourceName = sourceHint.Split("::")[0];
                 source = _sourceRegistry.GetSource(sourceName);
                 if (source != null)
-                {
-                    _logger?.LogDebug("Resolved hint '{Hint}' as member reference in source '{Source}'",
-                        sourceHint, sourceName);
                     return source;
-                }
 
                 // Fail fast: member reference but source not found
                 throw new InvalidOperationException(
@@ -171,13 +214,7 @@ internal sealed class DefaultAiRouter : IAiRouter
                 "Configure a source or enable auto-discovery.");
         }
 
-        var elected = candidates.First(); // Already sorted by priority descending
-
-        _logger?.LogDebug(
-            "Elected source '{Source}' (priority {Priority}) for capability '{Capability}'",
-            elected.Name, elected.Priority, capabilityName);
-
-        return elected;
+        return candidates.First(); // Already sorted by priority descending
     }
 
     /// <summary>
@@ -199,7 +236,6 @@ internal sealed class DefaultAiRouter : IAiRouter
                     $"Available members: {string.Join(", ", source.Members.Select(m => m.Name))}");
             }
 
-            _logger?.LogDebug("Pinned to member '{Member}' (policy bypassed)", pinnedMember.Name);
             return pinnedMember;
         }
 
@@ -212,16 +248,10 @@ internal sealed class DefaultAiRouter : IAiRouter
 
         // Simple policy: use first healthy member (Fallback policy)
         // TODO: Implement RoundRobin, WeightedRoundRobin in Phase 4
-        var member = source.Members
+        return source.Members
             .OrderBy(m => m.Order)
             .FirstOrDefault(m => m.HealthState != MemberHealthState.Unhealthy)
             ?? source.Members.OrderBy(m => m.Order).First();
-
-        _logger?.LogDebug(
-            "Policy '{Policy}' selected member '{Member}' from source '{Source}' (order {Order})",
-            source.Policy, member.Name, source.Name, member.Order);
-
-        return member;
     }
 
     /// <summary>

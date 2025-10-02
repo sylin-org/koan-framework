@@ -26,22 +26,28 @@ namespace Koan.AI.Connector.Ollama.Initialization;
 /// ADR-0015 compliant Ollama discovery service.
 /// Creates source "ollama" (priority 50) with auto-discovered members.
 /// Implements Urls vs AdditionalUrls semantics.
-/// NO duplicate adapter registration - adapters are singletons managed by DI.
+/// Registers singleton OllamaAdapter with router's adapter registry.
 /// </summary>
 internal sealed class OllamaDiscoveryService : IHostedService
 {
     private readonly IServiceProvider _sp;
     private readonly IConfiguration _cfg;
     private readonly IAiSourceRegistry _sourceRegistry;
+    private readonly IAiAdapterRegistry _adapterRegistry;
     private readonly ILogger<OllamaDiscoveryService> _logger;
     private readonly IOrchestrationAwareServiceDiscovery _serviceDiscovery;
     private const string CacheDirectory = "/app/cache/ai-introspection";
 
-    public OllamaDiscoveryService(IServiceProvider sp, IConfiguration cfg, IAiSourceRegistry sourceRegistry)
+    public OllamaDiscoveryService(
+        IServiceProvider sp,
+        IConfiguration cfg,
+        IAiSourceRegistry sourceRegistry,
+        IAiAdapterRegistry adapterRegistry)
     {
         _sp = sp;
         _cfg = cfg;
         _sourceRegistry = sourceRegistry;
+        _adapterRegistry = adapterRegistry;
         _logger = sp.GetService<ILogger<OllamaDiscoveryService>>()
                  ?? NullLogger<OllamaDiscoveryService>.Instance;
         _serviceDiscovery = new OrchestrationAwareServiceDiscovery(cfg, null);
@@ -176,11 +182,46 @@ internal sealed class OllamaDiscoveryService : IHostedService
                     ("url", member.ConnectionString),
                     ("capabilities", member.Capabilities?.Count ?? 0));
             }
+
+            // ADR-0015: Register singleton OllamaAdapter
+            // Router will inject member URLs via InternalConnectionString per request
+            RegisterSingletonAdapter();
         }
         catch (Exception ex)
         {
             KoanLog.BootWarning(_logger, LogActions.Discovery, "unexpected-error", ("reason", ex.Message));
             KoanLog.BootDebug(_logger, LogActions.Discovery, "error-detail", ("exception", ex.ToString()));
+        }
+    }
+
+    private void RegisterSingletonAdapter()
+    {
+        try
+        {
+            // Create singleton adapter with first member URL as fallback
+            // Router will override via InternalConnectionString for each request
+            var http = new HttpClient
+            {
+                BaseAddress = new Uri("http://localhost:11434"), // Fallback, router overrides
+                Timeout = TimeSpan.FromSeconds(60)
+            };
+
+            var adapterLogger = _sp.GetService<ILogger<OllamaAdapter>>()
+                             ?? NullLogger<OllamaAdapter>.Instance;
+
+            var readinessDefaults = _sp.GetService<IOptions<AdaptersReadinessOptions>>()?.Value;
+
+            var adapter = new OllamaAdapter(http, adapterLogger, _cfg, readinessDefaults);
+            _adapterRegistry.Add(adapter);
+
+            KoanLog.BootInfo(_logger, LogActions.Discovery, "adapter-registered",
+                ("adapter", "ollama"),
+                ("pattern", "singleton"));
+        }
+        catch (Exception ex)
+        {
+            KoanLog.BootWarning(_logger, LogActions.Discovery, "adapter-registration-failed",
+                ("reason", ex.Message));
         }
     }
 
@@ -406,14 +447,23 @@ internal sealed class OllamaDiscoveryService : IHostedService
                 .Select(n => n!)
                 .ToList();
 
-            // Preferred models for each capability
+            // ADR-0015: If DefaultModel is explicitly configured, use it instead of auto-detection
+            if (!string.IsNullOrWhiteSpace(defaultModel))
+            {
+                // Explicit configuration takes precedence
+                capabilities["Chat"] = new AiCapabilityConfig { Model = defaultModel };
+                capabilities["Embedding"] = new AiCapabilityConfig { Model = defaultModel };
+                return capabilities;
+            }
+
+            // Preferred models for each capability (auto-detection mode)
             var chatPreferred = new[] { "llama3.2", "llama3.1", "llama3", "llama2", "mistral", "qwen" };
             var embedPreferred = new[] { "nomic-embed-text", "all-minilm", "bge-", "mxbai-embed" };
             var visionPreferred = new[] { "llava", "bakllava", "vision" };
 
             // Map capabilities intelligently
-            var chatModel = FindPreferredModel(modelNames, chatPreferred) ?? defaultModel ?? modelNames.FirstOrDefault();
-            var embedModel = FindPreferredModel(modelNames, embedPreferred) ?? defaultModel ?? modelNames.FirstOrDefault();
+            var chatModel = FindPreferredModel(modelNames, chatPreferred) ?? modelNames.FirstOrDefault();
+            var embedModel = FindPreferredModel(modelNames, embedPreferred) ?? modelNames.FirstOrDefault();
             var visionModel = FindPreferredModel(modelNames, visionPreferred);
 
             if (!string.IsNullOrWhiteSpace(chatModel))

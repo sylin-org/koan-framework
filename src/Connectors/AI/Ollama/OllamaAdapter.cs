@@ -125,50 +125,50 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     }
 
     public async Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
-        => await this.WithReadinessAsync(async () =>
+    {
+        // ADR-0015: Router handles member health selection - skip singleton readiness check
+        var http = GetHttpClientForRequest(request.InternalConnectionString);
+        var model = request.Model ?? _defaultModel;
+        if (string.IsNullOrWhiteSpace(model))
         {
-            var http = GetHttpClientForRequest(request.InternalConnectionString);
-            var model = request.Model ?? _defaultModel;
-            if (string.IsNullOrWhiteSpace(model))
-            {
-                throw new InvalidOperationException("Ollama adapter requires a model name.");
-            }
+            throw new InvalidOperationException("Ollama adapter requires a model name.");
+        }
 
-            var prompt = BuildPrompt(request);
-            var body = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["model"] = model,
-                ["prompt"] = prompt,
-                ["stream"] = false,
-                ["options"] = MapOptions(request.Options)
-            };
+        var prompt = BuildPrompt(request);
+        var body = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["model"] = model,
+            ["prompt"] = prompt,
+            ["stream"] = false,
+            ["options"] = MapOptions(request.Options)
+        };
 
-            if (request.Options?.Think is bool thinkFlag)
-            {
-                body["think"] = thinkFlag;
-            }
+        if (request.Options?.Think is bool thinkFlag)
+        {
+            body["think"] = thinkFlag;
+        }
 
-            Logger.LogDebug("Ollama: POST {Path} model={Model}", "/api/generate", model);
-            var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-            using var resp = await http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                Logger.LogWarning("Ollama: generate failed ({Status}) body={Body}", (int)resp.StatusCode, text);
-            }
+        Logger.LogDebug("Ollama: POST {Path} model={Model}", "/api/generate", model);
+        var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+        using var resp = await http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            Logger.LogWarning("Ollama: generate failed ({Status}) body={Body}", (int)resp.StatusCode, text);
+        }
 
-            resp.EnsureSuccessStatusCode();
-            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            var doc = JsonConvert.DeserializeObject<OllamaGenerateResponse>(json)
-                      ?? throw new InvalidOperationException("Empty response from Ollama.");
+        resp.EnsureSuccessStatusCode();
+        var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        var doc = JsonConvert.DeserializeObject<OllamaGenerateResponse>(json)
+                  ?? throw new InvalidOperationException("Empty response from Ollama.");
 
-            return new AiChatResponse
-            {
-                Text = doc.response ?? string.Empty,
-                FinishReason = doc.done_reason,
-                Model = doc.model
-            };
-        }, ct).ConfigureAwait(false);
+        return new AiChatResponse
+        {
+            Text = doc.response ?? string.Empty,
+            FinishReason = doc.done_reason,
+            Model = doc.model
+        };
+    }
 
     public async IAsyncEnumerable<AiChatChunk> StreamAsync(
         AiChatRequest request,
@@ -222,39 +222,39 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     }
 
     public async Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
-        => await this.WithReadinessAsync(async () =>
+    {
+        // ADR-0015: Router handles member health selection - skip singleton readiness check
+        var http = GetHttpClientForRequest(request.InternalConnectionString);
+        var model = request.Model ?? _defaultModel;
+        if (string.IsNullOrWhiteSpace(model))
         {
-            var http = GetHttpClientForRequest(request.InternalConnectionString);
-            var model = request.Model ?? _defaultModel;
-            if (string.IsNullOrWhiteSpace(model))
+            throw new InvalidOperationException("Ollama adapter requires a model name.");
+        }
+
+        var vectors = new List<float[]>();
+        foreach (var input in request.Input)
+        {
+            var body = new { model, prompt = input };
+            var payload = JsonConvert.SerializeObject(body);
+
+            using var resp = await http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException("Ollama adapter requires a model name.");
+                var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                Logger.LogWarning("Ollama: embeddings failed ({Status}) body={Body}", (int)resp.StatusCode, text);
             }
 
-            var vectors = new List<float[]>();
-            foreach (var input in request.Input)
-            {
-                var body = new { model, prompt = input };
-                var payload = JsonConvert.SerializeObject(body);
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var doc = JsonConvert.DeserializeObject<OllamaEmbeddingsResponse>(json)
+                      ?? throw new InvalidOperationException("Empty response from Ollama.");
 
-                using var resp = await http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
-                if (!resp.IsSuccessStatusCode)
-                {
-                    var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                    Logger.LogWarning("Ollama: embeddings failed ({Status}) body={Body}", (int)resp.StatusCode, text);
-                }
+            vectors.Add(doc.embedding ?? Array.Empty<float>());
+        }
 
-                resp.EnsureSuccessStatusCode();
-                var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                var doc = JsonConvert.DeserializeObject<OllamaEmbeddingsResponse>(json)
-                          ?? throw new InvalidOperationException("Empty response from Ollama.");
-
-                vectors.Add(doc.embedding ?? Array.Empty<float>());
-            }
-
-            var dimension = vectors.FirstOrDefault()?.Length ?? 0;
-            return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = dimension };
-        }, ct).ConfigureAwait(false);
+        var dimension = vectors.FirstOrDefault()?.Length ?? 0;
+        return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = dimension };
+    }
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
         => await this.WithReadinessAsync(async () =>
