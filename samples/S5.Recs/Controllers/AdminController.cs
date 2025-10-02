@@ -637,7 +637,7 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
 
     [HttpPost("cache/embeddings/export")]
     public async Task<IActionResult> ExportEmbeddingsToCache(
-        [FromServices] IVectorSearchRepository<Models.Media, string> vectorRepo,
+        [FromServices] Koan.Data.Vector.IVectorService vectorService,
         [FromServices] Services.IEmbeddingCache embeddingCache,
         [FromServices] Services.ISeedService seedService,
         CancellationToken ct)
@@ -649,6 +649,16 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             var errors = 0;
 
             _logger.LogInformation("Starting export of existing vectors to embedding cache...");
+
+            // Get vector repository from IVectorService
+            var vectorRepo = vectorService.TryGetRepository<Models.Media, string>();
+            if (vectorRepo == null)
+            {
+                _logger.LogError("Failed to resolve vector repository for Media entity");
+                return StatusCode(500, new { error = "Vector repository not available" });
+            }
+
+            _logger.LogInformation("Using vector repository: {Type}", vectorRepo.GetType().FullName);
 
             await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
             {
