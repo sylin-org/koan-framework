@@ -368,7 +368,10 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                     metadata.Remove("_additional");
                     metadata.Remove("docId");
 
-                    yield return new VectorExportBatch<TKey>(ConvertId(docId), embedding, metadata.Count > 0 ? metadata.ToObject<object>() : null);
+                    // Convert ID using same approach as ParseGraphQlIds
+                    TKey id = (TKey)Convert.ChangeType(docId, typeof(TKey));
+
+                    yield return new VectorExportBatch<TKey>(id, embedding, metadata.Count > 0 ? metadata.ToObject<object>() : null);
                     totalExported++;
                 }
             }

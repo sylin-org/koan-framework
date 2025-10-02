@@ -15,8 +15,8 @@
     <ProjectReference Include="..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
-    <!-- <ProjectReference Include="..\..\src\Connectors\Data\Vector\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj" /> -->
-    <ProjectReference Include="..\..\src\Connectors\Data\ElasticSearch\Koan.Data.Connector.ElasticSearch.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Data\Vector\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj" />
+    <!-- <ProjectReference Include="..\..\src\Connectors\Data\ElasticSearch\Koan.Data.Connector.ElasticSearch.csproj" /> -->
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Web\Koan.AI.Web.csproj" />
