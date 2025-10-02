@@ -434,8 +434,8 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 jobsToProcess.Count, req.Source, req.MediaType);
         }
 
-        // Parse all cached pages from all jobs (in order)
-        var allMedia = new List<Models.Media>();
+        // Parse and import per page to avoid memory issues
+        int totalImported = 0;
         int totalCached = 0;
 
         foreach (var job in jobsToProcess)
@@ -445,27 +445,33 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
 
             await foreach (var (pageNum, rawJson) in cache.ReadPagesAsync(job.Source, job.MediaType, job.JobId, ct))
             {
-                _logger.LogDebug("Rebuild: parsing page {Page} from {JobId}", pageNum, job.JobId);
-
                 var parsedMedia = await parser.ParsePageAsync(rawJson, mediaType, ct);
-                allMedia.AddRange(parsedMedia);
+
+                if (parsedMedia.Count > 0)
+                {
+                    var imported = await Models.Media.UpsertMany(parsedMedia, ct);
+                    totalImported += imported;
+
+                    if (pageNum % 50 == 0) // Log every 50 pages
+                    {
+                        _logger.LogInformation("Rebuild: page {Page} complete ({PageItems} items, total: {Total})",
+                            pageNum, parsedMedia.Count, totalImported);
+                    }
+                }
             }
 
             totalCached += job.TotalItems;
         }
 
-        // Import the parsed data
-        var imported = await Models.Media.UpsertMany(allMedia, ct);
-
         _logger.LogInformation("Rebuilt database from {JobCount} cache job(s): {Source}/{MediaType} - imported {Imported} items",
-            jobsToProcess.Count, req.Source, req.MediaType, imported);
+            jobsToProcess.Count, req.Source, req.MediaType, totalImported);
 
         return Ok(new {
             source = req.Source,
             mediaType = req.MediaType,
             jobsProcessed = jobsToProcess.Count,
             jobIds = jobsToProcess.Select(j => j.JobId).ToArray(),
-            imported = imported,
+            imported = totalImported,
             cached = totalCached
         });
     }
