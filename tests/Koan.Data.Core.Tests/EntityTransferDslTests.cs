@@ -23,6 +23,8 @@ public sealed class EntityTransferDslTests : IDisposable
 
     public EntityTransferDslTests()
     {
+        TestHooks.ResetDataConfigs();
+
         _workDir = Path.Combine(Path.GetTempPath(), "Koan-Transfer-Tests", Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(_workDir);
 

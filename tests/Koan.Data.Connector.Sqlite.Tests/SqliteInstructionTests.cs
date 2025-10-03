@@ -4,12 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
+using Koan.Testing;
 using Xunit;
 using DataServiceExecuteExtensions = Koan.Data.Relational.Extensions.DataServiceExecuteExtensions;
 
 namespace Koan.Data.Connector.Sqlite.Tests;
 
-public class SqliteInstructionTests
+public class SqliteInstructionTests : KoanTestBase
 {
     public class Todo : IEntity<string>
     {
@@ -19,20 +20,21 @@ public class SqliteInstructionTests
 
     }
 
-    private static IServiceProvider BuildServices(string file)
+    private IServiceProvider BuildSqliteServices(string file)
     {
-        var sc = new ServiceCollection();
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[] {
-                new KeyValuePair<string,string?>("SqliteOptions:ConnectionString", $"Data Source={file}"),
-                new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite")
-            })
-            .Build();
-        sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={file}");
-        sc.AddKoanDataCore();
-        sc.AddSingleton<IDataService, DataService>();
-        return sc.BuildServiceProvider();
+        return BuildServices(services =>
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[] {
+                    new KeyValuePair<string,string?>("SqliteOptions:ConnectionString", $"Data Source={file}"),
+                    new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite")
+                })
+                .Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            services.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={file}");
+            services.AddKoanDataCore();
+            services.AddSingleton<IDataService, DataService>();
+        });
     }
 
     private static string TempFile()
@@ -46,7 +48,7 @@ public class SqliteInstructionTests
     public async Task EnsureCreated_And_Scalar_Works()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
 
         var ensured = await data.Execute<Todo, bool>(new Instruction("relational.schema.ensureCreated"));

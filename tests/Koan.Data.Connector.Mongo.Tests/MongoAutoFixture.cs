@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Koan.Core;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Koan.Data.Core;
@@ -88,11 +90,26 @@ public sealed class MongoAutoFixture : IAsyncLifetime
             })
             .Build();
         var sc = new ServiceCollection();
+
+        // Add logging infrastructure
+        sc.AddLogging(builder =>
+        {
+            builder.AddConsole();
+            builder.SetMinimumLevel(LogLevel.Debug);
+        });
+
         sc.AddSingleton<IConfiguration>(cfg);
+        sc.AddKoanCore();
         sc.AddKoanDataCore();
         sc.AddMongoAdapter();
+        sc.Configure<MongoOptions>(o =>
+        {
+            o.DefaultPageSize = 1000;
+            o.MaxPageSize = 2000;
+        });
         // Provide naming resolver for StorageNameRegistry
         sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
+        TestHooks.ResetDataConfigs();
         Services = sc.BuildServiceProvider();
     }
 }

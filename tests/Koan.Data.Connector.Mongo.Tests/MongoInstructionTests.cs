@@ -4,11 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
+using Koan.Testing;
 using Xunit;
 
 namespace Koan.Data.Connector.Mongo.Tests;
 
-public class MongoInstructionTests : IClassFixture<MongoAutoFixture>
+public class MongoInstructionTests : KoanTestBase, IClassFixture<MongoAutoFixture>
 {
     private readonly MongoAutoFixture _fx;
     public MongoInstructionTests(MongoAutoFixture fx) => _fx = fx;
@@ -20,30 +21,31 @@ public class MongoInstructionTests : IClassFixture<MongoAutoFixture>
         public string Title { get; set; } = string.Empty;
     }
 
-    private IServiceProvider BuildServices()
+    private IServiceProvider BuildMongoServices()
     {
         var dbName = "Koan-instr-" + Guid.NewGuid().ToString("n");
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[]
-            {
-                new KeyValuePair<string,string?>("Koan:Data:Mongo:ConnectionString", _fx.ConnectionString),
-                new KeyValuePair<string,string?>("Koan:Data:Mongo:Database", dbName)
-            })
-            .Build();
-        var sc = new ServiceCollection();
-        sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddKoanDataCore();
-        sc.AddMongoAdapter();
-        // Provide naming resolver for StorageNameRegistry
-        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
-        return sc.BuildServiceProvider();
+        return BuildServices(services =>
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[]
+                {
+                    new KeyValuePair<string,string?>("Koan:Data:Mongo:ConnectionString", _fx.ConnectionString),
+                    new KeyValuePair<string,string?>("Koan:Data:Mongo:Database", dbName)
+                })
+                .Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            services.AddKoanDataCore();
+            services.AddMongoAdapter();
+            // Provide naming resolver for StorageNameRegistry
+            services.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
+        });
     }
 
     [Fact]
     public async Task EnsureCreated_Insert_Then_Clear_Works()
     {
         if (!_fx.IsAvailable) return; // effectively skip when Mongo isn't available
-        var sp = BuildServices();
+        var sp = BuildMongoServices();
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 

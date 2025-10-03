@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Koan.Data.Connector.Mongo.Tests;
 
-public class MongoContainerSmokeTests : IAsyncLifetime
+public class MongoContainerSmokeTests : KoanTestBase, IAsyncLifetime
 {
     private MongoDbContainer? _mongo;
     private string? _connString;
@@ -56,22 +56,23 @@ public class MongoContainerSmokeTests : IAsyncLifetime
         if (_mongo is not null) await _mongo.DisposeAsync();
     }
 
-    private IServiceProvider BuildServices()
+    private IServiceProvider BuildMongoServices()
     {
         var dbName = "Koan-it-" + Guid.NewGuid().ToString("n");
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[]
-            {
-                new KeyValuePair<string,string?>("Koan:Data:Mongo:ConnectionString", _connString),
-                new KeyValuePair<string,string?>("Koan:Data:Mongo:Database", dbName)
-            })
-            .Build();
-        var sc = new ServiceCollection();
-        sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddKoanDataCore();
-        sc.AddMongoAdapter();
-        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
-        return sc.BuildServiceProvider();
+        return BuildServices(services =>
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[]
+                {
+                    new KeyValuePair<string,string?>("Koan:Data:Mongo:ConnectionString", _connString),
+                    new KeyValuePair<string,string?>("Koan:Data:Mongo:Database", dbName)
+                })
+                .Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            services.AddKoanDataCore();
+            services.AddMongoAdapter();
+            services.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
+        });
     }
 
     public class Todo : IEntity<string>
@@ -85,7 +86,7 @@ public class MongoContainerSmokeTests : IAsyncLifetime
     public async Task Crud_roundtrip_against_container()
     {
         Skip.IfNot(_available, "Docker is not running or misconfigured; skipping container-based test.");
-        var sp = BuildServices();
+        var sp = BuildMongoServices();
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 

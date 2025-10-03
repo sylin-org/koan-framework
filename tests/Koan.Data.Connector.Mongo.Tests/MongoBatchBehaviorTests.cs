@@ -1,34 +1,44 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Testing;
 using Xunit;
 
 namespace Koan.Data.Connector.Mongo.Tests;
 
-public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
+public class MongoBatchBehaviorTests : KoanTestBase, IClassFixture<MongoAutoFixture>
 {
     private readonly MongoAutoFixture _fx;
     public MongoBatchBehaviorTests(MongoAutoFixture fx) => _fx = fx;
 
-    private IServiceProvider BuildServices()
+    private IServiceProvider BuildMongoServices()
     {
         if (!_fx.IsAvailable) return null!; // signal skip to callers
         var dbName = "Koan-batch-" + Guid.NewGuid().ToString("n");
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[]
+        TestHooks.ResetDataConfigs();
+        return BuildServices(services =>
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[]
+                {
+                    new KeyValuePair<string,string?>("Koan:Data:Mongo:ConnectionString", _fx.ConnectionString),
+                    new KeyValuePair<string,string?>("Koan:Data:Mongo:Database", dbName)
+                })
+                .Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            services.AddKoanCore();
+            services.AddKoanDataCore();
+            services.AddMongoAdapter();
+            services.Configure<MongoOptions>(o =>
             {
-                new KeyValuePair<string,string?>("Koan:Data:Mongo:ConnectionString", _fx.ConnectionString),
-                new KeyValuePair<string,string?>("Koan:Data:Mongo:Database", dbName)
-            })
-            .Build();
-        var sc = new ServiceCollection();
-        sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddKoanDataCore();
-        sc.AddMongoAdapter();
-        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
-        return sc.BuildServiceProvider();
+                o.DefaultPageSize = 1000;
+                o.MaxPageSize = 2000;
+            });
+            services.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
+        });
     }
 
     public record Todo([property: Identifier] string Id, string Title) : IEntity<string>;
@@ -36,7 +46,7 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
     [Fact]
     public async Task RequireAtomic_true_on_standalone_should_throw_NotSupported()
     {
-        var sp = BuildServices();
+        var sp = BuildMongoServices();
         if (sp == null) return; // skip
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
@@ -56,7 +66,7 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
     [Fact]
     public async Task Batch_deleted_count_is_reported_correctly()
     {
-        var sp = BuildServices();
+        var sp = BuildMongoServices();
         if (sp == null) return; // skip
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
@@ -76,7 +86,7 @@ public class MongoBatchBehaviorTests : IClassFixture<MongoAutoFixture>
     [Fact]
     public async Task Batch_cancellation_is_observed()
     {
-        var sp = BuildServices();
+        var sp = BuildMongoServices();
         if (sp == null) return; // skip
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();

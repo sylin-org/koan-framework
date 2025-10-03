@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core;
@@ -20,25 +21,34 @@ public class SqliteRepositoryTests
     }
     public class MetaData { public int Priority { get; set; } }
 
-    private static IServiceProvider BuildServices(string file)
+    private IServiceProvider BuildSqliteServices(string file)
     {
-        var sc = new ServiceCollection();
+        var services = new ServiceCollection();
+
+        // Add logging infrastructure
+        services.AddLogging(builder =>
+        {
+            builder.AddConsole();
+            builder.SetMinimumLevel(LogLevel.Debug);
+        });
+
         var cfg = new ConfigurationBuilder()
             .AddInMemoryCollection(new[] {
                 new KeyValuePair<string,string?>("SqliteOptions:ConnectionString", $"Data Source={file}"),
                 new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite")
             })
             .Build();
-        sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddSqliteAdapter(o =>
+        services.AddSingleton<IConfiguration>(cfg);
+        services.AddSqliteAdapter(o =>
         {
             o.ConnectionString = $"Data Source={file}";
             o.DdlPolicy = SchemaDdlPolicy.AutoCreate;
             o.AllowProductionDdl = true;
         });
-        sc.AddKoanDataCore();
-        sc.AddSingleton<IDataService, DataService>();
-        return sc.BuildServiceProvider();
+        services.AddKoanDataCore();
+        services.AddSingleton<IDataService, DataService>();
+
+        return services.BuildServiceProvider();
     }
 
     private static string TempFile()
@@ -52,7 +62,7 @@ public class SqliteRepositoryTests
     public async Task Crud_And_Index_Works()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
@@ -93,7 +103,7 @@ public class SqliteRepositoryTests
     public async Task StringQuery_Works_WithWhereSuffix_AndFullSelect_AndParameters()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
@@ -122,7 +132,7 @@ public class SqliteRepositoryTests
     public async Task StringQuery_ParameterBinding_PreventsInjection()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
@@ -139,7 +149,7 @@ public class SqliteRepositoryTests
     public async Task StringQuery_EmptyResults_And_Cancellation()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
@@ -156,7 +166,7 @@ public class SqliteRepositoryTests
     public async Task Cancellation_UpsertMany_IsHonored()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
@@ -170,7 +180,7 @@ public class SqliteRepositoryTests
     public async Task Cancellation_Batch_SaveAsync_IsHonored()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 

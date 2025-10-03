@@ -18,5 +18,6 @@
     <ProjectReference Include="..\..\src\Koan.Data.Relational\Koan.Data.Relational.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.Testing\Koan.Testing.csproj" />
   </ItemGroup>
 </Project>

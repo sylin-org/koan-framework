@@ -5,11 +5,12 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Testing;
 using Xunit;
 
 namespace Koan.Data.Connector.Mongo.Tests;
 
-public class PartitionRoutingCountsAndUpdatesTests
+public class PartitionRoutingCountsAndUpdatesTests : KoanTestBase
 {
     public class Todo : IEntity<string>
     {
@@ -18,21 +19,22 @@ public class PartitionRoutingCountsAndUpdatesTests
         public string Title { get; set; } = string.Empty;
     }
 
-    private static IServiceProvider BuildServices()
+    private IServiceProvider BuildMongoServices()
     {
-        var sc = new ServiceCollection();
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[] {
-                new KeyValuePair<string,string?>("Koan:Data:Mongo:ConnectionString", "mongodb://localhost:27017"),
-                new KeyValuePair<string,string?>("Koan:Data:Mongo:Database", "Koan-test-" + Guid.NewGuid().ToString("n"))
-            })
-            .Build();
-        sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddKoanDataCore();
-        sc.AddMongoAdapter();
-        // Provide naming resolver for StorageNameRegistry
-        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
-        return sc.BuildServiceProvider();
+        return BuildServices(services =>
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[] {
+                    new KeyValuePair<string,string?>("Koan:Data:Mongo:ConnectionString", "mongodb://localhost:27017"),
+                    new KeyValuePair<string,string?>("Koan:Data:Mongo:Database", "Koan-test-" + Guid.NewGuid().ToString("n"))
+                })
+                .Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            services.AddKoanDataCore();
+            services.AddMongoAdapter();
+            // Provide naming resolver for StorageNameRegistry
+            services.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
+        });
     }
 
     private static async Task<bool> EnsureMongoAvailableAsync(IServiceProvider sp)
@@ -54,7 +56,7 @@ public class PartitionRoutingCountsAndUpdatesTests
     [Fact]
     public async Task Counts_Clear_Update_Isolation_Across_Sets()
     {
-        var sp = BuildServices();
+        var sp = BuildMongoServices();
         if (!await EnsureMongoAvailableAsync(sp)) return; // skip when Mongo isn't available
 
         var data = sp.GetRequiredService<IDataService>();

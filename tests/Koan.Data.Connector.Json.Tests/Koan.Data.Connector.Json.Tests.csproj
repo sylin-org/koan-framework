@@ -24,7 +24,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\\Connectors\\Data\\Json\Koan.Data.Connector.Json.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\Koan.Testing\Koan.Testing.csproj" />
   </ItemGroup>
 
 </Project>

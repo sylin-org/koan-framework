@@ -3,11 +3,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Testing;
 using Xunit;
 
 namespace Koan.Data.Connector.Sqlite.Tests;
 
-public class SqliteGuardrailsTests
+public class SqliteGuardrailsTests : KoanTestBase
 {
     public class Todo : IEntity<string>
     {
@@ -15,21 +16,22 @@ public class SqliteGuardrailsTests
         public string Title { get; set; } = string.Empty;
     }
 
-    private static IServiceProvider BuildServices(string file)
+    private IServiceProvider BuildSqliteServices(string file)
     {
-        var sc = new ServiceCollection();
         var cs = $"Data Source={file}";
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[] {
-                new KeyValuePair<string,string?>("SqliteOptions:ConnectionString", cs),
-                new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite"),
-            })
-            .Build();
-        sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddSqliteAdapter(o => { o.ConnectionString = cs; o.DefaultPageSize = 5; });
-        sc.AddKoanDataCore();
-        sc.AddSingleton<IDataService, DataService>();
-        return sc.BuildServiceProvider();
+        return BuildServices(services =>
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[] {
+                    new KeyValuePair<string,string?>("SqliteOptions:ConnectionString", cs),
+                    new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite"),
+                })
+                .Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            services.AddSqliteAdapter(o => { o.ConnectionString = cs; o.DefaultPageSize = 5; });
+            services.AddKoanDataCore();
+            services.AddSingleton<IDataService, DataService>();
+        });
     }
 
     private static string TempFile()
@@ -43,7 +45,7 @@ public class SqliteGuardrailsTests
     public async Task Unpaged_Queries_Are_Limited_By_Default()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
         for (int i = 0; i < 20; i++) await repo.UpsertAsync(new Todo { Title = $"t-{i}" });

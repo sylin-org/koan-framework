@@ -3,11 +3,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
+using Koan.Testing;
 using Xunit;
 
 namespace Koan.Data.Connector.Sqlite.Tests;
 
-public class SqliteInstructionExtraTests
+public class SqliteInstructionExtraTests : KoanTestBase
 {
     public class Todo : Abstractions.IEntity<string>
     {
@@ -15,21 +16,22 @@ public class SqliteInstructionExtraTests
         public string Title { get; set; } = string.Empty;
     }
 
-    private static IServiceProvider BuildServices(string file)
+    private IServiceProvider BuildSqliteServices(string file)
     {
-        var sc = new ServiceCollection();
         var cs = $"Data Source={file}";
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[] {
-                new KeyValuePair<string,string?>("SqliteOptions:ConnectionString", cs),
-        new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite"),
-            })
-            .Build();
-        sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddSqliteAdapter(o => o.ConnectionString = cs);
-        sc.AddKoanDataCore();
-        sc.AddSingleton<IDataService, DataService>();
-        return sc.BuildServiceProvider();
+        return BuildServices(services =>
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[] {
+                    new KeyValuePair<string,string?>("SqliteOptions:ConnectionString", cs),
+                    new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite"),
+                })
+                .Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            services.AddSqliteAdapter(o => o.ConnectionString = cs);
+            services.AddKoanDataCore();
+            services.AddSingleton<IDataService, DataService>();
+        });
     }
 
     private static string TempFile()
@@ -43,7 +45,7 @@ public class SqliteInstructionExtraTests
     public async Task DataInstructions_EnsureCreated_And_Clear()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 

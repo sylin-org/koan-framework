@@ -1,34 +1,38 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
+using Koan.Testing;
 using Xunit;
 
 namespace Koan.Data.Connector.Json.Tests;
 
-public class RepositoryTests
+public class RepositoryTests : KoanTestBase
 {
-    private static IServiceProvider BuildServices(string dir)
+    private IServiceProvider BuildJsonServices(string dir)
     {
-        var sc = new ServiceCollection();
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("JsonDataOptions:DirectoryPath", dir) })
-            .Build();
-        sc.AddSingleton<IConfiguration>(cfg);
-        // Provide naming resolver needed by StorageNameRegistry for set-aware physical names
-        sc.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
-        sc.AddJsonData<Todo, string>(o => { o.DirectoryPath = dir; o.DefaultPageSize = 2; o.MaxPageSize = 3; });
-        sc.AddKoanDataCore();
-        return sc.BuildServiceProvider();
+        return BuildServices(services =>
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("JsonDataOptions:DirectoryPath", dir) })
+                .Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            // Provide naming resolver needed by StorageNameRegistry for set-aware physical names
+            services.AddSingleton<Abstractions.Naming.IStorageNameResolver, Abstractions.Naming.DefaultStorageNameResolver>();
+            services.AddKoanCore();
+            services.AddJsonData<Todo, string>(o => { o.DirectoryPath = dir; o.DefaultPageSize = 2; o.MaxPageSize = 3; });
+            services.AddKoanDataCore();
+        });
     }
 
     [Fact]
     public async Task Linq_Filtering_Works()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
         // Seed
@@ -48,7 +52,7 @@ public class RepositoryTests
     public async Task Linq_Count_Is_Accurate()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
         // Seed 8 items, 5 match
@@ -65,7 +69,7 @@ public class RepositoryTests
     public async Task Linq_Paging_With_Options_Is_Enforced()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
         // Seed 10 matching items so multiple pages exist
@@ -84,7 +88,7 @@ public class RepositoryTests
     public async Task Linq_Cancellation_Is_Observed()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
         var linq = Assert.IsAssignableFrom<ILinqQueryRepository<Todo, string>>(repo);
 
@@ -114,7 +118,7 @@ public class RepositoryTests
     public async Task Instance_Save_With_Set_Routes_To_Set()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         // Ensure AppHost.Current is set so DataService() in AggregateExtensions can resolve
         Koan.Core.Hosting.App.AppHost.Current = sp;
 
@@ -143,7 +147,7 @@ public class RepositoryTests
     public async Task Crud_Works()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
         var todo = new Todo { Title = "one" };
@@ -166,7 +170,7 @@ public class RepositoryTests
     public async Task Batch_Works_And_Persists()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
         var a = new Todo { Title = "a" };
@@ -191,7 +195,7 @@ public class RepositoryTests
         r.Deleted.Should().Be(1);
 
         // ensure persisted by creating a new provider reading from disk
-        var sp2 = BuildServices(dir);
+        var sp2 = BuildJsonServices(dir);
         var repo2 = sp2.GetRequiredService<IDataRepository<Todo, string>>();
         var all = await repo2.QueryAsync(null);
         all.Count.Should().Be(2); // a, b remain
@@ -201,7 +205,7 @@ public class RepositoryTests
     public async Task Sets_Counts_Clear_Update_Isolation()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         // Set AppHost.Current so JSON repo can resolve set-aware physical names
         Koan.Core.Hosting.App.AppHost.Current = sp;
 
@@ -257,7 +261,7 @@ public class RepositoryTests
     public async Task Paging_Defaults_And_MaxPageSize_Are_Enforced()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
         // DefaultPageSize set to 2 in BuildServices; insert 10 items
@@ -281,7 +285,7 @@ public class RepositoryTests
     public async Task Instruction_EnsureCreated_Succeeds()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
         var exec = Assert.IsAssignableFrom<IInstructionExecutor<Todo>>(repo);
         var ok = await exec.ExecuteAsync<bool>(new Instruction(DataInstructions.EnsureCreated));
@@ -292,7 +296,7 @@ public class RepositoryTests
     public async Task Cancellation_Is_Observed_In_UpsertMany()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
         var repo = sp.GetRequiredService<IDataRepository<Todo, string>>();
 
         using var cts = new CancellationTokenSource();
@@ -305,7 +309,7 @@ public class RepositoryTests
     public async Task Health_Is_Healthy_When_Directory_Exists()
     {
         var dir = TempDir();
-        var sp = BuildServices(dir);
+        var sp = BuildJsonServices(dir);
 
         var hc = sp.GetServices<Koan.Core.IHealthContributor>().FirstOrDefault(h => h.Name == "data:json");
         hc.Should().NotBeNull();

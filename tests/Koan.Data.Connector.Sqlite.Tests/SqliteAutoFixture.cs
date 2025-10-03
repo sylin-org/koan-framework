@@ -1,5 +1,9 @@
+using System.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Koan.Core;
 using Koan.Data.Core;
 using Koan.Data.Relational.Tests;
 
@@ -26,7 +30,14 @@ public class SqliteAutoFixture : IRelationalTestFixture<SqliteSchemaGovernanceSh
             })
             .Build();
         var sc = new ServiceCollection();
+        sc.AddLogging(builder =>
+        {
+            builder.AddConsole();
+            builder.SetMinimumLevel(LogLevel.Debug);
+        });
+        sc.AddSingleton<IHostApplicationLifetime>(new StubHostApplicationLifetime());
         sc.AddSingleton<IConfiguration>(config);
+        sc.AddKoanCore();
         sc.AddSqliteAdapter(o =>
         {
             o.ConnectionString = cs;
@@ -48,6 +59,14 @@ public class SqliteAutoFixture : IRelationalTestFixture<SqliteSchemaGovernanceSh
             try { File.Delete(_dbFile); } catch { }
         }
         await Task.CompletedTask;
+    }
+
+    private class StubHostApplicationLifetime : IHostApplicationLifetime
+    {
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+        public CancellationToken ApplicationStopping => CancellationToken.None;
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+        public void StopApplication() { }
     }
 }
 

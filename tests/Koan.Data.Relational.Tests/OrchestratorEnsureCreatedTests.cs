@@ -5,11 +5,12 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Relational.Orchestration;
+using Koan.Testing;
 using Xunit;
 
 namespace Koan.Data.Relational.Tests;
 
-public class OrchestratorEnsureCreatedTests
+public class OrchestratorEnsureCreatedTests : KoanTestBase
 {
     public class Todo : IEntity<string>
     {
@@ -20,28 +21,49 @@ public class OrchestratorEnsureCreatedTests
         public int Priority { get; set; }
     }
 
-    private static (IRelationalSchemaOrchestrator orch, IServiceProvider sp) CreateSut(RelationalMaterializationOptions? opts = null)
+    private (IRelationalSchemaOrchestrator orch, IServiceProvider sp) CreateSut(RelationalMaterializationOptions? opts = null)
     {
-        var services = new ServiceCollection();
-        var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
-        services.AddSingleton<IConfiguration>(cfg);
-        services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddRelationalOrchestration();
-        if (opts is not null)
+        var sp = BuildServices(services =>
         {
-            services.Configure<RelationalMaterializationOptions>(o =>
+            var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
+
+            // Register stub adapter factory for schema-only tests
+            services.AddSingleton<IDataAdapterFactory>(new StubDataAdapterFactory());
+
+            services.AddRelationalOrchestration();
+            if (opts is not null)
             {
-                o.Materialization = opts.Materialization;
-                o.ProbeOnStartup = opts.ProbeOnStartup;
-                o.FailOnMismatch = opts.FailOnMismatch;
-                o.DdlPolicy = opts.DdlPolicy;
-                o.SchemaMatching = opts.SchemaMatching;
-                o.AllowProductionDdl = opts.AllowProductionDdl;
-            });
-        }
-        var sp = services.BuildServiceProvider();
+                services.Configure<RelationalMaterializationOptions>(o =>
+                {
+                    o.Materialization = opts.Materialization;
+                    o.ProbeOnStartup = opts.ProbeOnStartup;
+                    o.FailOnMismatch = opts.FailOnMismatch;
+                    o.DdlPolicy = opts.DdlPolicy;
+                    o.SchemaMatching = opts.SchemaMatching;
+                    o.AllowProductionDdl = opts.AllowProductionDdl;
+                });
+            }
+        });
         var orch = sp.GetRequiredService<IRelationalSchemaOrchestrator>();
         return (orch, sp);
+    }
+
+    /// <summary>
+    /// Stub adapter factory for schema-only orchestration tests.
+    /// Schema tests don't need actual data operations, just metadata resolution.
+    /// </summary>
+    private sealed class StubDataAdapterFactory : IDataAdapterFactory
+    {
+        public bool CanHandle(string provider) => provider == "test-stub";
+
+        public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
+            where TEntity : class, IEntity<TKey>
+            where TKey : notnull
+        {
+            throw new NotSupportedException("StubDataAdapterFactory is for schema tests only - data operations not supported");
+        }
     }
 
     [RelationalStorage(Shape = RelationalStorageShape.ComputedProjections)]

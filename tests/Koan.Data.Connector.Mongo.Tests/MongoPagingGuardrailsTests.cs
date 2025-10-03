@@ -23,6 +23,8 @@ public class MongoPagingGuardrailsTests : IClassFixture<MongoAutoFixture>
     public async Task Query_Should_Return_All_When_Unpaged()
     {
         if (_sp is null) return; // effectively skip when Mongo isn't available
+        TestHooks.ResetDataConfigs();
+        await TestMongoTeardown.DropDatabaseAsync(_sp);
         var repo = _sp.GetRequiredService<IDataService>().GetRepository<Todo, string>();
         // Seed 300 docs
         for (int i = 0; i < 300; i++)
@@ -38,6 +40,8 @@ public class MongoPagingGuardrailsTests : IClassFixture<MongoAutoFixture>
     public async Task LinqQuery_Should_Return_All_When_Unpaged()
     {
         if (_sp is null) return; // effectively skip
+        TestHooks.ResetDataConfigs();
+        await TestMongoTeardown.DropDatabaseAsync(_sp);
         var repo = (ILinqQueryRepository<Todo, string>)_sp.GetRequiredService<IDataService>().GetRepository<Todo, string>();
         // Seed 120 docs with same prefix
         for (int i = 0; i < 120; i++)

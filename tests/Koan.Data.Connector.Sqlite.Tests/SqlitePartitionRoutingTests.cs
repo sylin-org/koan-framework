@@ -4,11 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core;
+using Koan.Testing;
 using Xunit;
 
 namespace Koan.Data.Connector.Sqlite.Tests;
 
-public class SqlitePartitionRoutingTests
+public class SqlitePartitionRoutingTests : KoanTestBase
 {
     public class Todo : IEntity<string>
     {
@@ -17,20 +18,21 @@ public class SqlitePartitionRoutingTests
         public string Title { get; set; } = string.Empty;
     }
 
-    private static IServiceProvider BuildServices(string file)
+    private IServiceProvider BuildSqliteServices(string file)
     {
-        var sc = new ServiceCollection();
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new[] {
-                new KeyValuePair<string,string?>("Koan:Data:Sqlite:ConnectionString", $"Data Source={file}"),
-                new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite")
-            })
-            .Build();
-        sc.AddSingleton<IConfiguration>(cfg);
-        sc.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={file}");
-        sc.AddKoanDataCore();
-        sc.AddSingleton<IDataService, DataService>();
-        return sc.BuildServiceProvider();
+        return BuildServices(services =>
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[] {
+                    new KeyValuePair<string,string?>("Koan:Data:Sqlite:ConnectionString", $"Data Source={file}"),
+                    new KeyValuePair<string,string?>("Koan_DATA_PROVIDER","sqlite")
+                })
+                .Build();
+            services.AddSingleton<IConfiguration>(cfg);
+            services.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={file}");
+            services.AddKoanDataCore();
+            services.AddSingleton<IDataService, DataService>();
+        });
     }
 
     private static string TempFile()
@@ -44,7 +46,7 @@ public class SqlitePartitionRoutingTests
     public async Task Set_Isolation_Root_And_Backup()
     {
         var file = TempFile();
-        var sp = BuildServices(file);
+        var sp = BuildSqliteServices(file);
         var data = sp.GetRequiredService<IDataService>();
         var repo = data.GetRepository<Todo, string>();
 
