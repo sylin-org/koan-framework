@@ -11,7 +11,7 @@ namespace Koan.Data.Core.Metadata;
 /// Performs reflection scan once per entity type and compiles fast setter delegate.
 /// Cached at RepositoryFacade construction for hot path optimization.
 /// </summary>
-internal sealed class TimestampPropertyBag
+public sealed class TimestampPropertyBag
 {
     /// <summary>
     /// Indicates whether this entity type has a [Timestamp] property.

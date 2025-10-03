@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Data.Core.Metadata;
 using Koan.Jobs.Model;
 using Koan.Jobs.Support;
 
@@ -14,14 +15,20 @@ internal sealed class InMemoryJobStore : IJobStore
     private readonly ConcurrentDictionary<string, StoredJob> _jobs = new();
     private readonly ConcurrentDictionary<string, List<JobExecution>> _executions = new();
     private readonly JobIndexCache _index;
+    private readonly TimestampPropertyBag _timestampBag;
 
     public InMemoryJobStore(JobIndexCache index)
     {
         _index = index;
+        _timestampBag = new TimestampPropertyBag(typeof(Job));
     }
 
     public Task<Job> CreateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
+        // Auto-update [Timestamp] field if present
+        if (_timestampBag.HasTimestamp)
+            _timestampBag.UpdateTimestamp(job);
+
         var stored = _jobs.GetOrAdd(job.Id, _ => new StoredJob(job));
         stored.Update(job);
         _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
@@ -35,6 +42,10 @@ internal sealed class InMemoryJobStore : IJobStore
 
     public Task<Job> UpdateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
+        // Auto-update [Timestamp] field if present
+        if (_timestampBag.HasTimestamp)
+            _timestampBag.UpdateTimestamp(job);
+
         var stored = _jobs.GetOrAdd(job.Id, _ => new StoredJob(job));
         stored.Update(job);
         _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
