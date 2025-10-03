@@ -9,6 +9,7 @@ using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;
+using Koan.AI.Contracts.Sources;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -117,7 +118,8 @@ public sealed class DefaultAiRouterTests
     private static DefaultAiRouter CreateRouter(IAiAdapterRegistry registry, string defaultPolicy)
     {
         var options = new StaticOptionsMonitor(new AiOptions { DefaultPolicy = defaultPolicy });
-        return new DefaultAiRouter(registry, options, NullLogger<DefaultAiRouter>.Instance);
+        var sourceRegistry = new EmptySourceRegistry();
+        return new DefaultAiRouter(registry, sourceRegistry, options, NullLogger<DefaultAiRouter>.Instance);
     }
 
     [AiAdapterDescriptor(priority: 1)]
@@ -236,5 +238,20 @@ public sealed class DefaultAiRouterTests
             public static readonly NullDisposable Instance = new();
             public void Dispose() { }
         }
+    }
+
+    private sealed class EmptySourceRegistry : IAiSourceRegistry
+    {
+        public void RegisterSource(AiSourceDefinition source) { }
+        public AiSourceDefinition? GetSource(string name) => null;
+        public bool TryGetSource(string name, out AiSourceDefinition? source)
+        {
+            source = null;
+            return false;
+        }
+        public IReadOnlyCollection<string> GetSourceNames() => Array.Empty<string>();
+        public IReadOnlyCollection<AiSourceDefinition> GetAllSources() => Array.Empty<AiSourceDefinition>();
+        public bool HasSource(string name) => false;
+        public IReadOnlyCollection<AiSourceDefinition> GetSourcesWithCapability(string capabilityName) => Array.Empty<AiSourceDefinition>();
     }
 }
